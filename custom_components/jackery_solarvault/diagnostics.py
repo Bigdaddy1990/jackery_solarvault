@@ -19,6 +19,7 @@ REDACT = {
     "bluetoothKey", "deviceSecret", "randomSalt",
     "phone", "mobPhone", "email", "bindEmail",
     "avatar", "appUserName", "nickname",
+    "latitude", "longitude",
 }
 
 
@@ -51,6 +52,18 @@ async def async_get_config_entry_diagnostics(
         "price_response": async_redact_data(
             coordinator.api.last_price_response or {}, REDACT
         ),
+        "device_statistic_responses": {
+            dev_id: async_redact_data(resp, REDACT)
+            for dev_id, resp in coordinator.api.last_device_statistic_responses.items()
+        },
+        "ota_responses": {
+            sn_or_id: async_redact_data(resp, REDACT)
+            for sn_or_id, resp in coordinator.api.last_ota_responses.items()
+        },
+        "location_responses": {
+            dev_id: async_redact_data(resp, REDACT)
+            for dev_id, resp in coordinator.api.last_location_responses.items()
+        },
     }
 
     return {

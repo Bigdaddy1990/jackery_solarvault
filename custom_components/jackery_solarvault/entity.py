@@ -60,6 +60,26 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         return self._payload.get("alarm")
 
     @property
+    def _device_statistic(self) -> dict[str, Any]:
+        return self._payload.get("device_statistic") or {}
+
+    @property
+    def _ota(self) -> dict[str, Any]:
+        return self._payload.get("ota") or {}
+
+    @property
+    def _location(self) -> dict[str, Any]:
+        return self._payload.get("location") or {}
+
+    @property
+    def _home_trends(self) -> dict[str, Any]:
+        return self._payload.get("home_trends") or {}
+
+    @property
+    def _battery_trends(self) -> dict[str, Any]:
+        return self._payload.get("battery_trends") or {}
+
+    @property
     def device_info(self) -> DeviceInfo:
         sys_name = self._system.get("deviceName")   # e.g. "SolarVault 3 Pro Max"
         disc_name = self._discovery.get("deviceName")
@@ -71,7 +91,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or self._device_meta.get("modelName")
             or "SolarVault"
         )
-        sw_version = None
+        sw_version = self._ota.get("currentVersion") or None
         sn = (
             self._device_meta.get("deviceSn")
             or self._discovery.get("deviceSn")

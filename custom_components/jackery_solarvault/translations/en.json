@@ -78,6 +78,17 @@
       "grid_standard": { "name": "Grid standard" },
       "country_code": { "name": "Country code" },
       "timezone": { "name": "Timezone" },
+      "lifetime_pv_energy": { "name": "Lifetime PV energy" },
+      "lifetime_battery_charge": { "name": "Lifetime battery charge" },
+      "lifetime_battery_discharge": { "name": "Lifetime battery discharge" },
+      "lifetime_grid_import": { "name": "Lifetime grid import" },
+      "lifetime_grid_export": { "name": "Lifetime grid export" },
+      "lifetime_ongrid_to_battery": { "name": "Lifetime grid→battery" },
+      "lifetime_pv_to_battery": { "name": "Lifetime PV→battery" },
+      "lifetime_battery_to_grid": { "name": "Lifetime battery→grid" },
+      "firmware_version": { "name": "Firmware version" },
+      "latitude": { "name": "Latitude" },
+      "longitude": { "name": "Longitude" },
       "raw_properties": { "name": "Raw properties" }
     },
     "binary_sensor": {
@@ -85,6 +96,9 @@
       "eps_enabled": { "name": "EPS enabled" },
       "eps_active": { "name": "EPS active" },
       "eth_connected": { "name": "Ethernet connected" }
+    },
+    "text": {
+      "system_name": { "name": "System name" }
     }
   }
 }

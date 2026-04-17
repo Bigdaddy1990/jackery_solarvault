@@ -1,7 +1,7 @@
 # Jackery SolarVault — Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
-[![version](https://img.shields.io/badge/version-1.1.0-blue.svg)]()
+[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)]()
 
 HACS-Integration für den **Jackery SolarVault 3 Pro Max** (und verwandte Modelle der SolarVault-3-Serie). Kommuniziert mit der Jackery-Cloud via `iot.jackeryapp.com` und liefert ~30 Sensoren für Echtzeit- und Energie-Daten.
 
@@ -15,27 +15,37 @@ Alle Pfade unter `https://iot.jackeryapp.com`:
 
 | Endpoint | Parameter | Zweck |
 |---|---|---|
-| `POST /v1/auth/login` | AES+RSA-encrypted body | Login (JWT-Token) |
+| `POST /v1/auth/login` | form-urlencoded, AES+RSA | Login (JWT-Token) |
 | `GET /v1/device/system/list` | — | System- & Geräte-Discovery |
 | `GET /v1/device/property` | `deviceId` | Echtzeit-Properties |
+| `GET /v1/device/stat/deviceStatistic` | `deviceId` | Lifetime-Energien |
 | `GET /v1/api/alarm` | `systemId` | Fehler-/Alarm-Status |
 | `GET /v1/device/stat/systemStatistic` | `systemId` | Tages-/Gesamt-KPIs |
-| `GET /v1/device/stat/sys/pv/trends` | `systemId&beginDate&endDate&dateType` | Historische Kurven |
+| `GET /v1/device/stat/sys/pv/trends` | `systemId&beginDate&endDate&dateType` | PV-Historie |
+| `GET /v1/device/stat/sys/home/trends` | `systemId&beginDate&endDate&dateType` | Home-Historie |
+| `GET /v1/device/stat/sys/battery/trends` | `systemId&beginDate&endDate&dateType` | Batterie-Historie |
 | `GET /v1/device/dynamic/powerPriceConfig` | `systemId` | Strompreis-Config |
+| `GET /v1/device/ota/list` | `deviceSnList` | Firmware-Version |
+| `GET /v1/device/location` | `deviceId` | GPS-Koordinaten |
+| **`PUT /v1/device/system/name`** | JSON Body | **System umbenennen** (Write!) |
 
-## Sensoren (≈ 45)
+## Sensoren (≈ 55)
 
-**Echtzeit-Leistung**: SOC, Zellentemperatur, Batterie-Lade-/Entladeleistung, **Batterie-Netto** (signiert), PV gesamt, PV-Kanäle 1–4 einzeln, Netzbezug, Netzeinspeisung, **Netz-Netto** (signiert, +Import/−Export), EPS-Ein/Aus, Stack-Ein/Aus
+**Echtzeit-Leistung**: SOC, Zellentemperatur, Batterie-Lade-/Entladeleistung, **Batterie-Netto** (signiert), PV gesamt, PV-Kanäle 1–4 einzeln, Netzbezug, Netzeinspeisung, **Netz-Netto** (signiert), EPS-Ein/Aus, Stack-Ein/Aus
 
-**Tages-/Gesamt-Energie** (Energy-Dashboard-tauglich): Heute Verbrauch, Heute Batterie-Laden, Heute Batterie-Entladen, Heute PV-Ertrag, **PV heute** (aus pv/trends), Gesamt PV-Ertrag, Gesamt Ersparnis (€), Gesamt CO₂ eingespart (kg), Strompreis (€/kWh)
+**Lifetime-Energie** 🆕 (aus `deviceStatistic`, perfekt für Energy-Dashboard): PV gesamt, Batterie-Ladung gesamt, Batterie-Entladung gesamt, Netzbezug gesamt, Netzeinspeisung gesamt, Netz→Batterie gesamt, PV→Batterie gesamt, Batterie→Netz gesamt
 
-**Alarme & Zeitstempel**: Aktive Alarme (Count + Attribute), Zuletzt online, Zuletzt offline, Letzte Aktualisierung, Aktivierungsdatum
+**Tages-/Gesamt-Energie**: Heute Verbrauch, Heute Batterie-Laden, Heute Batterie-Entladen, Heute PV-Ertrag, PV heute (Trends), Gesamt PV-Ertrag, Gesamt Ersparnis (€), Gesamt CO₂ eingespart (kg), Strompreis (€/kWh)
 
-**System-Meta**: Netz-Standard, Ländercode, Zeitzone
+**Alarme & Zeitstempel**: Aktive Alarme (Count + Details), Zuletzt online, Zuletzt offline, Letzte Aktualisierung, Aktivierungsdatum
 
-**Diagnose**: WLAN-Signal (dBm), WLAN-Name, IP-Adresse, Ladelimit, Entladelimit, Max. Ausgangsleistung, Max. Netzleistung, Max. Wechselrichterleistung, Anzahl Batterien, Batteriezustand, Auto-Standby-Modus, Rohdaten-Dump
+**System-Meta & Diagnose**: Netz-Standard, Ländercode, Zeitzone, WLAN-Signal, WLAN-Name, IP-Adresse, Ladelimit, Entladelimit, Max. Ausgangsleistung/Netzleistung/Wechselrichter, Batterieanzahl/-zustand, Auto-Standby, **Firmware-Version** 🆕, **GPS Lat/Lng** 🆕 (default disabled), Rohdaten-Dump
 
 **Binärsensoren**: Online, EPS aktiviert, EPS aktiv, Ethernet verbunden
+
+**Schreib-Entities** 🆕:
+- **Text-Entity** "Systemname" — Gerätename direkt in HA bearbeiten
+- **Service** `jackery_solarvault.rename_system` — für Automationen und Skripte
 
 ## Installation
 
@@ -128,7 +138,7 @@ logger:
 - Home Assistant 2024.4.0 oder neuer
 - Jackery-Cloud-Account
 - SolarVault online (WLAN oder Ethernet)
-- App-Familie: **`com.hbxn.jackery`** (Standard-Jackery-App, blau)
+- App-Familie: **`com.hbxn.jackery`** (Standard-Jackery-App)
 
 ## Abhängigkeiten
 

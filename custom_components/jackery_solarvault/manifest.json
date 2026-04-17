@@ -1,13 +1,13 @@
 {
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "config_flow": true,
-  "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
-  "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
+  "documentation": "https://github.com/bigdaddy1990/jackery_solarvault",
+  "issue_tracker": "https://github.com/bigdaddy1990/jackery_solarvault/issues",
   "iot_class": "cloud_polling",
   "integration_type": "hub",
-  "codeowners": ["Bigdaddy1990"],
+  "codeowners": ["@bigdaddy1990"],
   "requirements": [],
   "dependencies": [],
   "after_dependencies": []

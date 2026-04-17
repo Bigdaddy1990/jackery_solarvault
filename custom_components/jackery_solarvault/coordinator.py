@@ -150,33 +150,47 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             for per_system in self._slow_cache.values():
                 per_system.pop("statistic", None)
                 per_system.pop("pv_trends", None)
+                per_system.pop("home_trends", None)
+                per_system.pop("battery_trends", None)
         self._cached_date = today
 
-        async def _get_with_ttl(
-            sys_id: str,
+        async def _get_with_ttl_for(
+            cache: dict[str, tuple[float, Any]],
             cache_key: str,
             ttl_sec: int,
-            fetcher,
+            fetcher,  # zero-arg async callable
             default: Any,
         ) -> Any:
-            """Return cached value if fresh enough, otherwise refresh."""
-            per_system = self._slow_cache.setdefault(sys_id, {})
+            """Generic TTL cache helper operating on any dict."""
             now = time.monotonic()
-            entry = per_system.get(cache_key)
+            entry = cache.get(cache_key)
             if entry is not None:
                 last_ts, last_value = entry
                 if now - last_ts < ttl_sec:
                     return last_value
             try:
-                value = await fetcher(sys_id)
+                value = await fetcher()
             except JackeryError as err:
-                _LOGGER.debug("%s failed for %s: %s", cache_key, sys_id, err)
-                # Keep serving the stale value if we have one
+                _LOGGER.debug("%s failed: %s", cache_key, err)
                 if entry is not None:
                     return entry[1]
                 return default
-            per_system[cache_key] = (now, value)
+            cache[cache_key] = (now, value)
             return value
+
+        async def _get_with_ttl(
+            sys_id: str,
+            cache_key: str,
+            ttl_sec: int,
+            fetcher,  # callable(sys_id) -> awaitable
+            default: Any,
+        ) -> Any:
+            """System-scoped TTL cache wrapper."""
+            per_system = self._slow_cache.setdefault(sys_id, {})
+            return await _get_with_ttl_for(
+                per_system, cache_key, ttl_sec,
+                lambda: fetcher(sys_id), default,
+            )
 
         async def _fetch_system(sys_id: str) -> dict[str, Any]:
             if sys_id in system_cache:
@@ -194,6 +208,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     sys_id, "pv_trends", SLOW_METRICS_INTERVAL_SEC,
                     self.api.async_get_pv_trends, {},
                 ),
+                "home_trends": await _get_with_ttl(
+                    sys_id, "home_trends", SLOW_METRICS_INTERVAL_SEC,
+                    self.api.async_get_home_trends, {},
+                ),
+                "battery_trends": await _get_with_ttl(
+                    sys_id, "battery_trends", SLOW_METRICS_INTERVAL_SEC,
+                    self.api.async_get_battery_trends, {},
+                ),
                 "price": await _get_with_ttl(
                     sys_id, "price", PRICE_CONFIG_INTERVAL_SEC,
                     self.api.async_get_power_price, {},
@@ -201,6 +223,35 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             }
             system_cache[sys_id] = bundle
             return bundle
+
+        async def _fetch_device_extras(
+            dev_id: str, dev_sn: str | None
+        ) -> dict[str, Any]:
+            """Device-level slow metrics (deviceStatistic, OTA, location).
+
+            deviceStatistic: changes on ~5 min boundary, like system stats.
+            OTA + location: change practically never → hourly TTL.
+            """
+            per_dev_key = f"dev:{dev_id}"
+            per_dev = self._slow_cache.setdefault(per_dev_key, {})
+
+            out: dict[str, Any] = {}
+            out["device_statistic"] = await _get_with_ttl_for(
+                per_dev, "device_statistic", SLOW_METRICS_INTERVAL_SEC,
+                lambda: self.api.async_get_device_statistic(dev_id), {},
+            )
+            out["location"] = await _get_with_ttl_for(
+                per_dev, "location", PRICE_CONFIG_INTERVAL_SEC,
+                lambda: self.api.async_get_location(dev_id), {},
+            )
+            if dev_sn:
+                out["ota"] = await _get_with_ttl_for(
+                    per_dev, "ota", PRICE_CONFIG_INTERVAL_SEC,
+                    lambda: self.api.async_get_ota_info(dev_sn), {},
+                )
+            else:
+                out["ota"] = {}
+            return out
 
         result: dict[str, dict[str, Any]] = {}
         for dev_id, idx in self._device_index.items():
@@ -217,11 +268,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     result[dev_id] = self.data[dev_id]
                 continue
 
+            # Pull SN from either the fresh property payload or the discovery
+            # metadata — needed for the OTA endpoint (which keys on SN).
+            dev_sn = (
+                (payload.get("device") or {}).get("deviceSn")
+                or (idx.get("device_meta") or {}).get("deviceSn")
+            )
+            extras = await _fetch_device_extras(dev_id, dev_sn)
+
             entry: dict[str, Any] = {
                 "device": payload.get("device") or {},
                 "properties": payload.get("properties") or {},
                 "system": idx.get("system_meta") or {},
                 "discovery": idx.get("device_meta") or {},
+                "device_statistic": extras.get("device_statistic") or {},
+                "ota": extras.get("ota") or {},
+                "location": extras.get("location") or {},
             }
             sys_id = idx.get("systemId")
             if sys_id:

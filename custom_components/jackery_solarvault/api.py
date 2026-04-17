@@ -36,12 +36,17 @@ from .const import (
     APP_VERSION,
     APP_VERSION_CODE,
     BASE_URL,
+    BATTERY_TRENDS_PATH,
     CODE_OK,
     CODE_TOKEN_EXPIRED,
     DEVICE_LIST_PATH,
     DEVICE_MODEL_HEADER,
     DEVICE_PROPERTY_PATH,
+    DEVICE_STATISTIC_PATH,
+    HOME_TRENDS_PATH,
+    LOCATION_PATH,
     LOGIN_PATH,
+    OTA_LIST_PATH,
     PLATFORM_HEADER,
     POWER_PRICE_PATH,
     PV_TRENDS_PATH,
@@ -49,6 +54,7 @@ from .const import (
     RSA_PUBLIC_KEY_B64,
     SYS_VERSION,
     SYSTEM_LIST_PATH,
+    SYSTEM_NAME_PATH,
     SYSTEM_STATISTIC_PATH,
     USER_AGENT,
 )
@@ -116,6 +122,9 @@ class JackeryApi:
         self.last_alarm_response: dict[str, Any] | None = None
         self.last_statistic_response: dict[str, Any] | None = None
         self.last_price_response: dict[str, Any] | None = None
+        self.last_device_statistic_responses: dict[str, dict[str, Any]] = {}
+        self.last_ota_responses: dict[str, dict[str, Any]] = {}
+        self.last_location_responses: dict[str, dict[str, Any]] = {}
 
     # --- headers ------------------------------------------------------------
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
@@ -157,14 +166,16 @@ class JackeryApi:
         ).decode("ascii")
 
         url = f"{BASE_URL}{LOGIN_PATH}"
-        params = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
-        form = aiohttp.FormData()
-        form.add_field("file", b"", filename="", content_type="")
+
+        # The Android app sends login params as form-urlencoded body, not as
+        # query string. This matches the captured traffic byte-for-byte.
+        headers = self._headers()
+        headers["content-type"] = "application/x-www-form-urlencoded"
+        form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
         try:
             async with self._session.post(
-                url, params=params, headers=self._headers(),
-                data=form, timeout=30,
+                url, data=form_body, headers=headers, timeout=30,
             ) as resp:
                 if resp.status != 200:
                     raise JackeryApiError(f"Login HTTP {resp.status}")
@@ -318,6 +329,130 @@ class JackeryApi:
         )
         self.last_price_response = data
         return data.get("data") or {}
+
+    # --- v1.2.0 additions --------------------------------------------------
+    async def async_get_device_statistic(self, device_id: str | int) -> dict:
+        """GET /v1/device/stat/deviceStatistic — lifetime energy totals.
+
+        Response keys (all strings in kWh):
+            pvEgy, inEpsEgy, ongridOtBatEgy, pvOtBatEgy, inOngridEgy,
+            outOngridEgy, batOtGridEgy, outEpsEgy, batDisChgEgy,
+            acOtBatEgy, batOtAcEgy, batChgEgy
+        """
+        data = await self._get_json(
+            DEVICE_STATISTIC_PATH, params={"deviceId": str(device_id)}
+        )
+        self.last_device_statistic_responses[str(device_id)] = data
+        return data.get("data") or {}
+
+    async def async_get_home_trends(
+        self,
+        system_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict:
+        """GET /v1/device/stat/sys/home/trends — home consumption breakdown."""
+        today = date.today().isoformat()
+        params = {
+            "systemId": str(system_id),
+            "dateType": date_type,
+            "beginDate": begin_date or today,
+            "endDate": end_date or today,
+        }
+        data = await self._get_json(HOME_TRENDS_PATH, params=params)
+        return data.get("data") or {}
+
+    async def async_get_battery_trends(
+        self,
+        system_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict:
+        """GET /v1/device/stat/sys/battery/trends — battery charge/discharge history."""
+        today = date.today().isoformat()
+        params = {
+            "systemId": str(system_id),
+            "dateType": date_type,
+            "beginDate": begin_date or today,
+            "endDate": end_date or today,
+        }
+        data = await self._get_json(BATTERY_TRENDS_PATH, params=params)
+        return data.get("data") or {}
+
+    async def async_get_ota_info(self, device_sn: str) -> dict:
+        """GET /v1/device/ota/list — firmware version + available updates."""
+        data = await self._get_json(OTA_LIST_PATH, params={"deviceSnList": device_sn})
+        self.last_ota_responses[device_sn] = data
+        payload = data.get("data")
+        if isinstance(payload, list) and payload:
+            return payload[0]
+        return {}
+
+    async def async_get_location(self, device_id: str | int) -> dict:
+        """GET /v1/device/location — GPS coordinates set by the user."""
+        data = await self._get_json(
+            LOCATION_PATH, params={"deviceId": str(device_id)}
+        )
+        self.last_location_responses[str(device_id)] = data
+        return data.get("data") or {}
+
+    # --- writers (v1.2.0) ---------------------------------------------------
+    async def _put_json(self, path: str, payload: dict) -> dict:
+        """Generic JSON PUT helper with token re-login on expiry."""
+        await self._ensure_token()
+        url = f"{BASE_URL}{path}"
+        headers = self._headers(with_token=True)
+        headers["content-type"] = "application/json; charset=utf-8"
+
+        async def _do() -> tuple[int, dict]:
+            async with self._session.put(
+                url, json=payload, headers=headers, timeout=30,
+            ) as resp:
+                status = resp.status
+                try:
+                    body = await resp.json(content_type=None)
+                except Exception:
+                    body = {"_raw_text": (await resp.text())[:500]}
+                return status, body
+
+        status, data = await _do()
+        if (
+            status == 200
+            and isinstance(data, dict)
+            and data.get("code") == CODE_TOKEN_EXPIRED
+        ):
+            _LOGGER.info("Jackery token expired — re-login for PUT %s", path)
+            self._token = None
+            await self._ensure_token()
+            status, data = await _do()
+
+        if status != 200:
+            raise JackeryApiError(f"PUT {path} HTTP {status}")
+        if isinstance(data, dict) and data.get("code") not in (CODE_OK, None):
+            raise JackeryApiError(
+                f"PUT {path} code={data.get('code')} msg={data.get('msg')}"
+            )
+        return data
+
+    async def async_set_system_name(
+        self, system_id: str | int, system_name: str
+    ) -> bool:
+        """PUT /v1/device/system/name — rename a system.
+
+        Captured body: {"systemName": "SolarVault", "id": "<systemId>"}
+        Response payload is a boolean: `data: true`.
+        """
+        if not system_name or not system_name.strip():
+            raise JackeryApiError("system_name must be a non-empty string")
+        data = await self._put_json(
+            SYSTEM_NAME_PATH,
+            {"systemName": system_name.strip(), "id": str(system_id)},
+        )
+        return bool(data.get("data"))
 
     # --- legacy fallback ----------------------------------------------------
     async def async_list_devices_legacy(self) -> list[dict[str, Any]]:

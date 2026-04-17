@@ -1,0 +1,23 @@
+rename_system:
+  name: Rename SolarVault system
+  description: >
+    Rename a Jackery SolarVault system via the Jackery cloud API
+    (PUT /v1/device/system/name). Affects the label shown in the Jackery
+    app and the Home Assistant device name.
+  fields:
+    system_id:
+      name: System ID
+      description: >
+        The numeric system ID (visible in diagnostics under
+        raw_api.system_list_response.data[].id).
+      required: true
+      example: "595364183558991872"
+      selector:
+        text:
+    new_name:
+      name: New name
+      description: The new display name (1–64 characters).
+      required: true
+      example: "Balkonkraftwerk Süd"
+      selector:
+        text:

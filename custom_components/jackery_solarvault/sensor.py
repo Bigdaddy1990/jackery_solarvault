@@ -430,6 +430,93 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         icon="mdi:currency-eur",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+
+    # --- Lifetime energy totals from /v1/device/stat/deviceStatistic -----
+    # All values are cumulative kWh strings that never reset. Perfect as
+    # TOTAL_INCREASING long-term stats (Energy Dashboard).
+    JackeryStatSensorDescription(
+        key="lifetime_pv_energy",
+        translation_key="lifetime_pv_energy",
+        stat_key="pvEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_battery_charge",
+        translation_key="lifetime_battery_charge",
+        stat_key="batChgEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_battery_discharge",
+        translation_key="lifetime_battery_discharge",
+        stat_key="batDisChgEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_grid_import",
+        translation_key="lifetime_grid_import",
+        stat_key="inOngridEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_grid_export",
+        translation_key="lifetime_grid_export",
+        stat_key="outOngridEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_ongrid_to_battery",
+        translation_key="lifetime_ongrid_to_battery",
+        stat_key="ongridOtBatEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_pv_to_battery",
+        translation_key="lifetime_pv_to_battery",
+        stat_key="pvOtBatEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
+    ),
+    JackeryStatSensorDescription(
+        key="lifetime_battery_to_grid",
+        translation_key="lifetime_battery_to_grid",
+        stat_key="batOtGridEgy",
+        section="device_statistic",
+        transform=_to_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
+    ),
 )
 
 
@@ -456,9 +543,14 @@ async def async_setup_entry(
             if desc.getter(props) is not None:
                 entities.append(JackerySensor(coordinator, dev_id, desc))
 
-        # Statistic / price sensors
+        # Statistic / price / device_statistic sensors
         for stat_desc in STAT_DESCRIPTIONS:
-            source = stat if stat_desc.section == "statistic" else price
+            if stat_desc.section == "price":
+                source = price
+            elif stat_desc.section == "device_statistic":
+                source = payload.get("device_statistic") or {}
+            else:
+                source = stat
             if stat_desc.stat_key in source:
                 entities.append(JackeryStatSensor(coordinator, dev_id, stat_desc))
 
@@ -544,6 +636,25 @@ async def async_setup_entry(
         if "totalSolarEnergy" in trends or "totalSolarRevenue" in trends:
             entities.append(JackeryPvTrendsTodaySensor(coordinator, dev_id))
 
+        # Firmware version (from /v1/device/ota/list)
+        if (payload.get("ota") or {}).get("currentVersion"):
+            entities.append(JackeryFirmwareSensor(coordinator, dev_id))
+
+        # GPS coordinates (from /v1/device/location). Default disabled
+        # for privacy; user can enable them explicitly if desired.
+        loc = payload.get("location") or {}
+        if "latitude" in loc and "longitude" in loc:
+            entities.append(
+                JackeryLocationSensor(
+                    coordinator, dev_id, key="latitude", axis="latitude",
+                )
+            )
+            entities.append(
+                JackeryLocationSensor(
+                    coordinator, dev_id, key="longitude", axis="longitude",
+                )
+            )
+
         # Raw diagnostic dump
         entities.append(JackeryRawPropertiesSensor(coordinator, dev_id))
 
@@ -589,8 +700,11 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
-        if self.entity_description.section == "price":
+        section = self.entity_description.section
+        if section == "price":
             source = self._price
+        elif section == "device_statistic":
+            source = self._device_statistic
         else:
             source = self._statistic
         raw = source.get(self.entity_description.stat_key)
@@ -824,3 +938,73 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
     @property
     def native_value(self) -> Any:
         return self._system.get(self._source_key)
+
+
+# ---------------------------------------------------------------------------
+# Firmware + location (v1.2.0)
+# ---------------------------------------------------------------------------
+class JackeryFirmwareSensor(JackeryEntity, SensorEntity):
+    """Current firmware version with update info as attributes."""
+
+    _attr_translation_key = "firmware_version"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:chip"
+
+    def __init__(
+        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+    ) -> None:
+        super().__init__(coordinator, device_id, "firmware_version")
+
+    @property
+    def native_value(self) -> str | None:
+        return self._ota.get("currentVersion")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        ota = self._ota
+        attrs: dict[str, Any] = {}
+        # Surface only fields that are actually populated (many are null)
+        for key in (
+            "updateStatus", "targetVersion", "targetModuleVersion",
+            "updateContent", "upgradeType",
+        ):
+            val = ota.get(key)
+            if val is not None:
+                attrs[key] = val
+        return attrs
+
+
+class JackeryLocationSensor(JackeryEntity, SensorEntity):
+    """Single axis of the configured GPS location (lat or lng).
+
+    Disabled by default for privacy reasons; the coordinates come from
+    whatever the user set in the Jackery app during device commissioning.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        key: str,
+        axis: str,
+    ) -> None:
+        super().__init__(coordinator, device_id, key)
+        self._axis = axis
+        self._attr_translation_key = key
+        self._attr_icon = (
+            "mdi:latitude" if axis == "latitude" else "mdi:longitude"
+        )
+        self._attr_native_unit_of_measurement = "°"
+
+    @property
+    def native_value(self) -> float | None:
+        val = self._location.get(self._axis)
+        try:
+            return float(val) if val is not None else None
+        except (TypeError, ValueError):
+            return None
