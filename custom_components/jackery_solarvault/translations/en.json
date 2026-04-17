@@ -1,0 +1,90 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Jackery SolarVault",
+        "description": "Enter your Jackery cloud credentials. Optionally specify a device ID directly if auto-discovery fails (from `device.id` in API responses).\n\n⚠️ Jackery enforces a single active session per account. Create a secondary account and share devices via QR-code if you also want to use the mobile app concurrently.",
+        "data": {
+          "username": "Email",
+          "password": "Password",
+          "device_id": "Device ID (optional)",
+          "system_id": "System ID (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not connect to iot.jackeryapp.com."
+    },
+    "abort": {
+      "already_configured": "This Jackery account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Jackery options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_soc": { "name": "Battery" },
+      "battery_soc_internal": { "name": "Battery (internal)" },
+      "cell_temperature": { "name": "Cell temperature" },
+      "battery_charge_power": { "name": "Battery charge power" },
+      "battery_discharge_power": { "name": "Battery discharge power" },
+      "pv_power_total": { "name": "PV power total" },
+      "pv1_power": { "name": "PV channel 1" },
+      "pv2_power": { "name": "PV channel 2" },
+      "pv3_power": { "name": "PV channel 3" },
+      "pv4_power": { "name": "PV channel 4" },
+      "grid_in_power": { "name": "Grid import" },
+      "grid_out_power": { "name": "Grid export" },
+      "eps_in_power": { "name": "EPS input power" },
+      "eps_out_power": { "name": "EPS output power" },
+      "stack_in_power": { "name": "Stack input" },
+      "stack_out_power": { "name": "Stack output" },
+      "wifi_signal": { "name": "WiFi signal" },
+      "wifi_name": { "name": "WiFi name" },
+      "wifi_ip": { "name": "IP address" },
+      "soc_charge_limit": { "name": "Charge limit" },
+      "soc_discharge_limit": { "name": "Discharge limit" },
+      "max_output_power": { "name": "Max output power" },
+      "max_grid_power": { "name": "Max grid power (standard)" },
+      "max_inverter_power": { "name": "Max inverter power" },
+      "battery_count": { "name": "Battery count" },
+      "battery_state": { "name": "Battery state" },
+      "auto_standby": { "name": "Auto standby mode" },
+      "today_load": { "name": "Today load" },
+      "today_battery_charge": { "name": "Today battery charge" },
+      "today_battery_discharge": { "name": "Today battery discharge" },
+      "today_generation": { "name": "Today PV generation" },
+      "total_generation": { "name": "Total PV generation" },
+      "total_revenue": { "name": "Total revenue" },
+      "total_carbon_saved": { "name": "Total CO₂ saved" },
+      "power_price": { "name": "Power price" },
+      "battery_net_power": { "name": "Battery net power" },
+      "grid_net_power": { "name": "Grid net power" },
+      "alarm_count": { "name": "Active alarms" },
+      "pv_today_energy": { "name": "PV today" },
+      "last_online": { "name": "Last online" },
+      "last_offline": { "name": "Last offline" },
+      "last_update": { "name": "Last update" },
+      "activation_date": { "name": "Activation date" },
+      "grid_standard": { "name": "Grid standard" },
+      "country_code": { "name": "Country code" },
+      "timezone": { "name": "Timezone" },
+      "raw_properties": { "name": "Raw properties" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" },
+      "eps_enabled": { "name": "EPS enabled" },
+      "eps_active": { "name": "EPS active" },
+      "eth_connected": { "name": "Ethernet connected" }
+    }
+  }
+}
