@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Jackery SolarVault",
+        "description": "Enter your Jackery cloud credentials. Optionally specify a device ID directly if auto-discovery fails (from `device.id` in API responses).\n\n⚠️ Jackery enforces a single active session per account.",
+        "data": {
+          "username": "Email",
+          "password": "Password",
+          "device_id": "Device ID (optional)",
+          "system_id": "System ID (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not connect to iot.jackeryapp.com."
+    },
+    "abort": {
+      "already_configured": "This Jackery account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Jackery options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_soc": { "name": "Battery" },
+      "cell_temperature": { "name": "Cell temperature" },
+      "battery_charge_power": { "name": "Battery charge power" },
+      "battery_discharge_power": { "name": "Battery discharge power" },
+      "pv_power_total": { "name": "PV power total" },
+      "pv1_power": { "name": "PV channel 1" },
+      "pv2_power": { "name": "PV channel 2" },
+      "pv3_power": { "name": "PV channel 3" },
+      "pv4_power": { "name": "PV channel 4" },
+      "grid_in_power": { "name": "Grid import" },
+      "grid_out_power": { "name": "Grid export" },
+      "wifi_signal": { "name": "WiFi signal" },
+      "wifi_ip": { "name": "IP address" },
+      "raw_properties": { "name": "Raw properties" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" },
+      "eps_enabled": { "name": "EPS enabled" },
+      "eps_active": { "name": "EPS active" },
+      "eth_connected": { "name": "Ethernet connected" }
+    }
+  }
+}
