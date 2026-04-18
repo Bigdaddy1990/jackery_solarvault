@@ -19,10 +19,19 @@ from .coordinator import JackerySolarVaultCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_RENAME_SYSTEM = "rename_system"
+SERVICE_SET_MAX_POWER = "set_max_power"
 RENAME_SCHEMA = vol.Schema(
     {
         vol.Required("system_id"): cv.string,
         vol.Required("new_name"): vol.All(cv.string, vol.Length(min=1, max=64)),
+    }
+)
+SET_MAX_POWER_SCHEMA = vol.Schema(
+    {
+        vol.Required("device_id"): cv.string,
+        vol.Required("max_power"): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=2500)
+        ),
     }
 )
 
@@ -78,6 +87,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN, SERVICE_RENAME_SYSTEM, _handle_rename, schema=RENAME_SCHEMA,
         )
 
+    # Experimental: set_max_power service
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_MAX_POWER):
+        async def _handle_set_max_power(call: ServiceCall) -> None:
+            device_id = call.data["device_id"]
+            max_power = call.data["max_power"]
+            last_err: Exception | None = None
+            for coord in hass.data.get(DOMAIN, {}).values():
+                try:
+                    await coord.api.async_set_max_power(device_id, max_power)
+                    await coord.async_request_refresh()
+                    return
+                except JackeryError as err:
+                    last_err = err
+                    _LOGGER.debug(
+                        "set_max_power via %s failed: %s",
+                        coord.entry.entry_id, err,
+                    )
+                    continue
+            raise RuntimeError(
+                f"set_max_power failed for device {device_id}: {last_err}"
+            )
+
+        hass.services.async_register(
+            DOMAIN, SERVICE_SET_MAX_POWER, _handle_set_max_power,
+            schema=SET_MAX_POWER_SCHEMA,
+        )
+
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
@@ -90,7 +126,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        # Remove the service only when the last entry is gone
+        # Remove services only when the last entry is gone
         if not hass.data.get(DOMAIN):
             hass.services.async_remove(DOMAIN, SERVICE_RENAME_SYSTEM)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_MAX_POWER)
     return unload_ok

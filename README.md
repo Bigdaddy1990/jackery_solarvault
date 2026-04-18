@@ -1,7 +1,7 @@
 # Jackery SolarVault — Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
-[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)]()
+[![version](https://img.shields.io/badge/version-1.3.0-blue.svg)]()
 
 HACS-Integration für den **Jackery SolarVault 3 Pro Max** (und verwandte Modelle der SolarVault-3-Serie). Kommuniziert mit der Jackery-Cloud via `iot.jackeryapp.com` und liefert ~30 Sensoren für Echtzeit- und Energie-Daten.
 
@@ -46,6 +46,10 @@ Alle Pfade unter `https://iot.jackeryapp.com`:
 **Schreib-Entities** 🆕:
 - **Text-Entity** "Systemname" — Gerätename direkt in HA bearbeiten
 - **Service** `jackery_solarvault.rename_system` — für Automationen und Skripte
+
+**⚠️ Experimentelle Schreib-Entities** (v1.3.0):
+- **Number-Entity** "Max. Leistung (experimentell)" — Default disabled. Versucht, die Ausgangsleistung per `POST /v1/device/deviceMaxPowerRecord/saveRecord` zu setzen. Bisher wurde nur ein abgelehnter Call gesehen (Server-Code `10600`). Der Endpoint-Name ("saveRecord") deutet eher auf ein History-Log als auf den Live-Setter hin. Bei Fehlern wird die komplette Server-Antwort im HA-Log ausgegeben.
+- **Service** `jackery_solarvault.set_max_power` — gleiches Feature, für Automationen.
 
 ## Installation
 
@@ -138,7 +142,7 @@ logger:
 - Home Assistant 2024.4.0 oder neuer
 - Jackery-Cloud-Account
 - SolarVault online (WLAN oder Ethernet)
-- App-Familie: **`com.hbxn.jackery`** (Standard-Jackery-App)
+- App-Familie: **`com.hbxn.jackery`** (Standard-Jackery-App, blau)
 
 ## Abhängigkeiten
 

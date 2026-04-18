@@ -99,6 +99,9 @@
     },
     "text": {
       "system_name": { "name": "Systemname" }
+    },
+    "number": {
+      "max_power_experimental": { "name": "Max. Leistung (experimentell)" }
     }
   }
 }

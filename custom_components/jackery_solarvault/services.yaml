@@ -21,3 +21,34 @@ rename_system:
       example: "Balkonkraftwerk Süd"
       selector:
         text:
+
+set_max_power:
+  name: "Set max feed-in power (experimental)"
+  description: >
+    ⚠️  EXPERIMENTAL. Send a max-power value to the Jackery cloud using
+    POST /v1/device/deviceMaxPowerRecord/saveRecord. Only failed calls have
+    been observed during reverse-engineering; the endpoint might be an
+    audit log rather than the live setter. The integration will raise an
+    error with the full server response if the call is rejected.
+  fields:
+    device_id:
+      name: Device ID
+      description: >
+        The numeric device ID (visible in diagnostics under
+        raw_api.system_list_response.data[].devices[].deviceId).
+      required: true
+      example: "573702884982521856"
+      selector:
+        text:
+    max_power:
+      name: Max power
+      description: Requested maximum feed-in / output power in watts (0–2500).
+      required: true
+      example: 800
+      selector:
+        number:
+          min: 0
+          max: 2500
+          step: 10
+          unit_of_measurement: W
+          mode: box

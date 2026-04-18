@@ -27,6 +27,11 @@ OTA_LIST_PATH: Final = "/v1/device/ota/list"                       # ?deviceSnLi
 LOCATION_PATH: Final = "/v1/device/location"                       # ?deviceId=<id>
 SYSTEM_NAME_PATH: Final = "/v1/device/system/name"                 # PUT {systemName,id}
 
+# Experimental write endpoints (v1.3.0)
+# The max-power endpoint was captured but only failed responses (code 10600)
+# have been seen so far. It might be a history log rather than the live setter.
+MAX_POWER_SAVE_PATH: Final = "/v1/device/deviceMaxPowerRecord/saveRecord"
+
 # Legacy endpoint used by Explorer portables — kept as fallback only
 DEVICE_LIST_PATH: Final = "/v1/device/bind/list"
 
@@ -68,4 +73,4 @@ UPDATE_INTERVAL: Final = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 SLOW_METRICS_INTERVAL_SEC: Final = 300   # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 
-PLATFORMS: Final = ["sensor", "binary_sensor", "text"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "text", "number"]

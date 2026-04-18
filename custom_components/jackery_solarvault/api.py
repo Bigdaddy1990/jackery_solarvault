@@ -46,6 +46,7 @@ from .const import (
     HOME_TRENDS_PATH,
     LOCATION_PATH,
     LOGIN_PATH,
+    MAX_POWER_SAVE_PATH,
     OTA_LIST_PATH,
     PLATFORM_HEADER,
     POWER_PRICE_PATH,
@@ -451,6 +452,74 @@ class JackeryApi:
         data = await self._put_json(
             SYSTEM_NAME_PATH,
             {"systemName": system_name.strip(), "id": str(system_id)},
+        )
+        return bool(data.get("data"))
+
+    # ------------------------------------------------------------------
+    # Experimental writers (v1.3.0)
+    # ------------------------------------------------------------------
+    # These endpoints were discovered via PCAPdroid captures but only failed
+    # responses have been seen so far. They're kept as best-effort helpers;
+    # the integration surfaces the server's full error response so the user
+    # can troubleshoot. See const.py for caveats.
+
+    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
+        """Generic form-urlencoded POST with auto re-login on expiry."""
+        await self._ensure_token()
+        url = f"{BASE_URL}{path}"
+        headers = self._headers(with_token=True)
+        headers["content-type"] = "application/x-www-form-urlencoded"
+        body = {k: str(v) for k, v in fields.items()}
+
+        async def _do() -> tuple[int, dict]:
+            async with self._session.post(
+                url, data=body, headers=headers, timeout=30,
+            ) as resp:
+                status = resp.status
+                try:
+                    data = await resp.json(content_type=None)
+                except Exception:
+                    data = {"_raw_text": (await resp.text())[:500]}
+                return status, data
+
+        status, data = await _do()
+        if (
+            status == 200
+            and isinstance(data, dict)
+            and data.get("code") == CODE_TOKEN_EXPIRED
+        ):
+            _LOGGER.info("Jackery token expired — re-login for POST %s", path)
+            self._token = None
+            await self._ensure_token()
+            status, data = await _do()
+
+        if status != 200:
+            raise JackeryApiError(f"POST {path} HTTP {status}")
+        if isinstance(data, dict) and data.get("code") not in (CODE_OK, None):
+            # Surface the whole response so callers can show it to the user
+            raise JackeryApiError(
+                f"POST {path} code={data.get('code')} msg={data.get('msg')!r} "
+                f"data={data.get('data')!r}"
+            )
+        return data
+
+    async def async_set_max_power(
+        self, device_id: str | int, max_power: int
+    ) -> bool:
+        """POST /v1/device/deviceMaxPowerRecord/saveRecord (experimental).
+
+        Captured body: `maxPower=<int>&deviceId=<long>` as form-urlencoded.
+
+        ⚠️  Only failed responses (code=10600) have been observed so far.
+        The endpoint name ("saveRecord") suggests this might be a history
+        log, not the live setter. May require specific value ranges or
+        additional fields we haven't identified yet.
+        """
+        if not isinstance(max_power, int) or max_power < 0:
+            raise JackeryApiError("max_power must be a non-negative integer")
+        data = await self._post_form(
+            MAX_POWER_SAVE_PATH,
+            {"maxPower": max_power, "deviceId": str(device_id)},
         )
         return bool(data.get("data"))
 
