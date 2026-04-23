@@ -2,7 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![version](https://img.shields.io/badge/version-1.3.0-blue.svg)]()
-<a href='https://ko-fi.com/Z8Z11HDQ2M' target='_blank'><img height='36' style='border:0px;height:20px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=6' border='0' alt='Buy Me a Coffee' /></a>
+<a href='https://ko-fi.com/Z8Z11HDQ2M' target='_blank'><img height='36' style='border:0px;height:25px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=6' border='0' alt='Buy Me a Coffee' /></a>
 
 
 HACS-Integration für den **Jackery SolarVault 3 Pro Max** (und verwandte Modelle der SolarVault-3-Serie). Kommuniziert mit der Jackery-Cloud via `iot.jackeryapp.com` und liefert ~30 Sensoren für Echtzeit- und Energie-Daten.
