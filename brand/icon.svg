@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" role="img" aria-label="Jackery">
-  <rect width="640" height="180" rx="30" fill="none"/>
-  <text x="320" y="112" text-anchor="middle" font-family="Montserrat, Avenir Next, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="-3" fill="#f58220">Jackery</text>
-  <path d="M86 132h468" stroke="#f58220" stroke-width="10" stroke-linecap="round" opacity="0.28"/>
-</svg>
