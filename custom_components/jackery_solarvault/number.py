@@ -345,7 +345,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             await self.entity_description.setter(
                 self.coordinator, self._device_id, wire_value
             )
-        except Exception as err:  # noqa: BLE001 — setter callables wrap cloud/MQTT errors
+        except Exception as err:
             if self.entity_description.raise_on_setter_error:
                 raise
             _LOGGER.debug(

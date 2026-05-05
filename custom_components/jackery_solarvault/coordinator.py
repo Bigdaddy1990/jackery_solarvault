@@ -607,7 +607,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         started = time.monotonic()
         try:
             await self.async_request_refresh()
-        except Exception as err:  # noqa: BLE001 - keep the background poller alive
+        except Exception as err:
             _LOGGER.debug("Jackery scheduled refresh failed: %s", err)
             return
         elapsed = time.monotonic() - started
@@ -1380,7 +1380,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return 0
         # Local import keeps the registry stub-free for unit tests that
         # exercise the coordinator without HA helpers loaded.
-        from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+        from homeassistant.helpers import device_registry as dr
 
         registry = dr.async_get(self.hass)
         removed = 0
@@ -2389,7 +2389,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await self._async_query_system_info_for_missing(snapshot=snapshot)
             await self._async_query_weather_plan_for_missing(snapshot=snapshot)
             await self._async_query_subdevices_for_missing(snapshot=snapshot)
-        except Exception as err:  # noqa: BLE001 - background MQTT query must not die noisily
+        except Exception as err:
             _LOGGER.debug("Jackery MQTT backfill query failed: %s", err)
 
     def _local_statistic_start(self, bucket_date: date) -> datetime:
@@ -2437,7 +2437,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             recorder = get_instance(self.hass)
-        except Exception as err:  # noqa: BLE001 - recorder may be disabled
+        except Exception as err:
             _LOGGER.debug("Recorder instance unavailable: %s", err)
             return 0.0
 
@@ -2456,7 +2456,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 None,
                 {"start", "sum"},
             )
-        except Exception as err:  # noqa: BLE001 - recorder must not break polling
+        except Exception as err:
             _LOGGER.debug(
                 "Could not read previous statistics for %s: %s",
                 statistic_id,
@@ -2656,7 +2656,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             metadata,
                             statistics,
                         )
-                    except Exception as err:  # noqa: BLE001 - recorder must not break polling
+                    except Exception as err:
                         _LOGGER.debug(
                             "Could not import %d app chart statistics for %s: %s",
                             len(statistics),
@@ -3247,7 +3247,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._pending_device_removals:
             try:
                 await self.async_cleanup_pending_device_removals()
-            except Exception as err:  # noqa: BLE001 - cleanup must not break refresh
+            except Exception as err:
                 _LOGGER.debug("Jackery: device-registry cleanup deferred: %s", err)
         return result
 

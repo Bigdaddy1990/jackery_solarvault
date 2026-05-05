@@ -42,7 +42,7 @@ def test_stale_threshold_constant_is_a_full_week() -> None:
     assert match is not None
     expr = match.group(1).strip()
     # Evaluate the literal expression (e.g. "7 * 24 * 3600")
-    value = eval(expr, {"__builtins__": {}}, {})  # noqa: S307 - constant-only expr
+    value = eval(expr, {"__builtins__": {}}, {})
     assert isinstance(value, int)
     assert value >= 24 * 3600, f"threshold {value}s is shorter than 24h"
     # Don't make it ridiculously long either — a year-long stale pack
