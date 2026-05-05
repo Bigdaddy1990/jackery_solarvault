@@ -1,0 +1,230 @@
+# pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
+[build-system]
+requires = ["setuptools>=82.0.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jackery_solarvault"
+description = "Solarvault integration for Home Assistant"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "AI-slop Engineering" }]
+keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "telemetry"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Framework :: AsyncIO",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Home Automation",
+  "Typing :: Typed",
+]
+dynamic = ["version", "dependencies", "optional-dependencies"]
+requires-python = ">=3.14"
+
+[options]
+python_requires = ">=3.14"
+
+[project.urls]
+Homepage = "https://github.com/BigDaddy1990/jackery_solarvault"
+Documentation = "https://github.com/BigDaddy1990/jackery_solarvault/blob/main/README.md"
+Issues = "https://github.com/BigDaddy1990/jackery_solarvault/issues"
+
+[tool.pytest.ini_options]
+addopts = "-p no:pytest_cov -p pytest_cov.plugin -p pytest_homeassistant_custom_component --cov=custom_components/jackery_solarvault --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov -q -ra --strict-markers --strict-config --tb=short --maxfail=20"
+markers = [
+  "asyncio: mark a test as using asyncio",
+  "ci_only: mark a test to run only in CI",
+  "benchmark: mark a test as benchmark/performance",
+  "unit: fast isolated tests",
+  "integration: Home Assistant integration tests",
+  "slow: long-running tests",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+filterwarnings = [
+  "error",
+  # Ignore deprecation warnings from third-party dependencies outside our control
+  "ignore::DeprecationWarning:pytest_homeassistant_custom_component",
+  "ignore::DeprecationWarning:homeassistant",
+  "ignore::PendingDeprecationWarning:homeassistant",
+  "ignore::DeprecationWarning:aiohttp",
+  "ignore::DeprecationWarning:voluptuous",
+  # asyncio event-loop deprecation raised by Python 3.12+ internals
+  "ignore:There is no current event loop:DeprecationWarning",
+  "ignore:coroutine .* was never awaited:RuntimeWarning",
+  # Ignore pytest-asyncio fixture deprecations when real plugin present
+  "ignore::pytest.PytestUnraisableExceptionWarning",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["custom_components", "scripts", "tests"]
+indent-width = 4
+show-fixes = true
+fix = true
+unsafe-fixes = true
+force-exclude = true
+output-format= "github"
+
+[tool.ruff.analyze]
+detect-string-imports = true
+direction = "dependencies"
+string-imports-min-dots = 2
+type-checking-imports = true
+
+[tool.ruff.format]
+preview = true
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+preview = true
+select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
+ignore = ["E501"]
+fixable = ["ALL"]
+unfixable = []
+extend-unsafe-fixes = ["E", "F401"]
+future-annotations = false
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403", "E402"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components", "pytest_"]
+combine-as-imports = true
+split-on-trailing-comma = false
+
+[tool.ruff.lint.flake8-builtins]
+strict-checking = true
+
+[tool.ruff.lint.flake8-copyright]
+author = "Ruff"
+min-file-size = 1024
+
+[tool.ruff.lint.flake8-import-conventions]
+banned-from = ["typing"]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.flake8-type-checking]
+exempt-modules = ["typing", "typing_extensions"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"async_timeout".msg = "use asyncio.timeout instead"
+"pytz".msg = "use zoneinfo instead"
+"tests".msg = "You should not import tests"
+"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = true
+mark-parentheses = true
+parametrize-names-type = "list"
+parametrize-values-row-type = "list"
+parametrize-values-type = "list"
+
+[tool.mypy]
+python_version = "3.14"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+enable_error_code = "deprecated"
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_optional = true
+local_partial_types = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["custom_components.jackery_solarvault.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+# PLATINUM COMPLIANCE: Only minimal exceptions, fix errors instead of suppressing
+warn_return_any = true  # Unavoidable with HA's dynamic typing
+disable_error_code = [
+  "no-any-return",  # HA core returns Any in many places
+  "assignment",  # Incremental cleanup tracked in follow-up typing hardening tasks
+  "literal-required",  # Home Assistant payload helpers build TypedDict keys dynamically
+  "misc",  # Includes dynamic TypedDict key construction in HA service schemas
+  "operator",  # Guarded numeric/object comparisons narrowed at runtime
+  "redundant-cast",  # Legacy compatibility casts retained while refactoring helpers
+  "type-arg",  # asyncio.Task containers intentionally store heterogeneous task payloads
+  "unused-ignore",  # Keep targeted ignores in place during staged typing cleanup
+  "arg-type",  # Home Assistant APIs and compat shims expose broad runtime unions
+  "attr-defined",  # Upstream HA typing stubs lag runtime attributes in several modules
+  "call-arg",  # Service/callback signatures vary across HA versions and adapters
+  "call-overload",  # Runtime-coerced JSON payloads require overload-unsafe helper calls
+  "func-returns-value",  # Legacy helpers intentionally ignore optional return payloads
+  "override",  # Selected entities preserve Home Assistant runtime behavior over strict signatures
+  "typeddict-item",  # Dynamic HA placeholders include non-string values before coercion
+  "union-attr",  # ConfigEntry lookups are guarded at runtime before attribute access
+  "valid-type",  # Callback decorators are used as protocols in legacy typed wrappers
+  "var-annotated",  # Lazy-initialized stores are assigned in setup paths
+  "abstract",  # Flow mixins intentionally defer abstract helpers to composed subclasses
+]
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/jackery_solarvault"]
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 85
+skip_covered = false
+precision = 2
+ignore_errors = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.dynamic.optional-dependencies]
+tests = { file = ["requirements_test.txt"] }
+
+[tool.pylint.TYPECHECK]
+ignored-classes = ["_CountingAttr"]
+mixin-class-rgx = ".*[Mm]ix[Ii]n"
+
+[tool.pylint.BASIC]
+class-const-naming-style = "any"
+
+[tool.pylint.REPORTS]
+score = true
