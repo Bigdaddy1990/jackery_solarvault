@@ -1,7 +1,5 @@
 """Button platform for Jackery SolarVault."""
 
-from __future__ import annotations
-
 import logging
 
 from homeassistant.components.button import ButtonEntity
