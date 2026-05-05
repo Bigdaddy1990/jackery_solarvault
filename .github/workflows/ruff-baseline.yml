@@ -1,0 +1,42 @@
+# .github/workflows/ruff-baseline.yml
+name: Ruff baseline (web only)
+on: { workflow_dispatch: {} }
+permissions: { contents: write, pull-requests: write, actions: write, checks: write }
+env:
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+jobs:
+  baseline:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' && (
+          (vars.RUFF_BASELINE_ALLOWLIST == '' && github.actor == github.repository_owner) ||
+          (vars.RUFF_BASELINE_ALLOWLIST != '' && contains(format(',{0},', vars.RUFF_BASELINE_ALLOWLIST), format(',{0},', github.actor)))
+        )
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install --upgrade pip ruff
+      - run: |
+          python scripts/enforce_docstring_baseline.py --update
+          python -m scripts.sync_contributor_guides --check
+          python -m scripts.enforce_test_requirements
+          python -m scripts.sync_localization_flags \
+            --allowlist scripts/sync_localization_flags.allowlist \
+            --check
+          ruff check . --fix all || true
+          ruff check . --fix --unsafe-fixes || true
+          ruff check . --add-noqa || true
+          ruff check . --extend-select RUF100 --fix || true
+          ruff check . --output-format=github || true
+          ruff check . --preview || true
+          ruff format .
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          branch: chore/ruff-baseline
+          title: "chore: ruff baseline (format+fix)"
+          commit-message: "chore: ruff baseline (format+fix)"
+          body: "Automated ruff baseline via GitHub Actions."
