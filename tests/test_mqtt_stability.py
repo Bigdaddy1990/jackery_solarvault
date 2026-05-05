@@ -15,8 +15,6 @@ session against accidental regressions:
    not the generic "disconnected" message.
 """
 
-from __future__ import annotations
-
 import datetime
 from pathlib import Path
 import re

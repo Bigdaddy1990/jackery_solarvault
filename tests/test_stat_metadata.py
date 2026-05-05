@@ -5,8 +5,6 @@ runtime. They guard the integration contract that period totals are not exposed
 as monotonically increasing lifetime counters.
 """
 
-from __future__ import annotations
-
 import ast
 from pathlib import Path
 import re
