@@ -1,0 +1,24 @@
+breaking:
+  - changed-files:
+      - any-glob-to-any-file: '**'
+      - any-glob-to-any-file: '!**'  # never auto-applied — manual only
+fix:
+  - head-branch: ['^fix/', '^bugfix/']
+feature:
+  - head-branch: ['^feature/', '^feat/']
+performance:
+  - head-branch: ['^perf/', '^performance/']
+documentation:
+  - head-branch: ['^docs/', '^doc/']
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', 'README*.md', '**/*.md']
+refactor:
+  - head-branch: ['^refactor/']
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ['tests/**']
+chore:
+  - head-branch: ['^chore/']
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['requirements*.txt', 'pyproject.toml', '.pre-commit-config.yaml']

@@ -7,40 +7,64 @@ on:
       - master
   pull_request:
   schedule:
+    # Daily run catches HACS/hassfest spec changes that affect this repo
     - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  validate-hassfest:
+  hassfest:
+    name: Home Assistant hassfest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: home-assistant/actions/hassfest@master
 
-  validate-hacs:
+  hacs:
+    name: HACS validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: HACS Validation
-        uses: hacs/action@main
+      - uses: hacs/action@main
         with:
           category: integration
 
-  unit-tests:
+  ruff:
+    name: Ruff lint + format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install unit test dependencies
-        run: python -m pip install pytest PyYAML
+      - name: Install ruff
+        run: python -m pip install ruff
+      - name: Lint
+        run: ruff check custom_components/ tests/
+      - name: Format check
+        run: ruff format --check custom_components/ tests/
+
+  unit-tests:
+    name: Unit / source-only tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install unit-test deps
+        run: python -m pip install pytest pytest-asyncio PyYAML
       - name: Compile integration and tests
         run: python -m compileall -q custom_components tests
-      - name: Run pure unit/source checks without Home Assistant plugin autoload
-        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p no:cacheprovider tests/test_*.py
+      - name: Run pure unit tests without HA plugin autoload
+        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p no:cacheprovider -o addopts="" tests/test_*.py
 
   ha-fixture-tests:
+    name: HA fixture tests
     runs-on: ubuntu-latest
+    if: hashFiles('tests/ha/**') != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,5 +72,5 @@ jobs:
           python-version: "3.13"
       - name: Install Home Assistant test dependencies
         run: python -m pip install -r requirements-test.txt
-      - name: Run Home Assistant fixture tests with plugin autoload enabled
+      - name: Run HA fixture tests
         run: pytest -q -p no:cacheprovider -c pytest-ha.ini tests/ha

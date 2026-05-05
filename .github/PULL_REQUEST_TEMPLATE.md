@@ -1,20 +1,23 @@
-## Mandatory quality checklist
+<!--
+Thanks for contributing! Before submitting, please confirm the items
+below. The repository follows the strict, narrow review style described
+in `docs/STRICT_WORK_INSTRUCTIONS.md`.
+-->
 
-Do not merge or package this integration unless every applicable item is true.
+## Summary
 
-- [ ] I followed `docs/STRICT_WORK_INSTRUCTIONS.md` in order.
-- [ ] I traced affected data from raw HTTP/MQTT payload to parser, coordinator,
-      entity state, attributes, and Home Assistant metadata.
-- [ ] I removed speculative/over-engineered workaround code before adding new
-      behavior.
-- [ ] I did not add tests that preserve unverified or broken behavior.
-- [ ] I did not add migrations, version ladders, or CT-period logic unless this
-      PR is explicitly scoped to that and backed by fixtures.
-- [ ] Config-flow and service schemas contain only Home Assistant serializable
-      validators.
-- [ ] No platform module has missing imports or unresolved globals.
-- [ ] No async function performs direct blocking file I/O.
-- [ ] Unit/source checks pass.
-- [ ] Home Assistant fixture tests pass with `pytest-homeassistant-custom-component`.
-- [ ] JSON validation and ZIP validation pass.
-- [ ] The release ZIP contains no caches, debug logs, or generated files.
+<!-- One paragraph: what changed, why, and what user-visible effect this has. -->
+
+## Checklist
+
+- [ ] I have read `docs/STRICT_WORK_INSTRUCTIONS.md` and the relevant
+      contract files in `docs/`.
+- [ ] My change does not silently repair one period with another period
+      (`docs/DATA_SOURCE_PRIORITY.md`).
+- [ ] Unique IDs follow `docs/UNIQUE_ID_CONTRACT.md`.
+- [ ] No raw payload, serial number, MQTT password or `<userId>` is
+      written to logs or diagnostics on a normal install
+      (`docs/MQTT_PROTOCOL.md`).
+- [ ] Tests are added/updated to lock down the **correct** behaviour.
+      I have not adapted asserts to match wrong output.
+- [ ] `pytest tests/` passes locally and in CI.
