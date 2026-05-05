@@ -1,14 +1,14 @@
 # Intégration Home Assistant Jackery SolarVault 3 Pro Max
 
 **🌍 Language / Sprache / Idioma / Langue :**
-[🇬🇧 English](../README.md) · [🇩🇪 Deutsch](README.de.md) · [🇫🇷 Français](README.fr.md) · [🇪🇸 Español](README.es.md)
+[🇬🇧 English](../README.md) · [🇩🇪 Deutsch](./README.de.md) · [🇫🇷 Français](./README.fr.md) · [🇪🇸 Español](./README.es.md)
 
 ---
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
+
 
 Intégration communautaire pour les systèmes Jackery SolarVault, en particulier SolarVault 3 Pro Max. L'intégration lit les valeurs en direct, les statistiques d'énergie et les paramètres configurables depuis le cloud Jackery, et utilise le push MQTT pour les changements d'état rapides et les commandes de contrôle.
 
