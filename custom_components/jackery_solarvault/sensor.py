@@ -73,11 +73,12 @@ must never affect ``unique_id``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 import json
 import logging
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -105,6 +106,14 @@ from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_LABELS,
     APP_CHART_METRIC_KEY_BY_SECTION_PREFIX,
+    APP_DEVICE_STAT_BATTERY_CHARGE,
+    APP_DEVICE_STAT_BATTERY_DISCHARGE,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_INPUT,
+    APP_DEVICE_STAT_ONGRID_OUTPUT,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_PV_ENERGY,
+    APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_REQUEST_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
@@ -128,127 +137,128 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
-    APP_DEVICE_STAT_BATTERY_CHARGE,
-    APP_DEVICE_STAT_BATTERY_DISCHARGE,
-    APP_DEVICE_STAT_BATTERY_TO_GRID,
-    APP_DEVICE_STAT_ONGRID_INPUT,
-    APP_DEVICE_STAT_ONGRID_OUTPUT,
-    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
-    APP_DEVICE_STAT_PV_ENERGY,
-    APP_DEVICE_STAT_PV_TO_BATTERY,
+    CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CT_ATTRIBUTE_FIELDS,
+    CT_NEGATIVE_PHASE_POWER_FIELDS,
+    CT_POSITIVE_PHASE_POWER_FIELDS,
+    CT_TOTAL_POWER_PAIR,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
-    FIELD_UPDATE_CONTENT,
-    FIELD_UPGRADE_TYPE,
-    FIELD_TARGET_MODULE_VERSION,
-    FIELD_TARGET_VERSION,
-    FIELD_CT_POWER3,
-    FIELD_CT_POWER2,
-    FIELD_CT_POWER1,
-    FIELD_CT_POWER,
-    CT_TOTAL_POWER_PAIR,
-    CT_POSITIVE_PHASE_POWER_FIELDS,
-    CT_NEGATIVE_PHASE_POWER_FIELDS,
-    CT_ATTRIBUTE_FIELDS,
+    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_STORM_WARNING_MINUTES,
+    DOMAIN,
+    FIELD_ABILITY,
+    FIELD_BAT_IN_PW,
+    FIELD_BAT_NUM,
+    FIELD_BAT_OUT_PW,
+    FIELD_BAT_SOC,
+    FIELD_BAT_STATE,
+    FIELD_CELL_TEMP,
+    FIELD_CHARGE_PLAN_PW,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
+    FIELD_CT_POWER,
+    FIELD_CT_POWER1,
+    FIELD_CT_POWER2,
+    FIELD_CT_POWER3,
+    FIELD_CT_STAT,
+    FIELD_CT_STATE,
     FIELD_CURRENT_VERSION,
+    FIELD_DEFAULT_PW,
+    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
-    FIELD_DEV_SN,
-    FIELD_IP,
-    FIELD_IS_FIRMWARE_UPGRADE,
-    FIELD_VERSION,
-    FIELD_TEMP_UNIT,
-    FIELD_FUNC_ENABLE,
-    FIELD_CHARGE_PLAN_PW,
+    FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_EC,
     FIELD_ENERGY_PLAN_PW,
-    FIELD_STANDBY_PW,
-    FIELD_DEFAULT_PW,
-    FIELD_OFF_GRID_AUTO_OFF_TIME,
-    FIELD_OFF_GRID_DOWN_TIME,
-    FIELD_OFF_GRID_TIME,
-    FIELD_MAX_SYS_IN_PW,
-    FIELD_MAX_SYS_OUT_PW,
-    FIELD_GRID_STATE_ALT,
-    FIELD_GRID_STATE,
+    FIELD_ETH_PORT,
+    FIELD_FOLLOW_METER,
+    FIELD_FUNC_ENABLE,
+    FIELD_GRID_IN_PW,
+    FIELD_GRID_OUT_PW,
     FIELD_GRID_STAT,
+    FIELD_GRID_STATE,
+    FIELD_GRID_STATE_ALT,
+    FIELD_HOME_LOAD_PW,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
-    FIELD_GRID_IN_PW,
-    FIELD_OUT_GRID_SIDE_PW,
-    FIELD_OUT_ONGRID_PW,
-    FIELD_GRID_OUT_PW,
-    FIELD_CT_STATE,
-    FIELD_CT_STAT,
-    FIELD_ON_GRID_STAT,
-    FIELD_ONGRID_STAT,
-    FIELD_STAT,
-    FIELD_BAT_STATE,
-    FIELD_BAT_NUM,
-    FIELD_MAX_INV_STD_PW,
-    FIELD_MAX_OUT_PW,
-    FIELD_REBOOT,
-    FIELD_SW_EPS_STATE,
-    FIELD_SW_EPS_IN_PW,
-    FIELD_SW_EPS_OUT_PW,
-    FIELD_MAX_IOT_NUM,
-    FIELD_ABILITY,
-    FIELD_ETH_PORT,
-    FIELD_MAC,
-    FIELD_WIP,
-    FIELD_WNAME,
-    FIELD_WSIG,
-    FIELD_STACK_OUT_PW,
-    FIELD_STACK_IN_PW,
-    FIELD_BAT_OUT_PW,
-    FIELD_BAT_IN_PW,
-    FIELD_PV4,
-    FIELD_PV3,
-    FIELD_PV2,
-    FIELD_PV1,
-    FIELD_PV_PW,
-    FIELD_BAT_SOC,
-    FIELD_SOC,
-    FIELD_CELL_TEMP,
-    FIELD_SCAN_NAME,
-    FIELD_SN,
-    FIELD_TYPE_NAME,
-    FIELD_OTHER_LOAD_PW,
-    FIELD_HOME_LOAD_PW,
-    FIELD_LOAD_PW,
     FIELD_IN_PW,
-    FIELD_OUT_PW,
-    FIELD_EC,
+    FIELD_IP,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_IS_FOLLOW_METER_PW,
     FIELD_IT,
-    FIELD_OT,
+    FIELD_LATITUDE,
+    FIELD_LOAD_PW,
+    FIELD_LONGITUDE,
+    FIELD_MAC,
+    FIELD_MAX_GRID_STD_PW,
+    FIELD_MAX_INV_STD_PW,
+    FIELD_MAX_IOT_NUM,
+    FIELD_MAX_OUT_PW,
+    FIELD_MAX_SYS_IN_PW,
+    FIELD_MAX_SYS_OUT_PW,
+    FIELD_MINS_INTERVAL,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
-    FIELD_OP,
-    FIELD_RB,
-    FIELD_DYNAMIC_OR_SINGLE,
-    FIELD_LATITUDE,
-    FIELD_LONGITUDE,
-    FIELD_FOLLOW_METER,
-    FIELD_IS_AUTO_STANDBY,
-    FIELD_IS_FOLLOW_METER_PW,
-    FIELD_SINGLE_PRICE,
+    FIELD_OFF_GRID_AUTO_OFF_TIME,
     FIELD_OFF_GRID_DOWN,
-    FIELD_SOC_CHG_LIMIT,
+    FIELD_OFF_GRID_DOWN_TIME,
+    FIELD_OFF_GRID_TIME,
+    FIELD_ON_GRID_STAT,
+    FIELD_ONGRID_STAT,
+    FIELD_OP,
+    FIELD_OT,
+    FIELD_OTHER_LOAD_PW,
+    FIELD_OUT_GRID_SIDE_PW,
+    FIELD_OUT_ONGRID_PW,
+    FIELD_OUT_PW,
+    FIELD_PV1,
+    FIELD_PV2,
+    FIELD_PV3,
+    FIELD_PV4,
+    FIELD_PV_PW,
+    FIELD_RB,
+    FIELD_REBOOT,
+    FIELD_SCAN_NAME,
+    FIELD_SINGLE_PRICE,
+    FIELD_SN,
+    FIELD_SOC,
     FIELD_SOC_CHARGE_LIMIT,
-    FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
-    FIELD_MAX_GRID_STD_PW,
+    FIELD_SOC_DISCHG_LIMIT,
+    FIELD_STACK_IN_PW,
+    FIELD_STACK_OUT_PW,
+    FIELD_STANDBY_PW,
+    FIELD_STAT,
+    FIELD_STORM,
+    FIELD_SW_EPS_IN_PW,
+    FIELD_SW_EPS_OUT_PW,
+    FIELD_SW_EPS_STATE,
+    FIELD_TARGET_MODULE_VERSION,
+    FIELD_TARGET_VERSION,
+    FIELD_TEMP_UNIT,
+    FIELD_TYPE_NAME,
+    FIELD_UPDATE_CONTENT,
     FIELD_UPDATE_STATUS,
-    TASK_PLAN_BODY,
-    TASK_PLAN_TASKS,
+    FIELD_UPGRADE_TYPE,
+    FIELD_VERSION,
+    FIELD_WIP,
+    FIELD_WNAME,
     FIELD_WORK_MODEL,
+    FIELD_WPC,
+    FIELD_WPS,
+    FIELD_WSIG,
+    MANUFACTURER,
     PAYLOAD_ALARM,
     PAYLOAD_BATTERY_PACKS,
-    PAYLOAD_CT_METER,
     PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_CT_METER,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_HOME_TRENDS,
     PAYLOAD_HTTP_PROPERTIES,
@@ -259,28 +269,19 @@ from .const import (
     PAYLOAD_STATISTIC,
     PAYLOAD_TASK_PLAN,
     PAYLOAD_WEATHER_PLAN,
-    CONF_CREATE_CALCULATED_POWER_SENSORS,
-    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_STORM_WARNING_MINUTES,
-    DOMAIN,
-    FIELD_MINS_INTERVAL,
-    FIELD_STORM,
-    FIELD_WPC,
-    FIELD_WPS,
-    MANUFACTURER,
+    TASK_PLAN_BODY,
+    TASK_PLAN_TASKS,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
+    HomeConsumptionPower,
     append_unique_entity,
+    calculated_smart_meter_power,
     compact_json,
+    directional_power_value,
     effective_period_total_value,
     effective_trend_series_values,
-    HomeConsumptionPower,
-    calculated_smart_meter_power,
-    directional_power_value,
     first_power_value,
     jackery_corrected_home_consumption_power,
     jackery_grid_side_input_power,
@@ -290,8 +291,8 @@ from .util import (
     signed_phase_power_values,
     smart_meter_net_power,
     task_plan_value,
-    trend_series_key,
     trend_series_has_value,
+    trend_series_key,
     trend_series_total,
 )
 
@@ -317,6 +318,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
             return round(float(value) / divisor, 2)
         except (TypeError, ValueError):
             return None
+
     return _f
 
 
@@ -406,6 +408,7 @@ def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
 
 def _payload_http_prop(key: str) -> Callable[[dict[str, Any]], Any]:
     """Read the latest HTTP property value before MQTT overlay values."""
+
     def _getter(payload: dict[str, Any]) -> Any:
         http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
         if isinstance(http_props, dict) and http_props:
@@ -424,6 +427,7 @@ def _nested(*keys: str) -> Callable[[dict[str, Any]], Any]:
 
 def _pv_channel_power(channel_key: str) -> Callable[[dict[str, Any]], Any]:
     """Read per-channel PV power and default to 0W when channel exists."""
+
     def _getter(props: dict[str, Any]) -> Any:
         channel = props.get(channel_key)
         if not isinstance(channel, dict):
@@ -453,7 +457,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
     ),
-
     # --- Temperatures ------------------------------------------------------
     JackerySensorDescription(
         key="cell_temperature",
@@ -464,7 +467,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
     ),
-
     # --- Battery power -----------------------------------------------------
     JackerySensorDescription(
         key="battery_charge_power",
@@ -486,7 +488,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         icon="mdi:battery-arrow-down",
     ),
-
     # --- Solar / PV --------------------------------------------------------
     JackerySensorDescription(
         key="pv_power_total",
@@ -533,7 +534,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
         icon="mdi:solar-panel",
     ),
-
     # --- Grid --------------------------------------------------------------
     JackerySensorDescription(
         key="grid_in_power",
@@ -547,13 +547,14 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="grid_out_power",
         translation_key="grid_out_power",
-        getter=_prop_any(FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW),
+        getter=_prop_any(
+            FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW
+        ),
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         icon="mdi:transmission-tower-export",
     ),
-
     # --- EPS (Emergency Power Supply, AC OUT) ------------------------------
     JackerySensorDescription(
         key="eps_in_power",
@@ -571,7 +572,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
     ),
-
     # --- Stack (additional battery pack) -----------------------------------
     JackerySensorDescription(
         key="stack_in_power",
@@ -589,7 +589,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
     ),
-
     # --- Network / diagnostics --------------------------------------------
     JackerySensorDescription(
         key="wifi_signal",
@@ -661,7 +660,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:restart",
     ),
-
     # --- Configuration readouts ------------------------------------------
     JackerySensorDescription(
         key="soc_charge_limit",
@@ -724,7 +722,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:power-sleep",
         fallbacks=(
-            lambda pl: task_plan_value(pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_IS_AUTO_STANDBY),
+            lambda pl: task_plan_value(
+                pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_IS_AUTO_STANDBY
+            ),
         ),
     ),
     JackerySensorDescription(
@@ -766,8 +766,15 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:tune-variant",
         fallbacks=(
-            lambda pl: task_plan_value(pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_WORK_MODEL),
-            lambda pl: 7 if safe_int((pl.get(PAYLOAD_PRICE) or {}).get(FIELD_DYNAMIC_OR_SINGLE)) == 1 else None,
+            lambda pl: task_plan_value(
+                pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_WORK_MODEL
+            ),
+            lambda pl: (
+                7
+                if safe_int((pl.get(PAYLOAD_PRICE) or {}).get(FIELD_DYNAMIC_OR_SINGLE))
+                == 1
+                else None
+            ),
         ),
     ),
     # Removed max_feed_grid sensor
@@ -797,7 +804,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         fallbacks=(
             lambda pl: task_plan_value(
                 pl.get(PAYLOAD_TASK_PLAN) or {},
-                FIELD_OFF_GRID_TIME, FIELD_OFF_GRID_DOWN_TIME, FIELD_OFF_GRID_AUTO_OFF_TIME,
+                FIELD_OFF_GRID_TIME,
+                FIELD_OFF_GRID_DOWN_TIME,
+                FIELD_OFF_GRID_AUTO_OFF_TIME,
             ),
         ),
     ),
@@ -850,7 +859,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         fallbacks=(
             lambda pl: task_plan_value(
-                pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER,
+                pl.get(PAYLOAD_TASK_PLAN) or {},
+                FIELD_IS_FOLLOW_METER_PW,
+                FIELD_FOLLOW_METER,
             ),
         ),
     ),
@@ -862,7 +873,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         icon="mdi:power-off",
         entity_category=EntityCategory.DIAGNOSTIC,
         fallbacks=(
-            lambda pl: task_plan_value(pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_OFF_GRID_DOWN),
+            lambda pl: task_plan_value(
+                pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_OFF_GRID_DOWN
+            ),
         ),
     ),
     JackerySensorDescription(
@@ -903,7 +916,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         fallbacks=(
             lambda pl: _storm_minutes_from_plan(pl.get(PAYLOAD_WEATHER_PLAN) or {}),
             lambda pl: task_plan_value(
-                pl.get(PAYLOAD_TASK_PLAN) or {}, FIELD_WPC, FIELD_MINS_INTERVAL,
+                pl.get(PAYLOAD_TASK_PLAN) or {},
+                FIELD_WPC,
+                FIELD_MINS_INTERVAL,
             ),
             lambda pl: _storm_minutes_fallback(
                 pl.get(PAYLOAD_PROPERTIES) or {},
@@ -934,7 +949,7 @@ def _period_start(reset_period: StatResetPeriod) -> datetime:
 
 
 def _period_from_stat_description(
-    description: "JackeryStatSensorDescription",
+    description: JackeryStatSensorDescription,
 ) -> StatResetPeriod | None:
     """Infer reset period for app period stats when older descriptions omit it."""
     if description.reset_period is not None:
@@ -955,7 +970,7 @@ class JackeryStatSensorDescription(SensorEntityDescription):
 
     stat_key: str
     transform: Callable[[Any], Any] = _identity
-    section: str = PAYLOAD_STATISTIC   # statistic | price | system
+    section: str = PAYLOAD_STATISTIC  # statistic | price | system
     fallback_sources: tuple[tuple[str, str], ...] = ()
     reset_period: StatResetPeriod | None = None
 
@@ -1027,16 +1042,14 @@ def _stat_section_has_values(
 
 def _stat_description_has_value(
     payload: dict[str, Any],
-    description: "JackeryStatSensorDescription",
+    description: JackeryStatSensorDescription,
 ) -> bool:
     """Return True when a stat entity has a usable app value now."""
     source = payload.get(description.section)
     if not isinstance(source, dict):
         return False
     if _trend_series_key(description.section, description.stat_key) is not None:
-        if trend_series_has_value(
-            source, description.section, description.stat_key
-        ):
+        if trend_series_has_value(source, description.section, description.stat_key):
             return True
         for section, stat_key in description.fallback_sources:
             fallback_source = payload.get(section)
@@ -1049,7 +1062,10 @@ def _stat_description_has_value(
         return True
     for section, stat_key in description.fallback_sources:
         fallback_source = payload.get(section)
-        if isinstance(fallback_source, dict) and fallback_source.get(stat_key) is not None:
+        if (
+            isinstance(fallback_source, dict)
+            and fallback_source.get(stat_key) is not None
+        ):
             return True
     return False
 
@@ -1304,12 +1320,10 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
-
     # System-level trend sensors (system_pv_*, system_home_*, system_battery_*).
     # These values largely duplicate the per-device and home sensors and were
     # removed to reduce redundancy in Home Assistant. Removing them here ensures
     # the integration only exposes one set of PV, home and battery statistics.
-
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -1496,7 +1510,6 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         icon="mdi:battery-arrow-down",
     ),
     # Removed smart meter panel energy sensors (charging/discharging)
-
     # Single-tariff power price from powerPriceConfig
     JackeryStatSensorDescription(
         key="power_price",
@@ -1507,7 +1520,6 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:currency-eur",
     ),
-
     # --- APP_POLLING_MQTT.md: /v1/device/stat/deviceStatistic ------------
     # The app endpoint name does not include a date range, but captures show
     # these values matching current-day totals. The dated app period endpoints
@@ -1517,7 +1529,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_pv_energy",
         stat_key=APP_DEVICE_STAT_PV_ENERGY,
         section=PAYLOAD_DEVICE_STATISTIC,
-        fallback_sources=((f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_SOLAR_ENERGY),),
+        fallback_sources=(
+            (f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_SOLAR_ENERGY),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1529,7 +1543,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_battery_charge",
         stat_key=APP_DEVICE_STAT_BATTERY_CHARGE,
         section=PAYLOAD_DEVICE_STATISTIC,
-        fallback_sources=((f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CHARGE),),
+        fallback_sources=(
+            (f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CHARGE),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1541,7 +1557,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_battery_discharge",
         stat_key=APP_DEVICE_STAT_BATTERY_DISCHARGE,
         section=PAYLOAD_DEVICE_STATISTIC,
-        fallback_sources=((f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_DISCHARGE),),
+        fallback_sources=(
+            (f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_DISCHARGE),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1553,7 +1571,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_ongrid_input",
         stat_key=APP_DEVICE_STAT_ONGRID_INPUT,
         section=PAYLOAD_DEVICE_STATISTIC,
-        fallback_sources=((f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_IN_GRID_ENERGY),),
+        fallback_sources=(
+            (f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_IN_GRID_ENERGY),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1565,7 +1585,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_ongrid_output",
         stat_key=APP_DEVICE_STAT_ONGRID_OUTPUT,
         section=PAYLOAD_DEVICE_STATISTIC,
-        fallback_sources=((f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_OUT_GRID_ENERGY),),
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
+                APP_STAT_TOTAL_OUT_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1787,6 +1812,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[SensorEntity] = []
     seen_unique_ids: set[str] = set()
@@ -1861,7 +1887,7 @@ async def async_setup_entry(
                 # the first pack into the main device.
                 pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
             for index in range(1, pack_count + 1):
-                pack = valid_packs[index - 1] if index <= len(valid_packs) else {}
+                valid_packs[index - 1] if index <= len(valid_packs) else {}
                 for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
                     if pack_desc.field == FIELD_CELL_TEMP and not any(
                         FIELD_CELL_TEMP in item for item in valid_packs
@@ -1880,7 +1906,9 @@ async def async_setup_entry(
         # Smart meter / CT values arrive through MQTT sub-device responses.
         # Create them when discovery confirms a meter accessory, or when a
         # CT payload was already received before entity setup.
-        if coordinator._has_smart_meter_accessory(payload) or payload.get(PAYLOAD_CT_METER):
+        if coordinator._has_smart_meter_accessory(payload) or payload.get(
+            PAYLOAD_CT_METER
+        ):
             for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
                 if ct_desc.calculation and not create_smart_meter_derived:
                     continue
@@ -1903,6 +1931,8 @@ async def async_setup_entry(
 # Entities
 # ---------------------------------------------------------------------------
 class JackerySensor(JackeryEntity, SensorEntity):
+    """Jackery sensor for the Jackery SolarVault integration."""
+
     entity_description: JackerySensorDescription
 
     def __init__(
@@ -1911,6 +1941,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         device_id: str,
         description: JackerySensorDescription,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
         # App-backed values should not land in HA as disabled entities. The
@@ -1919,6 +1950,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
+        """Return the entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
             for fallback in self.entity_description.fallbacks:
@@ -1965,6 +1997,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         device_id: str,
         description: JackeryStatSensorDescription,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
         self._reset_period = _period_from_stat_description(description)
@@ -2058,9 +2091,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         fb_source, fb_section, fb_stat_key
                     )
                     if fb_total is None:
-                        fb_total = _trend_series_sum(
-                            fb_source, fb_section, fb_stat_key
-                        )
+                        fb_total = _trend_series_sum(fb_source, fb_section, fb_stat_key)
                     if fb_total is not None:
                         raw = fb_total
                         break
@@ -2085,12 +2116,10 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 attrs["period_values_count"] = len(values)
                 attrs["period_values_json"] = compact_json(values)
                 if isinstance(labels, list):
-                    attrs["period_values_by_label_json"] = compact_json(
-                        {
-                            str(label): values[index]
-                            for index, label in enumerate(labels[: len(values)])
-                        }
-                    )
+                    attrs["period_values_by_label_json"] = compact_json({
+                        str(label): values[index]
+                        for index, label in enumerate(labels[: len(values)])
+                    })
             request = source.get(APP_REQUEST_META)
             if isinstance(request, dict):
                 attrs["request"] = request
@@ -2128,10 +2157,12 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
+        """Return the entity's current value."""
         return self._cached_native_value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         return self._cached_attrs
 
 
@@ -2149,6 +2180,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         description: JackeryBatteryPackSensorDescription,
         enabled_default: bool = True,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(
             coordinator,
             device_id,
@@ -2176,6 +2208,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
+        """Return the entity's current value."""
         field = self.entity_description.field
         raw = self._pack.get(field)
         if raw is None:
@@ -2197,6 +2230,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device-registry metadata for this entity."""
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
@@ -2213,7 +2247,9 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         )
         version = pack.get(FIELD_VERSION) or pack.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._device_id}_battery_pack_{self._pack_index}")},
+            identifiers={
+                (DOMAIN, f"{self._device_id}_battery_pack_{self._pack_index}")
+            },
             manufacturer=MANUFACTURER,
             name=f"{base_name} Zusatzbatterie {self._pack_index}",
             model=str(model),
@@ -2224,6 +2260,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         attrs: dict[str, Any] = {"pack_index": self._pack_index}
         for key in (
             FIELD_IS_FIRMWARE_UPGRADE,
@@ -2249,6 +2286,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         device_id: str,
         description: JackerySmartMeterSensorDescription,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, f"smart_meter_{description.key}")
         self.entity_description = description
 
@@ -2278,6 +2316,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:
+        """Return the entity's current value."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             return None
@@ -2289,8 +2328,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         # The Jackery app exposes the CT net value through tPhasePw/tnPhasePw.
         # Phase fields are still used for gross phase import/export/flow.
         if raw is None and (
-            self.entity_description.aliases
-            or self.entity_description.negative_aliases
+            self.entity_description.aliases or self.entity_description.negative_aliases
         ):
             raw = self._directional_value(
                 ct,
@@ -2315,6 +2353,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device-registry metadata for this entity."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             ct = {}
@@ -2339,6 +2378,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             return {}
@@ -2351,7 +2391,9 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             attrs["phase_a_signed_power"] = phases[0]
             attrs["phase_b_signed_power"] = phases[1]
             attrs["phase_c_signed_power"] = phases[2]
-            attrs["signed_phase_convention"] = "positive=grid_import, negative=grid_export"
+            attrs["signed_phase_convention"] = (
+                "positive=grid_import, negative=grid_export"
+            )
         if self.entity_description.calculation:
             attrs["calculation"] = self.entity_description.calculation
             attrs["source"] = (
@@ -2396,14 +2438,17 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "raw_properties")
 
     @property
     def native_value(self) -> int:
+        """Return the entity's current value."""
         return len(self._properties)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         attrs: dict[str, Any] = {}
         for k, v in self._properties.items():
             try:
@@ -2425,10 +2470,12 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, PAYLOAD_WEATHER_PLAN)
 
     @property
     def native_value(self) -> int:
+        """Return the entity's current value."""
         storm = self._weather_plan.get(FIELD_STORM)
         if isinstance(storm, list):
             return len(storm)
@@ -2436,6 +2483,7 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         plan = self._weather_plan
         if isinstance(plan, dict):
             return dict(plan)
@@ -2453,10 +2501,12 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, PAYLOAD_TASK_PLAN)
 
     @property
     def native_value(self) -> int:
+        """Return the entity's current value."""
         plan = self._task_plan
         tasks = None
         if isinstance(plan, dict):
@@ -2469,6 +2519,7 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         plan = self._task_plan
         if isinstance(plan, dict):
             return dict(plan)
@@ -2494,10 +2545,12 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "battery_net_power")
 
     @property
     def native_value(self) -> int | None:
+        """Return the entity's current value."""
         props = self._properties
         in_pw = safe_int(props.get(FIELD_BAT_IN_PW))
         out_pw = safe_int(props.get(FIELD_BAT_OUT_PW))
@@ -2507,6 +2560,7 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         http_props = self._http_properties
         props = http_props or self._properties
         merged = self._properties
@@ -2537,10 +2591,12 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "battery_stack_net_power")
 
     @property
     def native_value(self) -> int | None:
+        """Return the entity's current value."""
         props = self._properties
         in_pw = safe_int(props.get(FIELD_STACK_IN_PW))
         out_pw = safe_int(props.get(FIELD_STACK_OUT_PW))
@@ -2550,6 +2606,7 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         props = self._properties
         http_props = self._http_properties
         return {
@@ -2587,10 +2644,12 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "grid_net_power")
 
     @property
     def native_value(self) -> int | None:
+        """Return the entity's current value."""
         props = self._properties
         in_pw = safe_int(jackery_grid_side_input_power(props))
         out_pw = safe_int(jackery_grid_side_output_power(props))
@@ -2600,6 +2659,7 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         props = self._properties
         return {
             "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",
@@ -2620,7 +2680,6 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
         }
 
 
-
 class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
     """Live home consumption corrected for Jackery AC input/output."""
 
@@ -2632,6 +2691,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "home_consumption_power")
 
     @staticmethod
@@ -2658,6 +2718,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
+        """Return the entity's current value."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             ct = {}
@@ -2668,6 +2729,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         props = self._properties
         attrs: dict[str, Any] = {
@@ -2686,11 +2748,19 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
         meter_net = JackerySmartMeterSensor._net_power(ct)
         input_available = self._grid_side_input_power(props) is not None
         output_available = self._grid_side_output_power(props) is not None
-        reported_load_available = self._first_power(props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW) is not None
+        reported_load_available = (
+            self._first_power(
+                props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW
+            )
+            is not None
+        )
         attrs["calculation_confidence"] = (
-            "direct_app_value" if reported_load_available and result is not None
-            else "fallback_complete" if input_available and output_available and result is not None
-            else "fallback_partial" if result is not None
+            "direct_app_value"
+            if reported_load_available and result is not None
+            else "fallback_complete"
+            if input_available and output_available and result is not None
+            else "fallback_partial"
+            if result is not None
             else "unavailable"
         )
         attrs["reported_home_load_available"] = reported_load_available
@@ -2701,15 +2771,21 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             attrs["home_consumption_source"] = result.source
             if result.smart_meter_net_power is not None:
                 attrs["smart_meter_net_power"] = round(result.smart_meter_net_power, 2)
-            attrs["jackery_grid_side_input_power"] = round(result.jackery_input_power, 2)
-            attrs["jackery_grid_side_output_power"] = round(result.jackery_output_power, 2)
+            attrs["jackery_grid_side_input_power"] = round(
+                result.jackery_input_power, 2
+            )
+            attrs["jackery_grid_side_output_power"] = round(
+                result.jackery_output_power, 2
+            )
 
         phases = JackerySmartMeterSensor._signed_phase_values(ct)
         if phases is not None:
             attrs["phase_a_signed_power"] = round(phases[0], 2)
             attrs["phase_b_signed_power"] = round(phases[1], 2)
             attrs["phase_c_signed_power"] = round(phases[2], 2)
-            attrs["signed_phase_convention"] = "positive=grid_import, negative=grid_export"
+            attrs["signed_phase_convention"] = (
+                "positive=grid_import, negative=grid_export"
+            )
 
         for key in (
             FIELD_IN_GRID_SIDE_PW,
@@ -2723,7 +2799,6 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             if key in props:
                 attrs[key] = props.get(key)
         return attrs
-
 
 
 # ---------------------------------------------------------------------------
@@ -2740,10 +2815,12 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "alarm_count")
 
     @property
     def native_value(self) -> int:
+        """Return the entity's current value."""
         alarms = self._alarm
         if isinstance(alarms, list):
             return len(alarms)
@@ -2757,6 +2834,7 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         alarms = self._alarm
         if isinstance(alarms, list):
             return {"alarms": alarms}
@@ -2784,17 +2862,19 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
         translation_key: str,
         source_key: str,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, key)
         self._attr_translation_key = translation_key
         self._source_key = source_key
 
     @property
     def native_value(self) -> datetime | None:
+        """Return the entity's current value."""
         ts_ms = self._device_meta.get(self._source_key)
         if not ts_ms:
             return None
         try:
-            return datetime.fromtimestamp(int(ts_ms) / 1000, tz=timezone.utc)
+            return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
         except (TypeError, ValueError, OSError):
             return None
 
@@ -2817,12 +2897,14 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
         translation_key: str,
         source_key: str,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, key)
         self._attr_translation_key = translation_key
         self._source_key = source_key
 
     @property
     def native_value(self) -> Any:
+        """Return the entity's current value."""
         return self._system.get(self._source_key)
 
 
@@ -2839,14 +2921,17 @@ class JackeryFirmwareSensor(JackeryEntity, SensorEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "firmware_version")
 
     @property
     def native_value(self) -> str | None:
+        """Return the entity's current value."""
         return self._ota.get(FIELD_CURRENT_VERSION)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
         ota = self._ota
         attrs: dict[str, Any] = {}
         # Surface only fields that are actually populated (many are null)
@@ -2882,6 +2967,7 @@ class JackeryLocationSensor(JackeryEntity, SensorEntity):
         key: str,
         axis: str,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, key)
         self._axis = axis
         self._attr_translation_key = key
@@ -2895,4 +2981,5 @@ class JackeryLocationSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
+        """Return the entity's current value."""
         return safe_float(self._location.get(self._axis))

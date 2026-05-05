@@ -617,5 +617,22 @@
       "title": "Jackery app statistics are inconsistent",
       "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections from APP_POLLING_MQTT.md and DATA_SOURCE_PRIORITY.md."
     }
+  },
+  "exceptions": {
+    "rename_system_failed": {
+      "message": "Could not rename Jackery system {system_id}: {error}"
+    },
+    "refresh_weather_plan_failed": {
+      "message": "Could not refresh weather plan for device {device_id}: {error}"
+    },
+    "delete_storm_alert_failed": {
+      "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
+    },
+    "mqtt_command_failed": {
+      "message": "Jackery MQTT command failed ({error}). Last MQTT error: {mqtt_last_error}"
+    },
+    "mqtt_missing_device_sn": {
+      "message": "Cannot send Jackery MQTT command for {device_id}: missing deviceSn"
+    }
   }
 }

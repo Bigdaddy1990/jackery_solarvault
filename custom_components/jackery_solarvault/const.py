@@ -1,4 +1,5 @@
 """Constants for the Jackery SolarVault integration."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -21,36 +22,63 @@ LOGIN_TIMEOUT_SEC: Final = 30
 MQTT_HOST: Final = "emqx.jackeryapp.com"
 MQTT_PORT: Final = 8883
 MQTT_KEEPALIVE_SEC: Final = 60
+
+# How long the integration tolerates silence on the MQTT subscription
+# before flagging it as stale in diagnostics. Real Jackery devices send
+# at least one heartbeat every ~30 s; 5 minutes of silence is a strong
+# signal the broker subscription is broken even though the TCP socket
+# is still open.
+MQTT_SILENT_THRESHOLD_SEC: Final = 300
+
+# How long a battery pack may report ``commState=0`` (offline) before the
+# coordinator removes it from PAYLOAD_BATTERY_PACKS. The Jackery cloud
+# never explicitly emits "pack-removed"; a pack that has been physically
+# unplugged simply stops appearing in MQTT updates while sometimes being
+# echoed on HTTP for a while. 7 days is conservative — daily power
+# outages or WiFi blips do NOT trigger removal, but a permanently-removed
+# pack is cleaned up within a week.
+BATTERY_PACK_STALE_THRESHOLD_SEC: Final = 7 * 24 * 3600
+
+# Internal field name used by the coordinator to remember when a pack
+# last reported as online. Not exposed as an entity attribute.
+PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
+
 # When the REST token/session rotates frequently (for example because the
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 90
 
 # HTTP endpoint constants. Keep this list aligned with APP_POLLING_MQTT.md.
-DEVICE_PROPERTY_PATH: Final = "/v1/device/property"       # ?deviceId=<id>
-SYSTEM_LIST_PATH: Final = "/v1/device/system/list"        # system/list discovery endpoint
-ALARM_PATH: Final = "/v1/api/alarm"                       # ?systemId=<id>
-SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"   # ?systemId=<id>
-PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"   # ?systemId=<id>&beginDate&endDate&dateType
-POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"    # ?systemId=<id>
+DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
+SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
+ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
+SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
+PV_TRENDS_PATH: Final = (
+    "/v1/device/stat/sys/pv/trends"  # ?systemId=<id>&beginDate&endDate&dateType
+)
+POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
 PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
 PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?systemId=<id>
-SAVE_SINGLE_MODE_PATH: Final = "/v1/device/dynamic/saveSingleMode"  # form: systemId,singlePrice,currency
-SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode" # form: systemId,platformCompanyId,systemRegion
+SAVE_SINGLE_MODE_PATH: Final = (
+    "/v1/device/dynamic/saveSingleMode"  # form: systemId,singlePrice,currency
+)
+SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion
 
 # Device/statistic endpoint group from APP_POLLING_MQTT.md.
-DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"   # ?deviceId=<id>
-HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"        # ?systemId&...
+DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
+HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...
 BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...
-DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"                  # ?deviceId&systemId&...
-DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"        # ?deviceId&...
-DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"            # ?deviceId&...
-DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"                  # ?deviceId&...
-DEVICE_METER_STAT_PATH: Final = "/v1/device/stat/meter"            # ?deviceId=<smart-meter subdevice>
-BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"          # ?deviceSn=<sn>
-OTA_LIST_PATH: Final = "/v1/device/ota/list"                       # ?deviceSnList=<sn>
-LOCATION_PATH: Final = "/v1/device/location"                       # ?deviceId=<id>
-SYSTEM_NAME_PATH: Final = "/v1/device/system/name"                 # PUT {systemName,id}
+DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"  # ?deviceId&systemId&...
+DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"  # ?deviceId&...
+DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...
+DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...
+DEVICE_METER_STAT_PATH: Final = (
+    "/v1/device/stat/meter"  # ?deviceId=<smart-meter subdevice>
+)
+BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
+OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
+LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>
+SYSTEM_NAME_PATH: Final = "/v1/device/system/name"  # PUT {systemName,id}
 
 # Experimental write endpoint observed in the app traffic.
 # The max-power endpoint was captured but only failed responses (code 10600)
@@ -86,9 +114,7 @@ CODE_TOKEN_EXPIRED: Final = 10402
 # --- Config / Options --------------------------------------------------------
 CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
 CONF_REGION_CODE: Final = "region_code"
-CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = (
-    "create_smart_meter_derived_sensors"
-)
+CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
 
 
@@ -112,7 +138,7 @@ UPDATE_INTERVAL: Final = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 # Slow-metric refresh cadences (decoupled from the fast property polling).
 # These values match the server-side update rhythm we observed in the
 # captured traffic — polling faster yields no fresher data.
-SLOW_METRICS_INTERVAL_SEC: Final = 300   # statistic + pv_trends + alarm
+SLOW_METRICS_INTERVAL_SEC: Final = 300  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 
@@ -422,147 +448,135 @@ STORM_MINUTES_FIELDS: Final = (FIELD_WPC, FIELD_MINS_INTERVAL)
 STORM_ENABLE_FIELDS: Final = (FIELD_WPS,)
 
 # MQTT subdevice routing and mirroring keys documented in MQTT_PROTOCOL.md.
-CT_METER_KEYS: Final = frozenset(
-    {
-        FIELD_CT_POWER,
-        FIELD_CT_POWER1,
-        FIELD_CT_POWER2,
-        FIELD_CT_POWER3,
-        FIELD_CT_VOLT,
-        FIELD_CT_VOLT1,
-        FIELD_CT_VOLT2,
-        FIELD_CT_VOLT3,
-        FIELD_CT_CURRENT,
-        FIELD_CT_CURRENT1,
-        FIELD_CT_CURRENT2,
-        FIELD_CT_CURRENT3,
-        FIELD_CT_FREQUENCY,
-        FIELD_CT_POWER_FACTOR,
-        FIELD_CT_POWER_FACTOR1,
-        FIELD_CT_POWER_FACTOR2,
-        FIELD_CT_POWER_FACTOR3,
-        "ap",
-        "ap1",
-        "ap2",
-        "ap3",
-        FIELD_CT_A_PHASE_POWER,
-        FIELD_CT_B_PHASE_POWER,
-        FIELD_CT_C_PHASE_POWER,
-        FIELD_CT_TOTAL_PHASE_POWER,
-        FIELD_CT_A_NEGATIVE_PHASE_POWER,
-        FIELD_CT_B_NEGATIVE_PHASE_POWER,
-        FIELD_CT_C_NEGATIVE_PHASE_POWER,
-        FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
-    }
-)
-SUBDEVICE_HINT_KEYS: Final = frozenset(
-    {
-        FIELD_SCAN_NAME,
-        FIELD_SUB_TYPE,
-        FIELD_DEV_TYPE,
-        FIELD_CT_A_PHASE_POWER,
-        FIELD_CT_B_PHASE_POWER,
-        FIELD_CT_C_PHASE_POWER,
-        FIELD_CT_TOTAL_PHASE_POWER,
-        FIELD_CT_A_NEGATIVE_PHASE_POWER,
-        FIELD_CT_B_NEGATIVE_PHASE_POWER,
-        FIELD_CT_C_NEGATIVE_PHASE_POWER,
-        FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
-    }
-)
-SUBDEVICE_ONLY_PROPERTY_KEYS: Final = frozenset(
-    {
-        FIELD_SCAN_NAME,
-        FIELD_SUB_TYPE,
-        FIELD_DEV_TYPE,
-        FIELD_DEVICE_SN,
-        FIELD_CMD,
-        "messageId",
-        "funForm",
-        "schePhase",
-        FIELD_COMM_MODE,
-        FIELD_COMM_STATE,
-        FIELD_IN_PW,
-        FIELD_OUT_PW,
-        FIELD_CT_A_PHASE_POWER,
-        FIELD_CT_B_PHASE_POWER,
-        FIELD_CT_C_PHASE_POWER,
-        FIELD_CT_TOTAL_PHASE_POWER,
-        FIELD_CT_A_NEGATIVE_PHASE_POWER,
-        FIELD_CT_B_NEGATIVE_PHASE_POWER,
-        FIELD_CT_C_NEGATIVE_PHASE_POWER,
-        FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
-    }
-)
-SUBDEVICE_MAIN_MIRROR_KEYS: Final = frozenset(
-    {
-        FIELD_IN_GRID_SIDE_PW,
-        FIELD_OUT_GRID_SIDE_PW,
-        FIELD_GRID_IN_PW,
-        FIELD_GRID_OUT_PW,
-        FIELD_IN_ONGRID_PW,
-        FIELD_OUT_ONGRID_PW,
-        FIELD_OTHER_LOAD_PW,
-        FIELD_MAX_FEED_GRID,
-        FIELD_MAX_GRID_STD_PW,
-        FIELD_MAX_OUT_PW,
-        FIELD_MAX_INV_STD_PW,
-        FIELD_OFF_GRID_TIME,
-        FIELD_OFF_GRID_DOWN,
-        FIELD_TEMP_UNIT,
-        FIELD_WORK_MODEL,
-        FIELD_WPS,
-        FIELD_WPC,
-        FIELD_MINS_INTERVAL,
-        FIELD_IS_AUTO_STANDBY,
-        FIELD_AUTO_STANDBY,
-        FIELD_IS_FOLLOW_METER_PW,
-        FIELD_DEFAULT_PW,
-        FIELD_STANDBY_PW,
-        FIELD_SW_EPS,
-        FIELD_SW_EPS_STATE,
-        FIELD_SW_EPS_IN_PW,
-        FIELD_SW_EPS_OUT_PW,
-        FIELD_REBOOT,
-        FIELD_ONLINE,
-    }
-)
-SYSTEM_INFO_KEYS: Final = frozenset(
-    {
-        FIELD_STAT,
-        FIELD_ONGRID_STAT,
-        FIELD_CT_STAT,
-        FIELD_GRID_STATE,
-        FIELD_ENERGY_PLAN_PW,
-        FIELD_MAX_SYS_OUT_PW,
-        FIELD_MAX_SYS_IN_PW,
-        FIELD_WPS,
-        FIELD_WPC,
-        FIELD_WORK_MODEL,
-        FIELD_MAX_FEED_GRID,
-        FIELD_FUNC_ENABLE,
-        FIELD_STANDBY_PW,
-        FIELD_OFF_GRID_DOWN,
-        FIELD_OFF_GRID_TIME,
-        FIELD_IS_AUTO_STANDBY,
-        FIELD_TEMP_UNIT,
-        FIELD_DEFAULT_PW,
-        FIELD_IS_FOLLOW_METER_PW,
-    }
-)
-BATTERY_PACK_HINT_KEYS: Final = frozenset(
-    {
-        FIELD_BAT_SOC,
-        FIELD_CELL_TEMP,
-        FIELD_IN_PW,
-        FIELD_OUT_PW,
-        FIELD_RB,
-        FIELD_IP,
-        FIELD_OP,
-        FIELD_VERSION,
-        FIELD_IS_FIRMWARE_UPGRADE,
-    }
-)
+CT_METER_KEYS: Final = frozenset({
+    FIELD_CT_POWER,
+    FIELD_CT_POWER1,
+    FIELD_CT_POWER2,
+    FIELD_CT_POWER3,
+    FIELD_CT_VOLT,
+    FIELD_CT_VOLT1,
+    FIELD_CT_VOLT2,
+    FIELD_CT_VOLT3,
+    FIELD_CT_CURRENT,
+    FIELD_CT_CURRENT1,
+    FIELD_CT_CURRENT2,
+    FIELD_CT_CURRENT3,
+    FIELD_CT_FREQUENCY,
+    FIELD_CT_POWER_FACTOR,
+    FIELD_CT_POWER_FACTOR1,
+    FIELD_CT_POWER_FACTOR2,
+    FIELD_CT_POWER_FACTOR3,
+    "ap",
+    "ap1",
+    "ap2",
+    "ap3",
+    FIELD_CT_A_PHASE_POWER,
+    FIELD_CT_B_PHASE_POWER,
+    FIELD_CT_C_PHASE_POWER,
+    FIELD_CT_TOTAL_PHASE_POWER,
+    FIELD_CT_A_NEGATIVE_PHASE_POWER,
+    FIELD_CT_B_NEGATIVE_PHASE_POWER,
+    FIELD_CT_C_NEGATIVE_PHASE_POWER,
+    FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
+})
+SUBDEVICE_HINT_KEYS: Final = frozenset({
+    FIELD_SCAN_NAME,
+    FIELD_SUB_TYPE,
+    FIELD_DEV_TYPE,
+    FIELD_CT_A_PHASE_POWER,
+    FIELD_CT_B_PHASE_POWER,
+    FIELD_CT_C_PHASE_POWER,
+    FIELD_CT_TOTAL_PHASE_POWER,
+    FIELD_CT_A_NEGATIVE_PHASE_POWER,
+    FIELD_CT_B_NEGATIVE_PHASE_POWER,
+    FIELD_CT_C_NEGATIVE_PHASE_POWER,
+    FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
+})
+SUBDEVICE_ONLY_PROPERTY_KEYS: Final = frozenset({
+    FIELD_SCAN_NAME,
+    FIELD_SUB_TYPE,
+    FIELD_DEV_TYPE,
+    FIELD_DEVICE_SN,
+    FIELD_CMD,
+    "messageId",
+    "funForm",
+    "schePhase",
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_IN_PW,
+    FIELD_OUT_PW,
+    FIELD_CT_A_PHASE_POWER,
+    FIELD_CT_B_PHASE_POWER,
+    FIELD_CT_C_PHASE_POWER,
+    FIELD_CT_TOTAL_PHASE_POWER,
+    FIELD_CT_A_NEGATIVE_PHASE_POWER,
+    FIELD_CT_B_NEGATIVE_PHASE_POWER,
+    FIELD_CT_C_NEGATIVE_PHASE_POWER,
+    FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
+})
+SUBDEVICE_MAIN_MIRROR_KEYS: Final = frozenset({
+    FIELD_IN_GRID_SIDE_PW,
+    FIELD_OUT_GRID_SIDE_PW,
+    FIELD_GRID_IN_PW,
+    FIELD_GRID_OUT_PW,
+    FIELD_IN_ONGRID_PW,
+    FIELD_OUT_ONGRID_PW,
+    FIELD_OTHER_LOAD_PW,
+    FIELD_MAX_FEED_GRID,
+    FIELD_MAX_GRID_STD_PW,
+    FIELD_MAX_OUT_PW,
+    FIELD_MAX_INV_STD_PW,
+    FIELD_OFF_GRID_TIME,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_TEMP_UNIT,
+    FIELD_WORK_MODEL,
+    FIELD_WPS,
+    FIELD_WPC,
+    FIELD_MINS_INTERVAL,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_AUTO_STANDBY,
+    FIELD_IS_FOLLOW_METER_PW,
+    FIELD_DEFAULT_PW,
+    FIELD_STANDBY_PW,
+    FIELD_SW_EPS,
+    FIELD_SW_EPS_STATE,
+    FIELD_SW_EPS_IN_PW,
+    FIELD_SW_EPS_OUT_PW,
+    FIELD_REBOOT,
+    FIELD_ONLINE,
+})
+SYSTEM_INFO_KEYS: Final = frozenset({
+    FIELD_STAT,
+    FIELD_ONGRID_STAT,
+    FIELD_CT_STAT,
+    FIELD_GRID_STATE,
+    FIELD_ENERGY_PLAN_PW,
+    FIELD_MAX_SYS_OUT_PW,
+    FIELD_MAX_SYS_IN_PW,
+    FIELD_WPS,
+    FIELD_WPC,
+    FIELD_WORK_MODEL,
+    FIELD_MAX_FEED_GRID,
+    FIELD_FUNC_ENABLE,
+    FIELD_STANDBY_PW,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_OFF_GRID_TIME,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_TEMP_UNIT,
+    FIELD_DEFAULT_PW,
+    FIELD_IS_FOLLOW_METER_PW,
+})
+BATTERY_PACK_HINT_KEYS: Final = frozenset({
+    FIELD_BAT_SOC,
+    FIELD_CELL_TEMP,
+    FIELD_IN_PW,
+    FIELD_OUT_PW,
+    FIELD_RB,
+    FIELD_IP,
+    FIELD_OP,
+    FIELD_VERSION,
+    FIELD_IS_FIRMWARE_UPGRADE,
+})
 
 
 # Normalized metadata/series keys used by app-period helpers. Request metadata is
@@ -775,6 +789,11 @@ PAYLOAD_DEBUG_LOG_FILENAME: Final = "jackery_solarvault_payload_debug.jsonl"
 PAYLOAD_DEBUG_LOGGER_NAME: Final = f"custom_components.{DOMAIN}.payload_debug"
 PAYLOAD_DEBUG_LOG_MAX_BYTES: Final = 2_000_000
 PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX: Final = ".1"
+# Per-channel throttle window for payload-debug records. Stops the JSONL log
+# from growing at the MQTT push-rate when a user enabled the dedicated DEBUG
+# logger and forgot to disable it. Genuine first-of-its-kind records are still
+# emitted immediately because the dedup check runs *before* the throttle.
+PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 REDACT_KEYS: Final = {
     "password",
     "username",
@@ -842,7 +861,8 @@ MQTT_TOPIC_ALERT: Final = "alert"
 MQTT_TOPIC_CONFIG: Final = "config"
 MQTT_TOPIC_NOTICE: Final = "notice"
 MQTT_TOPIC_COMMAND: Final = "command"
-MQTT_TOPIC_ACTION: Final = "action"  # Documented app topic; integration does not publish here.
+# Documented app topic; integration does not publish here.
+MQTT_TOPIC_ACTION: Final = "action"
 MQTT_TOPIC_SUFFIXES: Final = (
     MQTT_TOPIC_DEVICE,
     MQTT_TOPIC_ALERT,
@@ -1031,33 +1051,49 @@ MQTT_CMD_CONTROL_COMBINE: Final = 121
 # aligned with the MQTT command tables in MQTT_PROTOCOL.md and APP_POLLING_MQTT.md.
 
 # Individual action IDs used in outbound commands:
-ACTION_ID_SOC_CHARGE_LIMIT: Final = 3022           # cmd=107 DevicePropertyChange
-ACTION_ID_SOC_DISCHARGE_LIMIT: Final = 3028        # cmd=107 DevicePropertyChange
-ACTION_ID_MAX_FEED_GRID: Final = 3029              # cmd=121 ControlCombine (800W rule)
-ACTION_ID_MAX_OUT_PW: Final = 3038                 # cmd=121 ControlCombine
-ACTION_ID_AUTO_STANDBY: Final = 3021               # cmd=121 ControlCombine
-ACTION_ID_WORK_MODEL: Final = 3027                 # cmd=121 ControlCombine
-ACTION_ID_OFF_GRID_DOWN: Final = 3039              # cmd=121 ControlCombine
-ACTION_ID_OFF_GRID_TIME: Final = 3040              # cmd=121 ControlCombine
-ACTION_ID_TEMP_UNIT: Final = 3041                  # cmd=121 ControlCombine
-ACTION_ID_DEFAULT_PW: Final = 3043                 # cmd=121 ControlCombine
-ACTION_ID_FOLLOW_METER_PW: Final = 3044            # cmd=121 ControlCombine
-ACTION_ID_QUERY_COMBINE_DATA: Final = 3019         # cmd=120 QueryCombineData
+ACTION_ID_SOC_CHARGE_LIMIT: Final = 3022  # cmd=107 DevicePropertyChange
+ACTION_ID_SOC_DISCHARGE_LIMIT: Final = 3028  # cmd=107 DevicePropertyChange
+ACTION_ID_MAX_FEED_GRID: Final = 3029  # cmd=121 ControlCombine (800W rule)
+ACTION_ID_MAX_OUT_PW: Final = 3038  # cmd=121 ControlCombine
+ACTION_ID_AUTO_STANDBY: Final = 3021  # cmd=121 ControlCombine
+ACTION_ID_WORK_MODEL: Final = 3027  # cmd=121 ControlCombine
+ACTION_ID_OFF_GRID_DOWN: Final = 3039  # cmd=121 ControlCombine
+ACTION_ID_OFF_GRID_TIME: Final = 3040  # cmd=121 ControlCombine
+ACTION_ID_TEMP_UNIT: Final = 3041  # cmd=121 ControlCombine
+ACTION_ID_DEFAULT_PW: Final = 3043  # cmd=121 ControlCombine
+ACTION_ID_FOLLOW_METER_PW: Final = 3044  # cmd=121 ControlCombine
+ACTION_ID_QUERY_COMBINE_DATA: Final = 3019  # cmd=120 QueryCombineData
 ACTION_ID_WPS_ENABLED: Final = ACTION_ID_QUERY_COMBINE_DATA
-ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020         # cmd=23 QueryWeatherPlan
-ACTION_ID_EPS_ENABLED: Final = 3023                # cmd=107 DevicePropertyChange (EPS toggle)
-ACTION_ID_STANDBY: Final = ACTION_ID_EPS_ENABLED  # cmd=107 DevicePropertyChange (standby)
-ACTION_ID_REBOOT_DEVICE: Final = 3030              # cmd=107 DevicePropertyChange
-ACTION_ID_STORM_MINUTES: Final = 3034              # cmd=*** SendWeatherAlert
-ACTION_ID_DELETE_STORM_ALERT: Final = 3035         # cmd=*** CancelWeatherAlert
-ACTION_ID_STORM_WARNING: Final = 3036              # cmd=121 ControlCombine
-ACTION_ID_SUBDEVICE_3014: Final = 3014             # cmd=110 QuerySubDeviceGroupProperty, battery packs
-ACTION_ID_SUBDEVICE_3031: Final = 3031             # cmd=110 QuerySubDeviceGroupProperty, CT/smart meter
-ACTION_ID_SUBDEVICE_3037: Final = 3037             # cmd=110 QuerySubDeviceGroupProperty, combined subdevices
+ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020  # cmd=23 QueryWeatherPlan
+ACTION_ID_EPS_ENABLED: Final = 3023  # cmd=107 DevicePropertyChange (EPS toggle)
+ACTION_ID_STANDBY: Final = (
+    ACTION_ID_EPS_ENABLED  # cmd=107 DevicePropertyChange (standby)
+)
+ACTION_ID_REBOOT_DEVICE: Final = 3030  # cmd=107 DevicePropertyChange
+ACTION_ID_STORM_MINUTES: Final = 3034  # cmd=*** SendWeatherAlert
+ACTION_ID_DELETE_STORM_ALERT: Final = 3035  # cmd=*** CancelWeatherAlert
+ACTION_ID_STORM_WARNING: Final = 3036  # cmd=121 ControlCombine
+ACTION_ID_SUBDEVICE_3014: Final = (
+    3014  # cmd=110 QuerySubDeviceGroupProperty, battery packs
+)
+ACTION_ID_SUBDEVICE_3031: Final = (
+    3031  # cmd=110 QuerySubDeviceGroupProperty, CT/smart meter
+)
+ACTION_ID_SUBDEVICE_3037: Final = (
+    3037  # cmd=110 QuerySubDeviceGroupProperty, combined subdevices
+)
 
 # Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
 MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({3015, 3016, 3017, 3018})
-MQTT_ACTION_IDS_COMBINE: Final = frozenset(
-    {3019, 3021, 3027, 3029, 3039, 3040, 3041, 3043, 3044}
-)
+MQTT_ACTION_IDS_COMBINE: Final = frozenset({
+    3019,
+    3021,
+    3027,
+    3029,
+    3039,
+    3040,
+    3041,
+    3043,
+    3044,
+})
 MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3033, 3037})

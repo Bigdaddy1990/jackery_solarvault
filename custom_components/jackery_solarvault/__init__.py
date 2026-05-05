@@ -1,12 +1,11 @@
 """Jackery SolarVault integration."""
+
 from __future__ import annotations
 
-import logging
-import shutil
 from datetime import timedelta
+import logging
 from pathlib import Path
-
-import voluptuous as vol
+import shutil
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -15,10 +14,11 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
     HomeAssistantError,
+    ServiceValidationError,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import entity_registry as er
+import voluptuous as vol
 
 from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
@@ -52,37 +52,39 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 
+# Typed ConfigEntry alias — the runtime_data attribute is a
+# JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
+# alias lets type-checkers see through ``entry.runtime_data`` to the
+# concrete coordinator type without sprinkling cast/getattr around
+# the integration. PEP 695 syntax requires Python 3.12+; HA 2025.x
+# already requires Python 3.13.
+type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
+
 _LOGGER = logging.getLogger(__name__)
 
-RENAME_SCHEMA = vol.Schema(
-    {
-        vol.Required(SERVICE_FIELD_SYSTEM_ID): vol.All(
-            cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-        ),
-        vol.Required(SERVICE_FIELD_NEW_NAME): vol.All(
-            cv.string,
-            vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
-            vol.Length(max=64),
-        ),
-    }
-)
-REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema(
-    {
-        vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-            cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-        ),
-    }
-)
-DELETE_STORM_ALERT_SCHEMA = vol.Schema(
-    {
-        vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-            cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-        ),
-        vol.Required(SERVICE_FIELD_ALERT_ID): vol.All(
-            cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
-        ),
-    }
-)
+RENAME_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_SYSTEM_ID): vol.All(
+        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
+    ),
+    vol.Required(SERVICE_FIELD_NEW_NAME): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=64),
+    ),
+})
+REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
+    ),
+})
+DELETE_STORM_ALERT_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
+    ),
+    vol.Required(SERVICE_FIELD_ALERT_ID): vol.All(
+        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+    ),
+})
 
 
 BRAND_IMAGE_FILENAMES = (
@@ -185,15 +187,25 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 except JackeryError as err:
                     last_err = err
                     _LOGGER.debug(
-                        "rename_system via %s failed: %s", coord.entry.entry_id, err,
+                        "rename_system via %s failed: %s",
+                        coord.entry.entry_id,
+                        err,
                     )
                     continue
-            raise HomeAssistantError(
-                f"rename_system failed for system {system_id}: {last_err or 'no loaded Jackery entry'}"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="rename_system_failed",
+                translation_placeholders={
+                    "system_id": str(system_id),
+                    "error": str(last_err or "no loaded Jackery entry"),
+                },
             )
 
         hass.services.async_register(
-            DOMAIN, SERVICE_RENAME_SYSTEM, _handle_rename, schema=RENAME_SCHEMA,
+            DOMAIN,
+            SERVICE_RENAME_SYSTEM,
+            _handle_rename,
+            schema=RENAME_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_REFRESH_WEATHER_PLAN):
@@ -209,15 +221,23 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     last_err = err
                     _LOGGER.debug(
                         "refresh_weather_plan via %s failed: %s",
-                        coord.entry.entry_id, err,
+                        coord.entry.entry_id,
+                        err,
                     )
                     continue
-            raise HomeAssistantError(
-                f"refresh_weather_plan failed for device {device_id}: {last_err or 'no loaded Jackery entry'}"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="refresh_weather_plan_failed",
+                translation_placeholders={
+                    "device_id": str(device_id),
+                    "error": str(last_err or "no loaded Jackery entry"),
+                },
             )
 
         hass.services.async_register(
-            DOMAIN, SERVICE_REFRESH_WEATHER_PLAN, _handle_refresh_weather_plan,
+            DOMAIN,
+            SERVICE_REFRESH_WEATHER_PLAN,
+            _handle_refresh_weather_plan,
             schema=REFRESH_WEATHER_PLAN_SCHEMA,
         )
 
@@ -235,23 +255,31 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                     last_err = err
                     _LOGGER.debug(
                         "delete_storm_alert via %s failed: %s",
-                        coord.entry.entry_id, err,
+                        coord.entry.entry_id,
+                        err,
                     )
                     continue
-            raise HomeAssistantError(
-                f"delete_storm_alert failed for device {device_id} alert {alert_id}: {last_err or 'no loaded Jackery entry'}"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="delete_storm_alert_failed",
+                translation_placeholders={
+                    "device_id": str(device_id),
+                    "alert_id": str(alert_id),
+                    "error": str(last_err or "no loaded Jackery entry"),
+                },
             )
 
         hass.services.async_register(
-            DOMAIN, SERVICE_DELETE_STORM_ALERT, _handle_delete_storm_alert,
+            DOMAIN,
+            SERVICE_DELETE_STORM_ALERT,
+            _handle_delete_storm_alert,
             schema=DELETE_STORM_ALERT_SCHEMA,
         )
 
     return True
 
 
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up Jackery SolarVault from a config entry."""
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
@@ -316,7 +344,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-
 async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     """Remove known stale Energy helper sensors that were created without a unit."""
     registry = er.async_get(hass)
@@ -332,7 +359,9 @@ async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         # should be removed when it no longer has a valid unit.
         if any(token in lowered for token in STALE_HELPER_VENDOR_TOKENS):
             state = hass.states.get(entity_id)
-            unit = None if state is None else state.attributes.get("unit_of_measurement")
+            unit = (
+                None if state is None else state.attributes.get("unit_of_measurement")
+            )
             if unit in (None, ""):
                 to_remove.append(entity_id)
                 continue
@@ -357,7 +386,6 @@ async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
             entity_id,
         )
         registry.async_remove(entity_id)
-
 
 
 async def _async_remove_smart_meter_derived_sensors(
@@ -453,17 +481,22 @@ async def _async_remove_removed_sensors(
             registry.async_remove(ent.entity_id)
 
 
-
-async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_update_listener(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    coordinator = getattr(entry, "runtime_data", None)
+async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
+    """Unload a config entry."""
+    coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok and hasattr(entry, "runtime_data"):
-        entry.runtime_data = None
+    # Note: entry.runtime_data is reset by HA on unload; explicit clear
+    # only happens on success to avoid leaking the coordinator if unload
+    # rolls back.
+    if unload_ok:
+        entry.runtime_data = None  # type: ignore[assignment]
     return unload_ok

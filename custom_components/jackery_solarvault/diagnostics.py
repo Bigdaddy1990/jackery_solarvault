@@ -1,4 +1,5 @@
 """Diagnostics support for Jackery SolarVault."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -24,7 +25,9 @@ def _redacted_payload_map(
     outer keys with stable local labels.
     """
     redacted: dict[str, Any] = {}
-    for index, key in enumerate(sorted(payloads, key=lambda value: str(value)), start=1):
+    for index, key in enumerate(
+        sorted(payloads, key=lambda value: str(value)), start=1
+    ):
         payload = payloads[key]
         label = f"{prefix}_{index}"
         if isinstance(payload, dict):
@@ -37,6 +40,7 @@ def _redacted_payload_map(
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
+    """Get config entry diagnostics."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
 
     devices = _redacted_payload_map(coordinator.data or {}, "device")
@@ -76,7 +80,8 @@ async def async_get_config_entry_diagnostics(
             coordinator.api.last_device_statistic_responses, "device_statistic_response"
         ),
         "device_period_stat_responses": _redacted_payload_map(
-            coordinator.api.last_device_period_stat_responses, "device_period_stat_response"
+            coordinator.api.last_device_period_stat_responses,
+            "device_period_stat_response",
         ),
         "battery_pack_responses": _redacted_payload_map(
             coordinator.api.last_battery_pack_responses, "battery_pack_response"

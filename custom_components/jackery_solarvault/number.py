@@ -5,11 +5,12 @@ Specials (max-feed-grid dynamic max, default-power 0.0 fallback,
 single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
+
 from __future__ import annotations
 
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 from homeassistant.components.number import (
@@ -24,7 +25,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import JackeryError
-from .coordinator import JackerySolarVaultCoordinator
 from .const import (
     FIELD_CURRENCY,
     FIELD_CURRENCY_CODE,
@@ -46,8 +46,15 @@ from .const import (
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
 )
+from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, safe_float, safe_int
+
+# Limit concurrent control-write/update calls. This is a setter platform:
+# writes go to the cloud and to MQTT. Serializing keeps the queue depth on
+# the broker bounded and prevents reordering of `DevicePropertyChange`
+# commands per HA dev guidance for write-heavy platforms.
+PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,6 +62,7 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Description
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, kw_only=True)
 class JackeryNumberDescription(NumberEntityDescription):
@@ -70,9 +78,9 @@ class JackeryNumberDescription(NumberEntityDescription):
     source_keys: tuple[str, ...] = ()
     source_section: str = PAYLOAD_PROPERTIES
     none_fallback: float | None = None
-    setter: Callable[
-        [JackerySolarVaultCoordinator, str, Any], Awaitable[Any]
-    ] | None = None
+    setter: (
+        Callable[[JackerySolarVaultCoordinator, str, Any], Awaitable[Any]] | None
+    ) = None
     dynamic_max: Callable[[dict[str, Any]], float] | None = None
     dynamic_unit: Callable[[dict[str, Any]], str] | None = None
     value_transform: Callable[[float], Any] = lambda v: int(round(v))
@@ -84,44 +92,68 @@ class JackeryNumberDescription(NumberEntityDescription):
 # Setter helpers
 # ---------------------------------------------------------------------------
 
-async def _set_soc_charge(coord, dev_id, value):
+
+async def _set_soc_charge(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the SOC charge limit on a device."""
     return await coord.async_set_soc_limits(dev_id, charge_limit=value)
 
 
-async def _set_soc_discharge(coord, dev_id, value):
+async def _set_soc_discharge(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the SOC discharge limit on a device."""
     return await coord.async_set_soc_limits(dev_id, discharge_limit=value)
 
 
-async def _set_max_feed_grid(coord, dev_id, value):
+async def _set_max_feed_grid(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the maximum grid feed-in power on a device."""
     return await coord.async_set_max_feed_grid(dev_id, value)
 
 
-async def _set_max_output_power(coord, dev_id, value):
+async def _set_max_output_power(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the maximum output power on a device."""
     return await coord.async_set_max_output_power(dev_id, value)
 
 
-async def _set_default_power(coord, dev_id, value):
+async def _set_default_power(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the default-load power preference on a device."""
     return await coord.async_set_default_power(dev_id, value)
 
 
-async def _set_single_price(coord, dev_id, value):
+async def _set_single_price(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
+    """Set the single-tariff electricity price on a device."""
     return await coord.async_set_single_price(dev_id, value)
 
 
-async def _set_max_power_experimental(coord, dev_id, value):
+async def _set_max_power_experimental(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> bool:
     """Direct API call for experimental max-power setter."""
     try:
         ok = await coord.api.async_set_max_power(dev_id, value)
     except JackeryError as err:
         _LOGGER.error(
             "Max-power write failed for device %s (value=%s): %s",
-            dev_id, value, err,
+            dev_id,
+            value,
+            err,
         )
         raise
     if not ok:
         _LOGGER.warning(
             "Server returned data=false for max-power=%sW on device %s",
-            value, dev_id,
+            value,
+            dev_id,
         )
     return ok
 
@@ -129,6 +161,7 @@ async def _set_max_power_experimental(coord, dev_id, value):
 # ---------------------------------------------------------------------------
 # Dynamic-value helpers
 # ---------------------------------------------------------------------------
+
 
 def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     """800W if device max-out is ≤800W, else 2500W (German balcony rule)."""
@@ -251,6 +284,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
 # Generic entity
 # ---------------------------------------------------------------------------
 
+
 class JackeryNumber(JackeryEntity, NumberEntity):
     """Generic description-driven number entity for Jackery."""
 
@@ -262,6 +296,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         device_id: str,
         description: JackeryNumberDescription,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
@@ -271,6 +306,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
+        """Return the entity's current value."""
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -280,24 +316,28 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
+        """Return the highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(self._payload)
         return float(self.entity_description.native_max_value)
 
     @property
     def native_unit_of_measurement(self) -> str | None:
+        """Return the entity's unit of measurement."""
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
 
     async def async_set_native_value(self, value: float) -> None:
-        if self.entity_description.validate_range:
-            if value < self.native_min_value or value > self.native_max_value:
-                raise ValueError(
-                    f"{self.entity_description.key} must be between "
-                    f"{self.native_min_value:.0f} and "
-                    f"{self.native_max_value:.0f}"
-                )
+        """Forward a numeric write to the device."""
+        if self.entity_description.validate_range and (
+            value < self.native_min_value or value > self.native_max_value
+        ):
+            raise ValueError(
+                f"{self.entity_description.key} must be between "
+                f"{self.native_min_value:.0f} and "
+                f"{self.native_max_value:.0f}"
+            )
         if self.entity_description.setter is None:
             return
         wire_value = self.entity_description.value_transform(value)
@@ -320,6 +360,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

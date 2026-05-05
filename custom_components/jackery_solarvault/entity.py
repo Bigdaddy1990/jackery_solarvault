@@ -1,4 +1,5 @@
 """Shared entity base class."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -9,9 +10,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
+    FIELD_DEV_MODEL,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
-    FIELD_DEV_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,
@@ -38,6 +39,8 @@ from .coordinator import JackerySolarVaultCoordinator
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
+    """Jackery entity."""
+
     _attr_has_entity_name = True
 
     def __init__(
@@ -46,6 +49,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         device_id: str,
         key_suffix: str,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{device_id}_{key_suffix}"
@@ -120,6 +124,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
+        """Return device-registry metadata for this entity."""
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -131,9 +136,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or "SolarVault"
         )
         sw_version = self._ota.get(FIELD_CURRENT_VERSION) or None
-        sn = (
-            self._device_meta.get(FIELD_DEVICE_SN)
-            or self._discovery.get(FIELD_DEVICE_SN)
+        sn = self._device_meta.get(FIELD_DEVICE_SN) or self._discovery.get(
+            FIELD_DEVICE_SN
         )
 
         return DeviceInfo(
@@ -147,6 +151,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def available(self) -> bool:
+        """Return whether the entity is currently available."""
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)

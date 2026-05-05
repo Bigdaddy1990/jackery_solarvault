@@ -1,4 +1,5 @@
 """Select platform for Jackery SolarVault preset-style controls."""
+
 from __future__ import annotations
 
 import logging
@@ -11,13 +12,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import JackerySolarVaultCoordinator
 from .const import (
     AUTO_OFF_HOURS,
     DEFAULT_STORM_WARNING_MINUTES,
+    FIELD_CID,
     FIELD_COMPANY_NAME,
     FIELD_COUNTRY,
-    FIELD_CID,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_MINS_INTERVAL,
     FIELD_NAME,
@@ -31,8 +31,8 @@ from .const import (
     FIELD_STORM,
     FIELD_SYSTEM_REGION,
     FIELD_TEMP_UNIT,
-    FIELD_WPC,
     FIELD_WORK_MODEL,
+    FIELD_WPC,
     FIELD_WPS,
     PAYLOAD_PRICE,
     PAYLOAD_PRICE_SOURCES,
@@ -40,13 +40,20 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
     PRICE_MODE_TO_OPTION,
     STORM_MINUTES_DEFAULT,
+    TEMP_UNIT_TO_OPTION,
     UNKNOWN_OPTION_PREFIX,
     WORK_MODE_READ_ALIASES,
     WORK_MODE_TO_OPTION,
-    TEMP_UNIT_TO_OPTION,
 )
+from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, safe_int, task_plan_value
+
+# Limit concurrent control-write/update calls. This is a setter platform:
+# writes go to the cloud and to MQTT. Serializing keeps the queue depth on
+# the broker bounded and prevents reordering of `DevicePropertyChange`
+# commands per HA dev guidance for write-heavy platforms.
+PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,12 +140,11 @@ def _price_source_label(source: dict[str, object]) -> str:
         or source.get(FIELD_PLATFORM_COMPANY_ID)
         or "Provider"
     ).strip()
-    country = str(source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or "").strip()
+    country = str(
+        source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or ""
+    ).strip()
     company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
-    if country:
-        label = f"{name} ({country})"
-    else:
-        label = name
+    label = f"{name} ({country})" if country else name
     if company_id not in (None, ""):
         return f"{label} #{company_id}"
     return label
@@ -182,6 +188,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[SelectEntity] = []
     seen_unique_ids: set[str] = set()
@@ -244,10 +251,12 @@ class JackeryWorkModeSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "work_mode_select")
 
     @property
     def options(self) -> list[str]:
+        """Return the list of available options."""
         opts = list(_OPTION_TO_WORK_MODE.keys())
         current = self.current_option
         if current and current not in opts:
@@ -256,6 +265,7 @@ class JackeryWorkModeSelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         raw = self._properties.get(FIELD_WORK_MODEL)
         if raw is None:
             raw = task_plan_value(self._task_plan, FIELD_WORK_MODEL)
@@ -275,6 +285,7 @@ class JackeryWorkModeSelect(JackeryEntity, SelectEntity):
         return f"{UNKNOWN_OPTION_PREFIX}{value}"
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         if option in _OPTION_TO_WORK_MODE:
             mode = _OPTION_TO_WORK_MODE[option]
         else:
@@ -296,17 +307,20 @@ class JackeryTempUnitSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "temp_unit_select")
         self._attr_options = list(_OPTION_TO_TEMP_UNIT.keys())
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         val = safe_int(self._properties.get(FIELD_TEMP_UNIT))
         if val is None:
             return None
         return TEMP_UNIT_TO_OPTION.get(val)
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         if option not in _OPTION_TO_TEMP_UNIT:
             raise ValueError(f"Invalid temperature unit option: {option}")
         await self.coordinator.async_set_temp_unit(
@@ -326,14 +340,19 @@ class JackeryIslandAutoOffSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "auto_off_island_mode")
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         raw = self._properties.get(FIELD_OFF_GRID_TIME)
         if raw is None:
             raw = task_plan_value(
-                self._task_plan, FIELD_OFF_GRID_TIME, FIELD_OFF_GRID_DOWN_TIME, FIELD_OFF_GRID_AUTO_OFF_TIME
+                self._task_plan,
+                FIELD_OFF_GRID_TIME,
+                FIELD_OFF_GRID_DOWN_TIME,
+                FIELD_OFF_GRID_AUTO_OFF_TIME,
             )
         if raw is None:
             return None
@@ -347,12 +366,11 @@ class JackeryIslandAutoOffSelect(JackeryEntity, SelectEntity):
         return None
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         if option not in _AUTO_OFF_OPTION_TO_HOURS:
             raise ValueError(f"Invalid island auto-off option: {option}")
         hours = _AUTO_OFF_OPTION_TO_HOURS[option]
-        await self.coordinator.async_set_off_grid_time(
-            self._device_id, hours * 60
-        )
+        await self.coordinator.async_set_off_grid_time(self._device_id, hours * 60)
         await self.coordinator.async_request_refresh()
 
 
@@ -366,10 +384,12 @@ class JackeryStormWarningMinutesSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "storm_warning_minutes_select")
 
     @property
     def options(self) -> list[str]:
+        """Return the list of available options."""
         values = set(STORM_MINUTES_DEFAULT)
         current_minutes = self._current_minutes()
         if current_minutes is not None and current_minutes > 0:
@@ -378,6 +398,7 @@ class JackeryStormWarningMinutesSelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         current_minutes = self._current_minutes()
         if current_minutes is None:
             return None
@@ -394,6 +415,7 @@ class JackeryStormWarningMinutesSelect(JackeryEntity, SelectEntity):
         )
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         match = re.fullmatch(r"min_(\d+)", option)
         if not match:
             raise ValueError(f"Invalid storm warning lead-time option: {option}")
@@ -412,12 +434,15 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "electricity_price_mode")
 
     def _current_mode(self) -> int | None:
         raw = self._price.get(FIELD_DYNAMIC_OR_SINGLE)
         if raw is None:
-            raw = task_plan_value(self._task_plan, FIELD_DYNAMIC_OR_SINGLE, FIELD_PRICE_MODE)
+            raw = task_plan_value(
+                self._task_plan, FIELD_DYNAMIC_OR_SINGLE, FIELD_PRICE_MODE
+            )
         if raw is None:
             work_mode = safe_int(self._properties.get(FIELD_WORK_MODEL))
             if work_mode == 7:
@@ -436,6 +461,7 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
 
     @property
     def options(self) -> list[str]:
+        """Return the list of available options."""
         opts: list[str] = [
             PRICE_MODE_TO_OPTION[1],
             PRICE_MODE_TO_OPTION[2],
@@ -447,6 +473,7 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         mode = self._current_mode()
         if mode is None:
             return None
@@ -456,6 +483,7 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
         return f"{UNKNOWN_OPTION_PREFIX}{mode}"
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         mode = _OPTION_TO_PRICE_MODE.get(option)
         if mode is None:
             raise ValueError(f"Invalid electricity price mode option: {option}")
@@ -481,10 +509,12 @@ class JackeryElectricityPriceSourceSelect(JackeryEntity, SelectEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "electricity_price_provider")
 
     @property
     def options(self) -> list[str]:
+        """Return the list of available options."""
         labels = [_price_source_label(source) for source in self._sources()]
         current = self.current_option
         if current and current not in labels:
@@ -493,6 +523,7 @@ class JackeryElectricityPriceSourceSelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
+        """Return the currently-selected option."""
         company_id = self._price.get(FIELD_PLATFORM_COMPANY_ID)
         region = self._price.get(FIELD_SYSTEM_REGION)
         if company_id in (None, ""):
@@ -500,18 +531,17 @@ class JackeryElectricityPriceSourceSelect(JackeryEntity, SelectEntity):
         for source in self._sources():
             if _price_source_matches_current(source, company_id, region):
                 return _price_source_label(source)
-        return _price_source_label(
-            {
-                FIELD_PLATFORM_COMPANY_ID: company_id,
-                FIELD_COUNTRY: region,
-                FIELD_COMPANY_NAME: self._price.get(FIELD_COMPANY_NAME),
-            }
-        )
+        return _price_source_label({
+            FIELD_PLATFORM_COMPANY_ID: company_id,
+            FIELD_COUNTRY: region,
+            FIELD_COMPANY_NAME: self._price.get(FIELD_COMPANY_NAME),
+        })
 
     def _sources(self) -> list[dict[str, object]]:
         return _price_sources_from_payload(self._payload)
 
     async def async_select_option(self, option: str) -> None:
+        """Select option."""
         for source in self._sources():
             if _price_source_label(source) == option:
                 await self.coordinator.async_set_price_source(

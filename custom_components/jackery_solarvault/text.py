@@ -1,4 +1,5 @@
 """Text platform for Jackery SolarVault — editable system name."""
+
 from __future__ import annotations
 
 import logging
@@ -11,7 +12,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import JackeryError
-from .coordinator import JackerySolarVaultCoordinator
 from .const import (
     FIELD_DEVICE_NAME,
     FIELD_ID,
@@ -19,8 +19,15 @@ from .const import (
     FIELD_SYSTEM_NAME,
     PAYLOAD_SYSTEM,
 )
+from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity
+
+# Limit concurrent control-write/update calls. This is a setter platform:
+# writes go to the cloud and to MQTT. Serializing keeps the queue depth on
+# the broker bounded and prevents reordering of `DevicePropertyChange`
+# commands per HA dev guidance for write-heavy platforms.
+PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +37,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[TextEntity] = []
     seen_unique_ids: set[str] = set()
@@ -60,15 +68,18 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "system_name")
 
     @property
     def native_value(self) -> str | None:
+        """Return the entity's current value."""
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
+        """Forward a text write to the device."""
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:
@@ -79,9 +90,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
             raise ValueError("System name must not be empty")
 
         try:
-            ok = await self.coordinator.api.async_set_system_name(
-                system_id, new_name
-            )
+            ok = await self.coordinator.api.async_set_system_name(system_id, new_name)
         except JackeryError as err:
             _LOGGER.error("Failed to rename system %s: %s", system_id, err)
             raise

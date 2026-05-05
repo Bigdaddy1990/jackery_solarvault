@@ -1,15 +1,17 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
+
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import contextlib
+from datetime import UTC, datetime
 import inspect
 import json
 import logging
-import ssl
 from pathlib import Path
-from datetime import UTC, datetime
-from typing import Any, Awaitable, Callable
+import ssl
+from typing import Any
 
 from gmqtt import Client as MQTTClient
 from gmqtt.mqtt.constants import MQTTv311
@@ -23,6 +25,7 @@ from .const import (
     MQTT_HOST,
     MQTT_KEEPALIVE_SEC,
     MQTT_PORT,
+    MQTT_SILENT_THRESHOLD_SEC,
     MQTT_TOPIC_PREFIX,
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
@@ -40,6 +43,7 @@ class JackeryMqttPushClient:
         message_callback: Callable[[str, dict[str, Any]], Awaitable[None]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         self._hass = hass
         self._loop = hass.loop
         self._message_callback = message_callback
@@ -165,9 +169,11 @@ class JackeryMqttPushClient:
     async def _async_wait_connected(self, timeout_sec: float) -> None:
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             if self._last_error:
-                raise RuntimeError(f"MQTT not connected yet ({self._last_error})") from err
+                raise RuntimeError(
+                    f"MQTT not connected yet ({self._last_error})"
+                ) from err
             self._last_error = "publish timeout waiting for MQTT connect"
             raise RuntimeError("MQTT not connected yet") from err
         if not self._connected:
@@ -219,12 +225,18 @@ class JackeryMqttPushClient:
         ctx = ssl.create_default_context()
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
-        ca_path = Path(self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt"))
+        ca_path = Path(
+            self._hass.config.path(
+                "custom_components", "jackery_solarvault", "jackery_ca.crt"
+            )
+        )
         if ca_path.is_file():
             try:
                 ctx.load_verify_locations(cafile=str(ca_path))
             except (OSError, ssl.SSLError) as err:
-                _LOGGER.warning("Jackery MQTT CA file %s could not be loaded: %s", ca_path, err)
+                _LOGGER.warning(
+                    "Jackery MQTT CA file %s could not be loaded: %s", ca_path, err
+                )
             else:
                 self._tls_custom_ca_loaded = True
                 source_parts.append(f"jackery_ca:{ca_path}")
@@ -250,7 +262,7 @@ class JackeryMqttPushClient:
         return ctx
 
     def _on_connect(self, _client: MQTTClient, *args: Any) -> None:
-        """gmqtt connect callback."""
+        """Gmqtt connect callback."""
         rc = self._extract_connect_rc(args)
         if rc != 0:
             self._connected = False
@@ -291,7 +303,7 @@ class JackeryMqttPushClient:
         return 0
 
     def _on_disconnect(self, _client: MQTTClient, *args: Any) -> None:
-        """gmqtt disconnect callback."""
+        """Gmqtt disconnect callback."""
         self._connected = False
         self._last_disconnect_at = self._utc_now_iso()
         self._connected_event.clear()
@@ -378,6 +390,7 @@ class JackeryMqttPushClient:
 
     @property
     def diagnostics(self) -> dict[str, Any]:
+        """Return a redacted snapshot of the MQTT client state for diagnostics."""
         return {
             "connected": self._connected,
             "started": self._client is not None,
@@ -392,6 +405,8 @@ class JackeryMqttPushClient:
             "last_disconnect_at": self._last_disconnect_at,
             "last_message_at": self._last_message_at,
             "last_publish_at": self._last_publish_at,
+            "seconds_since_last_message": self._seconds_since_last_message(),
+            "mqtt_silent_for_too_long": self._mqtt_silent_for_too_long(),
             "host": MQTT_HOST,
             "port": MQTT_PORT,
             "connect_attempts": self._connect_attempts,
@@ -402,10 +417,55 @@ class JackeryMqttPushClient:
             "library": MQTT_CLIENT_LIBRARY,
         }
 
+    def _seconds_since_last_message(self) -> float | None:
+        """Return seconds elapsed since the last inbound MQTT frame, or None.
+
+        ``None`` means we have not received a single message yet on this
+        client lifetime — the broker connect may have succeeded but the
+        topic subscriptions may not have been honoured. The
+        ``mqtt_silent_for_too_long`` flag combines this with a threshold.
+        """
+        if self._last_message_at is None:
+            return None
+        try:
+            then = datetime.fromisoformat(self._last_message_at)
+        except ValueError:
+            return None
+        now = datetime.now(tz=then.tzinfo)
+        return max(0.0, (now - then).total_seconds())
+
+    def _mqtt_silent_for_too_long(self) -> bool:
+        """Return True when the broker is "connected" but no message arrives.
+
+        Real Jackery devices emit at least one heartbeat per ~30 s. A
+        sustained silence of ``MQTT_SILENT_THRESHOLD_SEC`` (default 300 s)
+        while the connection is still open is a strong signal the
+        subscription is broken even though TCP is alive — surface it in
+        diagnostics so the user can investigate without enabling DEBUG.
+        """
+        if not self._connected:
+            return False
+        elapsed = self._seconds_since_last_message()
+        if elapsed is None:
+            # Still waiting for the first frame after connect — only
+            # flag if it has been silent longer than the threshold AND
+            # the connect itself was that long ago.
+            if self._last_connect_at is None:
+                return False
+            try:
+                then = datetime.fromisoformat(self._last_connect_at)
+            except ValueError:
+                return False
+            now = datetime.now(tz=then.tzinfo)
+            return (now - then).total_seconds() > MQTT_SILENT_THRESHOLD_SEC
+        return elapsed > MQTT_SILENT_THRESHOLD_SEC
+
     @property
     def is_started(self) -> bool:
+        """Return True once the connect/start lifecycle has run at least once."""
         return self._client is not None
 
     @property
     def is_connected(self) -> bool:
+        """Return True when the MQTT client has an active broker session."""
         return self._connected

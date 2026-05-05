@@ -1,12 +1,13 @@
 """Shared helpers for Jackery SolarVault entities."""
+
 from __future__ import annotations
 
 import calendar
 import contextlib
-import json
-import re
 from datetime import date, datetime, timedelta
+import json
 from pathlib import Path
+import re
 from typing import Any, NamedTuple
 
 from .const import (
@@ -18,8 +19,9 @@ from .const import (
     APP_CHART_SERIES_Y4,
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
-    APP_HOME_GRID_SERIES_KEYS,
     APP_CHART_STAT_METRICS,
+    APP_HOME_GRID_SERIES_KEYS,
+    APP_PERIOD_DATE_TYPES,
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_DATE_TYPE,
@@ -27,8 +29,6 @@ from .const import (
     APP_REQUEST_END_DATE,
     APP_REQUEST_END_DATE_ALT,
     APP_REQUEST_META,
-    APP_STAT_UNIT,
-    APP_UNIT_KWH,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
     APP_SECTION_CT_STAT,
@@ -44,41 +44,38 @@ from .const import (
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
     APP_STAT_TOTAL_DISCHARGE,
+    APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
-    APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
-    APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_SOLAR_ENERGY,
-    APP_STAT_TOTAL_GENERATION,
-    APP_PERIOD_DATE_TYPES,
-    DATE_TYPE_DAY,
-    DATE_TYPE_MONTH,
-    PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
-    PAYLOAD_DEBUG_LOG_MAX_BYTES,
-    REDACTED_VALUE,
-    REDACT_KEYS,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_YEAR,
+    APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+    APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+    APP_STAT_UNIT,
+    APP_UNIT_KWH,
+    CT_PHASE_POWER_PAIRS,
+    CT_TOTAL_POWER_PAIR,
     DATA_QUALITY_KEY_LABEL,
     DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
-    DATA_QUALITY_KEY_REFERENCE_SECTION,
-    DATA_QUALITY_KEY_REFERENCE_VALUE,
     DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
-    DATA_QUALITY_KEY_SOURCE_SECTION,
-    DATA_QUALITY_KEY_SOURCE_VALUE,
+    DATA_QUALITY_KEY_REFERENCE_SECTION,
+    DATA_QUALITY_KEY_REFERENCE_VALUE,
     DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
+    DATA_QUALITY_KEY_SOURCE_SECTION,
+    DATA_QUALITY_KEY_SOURCE_VALUE,
     DATA_QUALITY_KEY_TOTAL_METHOD,
     DATA_QUALITY_LEVEL_WARNING,
     DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
     DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
     DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
     DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
-    CT_TOTAL_POWER_PAIR,
-    CT_PHASE_POWER_PAIRS,
+    DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
@@ -88,12 +85,14 @@ from .const import (
     FIELD_OTHER_LOAD_PW,
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
+    PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
+    PAYLOAD_DEBUG_LOG_MAX_BYTES,
+    PAYLOAD_STATISTIC,
+    REDACT_KEYS,
+    REDACTED_VALUE,
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
-    PAYLOAD_STATISTIC,
 )
-
-
 
 
 def append_unique_entity(
@@ -205,7 +204,9 @@ def app_period_date_bounds(
     return begin.isoformat(), end.isoformat()
 
 
-def app_period_request_kwargs(date_type: str, *, today: date | None = None) -> dict[str, str]:
+def app_period_request_kwargs(
+    date_type: str, *, today: date | None = None
+) -> dict[str, str]:
     """Return method kwargs for documented app-period API calls."""
     begin, end = app_period_date_bounds(date_type, today=today)
     return {
@@ -265,7 +266,9 @@ def _payload_debug_redacted(value: Any) -> Any:
     """Return a recursively redacted, JSON-serializable debug payload."""
     if isinstance(value, dict):
         return {
-            str(key): REDACTED_VALUE if str(key) in REDACT_KEYS else _payload_debug_redacted(item)
+            str(key): REDACTED_VALUE
+            if str(key) in REDACT_KEYS
+            else _payload_debug_redacted(item)
             for key, item in value.items()
         }
     if isinstance(value, list):
@@ -303,14 +306,12 @@ def chart_series_debug(source: Any) -> dict[str, Any]:
         found = False
         for index, raw in enumerate(series):
             parsed = safe_float(raw)
-            parsed_items.append(
-                {
-                    "index": index,
-                    "raw": raw,
-                    "raw_type": type(raw).__name__,
-                    "parsed_float": parsed,
-                }
-            )
+            parsed_items.append({
+                "index": index,
+                "raw": raw,
+                "raw_type": type(raw).__name__,
+                "parsed_float": parsed,
+            })
             if parsed is not None:
                 total += parsed
                 found = True
@@ -338,7 +339,9 @@ def append_payload_debug_line(path: str | Path, event: dict[str, Any]) -> None:
             debug_path.replace(backup)
     redacted = _payload_debug_redacted(event)
     with debug_path.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str))
+        file.write(
+            json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
+        )
         file.write("\n")
 
 
@@ -410,9 +413,13 @@ class AppDataQualityWarning(NamedTuple):
         if self.reference_request is not None:
             payload[DATA_QUALITY_KEY_REFERENCE_REQUEST] = dict(self.reference_request)
         if self.source_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = self.source_chart_series_key
+            payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
+                self.source_chart_series_key
+            )
         if self.reference_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = self.reference_chart_series_key
+            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
+                self.reference_chart_series_key
+            )
         if self.total_method is not None:
             payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
         return payload
@@ -448,8 +455,12 @@ def _format_request_range(request: Any) -> str | None:
     """Return a compact dateType/range summary for diagnostics messages."""
     if not isinstance(request, dict):
         return None
-    date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(APP_REQUEST_DATE_TYPE_ALT)
-    begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+    date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
+        APP_REQUEST_DATE_TYPE_ALT
+    )
+    begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
+        APP_REQUEST_BEGIN_DATE_ALT
+    )
     end = request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
     if not date_type and not begin and not end:
         return None
@@ -460,7 +471,11 @@ def _format_request_range(request: Any) -> str | None:
 
 def format_data_quality_warning(warning: dict[str, Any]) -> str:
     """Return a compact, deterministic repair/diagnostic warning example."""
-    metric = warning.get(DATA_QUALITY_KEY_LABEL) or warning.get(DATA_QUALITY_KEY_METRIC_KEY) or "unknown"
+    metric = (
+        warning.get(DATA_QUALITY_KEY_LABEL)
+        or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
+        or "unknown"
+    )
     source_section = warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or "unknown"
     source_value = warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)
     reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or "unknown"
@@ -472,7 +487,9 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
         f"< {reference_section}={reference_text}"
     )
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
-    reference_request = _format_request_range(warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST))
+    reference_request = _format_request_range(
+        warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST)
+    )
     if source_request or reference_request:
         text += (
             f" [{source_section}: {source_request or 'unknown'}; "
@@ -503,7 +520,9 @@ def app_data_quality_warnings(
         and week_begin.month == today.month
         and week_end.month == today.month
     )
-    week_inside_current_year = week_begin.year == today.year and week_end.year == today.year
+    week_inside_current_year = (
+        week_begin.year == today.year and week_end.year == today.year
+    )
 
     warnings: list[AppDataQualityWarning] = []
 
@@ -533,6 +552,7 @@ def app_data_quality_warnings(
         return None
 
     def _add_warning(
+        *,
         reason: str,
         metric_key: str,
         label: str,
@@ -542,6 +562,12 @@ def app_data_quality_warnings(
         reference_section: str,
         reference_value: float,
     ) -> None:
+        """Append a single contradiction warning to the loop-scoped list.
+
+        Keyword-only by design: with eight strings/floats it is otherwise
+        too easy to swap source and reference values silently. The
+        existing call sites all pass explicit kwargs.
+        """
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -554,8 +580,12 @@ def app_data_quality_warnings(
                 reference_value=round(reference_value, 5),
                 source_request=_request_for_section(source_section),
                 reference_request=_request_for_section(reference_section),
-                source_chart_series_key=_chart_series_key_for_section(source_section, stat_key),
-                reference_chart_series_key=_chart_series_key_for_section(reference_section, stat_key),
+                source_chart_series_key=_chart_series_key_for_section(
+                    source_section, stat_key
+                ),
+                reference_chart_series_key=_chart_series_key_for_section(
+                    reference_section, stat_key
+                ),
                 total_method="chart_series_sum"
                 if source_section != PAYLOAD_STATISTIC
                 else None,
@@ -568,14 +598,14 @@ def app_data_quality_warnings(
         year = _period_total(prefix, DATE_TYPE_YEAR, stat_key)
         if year is not None and month is not None and year + tolerance < month:
             _add_warning(
-                DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
-                metric_key,
-                label,
-                stat_key,
-                _section(prefix, DATE_TYPE_YEAR),
-                year,
-                _section(prefix, DATE_TYPE_MONTH),
-                month,
+                reason=DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
+                metric_key=metric_key,
+                label=label,
+                stat_key=stat_key,
+                source_section=_section(prefix, DATE_TYPE_YEAR),
+                source_value=year,
+                reference_section=_section(prefix, DATE_TYPE_MONTH),
+                reference_value=month,
             )
         if (
             week_inside_current_year
@@ -584,14 +614,14 @@ def app_data_quality_warnings(
             and year + tolerance < week
         ):
             _add_warning(
-                DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
-                metric_key,
-                label,
-                stat_key,
-                _section(prefix, DATE_TYPE_YEAR),
-                year,
-                _section(prefix, DATE_TYPE_WEEK),
-                week,
+                reason=DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
+                metric_key=metric_key,
+                label=label,
+                stat_key=stat_key,
+                source_section=_section(prefix, DATE_TYPE_YEAR),
+                source_value=year,
+                reference_section=_section(prefix, DATE_TYPE_WEEK),
+                reference_value=week,
             )
         if (
             week_inside_current_month
@@ -600,14 +630,14 @@ def app_data_quality_warnings(
             and month + tolerance < week
         ):
             _add_warning(
-                DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
-                metric_key,
-                label,
-                stat_key,
-                _section(prefix, DATE_TYPE_MONTH),
-                month,
-                _section(prefix, DATE_TYPE_WEEK),
-                week,
+                reason=DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
+                metric_key=metric_key,
+                label=label,
+                stat_key=stat_key,
+                source_section=_section(prefix, DATE_TYPE_MONTH),
+                source_value=month,
+                reference_section=_section(prefix, DATE_TYPE_WEEK),
+                reference_value=week,
             )
 
     statistic = payload.get(PAYLOAD_STATISTIC)
@@ -624,14 +654,14 @@ def app_data_quality_warnings(
             and lifetime_generation + tolerance < year_generation
         ):
             _add_warning(
-                DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
-                "pv_energy",
-                "PV energy",
-                APP_STAT_TOTAL_SOLAR_ENERGY,
-                PAYLOAD_STATISTIC,
-                lifetime_generation,
-                _section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
-                year_generation,
+                reason=DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
+                metric_key="pv_energy",
+                label="PV energy",
+                stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
+                source_section=PAYLOAD_STATISTIC,
+                source_value=lifetime_generation,
+                reference_section=_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+                reference_value=year_generation,
             )
 
     return warnings
@@ -677,7 +707,9 @@ def _parse_iso_date(value: Any) -> date | None:
 def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
-        date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(APP_REQUEST_DATE_TYPE_ALT)
+        date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
+            APP_REQUEST_DATE_TYPE_ALT
+        )
         if isinstance(date_type, str):
             return date_type
     for suffix in (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR):
@@ -689,14 +721,12 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
 def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
     """Return True for device app dateType=year statistic payloads."""
     date_type = _trend_date_type(section, source)
-    return date_type == DATE_TYPE_YEAR and section.startswith(
-        (
-            APP_SECTION_PV_STAT,
-            APP_SECTION_HOME_STAT,
-            APP_SECTION_BATTERY_STAT,
-            APP_SECTION_CT_STAT,
-        )
-    )
+    return date_type == DATE_TYPE_YEAR and section.startswith((
+        APP_SECTION_PV_STAT,
+        APP_SECTION_HOME_STAT,
+        APP_SECTION_BATTERY_STAT,
+        APP_SECTION_CT_STAT,
+    ))
 
 
 def _compact_year_parts(value: Any) -> tuple[float, float] | None:
@@ -721,15 +751,15 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     text = str(value).strip()
     if not text:
         return None
-    text = text.replace(',', '.')
-    sign = -1.0 if text.startswith('-') else 1.0
-    unsigned = text[1:] if text.startswith('-') else text
-    if '.' not in unsigned:
+    text = text.replace(",", ".")
+    sign = -1.0 if text.startswith("-") else 1.0
+    unsigned = text[1:] if text.startswith("-") else text
+    if "." not in unsigned:
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
-    whole_text, fraction_text = unsigned.split('.', 1)
+    whole_text, fraction_text = unsigned.split(".", 1)
     if not whole_text:
-        whole_text = '0'
+        whole_text = "0"
     if not whole_text.isdigit() or not fraction_text.isdigit():
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
@@ -792,7 +822,7 @@ def expanded_year_series_values(
     Tolerance is the larger of 0.05 kWh (covers rounding noise like
     ``71.72`` vs sum ``71.72000003``) and 0.5 % of the absolute total.
 
-    Returns
+    Returns:
     -------
     list[float] | None
         Effective per-month series, or ``None`` if the section/stat_key is
@@ -909,7 +939,7 @@ def effective_period_total_value(
 
 def compact_json(value: Any) -> str:
     """Return compact JSON for diagnostic attributes."""
-    return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def trend_series_points(
@@ -940,8 +970,13 @@ def trend_series_points(
     begin = None
     end = None
     if isinstance(request, dict):
-        begin = _parse_iso_date(request.get(APP_REQUEST_BEGIN_DATE) or request.get(APP_REQUEST_BEGIN_DATE_ALT))
-        end = _parse_iso_date(request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT))
+        begin = _parse_iso_date(
+            request.get(APP_REQUEST_BEGIN_DATE)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+        )
+        end = _parse_iso_date(
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+        )
     date_type = _trend_date_type(section, source)
     if begin is None:
         return []
@@ -967,8 +1002,6 @@ def trend_series_points(
             continue
         points.append(TrendStatisticPoint(bucket_start, round(value, 5)))
     return points
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -1026,7 +1059,9 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     fields. The Jackery app uses the aggregate pair for its net CT value; the
     phase fields remain available for gross import/export/flow diagnostics.
     """
-    total = directional_power_value(ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],))
+    total = directional_power_value(
+        ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],)
+    )
     if total is not None:
         return total
     phases = signed_phase_power_values(ct)
@@ -1173,9 +1208,11 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
     (for example raw May value 13.26 -> April 13, May 26) before totals or
     external statistics are published.
     """
-    if not section.endswith(
-        (f"_{DATE_TYPE_WEEK}", f"_{DATE_TYPE_MONTH}", f"_{DATE_TYPE_YEAR}")
-    ):
+    if not section.endswith((
+        f"_{DATE_TYPE_WEEK}",
+        f"_{DATE_TYPE_MONTH}",
+        f"_{DATE_TYPE_YEAR}",
+    )):
         return None
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
@@ -1243,7 +1280,9 @@ def trend_series_total(
         if (
             section.startswith(APP_SECTION_HOME_STAT)
             and server_total == 0.0
-            and any(isinstance(source.get(key), list) for key in APP_HOME_GRID_SERIES_KEYS)
+            and any(
+                isinstance(source.get(key), list) for key in APP_HOME_GRID_SERIES_KEYS
+            )
         ):
             return 0.0
         if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
@@ -1290,17 +1329,20 @@ def trend_series_has_value(
         if (
             section.startswith(APP_SECTION_HOME_STAT)
             and server_total == 0.0
-            and any(isinstance(source.get(key), list) for key in APP_HOME_GRID_SERIES_KEYS)
+            and any(
+                isinstance(source.get(key), list) for key in APP_HOME_GRID_SERIES_KEYS
+            )
         ):
             return True
-        if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
-            return True
-        return False
+        return bool(
+            section.startswith(APP_SECTION_CT_STAT) and server_total is not None
+        )
     if any(safe_float(item) is not None for item in series):
         return True
-    if section.startswith(APP_SECTION_CT_STAT) and safe_float(source.get(stat_key)) is not None:
-        return True
-    return False
+    return bool(
+        section.startswith(APP_SECTION_CT_STAT)
+        and safe_float(source.get(stat_key)) is not None
+    )
 
 
 def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:

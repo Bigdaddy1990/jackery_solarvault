@@ -617,5 +617,22 @@
       "title": "Jackery-App-Statistiken sind widersprüchlich",
       "description": "Jackery hat widersprüchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen."
     }
+  },
+  "exceptions": {
+    "rename_system_failed": {
+      "message": "Jackery-System {system_id} konnte nicht umbenannt werden: {error}"
+    },
+    "refresh_weather_plan_failed": {
+      "message": "Wetterplan für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
+    },
+    "delete_storm_alert_failed": {
+      "message": "Sturm-Warnung {alert_id} für Gerät {device_id} konnte nicht gelöscht werden: {error}"
+    },
+    "mqtt_command_failed": {
+      "message": "Jackery MQTT-Befehl fehlgeschlagen ({error}). Letzter MQTT-Fehler: {mqtt_last_error}"
+    },
+    "mqtt_missing_device_sn": {
+      "message": "MQTT-Befehl für {device_id} kann nicht gesendet werden: deviceSn fehlt"
+    }
   }
 }

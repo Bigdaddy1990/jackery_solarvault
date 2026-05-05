@@ -1,9 +1,11 @@
 """Binary sensor platform for Jackery SolarVault."""
+
 from __future__ import annotations
 
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+import logging
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -15,8 +17,8 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import JackerySolarVaultCoordinator
 from .const import FIELD_ETH_PORT, FIELD_ONLINE_STATUS, FIELD_SW_EPS_STATE
+from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, safe_bool
 
@@ -25,6 +27,8 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class JackeryBinaryDescription(BinarySensorEntityDescription):
+    """Jackery binary description for the Jackery SolarVault entity description."""
+
     getter: Callable[[dict[str, Any], dict[str, Any]], Any]
 
 
@@ -60,6 +64,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[BinarySensorEntity] = []
     seen_unique_ids: set[str] = set()
@@ -69,13 +74,15 @@ async def async_setup_entry(
             entities, seen_unique_ids, entity, platform="binary_sensor", logger=_LOGGER
         )
 
-    for dev_id, payload in (coordinator.data or {}).items():
+    for dev_id, _payload in (coordinator.data or {}).items():
         for desc in BINARY_DESCRIPTIONS:
             _append_unique(JackeryBinarySensor(coordinator, dev_id, desc))
     async_add_entities(entities)
 
 
 class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
+    """Jackery binary sensor for the Jackery SolarVault integration."""
+
     entity_description: JackeryBinaryDescription
 
     def __init__(
@@ -84,11 +91,13 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         device_id: str,
         description: JackeryBinaryDescription,
     ) -> None:
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
     @property
     def is_on(self) -> bool | None:
+        """Return True when the entity is on."""
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
         )
