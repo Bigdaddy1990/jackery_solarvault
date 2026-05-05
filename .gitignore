@@ -8,3 +8,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .coverage
+htmlcov/
+coverage.xml
+
+# Generated payload-debug logs (only created when the dedicated DEBUG logger
+# is enabled; never check these into the repo).
+jackery_solarvault_payload_debug.jsonl
+jackery_solarvault_payload_debug.jsonl.1
