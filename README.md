@@ -192,3 +192,52 @@ Please submit bug reports and feature requests through [GitHub Issues](https://g
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Period rules and data quality (verbindliche Regeln)
+
+The integration honours the same period boundaries that the Jackery app
+itself uses, localised to the user's Home Assistant timezone:
+
+* **Woche = Montag bis Sonntag** (ISO 8601)
+* **Monat = Kalendermonat** (1. bis Monatsletzter)
+* **Jahr = Kalenderjahr** (1. Januar bis 31. Dezember)
+
+The integration must never silently fix one period using another period:
+**keine Wochenwerte zur Reparatur** von Monats- oder Jahres-Totals,
+keine Monatswerte für Jahres-Totals, keine Jahreswerte für
+Lifetime-Totals. Widersprüchliche Cloud-Werte erscheinen als Home
+Assistant **Repair**-Eintrag und in der **Diagnose**, der Entity-State
+bleibt aber auf der dokumentierten Quelle.
+
+## Diagnostics privacy
+
+Topic paths and account identifiers are redacted in diagnostics and the
+`mqtt_status` payload. The exported topic looks like
+`hb/app/**REDACTED**/` instead of the raw subscription path. Counters
+für **verworfene Payloads** ("dropped messages") werden separat
+mitgeführt.
+
+## Raw payload debug logging
+
+Raw HTTP/MQTT payloads are only written to
+`/config/jackery_solarvault_payload_debug.jsonl` when the dedicated
+DEBUG logger is enabled by the user:
+
+```yaml
+logger:
+  logs:
+    custom_components.jackery_solarvault.payload_debug: debug
+```
+
+The file is throttled (`PAYLOAD_DEBUG_THROTTLE_SEC = 60 s`) and rotated
+at 2 MB to `jackery_solarvault_payload_debug.jsonl.1`. Both file names
+are listed in `.gitignore`. On normal installations the file does not
+exist.
+
+## Brand assets
+
+The integration uses Home Assistant's brand cache at
+`/homeassistant/.cache/brands/integrations/jackery/` for icon/logo
+delivery, instead of bundling stale placeholders.

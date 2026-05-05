@@ -9,7 +9,11 @@
     "US",
     "GB",
     "NL",
-    "FR"
+    "FR",
+    "ES",
+    "IT"
   ],
-  "zip_release": false
+  "zip_release": true,
+  "filename": "jackery_solarvault.zip",
+  "hide_default_branch": false
 }

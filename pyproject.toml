@@ -59,7 +59,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py313"  # HA 2025.x ships Python 3.13; PEP 758 except-without-parens is 3.14-only
 line-length = 88
 src = ["custom_components", "scripts", "tests"]
 indent-width = 4
