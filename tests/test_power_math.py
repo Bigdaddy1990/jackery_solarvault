@@ -5,8 +5,6 @@ Home Assistant test harness. They cover the parts that are easiest to break:
 CT saldierung, gross phase flow and live home consumption.
 """
 
-from __future__ import annotations
-
 import importlib.util
 from pathlib import Path
 import sys

@@ -28,7 +28,7 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --preview || true
           ruff format .
-          
+
       - uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/ruff-baseline
