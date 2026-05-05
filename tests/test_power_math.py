@@ -7,17 +7,36 @@ CT saldierung, gross phase flow and live home consumption.
 from __future__ import annotations
 
 import importlib.util
+import sys
+import types
 from pathlib import Path
 
 
 def _load_util_module():
-    util_path = (
+    package_dir = (
         Path(__file__).resolve().parents[1]
         / "custom_components"
         / "jackery_solarvault"
-        / "util.py"
     )
-    spec = importlib.util.spec_from_file_location("jackery_solarvault_util", util_path)
+    sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
+    package = types.ModuleType("custom_components.jackery_solarvault")
+    package.__path__ = [str(package_dir)]
+    sys.modules.setdefault("custom_components.jackery_solarvault", package)
+
+    const_spec = importlib.util.spec_from_file_location(
+        "custom_components.jackery_solarvault.const",
+        package_dir / "const.py",
+    )
+    assert const_spec is not None
+    const_module = importlib.util.module_from_spec(const_spec)
+    sys.modules[const_spec.name] = const_module
+    assert const_spec.loader is not None
+    const_spec.loader.exec_module(const_module)
+
+    spec = importlib.util.spec_from_file_location(
+        "custom_components.jackery_solarvault.util",
+        package_dir / "util.py",
+    )
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -26,6 +45,118 @@ def _load_util_module():
 
 
 util = _load_util_module()
+
+
+
+
+def test_app_period_range_contract() -> None:
+    today = util.date(2026, 5, 3)
+
+    assert util.app_period_range("day", today=today) == (
+        util.date(2026, 5, 3),
+        util.date(2026, 5, 3),
+    )
+    assert util.app_period_range("week", today=today) == (
+        util.date(2026, 4, 27),
+        util.date(2026, 5, 3),
+    )
+    assert util.app_period_range("month", today=today) == (
+        util.date(2026, 5, 1),
+        util.date(2026, 5, 31),
+    )
+    assert util.app_period_range("year", today=today) == (
+        util.date(2026, 1, 1),
+        util.date(2026, 12, 31),
+    )
+
+
+def test_app_period_range_handles_boundaries_and_leap_years() -> None:
+    assert util.app_period_range("week", today=util.date(2026, 1, 1)) == (
+        util.date(2025, 12, 29),
+        util.date(2026, 1, 4),
+    )
+    assert util.app_period_range("month", today=util.date(2024, 2, 15)) == (
+        util.date(2024, 2, 1),
+        util.date(2024, 2, 29),
+    )
+    assert util.app_period_range("month", today=util.date(2026, 2, 15)) == (
+        util.date(2026, 2, 1),
+        util.date(2026, 2, 28),
+    )
+
+
+def test_app_period_range_rejects_unknown_date_types() -> None:
+    try:
+        util.app_period_range("quarter", today=util.date(2026, 5, 3))
+    except ValueError as err:
+        assert "Unsupported Jackery app period dateType" in str(err)
+    else:
+        raise AssertionError("unknown Jackery app dateType was silently accepted")
+
+
+def test_app_period_date_bounds_fills_only_missing_sides() -> None:
+    today = util.date(2026, 5, 3)
+
+    assert util.app_period_date_bounds("month", today=today) == (
+        "2026-05-01",
+        "2026-05-31",
+    )
+    assert util.app_period_date_bounds(
+        "month", begin_date="2026-05-02", today=today
+    ) == (
+        "2026-05-02",
+        "2026-05-31",
+    )
+    assert util.app_period_date_bounds(
+        "month", end_date=util.date(2026, 5, 20), today=today
+    ) == (
+        "2026-05-01",
+        "2026-05-20",
+    )
+
+
+
+def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
+    today = util.date(2026, 5, 3)
+
+    for kwargs in (
+        {"begin_date": ""},
+        {"begin_date": "2026/05/01"},
+        {"end_date": "not-a-date"},
+        {"begin_date": "2026-05-31", "end_date": "2026-05-01"},
+    ):
+        try:
+            util.app_period_date_bounds("month", today=today, **kwargs)
+        except ValueError as err:
+            assert "Jackery app period" in str(err)
+        else:
+            raise AssertionError(f"invalid app period bounds were accepted: {kwargs!r}")
+
+
+def test_app_period_date_bounds_strips_manual_date_strings() -> None:
+    assert util.app_period_date_bounds(
+        "month",
+        begin_date=" 2026-05-02 ",
+        end_date=" 2026-05-03 ",
+        today=util.date(2026, 5, 3),
+    ) == ("2026-05-02", "2026-05-03")
+
+
+def test_app_period_date_bounds_converts_datetime_to_date_only() -> None:
+    assert util.app_period_date_bounds(
+        "month",
+        begin_date=util.datetime(2026, 5, 2, 12, 30),
+        end_date=util.datetime(2026, 5, 3, 23, 59),
+        today=util.date(2026, 5, 3),
+    ) == ("2026-05-02", "2026-05-03")
+
+
+def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
+    assert util.app_period_request_kwargs("week", today=util.date(2026, 5, 3)) == {
+        "date_type": "week",
+        "begin_date": "2026-04-27",
+        "end_date": "2026-05-03",
+    }
 
 
 def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
@@ -244,7 +375,7 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
     ) == 3.25
 
 
-def test_empty_ct_period_series_is_not_a_usable_app_statistic() -> None:
+def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
     source = {
         "unit": "kWh",
         "totalInCtEnergy": "0",
@@ -253,12 +384,12 @@ def test_empty_ct_period_series_is_not_a_usable_app_statistic() -> None:
         "y2": [],
     }
 
-    assert not util.trend_series_has_value(
+    assert util.trend_series_has_value(
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
-    assert not util.trend_series_has_value(
+    assert util.trend_series_has_value(
         source,
         "device_ct_stat_month",
         "totalOutCtEnergy",
@@ -267,7 +398,7 @@ def test_empty_ct_period_series_is_not_a_usable_app_statistic() -> None:
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
-    ) is None
+    ) == 0.0
 
 
 def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
@@ -320,3 +451,402 @@ def test_period_trend_totals_from_latest_diagnostics() -> None:
     assert util.trend_series_total(bat_month, "battery_trends_month", "totalDisChgEgy") == 3.82
     assert util.trend_series_total(bat_year, "battery_trends_year", "totalChgEgy") == 3.49
     assert util.trend_series_total(bat_year, "battery_trends_year", "totalDisChgEgy") == 3.82
+
+
+def test_trend_series_points_build_week_daily_buckets() -> None:
+    source = {
+        "unit": "kWh",
+        "_request": {
+            "dateType": "week",
+            "beginDate": "2026-04-27",
+            "endDate": "2026-05-03",
+        },
+        "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.52, 0.0],
+    }
+
+    points = util.trend_series_points(
+        source,
+        "home_trends_week",
+        "totalHomeEgy",
+        today=util.date(2026, 5, 3),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.date(2026, 4, 27), 12.54),
+        util.TrendStatisticPoint(util.date(2026, 4, 28), 15.3),
+        util.TrendStatisticPoint(util.date(2026, 4, 29), 15.57),
+        util.TrendStatisticPoint(util.date(2026, 4, 30), 15.36),
+        util.TrendStatisticPoint(util.date(2026, 5, 1), 15.53),
+        util.TrendStatisticPoint(util.date(2026, 5, 2), 0.52),
+        util.TrendStatisticPoint(util.date(2026, 5, 3), 0.0),
+    ]
+
+
+def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None:
+    source = {
+        "unit": "kWh",
+        "_request": {
+            "dateType": "month",
+            "beginDate": "2026-05-01",
+            "endDate": "2026-05-31",
+        },
+        "y1": [3.49, 4.35, 0.0, 99.0],
+    }
+
+    points = util.trend_series_points(
+        source,
+        "device_battery_stat_month",
+        "totalCharge",
+        today=util.date(2026, 5, 3),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.date(2026, 5, 1), 3.49),
+        util.TrendStatisticPoint(util.date(2026, 5, 2), 4.35),
+        util.TrendStatisticPoint(util.date(2026, 5, 3), 0.0),
+    ]
+
+
+def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> None:
+    source = {
+        "unit": "kWh",
+        # Documented year total anchors compact expansion: 7.84 -> April=7, May=84
+        # plus 99 in June. Without this anchor the disambiguation (Path 3b)
+        # would publish raw values verbatim per DATA_SOURCE_PRIORITY.md.
+        "totalOutGridEnergy": "190",
+        "_request": {
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
+        "y2": [0.0, 0.0, 0.0, 0.0, 7.84, 99.0],
+    }
+
+    points = util.trend_series_points(
+        source,
+        "device_home_stat_year",
+        "totalOutGridEnergy",
+        today=util.date(2026, 5, 3),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.date(2026, 1, 1), 0.0),
+        util.TrendStatisticPoint(util.date(2026, 2, 1), 0.0),
+        util.TrendStatisticPoint(util.date(2026, 3, 1), 0.0),
+        util.TrendStatisticPoint(util.date(2026, 4, 1), 7.0),
+        util.TrendStatisticPoint(util.date(2026, 5, 1), 84.0),
+    ]
+
+
+def test_external_trend_statistic_id_uses_colon_external_id() -> None:
+    assert util.external_trend_statistic_id(
+        "jackery_solarvault",
+        "ABC-123",
+        "battery_charge_energy",
+        "daily",
+    ) == "jackery_solarvault:abc_123_battery_charge_energy_daily"
+
+
+def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
+    """``DATA_SOURCE_PRIORITY.md`` Non-negotiable rules: contradictions must
+    surface as warnings, never as silent cross-period repairs.
+
+    Setup: year payload encodes May as compact ``30.28`` (April=30 + May=28)
+    with documented ``totalOutGridEnergy=58`` confirming the encoding.
+    The full week (89.08 kWh) lies inside the same year, so 58 < 89.08
+    is a real contradiction in Jackery's data.
+    """
+    payload = {
+        "device_home_stat_week": {
+            "unit": "kWh",
+            "_request": {"dateType": "week", "beginDate": "2026-04-27", "endDate": "2026-05-03"},
+            "totalOutGridEnergy": "89.08",
+            "x": ["1", "2", "3", "4", "5", "6", "7"],
+            "y2": [15.0, 12.0, 10.0, 11.8, 14.0, 12.0, 14.28],
+        },
+        "device_home_stat_month": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "30.28",
+            "x": list(range(1, 32)),
+            "y2": [15.0, 14.0, 1.28] + [0.0] * 28,
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+            # Anchor confirming compact: 30.28 in slot[4] -> April=30 + May=28 = 58
+            "totalOutGridEnergy": "58",
+            "x": [str(i) for i in range(1, 13)],
+            "y2": [0.0, 0.0, 0.0, 0.0, 30.28, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
+
+    assert [warning.reason for warning in warnings] == ["year_less_than_week"]
+    assert warnings[0].source_section == "device_home_stat_year"
+    assert warnings[0].source_value == 58.0
+    assert warnings[0].reference_section == "device_home_stat_week"
+    assert warnings[0].reference_value == 89.08
+    assert warnings[0].source_request == {
+        "dateType": "year",
+        "beginDate": "2026-01-01",
+        "endDate": "2026-12-31",
+    }
+    assert warnings[0].reference_request == {
+        "dateType": "week",
+        "beginDate": "2026-04-27",
+        "endDate": "2026-05-03",
+    }
+    assert warnings[0].source_chart_series_key == "y2"
+    assert warnings[0].reference_chart_series_key == "y2"
+    assert warnings[0].total_method == "chart_series_sum"
+
+
+def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> None:
+    payload = {
+        "device_home_stat_week": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "89.08",
+            "y2": [15.0, 12.0, 10.0, 11.8, 14.0, 12.0, 14.28],
+        },
+        "device_home_stat_month": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "30.28",
+            "y2": [15.0, 14.0, 1.28] + [0.0] * 28,
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "100.00",
+            "y2": [0.0, 0.0, 0.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
+
+    assert not warnings
+
+
+def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() -> None:
+    payload = {
+        "statistic": {"totalGeneration": "41.31"},
+        "device_pv_stat_year": {
+            "unit": "kWh",
+            "totalSolarEnergy": "126.97",
+            "y": [0.0, 0.0, 0.0, 0.0, 126.97, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
+
+    assert [warning.reason for warning in warnings] == ["lifetime_less_than_year"]
+    assert warnings[0].source_section == "statistic"
+    assert warnings[0].reference_section == "device_pv_stat_year"
+
+
+def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
+    warning_a = util.AppDataQualityWarning(
+        level="warning",
+        reason="year_less_than_week",
+        metric_key="device_ongrid_output_energy",
+        label="Device grid-side output energy",
+        source_section="device_home_stat_year",
+        source_value=30.28,
+        reference_section="device_home_stat_week",
+        reference_value=89.08,
+    ).as_dict()
+    warning_b = dict(warning_a)
+    warning_c = util.AppDataQualityWarning(
+        level="warning",
+        reason="lifetime_less_than_year",
+        metric_key="pv_energy",
+        label="PV energy",
+        source_section="statistic",
+        source_value=41.31,
+        reference_section="device_pv_stat_year",
+        reference_value=126.97,
+    ).as_dict()
+
+    normalized = util.normalized_data_quality_warnings([warning_b, warning_c, warning_a])
+
+    assert normalized == [warning_c, warning_a]
+    assert util.format_data_quality_warning(normalized[0]) == (
+        "PV energy: statistic=41.31 < device_pv_stat_year=126.97"
+    )
+    assert util.format_data_quality_warning(normalized[1]) == (
+        "Device grid-side output energy: device_home_stat_year=30.28 "
+        "< device_home_stat_week=89.08"
+    )
+
+
+def test_data_quality_warning_format_includes_request_ranges_when_available() -> None:
+    warning = util.AppDataQualityWarning(
+        level="warning",
+        reason="year_less_than_week",
+        metric_key="device_ongrid_output_energy",
+        label="Device grid-side output energy",
+        source_section="device_home_stat_year",
+        source_value=40.45,
+        reference_section="device_home_stat_week",
+        reference_value=99.25,
+        source_request={"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+        reference_request={"dateType": "week", "beginDate": "2026-04-27", "endDate": "2026-05-03"},
+        source_chart_series_key="y2",
+        reference_chart_series_key="y2",
+        total_method="chart_series_sum",
+    ).as_dict()
+
+    assert warning["source_request"] == {
+        "dateType": "year",
+        "beginDate": "2026-01-01",
+        "endDate": "2026-12-31",
+    }
+    assert warning["reference_request"] == {
+        "dateType": "week",
+        "beginDate": "2026-04-27",
+        "endDate": "2026-05-03",
+    }
+    assert warning["source_chart_series_key"] == "y2"
+    assert warning["reference_chart_series_key"] == "y2"
+    assert warning["total_method"] == "chart_series_sum"
+    assert util.format_data_quality_warning(warning) == (
+        "Device grid-side output energy: device_home_stat_year=40.45 "
+        "< device_home_stat_week=99.25 "
+        "[device_home_stat_year: year 2026-01-01..2026-12-31; "
+        "device_home_stat_week: week 2026-04-27..2026-05-03]"
+    )
+
+
+def test_safe_int_decimal_strings_and_bad_values() -> None:
+    assert util.safe_int("8") == 8
+    assert util.safe_int("8.0") == 8
+    assert util.safe_int(8.9) == 8
+    assert util.safe_int(None) is None
+    assert util.safe_int("not-a-number") is None
+
+
+def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
+    assert util.safe_float("40,96") == 40.96
+    assert util.safe_float(" 59,43 ") == 59.43
+    assert util.safe_float("40,96") != 4096
+    assert util.safe_float("1,2,3") is None
+
+
+def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -> None:
+    """Compact-bucket expansion is applied when the documented total confirms it.
+
+    Per ``DATA_SOURCE_PRIORITY.md`` the device year series can encode two
+    adjacent months in one slot. The ``totalSolarEnergy`` field on the
+    payload anchors the disambiguation: ``40,96`` is interpreted as
+    ``40 + 96 = 136`` only when the documented total agrees.
+    """
+    source = {
+        "unit": "kWh",
+        "totalSolarEnergy": "136",  # anchors the compact interpretation
+        "y": ["0", "0", "40,96", "0"],
+    }
+
+    assert util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy") == 136.0
+    # Without an array context the month section is plain decimal.
+    month_source = {"unit": "kWh", "totalSolarEnergy": "40.96", "y": ["0", "0", "40,96", "0"]}
+    assert util.trend_series_total(month_source, "device_pv_stat_month", "totalSolarEnergy") == 40.96
+    assert util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy") != 4096
+
+
+def test_device_year_compact_bucket_expands_previous_and_current_months() -> None:
+    """Documented spec example from REPAIR_ROADMAP.md ("Device year compact bucket expansion").
+
+    Raw series ``[0,0,0,0,13.26,0,...]`` with documented year total ``39``
+    is published as ``[0,0,0,13,26,0,...]`` (April=13, May=26). The
+    ``totalDischarge="39"`` field is the anchor that confirms the compact
+    interpretation; without it path 3b would publish raw.
+    """
+    source = {
+        "unit": "kWh",
+        # The documented year total proves compact encoding is in effect.
+        "totalDischarge": "39",
+        "x": [str(i) for i in range(1, 13)],
+        "y2": [0.0, 0.0, 0.0, 0.0, 13.26, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+    }
+
+    assert util.effective_trend_series_values(
+        source, "device_battery_stat_year", "totalDischarge"
+    ) == [0.0, 0.0, 0.0, 13.0, 26.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert util.effective_period_total_value(
+        source, "device_battery_stat_year", "totalDischarge"
+    ) == 39.0
+    assert util.trend_series_total(
+        source, "device_battery_stat_year", "totalDischarge"
+    ) == 39.0
+
+
+def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw() -> None:
+    """Regression test for the real diag fixture (May 2026 SolarVault Pro Max).
+
+    Diagnostic data showed ``y[4] = 71.72`` paired with
+    ``totalSolarEnergy = "71.72"``. The previous unconditional expansion
+    inflated the published year value to ``143``, contaminating HA
+    long-term statistics with phantom April energy. Disambiguation must
+    keep this as a single Float and not invent a second month.
+    """
+    source = {
+        "unit": "kWh",
+        # totalSolarEnergy matches sum(raw) -> path 1, no expansion.
+        "totalSolarEnergy": "71.72",
+        "x": [str(i) for i in range(1, 13)],
+        "y": [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+    }
+
+    assert util.effective_trend_series_values(
+        source, "device_pv_stat_year", "totalSolarEnergy"
+    ) == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert util.effective_period_total_value(
+        source, "device_pv_stat_year", "totalSolarEnergy"
+    ) == 71.72
+    assert util.trend_series_total(
+        source, "device_pv_stat_year", "totalSolarEnergy"
+    ) == 71.72
+
+
+def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None:
+    """When neither raw nor compact-expanded sum matches the documented total
+    the integration must publish raw and surface the contradiction via
+    data_quality (per STRICT_WORK_INSTRUCTIONS.md rule 7: "Never hide,
+    synthesize, extrapolate, or repair energy values silently").
+    """
+    source = {
+        "unit": "kWh",
+        # Total contradicts both raw (71.72) and expanded (143).
+        "totalSolarEnergy": "100",
+        "x": [str(i) for i in range(1, 13)],
+        "y": [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+    }
+
+    # Raw is published verbatim — no silent "repair" to either 71.72 or 143.
+    values = util.effective_trend_series_values(
+        source, "device_pv_stat_year", "totalSolarEnergy"
+    )
+    assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert util.trend_series_total(
+        source, "device_pv_stat_year", "totalSolarEnergy"
+    ) == 71.72
+
+
+def test_month_series_does_not_use_compact_year_expansion() -> None:
+    source = {
+        "unit": "kWh",
+        "totalDischarge": "13.26",
+        "x": [1, 2, 3],
+        "y2": [13.26, 0.0, 0.0],
+        "_request": {"dateType": "month", "beginDate": "2026-05-01", "endDate": "2026-05-31"},
+    }
+
+    assert util.effective_trend_series_values(
+        source, "device_battery_stat_month", "totalDischarge"
+    ) == [13.26, 0.0, 0.0]
+    assert util.trend_series_total(
+        source, "device_battery_stat_month", "totalDischarge"
+    ) == 13.26
+
