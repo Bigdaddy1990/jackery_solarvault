@@ -8,7 +8,7 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
+
 
 Community-Integration für Jackery SolarVault Systeme, insbesondere SolarVault 3 Pro Max. Die Integration liest Livewerte, Energie-Statistiken und konfigurierbare Parameter aus der Jackery-Cloud und nutzt MQTT-Push für schnelle Statusänderungen und Steuerbefehle.
 
