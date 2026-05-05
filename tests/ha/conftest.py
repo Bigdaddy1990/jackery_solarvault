@@ -6,8 +6,6 @@ configures pytest-asyncio and provides a couple of helpers shared
 across config-flow and entry-setup tests.
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from unittest.mock import patch
 

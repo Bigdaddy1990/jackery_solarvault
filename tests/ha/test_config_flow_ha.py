@@ -1,7 +1,5 @@
 """HA fixture tests for the Jackery SolarVault config flow."""
 
-from __future__ import annotations
-
 from unittest.mock import patch
 
 from homeassistant import config_entries

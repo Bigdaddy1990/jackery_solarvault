@@ -1,7 +1,5 @@
 """Translation contract tests for generated Home Assistant entity keys."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any

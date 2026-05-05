@@ -1,7 +1,5 @@
 """Switch platform for Jackery SolarVault writable controls."""
 
-from __future__ import annotations
-
 import logging
 
 from homeassistant.components.switch import SwitchEntity
