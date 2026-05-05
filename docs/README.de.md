@@ -192,4 +192,3 @@ Bug-Reports und Feature-Requests bitte über die [GitHub Issues](https://github.
 ## Lizenz
 
 MIT-Lizenz. Siehe [LICENSE](LICENSE).
-
