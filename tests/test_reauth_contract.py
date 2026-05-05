@@ -14,8 +14,6 @@ fixture stack. They lock down the contract that:
 Together these are the Silver-tier ``reauthentication-flow`` rule.
 """
 
-from __future__ import annotations
-
 import ast
 import json
 from pathlib import Path

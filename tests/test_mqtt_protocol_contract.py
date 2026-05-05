@@ -4,8 +4,6 @@ These tests avoid importing Home Assistant while guarding the app-captured
 MQTT details documented in MQTT_PROTOCOL.md and APP_POLLING_MQTT.md.
 """
 
-from __future__ import annotations
-
 import ast
 from pathlib import Path
 
