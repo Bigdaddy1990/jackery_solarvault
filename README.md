@@ -1,7 +1,7 @@
 # Jackery SolarVault 3 Pro Max Home Assistant Integration
 
 **🌍 Language / Sprache / Idioma / Langue:**
-[🇬🇧 English](../README.md) · [🇩🇪 Deutsch](./docs/README.de.md) · [🇫🇷 Français](./docs/README.fr.md) · [🇪🇸 Español](./docs/README.es.md)
+[🇬🇧 English](./README.md) · [🇩🇪 Deutsch](./docs/README.de.md) · [🇫🇷 Français](./docs/README.fr.md) · [🇪🇸 Español](./docs/README.es.md)
 
 ---
 
