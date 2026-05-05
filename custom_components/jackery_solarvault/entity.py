@@ -6,7 +6,34 @@ from typing import Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER
+from .const import (
+    DOMAIN,
+    FIELD_CURRENT_VERSION,
+    FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
+    FIELD_MODEL_NAME,
+    FIELD_ONLINE_STATE,
+    FIELD_ONLINE_STATUS,
+    FIELD_WNAME,
+    MANUFACTURER,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DEVICE_STATISTIC,
+    PAYLOAD_DISCOVERY,
+    PAYLOAD_HOME_TRENDS,
+    PAYLOAD_HTTP_PROPERTIES,
+    PAYLOAD_LOCATION,
+    PAYLOAD_OTA,
+    PAYLOAD_PRICE,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_PV_TRENDS,
+    PAYLOAD_STATISTIC,
+    PAYLOAD_SYSTEM,
+    PAYLOAD_TASK_PLAN,
+    PAYLOAD_WEATHER_PLAN,
+)
 from .coordinator import JackerySolarVaultCoordinator
 
 
@@ -29,72 +56,84 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _properties(self) -> dict[str, Any]:
-        return self._payload.get("properties") or {}
+        return self._payload.get(PAYLOAD_PROPERTIES) or {}
+
+    @property
+    def _http_properties(self) -> dict[str, Any]:
+        return self._payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
 
     @property
     def _device_meta(self) -> dict[str, Any]:
-        return self._payload.get("device") or {}
+        return self._payload.get(PAYLOAD_DEVICE) or {}
 
     @property
     def _discovery(self) -> dict[str, Any]:
-        return self._payload.get("discovery") or {}
+        return self._payload.get(PAYLOAD_DISCOVERY) or {}
 
     @property
     def _system(self) -> dict[str, Any]:
-        return self._payload.get("system") or {}
+        return self._payload.get(PAYLOAD_SYSTEM) or {}
 
     @property
     def _statistic(self) -> dict[str, Any]:
-        return self._payload.get("statistic") or {}
+        return self._payload.get(PAYLOAD_STATISTIC) or {}
 
     @property
     def _price(self) -> dict[str, Any]:
-        return self._payload.get("price") or {}
+        return self._payload.get(PAYLOAD_PRICE) or {}
 
     @property
     def _pv_trends(self) -> dict[str, Any]:
-        return self._payload.get("pv_trends") or {}
+        return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
     def _alarm(self) -> Any:
-        return self._payload.get("alarm")
+        return self._payload.get(PAYLOAD_ALARM)
 
     @property
     def _device_statistic(self) -> dict[str, Any]:
-        return self._payload.get("device_statistic") or {}
+        return self._payload.get(PAYLOAD_DEVICE_STATISTIC) or {}
 
     @property
     def _ota(self) -> dict[str, Any]:
-        return self._payload.get("ota") or {}
+        return self._payload.get(PAYLOAD_OTA) or {}
 
     @property
     def _location(self) -> dict[str, Any]:
-        return self._payload.get("location") or {}
+        return self._payload.get(PAYLOAD_LOCATION) or {}
 
     @property
     def _home_trends(self) -> dict[str, Any]:
-        return self._payload.get("home_trends") or {}
+        return self._payload.get(PAYLOAD_HOME_TRENDS) or {}
 
     @property
     def _battery_trends(self) -> dict[str, Any]:
-        return self._payload.get("battery_trends") or {}
+        return self._payload.get(PAYLOAD_BATTERY_TRENDS) or {}
+
+    @property
+    def _weather_plan(self) -> dict[str, Any]:
+        return self._payload.get(PAYLOAD_WEATHER_PLAN) or {}
+
+    @property
+    def _task_plan(self) -> dict[str, Any]:
+        return self._payload.get(PAYLOAD_TASK_PLAN) or {}
 
     @property
     def device_info(self) -> DeviceInfo:
-        sys_name = self._system.get("deviceName")   # e.g. "SolarVault 3 Pro Max"
-        disc_name = self._discovery.get("deviceName")
-        props_wname = self._properties.get("wname")
+        sys_name = self._system.get(FIELD_DEVICE_NAME)
+        disc_name = self._discovery.get(FIELD_DEVICE_NAME)
+        props_wname = self._properties.get(FIELD_WNAME)
         name = sys_name or disc_name or props_wname or f"Jackery {self._device_id}"
 
         model = (
-            self._discovery.get("devModel")
-            or self._device_meta.get("modelName")
+            self._discovery.get(FIELD_DEV_MODEL)
+            or self._device_meta.get(FIELD_MODEL_NAME)
             or "SolarVault"
         )
-        sw_version = self._ota.get("currentVersion") or None
+        sw_version = self._ota.get(FIELD_CURRENT_VERSION) or None
         sn = (
-            self._device_meta.get("deviceSn")
-            or self._discovery.get("deviceSn")
+            self._device_meta.get(FIELD_DEVICE_SN)
+            or self._discovery.get(FIELD_DEVICE_SN)
         )
 
         return DeviceInfo(
@@ -110,9 +149,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     def available(self) -> bool:
         if not super().available:
             return False
-        online = self._device_meta.get("onlineStatus")
+        online = self._device_meta.get(FIELD_ONLINE_STATUS)
         if online is None:
-            online = self._system.get("onlineState")
+            online = self._system.get(FIELD_ONLINE_STATE)
         if online is not None:
             return bool(online)
         return self._device_id in (self.coordinator.data or {})

@@ -22,14 +22,13 @@ rename_system:
       selector:
         text:
 
-set_max_power:
-  name: "Set max feed-in power (experimental)"
+
+refresh_weather_plan:
+  name: Refresh weather / storm plan
   description: >
-    ⚠️  EXPERIMENTAL. Send a max-power value to the Jackery cloud using
-    POST /v1/device/deviceMaxPowerRecord/saveRecord. Only failed calls have
-    been observed during reverse-engineering; the endpoint might be an
-    audit log rather than the live setter. The integration will raise an
-    error with the full server response if the call is rejected.
+    Query the current weather/storm plan from the device over MQTT
+    (messageType=QueryWeatherPlan, cmd=23). The response is exposed in the
+    diagnostic sensor "Weather plan" attributes.
   fields:
     device_id:
       name: Device ID
@@ -40,15 +39,28 @@ set_max_power:
       example: "573702884982521856"
       selector:
         text:
-    max_power:
-      name: Max power
-      description: Requested maximum feed-in / output power in watts (0–2500).
+
+delete_storm_alert:
+  name: Delete storm alert
+  description: >
+    Delete a specific weather/storm alert by `alertId` over MQTT
+    (messageType=CancelWeatherAlert, actionId=3035).
+  fields:
+    device_id:
+      name: Device ID
+      description: >
+        The numeric device ID (visible in diagnostics under
+        raw_api.system_list_response.data[].devices[].deviceId).
       required: true
-      example: 800
+      example: "573702884982521856"
       selector:
-        number:
-          min: 0
-          max: 2500
-          step: 10
-          unit_of_measurement: W
-          mode: box
+        text:
+    alert_id:
+      name: Alert ID
+      description: >
+        Alert identifier from the `weather_plan` diagnostic attributes
+        (`storm[].alertId`).
+      required: true
+      example: "A1746110400"
+      selector:
+        text:

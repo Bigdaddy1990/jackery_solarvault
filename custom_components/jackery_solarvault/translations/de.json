@@ -3,105 +3,619 @@
     "step": {
       "user": {
         "title": "Jackery SolarVault",
-        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Optional kannst du die Geräte-ID direkt angeben, falls die automatische Erkennung nichts findet (Wert aus `device.id` in den API-Responses).\n\n⚠️ Jackery erlaubt nur eine aktive Sitzung pro Konto. Lege ggf. ein Zweitkonto an und teile deine Geräte per QR-Code.",
+        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
         "data": {
           "username": "E-Mail",
           "password": "Passwort",
-          "device_id": "Geräte-ID (optional)",
-          "system_id": "System-ID (optional)"
+          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
+          "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen"
+        },
+        "data_description": {
+          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Jackery erneut anmelden",
+        "description": "Das gespeicherte Passwort für {username} funktioniert nicht mehr. Gib das aktuelle Passwort ein, um die Verbindung wiederherzustellen.",
+        "data": {
+          "password": "Passwort"
         }
       }
     },
     "error": {
       "invalid_auth": "E-Mail oder Passwort ist falsch.",
-      "cannot_connect": "Verbindung zu iot.jackeryapp.com fehlgeschlagen."
+      "cannot_connect": "Verbindung zu iot.jackeryapp.com fehlgeschlagen.",
+      "account_required": "Account darf nicht leer sein."
     },
     "abort": {
-      "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet."
+      "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
+      "reauth_successful": "Erneute Anmeldung erfolgreich.",
+      "reauth_entry_missing": "Der Jackery-Eintrag für die erneute Anmeldung wurde nicht gefunden."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Jackery Optionen",
+        "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zusätzlichen Rohwerte aus der Jackery-App.",
         "data": {
-          "scan_interval": "Abrufintervall (Sekunden)"
+          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
+          "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen"
+        },
+        "data_description": {
+          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben."
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "battery_soc": { "name": "Batterie" },
-      "battery_soc_internal": { "name": "Batterie (intern)" },
-      "cell_temperature": { "name": "Zellentemperatur" },
-      "battery_charge_power": { "name": "Batterie-Ladeleistung" },
-      "battery_discharge_power": { "name": "Batterie-Entladeleistung" },
-      "pv_power_total": { "name": "PV-Leistung gesamt" },
-      "pv1_power": { "name": "PV-Kanal 1" },
-      "pv2_power": { "name": "PV-Kanal 2" },
-      "pv3_power": { "name": "PV-Kanal 3" },
-      "pv4_power": { "name": "PV-Kanal 4" },
-      "grid_in_power": { "name": "Netzbezug" },
-      "grid_out_power": { "name": "Netzeinspeisung" },
-      "eps_in_power": { "name": "EPS Eingangsleistung" },
-      "eps_out_power": { "name": "EPS Ausgangsleistung" },
-      "stack_in_power": { "name": "Stack Eingang" },
-      "stack_out_power": { "name": "Stack Ausgang" },
-      "wifi_signal": { "name": "WLAN-Signal" },
-      "wifi_name": { "name": "WLAN-Name" },
-      "wifi_ip": { "name": "IP-Adresse" },
-      "soc_charge_limit": { "name": "Ladelimit" },
-      "soc_discharge_limit": { "name": "Entladelimit" },
-      "max_output_power": { "name": "Max. Ausgangsleistung" },
-      "max_grid_power": { "name": "Max. Netzleistung (Standard)" },
-      "max_inverter_power": { "name": "Max. Wechselrichterleistung" },
-      "battery_count": { "name": "Anzahl Batterien" },
-      "battery_state": { "name": "Batteriezustand" },
-      "auto_standby": { "name": "Auto-Standby-Modus" },
-      "today_load": { "name": "Heute Verbrauch" },
-      "today_battery_charge": { "name": "Heute Batterieladung" },
-      "today_battery_discharge": { "name": "Heute Batterieentladung" },
-      "today_generation": { "name": "Heute PV-Ertrag" },
-      "total_generation": { "name": "Gesamt PV-Ertrag" },
-      "total_revenue": { "name": "Gesamt Ersparnis" },
-      "total_carbon_saved": { "name": "Gesamt CO₂ eingespart" },
-      "power_price": { "name": "Strompreis" },
-      "battery_net_power": { "name": "Batterie-Netto" },
-      "grid_net_power": { "name": "Netz-Netto" },
-      "alarm_count": { "name": "Aktive Alarme" },
-      "pv_today_energy": { "name": "PV heute" },
-      "last_online": { "name": "Zuletzt online" },
-      "last_offline": { "name": "Zuletzt offline" },
-      "last_update": { "name": "Letzte Aktualisierung" },
-      "activation_date": { "name": "Aktivierungsdatum" },
-      "grid_standard": { "name": "Netz-Standard" },
-      "country_code": { "name": "Ländercode" },
-      "timezone": { "name": "Zeitzone" },
-      "lifetime_pv_energy": { "name": "PV-Ertrag gesamt" },
-      "lifetime_battery_charge": { "name": "Batterie-Ladung gesamt" },
-      "lifetime_battery_discharge": { "name": "Batterie-Entladung gesamt" },
-      "lifetime_grid_import": { "name": "Netzbezug gesamt" },
-      "lifetime_grid_export": { "name": "Netzeinspeisung gesamt" },
-      "lifetime_ongrid_to_battery": { "name": "Netz→Batterie gesamt" },
-      "lifetime_pv_to_battery": { "name": "PV→Batterie gesamt" },
-      "lifetime_battery_to_grid": { "name": "Batterie→Netz gesamt" },
-      "firmware_version": { "name": "Firmware-Version" },
-      "latitude": { "name": "Breitengrad" },
-      "longitude": { "name": "Längengrad" },
-      "raw_properties": { "name": "Rohdaten" }
+      "battery_soc": {
+        "name": "Batteriestand gesamt"
+      },
+      "battery_soc_internal": {
+        "name": "Hauptbatterie Ladestand"
+      },
+      "cell_temperature": {
+        "name": "Hauptbatterie Zelltemperatur"
+      },
+      "battery_charge_power": {
+        "name": "Hauptbatterie Ladeleistung"
+      },
+      "battery_discharge_power": {
+        "name": "Hauptbatterie Entladeleistung"
+      },
+      "pv_power_total": {
+        "name": "PV-Leistung gesamt"
+      },
+      "pv1_power": {
+        "name": "PV 1"
+      },
+      "pv2_power": {
+        "name": "PV 2"
+      },
+      "pv3_power": {
+        "name": "PV 3"
+      },
+      "pv4_power": {
+        "name": "PV 4"
+      },
+      "grid_in_power": {
+        "name": "Netzseitiger Eingang"
+      },
+      "grid_out_power": {
+        "name": "Netzseitiger Ausgang"
+      },
+      "eps_in_power": {
+        "name": "EPS Eingangsleistung"
+      },
+      "eps_out_power": {
+        "name": "EPS Ausgangsleistung"
+      },
+      "stack_in_power": {
+        "name": "Batteriesystem Ladeleistung"
+      },
+      "stack_out_power": {
+        "name": "Batteriesystem Entladeleistung"
+      },
+      "wifi_signal": {
+        "name": "WLAN-Signal"
+      },
+      "wifi_name": {
+        "name": "WLAN-Name"
+      },
+      "wifi_ip": {
+        "name": "IP-Adresse"
+      },
+      "mac_address": {
+        "name": "MAC-Adresse"
+      },
+      "eth_port": {
+        "name": "Ethernet-Portstatus"
+      },
+      "ability_bits": {
+        "name": "Fähigkeits-Flags"
+      },
+      "max_iot_num": {
+        "name": "Max. IoT-Geräte"
+      },
+      "eps_switch_state": {
+        "name": "EPS-Schalterstatus"
+      },
+      "reboot_flag": {
+        "name": "Neustart-Flag"
+      },
+      "soc_charge_limit": {
+        "name": "Ladelimit"
+      },
+      "soc_discharge_limit": {
+        "name": "Entladelimit"
+      },
+      "max_output_power": {
+        "name": "Max. Ausgangsleistung"
+      },
+      "max_grid_power": {
+        "name": "Max. Netzleistung (Standard)"
+      },
+      "max_inverter_power": {
+        "name": "Max. Wechselrichterleistung"
+      },
+      "battery_count": {
+        "name": "Anzahl Batterien"
+      },
+      "battery_state": {
+        "name": "Batteriezustand"
+      },
+      "auto_standby": {
+        "name": "Auto-Standby-Modus"
+      },
+      "system_state": {
+        "name": "Systemstatus"
+      },
+      "ongrid_state": {
+        "name": "Netzstatus"
+      },
+      "ct_state": {
+        "name": "CT-Status"
+      },
+      "grid_state": {
+        "name": "Netzzustand"
+      },
+      "work_mode": {
+        "name": "Arbeitsmodus"
+      },
+      "max_feed_grid_read": {
+        "name": "Max. Einspeiseleistung (Laufzeit)"
+      },
+      "max_system_output_power": {
+        "name": "Max. Systemausgangsleistung"
+      },
+      "max_system_input_power": {
+        "name": "Max. Systemeingangsleistung"
+      },
+      "off_grid_time": {
+        "name": "Off-Grid Abschalt-Timer"
+      },
+      "default_power": {
+        "name": "Standard-Lastleistung"
+      },
+      "standby_power": {
+        "name": "Standby-Leistung"
+      },
+      "other_load_power": {
+        "name": "Sonstige Lastleistung"
+      },
+      "energy_plan_power": {
+        "name": "Energieplan-Leistung"
+      },
+      "charge_plan_power": {
+        "name": "Ladeplan-Leistung"
+      },
+      "follow_meter_state": {
+        "name": "Smart-Meter-Folge Status"
+      },
+      "off_grid_shutdown_state": {
+        "name": "Inselbetrieb Auto-aus Status"
+      },
+      "function_enable_flags": {
+        "name": "Funktions-Flags"
+      },
+      "temp_unit": {
+        "name": "Temperatureinheit"
+      },
+      "storm_warning_enabled": {
+        "name": "Unwetterwarnung aktiv"
+      },
+      "storm_warning_minutes": {
+        "name": "Unwetter Vorwarnzeit"
+      },
+      "today_load": {
+        "name": "Heute Verbrauch"
+      },
+      "today_battery_charge": {
+        "name": "Heute Batterieladung"
+      },
+      "today_battery_discharge": {
+        "name": "Heute Batterieentladung"
+      },
+      "today_generation": {
+        "name": "Heute PV-Ertrag"
+      },
+      "total_generation": {
+        "name": "Gesamt PV-Ertrag"
+      },
+      "total_revenue": {
+        "name": "Gesamt Ersparnis"
+      },
+      "total_carbon_saved": {
+        "name": "Gesamt CO₂ eingespart"
+      },
+      "pv_week_energy": {
+        "name": "PV Wochenenergie"
+      },
+      "pv_month_energy": {
+        "name": "PV Monatsenergie"
+      },
+      "pv_year_energy": {
+        "name": "PV Jahresenergie"
+      },
+      "home_week_energy": {
+        "name": "Wochenverbrauch"
+      },
+      "home_month_energy": {
+        "name": "Monatsverbrauch"
+      },
+      "home_year_energy": {
+        "name": "Jahresverbrauch"
+      },
+      "smart_meter_import_week_energy": {
+        "name": "Smart-Meter Netzbezug Wochenwert"
+      },
+      "smart_meter_import_month_energy": {
+        "name": "Smart-Meter Netzbezug Monatswert"
+      },
+      "smart_meter_import_year_energy": {
+        "name": "Smart-Meter Netzbezug Jahreswert"
+      },
+      "smart_meter_export_week_energy": {
+        "name": "Smart-Meter Netzeinspeisung Wochenwert"
+      },
+      "smart_meter_export_month_energy": {
+        "name": "Smart-Meter Netzeinspeisung Monatswert"
+      },
+      "smart_meter_export_year_energy": {
+        "name": "Smart-Meter Netzeinspeisung Jahreswert"
+      },
+      "battery_charge_week_energy": {
+        "name": "Batterieladung Wochenwert"
+      },
+      "battery_charge_month_energy": {
+        "name": "Batterieladung Monatswert"
+      },
+      "battery_charge_year_energy": {
+        "name": "Batterieladung Jahreswert"
+      },
+      "battery_discharge_week_energy": {
+        "name": "Batterieentladung Wochenwert"
+      },
+      "battery_discharge_month_energy": {
+        "name": "Batterieentladung Monatswert"
+      },
+      "battery_discharge_year_energy": {
+        "name": "Batterieentladung Jahreswert"
+      },
+      "power_price": {
+        "name": "Strompreis"
+      },
+      "battery_net_power": {
+        "name": "Hauptbatterie Nettoleistung"
+      },
+      "battery_stack_net_power": {
+        "name": "Batteriesystem Nettoleistung"
+      },
+      "grid_net_power": {
+        "name": "Netzseite Nettoleistung"
+      },
+      "alarm_count": {
+        "name": "Aktive Alarme"
+      },
+      "last_online": {
+        "name": "Zuletzt online"
+      },
+      "last_offline": {
+        "name": "Zuletzt offline"
+      },
+      "last_update": {
+        "name": "Letzte Aktualisierung"
+      },
+      "activation_date": {
+        "name": "Aktivierungsdatum"
+      },
+      "grid_standard": {
+        "name": "Netz-Standard"
+      },
+      "country_code": {
+        "name": "Ländercode"
+      },
+      "timezone": {
+        "name": "Zeitzone"
+      },
+      "device_ongrid_input_week_energy": {
+        "name": "Netzseite Eingang Wochenwert"
+      },
+      "device_ongrid_output_week_energy": {
+        "name": "Netzseite Ausgang Wochenwert"
+      },
+      "device_pv1_week_energy": {
+        "name": "PV1 Wochenwert"
+      },
+      "device_pv2_week_energy": {
+        "name": "PV2 Wochenwert"
+      },
+      "device_pv3_week_energy": {
+        "name": "PV3 Wochenwert"
+      },
+      "device_pv4_week_energy": {
+        "name": "PV4 Wochenwert"
+      },
+      "device_ongrid_input_month_energy": {
+        "name": "Netzseite Eingang Monatswert"
+      },
+      "device_ongrid_output_month_energy": {
+        "name": "Netzseite Ausgang Monatswert"
+      },
+      "device_pv1_month_energy": {
+        "name": "PV1 Monatswert"
+      },
+      "device_pv2_month_energy": {
+        "name": "PV2 Monatswert"
+      },
+      "device_pv3_month_energy": {
+        "name": "PV3 Monatswert"
+      },
+      "device_pv4_month_energy": {
+        "name": "PV4 Monatswert"
+      },
+      "device_ongrid_input_year_energy": {
+        "name": "Netzseite Eingang Jahreswert"
+      },
+      "device_ongrid_output_year_energy": {
+        "name": "Netzseite Ausgang Jahreswert"
+      },
+      "device_pv1_year_energy": {
+        "name": "PV1 Jahreswert"
+      },
+      "device_pv2_year_energy": {
+        "name": "PV2 Jahreswert"
+      },
+      "device_pv3_year_energy": {
+        "name": "PV3 Jahreswert"
+      },
+      "device_pv4_year_energy": {
+        "name": "PV4 Jahreswert"
+      },
+      "device_today_pv_energy": {
+        "name": "PV heute"
+      },
+      "device_today_battery_charge": {
+        "name": "Batterieladung heute"
+      },
+      "device_today_battery_discharge": {
+        "name": "Batterieentladung heute"
+      },
+      "device_today_ongrid_input": {
+        "name": "Netzseite Eingang heute"
+      },
+      "device_today_ongrid_output": {
+        "name": "Netzseite Ausgang heute"
+      },
+      "device_today_ongrid_to_battery": {
+        "name": "Netzseite→Batterie heute"
+      },
+      "device_today_pv_to_battery": {
+        "name": "PV→Batterie heute"
+      },
+      "device_today_battery_to_ongrid": {
+        "name": "Batterie→Netzseite heute"
+      },
+      "battery_pack_soc": {
+        "name": "Zusatzbatterie SOC"
+      },
+      "battery_pack_cell_temperature": {
+        "name": "Zusatzbatterie Zelltemperatur"
+      },
+      "battery_pack_charge_power": {
+        "name": "Zusatzbatterie Ladeleistung"
+      },
+      "battery_pack_discharge_power": {
+        "name": "Zusatzbatterie Entladeleistung"
+      },
+      "battery_pack_firmware_version": {
+        "name": "Zusatzbatterie Firmware-Version"
+      },
+      "battery_pack_serial_number": {
+        "name": "Zusatzbatterie Seriennummer"
+      },
+      "battery_pack_communication_state": {
+        "name": "Zusatzbatterie Kommunikationsstatus"
+      },
+      "battery_pack_update_status": {
+        "name": "Zusatzbatterie Update-Status"
+      },
+      "smart_meter_power": {
+        "name": "Smart-Meter Netzleistung saldiert"
+      },
+      "smart_meter_net_import_power": {
+        "name": "Smart-Meter Netzbezug saldiert"
+      },
+      "smart_meter_net_export_power": {
+        "name": "Smart-Meter Netzeinspeisung saldiert"
+      },
+      "smart_meter_gross_phase_import_power": {
+        "name": "Smart-Meter Phasenbezug brutto"
+      },
+      "smart_meter_gross_phase_export_power": {
+        "name": "Smart-Meter Phaseneinspeisung brutto"
+      },
+      "smart_meter_gross_phase_flow_power": {
+        "name": "Smart-Meter Phasenfluss brutto"
+      },
+      "smart_meter_phase_1_power": {
+        "name": "Smart-Meter Phase 1 Leistung"
+      },
+      "smart_meter_phase_2_power": {
+        "name": "Smart-Meter Phase 2 Leistung"
+      },
+      "smart_meter_phase_3_power": {
+        "name": "Smart-Meter Phase 3 Leistung"
+      },
+      "smart_meter_panel_charging_energy": {
+        "name": "Smart-Meter Panel Ladeenergie"
+      },
+      "smart_meter_panel_discharging_energy": {
+        "name": "Smart-Meter Panel Entladeenergie"
+      },
+      "firmware_version": {
+        "name": "Firmware-Version"
+      },
+      "latitude": {
+        "name": "Breitengrad"
+      },
+      "longitude": {
+        "name": "Längengrad"
+      },
+      "weather_plan": {
+        "name": "Unwetterplan"
+      },
+      "task_plan": {
+        "name": "Zeitplan-Aufgaben"
+      },
+      "raw_properties": {
+        "name": "Rohdaten"
+      },
+      "home_consumption_power": {
+        "name": "Hausverbrauch aktuell"
+      }
     },
     "binary_sensor": {
-      "online": { "name": "Online" },
-      "eps_enabled": { "name": "EPS aktiviert" },
-      "eps_active": { "name": "EPS aktiv" },
-      "eth_connected": { "name": "Ethernet verbunden" }
+      "online": {
+        "name": "Online"
+      },
+      "eps_enabled": {
+        "name": "EPS aktiviert"
+      },
+      "eps_active": {
+        "name": "EPS aktiv"
+      },
+      "eth_connected": {
+        "name": "Ethernet verbunden"
+      }
     },
     "text": {
-      "system_name": { "name": "Systemname" }
+      "system_name": {
+        "name": "Systemname"
+      }
     },
     "number": {
-      "max_power_experimental": { "name": "Max. Leistung (experimentell)" }
+      "soc_charge_limit_set": {
+        "name": "Ladelimit"
+      },
+      "soc_discharge_limit_set": {
+        "name": "Entladelimit"
+      },
+      "max_output_power_set": {
+        "name": "Max. Ausgangsleistung"
+      },
+      "max_feed_grid": {
+        "name": "Max. Einspeiseleistung"
+      },
+      "default_power_set": {
+        "name": "Standardausgangsleistung"
+      },
+      "single_tariff_price_set": {
+        "name": "Einheitstarif Strompreis"
+      }
+    },
+    "select": {
+      "work_mode_select": {
+        "name": "Energieverbrauchsmodus",
+        "state": {
+          "ai_smart": "KI-Smart-Modus",
+          "self_use": "Eigenverbrauch",
+          "custom": "Benutzerdefinierter Modus",
+          "tariff": "Tarifmodus"
+        }
+      },
+      "electricity_price_mode": {
+        "name": "Strompreismodus",
+        "state": {
+          "dynamic": "Dynamischer Strompreis",
+          "single": "Einheitstarif"
+        }
+      },
+      "electricity_price_provider": {
+        "name": "Strompreisanbieter"
+      },
+      "temp_unit_select": {
+        "name": "Temperatureinheit",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "auto_off_island_mode": {
+        "name": "Auto-aus (Inselbetrieb)",
+        "state": {
+          "h_2": "2 h",
+          "h_8": "8 h",
+          "h_12": "12 h",
+          "h_24": "24 h"
+        }
+      },
+      "storm_warning_minutes_select": {
+        "name": "Unwetter Vorwarnzeit",
+        "state": {
+          "min_60": "1 h",
+          "min_120": "2 h",
+          "min_180": "3 h",
+          "min_240": "4 h",
+          "min_300": "5 h",
+          "min_360": "6 h",
+          "min_420": "7 h",
+          "min_480": "8 h",
+          "min_540": "9 h",
+          "min_600": "10 h",
+          "min_660": "11 h",
+          "min_720": "12 h",
+          "min_780": "13 h",
+          "min_840": "14 h",
+          "min_900": "15 h",
+          "min_960": "16 h",
+          "min_1020": "17 h",
+          "min_1080": "18 h",
+          "min_1140": "19 h",
+          "min_1200": "20 h",
+          "min_1260": "21 h",
+          "min_1320": "22 h",
+          "min_1380": "23 h",
+          "min_1440": "24 h",
+          "min_2880": "48 h",
+          "min_4320": "72 h"
+        }
+      }
+    },
+    "switch": {
+      "eps_output": {
+        "name": "EPS-Ausgang"
+      },
+      "auto_standby_set": {
+        "name": "Auto-aus (netzgekoppelter Betrieb)"
+      },
+      "follow_meter": {
+        "name": "Smart Meter folgen"
+      },
+      "off_grid_shutdown": {
+        "name": "Auto-aus (Inselbetrieb)"
+      },
+      "storm_warning": {
+        "name": "Unwetterwarnung"
+      },
+      "standby": {
+        "name": "Standby"
+      }
+    },
+    "button": {
+      "reboot_device": {
+        "name": "Gerät neu starten"
+      }
+    }
+  },
+  "issues": {
+    "app_data_inconsistency": {
+      "title": "Jackery-App-Statistiken sind widersprüchlich",
+      "description": "Jackery hat widersprüchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen."
     }
   }
 }
