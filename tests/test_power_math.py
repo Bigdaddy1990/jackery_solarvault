@@ -4,19 +4,18 @@ These tests deliberately load util.py directly so they do not need a full
 Home Assistant test harness. They cover the parts that are easiest to break:
 CT saldierung, gross phase flow and live home consumption.
 """
+
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
 import sys
 import types
-from pathlib import Path
 
 
 def _load_util_module():
     package_dir = (
-        Path(__file__).resolve().parents[1]
-        / "custom_components"
-        / "jackery_solarvault"
+        Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
@@ -47,9 +46,8 @@ def _load_util_module():
 util = _load_util_module()
 
 
-
-
 def test_app_period_range_contract() -> None:
+    """Implement test app period range contract."""
     today = util.date(2026, 5, 3)
 
     assert util.app_period_range("day", today=today) == (
@@ -71,6 +69,7 @@ def test_app_period_range_contract() -> None:
 
 
 def test_app_period_range_handles_boundaries_and_leap_years() -> None:
+    """Implement test app period range handles boundaries and leap years."""
     assert util.app_period_range("week", today=util.date(2026, 1, 1)) == (
         util.date(2025, 12, 29),
         util.date(2026, 1, 4),
@@ -86,6 +85,7 @@ def test_app_period_range_handles_boundaries_and_leap_years() -> None:
 
 
 def test_app_period_range_rejects_unknown_date_types() -> None:
+    """Implement test app period range rejects unknown date types."""
     try:
         util.app_period_range("quarter", today=util.date(2026, 5, 3))
     except ValueError as err:
@@ -95,6 +95,7 @@ def test_app_period_range_rejects_unknown_date_types() -> None:
 
 
 def test_app_period_date_bounds_fills_only_missing_sides() -> None:
+    """Implement test app period date bounds fills only missing sides."""
     today = util.date(2026, 5, 3)
 
     assert util.app_period_date_bounds("month", today=today) == (
@@ -115,8 +116,8 @@ def test_app_period_date_bounds_fills_only_missing_sides() -> None:
     )
 
 
-
 def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
+    """Implement test app period date bounds rejects bad manual bounds."""
     today = util.date(2026, 5, 3)
 
     for kwargs in (
@@ -134,6 +135,7 @@ def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
 
 
 def test_app_period_date_bounds_strips_manual_date_strings() -> None:
+    """Implement test app period date bounds strips manual date strings."""
     assert util.app_period_date_bounds(
         "month",
         begin_date=" 2026-05-02 ",
@@ -143,6 +145,7 @@ def test_app_period_date_bounds_strips_manual_date_strings() -> None:
 
 
 def test_app_period_date_bounds_converts_datetime_to_date_only() -> None:
+    """Implement test app period date bounds converts datetime to date only."""
     assert util.app_period_date_bounds(
         "month",
         begin_date=util.datetime(2026, 5, 2, 12, 30),
@@ -152,6 +155,7 @@ def test_app_period_date_bounds_converts_datetime_to_date_only() -> None:
 
 
 def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
+    """Implement test app period request kwargs uses snake case method arguments."""
     assert util.app_period_request_kwargs("week", today=util.date(2026, 5, 3)) == {
         "date_type": "week",
         "begin_date": "2026-04-27",
@@ -160,6 +164,7 @@ def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
 
 
 def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
+    """Implement test smart meter net and gross values from signed phases."""
     ct = {
         "aPhasePw": 2.9,
         "bPhasePw": 0,
@@ -177,12 +182,14 @@ def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
 
 
 def test_smart_meter_net_falls_back_to_total_fields() -> None:
+    """Implement test smart meter net falls back to total fields."""
     assert util.smart_meter_net_power({"tPhasePw": 10}) == 10
     assert util.smart_meter_net_power({"tnPhasePw": 15}) == -15
     assert util.smart_meter_net_power({"tPhasePw": 3, "tnPhasePw": 7}) == -4
 
 
 def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
+    """Implement test smart meter net prefers app total over phase sum."""
     ct = {
         "aPhasePw": 3,
         "anPhasePw": 0,
@@ -201,6 +208,7 @@ def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
 
 
 def test_jackery_corrected_home_consumption_discharging() -> None:
+    """Implement test jackery corrected home consumption discharging."""
     ct = {
         "aPhasePw": 2.9,
         "bnPhasePw": 70.2,
@@ -219,6 +227,7 @@ def test_jackery_corrected_home_consumption_discharging() -> None:
 
 
 def test_jackery_corrected_home_consumption_charging() -> None:
+    """Implement test jackery corrected home consumption charging."""
     ct = {"aPhasePw": 300, "bPhasePw": 0, "cPhasePw": 0}
     props = {"inGridSidePw": 200}
 
@@ -233,6 +242,7 @@ def test_jackery_corrected_home_consumption_charging() -> None:
 
 
 def test_grid_side_helpers_prefer_ongrid_fields_from_live_diagnostics() -> None:
+    """Implement test grid side helpers prefer ongrid fields from live diagnostics."""
     props = {
         "outGridSidePw": 0,
         "outOngridPw": 385,
@@ -247,6 +257,7 @@ def test_grid_side_helpers_prefer_ongrid_fields_from_live_diagnostics() -> None:
 
 
 def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
+    """Implement test jackery reported home load preferred from live diagnostics."""
     ct = {
         "aPhasePw": 3,
         "bPhasePw": 0,
@@ -274,6 +285,7 @@ def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
 
 
 def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
+    """Implement test jackery reported home load does not require ct payload."""
     result = util.jackery_corrected_home_consumption_power({}, {"otherLoadPw": 385})
 
     assert result is not None
@@ -283,11 +295,15 @@ def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
 
 
 def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -> None:
-    assert util.jackery_corrected_home_consumption_power({}, {"outGridSidePw": 70}) is None
+    """Implement test jackery corrected home consumption requires ct for fallback formula."""
+    assert (
+        util.jackery_corrected_home_consumption_power({}, {"outGridSidePw": 70}) is None
+    )
     assert util.jackery_corrected_home_consumption_power({"tPhasePw": 10}, {}) is None
 
 
 def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -> None:
+    """Implement test period trend totals use same chart series logic for week month year."""
     week = {"totalHomeEgy": "999", "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.42, 0.0]}
     month = {"totalHomeEgy": "999", "y": [15.53, 0.42] + [0.0] * 29}
     year = {"totalHomeEgy": "999", "y": [0.0, 0.0, 0.0, 0.0, 15.95] + [0.0] * 7}
@@ -297,7 +313,10 @@ def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -
     assert util.trend_series_total(year, "home_trends_year", "totalHomeEgy") == 15.95
 
 
-def test_period_trend_entities_can_be_created_from_series_without_server_total() -> None:
+def test_period_trend_entities_can_be_created_from_series_without_server_total() -> (
+    None
+):
+    """Implement test period trend entities can be created from series without server total."""
     source = {"y": [0.0, 1.25, None, 2.75]}
 
     assert util.trend_payload_has_value(source, "home_trends_month", "totalHomeEgy")
@@ -305,6 +324,7 @@ def test_period_trend_entities_can_be_created_from_series_without_server_total()
 
 
 def test_battery_month_and_year_follow_week_series_keys() -> None:
+    """Implement test battery month and year follow week series keys."""
     month = {
         "totalChgEgy": "999",
         "totalDisChgEgy": "999",
@@ -319,12 +339,17 @@ def test_battery_month_and_year_follow_week_series_keys() -> None:
     }
 
     assert util.trend_series_total(month, "battery_trends_month", "totalChgEgy") == 3.49
-    assert util.trend_series_total(month, "battery_trends_month", "totalDisChgEgy") == 3.72
+    assert (
+        util.trend_series_total(month, "battery_trends_month", "totalDisChgEgy") == 3.72
+    )
     assert util.trend_series_total(year, "battery_trends_year", "totalChgEgy") == 3.49
-    assert util.trend_series_total(year, "battery_trends_year", "totalDisChgEgy") == 3.72
+    assert (
+        util.trend_series_total(year, "battery_trends_year", "totalDisChgEgy") == 3.72
+    )
 
 
 def test_device_period_stats_follow_app_series_keys() -> None:
+    """Implement test device period stats follow app series keys."""
     pv_month = {"unit": "kWh", "totalSolarEnergy": "999", "y": [1.0, 2.5, 0.0]}
     battery_month = {
         "unit": "kWh",
@@ -334,18 +359,26 @@ def test_device_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        pv_month, "device_pv_stat_month", "totalSolarEnergy"
-    ) == 3.5
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalCharge"
-    ) == 3.5
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalDischarge"
-    ) == 3.25
+    assert (
+        util.trend_series_total(pv_month, "device_pv_stat_month", "totalSolarEnergy")
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            battery_month, "device_battery_stat_month", "totalCharge"
+        )
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            battery_month, "device_battery_stat_month", "totalDischarge"
+        )
+        == 3.25
+    )
 
 
 def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
+    """Implement test device grid and ct period stats follow app series keys."""
     grid_month = {
         "unit": "kWh",
         "totalInGridEnergy": "999",
@@ -361,21 +394,30 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalInGridEnergy"
-    ) == 3.5
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalOutGridEnergy"
-    ) == 1.0
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalInCtEnergy"
-    ) == 3.5
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalOutCtEnergy"
-    ) == 3.25
+    assert (
+        util.trend_series_total(
+            grid_month, "device_home_stat_month", "totalInGridEnergy"
+        )
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            grid_month, "device_home_stat_month", "totalOutGridEnergy"
+        )
+        == 1.0
+    )
+    assert (
+        util.trend_series_total(ct_month, "device_ct_stat_month", "totalInCtEnergy")
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(ct_month, "device_ct_stat_month", "totalOutCtEnergy")
+        == 3.25
+    )
 
 
 def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
+    """Implement test empty ct period series falls back to server totals."""
     source = {
         "unit": "kWh",
         "totalInCtEnergy": "0",
@@ -394,14 +436,18 @@ def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
         "device_ct_stat_month",
         "totalOutCtEnergy",
     )
-    assert util.trend_series_total(
-        source,
-        "device_ct_stat_month",
-        "totalInCtEnergy",
-    ) == 0.0
+    assert (
+        util.trend_series_total(
+            source,
+            "device_ct_stat_month",
+            "totalInCtEnergy",
+        )
+        == 0.0
+    )
 
 
 def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
+    """Implement test zero filled ct period series is a valid zero statistic."""
     source = {
         "unit": "kWh",
         "totalInCtEnergy": "0",
@@ -415,45 +461,93 @@ def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
-    assert util.trend_series_total(
-        source,
-        "device_ct_stat_month",
-        "totalInCtEnergy",
-    ) == 0.0
+    assert (
+        util.trend_series_total(
+            source,
+            "device_ct_stat_month",
+            "totalInCtEnergy",
+        )
+        == 0.0
+    )
 
 
 def test_period_trend_totals_ignore_day_power_curves_in_watts() -> None:
+    """Implement test period trend totals ignore day power curves in watts."""
     source = {"unit": "W", "y": [256, 332, 456]}
 
     assert util.trend_series_total(source, "home_trends_month", "totalHomeEgy") is None
 
 
 def test_period_trend_totals_from_latest_diagnostics() -> None:
+    """Implement test period trend totals from latest diagnostics."""
     pv_week = {"unit": "kWh", "y": [18.41, 22.01, 22.83, 22.41, 22.29, 0.0, 0.0]}
     pv_month = {"unit": "kWh", "y": [22.29] + [0.0] * 30}
     pv_year = {"unit": "kWh", "y": [0.0, 0.0, 0.0, 0.0, 22.29] + [0.0] * 7}
     home_week = {"unit": "kWh", "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.52, 0.0]}
     home_month = {"unit": "kWh", "y": [15.53, 0.52] + [0.0] * 29}
     home_year = {"unit": "kWh", "y": [0.0, 0.0, 0.0, 0.0, 16.05] + [0.0] * 7}
-    bat_week = {"unit": "kWh", "y1": [3.74, 3.23, 3.47, 3.62, 3.49, 0.0, 0.0], "y2": [2.92, 3.16, 3.12, 2.96, 3.3, 0.52, 0.0]}
-    bat_month = {"unit": "kWh", "y1": [3.49] + [0.0] * 30, "y2": [3.3, 0.52] + [0.0] * 29}
-    bat_year = {"unit": "kWh", "y1": [0.0, 0.0, 0.0, 0.0, 3.49] + [0.0] * 7, "y2": [0.0, 0.0, 0.0, 0.0, 3.82] + [0.0] * 7}
+    bat_week = {
+        "unit": "kWh",
+        "y1": [3.74, 3.23, 3.47, 3.62, 3.49, 0.0, 0.0],
+        "y2": [2.92, 3.16, 3.12, 2.96, 3.3, 0.52, 0.0],
+    }
+    bat_month = {
+        "unit": "kWh",
+        "y1": [3.49] + [0.0] * 30,
+        "y2": [3.3, 0.52] + [0.0] * 29,
+    }
+    bat_year = {
+        "unit": "kWh",
+        "y1": [0.0, 0.0, 0.0, 0.0, 3.49] + [0.0] * 7,
+        "y2": [0.0, 0.0, 0.0, 0.0, 3.82] + [0.0] * 7,
+    }
 
-    assert util.trend_series_total(pv_week, "pv_trends_week", "totalSolarEnergy") == 107.95
-    assert util.trend_series_total(pv_month, "pv_trends_month", "totalSolarEnergy") == 22.29
-    assert util.trend_series_total(pv_year, "pv_trends_year", "totalSolarEnergy") == 22.29
-    assert util.trend_series_total(home_week, "home_trends_week", "totalHomeEgy") == 74.82
-    assert util.trend_series_total(home_month, "home_trends_month", "totalHomeEgy") == 16.05
-    assert util.trend_series_total(home_year, "home_trends_year", "totalHomeEgy") == 16.05
-    assert util.trend_series_total(bat_week, "battery_trends_week", "totalChgEgy") == 17.55
-    assert util.trend_series_total(bat_week, "battery_trends_week", "totalDisChgEgy") == 15.98
-    assert util.trend_series_total(bat_month, "battery_trends_month", "totalChgEgy") == 3.49
-    assert util.trend_series_total(bat_month, "battery_trends_month", "totalDisChgEgy") == 3.82
-    assert util.trend_series_total(bat_year, "battery_trends_year", "totalChgEgy") == 3.49
-    assert util.trend_series_total(bat_year, "battery_trends_year", "totalDisChgEgy") == 3.82
+    assert (
+        util.trend_series_total(pv_week, "pv_trends_week", "totalSolarEnergy") == 107.95
+    )
+    assert (
+        util.trend_series_total(pv_month, "pv_trends_month", "totalSolarEnergy")
+        == 22.29
+    )
+    assert (
+        util.trend_series_total(pv_year, "pv_trends_year", "totalSolarEnergy") == 22.29
+    )
+    assert (
+        util.trend_series_total(home_week, "home_trends_week", "totalHomeEgy") == 74.82
+    )
+    assert (
+        util.trend_series_total(home_month, "home_trends_month", "totalHomeEgy")
+        == 16.05
+    )
+    assert (
+        util.trend_series_total(home_year, "home_trends_year", "totalHomeEgy") == 16.05
+    )
+    assert (
+        util.trend_series_total(bat_week, "battery_trends_week", "totalChgEgy") == 17.55
+    )
+    assert (
+        util.trend_series_total(bat_week, "battery_trends_week", "totalDisChgEgy")
+        == 15.98
+    )
+    assert (
+        util.trend_series_total(bat_month, "battery_trends_month", "totalChgEgy")
+        == 3.49
+    )
+    assert (
+        util.trend_series_total(bat_month, "battery_trends_month", "totalDisChgEgy")
+        == 3.82
+    )
+    assert (
+        util.trend_series_total(bat_year, "battery_trends_year", "totalChgEgy") == 3.49
+    )
+    assert (
+        util.trend_series_total(bat_year, "battery_trends_year", "totalDisChgEgy")
+        == 3.82
+    )
 
 
 def test_trend_series_points_build_week_daily_buckets() -> None:
+    """Implement test trend series points build week daily buckets."""
     source = {
         "unit": "kWh",
         "_request": {
@@ -483,6 +577,7 @@ def test_trend_series_points_build_week_daily_buckets() -> None:
 
 
 def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None:
+    """Implement test trend series points build month daily buckets and skip future."""
     source = {
         "unit": "kWh",
         "_request": {
@@ -508,6 +603,7 @@ def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None
 
 
 def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> None:
+    """Implement test trend series points build year monthly buckets and skip future."""
     source = {
         "unit": "kWh",
         # Documented year total anchors compact expansion: 7.84 -> April=7, May=84
@@ -539,17 +635,22 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
 
 
 def test_external_trend_statistic_id_uses_colon_external_id() -> None:
-    assert util.external_trend_statistic_id(
-        "jackery_solarvault",
-        "ABC-123",
-        "battery_charge_energy",
-        "daily",
-    ) == "jackery_solarvault:abc_123_battery_charge_energy_daily"
+    """Implement test external trend statistic id uses colon external id."""
+    assert (
+        util.external_trend_statistic_id(
+            "jackery_solarvault",
+            "ABC-123",
+            "battery_charge_energy",
+            "daily",
+        )
+        == "jackery_solarvault:abc_123_battery_charge_energy_daily"
+    )
 
 
 def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
-    """``DATA_SOURCE_PRIORITY.md`` Non-negotiable rules: contradictions must
-    surface as warnings, never as silent cross-period repairs.
+    """Surface contradictions as warnings, never silent cross-period repairs.
+
+    ``DATA_SOURCE_PRIORITY.md`` is the contract this test enforces.
 
     Setup: year payload encodes May as compact ``30.28`` (April=30 + May=28)
     with documented ``totalOutGridEnergy=58`` confirming the encoding.
@@ -559,7 +660,11 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
     payload = {
         "device_home_stat_week": {
             "unit": "kWh",
-            "_request": {"dateType": "week", "beginDate": "2026-04-27", "endDate": "2026-05-03"},
+            "_request": {
+                "dateType": "week",
+                "beginDate": "2026-04-27",
+                "endDate": "2026-05-03",
+            },
             "totalOutGridEnergy": "89.08",
             "x": ["1", "2", "3", "4", "5", "6", "7"],
             "y2": [15.0, 12.0, 10.0, 11.8, 14.0, 12.0, 14.28],
@@ -572,7 +677,11 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
         },
         "device_home_stat_year": {
             "unit": "kWh",
-            "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+            "_request": {
+                "dateType": "year",
+                "beginDate": "2026-01-01",
+                "endDate": "2026-12-31",
+            },
             # Anchor confirming compact: 30.28 in slot[4] -> April=30 + May=28 = 58
             "totalOutGridEnergy": "58",
             "x": [str(i) for i in range(1, 13)],
@@ -602,7 +711,10 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
     assert warnings[0].total_method == "chart_series_sum"
 
 
-def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> None:
+def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (
+    None
+):
+    """Implement test app data quality does not warn month less than week across month boundary."""
     payload = {
         "device_home_stat_week": {
             "unit": "kWh",
@@ -627,6 +739,7 @@ def test_app_data_quality_does_not_warn_month_less_than_week_across_month_bounda
 
 
 def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() -> None:
+    """Implement test app data quality warns when lifetime generation is lower than year."""
     payload = {
         "statistic": {"totalGeneration": "41.31"},
         "device_pv_stat_year": {
@@ -644,6 +757,7 @@ def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() ->
 
 
 def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
+    """Implement test data quality warnings are normalized and formatted for repairs."""
     warning_a = util.AppDataQualityWarning(
         level="warning",
         reason="year_less_than_week",
@@ -666,7 +780,11 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         reference_value=126.97,
     ).as_dict()
 
-    normalized = util.normalized_data_quality_warnings([warning_b, warning_c, warning_a])
+    normalized = util.normalized_data_quality_warnings([
+        warning_b,
+        warning_c,
+        warning_a,
+    ])
 
     assert normalized == [warning_c, warning_a]
     assert util.format_data_quality_warning(normalized[0]) == (
@@ -679,6 +797,7 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
 
 
 def test_data_quality_warning_format_includes_request_ranges_when_available() -> None:
+    """Implement test data quality warning format includes request ranges when available."""
     warning = util.AppDataQualityWarning(
         level="warning",
         reason="year_less_than_week",
@@ -688,8 +807,16 @@ def test_data_quality_warning_format_includes_request_ranges_when_available() ->
         source_value=40.45,
         reference_section="device_home_stat_week",
         reference_value=99.25,
-        source_request={"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
-        reference_request={"dateType": "week", "beginDate": "2026-04-27", "endDate": "2026-05-03"},
+        source_request={
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
+        reference_request={
+            "dateType": "week",
+            "beginDate": "2026-04-27",
+            "endDate": "2026-05-03",
+        },
         source_chart_series_key="y2",
         reference_chart_series_key="y2",
         total_method="chart_series_sum",
@@ -717,6 +844,7 @@ def test_data_quality_warning_format_includes_request_ranges_when_available() ->
 
 
 def test_safe_int_decimal_strings_and_bad_values() -> None:
+    """Implement test safe int decimal strings and bad values."""
     assert util.safe_int("8") == 8
     assert util.safe_int("8.0") == 8
     assert util.safe_int(8.9) == 8
@@ -725,6 +853,7 @@ def test_safe_int_decimal_strings_and_bad_values() -> None:
 
 
 def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
+    """Implement test safe float parses decimal comma without deleting it."""
     assert util.safe_float("40,96") == 40.96
     assert util.safe_float(" 59,43 ") == 59.43
     assert util.safe_float("40,96") != 4096
@@ -745,11 +874,26 @@ def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -
         "y": ["0", "0", "40,96", "0"],
     }
 
-    assert util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy") == 136.0
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 136.0
+    )
     # Without an array context the month section is plain decimal.
-    month_source = {"unit": "kWh", "totalSolarEnergy": "40.96", "y": ["0", "0", "40,96", "0"]}
-    assert util.trend_series_total(month_source, "device_pv_stat_month", "totalSolarEnergy") == 40.96
-    assert util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy") != 4096
+    month_source = {
+        "unit": "kWh",
+        "totalSolarEnergy": "40.96",
+        "y": ["0", "0", "40,96", "0"],
+    }
+    assert (
+        util.trend_series_total(
+            month_source, "device_pv_stat_month", "totalSolarEnergy"
+        )
+        == 40.96
+    )
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        != 4096
+    )
 
 
 def test_device_year_compact_bucket_expands_previous_and_current_months() -> None:
@@ -766,21 +910,31 @@ def test_device_year_compact_bucket_expands_previous_and_current_months() -> Non
         "totalDischarge": "39",
         "x": [str(i) for i in range(1, 13)],
         "y2": [0.0, 0.0, 0.0, 0.0, 13.26, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+        "_request": {
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
     }
 
     assert util.effective_trend_series_values(
         source, "device_battery_stat_year", "totalDischarge"
     ) == [0.0, 0.0, 0.0, 13.0, 26.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_battery_stat_year", "totalDischarge"
-    ) == 39.0
-    assert util.trend_series_total(
-        source, "device_battery_stat_year", "totalDischarge"
-    ) == 39.0
+    assert (
+        util.effective_period_total_value(
+            source, "device_battery_stat_year", "totalDischarge"
+        )
+        == 39.0
+    )
+    assert (
+        util.trend_series_total(source, "device_battery_stat_year", "totalDischarge")
+        == 39.0
+    )
 
 
-def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw() -> None:
+def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw() -> (
+    None
+):
     """Regression test for the real diag fixture (May 2026 SolarVault Pro Max).
 
     Diagnostic data showed ``y[4] = 71.72`` paired with
@@ -795,25 +949,36 @@ def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw(
         "totalSolarEnergy": "71.72",
         "x": [str(i) for i in range(1, 13)],
         "y": [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+        "_request": {
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
     }
 
     assert util.effective_trend_series_values(
         source, "device_pv_stat_year", "totalSolarEnergy"
     ) == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == 71.72
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == 71.72
+    assert (
+        util.effective_period_total_value(
+            source, "device_pv_stat_year", "totalSolarEnergy"
+        )
+        == 71.72
+    )
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 71.72
+    )
 
 
 def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None:
-    """When neither raw nor compact-expanded sum matches the documented total
-    the integration must publish raw and surface the contradiction via
-    data_quality (per STRICT_WORK_INSTRUCTIONS.md rule 7: "Never hide,
-    synthesize, extrapolate, or repair energy values silently").
+    """Publish raw and surface contradiction when neither sum matches the total.
+
+    When neither the raw chart sum nor the compact-expanded sum matches the
+    documented total field, the integration must publish raw values and
+    surface the contradiction via ``data_quality`` (per
+    ``STRICT_WORK_INSTRUCTIONS.md`` rule 7: "Never hide, synthesize,
+    extrapolate, or repair energy values silently").
     """
     source = {
         "unit": "kWh",
@@ -821,7 +986,11 @@ def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None
         "totalSolarEnergy": "100",
         "x": [str(i) for i in range(1, 13)],
         "y": [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "_request": {"dateType": "year", "beginDate": "2026-01-01", "endDate": "2026-12-31"},
+        "_request": {
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
     }
 
     # Raw is published verbatim — no silent "repair" to either 71.72 or 143.
@@ -829,24 +998,30 @@ def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None
         source, "device_pv_stat_year", "totalSolarEnergy"
     )
     assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == 71.72
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 71.72
+    )
 
 
 def test_month_series_does_not_use_compact_year_expansion() -> None:
+    """Implement test month series does not use compact year expansion."""
     source = {
         "unit": "kWh",
         "totalDischarge": "13.26",
         "x": [1, 2, 3],
         "y2": [13.26, 0.0, 0.0],
-        "_request": {"dateType": "month", "beginDate": "2026-05-01", "endDate": "2026-05-31"},
+        "_request": {
+            "dateType": "month",
+            "beginDate": "2026-05-01",
+            "endDate": "2026-05-31",
+        },
     }
 
     assert util.effective_trend_series_values(
         source, "device_battery_stat_month", "totalDischarge"
     ) == [13.26, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_battery_stat_month", "totalDischarge"
-    ) == 13.26
-
+    assert (
+        util.trend_series_total(source, "device_battery_stat_month", "totalDischarge")
+        == 13.26
+    )

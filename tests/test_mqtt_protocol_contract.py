@@ -3,6 +3,7 @@
 These tests avoid importing Home Assistant while guarding the app-captured
 MQTT details documented in MQTT_PROTOCOL.md and APP_POLLING_MQTT.md.
 """
+
 from __future__ import annotations
 
 import ast
@@ -29,13 +30,17 @@ def _function_source(path: Path, name: str) -> str:
     tree = ast.parse(source)
     lines = source.splitlines()
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == name
+        ):
             assert node.end_lineno is not None
             return "\n".join(lines[node.lineno - 1 : node.end_lineno])
     raise AssertionError(f"{name} not found in {path}")
 
 
 def test_mqtt_setter_commands_match_app_protocol() -> None:
+    """Implement test mqtt setter commands match app protocol."""
     eps = _function_source(COORDINATOR_PATH, "async_set_eps")
     assert "action_id=ACTION_ID_EPS_ENABLED" in eps
     assert "ACTION_ID_SOC_CHARGE_LIMIT" not in eps
@@ -56,15 +61,19 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
 
 
 def test_mqtt_uses_captured_qos_zero() -> None:
+    """Implement test mqtt uses captured qos zero."""
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
     assert "qos: int = 0" in mqtt_source
     assert "subscribe(topic, qos=0)" in mqtt_source
-    assert "async_publish_json(topic, payload, qos=0, retain=False)" in coordinator_source
+    assert (
+        "async_publish_json(topic, payload, qos=0, retain=False)" in coordinator_source
+    )
 
 
 def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
+    """Implement test mqtt payload data field is normalized to body."""
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     const_source = _read(CONST_PATH)
@@ -72,7 +81,7 @@ def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
     assert 'FIELD_DATA: Final = "data"' in const_source
     assert 'FIELD_BODY: Final = "body"' in const_source
     assert 'MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"' in const_source
-    assert 'MQTT_CMD_CONTROL_COMBINE: Final = 121' in const_source
+    assert "MQTT_CMD_CONTROL_COMBINE: Final = 121" in const_source
     assert "alt_body = data.get(FIELD_DATA)" in mqtt_source
     assert "data[FIELD_BODY] = alt_body" in mqtt_source
     assert "alt_body = payload.get(FIELD_DATA)" in coordinator_source
@@ -119,7 +128,9 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
 def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     """The MQTT password must use the REST login userId/mqttPassWord/macId triple."""
     api_source = _read(ROOT / "custom_components" / "jackery_solarvault" / "api.py")
-    login = _function_source(ROOT / "custom_components" / "jackery_solarvault" / "api.py", "async_login")
+    login = _function_source(
+        ROOT / "custom_components" / "jackery_solarvault" / "api.py", "async_login"
+    )
     credentials = _function_source(
         ROOT / "custom_components" / "jackery_solarvault" / "api.py",
         "async_get_mqtt_credentials",
@@ -137,7 +148,8 @@ def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
 
 
 def test_mqtt_protocol_documents_diagnostics_privacy() -> None:
-    protocol = (ROOT / "MQTT_PROTOCOL.md").read_text(encoding="utf-8")
+    """Implement test mqtt protocol documents diagnostics privacy."""
+    protocol = (ROOT / "docs" / "MQTT_PROTOCOL.md").read_text(encoding="utf-8")
 
     assert "Diagnostics privacy" in protocol
     assert "hb/app/<userId>/" in protocol

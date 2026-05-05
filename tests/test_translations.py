@@ -1,4 +1,5 @@
 """Translation contract tests for generated Home Assistant entity keys."""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
 
 
 def test_language_files_cover_all_string_keys() -> None:
+    """Implement test language files cover all string keys."""
     base = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
     base_paths = _leaf_paths(base)
 

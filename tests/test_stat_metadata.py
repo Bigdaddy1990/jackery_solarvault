@@ -4,10 +4,12 @@ These tests use AST/source parsing only so they do not need a Home Assistant
 runtime. They guard the integration contract that period totals are not exposed
 as monotonically increasing lifetime counters.
 """
+
 from __future__ import annotations
 
 import ast
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
@@ -73,10 +75,7 @@ def _string_tuple_pairs_keyword(
             return ()
         pairs: list[tuple[str, str]] = []
         for item in value.elts:
-            if (
-                isinstance(item, ast.Tuple)
-                and len(item.elts) == 2
-            ):
+            if isinstance(item, ast.Tuple) and len(item.elts) == 2:
                 constants = _const_string_assignments(CONST_PATH)
                 left = _eval_static_string(item.elts[0], constants)
                 right = _eval_static_string(item.elts[1], constants)
@@ -120,18 +119,23 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
         if isinstance(node, ast.Assign):
             if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
                 continue
-            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            if isinstance(node.value, ast.Constant) and isinstance(
+                node.value.value, str
+            ):
                 assignments[node.targets[0].id] = node.value.value
             continue
         if isinstance(node, ast.AnnAssign):
             if not isinstance(node.target, ast.Name):
                 continue
-            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            if isinstance(node.value, ast.Constant) and isinstance(
+                node.value.value, str
+            ):
                 assignments[node.target.id] = node.value.value
     return assignments
 
 
 def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
+    """Implement test app period stat descriptions use total with reset period."""
     expected: dict[str, str] = {
         "today_load": "day",
         "today_battery_charge": "day",
@@ -168,7 +172,10 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
     for call in _stat_description_calls():
         key = _const_keyword(call, "key")
         if isinstance(key, str) and key in expected:
-            found[key] = (_state_class_keyword(call), _const_keyword(call, "reset_period"))
+            found[key] = (
+                _state_class_keyword(call),
+                _const_keyword(call, "reset_period"),
+            )
 
     assert set(found) == set(expected)
     for key, reset_period in expected.items():
@@ -178,6 +185,7 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
 
 
 def test_documented_stat_paths_match_const_values() -> None:
+    """Implement test documented stat paths match const values."""
     expected_paths = {
         "DEVICE_STATISTIC_PATH": "/v1/device/stat/deviceStatistic",
         "DEVICE_PV_STAT_PATH": "/v1/device/stat/pv",
@@ -194,6 +202,7 @@ def test_documented_stat_paths_match_const_values() -> None:
 
 
 def test_week_month_year_sensors_keep_same_source_family() -> None:
+    """Implement test week month year sensors keep same source family."""
     metadata = _stat_description_metadata()
     expected_source_prefix = {
         "pv": "device_pv_stat",
@@ -210,11 +219,14 @@ def test_week_month_year_sensors_keep_same_source_family() -> None:
 
 
 def test_device_day_sensors_fallback_to_day_period_sources() -> None:
+    """Implement test device day sensors fallback to day period sources."""
     metadata = _stat_description_metadata()
     expected = {
         "device_today_pv_energy": (("device_pv_stat_day", "totalSolarEnergy"),),
         "device_today_battery_charge": (("device_battery_stat_day", "totalCharge"),),
-        "device_today_battery_discharge": (("device_battery_stat_day", "totalDischarge"),),
+        "device_today_battery_discharge": (
+            ("device_battery_stat_day", "totalDischarge"),
+        ),
         "device_today_ongrid_input": (("device_home_stat_day", "totalInGridEnergy"),),
         "device_today_ongrid_output": (("device_home_stat_day", "totalOutGridEnergy"),),
     }
@@ -224,6 +236,7 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
 
 
 def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None:
+    """Implement test ct period stats remain removed from polling and chart imports."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "device_ct_stat_day" not in source
@@ -238,6 +251,7 @@ def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None
 
 
 def test_external_chart_import_uses_raw_app_period_points() -> None:
+    """Implement test external chart import uses raw app period points."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "trend_series_points(" in source
@@ -245,23 +259,40 @@ def test_external_chart_import_uses_raw_app_period_points() -> None:
 
 
 def test_device_period_stats_poll_all_app_periods() -> None:
+    """Implement test device period stats poll all app periods."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
-    assert "for date_type in APP_PERIOD_DATE_TYPES" in source
-    assert "self._app_period_section(APP_SECTION_PV_STAT, date_type)" in source
-    assert "self._app_period_section(APP_SECTION_BATTERY_STAT, date_type)" in source
-    assert "self._app_period_section(APP_SECTION_HOME_STAT, date_type)" in source
+    # Collapse whitespace so multi-line ruff format doesn't break the
+    # substring asserts (the call may wrap across lines after formatting).
+    flat = re.sub(r"\s+", " ", source)
+    assert "for date_type in APP_PERIOD_DATE_TYPES" in flat
+    assert (
+        "self._app_period_section( APP_SECTION_PV_STAT, date_type )" in flat
+        or "self._app_period_section(APP_SECTION_PV_STAT, date_type)" in flat
+    )
+    assert (
+        "self._app_period_section( APP_SECTION_BATTERY_STAT, date_type )" in flat
+        or "self._app_period_section(APP_SECTION_BATTERY_STAT, date_type)" in flat
+    )
+    assert (
+        "self._app_period_section( APP_SECTION_HOME_STAT, date_type )" in flat
+        or "self._app_period_section(APP_SECTION_HOME_STAT, date_type)" in flat
+    )
 
 
 def test_period_ranges_are_explicit_full_app_periods() -> None:
+    """Implement test period ranges are explicit full app periods."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     api_source = API_PATH.read_text(encoding="utf-8")
-    util_source = (ROOT / "custom_components" / "jackery_solarvault" / "util.py").read_text(
-        encoding="utf-8"
-    )
+    util_source = (
+        ROOT / "custom_components" / "jackery_solarvault" / "util.py"
+    ).read_text(encoding="utf-8")
 
     assert "APP_POLLING_MQTT.md requires explicit app ranges" in coordinator_source
-    assert "app_period_request_kwargs(date_type, today=dt_util.now().date())" in coordinator_source
+    assert (
+        "app_period_request_kwargs(date_type, today=dt_util.now().date())"
+        in coordinator_source
+    )
     assert "app_period_date_bounds(" in api_source
     assert "begin = today - timedelta(days=today.weekday())" in util_source
     assert "calendar.monthrange(today.year, today.month)" in util_source
@@ -269,8 +300,9 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
 
 
 def test_obsolete_period_entities_are_not_created() -> None:
+    """Implement test obsolete period entities are not created."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
-    init_source = INIT_PATH.read_text(encoding="utf-8")
+    INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
     assert "JackeryPvTrendsTodaySensor" not in sensor_source
@@ -290,8 +322,9 @@ def test_obsolete_period_entities_are_not_created() -> None:
 
 
 def test_non_app_diagnostic_sensors_are_not_created() -> None:
+    """Implement test non app diagnostic sensors are not created."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
-    init_source = INIT_PATH.read_text(encoding="utf-8")
+    INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
     for class_name in (
@@ -317,6 +350,7 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
 
 
 def test_app_sensor_descriptions_are_not_disabled_by_default() -> None:
+    """Implement test app sensor descriptions are not disabled by default."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
 
     assert "entity_registry_enabled_default=False" not in sensor_source
@@ -324,6 +358,7 @@ def test_app_sensor_descriptions_are_not_disabled_by_default() -> None:
 
 
 def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
+    """Implement test former disabled app sensor suffixes remain documented."""
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
     for suffix in (
@@ -338,16 +373,18 @@ def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
 
 
 def test_external_app_chart_statistics_are_period_scoped() -> None:
+    """Implement test external app chart statistics are period scoped."""
     source = CONST_PATH.read_text(encoding="utf-8")
 
-    assert 'DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY' in source
-    assert 'DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY' in source
-    assert 'DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY' in source
+    assert "DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY" in source
+    assert "DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY" in source
+    assert "DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY" in source
     assert 'DATE_TYPE_MONTH: "daily"' not in source
     assert 'DATE_TYPE_YEAR: "monthly"' not in source
 
 
 def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
+    """Implement test period sensor translations do not use this period wording."""
     for path in (
         ROOT / "custom_components" / "jackery_solarvault" / "strings.json",
         ROOT / "custom_components" / "jackery_solarvault" / "translations" / "de.json",
@@ -366,6 +403,7 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
 
 
 def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
+    """Implement test non period stat source diagnostics are not overbuilt."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
@@ -376,6 +414,7 @@ def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
 
 
 def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
+    """Implement test stat state class matrix for totals periods and prices."""
     matrix = {
         "today_load": ("TOTAL", "day"),
         "today_battery_charge": ("TOTAL", "day"),
@@ -391,7 +430,10 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
     for call in calls:
         key = _const_keyword(call, "key")
         if isinstance(key, str) and key in matrix:
-            found[key] = (_state_class_keyword(call), _const_keyword(call, "reset_period"))
+            found[key] = (
+                _state_class_keyword(call),
+                _const_keyword(call, "reset_period"),
+            )
 
     assert set(found) == set(matrix)
     for key, expected in matrix.items():

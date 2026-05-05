@@ -1,12 +1,13 @@
 """Lightweight static checks for integration code hygiene."""
+
 from __future__ import annotations
 
 import ast
 import importlib.util
 import pathlib
+import re
 import sys
 import types
-import re
 
 import yaml
 
@@ -15,8 +16,6 @@ LOG_METHODS = {"debug", "info", "warning", "error", "exception"}
 PERCENT_PLACEHOLDER = re.compile(
     r"(?<!%)%(?:\([^)]+\))?[#0 +\-]*(?:\d+|\*)?(?:\.\d+)?[hlL]?[diouxXeEfFgGcrs]"
 )
-
-
 
 
 def _load_util_module():
@@ -49,6 +48,7 @@ def _load_util_module():
 
 util = _load_util_module()
 
+
 def _python_sources() -> list[pathlib.Path]:
     return sorted(CUSTOM_COMPONENT.glob("*.py"))
 
@@ -63,7 +63,9 @@ def test_no_duplicate_literal_dict_keys() -> None:
             seen: set[str] = set()
             for key in node.keys:
                 if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                    assert key.value not in seen, f"{path}:{node.lineno} duplicates {key.value!r}"
+                    assert key.value not in seen, (
+                        f"{path}:{node.lineno} duplicates {key.value!r}"
+                    )
                     seen.add(key.value)
 
 
@@ -127,12 +129,13 @@ def test_period_reset_descriptions_use_date_type_constants() -> None:
             for keyword in node.keywords:
                 if keyword.arg != "reset_period":
                     continue
-                if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                if isinstance(keyword.value, ast.Constant) and isinstance(
+                    keyword.value.value, str
+                ):
                     raise AssertionError(
                         f"{path}:{keyword.value.lineno} uses raw reset_period "
                         f"{keyword.value.value!r}; use DATE_TYPE_* constants"
                     )
-
 
 
 def test_const_exports_are_not_reassigned() -> None:
@@ -143,11 +146,17 @@ def test_const_exports_are_not_reassigned() -> None:
     for node in tree.body:
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             name = node.target.id
-        elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+        elif (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
             name = node.targets[0].id
         else:
             continue
-        assert name not in seen, f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
+        assert name not in seen, (
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
+        )
         seen[name] = node.lineno
 
 
@@ -208,7 +217,6 @@ def test_mqtt_topic_literals_are_centralized() -> None:
                 )
 
 
-
 def test_app_period_stat_keys_are_centralized() -> None:
     """Keep app period/trend stat-key strings centralized in const.py."""
     forbidden = {
@@ -228,6 +236,7 @@ def test_app_period_stat_keys_are_centralized() -> None:
                     "use APP_STAT_* constants from const.py instead"
                 )
 
+
 def _const_string_values(name: str) -> tuple[str, ...]:
     """Read a tuple/frozenset/list constant of strings from const.py via AST."""
     const_tree = ast.parse((CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8"))
@@ -235,22 +244,31 @@ def _const_string_values(name: str) -> tuple[str, ...]:
     target_node: ast.AST | None = None
     for node in const_tree.body:
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            if isinstance(node.value, ast.Constant) and isinstance(
+                node.value.value, str
+            ):
                 env[node.target.id] = node.value.value
             if node.target.id == name:
                 target_node = node.value
     assert target_node is not None, f"const.py is missing {name}"
 
     def eval_node(node: ast.AST) -> object:
+        """Implement eval node."""
         if isinstance(node, ast.Constant):
             return node.value
         if isinstance(node, ast.Name):
             return env[node.id]
         if isinstance(node, ast.Tuple | ast.List | ast.Set):
             return tuple(eval_node(item) for item in node.elts)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "frozenset":
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "frozenset"
+        ):
             return tuple(eval_node(item) for item in node.args[0].elts)  # type: ignore[index,union-attr]
-        raise AssertionError(f"Unsupported const expression in {name}: {ast.dump(node)}")
+        raise AssertionError(
+            f"Unsupported const expression in {name}: {ast.dump(node)}"
+        )
 
     values = eval_node(target_node)
     assert isinstance(values, tuple)
@@ -299,9 +317,14 @@ def _class_constant_int(tree: ast.Module, class_name: str, attr_name: str) -> in
         for stmt in node.body:
             if not isinstance(stmt, ast.Assign):
                 continue
-            if not any(isinstance(target, ast.Name) and target.id == attr_name for target in stmt.targets):
+            if not any(
+                isinstance(target, ast.Name) and target.id == attr_name
+                for target in stmt.targets
+            ):
                 continue
-            if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, int):
+            if isinstance(stmt.value, ast.Constant) and isinstance(
+                stmt.value.value, int
+            ):
                 return stmt.value.value
     raise AssertionError(f"Missing {class_name}.{attr_name} integer constant")
 
@@ -310,7 +333,9 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     """The first public package must not carry internal entry-version history."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
-    config_tree = ast.parse((CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8"))
+    config_tree = ast.parse(
+        (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+    )
 
     assert "CONFIG_ENTRY_VERSION" not in const_source
     assert "CONF_DEVICE_ID" not in const_source
@@ -325,7 +350,9 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
 
 def test_ci_runs_all_pure_tests_and_compileall() -> None:
     """Keep GitHub Actions aligned with the local validation command."""
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(encoding="utf-8")
+    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
+        encoding="utf-8"
+    )
     assert "python -m compileall -q custom_components tests" in workflow
     assert "pytest -q -p no:cacheprovider" in workflow
     assert "tests/test_power_math.py" not in workflow
@@ -335,7 +362,7 @@ def test_period_source_diagnostics_stay_minimal() -> None:
     """Period sensors should expose calculation facts, not redundant contracts."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
-    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     for removed in (
         "SOURCE_CONTRACT_",
         "SOURCE_KIND_",
@@ -366,11 +393,14 @@ def test_period_source_diagnostics_stay_minimal() -> None:
 
 def test_data_source_priority_contract_exists() -> None:
     """Keep the no-cross-period-repair rule documented next to the code."""
-    contract = pathlib.Path("DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
+    contract = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
     assert "Do not use week values to repair month/year/lifetime totals." in contract
     assert "Do not use month values to repair year/lifetime totals." in contract
     assert "Do not use year values to repair lifetime totals." in contract
-    assert "month` and `year` must never fall back to `beginDate=endDate=today`" in contract
+    assert (
+        "month` and `year` must never fall back to `beginDate=endDate=today`"
+        in contract
+    )
 
 
 def test_diagnostics_anonymize_outer_payload_keys() -> None:
@@ -399,7 +429,9 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
     """Keep diagnostics aligned with HA's share-safe diagnostics rule."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    redaction_block = const_source.split("REDACT_KEYS: Final = {", 1)[1].split("}\n\n# MQTT", 1)[0]
+    redaction_block = const_source.split("REDACT_KEYS: Final = {", 1)[1].split(
+        "}\n\n# MQTT", 1
+    )[0]
     for required in (
         "CONF_MQTT_MAC_ID",
         "CONF_REGION_CODE",
@@ -417,9 +449,11 @@ def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
         assert required in redaction_block
 
 
-def test_data_source_priority_documents_minimal_attributes_and_payload_debug_log() -> None:
+def test_data_source_priority_documents_minimal_attributes_and_payload_debug_log() -> (
+    None
+):
     """Source diagnostics must be lean; raw parser proof belongs in debug JSONL."""
-    contract = pathlib.Path("DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
+    contract = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
     assert "Minimal entity diagnostic attributes" in contract
     assert "jackery_solarvault_payload_debug.jsonl" in contract
     assert "source_contract=" not in contract
@@ -456,7 +490,7 @@ def test_unique_id_helper_is_the_only_duplicate_entity_skip_logger() -> None:
 
 def test_unique_id_contract_is_documented_and_followed() -> None:
     """Unique IDs must stay independent from names/translations."""
-    contract = pathlib.Path("UNIQUE_ID_CONTRACT.md").read_text(encoding="utf-8")
+    contract = pathlib.Path("docs/UNIQUE_ID_CONTRACT.md").read_text(encoding="utf-8")
     assert "<device_id>_<stable_key_suffix>" in contract
     assert "deviceName" in contract
     assert "translation keys" in contract
@@ -482,9 +516,9 @@ def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
     """Battery-pack entities must not use serial/name fields for unique_id."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     assert 'f"battery_pack_{pack_index}_{description.key}"' in sensor_source
-    pack_class = sensor_source.split("class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1)[1].split(
-        "class JackerySmartMeterSensor", 1
-    )[0]
+    pack_class = sensor_source.split(
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackerySmartMeterSensor", 1)[0]
     pack_init = pack_class.split("    def __init__(", 1)[1].split(
         "    @property\n    def _pack", 1
     )[0]
@@ -496,10 +530,14 @@ def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
 def test_data_quality_repair_issue_is_wired_without_cross_period_repair() -> None:
     """Contradictory app data must create diagnostics/repairs, not state rewrites."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     strings_source = (CUSTOM_COMPONENT / "strings.json").read_text(encoding="utf-8")
-    data_priority = pathlib.Path("DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
+    data_priority = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "PAYLOAD_DATA_QUALITY" in const_source
     assert "REPAIR_ISSUE_APP_DATA_INCONSISTENCY" in const_source
@@ -524,7 +562,9 @@ def test_data_quality_repair_issue_is_wired_without_cross_period_repair() -> Non
 
 def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -> None:
     """Keep services.yaml, const.py field constants, and setup schemas aligned."""
-    services = yaml.safe_load((CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8"))
+    services = yaml.safe_load(
+        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8")
+    )
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
@@ -541,12 +581,12 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
     assert set(services["delete_storm_alert"]["fields"]) == {"device_id", "alert_id"}
 
     assert 'SERVICE_NUMERIC_ID_PATTERN: Final = r"^\\s*[0-9]+\\s*$"' in const_source
-    assert 'SERVICE_FIELD_SYSTEM_ID): vol.All(' in init_source
-    assert 'SERVICE_FIELD_DEVICE_ID): vol.All(' in init_source
-    assert 'cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)' in init_source
-    assert 'SERVICE_FIELD_ALERT_ID): vol.All(' in init_source
-    assert 'SERVICE_NON_EMPTY_TEXT_PATTERN' in init_source
-    assert 'str.strip' not in init_source
+    assert "SERVICE_FIELD_SYSTEM_ID): vol.All(" in init_source
+    assert "SERVICE_FIELD_DEVICE_ID): vol.All(" in init_source
+    assert "cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in init_source
+    assert "SERVICE_FIELD_ALERT_ID): vol.All(" in init_source
+    assert "SERVICE_NON_EMPTY_TEXT_PATTERN" in init_source
+    assert "str.strip" not in init_source
 
 
 def test_readme_documents_period_and_data_quality_behavior() -> None:
@@ -563,29 +603,44 @@ def test_readme_documents_period_and_data_quality_behavior() -> None:
 
 def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
     """Rejected credentials during refresh should start HA reauth instead of log-spamming."""
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     assert "ConfigEntryAuthFailed" in coordinator_source
-    assert "Jackery credentials were rejected during property refresh" in coordinator_source
-    assert "Jackery credentials were rejected while fetching extended device data" in coordinator_source
-    assert "Jackery credentials were rejected while fetching system data" in coordinator_source
+    assert (
+        "Jackery credentials were rejected during property refresh"
+        in coordinator_source
+    )
+    assert (
+        "Jackery credentials were rejected while fetching extended device data"
+        in coordinator_source
+    )
+    assert (
+        "Jackery credentials were rejected while fetching system data"
+        in coordinator_source
+    )
     assert "Auth revoked (likely another session logged in)" not in coordinator_source
 
 
 def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
     """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""
-    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
     strings_source = (CUSTOM_COMPONENT / "strings.json").read_text(encoding="utf-8")
     de_source = (CUSTOM_COMPONENT / "translations/de.json").read_text(encoding="utf-8")
     en_source = (CUSTOM_COMPONENT / "translations/en.json").read_text(encoding="utf-8")
 
     assert 'self.context.get("entry_id")' in config_flow_source
-    assert 'FLOW_ABORT_REAUTH_ENTRY_MISSING' in config_flow_source
-    assert 'async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)' in config_flow_source
+    assert "FLOW_ABORT_REAUTH_ENTRY_MISSING" in config_flow_source
+    assert "async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)" in config_flow_source
     assert "assert self._reauth_entry is not None" not in config_flow_source
     for source in (strings_source, de_source, en_source):
         assert "reauth_entry_missing" in source
 
+
 def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
+    """Implement test data quality warnings are normalized and formatted for repairs."""
     warning_a = util.AppDataQualityWarning(
         level="warning",
         reason="year_less_than_week",
@@ -608,7 +663,11 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         reference_value=126.97,
     ).as_dict()
 
-    normalized = util.normalized_data_quality_warnings([warning_b, warning_c, warning_a])
+    normalized = util.normalized_data_quality_warnings([
+        warning_b,
+        warning_c,
+        warning_a,
+    ])
 
     assert normalized == [warning_c, warning_a]
     assert util.format_data_quality_warning(normalized[0]) == (
@@ -619,7 +678,9 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         "< device_home_stat_week=89.08"
     )
 
+
 def test_data_quality_diagnostics_include_request_context_keys() -> None:
+    """Implement test data quality diagnostics include request context keys."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
 
@@ -640,16 +701,23 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
     """Runtime guard paths should raise HA/domain errors, not AssertionError."""
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
-    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "assert self._token is not None" not in api_source
-    assert 'raise JackeryAuthError("Login succeeded without returning a token")' in api_source
+    assert (
+        'raise JackeryAuthError("Login succeeded without returning a token")'
+        in api_source
+    )
     assert "assert self._reauth_entry is not None" not in config_flow_source
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
     """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     discover_block = coordinator_source.split("async def async_discover", 1)[1].split(
         "def _is_property_device_candidate", 1
     )[0]
@@ -661,7 +729,9 @@ def test_system_discovery_auth_errors_trigger_reauth() -> None:
 
 def test_system_discovery_does_not_keep_unpublished_manual_id_paths() -> None:
     """Unreleased manual device/system config paths are migration ballast."""
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
     assert "manual deviceId" not in coordinator_source
@@ -679,24 +749,38 @@ def test_optional_number_setter_failures_are_logged_before_suppression() -> None
     assert "self.entity_description.raise_on_setter_error" in number_source
 
 
-
 def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
     """Avoid duplicate entries caused by whitespace/case drift in usernames."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
 
     assert 'FLOW_STEP_USER: Final = "user"' in const_source
     assert 'FLOW_ERROR_INVALID_AUTH: Final = "invalid_auth"' in const_source
-    assert 'def _normalize_account(value: str) -> str:' in config_flow_source
-    assert 'return value.strip()' in config_flow_source
-    assert 'account = _normalize_account(user_input[CONF_USERNAME])' in config_flow_source
-    assert 'await self.async_set_unique_id(account.lower())' in config_flow_source
-    assert 'CONF_USERNAME: account' in config_flow_source
-    assert 'vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1))' in config_flow_source
-    assert 'FLOW_ERROR_ACCOUNT_REQUIRED' in config_flow_source
-    assert 'errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED' in config_flow_source
-    assert 'vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))' in config_flow_source
-    assert 'str.strip' not in config_flow_source.split('USER_SCHEMA =', 1)[1].split('class JackeryConfigFlow', 1)[0]
+    assert "def _normalize_account(value: str) -> str:" in config_flow_source
+    assert "return value.strip()" in config_flow_source
+    assert (
+        "account = _normalize_account(user_input[CONF_USERNAME])" in config_flow_source
+    )
+    assert "await self.async_set_unique_id(account.lower())" in config_flow_source
+    assert "CONF_USERNAME: account" in config_flow_source
+    assert (
+        "vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1))"
+        in config_flow_source
+    )
+    assert "FLOW_ERROR_ACCOUNT_REQUIRED" in config_flow_source
+    assert "errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED" in config_flow_source
+    assert (
+        "vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))"
+        in config_flow_source
+    )
+    assert (
+        "str.strip"
+        not in config_flow_source.split("USER_SCHEMA =", 1)[1].split(
+            "class JackeryConfigFlow", 1
+        )[0]
+    )
 
 
 def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
@@ -707,8 +791,13 @@ def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
     assert 'REDACTED_VALUE: Final = "**REDACTED**"' in const_source
     assert "def _redact_topic(topic: str | None) -> str | None:" in mqtt_source
     assert "parts[2] = REDACTED_VALUE" in mqtt_source
-    assert '"topics": [self._redact_topic(topic) for topic in self._topics]' in mqtt_source
-    assert '"last_published_topic": self._redact_topic(self._last_published_topic)' in mqtt_source
+    assert (
+        '"topics": [self._redact_topic(topic) for topic in self._topics]' in mqtt_source
+    )
+    assert (
+        '"last_published_topic": self._redact_topic(self._last_published_topic)'
+        in mqtt_source
+    )
     assert '"topic_count": len(self._topics)' in mqtt_source
     assert '"topics": list(self._topics)' not in mqtt_source
     assert '"last_published_topic": self._last_published_topic' not in mqtt_source
@@ -738,7 +827,9 @@ def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     assert "non-object JSON payload" in mqtt_source
 
 
-def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> None:
+def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (
+    None
+):
     """Reject malformed MQTT seeds and avoid copy/pasted redaction literals."""
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
 
@@ -771,12 +862,12 @@ def test_api_trend_endpoints_use_shared_period_range_contract() -> None:
         assert "APP_REQUEST_END_DATE: str(end_date)" in block
 
 
-
 def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> None:
     """Catch dead code such as duplicate return statements in helpers."""
     terminal = (ast.Return, ast.Raise, ast.Break, ast.Continue)
 
     def check_body(path: pathlib.Path, body: list[ast.stmt]) -> None:
+        """Implement check body."""
         terminal_node: ast.stmt | None = None
         for stmt in body:
             if terminal_node is not None:
@@ -788,8 +879,13 @@ def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> No
                 terminal_node = stmt
 
     def walk_statement_lists(path: pathlib.Path, node: ast.AST) -> None:
+        """Implement walk statement lists."""
         for _field, value in ast.iter_fields(node):
-            if isinstance(value, list) and value and all(isinstance(item, ast.stmt) for item in value):
+            if (
+                isinstance(value, list)
+                and value
+                and all(isinstance(item, ast.stmt) for item in value)
+            ):
                 check_body(path, value)
             for child in value if isinstance(value, list) else [value]:
                 if isinstance(child, ast.AST):
@@ -812,7 +908,9 @@ def test_entry_bool_option_calls_use_config_key_and_default() -> None:
     ]
     assert calls
     for call in calls:
-        assert len(call.args) == 3, f"_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+        assert len(call.args) == 3, (
+            f"_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+        )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
     assert "CONF_CREATE_CALCULATED_POWER_SENSORS" in source
@@ -822,18 +920,30 @@ def test_entry_bool_option_calls_use_config_key_and_default() -> None:
 
 
 def test_all_api_json_decode_paths_catch_value_error() -> None:
-    """aiohttp/json stacks may raise ValueError for malformed JSON payloads."""
+    """aiohttp/json stacks may raise ValueError for malformed JSON payloads.
+
+    Each ``resp.json(...)`` call site must wrap a four-tuple of the relevant
+    decode/format exceptions: ``aiohttp.ContentTypeError``,
+    ``json.JSONDecodeError``, ``UnicodeDecodeError`` and ``ValueError``. The
+    test is tolerant to ruff format's multi-line layout (one type per line)
+    by collecting the full text of each ``except (...)`` block before
+    asserting on the contents.
+    """
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
-    decode_blocks = [
-        line.strip()
-        for line in api_source.splitlines()
-        if line.strip().startswith("except (aiohttp.ContentTypeError")
-    ]
-    assert len(decode_blocks) == 4
+    # Collect every `except (...) ...` block, regardless of line wrapping.
+    decode_blocks: list[str] = []
+    pattern = re.compile(
+        r"except\s*\(\s*aiohttp\.ContentTypeError\s*,[^)]+\)",
+        re.S,
+    )
+    for match in pattern.finditer(api_source):
+        # Normalise to a single line so each assertion is local and clear.
+        decode_blocks.append(re.sub(r"\s+", " ", match.group(0)))
+    assert len(decode_blocks) == 4, decode_blocks
     for block in decode_blocks:
-        assert "json.JSONDecodeError" in block
-        assert "UnicodeDecodeError" in block
-        assert "ValueError" in block
+        assert "json.JSONDecodeError" in block, block
+        assert "UnicodeDecodeError" in block, block
+        assert "ValueError" in block, block
 
 
 def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None:
@@ -886,28 +996,39 @@ def test_api_payload_helper_paths_match_called_endpoint_constants() -> None:
     pv_block = api_source.split("async def async_get_pv_trends", 1)[1].split(
         "async def async_get_power_price", 1
     )[0]
-    price_sources_block = api_source.split("async def async_get_price_sources", 1)[1].split(
-        "async def async_get_price_history_config", 1
-    )[0]
+    price_sources_block = api_source.split("async def async_get_price_sources", 1)[
+        1
+    ].split("async def async_get_price_history_config", 1)[0]
     assert "payload = self._payload_dict(data, PV_TRENDS_PATH)" in pv_block
     assert "HOME_TRENDS_PATH" not in pv_block
-    assert "return self._payload_list(data, PRICE_SOURCE_LIST_PATH)" in price_sources_block
+    assert (
+        "return self._payload_list(data, PRICE_SOURCE_LIST_PATH)" in price_sources_block
+    )
     assert "DEVICE_LIST_PATH" not in price_sources_block
 
 
 def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -> None:
     """HA voluptuous_serialize cannot convert raw str.strip callables in UI schemas."""
-    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
-    user_schema = config_flow_source.split("USER_SCHEMA =", 1)[1].split("class JackeryConfigFlow", 1)[0]
-    reauth_schema = config_flow_source.split("data_schema=vol.Schema", 1)[1].split("description_placeholders", 1)[0]
-    service_schema_block = init_source.split("RENAME_SCHEMA =", 1)[1].split("def _entry_bool_option", 1)[0]
+    user_schema = config_flow_source.split("USER_SCHEMA =", 1)[1].split(
+        "class JackeryConfigFlow", 1
+    )[0]
+    reauth_schema = config_flow_source.split("data_schema=vol.Schema", 1)[1].split(
+        "description_placeholders", 1
+    )[0]
+    service_schema_block = init_source.split("RENAME_SCHEMA =", 1)[1].split(
+        "def _entry_bool_option", 1
+    )[0]
 
     assert "str.strip" not in user_schema
     assert "str.strip" not in reauth_schema
     assert "str.strip" not in service_schema_block
     assert "SERVICE_NON_EMPTY_TEXT_PATTERN" in service_schema_block
+
 
 def test_coordinator_imports_all_field_constants_it_references() -> None:
     """Catch runtime NameError regressions from missing FIELD_* imports."""
@@ -940,8 +1061,9 @@ def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -
     assert "str.strip" not in init_source
 
 
-
-def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> None:
+def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> (
+    None
+):
     """HTTP source payload must be defined before entry assembly."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     refresh_block = source.split("async def _async_update_data", 1)[1].split(
@@ -979,8 +1101,12 @@ def test_component_modules_import_all_referenced_const_names() -> None:
         used: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == "const":
-                imported_from_const.update(alias.asname or alias.name for alias in node.names)
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                imported_from_const.update(
+                    alias.asname or alias.name for alias in node.names
+                )
+            elif isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
                 assigned.add(node.name)
             elif isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -995,7 +1121,6 @@ def test_component_modules_import_all_referenced_const_names() -> None:
             failures[path.name] = missing
 
     assert not failures, f"Missing .const imports: {failures}"
-
 
 
 def test_component_modules_import_all_referenced_util_helpers() -> None:
@@ -1017,8 +1142,12 @@ def test_component_modules_import_all_referenced_util_helpers() -> None:
         used: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == "util":
-                imported_from_util.update(alias.asname or alias.name for alias in node.names)
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                imported_from_util.update(
+                    alias.asname or alias.name for alias in node.names
+                )
+            elif isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
                 assigned.add(node.name)
             elif isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -1033,7 +1162,6 @@ def test_component_modules_import_all_referenced_util_helpers() -> None:
             failures[path.name] = missing
 
     assert not failures, f"Missing .util helper imports: {failures}"
-
 
 
 def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> None:
@@ -1056,9 +1184,9 @@ def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> No
 def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> None:
     """Battery-pack diagnostics should not expose the same raw key twice."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
-    block = sensor_source.split("class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1)[1].split(
-        "class JackerySmartMeterSensor", 1
-    )[0]
+    block = sensor_source.split(
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackerySmartMeterSensor", 1)[0]
 
     assert block.count("FIELD_OT,") == 1
 
@@ -1066,9 +1194,9 @@ def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> Non
 def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
     """Repairs diagnose contradictions; entity states keep their documented source."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
-    stat_block = sensor_source.split("class JackeryStatSensor(JackeryEntity, SensorEntity):", 1)[1].split(
-        "class JackeryBatteryPackSensor", 1
-    )[0]
+    stat_block = sensor_source.split(
+        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
     assert "def _data_quality_warning_for_own_source" not in stat_block
     assert "def _is_source_untrusted_by_data_quality" not in stat_block
@@ -1077,9 +1205,12 @@ def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
 
 
 def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> None:
+    """Implement test payload debug log records raw types parsed floats and rotation."""
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
 
     for fragment in (
         "PAYLOAD_DEBUG_LOG_FILENAME",
@@ -1090,14 +1221,21 @@ def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> Non
         '"parsed_sum": round(total, 5)',
         "def append_payload_debug_line",
     ):
-        assert fragment in util_source or fragment in api_source or fragment in coordinator_source
+        assert (
+            fragment in util_source
+            or fragment in api_source
+            or fragment in coordinator_source
+        )
 
     assert "self.payload_debug_callback" in api_source
     assert "chart_series_debug(payload)" in api_source
     assert '"kind": "http"' in api_source
     assert '"kind": "mqtt"' in coordinator_source
     assert "append_payload_debug_line" in coordinator_source
-    assert "jackery_solarvault_payload_debug.jsonl" in (pathlib.Path("README.md").read_text(encoding="utf-8"))
+    assert "jackery_solarvault_payload_debug.jsonl" in (
+        pathlib.Path("README.md").read_text(encoding="utf-8")
+    )
+
 
 def test_local_helper_calls_match_their_declared_arity() -> None:
     """Catch nested helper call mistakes before they create runtime coroutine leaks."""
@@ -1117,7 +1255,9 @@ def test_local_helper_calls_match_their_declared_arity() -> None:
             if not local_defs:
                 continue
             for call in ast.walk(owner):
-                if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Name):
+                if not isinstance(call, ast.Call) or not isinstance(
+                    call.func, ast.Name
+                ):
                     continue
                 if call.func.id not in local_defs:
                     continue
@@ -1137,11 +1277,13 @@ def test_system_ttl_gather_calls_use_exact_helper_shape() -> None:
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     update_func = next(
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "_async_update_data"
     )
     ttl_calls = [
-        node for node in ast.walk(update_func)
+        node
+        for node in ast.walk(update_func)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "_get_with_ttl"
@@ -1176,7 +1318,13 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
         }
         unresolved: set[str] = set()
 
-        def walk(scope: symtable.SymbolTable) -> None:
+        def walk(
+            scope: symtable.SymbolTable,
+            *,
+            _module_defs: set[str] = module_defs,
+            _unresolved: set[str] = unresolved,
+        ) -> None:
+            """Recursively collect unresolved global names from this scope."""
             for symbol in scope.get_symbols():
                 name = symbol.get_name()
                 if (
@@ -1184,35 +1332,61 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
                     and symbol.is_global()
                     and not symbol.is_imported()
                     and not symbol.is_assigned()
-                    and name not in module_defs
+                    and name not in _module_defs
                     and name not in builtins_names
                     and name not in allowed_dunder_globals
                 ):
-                    unresolved.add(name)
+                    _unresolved.add(name)
             for child in scope.get_children():
-                walk(child)
+                walk(child, _module_defs=_module_defs, _unresolved=_unresolved)
 
         walk(table)
-        assert not unresolved, f"{path} has unresolved global names: {sorted(unresolved)}"
+        assert not unresolved, (
+            f"{path} has unresolved global names: {sorted(unresolved)}"
+        )
 
 
 def test_payload_debug_file_is_gated_by_dedicated_debug_logger() -> None:
     """Raw payload logging must not write on normal installations."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     readme = pathlib.Path("README.md").read_text(encoding="utf-8")
-    data_source_doc = pathlib.Path("DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
+    data_source_doc = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(
+        encoding="utf-8"
+    )
 
-    assert 'PAYLOAD_DEBUG_LOGGER_NAME: Final = f"custom_components.{DOMAIN}.payload_debug"' in const_source
-    assert "_PAYLOAD_DEBUG_LOGGER = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)" in coordinator_source
-    assert "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):\n            return" in coordinator_source
+    assert (
+        'PAYLOAD_DEBUG_LOGGER_NAME: Final = f"custom_components.{DOMAIN}.payload_debug"'
+        in const_source
+    )
+    assert (
+        "_PAYLOAD_DEBUG_LOGGER = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)"
+        in coordinator_source
+    )
+    assert (
+        "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):\n            return"
+        in coordinator_source
+    )
     assert "custom_components.jackery_solarvault.payload_debug: debug" in readme
-    assert "enabled only when logger `custom_components.jackery_solarvault.payload_debug`" in data_source_doc
+    assert (
+        "enabled only when logger `custom_components.jackery_solarvault.payload_debug`"
+        in data_source_doc
+    )
 
 
 def test_no_direct_blocking_file_io_inside_async_functions() -> None:
     """HA runtime paths must not do disk IO directly in the event loop."""
-    forbidden = {"open", "write_text", "read_text", "replace", "unlink", "mkdir", "stat"}
+    forbidden = {
+        "open",
+        "write_text",
+        "read_text",
+        "replace",
+        "unlink",
+        "mkdir",
+        "stat",
+    }
     for path in _python_sources():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -1227,14 +1401,20 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                 elif isinstance(call.func, ast.Attribute):
                     name = call.func.attr
                 if name in forbidden:
-                    raise AssertionError(f"{path}:{call.lineno} does blocking file IO in async function {node.name}()")
+                    raise AssertionError(
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"
+                    )
 
 
 def test_api_method_calls_use_valid_positional_arity() -> None:
     """Coordinator/service paths must not call JackeryApi methods with impossible arity."""
     api_tree = ast.parse((CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8"))
     method_arity: dict[str, tuple[int, int | None]] = {}
-    for cls in [node for node in ast.walk(api_tree) if isinstance(node, ast.ClassDef) and node.name == "JackeryApi"]:
+    for cls in [
+        node
+        for node in ast.walk(api_tree)
+        if isinstance(node, ast.ClassDef) and node.name == "JackeryApi"
+    ]:
         for item in cls.body:
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 args = item.args
@@ -1255,7 +1435,9 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
     for path in _python_sources():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for call in ast.walk(tree):
-            if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Attribute):
+            if not isinstance(call, ast.Call) or not isinstance(
+                call.func, ast.Attribute
+            ):
                 continue
             name = call.func.attr
             if name not in method_arity:
@@ -1269,8 +1451,12 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
                 continue
             required, max_count = method_arity[name]
             positional = len(call.args)
-            assert positional >= required, f"{path}:{call.lineno} calls {name}() with too few positional args"
-            assert max_count is None or positional <= max_count, f"{path}:{call.lineno} calls {name}() with too many positional args"
+            assert positional >= required, (
+                f"{path}:{call.lineno} calls {name}() with too few positional args"
+            )
+            assert max_count is None or positional <= max_count, (
+                f"{path}:{call.lineno} calls {name}() with too many positional args"
+            )
 
 
 def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
@@ -1285,11 +1471,18 @@ def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
 
 
 def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
-    instructions = pathlib.Path("docs/STRICT_WORK_INSTRUCTIONS.md").read_text(encoding="utf-8")
+    """Implement test strict work instructions and repair roadmap are present."""
+    instructions = pathlib.Path("docs/STRICT_WORK_INSTRUCTIONS.md").read_text(
+        encoding="utf-8"
+    )
     roadmap = pathlib.Path("docs/REPAIR_ROADMAP.md").read_text(encoding="utf-8")
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(encoding="utf-8")
+    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
+        encoding="utf-8"
+    )
     requirements = pathlib.Path("requirements-test.txt").read_text(encoding="utf-8")
-    pr_template = pathlib.Path(".github/PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+    pr_template = pathlib.Path(".github/PULL_REQUEST_TEMPLATE.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "Repair the foundation first" in instructions
     assert "raw HTTP/MQTT payload" in instructions
@@ -1303,11 +1496,11 @@ def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
 
 
 def test_generated_payload_debug_logs_are_ignored() -> None:
+    """Implement test generated payload debug logs are ignored."""
     gitignore = pathlib.Path(".gitignore").read_text(encoding="utf-8")
 
     assert "jackery_solarvault_payload_debug.jsonl" in gitignore
     assert "jackery_solarvault_payload_debug.jsonl.1" in gitignore
-
 
 
 def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
@@ -1316,12 +1509,21 @@ def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
     readme = pathlib.Path("README.md").read_text(encoding="utf-8")
 
     assert 'BRAND_CACHE_INTEGRATION_DOMAIN = "jackery"' in init_source
-    assert 'BRAND_IMAGE_FILENAMES = (' in init_source
+    assert "BRAND_IMAGE_FILENAMES = (" in init_source
     assert '"icon.png"' in init_source
     assert '"logo.png"' in init_source
-    assert '/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}' in init_source
-    assert 'hass.config.path(\n            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN' in init_source
-    assert 'await hass.async_add_executor_job(\n        _copy_cached_jackery_brand_images, source_dirs\n    )' in init_source
+    assert (
+        "/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}"
+        in init_source
+    )
+    assert (
+        'hass.config.path(\n            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN'
+        in init_source
+    )
+    assert (
+        "await hass.async_add_executor_job(\n        _copy_cached_jackery_brand_images, source_dirs\n    )"
+        in init_source
+    )
     assert pathlib.Path("custom_components/jackery_solarvault/brand/.gitkeep").exists()
     assert not pathlib.Path("brands/icon.svg").exists()
     assert not pathlib.Path("brands/logo.svg").exists()
@@ -1339,10 +1541,14 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     ]
     assert bundled_sensitive_files == []
     assert (CUSTOM_COMPONENT / "jackery_ca.crt").is_file()
-    assert "BEGIN CERTIFICATE" in (CUSTOM_COMPONENT / "jackery_ca.crt").read_text(encoding="utf-8")
+    assert "BEGIN CERTIFICATE" in (CUSTOM_COMPONENT / "jackery_ca.crt").read_text(
+        encoding="utf-8"
+    )
 
     mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
     combined = mqtt_source + coordinator_source
 
     assert "ssl.create_default_context()" in mqtt_source
@@ -1351,6 +1557,14 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     assert "tls_insecure=True" not in combined
     assert "disabled_after_strict_tls_failure" not in combined
     assert "ctx.load_verify_locations(cafile=str(ca_path))" in mqtt_source
-    assert 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")' in mqtt_source
+    # The path call may be multi-line after ruff format; collapse whitespace
+    # before checking. Equivalent to grepping "config.path(...jackery_ca.crt)".
+    mqtt_source_collapsed = re.sub(r"\s+", " ", mqtt_source)
+    assert (
+        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'
+        in mqtt_source_collapsed
+        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'
+        in mqtt_source_collapsed
+    )
     assert '"tls_custom_ca_loaded": self._tls_custom_ca_loaded' in mqtt_source
     assert 'diag["tls_certificate_verification"] = "enabled"' in coordinator_source
