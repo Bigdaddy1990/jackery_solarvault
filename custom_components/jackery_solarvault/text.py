@@ -1,7 +1,5 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
-from __future__ import annotations
-
 import logging
 
 from homeassistant.components.text import TextEntity
