@@ -18,7 +18,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_user_flow_happy_path(
     hass: HomeAssistant,
-    mock_jackery_login: None,  # noqa: ARG001
+    mock_jackery_login: None,
 ) -> None:
     """A valid login should create a config entry and configure unique_id."""
     result = await hass.config_entries.flow.async_init(
@@ -89,7 +89,7 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
 
 async def test_user_flow_unique_id_dedup(
     hass: HomeAssistant,
-    mock_jackery_login: None,  # noqa: ARG001
+    mock_jackery_login: None,
 ) -> None:
     """Re-running the flow for the same account must abort, not duplicate."""
     # First run creates the entry
@@ -117,7 +117,7 @@ async def test_user_flow_unique_id_dedup(
 
 async def test_reauth_flow_updates_password_and_reloads(
     hass: HomeAssistant,
-    mock_jackery_login: None,  # noqa: ARG001
+    mock_jackery_login: None,
 ) -> None:
     """A successful reauth must update the existing entry password."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry

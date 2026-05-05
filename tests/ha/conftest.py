@@ -14,7 +14,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
-    enable_custom_integrations: None,  # noqa: ARG001 - fixture from pytest-haccc
+    enable_custom_integrations: None,
 ) -> None:
     """Auto-enable the custom_components dir for every HA fixture test.
 

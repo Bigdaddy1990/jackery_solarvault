@@ -119,7 +119,7 @@ class JackeryMqttPushClient:
             )
             try:
                 await self._connect_client(client, ssl_context)
-            except Exception as err:  # noqa: BLE001 - surface broker/network errors.
+            except Exception as err:
                 self._last_error = f"connect failed: {err}"
                 self._connected = False
                 self._connected_event.set()
@@ -148,7 +148,7 @@ class JackeryMqttPushClient:
             await self._async_wait_connected(timeout_sec=12.0)
         try:
             client.publish(topic, text, qos=qos, retain=retain)
-        except Exception as err:  # noqa: BLE001 - gmqtt publish can raise on socket loss.
+        except Exception as err:
             self._connected = False
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
@@ -288,7 +288,7 @@ class JackeryMqttPushClient:
         for topic in self._topics:
             try:
                 _client.subscribe(topic, qos=0)
-            except Exception as err:  # noqa: BLE001 - callbacks must not raise.
+            except Exception as err:
                 _LOGGER.warning("Jackery MQTT subscribe failed for %s: %s", topic, err)
         if self._connect_callback is not None:
             self._schedule_coroutine(self._connect_callback(), "connect snapshot")
@@ -366,8 +366,8 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:  # noqa: BLE001 - log handler errors of any kind.
-                _LOGGER.debug("Jackery MQTT %s handler failed: %s", label, err)
+            except Exception as err:
+                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
 
         task.add_done_callback(_log_task_result)
 

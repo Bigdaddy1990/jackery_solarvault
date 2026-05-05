@@ -497,7 +497,7 @@ class JackeryApi:
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001 - diagnostics must not break API calls.
+        except Exception as err:
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
