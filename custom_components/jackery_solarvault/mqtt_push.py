@@ -367,7 +367,7 @@ class JackeryMqttPushClient:
             except asyncio.CancelledError:
                 return
             except Exception as err:
-                _LOGGER.debug("Jackery MQTT %s handler failed: %s", label, err)
+                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
 
         task.add_done_callback(_log_task_result)
 
