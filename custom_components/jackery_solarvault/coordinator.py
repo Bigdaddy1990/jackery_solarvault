@@ -229,8 +229,8 @@ from .util import (
     app_data_quality_warnings,
     app_month_request_kwargs,
     app_period_request_kwargs,
-    apply_year_month_backfill,
     append_payload_debug_line,
+    apply_year_month_backfill,
     chart_series_debug,
     external_trend_statistic_id,
     format_data_quality_warning,
@@ -3071,22 +3071,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     months[today.month] = current_month_source
                 if prefix == APP_SECTION_HOME_TRENDS:
                     previous_months = list(range(1, today.month))
-                    sources = await asyncio.gather(*(
-                        _get_with_ttl(
+
+                    async def _fetch_previous_home_month(
+                        month: int,
+                        section_prefix: str,
+                    ) -> Any:
+                        request_kwargs = app_month_request_kwargs(today.year, month)
+                        return await _get_with_ttl(
                             sys_id,
-                            f"{prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}",
+                            f"{section_prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}",
                             self._price_config_interval_sec,
-                            lambda sid, q=app_month_request_kwargs(
-                                today.year,
-                                month,
-                            ): self.api.async_get_home_trends(
+                            lambda sid: self.api.async_get_home_trends(
                                 sid,
-                                **q,
+                                **request_kwargs,
                             ),
                             {},
                         )
-                        for month in previous_months
-                    ))
+
+                    sources = await asyncio.gather(
+                        *(
+                            _fetch_previous_home_month(month, prefix)
+                            for month in previous_months
+                        )
+                    )
                     for month, source in zip(previous_months, sources, strict=False):
                         if isinstance(source, dict):
                             months[month] = source
@@ -3215,9 +3222,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 month: int,
             ) -> dict[str, Any]:
                 kwargs = app_month_request_kwargs(today.year, month)
-                cache_key = (
-                    f"{prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}"
-                )
+                cache_key = f"{prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}"
                 if prefix == APP_SECTION_PV_STAT:
                     if not sys_id:
                         return {}
