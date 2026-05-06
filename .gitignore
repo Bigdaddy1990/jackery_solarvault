@@ -1,4 +1,5 @@
 __pycache__/
+.pycache_compile/
 *.pyc
 *.pyo
 .DS_Store
