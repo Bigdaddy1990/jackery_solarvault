@@ -347,12 +347,60 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         assert suffix in const_source
 
 
+# App-stat sensors that are intentionally disabled by default because they
+# duplicate a per-device sensor on single-device systems. New installs only
+# show the canonical (`device_today_*`) entity; existing installs keep their
+# enabled state via HA's registry preservation rule.
+INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset({
+    "today_battery_charge",
+    "today_battery_discharge",
+    "today_generation",
+})
+
+
 def test_app_sensor_descriptions_are_not_disabled_by_default() -> None:
-    """Implement test app sensor descriptions are not disabled by default."""
+    """Disabled-by-default flag must be a deliberate, documented choice.
+
+    The ``INTENTIONALLY_DISABLED_BY_DEFAULT`` set above lists every key
+    that may carry ``entity_registry_enabled_default=False``. Any other
+    occurrence — accidental or otherwise — would silently hide a sensor
+    from new installs and is rejected by this test.
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
 
-    assert "entity_registry_enabled_default=False" not in sensor_source
-    assert "self._attr_entity_registry_enabled_default = True" in sensor_source
+    assert "self._attr_entity_registry_enabled_default = True" in sensor_source, (
+        "JackeryStatSensor must default-enable its entity_registry flag"
+    )
+
+    # Locate every JackeryStatSensorDescription block that opts out of
+    # the default. Each must be paired with a key that's whitelisted.
+    # Constraint: the key= and the disabled flag must appear inside the
+    # SAME constructor call. The non-greedy match below is bounded by a
+    # closing `),` (end of the description) so we never sweep across
+    # multiple descriptions.
+    import re
+
+    pattern = re.compile(
+        r"JackeryStatSensorDescription\(\s*\n"
+        r'\s*key="([^"]+)"'
+        r"(?:(?!\n    \),).)*?"
+        r"entity_registry_enabled_default=False",
+        re.MULTILINE | re.DOTALL,
+    )
+    found = set(pattern.findall(sensor_source))
+    unexpected = found - INTENTIONALLY_DISABLED_BY_DEFAULT
+    assert not unexpected, (
+        f"JackeryStatSensorDescription opts out of default-enabled for "
+        f"unexpected keys: {sorted(unexpected)}. Add them to "
+        f"INTENTIONALLY_DISABLED_BY_DEFAULT with a comment explaining why, "
+        f"or remove the entity_registry_enabled_default=False line."
+    )
+    missing = INTENTIONALLY_DISABLED_BY_DEFAULT - found
+    assert not missing, (
+        f"Whitelisted keys missing the entity_registry_enabled_default=False "
+        f"flag: {sorted(missing)}. Either add the flag back or remove from "
+        f"INTENTIONALLY_DISABLED_BY_DEFAULT."
+    )
 
 
 def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
@@ -442,3 +490,93 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
         reset_period = _const_keyword(call, "reset_period")
         if isinstance(key, str) and reset_period in {"day", "week", "month", "year"}:
             assert _state_class_keyword(call) == "TOTAL", key
+
+
+# ---------- 2.3.3+: Midnight period race condition guards ---------------
+
+
+def test_last_reset_is_data_driven_not_wall_clock() -> None:
+    """``last_reset`` must derive from APP_REQUEST_META, not dt_util.now().
+
+    Wall-clock anchoring caused a midnight race: at 00:00:01 local time
+    HA Recorder saw ``last_reset = today 00:00`` together with the
+    cloud's still-stale yesterday total, so the new day's bucket
+    started at yesterday's value and looked like a loss when the real
+    smaller value arrived seconds later. The fix anchors to the
+    begin_date stamped on the source by the API request, advancing
+    only when fresh data has actually arrived.
+    """
+    sensor_source = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components"
+        / "jackery_solarvault"
+        / "sensor.py"
+    ).read_text(encoding="utf-8")
+    # The last_reset property must consult begin_date metadata
+    assert "_period_begin_from_meta" in sensor_source
+    # And must NOT just return _period_start unconditionally
+    assert "begin_iso = self._period_begin_from_meta()" in sensor_source
+    # The fallback to wall-clock _period_start is documented and only
+    # applies when begin_iso is None
+    assert "if begin_iso is None:" in sensor_source
+
+
+def test_period_sensors_publish_none_when_data_is_stale() -> None:
+    """Stale-period guard returns None instead of yesterday's total.
+
+    ``_refresh_cache`` must publish None when the wall clock has
+    crossed a period boundary but the source data still belongs to
+    the previous period. Without this guard, yesterday's total would
+    be published against today's bucket and cause an artificial
+    spike+drop in the energy dashboard.
+    """
+    sensor_source = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components"
+        / "jackery_solarvault"
+        / "sensor.py"
+    ).read_text(encoding="utf-8")
+    # The helper exists
+    assert "def _is_period_data_stale(self) -> bool:" in sensor_source
+    # And is consulted in _refresh_cache before assigning native_value
+    assert "if self._reset_period and self._is_period_data_stale():" in sensor_source
+    # The stale path explicitly publishes None
+    # Ruff format may slightly tweak whitespace; do a tolerant search
+    import re
+
+    flat = re.sub(r"\s+", " ", sensor_source)
+    expected = (
+        "if self._reset_period and self._is_period_data_stale(): "
+        "self._cached_native_value = None"
+    )
+    assert expected in flat, "stale-period guard does not emit None"
+
+
+def test_total_revenue_state_class_compatible_with_monetary_device_class() -> None:
+    """MONETARY device_class only allows state_class=TOTAL or None.
+
+    HA's sensor entity validation logs an error and refuses to track
+    statistics for combinations like MONETARY + TOTAL_INCREASING:
+
+        Entity ... is using state class 'total_increasing' which is
+        impossible considering device class ('monetary') it is using;
+        expected None or one of 'total'
+
+    Lock that combination down so it can never regress (it did once
+    in 2.3.3 and was reverted in 2.3.4).
+    """
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"JackeryStatSensorDescription\(\s*\n"
+        r"(?:(?!\n    \),).)*?"
+        r'key="total_revenue"'
+        r"(?:(?!\n    \),).)*?"
+        r"state_class=SensorStateClass\.(\w+)",
+        re.S | re.M,
+    )
+    match = pattern.search(sensor_source)
+    assert match is not None, "total_revenue description not found"
+    assert match.group(1) == "TOTAL", (
+        f"total_revenue uses state_class={match.group(1)!r}; "
+        "MONETARY device_class only allows TOTAL or None per HA validation"
+    )

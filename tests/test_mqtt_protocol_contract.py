@@ -145,11 +145,28 @@ def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     assert "MQTT_USERNAME_SEPARATOR" in api_source
 
 
-def test_mqtt_protocol_documents_diagnostics_privacy() -> None:
-    """Implement test mqtt protocol documents diagnostics privacy."""
-    protocol = (ROOT / "docs" / "MQTT_PROTOCOL.md").read_text(encoding="utf-8")
+def test_mqtt_protocol_md_is_pure_api_reference() -> None:
+    """MQTT_PROTOCOL.md must remain a pure reverse-engineering reference.
 
-    assert "Diagnostics privacy" in protocol
-    assert "hb/app/<userId>/" in protocol
-    assert "hb/app/**REDACTED**/device" in protocol
-    assert "dropped-message counters" in protocol
+    Per docs/STRICT_WORK_INSTRUCTIONS.md the protocol file documents
+    paths, fields, frame formats and action IDs ONLY. Privacy policy,
+    redaction rules, changelog notes and similar meta-content belong
+    in STRICT_WORK_INSTRUCTIONS.md or DATA_SOURCE_PRIORITY.md. This
+    test prevents drift back into the file.
+    """
+    protocol = (ROOT / "docs" / "MQTT_PROTOCOL.md").read_text(encoding="utf-8")
+    forbidden_sections = (
+        "## Diagnostics privacy",
+        "## Topic redaction in diagnostics",
+        "## Changelog",
+        "## Migration",
+        "## Release notes",
+    )
+    for section in forbidden_sections:
+        assert section not in protocol, (
+            f"MQTT_PROTOCOL.md must not contain section {section!r}; "
+            "policy/process content belongs elsewhere"
+        )
+    # Sanity: the API-reference content must still be there
+    assert "hb/app" in protocol, "topic structure missing"
+    assert "DevicePropertyChange" in protocol, "command reference missing"

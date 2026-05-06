@@ -161,6 +161,16 @@ def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
     }
 
 
+def test_app_month_request_kwargs_builds_explicit_calendar_month() -> None:
+    """Historical year backfill must query explicit month ranges."""
+    assert util.app_month_request_kwargs(2026, 4) == {
+        "date_type": "month",
+        "begin_date": "2026-04-01",
+        "end_date": "2026-04-30",
+    }
+    assert util.app_month_request_kwargs(2024, 2)["end_date"] == "2024-02-29"
+
+
 def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
     """Implement test smart meter net and gross values from signed phases."""
     ct = {
@@ -838,6 +848,296 @@ def test_data_quality_warning_format_includes_request_ranges_when_available() ->
         "< device_home_stat_week=99.25 "
         "[device_home_stat_year: year 2026-01-01..2026-12-31; "
         "device_home_stat_week: week 2026-04-27..2026-05-03]"
+    )
+
+
+def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> None:
+    """May-only cloud year values are guarded by explicit monthly app payloads."""
+    payload = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "85.57",
+            "totalRevenue": "23.96",
+            "totalCarbon": "85.31",
+        },
+        "device_pv_stat_year": {
+            "unit": "kWh",
+            "totalSolarEnergy": "81.51",
+            "totalSolarRevenue": "22.82",
+            "pvProfit": 228228000.0,
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 0.0, 81.51, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "totalInGridEnergy": "0.11",
+            "totalOutGridEnergy": "59.80",
+            "x": [str(i) for i in range(1, 13)],
+            "y1": [0.0, 0.0, 0.0, 0.0, 0.11, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "y2": [0.0, 0.0, 0.0, 0.0, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "device_battery_stat_year": {
+            "unit": "kWh",
+            "totalCharge": "20.96",
+            "totalDischarge": "20.99",
+            "x": [str(i) for i in range(1, 13)],
+            "y1": [0.0, 0.0, 0.0, 0.0, 20.96, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "y2": [0.0, 0.0, 0.0, 0.0, 20.99, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "home_trends_year": {
+            "unit": "kWh",
+            "totalHomeEgy": "59.80",
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 0.0, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+    month_history = {
+        "device_pv_stat": {
+            4: {
+                "unit": "kWh",
+                "totalSolarEnergy": "146.51",
+                "totalSolarRevenue": "41.04",
+                "x": list(range(1, 31)),
+                "y": [146.51] + [0.0] * 29,
+            },
+            5: {
+                "unit": "kWh",
+                "totalSolarEnergy": "81.51",
+                "totalSolarRevenue": "22.82",
+                "x": list(range(1, 32)),
+                "y": [81.51] + [0.0] * 30,
+            },
+        },
+        "device_home_stat": {
+            4: {
+                "unit": "kWh",
+                "totalInGridEnergy": "0.00",
+                "totalOutGridEnergy": "107.17",
+                "x": list(range(1, 31)),
+                "y1": [0.0] * 30,
+                "y2": [107.17] + [0.0] * 29,
+            },
+            5: {
+                "unit": "kWh",
+                "totalInGridEnergy": "0.11",
+                "totalOutGridEnergy": "59.80",
+                "x": list(range(1, 32)),
+                "y1": [0.11] + [0.0] * 30,
+                "y2": [59.80] + [0.0] * 30,
+            },
+        },
+        "device_battery_stat": {
+            4: {
+                "unit": "kWh",
+                "totalCharge": "47.05",
+                "totalDischarge": "33.54",
+                "x": list(range(1, 31)),
+                "y1": [47.05] + [0.0] * 29,
+                "y2": [33.54] + [0.0] * 29,
+            },
+            5: {
+                "unit": "kWh",
+                "totalCharge": "20.96",
+                "totalDischarge": "20.99",
+                "x": list(range(1, 32)),
+                "y1": [20.96] + [0.0] * 30,
+                "y2": [20.99] + [0.0] * 30,
+            },
+        },
+        "home_trends": {
+            4: {
+                "unit": "kWh",
+                "totalHomeEgy": "107.17",
+                "x": list(range(1, 31)),
+                "y": [107.17] + [0.0] * 29,
+            },
+            5: {
+                "unit": "kWh",
+                "totalHomeEgy": "59.80",
+                "x": list(range(1, 32)),
+                "y": [59.80] + [0.0] * 30,
+            },
+        },
+    }
+
+    util.apply_year_month_backfill(payload, month_history)
+    util.guard_statistic_totals_from_year(payload)
+
+    year = payload["device_pv_stat_year"]
+    assert year["totalSolarEnergy"] == 228.02
+    assert year["totalSolarRevenue"] == 63.86
+    assert year["y"] == [
+        0.0,
+        0.0,
+        0.0,
+        146.51,
+        81.51,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    assert year["_year_month_backfill"]["corrected"]["totalSolarEnergy"] == {
+        "raw_total": 81.51,
+        "corrected_total": 228.02,
+        "series_key": "y",
+        "months": [4, 5],
+    }
+    assert payload["statistic"]["totalGeneration"] == 228.02
+    assert payload["statistic"]["totalRevenue"] == 46.72
+    assert payload["statistic"]["totalCarbon"] == 227.33
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 166.86
+    assert payload["statistic"]["_savings_calculation"]["source_energy"] == {
+        "pv_year_kwh": 228.02,
+        "device_grid_side_input_year_kwh": 0.11,
+        "device_grid_side_output_year_kwh": 166.97,
+        "device_grid_side_net_output_year_kwh": 166.86,
+        "savings_basis_ac_year_kwh": 166.86,
+        "home_consumption_year_kwh": 166.97,
+        "ct_public_export_year_kwh": None,
+        "battery_charge_year_kwh": 68.01,
+        "battery_discharge_year_kwh": 54.53,
+        "battery_charge_discharge_gap_kwh": 13.48,
+        "pv_not_savings_ac_energy_kwh": 61.16,
+    }
+
+
+def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
+    """Correct future cloud year payloads must win over partial month history."""
+    payload = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "300.00",
+            "totalRevenue": "84.00",
+            "totalCarbon": "299.00",
+        },
+        "device_pv_stat_year": {
+            "unit": "kWh",
+            "totalSolarEnergy": "228.02",
+            "totalSolarRevenue": "63.86",
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 146.51, 81.51, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "166.97",
+            "x": [str(i) for i in range(1, 13)],
+            "y2": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "home_trends_year": {
+            "unit": "kWh",
+            "totalHomeEgy": "166.97",
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+    month_history = {
+        "device_pv_stat": {
+            5: {
+                "unit": "kWh",
+                "totalSolarEnergy": "81.51",
+                "totalSolarRevenue": "22.82",
+                "x": list(range(1, 32)),
+                "y": [81.51] + [0.0] * 30,
+            },
+        }
+    }
+
+    util.apply_year_month_backfill(payload, month_history)
+    util.guard_statistic_totals_from_year(payload)
+
+    assert payload["device_pv_stat_year"]["totalSolarEnergy"] == "228.02"
+    assert "_year_month_backfill" not in payload["device_pv_stat_year"]
+    assert payload["statistic"]["totalGeneration"] == "300.00"
+    assert payload["statistic"]["totalRevenue"] == "84.00"
+    assert (
+        payload["statistic"]["_savings_calculation"]["published_value_source"]
+        == "cloud_total"
+    )
+    assert (
+        payload["statistic"]["_savings_calculation"]["decision"]
+        == "cloud_total_higher_than_current_year_savings"
+    )
+    assert "_total_lower_bound_guard" not in payload["statistic"]
+
+
+def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
+    """A PV-revenue shaped cloud total is replaced by self-consumption savings."""
+    payload = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "228.02",
+            "totalRevenue": "63.86",
+            "totalCarbon": "227.33",
+        },
+        "device_pv_stat_year": {
+            "unit": "kWh",
+            "totalSolarEnergy": "228.02",
+            "totalSolarRevenue": "63.86",
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 146.51, 81.51, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "166.97",
+            "x": [str(i) for i in range(1, 13)],
+            "y2": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        "home_trends_year": {
+            "unit": "kWh",
+            "totalHomeEgy": "166.97",
+            "x": [str(i) for i in range(1, 13)],
+            "y": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    util.guard_statistic_totals_from_year(payload)
+
+    assert payload["statistic"]["totalRevenue"] == 46.75
+    assert (
+        payload["statistic"]["_savings_calculation"]["decision"]
+        == "cloud_total_matches_pv_revenue_not_savings"
+    )
+
+
+def test_total_savings_subtracts_ct_export_when_available() -> None:
+    """Public CT export is subtracted before house-consumption bounding."""
+    payload = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "228.02",
+            "totalRevenue": "63.86",
+            "totalCarbon": "227.33",
+        },
+        "device_pv_stat_year": {
+            "unit": "kWh",
+            "totalSolarEnergy": "228.02",
+            "totalSolarRevenue": "63.86",
+        },
+        "device_home_stat_year": {
+            "unit": "kWh",
+            "totalOutGridEnergy": "180.00",
+        },
+        "device_ct_stat_year": {
+            "unit": "kWh",
+            "totalOutCtEnergy": "20.00",
+        },
+        "home_trends_year": {
+            "unit": "kWh",
+            "totalHomeEgy": "166.97",
+        },
+    }
+
+    util.guard_statistic_totals_from_year(payload)
+
+    assert payload["statistic"]["totalRevenue"] == 44.8
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 160.0
+    assert (
+        payload["statistic"]["_savings_calculation"]["method"]
+        == "device_grid_side_output_minus_ct_export_bounded_by_home"
     )
 
 

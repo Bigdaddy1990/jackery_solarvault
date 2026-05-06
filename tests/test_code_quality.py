@@ -390,10 +390,11 @@ def test_period_source_diagnostics_stay_minimal() -> None:
 
 
 def test_data_source_priority_contract_exists() -> None:
-    """Keep the no-cross-period-repair rule documented next to the code."""
+    """Keep the guarded month-backfill rule documented next to the code."""
     contract = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
     assert "Do not use week values to repair month/year/lifetime totals." in contract
-    assert "Do not use month values to repair year/lifetime totals." in contract
+    assert "Month values may only guard year totals" in contract
+    assert "same endpoint family" in contract
     assert "Do not use year values to repair lifetime totals." in contract
     assert (
         "month` and `year` must never fall back to `beginDate=endDate=today`"
@@ -525,8 +526,8 @@ def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
     assert "FIELD_SN" not in pack_init
 
 
-def test_data_quality_repair_issue_is_wired_without_cross_period_repair() -> None:
-    """Contradictory app data must create diagnostics/repairs, not state rewrites."""
+def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None:
+    """Contradictory app data still creates diagnostics around guarded states."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
@@ -554,7 +555,7 @@ def test_data_quality_repair_issue_is_wired_without_cross_period_repair() -> Non
     assert "{examples}" in strings_source
     assert "{source_section}" not in strings_source
     assert "{reference_section}" not in strings_source
-    assert "must not rewrite the entity state with another period" in data_priority
+    assert "same-endpoint month backfill" in data_priority
     assert "data_quality" in data_priority
 
 
@@ -594,6 +595,7 @@ def test_readme_documents_period_and_data_quality_behavior() -> None:
     assert "Monat = Kalendermonat" in readme
     assert "Jahr = Kalenderjahr" in readme
     assert "keine Wochenwerte zur Reparatur" in readme
+    assert "same-endpoint Monatswerte" in readme
     assert "Repair" in readme and "Diagnose" in readme
     assert "hb/app/**REDACTED**/" in readme
     assert "verworfene Payloads" in readme
@@ -1344,34 +1346,44 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
         )
 
 
-def test_payload_debug_file_is_gated_by_dedicated_debug_logger() -> None:
-    """Raw payload logging must not write on normal installations."""
+def test_payload_debug_file_is_gated_by_explicit_user_optin() -> None:
+    """Raw payload logging must require an explicit user opt-in.
+
+    Previous gating via ``_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)``
+    silently inherited the DEBUG level from the parent integration
+    logger, so enabling debug logging for unrelated reasons would
+    start writing multi-MB JSONL files in the HA config root.
+
+    The current contract:
+    1. ``CONF_DEBUG_PAYLOAD_LOG`` exists in const.py and defaults to
+       ``False``.
+    2. ``_async_payload_debug_event`` checks the entry option, NOT the
+       logger level.
+    3. ``__init__.py`` deletes any leftover JSONL on setup when the
+       option is off, so upgrading users immediately stop seeing the
+       file.
+    """
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
-    readme = pathlib.Path("README.md").read_text(encoding="utf-8")
-    data_source_doc = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(
-        encoding="utf-8"
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+
+    # 1. Constants exist with sane defaults
+    assert 'CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"' in const_source
+    assert "DEFAULT_DEBUG_PAYLOAD_LOG: Final = False" in const_source
+
+    # 2. Coordinator gates on entry options, NOT on logger level
+    assert "CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG" in coordinator_source
+    assert "self.entry.options.get(" in coordinator_source
+    assert (
+        "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):"
+        not in coordinator_source
     )
 
-    assert (
-        'PAYLOAD_DEBUG_LOGGER_NAME: Final = f"custom_components.{DOMAIN}.payload_debug"'
-        in const_source
-    )
-    assert (
-        "_PAYLOAD_DEBUG_LOGGER = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)"
-        in coordinator_source
-    )
-    assert (
-        "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):\n            return"
-        in coordinator_source
-    )
-    assert "custom_components.jackery_solarvault.payload_debug: debug" in readme
-    assert (
-        "enabled only when logger `custom_components.jackery_solarvault.payload_debug`"
-        in data_source_doc
-    )
+    # 3. Setup-time cleanup of stale JSONL when opt-in is off
+    assert "_async_purge_stale_payload_debug_log" in init_source
+    assert "path.unlink()" in init_source
 
 
 def test_no_direct_blocking_file_io_inside_async_functions() -> None:
