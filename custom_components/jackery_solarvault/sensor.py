@@ -22,7 +22,8 @@ Conventions used in the per-sensor doc strings:
 * ``MQTT:`` lines name the telemetry message and the field from
   ``MQTT_PROTOCOL.md`` (Telemetry messages section).
 * ``Source-priority:`` follows ``DATA_SOURCE_PRIORITY.md``: live MQTT wins
-  over HTTP property; period sensors use the documented app endpoint only.
+  over HTTP property; period sensors use the documented app endpoint, with the
+  documented same-endpoint month backfill for broken year payloads.
 
 Field-to-source mapping (consolidated reference for live entities):
 
@@ -57,11 +58,12 @@ device_ongrid_output_*        /v1/device/stat/onGrid (device_home_stat_*)       
 home_energy_*                 /v1/device/stat/sys/home/trends (home_trends_*)              ``y`` (totalHomeEgy)
 ============================  ==========================================================  ==================
 
-Lifetime totals (``total_generation``, ``total_revenue``, ``total_carbon``,
-``total_*_charge``, ``total_*_discharge``) come from
-``/v1/device/stat/deviceStatistic`` and ``/v1/device/stat/systemStatistic``.
-Per ``DATA_SOURCE_PRIORITY.md`` they are *never* derived from week/month/year
-endpoints.
+Lifetime totals (``total_generation``, ``total_revenue``, ``total_carbon``)
+prefer ``/v1/device/stat/systemStatistic``. Per
+``DATA_SOURCE_PRIORITY.md`` generation/carbon are guarded against broken
+month-only cloud totals. ``total_revenue`` is additionally calculated from
+year energy flows when available, because savings are self-consumed AC energy,
+not raw PV generation revenue.
 
 Unique IDs follow ``UNIQUE_ID_CONTRACT.md`` strictly:
 ``<device_id>_<stable_key_suffix>`` for the main device and
@@ -71,9 +73,11 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import json
 import logging
 from typing import Any, Literal
@@ -112,12 +116,15 @@ from .const import (
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_DEVICE_STAT_PV_ENERGY,
     APP_DEVICE_STAT_PV_TO_BATTERY,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
+    APP_SAVINGS_CALC_META,
     APP_STAT_PV1_ENERGY,
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
@@ -135,6 +142,8 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_TOTAL_GUARD_META,
+    APP_YEAR_BACKFILL_META,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CT_ATTRIBUTE_FIELDS,
@@ -1069,6 +1078,7 @@ def _stat_description_has_value(
 
 
 STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_LOAD
     JackeryStatSensorDescription(
         key="today_load",
         translation_key="today_load",
@@ -1079,6 +1089,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Disabled by default since 2.4.0 — duplicates device_today_battery_charge
+    # for single-device systems. The device-scoped sensor is the canonical one.
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_BATTERY_CHARGE
     JackeryStatSensorDescription(
         key="today_battery_charge",
         translation_key="today_battery_charge",
@@ -1088,7 +1101,13 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
     ),
+    # Disabled by default since 2.4.0 — duplicates device_today_battery_discharge
+    # for single-device systems. The device-scoped sensor is the canonical one.
+    # Existing installs keep this entity enabled (HA convention preserves
+    # registry_enabled state for already-known entities).
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_BATTERY_DISCHARGE
     JackeryStatSensorDescription(
         key="today_battery_discharge",
         translation_key="today_battery_discharge",
@@ -1098,7 +1117,11 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
     ),
+    # Disabled by default since 2.4.0 — duplicates device_today_pv_energy
+    # for single-device systems. The device-scoped sensor is the canonical one.
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_GENERATION
     JackeryStatSensorDescription(
         key="today_generation",
         translation_key="today_generation",
@@ -1108,7 +1131,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        entity_registry_enabled_default=False,
     ),
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TOTAL_GENERATION
     JackeryStatSensorDescription(
         key="total_generation",
         translation_key="total_generation",
@@ -1118,6 +1143,13 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: statistic_response.data.totalRevenue (lifetime cumulative
+    # revenue from APP /v1/device/stat/systemStatistic).
+    # state_class MUST be TOTAL (or None) — HA rejects TOTAL_INCREASING
+    # on device_class=MONETARY. last_reset stays None (lifetime total),
+    # which lets the recorder accept both rising and very-slightly-
+    # falling cloud reports during the midnight transient as part of
+    # a single running total instead of bucketed period totals.
     JackeryStatSensorDescription(
         key="total_revenue",
         translation_key="total_revenue",
@@ -1128,6 +1160,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=CURRENCY_EURO,
         icon="mdi:currency-eur",
     ),
+    # Source: /v1/device/stat/systemStatistic field APP_STAT_TOTAL_CARBON
     JackeryStatSensorDescription(
         key="total_carbon_saved",
         translation_key="total_carbon_saved",
@@ -1137,6 +1170,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfMass.KILOGRAMS,
         icon="mdi:molecule-co2",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_TOTAL_SOLAR_ENERGY
     JackeryStatSensorDescription(
         key="pv_week_energy",
         translation_key="pv_week_energy",
@@ -1149,6 +1183,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=month) field APP_STAT_TOTAL_SOLAR_ENERGY
     JackeryStatSensorDescription(
         key="pv_month_energy",
         translation_key="pv_month_energy",
@@ -1161,6 +1196,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=year) field APP_STAT_TOTAL_SOLAR_ENERGY
     JackeryStatSensorDescription(
         key="pv_year_energy",
         translation_key="pv_year_energy",
@@ -1174,6 +1210,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         icon="mdi:solar-power-variant",
     ),
     # --- APP_POLLING_MQTT.md: /v1/device/stat/pv per-channel totals -----
+    # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV1_ENERGY
     JackeryStatSensorDescription(
         key="device_pv1_week_energy",
         translation_key="device_pv1_week_energy",
@@ -1186,6 +1223,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=month) field APP_STAT_PV1_ENERGY
     JackeryStatSensorDescription(
         key="device_pv1_month_energy",
         translation_key="device_pv1_month_energy",
@@ -1198,6 +1236,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=year) field APP_STAT_PV1_ENERGY
     JackeryStatSensorDescription(
         key="device_pv1_year_energy",
         translation_key="device_pv1_year_energy",
@@ -1210,6 +1249,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV2_ENERGY
     JackeryStatSensorDescription(
         key="device_pv2_week_energy",
         translation_key="device_pv2_week_energy",
@@ -1222,6 +1262,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=month) field APP_STAT_PV2_ENERGY
     JackeryStatSensorDescription(
         key="device_pv2_month_energy",
         translation_key="device_pv2_month_energy",
@@ -1234,6 +1275,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=year) field APP_STAT_PV2_ENERGY
     JackeryStatSensorDescription(
         key="device_pv2_year_energy",
         translation_key="device_pv2_year_energy",
@@ -1246,6 +1288,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV3_ENERGY
     JackeryStatSensorDescription(
         key="device_pv3_week_energy",
         translation_key="device_pv3_week_energy",
@@ -1258,6 +1301,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=month) field APP_STAT_PV3_ENERGY
     JackeryStatSensorDescription(
         key="device_pv3_month_energy",
         translation_key="device_pv3_month_energy",
@@ -1270,6 +1314,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=year) field APP_STAT_PV3_ENERGY
     JackeryStatSensorDescription(
         key="device_pv3_year_energy",
         translation_key="device_pv3_year_energy",
@@ -1282,6 +1327,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV4_ENERGY
     JackeryStatSensorDescription(
         key="device_pv4_week_energy",
         translation_key="device_pv4_week_energy",
@@ -1294,6 +1340,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=month) field APP_STAT_PV4_ENERGY
     JackeryStatSensorDescription(
         key="device_pv4_month_energy",
         translation_key="device_pv4_month_energy",
@@ -1306,6 +1353,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=year) field APP_STAT_PV4_ENERGY
     JackeryStatSensorDescription(
         key="device_pv4_year_energy",
         translation_key="device_pv4_year_energy",
@@ -1322,6 +1370,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # These values largely duplicate the per-device and home sensors and were
     # removed to reduce redundancy in Home Assistant. Removing them here ensures
     # the integration only exposes one set of PV, home and battery statistics.
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -1334,6 +1383,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_month_energy",
         translation_key="home_month_energy",
@@ -1346,6 +1396,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_year_energy",
         translation_key="home_year_energy",
@@ -1361,6 +1412,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- APP_POLLING_MQTT.md: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -1373,6 +1425,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_month_energy",
         translation_key="device_ongrid_input_month_energy",
@@ -1385,6 +1438,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_year_energy",
         translation_key="device_ongrid_input_year_energy",
@@ -1397,6 +1451,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_week_energy",
         translation_key="device_ongrid_output_week_energy",
@@ -1409,6 +1464,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_month_energy",
         translation_key="device_ongrid_output_month_energy",
@@ -1421,6 +1477,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_year_energy",
         translation_key="device_ongrid_output_year_energy",
@@ -1435,6 +1492,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     ),
     # APP_POLLING_MQTT.md keeps Smart-Meter/CT live values on MQTT `devType=3`.
     # Obsolete CT period entities are cleaned from the registry by __init__.py.
+    # Source: /v1/device/stat/sys/battery (dateType=week) field APP_STAT_TOTAL_CHARGE
     JackeryStatSensorDescription(
         key="battery_charge_week_energy",
         translation_key="battery_charge_week_energy",
@@ -1447,6 +1505,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-up",
     ),
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_CHARGE
     JackeryStatSensorDescription(
         key="battery_charge_month_energy",
         translation_key="battery_charge_month_energy",
@@ -1459,6 +1518,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-up",
     ),
+    # Source: /v1/device/stat/sys/battery (dateType=year) field APP_STAT_TOTAL_CHARGE
     JackeryStatSensorDescription(
         key="battery_charge_year_energy",
         translation_key="battery_charge_year_energy",
@@ -1471,6 +1531,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-up",
     ),
+    # Source: /v1/device/stat/sys/battery (dateType=week) field APP_STAT_TOTAL_DISCHARGE
     JackeryStatSensorDescription(
         key="battery_discharge_week_energy",
         translation_key="battery_discharge_week_energy",
@@ -1483,6 +1544,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-down",
     ),
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE
     JackeryStatSensorDescription(
         key="battery_discharge_month_energy",
         translation_key="battery_discharge_month_energy",
@@ -1495,6 +1557,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-down",
     ),
+    # Source: /v1/device/stat/sys/battery (dateType=year) field APP_STAT_TOTAL_DISCHARGE
     JackeryStatSensorDescription(
         key="battery_discharge_year_energy",
         translation_key="battery_discharge_year_energy",
@@ -1509,6 +1572,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     ),
     # Removed smart meter panel energy sensors (charging/discharging)
     # Single-tariff power price from powerPriceConfig
+    # Source: /v1/device/stat/price field FIELD_SINGLE_PRICE
     JackeryStatSensorDescription(
         key="power_price",
         translation_key="power_price",
@@ -1522,6 +1586,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # The app endpoint name does not include a date range, but captures show
     # these values matching current-day totals. The dated app period endpoints
     # are fetched too and serve as backfill when deviceStatistic omits a field.
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_PV_ENERGY
     JackeryStatSensorDescription(
         key="device_today_pv_energy",
         translation_key="device_today_pv_energy",
@@ -1536,6 +1601,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_BATTERY_CHARGE
     JackeryStatSensorDescription(
         key="device_today_battery_charge",
         translation_key="device_today_battery_charge",
@@ -1550,6 +1616,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_BATTERY_DISCHARGE
     JackeryStatSensorDescription(
         key="device_today_battery_discharge",
         translation_key="device_today_battery_discharge",
@@ -1564,6 +1631,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_ONGRID_INPUT
     JackeryStatSensorDescription(
         key="device_today_ongrid_input",
         translation_key="device_today_ongrid_input",
@@ -1578,6 +1646,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_ONGRID_OUTPUT
     JackeryStatSensorDescription(
         key="device_today_ongrid_output",
         translation_key="device_today_ongrid_output",
@@ -1595,6 +1664,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_ONGRID_TO_BATTERY
     JackeryStatSensorDescription(
         key="device_today_ongrid_to_battery",
         translation_key="device_today_ongrid_to_battery",
@@ -1606,6 +1676,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_PV_TO_BATTERY
     JackeryStatSensorDescription(
         key="device_today_pv_to_battery",
         translation_key="device_today_pv_to_battery",
@@ -1617,6 +1688,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
+    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_BATTERY_TO_GRID
     JackeryStatSensorDescription(
         key="device_today_battery_to_ongrid",
         translation_key="device_today_battery_to_ongrid",
@@ -2016,10 +2088,85 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Local reset boundary for app period-total statistics."""
+        """Local reset boundary for app period-total statistics.
+
+        Anchored to the request metadata of the data we actually have,
+        NOT to the wall clock. Background:
+
+        After 0:00 the wall clock immediately points at the new day,
+        but the Jackery cloud still serves yesterday's period values
+        until the next refresh tick. With wall-clock anchoring HA
+        Recorder sees ``value=4.77 kWh, last_reset=today 00:00`` and
+        treats yesterday's total as today's bucket — and once today's
+        real (smaller) value arrives, it interprets the change as a
+        loss instead of a reset. The energy dashboard then shows a
+        sharp negative spike at the day boundary.
+
+        By anchoring last_reset to the begin_date that travelled with
+        the response payload, last_reset only advances when a fresh
+        period's data actually exists.
+        """
         if self._reset_period is None:
             return None
-        return _period_start(self._reset_period)
+        # Prefer the begin_date stamped on the source by the coordinator
+        # (`source[APP_REQUEST_META][APP_REQUEST_BEGIN_DATE]`), fall
+        # back to wall-clock period start for sources that have no
+        # request metadata (legacy code paths).
+        begin_iso = self._period_begin_from_meta()
+        if begin_iso is None:
+            return _period_start(self._reset_period)
+        try:
+            begin_date = date.fromisoformat(begin_iso)
+        except ValueError:
+            return _period_start(self._reset_period)
+        # Local midnight on the request's begin_date.
+        return datetime(
+            begin_date.year,
+            begin_date.month,
+            begin_date.day,
+            tzinfo=dt_util.now().tzinfo,
+        )
+
+    def _period_begin_from_meta(self) -> str | None:
+        """Read the begin_date stamped on this sensor's source by the API.
+
+        Returns ``None`` when the source has no request metadata yet —
+        which happens for cached / non-period sources and during the
+        very first coordinator update before the period endpoint has
+        been polled.
+        """
+        section = self.entity_description.section
+        source = self._source_for_section(section)
+        request = source.get(APP_REQUEST_META)
+        if not isinstance(request, dict):
+            return None
+        begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
+            APP_REQUEST_BEGIN_DATE_ALT
+        )
+        if not isinstance(begin, str) or not begin:
+            return None
+        return begin
+
+    def _is_period_data_stale(self) -> bool:
+        """Detect whether the source data is from a previous period.
+
+        Returns True when the wall-clock period (computed via
+        ``_period_start``) is strictly newer than the period stamped
+        on the source's request metadata. The boundary is conservative:
+        if either side is missing, we treat the data as fresh and
+        publish normally.
+        """
+        if self._reset_period is None:
+            return False
+        wall_clock_start = _period_start(self._reset_period)
+        begin_iso = self._period_begin_from_meta()
+        if begin_iso is None:
+            return False
+        try:
+            data_begin = date.fromisoformat(begin_iso)
+        except ValueError:
+            return False
+        return wall_clock_start.date() > data_begin
 
     def _source_for_section(self, section: str) -> dict[str, Any]:
         if section == PAYLOAD_PRICE:
@@ -2094,9 +2241,19 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         raw = fb_total
                         break
 
-            self._cached_native_value = (
-                self.entity_description.transform(raw) if raw is not None else None
-            )
+            # Stale-period guard: if the wall clock has crossed into a
+            # new period boundary but the source still carries the
+            # previous period's begin_date, refuse to publish the
+            # stale value as the new period's bucket. Returning None
+            # makes HA Recorder write "unavailable" for that brief
+            # window — much safer than letting yesterday's total
+            # masquerade as today's reading.
+            if self._reset_period and self._is_period_data_stale():
+                self._cached_native_value = None
+            else:
+                self._cached_native_value = (
+                    self.entity_description.transform(raw) if raw is not None else None
+                )
 
             attrs: dict[str, Any] = {
                 "source_section": section,
@@ -2118,9 +2275,43 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         str(label): values[index]
                         for index, label in enumerate(labels[: len(values)])
                     })
+            year_backfill = source.get(APP_YEAR_BACKFILL_META)
+            if isinstance(year_backfill, dict):
+                attrs["year_month_backfill"] = year_backfill
             request = source.get(APP_REQUEST_META)
             if isinstance(request, dict):
                 attrs["request"] = request
+                # For year-period responses, expose cloud completeness
+                # metrics so users can spot months the cloud reported
+                # as zero. We never modify the published value; this
+                # is read-only telemetry per STRICT_WORK_INSTRUCTIONS
+                # rule 7.
+                date_type = request.get("dateType") or request.get("date_type")
+                if (
+                    date_type == DATE_TYPE_YEAR
+                    and isinstance(values, list)
+                    and len(values) == 12
+                ):
+                    nonzero_months = [
+                        i for i, v in enumerate(values) if v not in (0, None, 0.0)
+                    ]
+                    attrs["cloud_year_chart_nonzero_months"] = len(nonzero_months)
+                    if nonzero_months:
+                        # Use 1-based month index for human readability
+                        attrs["cloud_year_chart_first_nonzero_month"] = (
+                            nonzero_months[0] + 1
+                        )
+                        attrs["cloud_year_chart_last_nonzero_month"] = (
+                            nonzero_months[-1] + 1
+                        )
+                        # Heuristic: the cloud is incomplete if the only
+                        # non-zero month is past January AND the chart
+                        # has fewer non-zero months than the calendar
+                        # would suggest. We surface it; we do not act
+                        # on it.
+                        attrs["cloud_year_appears_incomplete"] = (
+                            len(nonzero_months) == 1 and nonzero_months[0] > 0
+                        )
             self._cached_attrs = attrs
             return
 
@@ -2141,6 +2332,14 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             "source_section": section,
             "source_key": stat_key,
         }
+        total_guard = source.get(APP_TOTAL_GUARD_META)
+        if isinstance(total_guard, dict):
+            corrected = total_guard.get("corrected")
+            if isinstance(corrected, dict) and stat_key in corrected:
+                self._cached_attrs["total_lower_bound_guard"] = total_guard
+        savings = source.get(APP_SAVINGS_CALC_META)
+        if stat_key == APP_STAT_TOTAL_REVENUE and isinstance(savings, dict):
+            self._cached_attrs["savings_calculation"] = savings
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -2149,9 +2348,19 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         super()._handle_coordinator_update()
 
     async def async_added_to_hass(self) -> None:
-        """Prime the cache so the first state read sees real values."""
-        await super().async_added_to_hass()
+        """Prime the cache so the first state read sees real values.
+
+        IMPORTANT: the refresh runs BEFORE super().async_added_to_hass()
+        because CoordinatorEntity's super().async_added_to_hass() writes
+        the initial state to HA — and that initial write reads
+        `native_value` and `extra_state_attributes`. Filling the
+        cache after super() means the very first state write hits the
+        cold-cache path, costing ~400ms per period sensor on slower
+        Pi/HAOS hosts (visible in logs as
+        "Updating state for sensor... took 0.446 seconds").
+        """
         self._refresh_cache()
+        await super().async_added_to_hass()
 
     @property
     def native_value(self) -> Any:

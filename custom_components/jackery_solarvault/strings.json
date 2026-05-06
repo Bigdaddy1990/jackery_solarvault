@@ -297,7 +297,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery\u2192on-grid today"
+        "name": "Device battery→on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -306,13 +306,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid\u2192battery today"
+        "name": "Device on-grid→battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV\u2192battery today"
+        "name": "Device PV→battery today"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -546,7 +546,7 @@
         "name": "Today load"
       },
       "total_carbon_saved": {
-        "name": "Total CO\u2082 saved"
+        "name": "Total CO₂ saved"
       },
       "total_generation": {
         "name": "Total PV generation"
@@ -624,11 +624,13 @@
       "init": {
         "data": {
           "create_calculated_power_sensors": "Create calculated net-power sensors",
-          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors"
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "debug_payload_log": "Write raw payload debug log (advanced)"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
+          "debug_payload_log": "Off by default. When enabled, every redacted Jackery API/MQTT payload is appended to jackery_solarvault_payload_debug.jsonl in the HA config root. Only useful for parser/source bugs. The file grows several MB per day. Disable to delete the file on the next setup."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
         "title": "Jackery options"

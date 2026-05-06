@@ -114,6 +114,18 @@ CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
 CONF_REGION_CODE: Final = "region_code"
 CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
+# Explicit opt-in for the raw payload-debug JSONL writer.
+# Default: False. The previous gating via `_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)`
+# was unreliable: `_PAYLOAD_DEBUG_LOGGER` lives under
+# `custom_components.jackery_solarvault.payload_debug` and inherits its
+# effective level from any ancestor that the user sets to DEBUG (e.g.
+# enabling debug logging for the integration as a whole). With this
+# explicit option the JSONL is only written when the user actively
+# checks the box in the integration's options — turning DEBUG on for
+# the integration logger no longer triggers MB-sized files in the HA
+# config root.
+CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"
+DEFAULT_DEBUG_PAYLOAD_LOG: Final = False
 
 
 # Config-flow step, error and abort identifiers.
@@ -660,6 +672,13 @@ DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR: Final = "lifetime_less_than_year"
 DATA_QUALITY_REPAIR_EXAMPLE_LIMIT: Final = 3
 REPAIR_ISSUE_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
 REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
+
+# Internal metadata attached to corrected app statistic payloads. The raw cloud
+# values remain visible in diagnostics while entity states use the guarded
+# values produced from documented month endpoints.
+APP_YEAR_BACKFILL_META: Final = "_year_month_backfill"
+APP_TOTAL_GUARD_META: Final = "_total_lower_bound_guard"
+APP_SAVINGS_CALC_META: Final = "_savings_calculation"
 
 # Section prefixes and chart-series keys documented by APP_POLLING_MQTT.md.
 APP_SECTION_PV_STAT: Final = "device_pv_stat"

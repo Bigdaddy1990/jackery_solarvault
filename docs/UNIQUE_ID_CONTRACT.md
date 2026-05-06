@@ -1,33 +1,33 @@
-# Unique ID contract
+# Unique ID Contract
 
-Home Assistant unique IDs for Jackery SolarVault entities follow a single
-rule: ``<device_id>_<stable_key_suffix>``.
+This integration keeps entity unique IDs stable across translations, friendly
+names, app names, and dashboard labels.
 
-* ``device_id`` is the Jackery cloud device identifier (a stable
-  integer-string), captured from the ``/v1/device/system/list`` discovery
-  response and never derived from a translatable name.
-* ``stable_key_suffix`` is the entity-description ``key`` (e.g.
-  ``pv1_jahreswert``, ``home_today_load``). It is hard-coded in the code
-  and does not depend on translations or the user-visible
-  ``deviceName``.
+## Rules
 
-## Forbidden
+- Unique IDs are derived from the Jackery `device_id` plus a stable key suffix.
+- translation keys, localized names, `deviceName`, `wname`, and app labels must
+  never become part of an entity unique ID.
+- Add-on battery pack entities may include the stable pack index because Jackery
+  exposes battery packs as ordered app subcards.
+- Device registry identifiers use the integration domain plus stable device or
+  pack identifiers.
+- Renaming a device in the app may change the visible Home Assistant name, but
+  it must not change `unique_id`.
 
-The unique ID assignment line **must not** reference any of:
+## Expected format
 
-* ``FIELD_DEVICE_NAME`` — translatable.
-* ``FIELD_WNAME`` — user-controlled.
-* ``translation_key`` — translation keys are presentation-layer.
-* ``name=`` — names are not stable identifiers.
+Main device entity:
 
-This is enforced by ``test_unique_id_contract_is_documented_and_followed``
-in ``tests/test_code_quality.py``. The check inspects the line that sets
-``self._attr_unique_id`` in ``custom_components/jackery_solarvault/entity.py``
-and rejects any of the forbidden fragments.
+```text
+<device_id>_<stable_key_suffix>
+```
 
-## Migration story
+Battery-pack entity:
 
-There is none. The first public package shipped with the contract above;
-no entry-version migrations are needed and ``CONF_SCAN_INTERVAL`` is
-intentionally not present. Renaming or re-slugifying entities does not
-change their unique ID.
+```text
+<device_id>_battery_pack_<index>_<stable_key_suffix>
+```
+
+No migration should be introduced just to rename an entity. Prefer translation
+and display-name fixes over unique-ID changes.

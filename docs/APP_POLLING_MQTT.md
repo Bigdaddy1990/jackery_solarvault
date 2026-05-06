@@ -149,6 +149,11 @@ Aus `HomeSubBody$BatteryPackBody`, `BatteryPackSub` und `SubBaseBean`:
 - Smart-Meter-Werte kommen primaer aus MQTT `devType=3`.
 - Der berechnete Momentan-Hausverbrauch nutzt `otherLoadPw`; falls dieser App-Wert fehlt: `Smart-Meter-Netto - Jackery-Netzseite-Eingang + Jackery-Netzseite-Ausgang`, damit ein auf einer Phase einspeisender SolarVault den Hausverbrauch nicht weg saldiert.
 - MQTT-Subdevice-Polling folgt dem festen schnellen HA-Takt.
+- Wenn `dateType=year` von Jackery nur den aktuellen Monat enthaelt,
+  werden Jahreswerte nur mit expliziten `dateType=month`-Antworten desselben
+  Endpoints und Kalenderjahres nach oben abgesichert. Wochenwerte bleiben fuer
+  Reparaturen tabu; korrekte hoehere Cloud-Jahres-/Lifetime-Werte gewinnen
+  automatisch.
 - App/MQTT/Combine-gestuetzte Sensoren werden beim Start nicht mehr aus der
   Entity-Registry entfernt, nur weil der erste Payload einzelne Keys noch nicht
   enthaelt.

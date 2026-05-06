@@ -143,6 +143,7 @@ For details about the required parameters, see `services.yaml` or the HA Develop
 - Stack input/output refers to the expansion battery stack or the power flow between the main unit and the expansion batteries.
 - Smart meter values come from the connected meter and are handled separately from the main unit values.
 - The `Current house consumption` sensor calculates the instantaneous consumption from Jackery's reported live house consumption (`otherLoadPw`) and only uses smart meter net power minus Jackery grid-side input plus Jackery grid-side output as a fallback. This prevents SolarVault feed-in from being incorrectly subtracted from house consumption.
+- `Total savings` is not PV revenue. When year-flow data is available, the integration calculates savings from SolarVault grid-side AC output after inverter/battery effects, subtracts grid-side input and CT public export if present, bounds the result by house consumption, and multiplies it by the configured electricity price.
 - Daily/weekly/monthly/yearly energy sensors use `state_class: total` with the appropriate `last_reset` for the respective app period. They are period values, not lifetime monotonically increasing counters.
 - Weekly, monthly, and yearly values are calculated identically from the respective app chart series. The series depends on the payload: PV/home trend totals usually use `y`, battery charge/discharge uses `y1`/`y2`, device grid-side input/output uses `y1`/`y2`, and PV1..PV4 uses `y1`..`y4`. Server total fields are now only used as fallback/diagnostic values because monthly/yearly total fields may be misleading depending on the payload.
 
@@ -151,10 +152,11 @@ For details about the required parameters, see `services.yaml` or the HA Develop
 - Week = Monday to Sunday.
 - Month = calendar month.
 - Year = calendar year.
-- Total/lifetime values come from the documented app/HTTP/MQTT total fields and are not assembled from weekly, monthly, or yearly values.
-- Weekly values are explicitly not used to repair monthly, yearly, or total values, and monthly values are not used to repair yearly or total values.
+- Total/lifetime generation and carbon values prefer the documented app/HTTP/MQTT total fields. If Jackery reports the current month as the year/total, the integration raises those values with explicit same-endpoint month payloads from the same calendar year.
+- Total savings is calculated from self-consumed AC energy when possible, not from PV generation revenue. A cloud value that is missing, below the calculated current-year savings, or shaped like PV revenue is replaced; a higher plausible cloud total is kept.
+- Weekly values are explicitly not used to repair monthly, yearly, or total values. Monthly values may only guard yearly values when they come from the same endpoint family and explicit calendar-month app requests.
 - At the start of a month, the weekly value can be higher than the monthly value if the current week still includes days from the previous month. That is not a bug.
-- If Jackery provides contradictory data, for example a yearly value lower than a complete week within the same year or a total yield lower than the yearly yield, the integration does not silently change entity values. Instead, it creates a repair notice and stores details in the diagnostics export under `data_quality`.
+- If Jackery provides contradictory data that cannot be resolved by the guarded same-endpoint month backfill, the integration creates a repair notice and stores details in the diagnostics export under `data_quality`.
 
 ## Polling and updates
 
@@ -204,12 +206,16 @@ itself uses, localised to the user's Home Assistant timezone:
 * **Monat = Kalendermonat** (1. bis Monatsletzter)
 * **Jahr = Kalenderjahr** (1. Januar bis 31. Dezember)
 
-The integration must never silently fix one period using another period:
-**keine Wochenwerte zur Reparatur** von Monats- oder Jahres-Totals,
-keine Monatswerte für Jahres-Totals, keine Jahreswerte für
-Lifetime-Totals. Widersprüchliche Cloud-Werte erscheinen als Home
-Assistant **Repair**-Eintrag und in der **Diagnose**, der Entity-State
-bleibt aber auf der dokumentierten Quelle.
+The integration must never silently fix one period using an unrelated period:
+**keine Wochenwerte zur Reparatur** von Monats- oder Jahres-Totals.
+Für fehlerhafte Jahreswerte sind nur **same-endpoint Monatswerte** aus
+expliziten Monatsabfragen desselben Kalenderjahres erlaubt. Gesamtwerte
+für Erzeugung/CO2 werden damit nur nach oben abgesichert; liefert Jackery
+später korrekte, höhere Lifetime-Werte, gewinnen diese automatisch.
+`Gesamt Ersparnis` ist die Ausnahme: sie wird aus selbst genutzter AC-Energie
+berechnet, damit PV-Ertrag in Euro nicht als Ersparnis gezählt wird. Nicht
+auflösbare Widersprüche erscheinen als Home Assistant **Repair**-Eintrag und
+in der **Diagnose**.
 
 ## Diagnostics privacy
 

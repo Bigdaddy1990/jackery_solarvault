@@ -27,6 +27,7 @@ from .const import (
     APP_REQUEST_END_DATE,
     APP_REQUEST_END_DATE_ALT,
     APP_REQUEST_META,
+    APP_SAVINGS_CALC_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
     APP_SECTION_CT_STAT,
@@ -38,18 +39,23 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
     APP_STAT_TOTAL_DISCHARGE,
     APP_STAT_TOTAL_GENERATION,
+    APP_STAT_TOTAL_HOME_ENERGY,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
     APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
     APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
     APP_STAT_UNIT,
+    APP_TOTAL_GUARD_META,
     APP_UNIT_KWH,
+    APP_YEAR_BACKFILL_META,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATA_QUALITY_KEY_LABEL,
@@ -74,6 +80,7 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
+    FIELD_SINGLE_PRICE,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
@@ -85,6 +92,7 @@ from .const import (
     FIELD_OUT_ONGRID_PW,
     PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
+    PAYLOAD_PRICE,
     PAYLOAD_STATISTIC,
     REDACT_KEYS,
     REDACTED_VALUE,
@@ -209,6 +217,24 @@ def app_period_request_kwargs(
     begin, end = app_period_date_bounds(date_type, today=today)
     return {
         APP_REQUEST_DATE_TYPE_ALT: date_type,
+        APP_REQUEST_BEGIN_DATE_ALT: begin,
+        APP_REQUEST_END_DATE_ALT: end,
+    }
+
+
+def app_month_request_kwargs(year: int, month: int) -> dict[str, str]:
+    """Return method kwargs for one explicit calendar-month app request."""
+    if month < 1 or month > 12:
+        raise ValueError(f"Unsupported Jackery app month: {month!r}")
+    first = date(year, month, 1)
+    last = first.replace(day=calendar.monthrange(year, month)[1])
+    begin, end = app_period_date_bounds(
+        DATE_TYPE_MONTH,
+        begin_date=first,
+        end_date=last,
+    )
+    return {
+        APP_REQUEST_DATE_TYPE_ALT: DATE_TYPE_MONTH,
         APP_REQUEST_BEGIN_DATE_ALT: begin,
         APP_REQUEST_END_DATE_ALT: end,
     }
@@ -933,6 +959,578 @@ def effective_period_total_value(
         # without the array context that makes the encoding identifiable.
         return safe_float(source.get(stat_key))
     return safe_float(source.get(stat_key))
+
+
+def _tolerance_for_values(*values: float | None) -> float:
+    """Return a kWh/EUR tolerance large enough for app rounding noise."""
+    magnitude = max((abs(value) for value in values if value is not None), default=0.0)
+    return max(0.05, magnitude * 0.005)
+
+
+def _period_section(prefix: str, date_type: str) -> str:
+    return f"{prefix}_{date_type}"
+
+
+def _nonzero_months(values: list[float]) -> list[int]:
+    """Return one-based month numbers with non-zero app values."""
+    return [
+        index + 1
+        for index, value in enumerate(values[:12])
+        if abs(safe_float(value) or 0.0) > 0.00001
+    ]
+
+
+def year_payload_appears_current_month_only(
+    source: dict[str, Any],
+    section: str,
+    stat_keys: tuple[str, ...],
+    *,
+    current_month: int,
+) -> bool:
+    """Return True when a year payload looks like the app's month-only bug.
+
+    The SolarVault app can return a ``dateType=year`` chart where every month
+    except the current one is zero, and the scalar "year" total is the current
+    month total. When that shape appears after January, the coordinator fetches
+    explicit month payloads for the elapsed year and lets
+    ``backfill_year_payload_from_months`` decide whether the monthly sum should
+    replace the cloud year value. A corrected future Jackery year payload with
+    older non-zero months does not trigger this extra backfill path.
+    """
+    if current_month <= 1:
+        return False
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit != APP_UNIT_KWH:
+        return False
+    for stat_key in stat_keys:
+        values = effective_trend_series_values(source, section, stat_key)
+        if not isinstance(values, list) or len(values) < current_month:
+            continue
+        nonzero = _nonzero_months(values)
+        if not nonzero or set(nonzero).issubset({current_month}):
+            return True
+    return False
+
+
+def _month_value(
+    month_source: dict[str, Any],
+    month_section: str,
+    stat_key: str,
+) -> float | None:
+    value = trend_series_total(month_source, month_section, stat_key)
+    if value is not None:
+        return value
+    return safe_float(month_source.get(stat_key))
+
+
+def _pv_revenue_value(source: dict[str, Any]) -> float | None:
+    revenue = safe_float(source.get("totalSolarRevenue"))
+    if revenue is not None:
+        return revenue
+    profit = safe_float(source.get("pvProfit"))
+    if profit is None:
+        return None
+    return round(profit / 10_000_000, 5)
+
+
+def _period_total_from_payload(
+    payload: dict[str, Any],
+    section_prefix: str,
+    stat_key: str,
+) -> float | None:
+    section = _period_section(section_prefix, DATE_TYPE_YEAR)
+    source = payload.get(section)
+    if not isinstance(source, dict):
+        return None
+    return effective_period_total_value(source, section, stat_key)
+
+
+def _round_stat_value(value: float | None, digits: int = 2) -> float | None:
+    if value is None:
+        return None
+    return round(value, digits)
+
+
+def _configured_or_derived_price(
+    payload: dict[str, Any],
+    *,
+    year_generation: float | None,
+    year_revenue: float | None,
+) -> tuple[float | None, str | None]:
+    price_source = payload.get(PAYLOAD_PRICE)
+    if isinstance(price_source, dict):
+        configured = safe_float(price_source.get(FIELD_SINGLE_PRICE))
+        if configured is not None and 0 <= configured <= 10:
+            return configured, f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
+
+    if (
+        year_generation is not None
+        and year_generation > 0
+        and year_revenue is not None
+    ):
+        derived = year_revenue / year_generation
+        if 0 <= derived <= 10:
+            return round(derived, 5), "pv_year_revenue_per_kwh"
+    return None, None
+
+
+def _pv_revenue_candidates(
+    pv_year: dict[str, Any],
+    *,
+    year_revenue: float | None,
+    raw_generation: float | None,
+    price: float | None,
+) -> list[float]:
+    candidates: list[float] = []
+    if year_revenue is not None:
+        candidates.append(round(year_revenue, 2))
+    if raw_generation is not None and price is not None:
+        candidates.append(round(raw_generation * price, 2))
+
+    backfill = pv_year.get(APP_YEAR_BACKFILL_META)
+    if isinstance(backfill, dict):
+        corrected = backfill.get("corrected")
+        if isinstance(corrected, dict):
+            revenue_meta = corrected.get("totalSolarRevenue")
+            if isinstance(revenue_meta, dict):
+                for key in ("raw_total", "corrected_total"):
+                    value = safe_float(revenue_meta.get(key))
+                    if value is not None:
+                        candidates.append(round(value, 2))
+
+    unique: list[float] = []
+    for value in candidates:
+        if not any(
+            abs(value - existing) <= _tolerance_for_values(value, existing)
+            for existing in unique
+        ):
+            unique.append(value)
+    return unique
+
+
+def _matches_pv_revenue_shape(
+    raw_revenue: float,
+    candidates: list[float],
+) -> bool:
+    for candidate in candidates:
+        tolerance = max(0.5, abs(candidate) * 0.05)
+        if abs(raw_revenue - candidate) <= tolerance:
+            return True
+    return False
+
+
+def _calculated_savings_from_year(
+    payload: dict[str, Any],
+    *,
+    year_generation: float | None,
+    year_revenue: float | None,
+) -> dict[str, Any] | None:
+    device_output = _period_total_from_payload(
+        payload,
+        APP_SECTION_HOME_STAT,
+        APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    )
+    if device_output is None:
+        return None
+    device_input = _period_total_from_payload(
+        payload,
+        APP_SECTION_HOME_STAT,
+        APP_STAT_TOTAL_IN_GRID_ENERGY,
+    )
+
+    home_consumption = _period_total_from_payload(
+        payload,
+        APP_SECTION_HOME_TRENDS,
+        APP_STAT_TOTAL_HOME_ENERGY,
+    )
+    public_export = _period_total_from_payload(
+        payload,
+        APP_SECTION_CT_STAT,
+        APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+    )
+    if home_consumption is None and public_export is None:
+        return None
+
+    price, price_source = _configured_or_derived_price(
+        payload,
+        year_generation=year_generation,
+        year_revenue=year_revenue,
+    )
+    if price is None:
+        return None
+
+    delivered_ac = max(0.0, device_output)
+    method_prefix = "device_grid_side_output"
+    if device_input is not None:
+        delivered_ac = max(0.0, delivered_ac - max(0.0, device_input))
+        method_prefix = "device_grid_side_net_output"
+    net_device_output = delivered_ac
+    if public_export is not None:
+        delivered_ac = max(0.0, delivered_ac - max(0.0, public_export))
+        method_prefix = f"{method_prefix}_minus_ct_export"
+    if home_consumption is not None:
+        savings_energy = min(max(0.0, home_consumption), delivered_ac)
+        method = f"{method_prefix}_bounded_by_home"
+    else:
+        savings_energy = delivered_ac
+        method = method_prefix
+
+    battery_charge = _period_total_from_payload(
+        payload,
+        APP_SECTION_BATTERY_STAT,
+        APP_STAT_TOTAL_CHARGE,
+    )
+    battery_discharge = _period_total_from_payload(
+        payload,
+        APP_SECTION_BATTERY_STAT,
+        APP_STAT_TOTAL_DISCHARGE,
+    )
+    battery_gap = None
+    if battery_charge is not None and battery_discharge is not None:
+        battery_gap = max(0.0, battery_charge - battery_discharge)
+
+    pv_not_savings_energy = None
+    if year_generation is not None:
+        pv_not_savings_energy = max(0.0, year_generation - savings_energy)
+
+    calculated_total = round(savings_energy * price, 2)
+    return {
+        "method": method,
+        "calculated_total": calculated_total,
+        "energy_kwh": round(savings_energy, 2),
+        "price": round(price, 5),
+        "price_source": price_source,
+        "source_energy": {
+            "pv_year_kwh": _round_stat_value(year_generation),
+            "device_grid_side_input_year_kwh": _round_stat_value(device_input),
+            "device_grid_side_output_year_kwh": _round_stat_value(device_output),
+            "device_grid_side_net_output_year_kwh": _round_stat_value(
+                net_device_output
+            ),
+            "savings_basis_ac_year_kwh": _round_stat_value(delivered_ac),
+            "home_consumption_year_kwh": _round_stat_value(home_consumption),
+            "ct_public_export_year_kwh": _round_stat_value(public_export),
+            "battery_charge_year_kwh": _round_stat_value(battery_charge),
+            "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
+            "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
+            "pv_not_savings_ac_energy_kwh": _round_stat_value(
+                pv_not_savings_energy
+            ),
+        },
+    }
+
+
+def _savings_publish_decision(
+    *,
+    raw_revenue: float | None,
+    calculated_revenue: float,
+    raw_generation: float | None,
+    year_generation: float | None,
+    pv_revenue_candidates: list[float],
+) -> tuple[bool, str]:
+    if raw_revenue is None:
+        return True, "missing_cloud_total_revenue"
+
+    tolerance = _tolerance_for_values(raw_revenue, calculated_revenue)
+    if abs(raw_revenue - calculated_revenue) <= tolerance:
+        return True, "cloud_total_matches_calculated_savings"
+    if calculated_revenue > raw_revenue + tolerance:
+        return True, "cloud_total_below_current_year_savings"
+
+    has_prior_lifetime_generation = (
+        raw_generation is not None
+        and year_generation is not None
+        and raw_generation
+        > year_generation + _tolerance_for_values(raw_generation, year_generation)
+    )
+    if (
+        not has_prior_lifetime_generation
+        and _matches_pv_revenue_shape(raw_revenue, pv_revenue_candidates)
+    ):
+        return True, "cloud_total_matches_pv_revenue_not_savings"
+
+    return False, "cloud_total_higher_than_current_year_savings"
+
+
+def _backfill_pv_revenue(
+    out: dict[str, Any],
+    year_source: dict[str, Any],
+    month_sources: dict[int, dict[str, Any]],
+    meta: dict[str, Any],
+) -> None:
+    revenue_values = [0.0 for _ in range(12)]
+    found_months: list[int] = []
+    for month, month_source in sorted(month_sources.items()):
+        if month < 1 or month > 12:
+            continue
+        revenue = _pv_revenue_value(month_source)
+        if revenue is None:
+            continue
+        revenue_values[month - 1] = round(revenue, 5)
+        found_months.append(month)
+    if not found_months:
+        return
+    monthly_total = round(sum(revenue_values), 2)
+    raw_total = _pv_revenue_value(year_source)
+    if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
+        raw_total, monthly_total
+    ):
+        return
+
+    out["totalSolarRevenue"] = monthly_total
+    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
+    out[APP_CHART_SERIES_Y6] = [
+        round(value * 10_000_000, 1) for value in revenue_values
+    ]
+    meta.setdefault("corrected", {})["totalSolarRevenue"] = {
+        "raw_total": raw_total,
+        "corrected_total": monthly_total,
+        "months": found_months,
+    }
+
+
+def backfill_year_payload_from_months(
+    year_source: dict[str, Any],
+    section_prefix: str,
+    stat_keys: tuple[str, ...],
+    month_sources: dict[int, dict[str, Any]],
+) -> dict[str, Any]:
+    """Return a year payload guarded by explicit monthly app payloads.
+
+    This is intentionally narrower than a general cross-period repair:
+    month payloads must come from the same documented app endpoint family and
+    the current calendar year. The function only raises a year total when the
+    month sum is greater than the cloud year value. If Jackery later returns a
+    correct year payload, that value is kept because it is already >= the
+    independently fetched month lower bound.
+    """
+    if not isinstance(year_source, dict) or not month_sources:
+        return year_source
+
+    year_section = _period_section(section_prefix, DATE_TYPE_YEAR)
+    month_section = _period_section(section_prefix, DATE_TYPE_MONTH)
+    unit = str(year_source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit != APP_UNIT_KWH:
+        return year_source
+
+    out = dict(year_source)
+    out.setdefault(APP_CHART_LABELS, [str(month) for month in range(1, 13)])
+    meta: dict[str, Any] = {
+        "method": "same_endpoint_month_sum",
+        "source_period": DATE_TYPE_MONTH,
+        "target_period": DATE_TYPE_YEAR,
+    }
+
+    for stat_key in stat_keys:
+        series_key = trend_series_key(year_section, stat_key)
+        if not series_key:
+            continue
+
+        monthly_values = [0.0 for _ in range(12)]
+        found_months: list[int] = []
+        for month, month_source in sorted(month_sources.items()):
+            if month < 1 or month > 12:
+                continue
+            value = _month_value(month_source, month_section, stat_key)
+            if value is None:
+                continue
+            monthly_values[month - 1] = round(value, 5)
+            found_months.append(month)
+        if not found_months:
+            continue
+
+        monthly_total = round(sum(monthly_values), 2)
+        raw_values = effective_trend_series_values(year_source, year_section, stat_key)
+        raw_total = (
+            round(sum(value for value in raw_values if value is not None), 2)
+            if isinstance(raw_values, list)
+            else safe_float(year_source.get(stat_key))
+        )
+        if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
+            raw_total, monthly_total
+        ):
+            continue
+
+        out[series_key] = monthly_values
+        out[stat_key] = monthly_total
+        if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
+            out["pvEgy"] = monthly_total
+        elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
+            out["inOngridEgy"] = monthly_total
+        elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
+            out["outOngridEgy"] = monthly_total
+        elif stat_key == APP_STAT_TOTAL_DISCHARGE:
+            out["batOtGridEgy"] = monthly_total
+        meta.setdefault("corrected", {})[stat_key] = {
+            "raw_total": raw_total,
+            "corrected_total": monthly_total,
+            "series_key": series_key,
+            "months": found_months,
+        }
+
+    if section_prefix in {APP_SECTION_PV_STAT, APP_SECTION_PV_TRENDS}:
+        _backfill_pv_revenue(out, year_source, month_sources, meta)
+
+    if "corrected" not in meta:
+        return year_source
+    out[APP_YEAR_BACKFILL_META] = meta
+    return out
+
+
+def apply_year_month_backfill(
+    payload: dict[str, Any],
+    month_history: dict[str, dict[int, dict[str, Any]]],
+) -> None:
+    """Apply same-endpoint month backfill to known year statistic sections."""
+    section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
+        (
+            APP_SECTION_PV_STAT,
+            (
+                APP_STAT_TOTAL_SOLAR_ENERGY,
+                APP_STAT_PV1_ENERGY,
+                APP_STAT_PV2_ENERGY,
+                APP_STAT_PV3_ENERGY,
+                APP_STAT_PV4_ENERGY,
+            ),
+        ),
+        (
+            APP_SECTION_HOME_STAT,
+            (APP_STAT_TOTAL_IN_GRID_ENERGY, APP_STAT_TOTAL_OUT_GRID_ENERGY),
+        ),
+        (
+            APP_SECTION_BATTERY_STAT,
+            (APP_STAT_TOTAL_CHARGE, APP_STAT_TOTAL_DISCHARGE),
+        ),
+        (APP_SECTION_HOME_TRENDS, (APP_STAT_TOTAL_HOME_ENERGY,)),
+        (APP_SECTION_PV_TRENDS, (APP_STAT_TOTAL_SOLAR_ENERGY,)),
+        (
+            APP_SECTION_BATTERY_TRENDS,
+            (
+                APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+                APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+            ),
+        ),
+    )
+
+    for section_prefix, stat_keys in section_metrics:
+        year_section = _period_section(section_prefix, DATE_TYPE_YEAR)
+        year_source = payload.get(year_section)
+        months = month_history.get(section_prefix)
+        if not isinstance(year_source, dict) or not isinstance(months, dict):
+            continue
+        payload[year_section] = backfill_year_payload_from_months(
+            year_source,
+            section_prefix,
+            stat_keys,
+            months,
+        )
+
+
+def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
+    """Guard app total KPIs with corrected current-year period values.
+
+    The Jackery ``systemStatistic`` endpoint can suffer the same month-only bug
+    as the app year charts. Generation and carbon remain lower-bound guarded by
+    the corrected PV year total. ``totalRevenue`` is different: it represents
+    savings and must not equal raw PV revenue when part of the energy is stored,
+    exported, or lost in conversion. When enough year-flow data is available we
+    calculate savings from grid-side AC output after conversion losses, bounded
+    by house consumption and reduced by CT export if a CT period payload exists.
+    """
+    statistic = payload.get(PAYLOAD_STATISTIC)
+    pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
+    if not isinstance(statistic, dict) or not isinstance(pv_year, dict):
+        return
+
+    year_generation = effective_period_total_value(
+        pv_year,
+        _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+        APP_STAT_TOTAL_SOLAR_ENERGY,
+    )
+    year_revenue = _pv_revenue_value(pv_year)
+    savings = _calculated_savings_from_year(
+        payload,
+        year_generation=year_generation,
+        year_revenue=year_revenue,
+    )
+    if year_generation is None and year_revenue is None and savings is None:
+        return
+
+    out = dict(statistic)
+    meta: dict[str, Any] = {
+        "method": "current_year_lower_bound",
+        "source_section": _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+    }
+
+    raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
+    if (
+        year_generation is not None
+        and (
+            raw_generation is None
+            or year_generation > raw_generation + _tolerance_for_values(
+                raw_generation, year_generation
+            )
+        )
+    ):
+        out[APP_STAT_TOTAL_GENERATION] = round(year_generation, 2)
+        meta.setdefault("corrected", {})[APP_STAT_TOTAL_GENERATION] = {
+            "raw_total": raw_generation,
+            "corrected_total": round(year_generation, 2),
+        }
+
+    raw_revenue = safe_float(statistic.get(APP_STAT_TOTAL_REVENUE))
+    if savings is not None:
+        calculated_revenue = safe_float(savings.get("calculated_total"))
+        if calculated_revenue is not None:
+            candidates = _pv_revenue_candidates(
+                pv_year,
+                year_revenue=year_revenue,
+                raw_generation=raw_generation,
+                price=safe_float(savings.get("price")),
+            )
+            publish_calculated, reason = _savings_publish_decision(
+                raw_revenue=raw_revenue,
+                calculated_revenue=calculated_revenue,
+                raw_generation=raw_generation,
+                year_generation=year_generation,
+                pv_revenue_candidates=candidates,
+            )
+            savings["raw_cloud_total"] = raw_revenue
+            savings["pv_revenue_candidates"] = candidates
+            savings["decision"] = reason
+            if publish_calculated:
+                out[APP_STAT_TOTAL_REVENUE] = round(calculated_revenue, 2)
+                savings["published_value"] = round(calculated_revenue, 2)
+                savings["published_value_source"] = "calculated_savings"
+            else:
+                savings["published_value"] = raw_revenue
+                savings["published_value_source"] = "cloud_total"
+            out[APP_SAVINGS_CALC_META] = savings
+
+    raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
+    if (
+        year_generation is not None
+        and raw_generation is not None
+        and raw_generation > 0
+        and raw_carbon is not None
+    ):
+        factor = raw_carbon / raw_generation
+        corrected_carbon = round(year_generation * factor, 2)
+        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(
+            raw_carbon, corrected_carbon
+        ):
+            out[APP_STAT_TOTAL_CARBON] = corrected_carbon
+            meta.setdefault("corrected", {})[APP_STAT_TOTAL_CARBON] = {
+                "raw_total": raw_carbon,
+                "corrected_total": corrected_carbon,
+                "kg_per_kwh": round(factor, 5),
+            }
+
+    if "corrected" not in meta and APP_SAVINGS_CALC_META not in out:
+        return
+    if "corrected" in meta:
+        out[APP_TOTAL_GUARD_META] = meta
+    payload[PAYLOAD_STATISTIC] = out
 
 
 def compact_json(value: Any) -> str:

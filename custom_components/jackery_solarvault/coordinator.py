@@ -49,8 +49,19 @@ from .const import (
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
     APP_SECTION_PV_TRENDS,
+    APP_STAT_PV1_ENERGY,
+    APP_STAT_PV2_ENERGY,
+    APP_STAT_PV3_ENERGY,
+    APP_STAT_PV4_ENERGY,
+    APP_STAT_TOTAL_CHARGE,
+    APP_STAT_TOTAL_DISCHARGE,
+    APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_TOTAL_SOLAR_ENERGY,
     BATTERY_PACK_HINT_KEYS,
     BATTERY_PACK_STALE_THRESHOLD_SEC,
+    CONF_DEBUG_PAYLOAD_LOG,
     CT_METER_KEYS,
     DATA_QUALITY_KEY_LABEL,
     DATA_QUALITY_KEY_METRIC_KEY,
@@ -59,6 +70,7 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
+    DEFAULT_DEBUG_PAYLOAD_LOG,
     DOMAIN,
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
@@ -215,14 +227,18 @@ from .const import (
 from .mqtt_push import JackeryMqttPushClient
 from .util import (
     app_data_quality_warnings,
+    app_month_request_kwargs,
     app_period_request_kwargs,
+    apply_year_month_backfill,
     append_payload_debug_line,
     chart_series_debug,
     external_trend_statistic_id,
     format_data_quality_warning,
+    guard_statistic_totals_from_year,
     normalized_data_quality_warnings,
     safe_float,
     trend_series_points,
+    year_payload_appears_current_month_only,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -299,6 +315,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     _BATTERY_PACK_HINT_KEYS = BATTERY_PACK_HINT_KEYS
     _MAIN_PROPERTY_ALIAS_PAIRS = MAIN_PROPERTY_ALIAS_PAIRS
     _BATTERY_PACK_LIVE_KEYS = frozenset({FIELD_BAT_SOC, FIELD_CELL_TEMP})
+    _DEVICE_YEAR_BACKFILL_STAT_KEYS = {
+        APP_SECTION_PV_STAT: (
+            APP_STAT_TOTAL_SOLAR_ENERGY,
+            APP_STAT_PV1_ENERGY,
+            APP_STAT_PV2_ENERGY,
+            APP_STAT_PV3_ENERGY,
+            APP_STAT_PV4_ENERGY,
+        ),
+        APP_SECTION_BATTERY_STAT: (
+            APP_STAT_TOTAL_CHARGE,
+            APP_STAT_TOTAL_DISCHARGE,
+        ),
+        APP_SECTION_HOME_STAT: (
+            APP_STAT_TOTAL_IN_GRID_ENERGY,
+            APP_STAT_TOTAL_OUT_GRID_ENERGY,
+        ),
+    }
+    _SYSTEM_YEAR_BACKFILL_STAT_KEYS = {
+        APP_SECTION_HOME_TRENDS: (APP_STAT_TOTAL_HOME_ENERGY,),
+    }
 
     def __init__(
         self,
@@ -399,7 +435,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         sites avoid building the event when DEBUG is disabled — the most
         important hot-path optimization on the per-MQTT-message path.
         """
-        if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):
+        # Hard gate on an explicit user opt-in. We deliberately do NOT
+        # use `_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)` here: the
+        # payload_debug logger sits below
+        # `custom_components.jackery_solarvault.*` and silently inherits
+        # any DEBUG level the user sets on the parent integration logger
+        # — which led to multi-MB JSONL files in the HA config root the
+        # moment a user enabled debug logging for unrelated reasons.
+        # The opt-in is exposed in the integration's options flow.
+        if not self.entry.options.get(
+            CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG
+        ):
             return
         event = (
             event_or_factory() if callable(event_or_factory) else dict(event_or_factory)
@@ -1544,6 +1590,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _app_period_section(prefix: str, date_type: str) -> str:
         """Return the normalized payload key for documented app period sections."""
         return f"{prefix}_{date_type}"
+
+    def _needs_year_month_backfill(
+        self,
+        payload: dict[str, Any],
+        prefix: str,
+        stat_keys: tuple[str, ...],
+        *,
+        today: date,
+    ) -> bool:
+        """Return whether a year section needs historical month fetches."""
+        section = self._app_period_section(prefix, DATE_TYPE_YEAR)
+        source = payload.get(section)
+        if not isinstance(source, dict):
+            return False
+        return year_payload_appears_current_month_only(
+            source,
+            section,
+            stat_keys,
+            current_month=today.month,
+        )
 
     def _apply_local_property_patch(
         self,
@@ -2986,6 +3052,47 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 PAYLOAD_PRICE_SOURCES: price_sources,
                 PAYLOAD_PRICE_HISTORY_CONFIG: price_history_config,
             }
+            month_history: dict[str, dict[int, dict[str, Any]]] = {}
+            for prefix, stat_keys in self._SYSTEM_YEAR_BACKFILL_STAT_KEYS.items():
+                if not self._needs_year_month_backfill(
+                    bundle,
+                    prefix,
+                    stat_keys,
+                    today=today,
+                ):
+                    continue
+                current_month_section = self._app_period_section(
+                    prefix,
+                    DATE_TYPE_MONTH,
+                )
+                current_month_source = bundle.get(current_month_section)
+                months: dict[int, dict[str, Any]] = {}
+                if isinstance(current_month_source, dict):
+                    months[today.month] = current_month_source
+                if prefix == APP_SECTION_HOME_TRENDS:
+                    previous_months = list(range(1, today.month))
+                    sources = await asyncio.gather(*(
+                        _get_with_ttl(
+                            sys_id,
+                            f"{prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}",
+                            self._price_config_interval_sec,
+                            lambda sid, q=app_month_request_kwargs(
+                                today.year,
+                                month,
+                            ): self.api.async_get_home_trends(
+                                sid,
+                                **q,
+                            ),
+                            {},
+                        )
+                        for month in previous_months
+                    ))
+                    for month, source in zip(previous_months, sources, strict=False):
+                        if isinstance(source, dict):
+                            months[month] = source
+                if months:
+                    month_history[prefix] = months
+            apply_year_month_backfill(bundle, month_history)
             system_cache[sys_id] = bundle
             return bundle
 
@@ -3103,6 +3210,80 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if isinstance(packs, list) and packs:
                 await self._async_enrich_battery_pack_ota(dev_id, packs, dev_sn)
 
+            async def _fetch_device_month(
+                prefix: str,
+                month: int,
+            ) -> dict[str, Any]:
+                kwargs = app_month_request_kwargs(today.year, month)
+                cache_key = (
+                    f"{prefix}_{DATE_TYPE_MONTH}_{today.year}_{month:02d}"
+                )
+                if prefix == APP_SECTION_PV_STAT:
+                    if not sys_id:
+                        return {}
+                    return await _get_with_ttl_for(
+                        per_dev,
+                        cache_key,
+                        self._price_config_interval_sec,
+                        lambda q=kwargs: self.api.async_get_device_pv_stat(
+                            dev_id,
+                            sys_id,
+                            **q,
+                        ),
+                        {},
+                    )
+                if prefix == APP_SECTION_BATTERY_STAT:
+                    return await _get_with_ttl_for(
+                        per_dev,
+                        cache_key,
+                        self._price_config_interval_sec,
+                        lambda q=kwargs: self.api.async_get_device_battery_stat(
+                            dev_id,
+                            **q,
+                        ),
+                        {},
+                    )
+                if prefix == APP_SECTION_HOME_STAT:
+                    return await _get_with_ttl_for(
+                        per_dev,
+                        cache_key,
+                        self._price_config_interval_sec,
+                        lambda q=kwargs: self.api.async_get_device_home_stat(
+                            dev_id,
+                            **q,
+                        ),
+                        {},
+                    )
+                return {}
+
+            month_history: dict[str, dict[int, dict[str, Any]]] = {}
+            for prefix, stat_keys in self._DEVICE_YEAR_BACKFILL_STAT_KEYS.items():
+                if not self._needs_year_month_backfill(
+                    out,
+                    prefix,
+                    stat_keys,
+                    today=today,
+                ):
+                    continue
+                current_month_section = self._app_period_section(
+                    prefix,
+                    DATE_TYPE_MONTH,
+                )
+                current_month_source = out.get(current_month_section)
+                months: dict[int, dict[str, Any]] = {}
+                if isinstance(current_month_source, dict):
+                    months[today.month] = current_month_source
+                previous_months = list(range(1, today.month))
+                sources = await asyncio.gather(
+                    *(_fetch_device_month(prefix, month) for month in previous_months)
+                )
+                for month, source in zip(previous_months, sources, strict=False):
+                    if isinstance(source, dict):
+                        months[month] = source
+                if months:
+                    month_history[prefix] = months
+            apply_year_month_backfill(out, month_history)
+
             return out
 
         result: dict[str, dict[str, Any]] = {}
@@ -3213,6 +3394,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     )
                 else:
                     self._price_overrides.pop(dev_id, None)
+            guard_statistic_totals_from_year(entry)
             quality_warnings = app_data_quality_warnings(entry, today=today)
             if quality_warnings:
                 entry[PAYLOAD_DATA_QUALITY] = [

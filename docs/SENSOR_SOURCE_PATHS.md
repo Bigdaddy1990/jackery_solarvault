@@ -74,7 +74,9 @@ Source: APP_POLLING_MQTT.md HTTP table. Each entity selects one app
 endpoint via `section` + the chart-series key contract from
 DATA_SOURCE_PRIORITY.md. Device `dateType=year` series are passed
 through `expanded_year_series_values()` with cross-validation against
-the documented total field — see `util.py` docstring.
+the documented total field; if Jackery returns the current month as the
+whole year, the coordinator may raise the year buckets via documented
+same-endpoint month backfill before sensors read the payload.
 
 | Entity key | Section (`source_section`) | Stat key | HTTP path | Chart series |
 |---|---|---|---|---|
@@ -124,6 +126,14 @@ the documented total field — see `util.py` docstring.
 | `device_today_ongrid_to_battery` | `device_statistic` | `ongridOtBatEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_pv_to_battery` | `device_statistic` | `pvOtBatEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_battery_to_ongrid` | `device_statistic` | `batOtGridEgy` | `/v1/device/stat/deviceStatistic` | `—` |
+
+`total_revenue` is published from `statistic.totalRevenue`, but the coordinator
+may replace that raw cloud field with calculated house-side savings. The
+calculation uses `device_home_stat_year.totalOutGridEnergy`, optional
+`device_home_stat_year.totalInGridEnergy`, optional
+`device_ct_stat_year.totalOutCtEnergy`, `home_trends_year.totalHomeEgy`, and
+`price.singlePrice`; details are exposed on the entity as
+`savings_calculation`.
 
 ## Smart-Meter / CT live values (MQTT only)
 

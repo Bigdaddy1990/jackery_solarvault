@@ -11,8 +11,13 @@ parser -> coordinator data -> entity native value
 ```
 
 If a sensor shows the wrong number, the bug is in one of those three
-layers; never patch over it at the entity layer with a cross-period
-repair. Use the payload-debug JSONL log
+layers; never patch over it at the entity layer with an ad-hoc
+cross-period repair. The only allowed year repair is the documented
+coordinator-level same-endpoint month backfill from
+`DATA_SOURCE_PRIORITY.md`: explicit calendar-month payloads from the same
+endpoint family may raise a faulty year/lifetime lower bound, and the
+raw/corrected values must remain visible in diagnostics. Use the
+payload-debug JSONL log
 (`custom_components.jackery_solarvault.payload_debug=debug`) to compare
 the raw frame against the parsed result.
 

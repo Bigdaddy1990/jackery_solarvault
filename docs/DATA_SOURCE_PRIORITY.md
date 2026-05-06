@@ -1,106 +1,132 @@
-# Data source priority — Jackery SolarVault
+# Jackery SolarVault data-source priority
 
-This document is the contract between the Jackery cloud APIs and the Home
-Assistant entities exposed by the integration. Every period entity carries
-the section name and stat key from this document in its
-`extra_state_attributes` so a parser/source bug stays visible without a
-debug log.
+This file is the implementation contract for choosing between MQTT, HTTP and
+app-statistic values. It prevents hidden cross-period repairs and keeps Home
+Assistant entity states explainable.
 
-## Period boundaries
+## Source classes
 
-The integration follows the same period semantics that the Jackery app
-shows next to its day/week/month/year toggles, **localised to the user's
-Home Assistant timezone**:
+| Source class | Preferred use | Notes |
+| --- | --- | --- |
+| MQTT live payload | Live power, switch/select state, fast diagnostic attributes | Most recent value wins for live state. |
+| HTTP device property | Startup/backfill and slow fallback for live properties | Used when MQTT has not delivered a value yet. |
+| App statistic endpoint | Today/week/month/year energy totals | Use the matching documented app period; year values may be guarded by same-endpoint month payloads when Jackery returns the current month as the year. |
+| App chart series | HA statistic graph / period bucket diagnostics | Sum the documented series for period total sensors. |
+| Same-endpoint month backfill | Guarded year lower bound | Only for elapsed months of the same calendar year and same endpoint family. |
+| Lifetime app statistic | Total generation/revenue/carbon | Preferred source for generation/carbon; guarded so those values cannot be lower than the corrected current-year PV total. `totalRevenue` is calculated from self-consumed AC energy when enough year-flow data is available. |
 
-* **Day** — local calendar day, `00:00:00` to `23:59:59`.
-* **Week** — Monday to Sunday, ISO 8601, in the user's local timezone.
-* **Month** — full calendar month, day 1 `00:00` to last-day `23:59`.
-* **Year** — full calendar year, January 1st `00:00` to December 31st
-  `23:59`.
-
-App-period `year` chart arrays carry one bucket per month
-(12 entries). The integration imports them as Home Assistant external
-statistics with monthly buckets dated to the **first day of each month**.
-
-## No cross-period repair
-
-The integration must never silently fix one period using another period.
-This rule is enforced by tests and matches the explicit guidance from the
-Jackery app behaviour.
-
-* Do not use day values to repair week/month/year/lifetime totals.
-* Do not use week values to repair month/year/lifetime totals.
-* Do not use month values to repair year/lifetime totals.
-* Do not use year values to repair lifetime totals.
-
-When the cloud returns inconsistent values (e.g. lifetime statistic
-`81.95 kWh` while the year chart sums to `139 kWh`) the integration
-emits a Home Assistant **Repair issue** plus a `data_quality` entry on
-the diagnostics export. The entity itself **must not rewrite the entity state with another period**; the documented source value is preserved so
-the problem stays visible.
-
-The same rule applies to the date range used in the period requests:
-`month` and `year` must never fall back to `beginDate=endDate=today`
-on a quiet failure. The integration retries with exponential backoff and
-preserves the last good payload until the documented range is fetched.
-
-## Source-of-truth fields per period entity
-
-| Period | Endpoint | Total field | Chart series |
-|---|---|---|---|
-| Day | `/v1/device/stat/pv?dateType=day&beginDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | `totalSolarEnergy` | `y` (24 hourly buckets) |
-| Week | `/v1/device/stat/pv?dateType=week&beginDate=YYYY-MM-DD&endDate=YYYY-MM-DD` | `totalSolarEnergy` | `y` (7 daily buckets) |
-| Month | `/v1/device/stat/pv?dateType=month&beginDate=YYYY-MM-01&endDate=YYYY-MM-LAST` | `totalSolarEnergy` | `y` (28-31 daily buckets) |
-| Year | `/v1/device/stat/pv?dateType=year&beginDate=YYYY-01-01&endDate=YYYY-12-31` | `totalSolarEnergy` | `y` (12 monthly buckets) |
-
-The same shape applies to `device_battery_stat_*` (`totalCharge` / `y1`,
-`totalDischarge` / `y2`) and `device_home_stat_*` (`totalInGridEnergy` /
-`y1`, `totalOutGridEnergy` / `y2`).
-
-For year-period entities the integration cross-validates the raw chart
-sum against the documented total field. When they match, the raw
-floating-point chart values are used as-is. When they diverge but the
-"compact two-month encoding" expansion matches the total, the compact
-expansion is applied. This avoids the historical bug where every
-floating-point chart value was incorrectly interpreted as an
-encoded two-month bucket.
 
 ## Minimal entity diagnostic attributes
 
-Every period entity exposes a stable, minimal set of attributes for
-debugging — never the raw payload. These are written from the
-coordinator into the per-update sensor cache.
+Period and total sensors keep `extra_state_attributes` lean. Entity attributes
+may expose the concrete source section/key, parsed period values, the app
+request range, `_year_month_backfill` metadata, `_total_lower_bound_guard`
+metadata when those guards actually changed the value, and
+`_savings_calculation` metadata for the total-revenue/savings sensor.
 
-* `source_section` — the section name in the merged coordinator payload
-  (e.g. `device_pv_stat_year`).
-* `source_key` — the documented total field name (e.g.
-  `totalSolarEnergy`).
-* `chart_series_key` — when the entity reads from a chart series, the
-  array key (e.g. `y`, `y1`, ...).
-* `chart_series_sum` — sum of the chart series, rounded.
-* `server_total` — value of the documented total field as reported by
-  the cloud.
-* `period_labels`, `period_labels_count`, `period_labels_json` — the
-  `x` axis labels of the chart, when present.
-* `period_values_count`, `period_values_json`,
-  `period_values_by_label_json` — the chart values aligned to the labels.
-* `request` — the original `dateType`/`beginDate`/`endDate` request
-  metadata.
+Raw parser proof, ambiguous cloud payloads, and redacted source snapshots belong
+in the generated `jackery_solarvault_payload_debug.jsonl` file and Home
+Assistant diagnostics, not as large per-entity attributes.
 
-Earlier internal-only attributes were dropped from the schema; tests
-lock the cleaned-up attribute set above.
+## Non-negotiable rules
 
-## Raw payload debugging
+- Do not use week values to repair month/year/lifetime totals.
+- Month values may only guard year totals when they come from the same endpoint family and explicit calendar-month requests of the same year.
+- Do not use year values to repair lifetime totals.
+- Period entities expose the matching app period, except for the documented same-endpoint month backfill on faulty year payloads.
+- Diagnostics must show when a year value was raised by month backfill.
+- If sources still contradict each other after the guarded backfill, keep the guarded source and expose enough attributes/logging to diagnose the app/API issue.
 
-Raw HTTP responses and MQTT frames are **never** written by default.
-They are only logged to `jackery_solarvault_payload_debug.jsonl`. The
-file is enabled only when logger `custom_components.jackery_solarvault.payload_debug`
-is at DEBUG. On normal installations no file is created.
+## Same-Endpoint Month Backfill
 
-The log writer applies a per-channel content-aware dedup plus a
-`PAYLOAD_DEBUG_THROTTLE_SEC = 60` throttle so the file does not grow at
-the MQTT push-rate. Every genuinely new content fingerprint is written
-immediately; repetitions within the throttle window are skipped.
+Some Jackery app/cloud responses return the current month as the `dateType=year`
+value. The app chart then has twelve month slots but only the current month is
+non-zero, for example May `81.51 kWh` shown as the whole year even though April
+has `146.51 kWh` in the monthly app statistic view.
 
-The file rotates at 2 MB to a `.jsonl.1` backup. Both files are listed
-in `.gitignore` and excluded from any release artefact.
+When this shape is detected after January, the coordinator fetches explicit
+`dateType=month` payloads for elapsed months of the same calendar year and
+same endpoint family:
+
+- `/v1/device/stat/pv` guards `device_pv_stat_year` including PV1..PV4 and solar revenue.
+- `/v1/device/stat/battery` guards battery charge/discharge year values.
+- `/v1/device/stat/onGrid` guards device grid-side input/output year values.
+- `/v1/device/stat/sys/home/trends` guards home-consumption year values.
+
+The guard is one-way:
+
+- If the cloud year total is greater than or equal to the month sum, keep the
+  cloud year. This lets a future fixed Jackery response win automatically.
+- If the month sum is greater, use the month sum as a lower bound and attach
+  `_year_month_backfill` metadata with raw and corrected totals.
+- If historical month payloads are missing or lower than the cloud year, do not
+  lower the year value.
+
+`systemStatistic` total generation/carbon uses the corrected current year PV
+value as a lower bound only. A genuine lifetime total from the cloud is kept
+when it is higher; a month-only total is raised so Home Assistant does not see a
+false total drop.
+
+`systemStatistic.totalRevenue` / `total_revenue` is not PV revenue. It is a
+savings value and therefore uses year-flow data when available:
+
+- Start with `device_home_stat_year.totalOutGridEnergy`, the device grid-side
+  AC output after inverter and battery effects, and subtract
+  `device_home_stat_year.totalInGridEnergy` when present so grid-sourced energy
+  is not counted as PV savings.
+- Subtract `device_ct_stat_year.totalOutCtEnergy` when CT period statistics are
+  present, because public grid export is not house self-consumption.
+- Bound the result by `home_trends_year.totalHomeEgy`.
+- Multiply by `price.singlePrice`; if the price payload is missing, derive the
+  tariff from PV year revenue divided by PV year kWh.
+
+The cloud `totalRevenue` value is replaced when it is missing, lower than the
+calculated current-year savings, or shaped like PV revenue instead of savings.
+A higher cloud value is kept when the total-generation value also indicates a
+genuine higher total, so future corrected Jackery totals are not overwritten.
+The entity exposes `_savings_calculation` for the raw cloud value, calculation
+method, components, and publication decision.
+
+## Period ranges
+
+The app period endpoints must always be queried with explicit ranges from
+`APP_POLLING_MQTT.md`:
+
+- `day`: today .. today
+- `week`: Monday .. Sunday
+- `month`: first day .. last day of the calendar month
+- `year`: January 1 .. December 31
+
+`month` and `year` must never fall back to `beginDate=endDate=today`.
+
+## Contradictory app/cloud data
+
+When mathematically comparable sources contradict each other after the guarded
+month backfill, the integration attaches `data_quality` diagnostics to the
+affected device payload and raises the `app_data_inconsistency` repair issue.
+
+Examples that are valid to flag:
+
+- `year < month` for the same metric and source family.
+- `year < week` when the full current week is inside the current year.
+- `month < week` only when the full current week is inside the current month.
+- lifetime PV generation `<` current-year PV generation.
+
+Examples that are not valid to flag:
+
+- `month < week` at the start/end of a month when the week spans another month.
+- `year < week` around New Year when the week spans another year.
+
+The warning is diagnostic only. It protects the user from silent cross-period
+"repairs" while making broken Jackery responses visible in Home Assistant.
+
+## Repair issue presentation
+
+The repair issue uses a deterministic, de-duplicated warning list. This prevents
+Home Assistant from seeing a changed issue payload on every refresh just because
+device iteration order changed or the same contradiction was discovered through
+multiple payload paths.
+
+Repair text may include a small number of examples, but it must not include raw
+device IDs, serial numbers, tokens, coordinates or MQTT credentials. Full source
+details belong in redacted diagnostics under `data_quality`.

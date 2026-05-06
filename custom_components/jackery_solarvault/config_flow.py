@@ -1,5 +1,7 @@
 """Config flow for Jackery SolarVault."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -14,8 +16,10 @@ from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_DEBUG_PAYLOAD_LOG,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_DEBUG_PAYLOAD_LOG,
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
@@ -205,6 +209,10 @@ class JackeryOptionsFlow(OptionsFlow):
                 DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
             ),
         )
+        current_debug_payload_log = self._entry.options.get(
+            CONF_DEBUG_PAYLOAD_LOG,
+            DEFAULT_DEBUG_PAYLOAD_LOG,
+        )
         schema = vol.Schema({
             vol.Optional(
                 CONF_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -213,6 +221,14 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_CREATE_CALCULATED_POWER_SENSORS,
                 default=current_create_calculated_power,
+            ): bool,
+            # Off by default. When False the integration deletes any
+            # leftover JSONL on the next setup. Only enable when actively
+            # debugging a parser/source bug; the file grows ~2 MB/day
+            # of Jackery telemetry on a typical SolarVault.
+            vol.Optional(
+                CONF_DEBUG_PAYLOAD_LOG,
+                default=current_debug_payload_log,
             ): bool,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
