@@ -297,7 +297,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -306,13 +306,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -546,7 +546,7 @@
         "name": "Today load"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "Total PV generation"

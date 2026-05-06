@@ -2,7 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
-      "reauth_entry_missing": "Der Jackery-Eintrag für die erneute Anmeldung wurde nicht gefunden.",
+      "reauth_entry_missing": "Der Jackery-Eintrag f\u00fcr die erneute Anmeldung wurde nicht gefunden.",
       "reauth_successful": "Erneute Anmeldung erfolgreich."
     },
     "error": {
@@ -15,7 +15,7 @@
         "data": {
           "password": "Passwort"
         },
-        "description": "Das gespeicherte Passwort für {username} funktioniert nicht mehr. Gib das aktuelle Passwort ein, um die Verbindung wiederherzustellen.",
+        "description": "Das gespeicherte Passwort f\u00fcr {username} funktioniert nicht mehr. Gib das aktuelle Passwort ein, um die Verbindung wiederherzustellen.",
         "title": "Jackery erneut anmelden"
       },
       "user": {
@@ -26,10 +26,10 @@
           "username": "E-Mail"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind."
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
-        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
+        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Ger\u00e4t, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zus\u00e4tzlich zu den App-Werten einen vorzeichenbehafteten Nettowert f\u00fcr Dashboards brauchst.\n\nJackery erlaubt \u00fcblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
         "title": "Jackery SolarVault"
       }
     }
@@ -51,7 +51,7 @@
     },
     "button": {
       "reboot_device": {
-        "name": "Gerät neu starten"
+        "name": "Ger\u00e4t neu starten"
       }
     },
     "number": {
@@ -144,7 +144,7 @@
     },
     "sensor": {
       "ability_bits": {
-        "name": "Fähigkeits-Flags"
+        "name": "F\u00e4higkeits-Flags"
       },
       "activation_date": {
         "name": "Aktivierungsdatum"
@@ -228,7 +228,7 @@
         "name": "Ladeplan-Leistung"
       },
       "country_code": {
-        "name": "Ländercode"
+        "name": "L\u00e4ndercode"
       },
       "ct_state": {
         "name": "CT-Status"
@@ -297,7 +297,7 @@
         "name": "Batterieentladung heute"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Batterie→Netzseite heute"
+        "name": "Batterie\u2192Netzseite heute"
       },
       "device_today_ongrid_input": {
         "name": "Netzseite Eingang heute"
@@ -306,13 +306,13 @@
         "name": "Netzseite Ausgang heute"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Netzseite→Batterie heute"
+        "name": "Netzseite\u2192Batterie heute"
       },
       "device_today_pv_energy": {
         "name": "PV heute"
       },
       "device_today_pv_to_battery": {
-        "name": "PV→Batterie heute"
+        "name": "PV\u2192Batterie heute"
       },
       "energy_plan_power": {
         "name": "Energieplan-Leistung"
@@ -378,7 +378,7 @@
         "name": "Breitengrad"
       },
       "longitude": {
-        "name": "Längengrad"
+        "name": "L\u00e4ngengrad"
       },
       "mac_address": {
         "name": "MAC-Adresse"
@@ -393,7 +393,7 @@
         "name": "Max. Wechselrichterleistung"
       },
       "max_iot_num": {
-        "name": "Max. IoT-Geräte"
+        "name": "Max. IoT-Ger\u00e4te"
       },
       "max_output_power": {
         "name": "Max. Ausgangsleistung"
@@ -546,7 +546,7 @@
         "name": "Heute Verbrauch"
       },
       "total_carbon_saved": {
-        "name": "Gesamt CO₂ eingespart"
+        "name": "Gesamt CO\u2082 eingespart"
       },
       "total_generation": {
         "name": "Gesamt PV-Ertrag"
@@ -598,16 +598,16 @@
   },
   "exceptions": {
     "delete_storm_alert_failed": {
-      "message": "Sturm-Warnung {alert_id} für Gerät {device_id} konnte nicht gelöscht werden: {error}"
+      "message": "Sturm-Warnung {alert_id} f\u00fcr Ger\u00e4t {device_id} konnte nicht gel\u00f6scht werden: {error}"
     },
     "mqtt_command_failed": {
       "message": "Jackery MQTT-Befehl fehlgeschlagen ({error}). Letzter MQTT-Fehler: {mqtt_last_error}"
     },
     "mqtt_missing_device_sn": {
-      "message": "MQTT-Befehl für {device_id} kann nicht gesendet werden: deviceSn fehlt"
+      "message": "MQTT-Befehl f\u00fcr {device_id} kann nicht gesendet werden: deviceSn fehlt"
     },
     "refresh_weather_plan_failed": {
-      "message": "Wetterplan für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
+      "message": "Wetterplan f\u00fcr Ger\u00e4t {device_id} konnte nicht aktualisiert werden: {error}"
     },
     "rename_system_failed": {
       "message": "Jackery-System {system_id} konnte nicht umbenannt werden: {error}"
@@ -615,8 +615,8 @@
   },
   "issues": {
     "app_data_inconsistency": {
-      "description": "Jackery hat widersprüchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.",
-      "title": "Jackery-App-Statistiken sind widersprüchlich"
+      "description": "Jackery hat widerspr\u00fcchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.",
+      "title": "Jackery-App-Statistiken sind widerspr\u00fcchlich"
     }
   },
   "options": {
@@ -628,11 +628,11 @@
           "debug_payload_log": "Rohdaten-Debuglog schreiben (fortgeschritten)"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "debug_payload_log": "Standardmaessig aus. Wenn aktiviert, wird jede (anonymisierte) Jackery-API/MQTT-Antwort in jackery_solarvault_payload_debug.jsonl im HA-Konfigverzeichnis angehaengt. Nur fuer Parser-/Quellfehler sinnvoll - die Datei waechst taeglich um mehrere MB. Beim Deaktivieren wird die Datei beim naechsten Start geloescht."
         },
-        "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zusätzlichen Rohwerte aus der Jackery-App.",
+        "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",
         "title": "Jackery Optionen"
       }
     }
