@@ -80,7 +80,6 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
-    FIELD_SINGLE_PRICE,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
@@ -90,6 +89,7 @@ from .const import (
     FIELD_OTHER_LOAD_PW,
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
+    FIELD_SINGLE_PRICE,
     PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
     PAYLOAD_PRICE,
@@ -1063,11 +1063,7 @@ def _configured_or_derived_price(
         if configured is not None and 0 <= configured <= 10:
             return configured, f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
 
-    if (
-        year_generation is not None
-        and year_generation > 0
-        and year_revenue is not None
-    ):
+    if year_generation is not None and year_generation > 0 and year_revenue is not None:
         derived = year_revenue / year_generation
         if 0 <= derived <= 10:
             return round(derived, 5), "pv_year_revenue_per_kwh"
@@ -1213,9 +1209,7 @@ def _calculated_savings_from_year(
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
             "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
-            "pv_not_savings_ac_energy_kwh": _round_stat_value(
-                pv_not_savings_energy
-            ),
+            "pv_not_savings_ac_energy_kwh": _round_stat_value(pv_not_savings_energy),
         },
     }
 
@@ -1243,9 +1237,8 @@ def _savings_publish_decision(
         and raw_generation
         > year_generation + _tolerance_for_values(raw_generation, year_generation)
     )
-    if (
-        not has_prior_lifetime_generation
-        and _matches_pv_revenue_shape(raw_revenue, pv_revenue_candidates)
+    if not has_prior_lifetime_generation and _matches_pv_revenue_shape(
+        raw_revenue, pv_revenue_candidates
     ):
         return True, "cloud_total_matches_pv_revenue_not_savings"
 
@@ -1463,14 +1456,10 @@ def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
     }
 
     raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    if (
-        year_generation is not None
-        and (
-            raw_generation is None
-            or year_generation > raw_generation + _tolerance_for_values(
-                raw_generation, year_generation
-            )
-        )
+    if year_generation is not None and (
+        raw_generation is None
+        or year_generation
+        > raw_generation + _tolerance_for_values(raw_generation, year_generation)
     ):
         out[APP_STAT_TOTAL_GENERATION] = round(year_generation, 2)
         meta.setdefault("corrected", {})[APP_STAT_TOTAL_GENERATION] = {

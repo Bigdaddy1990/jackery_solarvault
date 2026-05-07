@@ -211,4 +211,3 @@ The integration must keep these MQTT rules aligned with this document and
 
 4. **Benefit**: fast SOC/power updates, instant writes, and much lower HTTP
    load than pure polling.
-
