@@ -1571,6 +1571,18 @@ def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
     assert "/homeassistant/.cache/brands/integrations/jackery/" in readme
 
 
+def test_legacy_app_cloud_values_doc_path_is_preserved() -> None:
+    """Keep the old German doc path available while README links use the new path."""
+    legacy = pathlib.Path("docs/Werte aus APP-Cloud.md")
+    canonical = pathlib.Path("docs/APP_CLOUD_VALUES.md")
+
+    assert legacy.is_file()
+    assert canonical.is_file()
+    legacy_text = legacy.read_text(encoding="utf-8")
+    assert "docs/APP_CLOUD_VALUES.md" in legacy_text
+    assert "Berechnung fuer `systemStatistic.totalRevenue`" in legacy_text
+
+
 def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     """MQTT TLS may ship a CA trust anchor, never keys or insecure TLS."""
     component_files = list(CUSTOM_COMPONENT.rglob("*"))
