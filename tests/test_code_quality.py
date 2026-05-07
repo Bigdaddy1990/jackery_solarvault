@@ -2,6 +2,7 @@
 
 import ast
 import importlib.util
+import json
 import pathlib
 import re
 import sys
@@ -49,6 +50,16 @@ util = _load_util_module()
 
 def _python_sources() -> list[pathlib.Path]:
     return sorted(CUSTOM_COMPONENT.glob("*.py"))
+
+
+def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
+    """HA fixture collection should not hard-require recorder setup."""
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert "recorder" not in manifest.get("dependencies", [])
+    assert "recorder" in manifest.get("after_dependencies", [])
 
 
 def test_no_duplicate_literal_dict_keys() -> None:
