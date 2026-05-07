@@ -14,15 +14,15 @@ keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "tele
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
-  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
 dynamic = ["version", "dependencies", "optional-dependencies"]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 
 [options]
-python_requires = ">=3.13"
+python_requires = ">=3.14"
 
 [project.urls]
 Homepage = "https://github.com/BigDaddy1990/jackery_solarvault"
@@ -59,7 +59,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88
 src = ["custom_components", "scripts", "tests"]
 indent-width = 4
@@ -136,7 +136,7 @@ parametrize-values-row-type = "list"
 parametrize-values-type = "list"
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true
@@ -217,7 +217,7 @@ include = ["custom_components*"]
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-tests = { file = ["requirements_test.txt"] }
+tests = { file = ["requirements-test.txt"] }
 
 [tool.pylint.TYPECHECK]
 ignored-classes = ["_CountingAttr"]

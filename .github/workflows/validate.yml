@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install ruff
         run: python -m pip install ruff
       - name: Lint
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install unit-test deps
         run: python -m pip install pytest pytest-asyncio PyYAML
       - name: Compile integration and tests
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install Home Assistant test dependencies
         run: python -m pip install -r requirements-test.txt
       - name: Run HA fixture tests
