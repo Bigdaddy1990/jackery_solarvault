@@ -1048,6 +1048,37 @@ def test_coordinator_imports_all_field_constants_it_references() -> None:
     assert not missing, f"Missing .const imports in coordinator.py: {missing}"
 
 
+def test_coordinator_lazy_imports_mqtt_client_for_collection_without_gmqtt() -> None:
+    """HA config-flow collection should not require optional MQTT deps."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    module_mqtt_imports = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "mqtt_push"
+        and any(alias.name == "JackeryMqttPushClient" for alias in node.names)
+    ]
+    assert module_mqtt_imports == []
+    assert "if TYPE_CHECKING:" in source
+    assert "self._mqtt: JackeryMqttPushClient | None = None" in source
+
+    start_mqtt = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_start_mqtt"
+    )
+    lazy_imports = [
+        node
+        for node in ast.walk(start_mqtt)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "mqtt_push"
+        and any(alias.name == "JackeryMqttPushClient" for alias in node.names)
+    ]
+    assert len(lazy_imports) == 1
+
+
 def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -> None:
     """Service IDs may include whitespace in UI/API input, then handlers strip them."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")

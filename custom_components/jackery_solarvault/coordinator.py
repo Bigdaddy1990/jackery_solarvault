@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 import json
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -222,7 +222,10 @@ from .const import (
     SUBDEVICE_TYPE_SMART_METER,
     SYSTEM_INFO_KEYS,
 )
-from .mqtt_push import JackeryMqttPushClient
+
+if TYPE_CHECKING:
+    from .mqtt_push import JackeryMqttPushClient
+
 from .util import (
     app_data_quality_warnings,
     app_month_request_kwargs,
@@ -587,6 +590,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     async def async_start_mqtt(self) -> None:
         """Start (or reconfigure) MQTT push channel."""
         if self._mqtt is None:
+            from .mqtt_push import JackeryMqttPushClient
+
             self._mqtt = JackeryMqttPushClient(
                 self.hass,
                 self._async_handle_mqtt_message,
