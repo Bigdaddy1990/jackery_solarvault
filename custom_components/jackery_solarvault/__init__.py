@@ -296,8 +296,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     """Set up Jackery SolarVault from a config entry."""
     from .coordinator import JackerySolarVaultCoordinator
 
-    # Clean up the previous payload-debug log if the user has not opted in.
-    _async_purge_stale_payload_debug_log(hass, entry)
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
     # longer part of the documented app/HTTP/MQTT data model.
