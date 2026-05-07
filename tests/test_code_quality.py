@@ -906,7 +906,7 @@ def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> No
         walk_statement_lists(path, ast.parse(path.read_text(encoding="utf-8")))
 
 
-def test_entry_bool_option_calls_use_config_key_and_default() -> None:
+def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     """Optional entity cleanup must pass option key plus fallback default."""
     source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
@@ -915,12 +915,12 @@ def test_entry_bool_option_calls_use_config_key_and_default() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "entry_bool_option"
+        and node.func.id == "config_entry_bool_option"
     ]
     assert calls
     for call in calls:
         assert len(call.args) == 3, (
-            f"entry_bool_option call at line {call.lineno} must pass entry, key, default"
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1400,8 +1400,8 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
         "class JackeryConfigFlow", 1
     )[0]
 
-    assert "from .util import entry_bool_option" in config_flow_source
-    assert options_block.count("entry_bool_option(") == 3
+    assert "from .util import config_entry_bool_option" in config_flow_source
+    assert options_block.count("config_entry_bool_option(") == 3
     assert ".options.get(" not in options_block
 
 
@@ -1413,8 +1413,8 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
         1,
     )[0]
 
-    assert "entry_bool_option," in sensor_source
-    assert setup_block.count("entry_bool_option(") == 3
+    assert "config_entry_bool_option," in sensor_source
+    assert setup_block.count("config_entry_bool_option(") == 3
     assert ".options.get(" not in setup_block
 
 

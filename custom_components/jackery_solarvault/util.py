@@ -109,7 +109,13 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     setup, so every caller must use the same lookup order to avoid platform
     drift after upgrades.
     """
-    return bool(entry.options.get(key, entry.data.get(key, default)))
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    parsed = safe_bool(value)
+    return default if parsed is None else parsed
 
 
 def normalize_account(value: str) -> str:
@@ -411,11 +417,7 @@ def safe_bool(value: Any) -> bool | None:
 
 def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a config-entry boolean option with safe legacy value parsing."""
-    options = getattr(entry, "options", {}) or {}
-    data = getattr(entry, "data", {}) or {}
-    value = options.get(key, data.get(key, default))
-    parsed = safe_bool(value)
-    return default if parsed is None else parsed
+    return config_entry_bool_option(entry, key, default)
 
 
 def jackery_online_state(value: Any) -> bool | None:
