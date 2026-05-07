@@ -8,11 +8,12 @@
 rules:
   # ----------------- Bronze (mandatory) -----------------
   action-setup:
-    status: exempt
+    status: done
     comment: >-
-      Integration does not register custom service actions; setters are exposed
-      as standard number/switch/select/button/text entities. No services.yaml-
-      backed actions need explicit setup.
+      async_setup registers all three services.yaml-backed service actions once
+      per domain and forwards work to the loaded config-entry coordinators.
+      Entity-native setters remain exposed via number/switch/select/button/text
+      platforms where possible.
   appropriate-polling:
     status: done
     comment: >-
@@ -32,8 +33,11 @@ rules:
   config-flow: done
   dependency-transparency: done
   docs-actions:
-    status: exempt
-    comment: No service actions; entity-driven setters only.
+    status: done
+    comment: >-
+      README.md and localized README files document rename_system,
+      refresh_weather_plan and delete_storm_alert; services.yaml defines their
+      fields for Home Assistant's Services developer tool.
   docs-high-level-description: done
   docs-installation-instructions: done
   docs-removal-instructions: done
@@ -51,8 +55,12 @@ rules:
 
   # ----------------- Silver -----------------
   action-exceptions:
-    status: exempt
-    comment: No service actions defined.
+    status: done
+    comment: >-
+      All service action handlers raise ServiceValidationError with
+      translation_domain, translation_key and placeholders; lower-level
+      JackeryError/LookupError details are logged at debug and surfaced through
+      translated Home Assistant exceptions.
   config-entry-unloading: done
   docs-configuration-parameters: done
   docs-installation-parameters: done
