@@ -133,6 +133,8 @@ rules:
       MQTT path uses gmqtt directly (not aiohttp). HTTP API uses an
       independently-managed aiohttp session bound to the entry lifecycle.
   strict-typing:
-    status: todo
+    status: done
     comment: >-
-      Annotations present throughout; mypy --strict not yet wired into CI.
+      Source modules pass python -m mypy custom_components/jackery_solarvault
+      under the integration's strict Home Assistant typing profile on
+      Python 3.14.
