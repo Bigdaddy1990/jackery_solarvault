@@ -590,7 +590,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     async def async_start_mqtt(self) -> None:
         """Start (or reconfigure) MQTT push channel."""
         if self._mqtt is None:
-            from .mqtt_push import JackeryMqttPushClient
+            try:
+                from .mqtt_push import JackeryMqttPushClient
+            except ModuleNotFoundError as err:
+                if err.name != "gmqtt":
+                    raise
+                _LOGGER.warning(
+                    "Jackery MQTT push is unavailable because gmqtt is not installed"
+                )
+                return
 
             self._mqtt = JackeryMqttPushClient(
                 self.hass,
