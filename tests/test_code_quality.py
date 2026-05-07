@@ -906,7 +906,7 @@ def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> No
         walk_statement_lists(path, ast.parse(path.read_text(encoding="utf-8")))
 
 
-def test_entry_bool_option_calls_use_config_key_and_default() -> None:
+def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     """Optional entity cleanup must pass option key plus fallback default."""
     source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     tree = ast.parse(source)

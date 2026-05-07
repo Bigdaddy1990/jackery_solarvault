@@ -1,7 +1,5 @@
 """Select platform for Jackery SolarVault preset-style controls."""
 
-from __future__ import annotations
-
 import logging
 import re
 

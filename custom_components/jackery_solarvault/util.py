@@ -1,10 +1,8 @@
 """Shared helpers for Jackery SolarVault entities."""
 
-from __future__ import annotations
-
 import calendar
 import contextlib
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
 import re
@@ -104,25 +102,25 @@ from .const import (
 
 
 def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
-    """Return a boolean config-entry option with setup-data fallback."""
-    return bool(entry.options.get(key, entry.data.get(key, default)))
+    """Return a bool option with legacy setup-data fallback.
 
-
-def utc_now() -> datetime:
-    """Return the current timezone-aware UTC timestamp.
-
-    Home Assistant deprecated ``dt_util.utcnow()``; keeping UTC stamping here
-    gives coordinator lifecycle code one non-deprecated source of truth.
+    Home Assistant options live in ``entry.options``. Older releases of this
+    custom integration briefly stored these toggles in ``entry.data`` during
+    setup, so every caller must use the same lookup order to avoid platform
+    drift after upgrades.
     """
-    return datetime.now(UTC)
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    parsed = safe_bool(value)
+    return default if parsed is None else parsed
 
 
-def parse_utc_datetime(value: str) -> datetime:
-    """Parse an ISO timestamp and normalize legacy naive values to UTC."""
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+def normalize_account(value: str) -> str:
+    """Normalize user-facing account identifiers before auth and unique IDs."""
+    return value.strip()
 
 
 def append_unique_entity(
@@ -419,11 +417,7 @@ def safe_bool(value: Any) -> bool | None:
 
 def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a config-entry boolean option with safe legacy value parsing."""
-    options = getattr(entry, "options", {}) or {}
-    data = getattr(entry, "data", {}) or {}
-    value = options.get(key, data.get(key, default))
-    parsed = safe_bool(value)
-    return default if parsed is None else parsed
+    return config_entry_bool_option(entry, key, default)
 
 
 def jackery_online_state(value: Any) -> bool | None:

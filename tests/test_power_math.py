@@ -1325,16 +1325,16 @@ def test_month_series_does_not_use_compact_year_expansion() -> None:
     )
 
 
-def test_entry_bool_option_parses_legacy_string_values() -> None:
+def test_config_entry_bool_option_parses_legacy_string_values() -> None:
     """Boolean options must not treat legacy string 'false' as truthy."""
 
     class Entry:
         options = {"enabled": "false"}
         data = {"enabled": True, "fallback": "yes"}
 
-    assert util.entry_bool_option(Entry(), "enabled", True) is False
-    assert util.entry_bool_option(Entry(), "fallback", False) is True
-    assert util.entry_bool_option(Entry(), "missing", True) is True
+    assert util.config_entry_bool_option(Entry(), "enabled", True) is False
+    assert util.config_entry_bool_option(Entry(), "fallback", False) is True
+    assert util.config_entry_bool_option(Entry(), "missing", True) is True
 
 
 def test_jackery_online_state_parses_numeric_and_text_markers() -> None:
