@@ -166,9 +166,9 @@ def test_parse_utc_datetime_normalizes_iso_z_and_naive_values() -> None:
     assert util.parse_utc_datetime("2026-05-06T10:23:07Z").isoformat() == (
         "2026-05-06T10:23:07+00:00"
     )
-    assert util.parse_utc_datetime(util.datetime(2026, 5, 6, 10, 23, 7)).isoformat() == (
-        "2026-05-06T10:23:07+00:00"
-    )
+    assert util.parse_utc_datetime(
+        util.datetime(2026, 5, 6, 10, 23, 7)
+    ).isoformat() == ("2026-05-06T10:23:07+00:00")
 
 
 def test_parse_utc_datetime_rejects_invalid_values() -> None:
