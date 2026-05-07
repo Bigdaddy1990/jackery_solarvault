@@ -101,6 +101,22 @@ from .const import (
 )
 
 
+def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+    """Return a bool option with legacy setup-data fallback.
+
+    Home Assistant options live in ``entry.options``. Older releases of this
+    custom integration briefly stored these toggles in ``entry.data`` during
+    setup, so every caller must use the same lookup order to avoid platform
+    drift after upgrades.
+    """
+    return bool(entry.options.get(key, entry.data.get(key, default)))
+
+
+def normalize_account(value: str) -> str:
+    """Normalize user-facing account identifiers before auth and unique IDs."""
+    return value.strip()
+
+
 def append_unique_entity(
     entities: list[Any],
     seen_unique_ids: set[str],

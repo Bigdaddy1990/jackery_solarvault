@@ -52,6 +52,7 @@ from .const import (
     STALE_NET_POWER_SUFFIX,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .util import config_entry_bool_option
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -153,11 +154,6 @@ async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
             "Jackery: copied cached brand image(s) into local integration brand folder: %s",
             ", ".join(copied),
         )
-
-
-def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
-    """Return a boolean option while preserving older setup-stored values."""
-    return bool(entry.options.get(key, entry.data.get(key, default)))
 
 
 def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
@@ -294,19 +290,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     # longer part of the documented app/HTTP/MQTT data model.
     await _async_remove_stale_energy_helpers(hass)
     await _async_remove_removed_sensors(hass, entry)
-    if not _entry_bool_option(
+    if not config_entry_bool_option(
         entry,
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     ):
         await _async_remove_smart_meter_derived_sensors(hass, entry)
-    if not _entry_bool_option(
+    if not config_entry_bool_option(
         entry,
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ):
         await _async_remove_calculated_power_sensors(hass, entry)
-    if not _entry_bool_option(
+    if not config_entry_bool_option(
         entry,
         CONF_CREATE_SAVINGS_DETAIL_SENSORS,
         DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
