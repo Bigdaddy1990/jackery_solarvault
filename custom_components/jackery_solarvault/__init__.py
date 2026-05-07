@@ -4,6 +4,7 @@ from datetime import timedelta
 import logging
 from pathlib import Path
 import shutil
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -22,10 +23,12 @@ from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_DEBUG_PAYLOAD_LOG,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_DEBUG_PAYLOAD_LOG,
     DEFAULT_SCAN_INTERVAL_SEC,
@@ -34,6 +37,7 @@ from .const import (
     PAYLOAD_DEBUG_LOG_FILENAME,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
+    SAVINGS_DETAIL_SENSOR_SUFFIXES,
     SERVICE_DELETE_STORM_ALERT,
     SERVICE_FIELD_ALERT_ID,
     SERVICE_FIELD_DEVICE_ID,
@@ -51,7 +55,9 @@ from .const import (
     STALE_HELPER_VENDOR_TOKENS,
     STALE_NET_POWER_SUFFIX,
 )
-from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -204,6 +210,8 @@ def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
 
 def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
     """Return runtime coordinators for loaded Jackery config entries."""
+    from .coordinator import JackerySolarVaultCoordinator
+
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -331,6 +339,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up Jackery SolarVault from a config entry."""
+    from .coordinator import JackerySolarVaultCoordinator
+
     # Clean up the previous payload-debug log if the user has not opted in.
     _async_purge_stale_payload_debug_log(hass, entry)
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
@@ -350,6 +360,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ):
         await _async_remove_calculated_power_sensors(hass, entry)
+    if not _entry_bool_option(
+        entry,
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    ):
+        await _async_remove_savings_detail_sensors(hass, entry)
     await _async_remove_duplicate_binary_sensors(hass, entry)
     session = async_get_clientsession(hass)
 
@@ -478,6 +494,25 @@ async def _async_remove_calculated_power_sensors(
             registry.async_remove(ent.entity_id)
 
 
+async def _async_remove_savings_detail_sensors(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Remove optional savings-calculation detail sensors when disabled."""
+    registry = er.async_get(hass)
+    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
+        uid = ent.unique_id or ""
+        if ent.domain == "sensor" and any(
+            uid.endswith(suffix) for suffix in SAVINGS_DETAIL_SENSOR_SUFFIXES
+        ):
+            _LOGGER.info(
+                "Removing disabled savings detail sensor %s (%s)",
+                ent.entity_id,
+                ent.unique_id,
+            )
+            registry.async_remove(ent.entity_id)
+
+
 async def _async_remove_duplicate_binary_sensors(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -541,6 +576,8 @@ async def _async_update_listener(
 
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
+    from .coordinator import JackerySolarVaultCoordinator
+
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()

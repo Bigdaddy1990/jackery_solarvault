@@ -119,12 +119,12 @@ from .const import (
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_META,
+    APP_SAVINGS_CALC_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
-    APP_SAVINGS_CALC_META,
     APP_STAT_PV1_ENERGY,
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
@@ -145,6 +145,7 @@ from .const import (
     APP_TOTAL_GUARD_META,
     APP_YEAR_BACKFILL_META,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CT_ATTRIBUTE_FIELDS,
     CT_NEGATIVE_PHASE_POWER_FIELDS,
@@ -155,6 +156,7 @@ from .const import (
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_STORM_WARNING_MINUTES,
     DOMAIN,
@@ -955,6 +957,17 @@ def _period_start(reset_period: StatResetPeriod) -> datetime:
     return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+@dataclass(frozen=True, kw_only=True)
+class JackeryStatSensorDescription(SensorEntityDescription):
+    """Sensor description sourcing from the statistic dict."""
+
+    stat_key: str
+    transform: Callable[[Any], Any] = _identity
+    section: str = PAYLOAD_STATISTIC  # statistic | price | system
+    fallback_sources: tuple[tuple[str, str], ...] = ()
+    reset_period: StatResetPeriod | None = None
+
+
 def _period_from_stat_description(
     description: JackeryStatSensorDescription,
 ) -> StatResetPeriod | None:
@@ -969,17 +982,6 @@ def _period_from_stat_description(
     if key.endswith("_year_energy"):
         return DATE_TYPE_YEAR
     return None
-
-
-@dataclass(frozen=True, kw_only=True)
-class JackeryStatSensorDescription(SensorEntityDescription):
-    """Sensor description sourcing from the statistic dict."""
-
-    stat_key: str
-    transform: Callable[[Any], Any] = _identity
-    section: str = PAYLOAD_STATISTIC  # statistic | price | system
-    fallback_sources: tuple[tuple[str, str], ...] = ()
-    reset_period: StatResetPeriod | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1001,6 +1003,14 @@ class JackerySmartMeterSensorDescription(SensorEntityDescription):
     sum_fields: tuple[str, ...] = ()
     negative_sum_fields: tuple[str, ...] = ()
     transform: Callable[[Any], Any] = _identity
+
+
+@dataclass(frozen=True, kw_only=True)
+class JackerySavingsDetailSensorDescription(SensorEntityDescription):
+    """Sensor description for calculated savings detail values."""
+
+    path: tuple[str, ...]
+    transform: Callable[[Any], Any] = safe_float
 
 
 def _external_chart_metric_key(section: str, stat_key: str) -> str | None:
@@ -1703,6 +1713,137 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
 )
 
 
+SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
+    JackerySavingsDetailSensorDescription, ...
+] = (
+    JackerySavingsDetailSensorDescription(
+        key="savings_calculated_total",
+        translation_key="savings_calculated_total",
+        path=("calculated_total",),
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=CURRENCY_EURO,
+        icon="mdi:cash-check",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_energy",
+        translation_key="savings_energy",
+        path=("energy_kwh",),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:home-lightning-bolt",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_price",
+        translation_key="savings_price",
+        path=("price",),
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
+        icon="mdi:currency-eur",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_pv_year_energy",
+        translation_key="savings_pv_year_energy",
+        path=("source_energy", "pv_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-power-variant",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_device_grid_input_year_energy",
+        translation_key="savings_device_grid_input_year_energy",
+        path=("source_energy", "device_grid_side_input_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_device_grid_output_year_energy",
+        translation_key="savings_device_grid_output_year_energy",
+        path=("source_energy", "device_grid_side_output_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_device_grid_net_output_year_energy",
+        translation_key="savings_device_grid_net_output_year_energy",
+        path=("source_energy", "device_grid_side_net_output_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_basis_ac_year_energy",
+        translation_key="savings_basis_ac_year_energy",
+        path=("source_energy", "savings_basis_ac_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:home-import-outline",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_home_consumption_year_energy",
+        translation_key="savings_home_consumption_year_energy",
+        path=("source_energy", "home_consumption_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:home-lightning-bolt",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_ct_public_export_year_energy",
+        translation_key="savings_ct_public_export_year_energy",
+        path=("source_energy", "ct_public_export_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_battery_charge_year_energy",
+        translation_key="savings_battery_charge_year_energy",
+        path=("source_energy", "battery_charge_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:battery-arrow-up",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_battery_discharge_year_energy",
+        translation_key="savings_battery_discharge_year_energy",
+        path=("source_energy", "battery_discharge_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:battery-arrow-down",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_battery_loss_year_energy",
+        translation_key="savings_battery_loss_year_energy",
+        path=("source_energy", "battery_charge_discharge_gap_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:battery-alert-variant-outline",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_pv_not_savings_year_energy",
+        translation_key="savings_pv_not_savings_year_energy",
+        path=("source_energy", "pv_not_savings_ac_energy_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-power-variant-outline",
+    ),
+)
+
+
 BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...] = (
     JackeryBatteryPackSensorDescription(
         key="soc",
@@ -1874,6 +2015,129 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
 )
 
 
+class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
+    """Expose one intermediate value from the total-savings calculation."""
+
+    entity_description: JackerySavingsDetailSensorDescription
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        description: JackerySavingsDetailSensorDescription,
+    ) -> None:
+        """Initialise the entity from the coordinator and description."""
+        super().__init__(coordinator, device_id, description.key)
+        self.entity_description = description
+        self._attr_translation_key = description.translation_key
+        self._attr_device_class = description.device_class
+        self._attr_state_class = description.state_class
+        self._attr_native_unit_of_measurement = description.native_unit_of_measurement
+        self._attr_icon = description.icon
+
+    @property
+    def _calculation(self) -> dict[str, Any]:
+        savings = (self._statistic or {}).get(APP_SAVINGS_CALC_META)
+        return savings if isinstance(savings, dict) else {}
+
+    @property
+    def native_value(self) -> Any:
+        """Return the selected calculated value."""
+        raw: Any = self._calculation
+        for key in self.entity_description.path:
+            if not isinstance(raw, dict):
+                return None
+            raw = raw.get(key)
+        if raw is None:
+            return None
+        value = self.entity_description.transform(raw)
+        if self.entity_description.key == "savings_price" and isinstance(value, float):
+            return round(value, 5)
+        return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return calculation context for diagnostics."""
+        calculation = self._calculation
+        return {
+            "source_section": PAYLOAD_STATISTIC,
+            "source_key": APP_SAVINGS_CALC_META,
+            "source_path": ".".join(self.entity_description.path),
+            "method": calculation.get("method"),
+            "price_source": calculation.get("price_source"),
+            "published_value_source": calculation.get("published_value_source"),
+            "decision": calculation.get("decision"),
+        }
+
+
+class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
+    """Live estimated unassigned conversion/loss power from the power balance."""
+
+    _attr_translation_key = "conversion_loss_power"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_icon = "mdi:transmission-tower-off"
+
+    def __init__(
+        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+    ) -> None:
+        """Initialise the entity from the coordinator and description."""
+        super().__init__(coordinator, device_id, "conversion_loss_power")
+
+    def _components(self) -> dict[str, float | None]:
+        props = self._properties
+        ct = self._payload.get(PAYLOAD_CT_METER) or {}
+        if not isinstance(ct, dict):
+            ct = {}
+        home = jackery_corrected_home_consumption_power(ct, props)
+        return {
+            "pv_power": safe_float(props.get(FIELD_PV_PW)),
+            "battery_charge_power": safe_float(props.get(FIELD_BAT_IN_PW)),
+            "battery_discharge_power": safe_float(props.get(FIELD_BAT_OUT_PW)),
+            "grid_side_input_power": safe_float(jackery_grid_side_input_power(props)),
+            "grid_side_output_power": safe_float(jackery_grid_side_output_power(props)),
+            "home_consumption_power": home.value if home is not None else None,
+        }
+
+    @property
+    def native_value(self) -> float | None:
+        """Return estimated positive residual power."""
+        c = self._components()
+        required = (
+            c["pv_power"],
+            c["battery_charge_power"],
+            c["battery_discharge_power"],
+            c["grid_side_input_power"],
+            c["grid_side_output_power"],
+            c["home_consumption_power"],
+        )
+        if any(value is None for value in required):
+            return None
+        produced = (
+            c["pv_power"] + c["battery_discharge_power"] + c["grid_side_input_power"]
+        )
+        consumed = (
+            c["home_consumption_power"]
+            + c["battery_charge_power"]
+            + c["grid_side_output_power"]
+        )
+        return round(max(0.0, produced - consumed), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return formula and source components."""
+        return {
+            "formula": (
+                "max(pv_power + battery_discharge_power + grid_side_input_power "
+                "- home_consumption_power - battery_charge_power "
+                "- grid_side_output_power, 0)"
+            ),
+            "scope": "estimated residual from mixed AC/DC live power fields",
+            **self._components(),
+        }
+
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
@@ -1901,6 +2165,15 @@ async def async_setup_entry(
             entry.data.get(
                 CONF_CREATE_CALCULATED_POWER_SENSORS,
                 DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+            ),
+        )
+    )
+    create_savings_details = bool(
+        entry.options.get(
+            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+            entry.data.get(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
             ),
         )
     )
@@ -1932,6 +2205,17 @@ async def async_setup_entry(
             _append_unique(JackeryBatteryNetPowerSensor(coordinator, dev_id))
             _append_unique(JackeryBatteryStackNetPowerSensor(coordinator, dev_id))
             _append_unique(JackeryGridNetPowerSensor(coordinator, dev_id))
+
+        if create_savings_details:
+            savings_meta = (payload.get(PAYLOAD_STATISTIC) or {}).get(
+                APP_SAVINGS_CALC_META
+            )
+            if isinstance(savings_meta, dict):
+                for savings_desc in SAVINGS_DETAIL_SENSOR_DESCRIPTIONS:
+                    _append_unique(
+                        JackerySavingsDetailSensor(coordinator, dev_id, savings_desc)
+                    )
+            _append_unique(JackeryConversionLossPowerSensor(coordinator, dev_id))
 
         # Alarm sensor (even if empty, useful to see "0 active alarms")
         if payload.get(PAYLOAD_ALARM) is not None:

@@ -192,3 +192,7 @@ Envía informes de errores y solicitudes de funciones mediante [GitHub Issues](h
 ## Licencia
 
 Licencia MIT. Ver [LICENSE](../LICENSE).
+
+## Calculation details
+
+Savings calculation and cloud-value guards are documented in [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md).

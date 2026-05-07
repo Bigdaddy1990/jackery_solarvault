@@ -133,7 +133,7 @@ calculation uses `device_home_stat_year.totalOutGridEnergy`, optional
 `device_home_stat_year.totalInGridEnergy`, optional
 `device_ct_stat_year.totalOutCtEnergy`, `home_trends_year.totalHomeEgy`, and
 `price.singlePrice`; details are exposed on the entity as
-`savings_calculation`.
+`savings_calculation`. Optional detail entities expose each `_savings_calculation` component using the stable `savings_*` keys, plus `conversion_loss_power` as a live estimated residual from the power balance.
 
 ## Smart-Meter / CT live values (MQTT only)
 

@@ -11,6 +11,15 @@ context.
 
 ## [Unreleased]
 
+### Added
+- Optional savings-calculation detail sensors expose calculated savings, self-consumed AC energy, price, grid-side energy, home consumption, export, battery charge/discharge gap and estimated live loss power.
+- Setup/options now include a dedicated switch for the savings calculation detail entities.
+
+### Changed
+- Removed the raw payload debug log checkbox from setup/options; debugging should use Home Assistant logging controls.
+- Normalized German/English entity names for house consumption, battery discharge and PV yield sensors.
+- Renamed `docs/Werte aus APP-Cloud.md` to `docs/APP_CLOUD_VALUES.md` and linked it from the READMEs.
+
 ## [2.3.3] - 2026-05-05
 
 ### Fixed

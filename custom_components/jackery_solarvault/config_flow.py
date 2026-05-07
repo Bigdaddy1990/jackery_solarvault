@@ -15,11 +15,11 @@ import voluptuous as vol
 from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_DEBUG_PAYLOAD_LOG,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_DEBUG_PAYLOAD_LOG,
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
@@ -51,7 +51,64 @@ USER_SCHEMA = vol.Schema({
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         default=DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ): bool,
+    vol.Optional(
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        default=DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    ): bool,
 })
+
+
+class JackeryOptionsFlow(OptionsFlow):
+    """Handle the Jackery SolarVault jackery options flow."""
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        """Initialise the entity from the coordinator and description."""
+        self._entry = entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Step init."""
+        if user_input is not None:
+            clean = {k: v for k, v in user_input.items() if v not in (None, "")}
+            return self.async_create_entry(title="", data=clean)
+
+        current_create_derived = self._entry.options.get(
+            CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+            self._entry.data.get(
+                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+            ),
+        )
+        current_create_calculated_power = self._entry.options.get(
+            CONF_CREATE_CALCULATED_POWER_SENSORS,
+            self._entry.data.get(
+                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+            ),
+        )
+        current_create_savings_details = self._entry.options.get(
+            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+            self._entry.data.get(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+            ),
+        )
+        schema = vol.Schema({
+            vol.Optional(
+                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                default=current_create_derived,
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                default=current_create_calculated_power,
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                default=current_create_savings_details,
+            ): bool,
+        })
+        return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
 
 class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -109,6 +166,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_CREATE_CALCULATED_POWER_SENSORS: user_input.get(
                             CONF_CREATE_CALCULATED_POWER_SENSORS,
                             DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+                        ),
+                        CONF_CREATE_SAVINGS_DETAIL_SENSORS: user_input.get(
+                            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
                         ),
                     },
                 )
@@ -178,57 +239,3 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(entry: ConfigEntry) -> JackeryOptionsFlow:
         """Return the options flow handler for this entry."""
         return JackeryOptionsFlow(entry)
-
-
-class JackeryOptionsFlow(OptionsFlow):
-    """Handle the Jackery SolarVault jackery options flow."""
-
-    def __init__(self, entry: ConfigEntry) -> None:
-        """Initialise the entity from the coordinator and description."""
-        self._entry = entry
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Step init."""
-        if user_input is not None:
-            clean = {k: v for k, v in user_input.items() if v not in (None, "")}
-            return self.async_create_entry(title="", data=clean)
-
-        current_create_derived = self._entry.options.get(
-            CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-            ),
-        )
-        current_create_calculated_power = self._entry.options.get(
-            CONF_CREATE_CALCULATED_POWER_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-            ),
-        )
-        current_debug_payload_log = self._entry.options.get(
-            CONF_DEBUG_PAYLOAD_LOG,
-            DEFAULT_DEBUG_PAYLOAD_LOG,
-        )
-        schema = vol.Schema({
-            vol.Optional(
-                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                default=current_create_derived,
-            ): bool,
-            vol.Optional(
-                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                default=current_create_calculated_power,
-            ): bool,
-            # Off by default. When False the integration deletes any
-            # leftover JSONL on the next setup. Only enable when actively
-            # debugging a parser/source bug; the file grows ~2 MB/day
-            # of Jackery telemetry on a typical SolarVault.
-            vol.Optional(
-                CONF_DEBUG_PAYLOAD_LOG,
-                default=current_debug_payload_log,
-            ): bool,
-        })
-        return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)

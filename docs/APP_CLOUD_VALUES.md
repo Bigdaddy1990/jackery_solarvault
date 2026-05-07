@@ -1,3 +1,5 @@
+# Jackery App Cloud Values
+
 falsch:
 
 PV Gesamt Jahr: 4=0kWh 5=81,51kWh
@@ -75,7 +77,9 @@ Absicherung in der Integration:
   Gesamtwerte tragen `_total_lower_bound_guard`, damit Diagnoseexporte Rohwert,
   korrigierten Wert und Quelle nachvollziehbar zeigen.
 - Der Ersparnis-Sensor traegt `_savings_calculation` mit Formel, Rohwert,
-  veroeffentlichtem Wert und den verwendeten Energiekomponenten.
+  veroeffentlichtem Wert und den verwendeten Energiekomponenten. Optional
+  koennen diese Zwischenwerte und die geschaetzte aktuelle Verlustleistung als
+  eigene Home-Assistant-Entitaeten aktiviert werden.
 
 
 
