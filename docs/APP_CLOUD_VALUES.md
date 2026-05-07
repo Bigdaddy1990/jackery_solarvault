@@ -80,9 +80,3 @@ Absicherung in der Integration:
   veroeffentlichtem Wert und den verwendeten Energiekomponenten. Optional
   koennen diese Zwischenwerte und die geschaetzte aktuelle Verlustleistung als
   eigene Home-Assistant-Entitaeten aktiviert werden.
-
-
-
-
-
-

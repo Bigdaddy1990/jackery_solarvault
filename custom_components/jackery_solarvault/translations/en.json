@@ -229,6 +229,9 @@
       "charge_plan_power": {
         "name": "Charge plan power"
       },
+      "conversion_loss_power": {
+        "name": "Estimated loss power"
+      },
       "country_code": {
         "name": "Country code"
       },
@@ -299,7 +302,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -308,13 +311,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -451,6 +454,48 @@
       "reboot_flag": {
         "name": "Reboot flag"
       },
+      "savings_basis_ac_year_energy": {
+        "name": "Savings basis AC yearly energy"
+      },
+      "savings_battery_charge_year_energy": {
+        "name": "Battery charge yearly energy (calculation)"
+      },
+      "savings_battery_discharge_year_energy": {
+        "name": "Battery discharge yearly energy (calculation)"
+      },
+      "savings_battery_loss_year_energy": {
+        "name": "Battery loss yearly energy"
+      },
+      "savings_calculated_total": {
+        "name": "Calculated savings"
+      },
+      "savings_ct_public_export_year_energy": {
+        "name": "Public export yearly energy"
+      },
+      "savings_device_grid_input_year_energy": {
+        "name": "Device grid input yearly energy"
+      },
+      "savings_device_grid_net_output_year_energy": {
+        "name": "Device grid net output yearly energy"
+      },
+      "savings_device_grid_output_year_energy": {
+        "name": "Device grid output yearly energy"
+      },
+      "savings_energy": {
+        "name": "Self-consumed AC energy"
+      },
+      "savings_home_consumption_year_energy": {
+        "name": "Home consumption yearly energy (calculation)"
+      },
+      "savings_price": {
+        "name": "Savings price"
+      },
+      "savings_pv_not_savings_year_energy": {
+        "name": "PV energy not counted as savings"
+      },
+      "savings_pv_year_energy": {
+        "name": "PV yield yearly energy"
+      },
       "smart_meter_export_month_energy": {
         "name": "Monthly smart-meter grid export"
       },
@@ -548,7 +593,7 @@
         "name": "Home consumption today"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "PV yield total"
@@ -558,51 +603,6 @@
       },
       "weather_plan": {
         "name": "Weather plan"
-      },
-      "conversion_loss_power": {
-        "name": "Estimated loss power"
-      },
-      "savings_basis_ac_year_energy": {
-        "name": "Savings basis AC yearly energy"
-      },
-      "savings_battery_charge_year_energy": {
-        "name": "Battery charge yearly energy (calculation)"
-      },
-      "savings_battery_discharge_year_energy": {
-        "name": "Battery discharge yearly energy (calculation)"
-      },
-      "savings_battery_loss_year_energy": {
-        "name": "Battery loss yearly energy"
-      },
-      "savings_calculated_total": {
-        "name": "Calculated savings"
-      },
-      "savings_ct_public_export_year_energy": {
-        "name": "Public export yearly energy"
-      },
-      "savings_device_grid_input_year_energy": {
-        "name": "Device grid input yearly energy"
-      },
-      "savings_device_grid_net_output_year_energy": {
-        "name": "Device grid net output yearly energy"
-      },
-      "savings_device_grid_output_year_energy": {
-        "name": "Device grid output yearly energy"
-      },
-      "savings_energy": {
-        "name": "Self-consumed AC energy"
-      },
-      "savings_home_consumption_year_energy": {
-        "name": "Home consumption yearly energy (calculation)"
-      },
-      "savings_price": {
-        "name": "Savings price"
-      },
-      "savings_pv_not_savings_year_energy": {
-        "name": "PV energy not counted as savings"
-      },
-      "savings_pv_year_energy": {
-        "name": "PV yield yearly energy"
       },
       "wifi_ip": {
         "name": "IP address"
