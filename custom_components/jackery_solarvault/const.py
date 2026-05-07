@@ -115,18 +115,6 @@ CONF_REGION_CODE: Final = "region_code"
 CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
 CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
-# Explicit opt-in for the raw payload-debug JSONL writer.
-# Default: False. The previous gating via `_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)`
-# was unreliable: `_PAYLOAD_DEBUG_LOGGER` lives under
-# `custom_components.jackery_solarvault.payload_debug` and inherits its
-# effective level from any ancestor that the user sets to DEBUG (e.g.
-# enabling debug logging for the integration as a whole). With this
-# explicit option the JSONL is only written when the user actively
-# checks the box in the integration's options — turning DEBUG on for
-# the integration logger no longer triggers MB-sized files in the HA
-# config root.
-CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"
-DEFAULT_DEBUG_PAYLOAD_LOG: Final = False
 
 
 # Config-flow step, error and abort identifiers.

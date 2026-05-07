@@ -61,7 +61,6 @@ from .const import (
     APP_STAT_TOTAL_SOLAR_ENERGY,
     BATTERY_PACK_HINT_KEYS,
     BATTERY_PACK_STALE_THRESHOLD_SEC,
-    CONF_DEBUG_PAYLOAD_LOG,
     CT_METER_KEYS,
     DATA_QUALITY_KEY_LABEL,
     DATA_QUALITY_KEY_METRIC_KEY,
@@ -70,7 +69,6 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
-    DEFAULT_DEBUG_PAYLOAD_LOG,
     DOMAIN,
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
@@ -435,17 +433,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         sites avoid building the event when DEBUG is disabled — the most
         important hot-path optimization on the per-MQTT-message path.
         """
-        # Hard gate on an explicit user opt-in. We deliberately do NOT
-        # use `_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)` here: the
-        # payload_debug logger sits below
-        # `custom_components.jackery_solarvault.*` and silently inherits
-        # any DEBUG level the user sets on the parent integration logger
-        # — which led to multi-MB JSONL files in the HA config root the
-        # moment a user enabled debug logging for unrelated reasons.
-        # The opt-in is exposed in the integration's options flow.
-        if not self.entry.options.get(
-            CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG
-        ):
+        # Hard gate on an explicitly configured payload-debug logger. Do not
+        # use ``isEnabledFor(DEBUG)``: this child logger would inherit DEBUG
+        # from the parent integration logger and unexpectedly create JSONL
+        # files when users only enabled normal HA debug logging. Requiring a
+        # concrete DEBUG level on this exact logger keeps diagnostics available
+        # through HA logging controls without keeping a hidden options toggle.
+        if _PAYLOAD_DEBUG_LOGGER.level != logging.DEBUG:
             return
         event = (
             event_or_factory() if callable(event_or_factory) else dict(event_or_factory)
@@ -769,8 +763,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         payload: dict[str, Any],
     ) -> None:
         """Merge inbound MQTT payloads into coordinator data and push update."""
-        # Lazy-built event: when the dedicated payload_debug logger is not at
-        # DEBUG level, the factory is never called — saving the
+        # Lazy-built event: when the dedicated payload_debug logger is not
+        # explicitly at DEBUG level, the factory is never called — saving the
         # ``chart_series_debug`` walk on the per-MQTT-message hot path.
         await self._async_payload_debug_event(
             lambda: {

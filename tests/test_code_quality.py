@@ -1346,22 +1346,13 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
         )
 
 
-def test_payload_debug_file_is_gated_by_explicit_user_optin() -> None:
-    """Raw payload logging must require an explicit user opt-in.
+def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
+    """Raw payload logging must use HA logger controls without a stale option.
 
-    Previous gating via ``_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)``
-    silently inherited the DEBUG level from the parent integration
-    logger, so enabling debug logging for unrelated reasons would
-    start writing multi-MB JSONL files in the HA config root.
-
-    The current contract:
-    1. ``CONF_DEBUG_PAYLOAD_LOG`` exists in const.py and defaults to
-       ``False``.
-    2. ``_async_payload_debug_event`` checks the entry option, NOT the
-       logger level.
-    3. ``__init__.py`` deletes any leftover JSONL on setup when the
-       option is off, so upgrading users immediately stop seeing the
-       file.
+    The setup/options checkbox was removed, but the JSONL writer must still avoid
+    inheriting DEBUG from the parent integration logger. Requiring DEBUG to be
+    set directly on the dedicated payload-debug logger keeps the feature
+    available for diagnostics without a hidden ``debug_payload_log`` option.
     """
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
@@ -1369,21 +1360,18 @@ def test_payload_debug_file_is_gated_by_explicit_user_optin() -> None:
     )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
-    # 1. Constants exist with sane defaults
-    assert 'CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"' in const_source
-    assert "DEFAULT_DEBUG_PAYLOAD_LOG: Final = False" in const_source
+    assert "CONF_DEBUG_PAYLOAD_LOG" not in const_source
+    assert "DEFAULT_DEBUG_PAYLOAD_LOG" not in const_source
+    assert "CONF_DEBUG_PAYLOAD_LOG" not in coordinator_source
+    assert "DEFAULT_DEBUG_PAYLOAD_LOG" not in coordinator_source
+    assert "debug_payload_log" not in init_source
+    assert "_async_purge_stale_payload_debug_log" not in init_source
 
-    # 2. Coordinator gates on entry options, NOT on logger level
-    assert "CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG" in coordinator_source
-    assert "self.entry.options.get(" in coordinator_source
+    assert "_PAYLOAD_DEBUG_LOGGER.level != logging.DEBUG" in coordinator_source
     assert (
         "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):"
         not in coordinator_source
     )
-
-    # 3. Setup-time cleanup of stale JSONL when opt-in is off
-    assert "_async_purge_stale_payload_debug_log" in init_source
-    assert "path.unlink()" in init_source
 
 
 def test_no_direct_blocking_file_io_inside_async_functions() -> None:

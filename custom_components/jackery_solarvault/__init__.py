@@ -25,16 +25,13 @@ from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_DEBUG_PAYLOAD_LOG,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_DEBUG_PAYLOAD_LOG,
     DEFAULT_SCAN_INTERVAL_SEC,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
-    PAYLOAD_DEBUG_LOG_FILENAME,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
@@ -158,48 +155,6 @@ async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
         _LOGGER.info(
             "Jackery: copied cached brand image(s) into local integration brand folder: %s",
             ", ".join(copied),
-        )
-
-
-def _async_purge_stale_payload_debug_log(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> None:
-    """Remove a leftover payload-debug JSONL when the option is now off.
-
-    The previous implementation kept writing the JSONL based on the
-    integration's debug-logger level, which silently inherited from any
-    parent the user enabled. After upgrading to the explicit opt-in,
-    we delete the leftover file once on every setup so the user's HA
-    config root is not polluted with a multi-MB file they never asked
-    for. If the file does not exist, this is a no-op.
-
-    The deletion is best-effort: an OSError just logs at INFO and moves
-    on, never blocking integration setup.
-    """
-    enabled = entry.options.get(CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG)
-    if enabled:
-        return
-    try:
-        candidates = [
-            Path(hass.config.path(PAYLOAD_DEBUG_LOG_FILENAME)),
-            Path(hass.config.path(f"{PAYLOAD_DEBUG_LOG_FILENAME}.1")),
-        ]
-        for path in candidates:
-            if path.is_file():
-                size = path.stat().st_size
-                path.unlink()
-                _LOGGER.info(
-                    "Jackery: removed stale payload-debug log %s (%d bytes). "
-                    "Enable 'debug_payload_log' in the integration options "
-                    "if you want it back.",
-                    path,
-                    size,
-                )
-    except OSError as err:
-        _LOGGER.info(
-            "Jackery: could not remove payload-debug log: %s "
-            "(this does not block setup)",
-            err,
         )
 
 
@@ -341,8 +296,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     """Set up Jackery SolarVault from a config entry."""
     from .coordinator import JackerySolarVaultCoordinator
 
-    # Clean up the previous payload-debug log if the user has not opted in.
-    _async_purge_stale_payload_debug_log(hass, entry)
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
     # longer part of the documented app/HTTP/MQTT data model.
