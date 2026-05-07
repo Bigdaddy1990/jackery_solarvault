@@ -310,6 +310,11 @@ _LOGGER = logging.getLogger(__name__)
 SAVINGS_PRICE_PRECISION = 5
 
 
+def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
+    """Return a boolean option, falling back to setup data then defaults."""
+    return bool(entry.options.get(key, entry.data.get(key, default)))
+
+
 # ---------------------------------------------------------------------------
 # Value extraction helpers
 # ---------------------------------------------------------------------------
@@ -2144,32 +2149,20 @@ async def async_setup_entry(
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[SensorEntity] = []
     seen_unique_ids: set[str] = set()
-    create_smart_meter_derived = bool(
-        entry.options.get(
-            CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-            entry.data.get(
-                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-            ),
-        )
+    create_smart_meter_derived = _entry_bool_option(
+        entry,
+        CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+        DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     )
-    create_calculated_power = bool(
-        entry.options.get(
-            CONF_CREATE_CALCULATED_POWER_SENSORS,
-            entry.data.get(
-                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-            ),
-        )
+    create_calculated_power = _entry_bool_option(
+        entry,
+        CONF_CREATE_CALCULATED_POWER_SENSORS,
+        DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     )
-    create_savings_details = bool(
-        entry.options.get(
-            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-            entry.data.get(
-                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-            ),
-        )
+    create_savings_details = _entry_bool_option(
+        entry,
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     )
 
     def _append_unique(entity: SensorEntity) -> None:

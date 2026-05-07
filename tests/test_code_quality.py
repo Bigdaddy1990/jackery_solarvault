@@ -1360,6 +1360,34 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
     assert ".options.get(" not in options_block
 
 
+def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
+    """Sensor setup should share one fallback path from options/data/defaults."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
+        "# ---------------------------------------------------------------------------\n# Entities",
+        1,
+    )[0]
+
+    assert "def _entry_bool_option(" in sensor_source
+    assert setup_block.count("_entry_bool_option(") == 3
+    assert ".options.get(" not in setup_block
+
+
+def test_no_unresolved_git_merge_conflict_markers() -> None:
+    """Catch real merge conflict markers without flagging reStructuredText tables."""
+    marker_prefixes = ("<<<<<<< ", ">>>>>>> ")
+    for path in pathlib.Path(".").rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            assert not line.startswith(marker_prefixes), f"{path}:{line_number}: {line}"
+            assert line != "=======", f"{path}:{line_number}: {line}"
+
+
 def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
     """Raw payload logging must use HA logger controls without a stale option.
 
