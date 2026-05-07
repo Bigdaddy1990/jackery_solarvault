@@ -307,6 +307,8 @@ from .util import (
 
 _LOGGER = logging.getLogger(__name__)
 
+SAVINGS_PRICE_PRECISION = 5
+
 
 # ---------------------------------------------------------------------------
 # Value extraction helpers
@@ -2052,7 +2054,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
             return None
         value = self.entity_description.transform(raw)
         if self.entity_description.key == "savings_price" and isinstance(value, float):
-            return round(value, 5)
+            return round(value, SAVINGS_PRICE_PRECISION)
         return value
 
     @property
@@ -2104,15 +2106,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return estimated positive residual power."""
         c = self._components()
-        required = (
-            c["pv_power"],
-            c["battery_charge_power"],
-            c["battery_discharge_power"],
-            c["grid_side_input_power"],
-            c["grid_side_output_power"],
-            c["home_consumption_power"],
-        )
-        if any(value is None for value in required):
+        if any(value is None for value in c.values()):
             return None
         produced = (
             c["pv_power"] + c["battery_discharge_power"] + c["grid_side_input_power"]

@@ -40,6 +40,11 @@ def _normalize_account(value: str) -> str:
     return value.strip()
 
 
+def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
+    """Return a boolean option, falling back to setup data then defaults."""
+    return bool(entry.options.get(key, entry.data.get(key, default)))
+
+
 USER_SCHEMA = vol.Schema({
     vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1)),
     vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
@@ -73,26 +78,20 @@ class JackeryOptionsFlow(OptionsFlow):
             clean = {k: v for k, v in user_input.items() if v not in (None, "")}
             return self.async_create_entry(title="", data=clean)
 
-        current_create_derived = self._entry.options.get(
+        current_create_derived = _entry_bool_option(
+            self._entry,
             CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-            ),
+            DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
         )
-        current_create_calculated_power = self._entry.options.get(
+        current_create_calculated_power = _entry_bool_option(
+            self._entry,
             CONF_CREATE_CALCULATED_POWER_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-            ),
+            DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
         )
-        current_create_savings_details = self._entry.options.get(
+        current_create_savings_details = _entry_bool_option(
+            self._entry,
             CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-            ),
+            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
         )
         schema = vol.Schema({
             vol.Optional(

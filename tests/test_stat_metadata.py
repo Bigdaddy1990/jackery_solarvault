@@ -502,6 +502,26 @@ def test_savings_detail_cumulative_energy_sensors_use_total_state_class() -> Non
     assert found["savings_price"] == (None, "MEASUREMENT")
 
 
+def test_savings_price_rounding_uses_named_precision_constant() -> None:
+    """Savings price precision should be named, not an unexplained literal."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+
+    assert "SAVINGS_PRICE_PRECISION = 5" in sensor_source
+    assert "round(value, SAVINGS_PRICE_PRECISION)" in sensor_source
+    assert "round(value, 5)" not in sensor_source
+
+
+def test_conversion_loss_required_component_check_uses_components_values() -> None:
+    """Conversion-loss sensor should validate all component values directly."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("BATTERY_PACK_SENSOR_DESCRIPTIONS", 1)[0]
+
+    assert "if any(value is None for value in c.values()):" in block
+    assert "required = (" not in block
+
+
 def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
     """Implement test non period stat source diagnostics are not overbuilt."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")

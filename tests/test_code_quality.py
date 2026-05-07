@@ -1346,6 +1346,20 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
         )
 
 
+def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
+    """Options defaults should share one fallback path from options/data/defaults."""
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
+    options_block = config_flow_source.split("class JackeryOptionsFlow", 1)[1].split(
+        "class JackeryConfigFlow", 1
+    )[0]
+
+    assert "def _entry_bool_option(" in config_flow_source
+    assert options_block.count("_entry_bool_option(") == 3
+    assert ".options.get(" not in options_block
+
+
 def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
     """Raw payload logging must use HA logger controls without a stale option.
 
