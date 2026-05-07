@@ -14,13 +14,16 @@ context.
 ### Added
 - Optional savings-calculation detail sensors expose calculated savings, self-consumed AC energy, price, grid-side energy, home consumption, export, battery charge/discharge gap and estimated live loss power.
 - Setup/options now include a dedicated switch for the savings calculation detail entities.
+- PV1..PV4 now expose day-energy entities in addition to week, month and year entities.
+- Expansion battery firmware version and serial number are documented as entity values and device-registry metadata when Jackery provides them.
 
 ### Changed
 - Removed the raw payload debug log checkbox from setup/options and the remaining stale option code; payload-debug JSONL now requires the dedicated Home Assistant payload-debug logger to be set explicitly to DEBUG.
 - Normalized German/English entity names for house consumption, battery discharge and PV yield sensors.
-- Renamed `docs/Werte aus APP-Cloud.md` to `docs/APP_CLOUD_VALUES.md` and linked it from the READMEs.
+- Moved the canonical cloud-value documentation to `docs/APP_CLOUD_VALUES.md`, linked it from the READMEs and kept `docs/Werte aus APP-Cloud.md` as a compatibility path.
 
 ### Fixed
+- Restored the missing `parse_utc_datetime` / `utc_now` helpers used by battery-pack stale cleanup so Home Assistant can import the integration again.
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
 - Pre-commit now targets Python 3.14 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.14.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.

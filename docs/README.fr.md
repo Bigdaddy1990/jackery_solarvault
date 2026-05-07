@@ -95,6 +95,8 @@ Les batteries d'extension sont créées séparément de l'appareil principal. Po
 - Puissance de charge
 - Puissance de décharge
 - Version du firmware
+- Numéro de série
+- Version du firmware et numéro de série comme informations d'appareil Home Assistant lorsque disponibles
 - État de communication sous forme d'attributs
 
 ### Smart meter

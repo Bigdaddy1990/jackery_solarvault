@@ -29,9 +29,14 @@ from .const import (
     FLOW_STEP_REAUTH_CONFIRM,
     FLOW_STEP_USER,
 )
-from .util import config_entry_bool_option, normalize_account
+from .util import config_entry_bool_option
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _normalize_account(value: str) -> str:
+    """Normalize user-facing account identifiers before auth and unique IDs."""
+    return value.strip()
 
 
 USER_SCHEMA = vol.Schema({
@@ -115,7 +120,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            account = normalize_account(user_input[CONF_USERNAME])
+            account = _normalize_account(user_input[CONF_USERNAME])
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
                 return self.async_show_form(

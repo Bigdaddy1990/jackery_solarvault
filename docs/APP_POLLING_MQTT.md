@@ -30,7 +30,7 @@ im festen schnellen Polling-Takt abfragen.
 | `/v1/api/alarm` | GET | `systemId` | Alarme/Fehler | langsam, Statistik-Takt |
 | `/v1/device/stat/systemStatistic` | GET | `systemId` | Tages-/Gesamt-KPIs des Systems | langsam, ca. 5 min |
 | `/v1/device/stat/deviceStatistic` | GET | `deviceId` | Geraete-KPIs | langsam, ca. 5 min |
-| `/v1/device/stat/pv` | GET | `deviceId`, `systemId`, `dateType`, `beginDate`, `endDate` | App-nahe PV-Statistiken pro Geraet | langsam, bevorzugte Quelle fuer Woche/Monat/Jahr |
+| `/v1/device/stat/pv` | GET | `deviceId`, `systemId`, `dateType`, `beginDate`, `endDate` | App-nahe PV-Statistiken pro Geraet | langsam, bevorzugte Quelle fuer Tag/Woche/Monat/Jahr |
 | `/v1/device/stat/battery` | GET | `deviceId`, `dateType`, `beginDate`, `endDate` | App-nahe Lade-/Entlade-Statistiken pro Geraet | langsam, bevorzugte Quelle fuer Woche/Monat/Jahr |
 | `/v1/device/stat/onGrid` | GET | `deviceId`, `dateType`, `beginDate`, `endDate` | App-nahe Geraete-Netzseite Eingang/Ausgang pro Geraet. Das ist nicht automatisch oeffentlicher Netzbezug/Netzeinspeisung. | langsam, bevorzugte Quelle fuer Geraete-Netzseite Woche/Monat/Jahr |
 | `/v1/device/stat/ct` | GET | `deviceId` = Smart-Meter-/CT-Zubehoer-ID, `dateType`, `beginDate`, `endDate` | App-nahe CT/Smart-Meter Bezug-/Einspeisung-Statistiken | langsam, bevorzugte Quelle fuer Smart-Meter-Statistiken Woche/Monat/Jahr |

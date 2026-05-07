@@ -1221,6 +1221,19 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         icon="mdi:solar-power-variant",
     ),
     # --- APP_POLLING_MQTT.md: /v1/device/stat/pv per-channel totals -----
+    # Source: /v1/device/stat/sys/pv (dateType=day) field APP_STAT_PV1_ENERGY
+    JackeryStatSensorDescription(
+        key="device_pv1_day_energy",
+        translation_key="device_pv1_day_energy",
+        stat_key=APP_STAT_PV1_ENERGY,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-panel",
+    ),
     # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV1_ENERGY
     JackeryStatSensorDescription(
         key="device_pv1_week_energy",
@@ -1257,6 +1270,19 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-panel",
+    ),
+    # Source: /v1/device/stat/sys/pv (dateType=day) field APP_STAT_PV2_ENERGY
+    JackeryStatSensorDescription(
+        key="device_pv2_day_energy",
+        translation_key="device_pv2_day_energy",
+        stat_key=APP_STAT_PV2_ENERGY,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
@@ -1299,6 +1325,19 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
+    # Source: /v1/device/stat/sys/pv (dateType=day) field APP_STAT_PV3_ENERGY
+    JackeryStatSensorDescription(
+        key="device_pv3_day_energy",
+        translation_key="device_pv3_day_energy",
+        stat_key=APP_STAT_PV3_ENERGY,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-panel",
+    ),
     # Source: /v1/device/stat/sys/pv (dateType=week) field APP_STAT_PV3_ENERGY
     JackeryStatSensorDescription(
         key="device_pv3_week_energy",
@@ -1335,6 +1374,19 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:solar-panel",
+    ),
+    # Source: /v1/device/stat/sys/pv (dateType=day) field APP_STAT_PV4_ENERGY
+    JackeryStatSensorDescription(
+        key="device_pv4_day_energy",
+        translation_key="device_pv4_day_energy",
+        stat_key=APP_STAT_PV4_ENERGY,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
@@ -2188,14 +2240,10 @@ async def async_setup_entry(
             _append_unique(JackeryGridNetPowerSensor(coordinator, dev_id))
 
         if create_savings_details:
-            savings_meta = (payload.get(PAYLOAD_STATISTIC) or {}).get(
-                APP_SAVINGS_CALC_META
-            )
-            if isinstance(savings_meta, dict):
-                for savings_desc in SAVINGS_DETAIL_SENSOR_DESCRIPTIONS:
-                    _append_unique(
-                        JackerySavingsDetailSensor(coordinator, dev_id, savings_desc)
-                    )
+            for savings_desc in SAVINGS_DETAIL_SENSOR_DESCRIPTIONS:
+                _append_unique(
+                    JackerySavingsDetailSensor(coordinator, dev_id, savings_desc)
+                )
             _append_unique(JackeryConversionLossPowerSensor(coordinator, dev_id))
 
         # Alarm sensor (even if empty, useful to see "0 active alarms")

@@ -259,41 +259,53 @@
       "device_ongrid_output_year_energy": {
         "name": "Netzseite Ausgang Jahreswert"
       },
+      "device_pv1_day_energy": {
+        "name": "PV1 Tagesenergie"
+      },
       "device_pv1_month_energy": {
-        "name": "PV1 Monatswert"
+        "name": "PV1 Monatsenergie"
       },
       "device_pv1_week_energy": {
-        "name": "PV1 Wochenwert"
+        "name": "PV1 Wochenenergie"
       },
       "device_pv1_year_energy": {
-        "name": "PV1 Jahreswert"
+        "name": "PV1 Jahresenergie"
+      },
+      "device_pv2_day_energy": {
+        "name": "PV2 Tagesenergie"
       },
       "device_pv2_month_energy": {
-        "name": "PV2 Monatswert"
+        "name": "PV2 Monatsenergie"
       },
       "device_pv2_week_energy": {
-        "name": "PV2 Wochenwert"
+        "name": "PV2 Wochenenergie"
       },
       "device_pv2_year_energy": {
-        "name": "PV2 Jahreswert"
+        "name": "PV2 Jahresenergie"
+      },
+      "device_pv3_day_energy": {
+        "name": "PV3 Tagesenergie"
       },
       "device_pv3_month_energy": {
-        "name": "PV3 Monatswert"
+        "name": "PV3 Monatsenergie"
       },
       "device_pv3_week_energy": {
-        "name": "PV3 Wochenwert"
+        "name": "PV3 Wochenenergie"
       },
       "device_pv3_year_energy": {
-        "name": "PV3 Jahreswert"
+        "name": "PV3 Jahresenergie"
+      },
+      "device_pv4_day_energy": {
+        "name": "PV4 Tagesenergie"
       },
       "device_pv4_month_energy": {
-        "name": "PV4 Monatswert"
+        "name": "PV4 Monatsenergie"
       },
       "device_pv4_week_energy": {
-        "name": "PV4 Wochenwert"
+        "name": "PV4 Wochenenergie"
       },
       "device_pv4_year_energy": {
-        "name": "PV4 Jahreswert"
+        "name": "PV4 Jahresenergie"
       },
       "device_today_battery_charge": {
         "name": "Batterieladung heute"
@@ -584,7 +596,7 @@
         "name": "Heute Batterieladung"
       },
       "today_battery_discharge": {
-        "name": "Heute Batterieentladung"
+        "name": "Batterieentladung heute"
       },
       "today_generation": {
         "name": "Heute PV-Ertrag"

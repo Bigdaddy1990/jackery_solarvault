@@ -161,6 +161,26 @@ def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
     }
 
 
+def test_parse_utc_datetime_normalizes_iso_z_and_naive_values() -> None:
+    """Battery-pack stale cleanup needs stable UTC timestamp parsing."""
+    assert util.parse_utc_datetime("2026-05-06T10:23:07Z").isoformat() == (
+        "2026-05-06T10:23:07+00:00"
+    )
+    assert util.parse_utc_datetime(util.datetime(2026, 5, 6, 10, 23, 7)).isoformat() == (
+        "2026-05-06T10:23:07+00:00"
+    )
+
+
+def test_parse_utc_datetime_rejects_invalid_values() -> None:
+    """Invalid pack timestamps should be explicit and recoverable."""
+    try:
+        util.parse_utc_datetime("not-a-time")
+    except ValueError as err:
+        assert "invalid UTC timestamp" in str(err)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_app_month_request_kwargs_builds_explicit_calendar_month() -> None:
     """Historical year backfill must query explicit month ranges."""
     assert util.app_month_request_kwargs(2026, 4) == {

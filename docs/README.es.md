@@ -95,6 +95,8 @@ Las baterías de expansión se crean por separado de la unidad principal. Para c
 - Potencia de carga
 - Potencia de descarga
 - Versión de firmware
+- Número de serie
+- Versión de firmware y número de serie como información del dispositivo de Home Assistant cuando estén disponibles
 - Estado de comunicación como atributos
 
 ### Smart meter

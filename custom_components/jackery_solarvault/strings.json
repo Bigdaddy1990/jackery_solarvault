@@ -173,16 +173,16 @@
         "name": "Battery count"
       },
       "battery_discharge_month_energy": {
-        "name": "Monthly battery discharge"
+        "name": "Battery discharge monthly energy"
       },
       "battery_discharge_power": {
-        "name": "Main battery discharge power"
+        "name": "Battery discharge power"
       },
       "battery_discharge_week_energy": {
-        "name": "Weekly battery discharge"
+        "name": "Battery discharge weekly energy"
       },
       "battery_discharge_year_energy": {
-        "name": "Yearly battery discharge"
+        "name": "Battery discharge yearly energy"
       },
       "battery_net_power": {
         "name": "Main battery net power"
@@ -259,41 +259,53 @@
       "device_ongrid_output_year_energy": {
         "name": "Yearly device on-grid output"
       },
+      "device_pv1_day_energy": {
+        "name": "PV1 daily energy"
+      },
       "device_pv1_month_energy": {
-        "name": "Monthly device PV1"
+        "name": "PV1 monthly energy"
       },
       "device_pv1_week_energy": {
-        "name": "Weekly device PV1"
+        "name": "PV1 weekly energy"
       },
       "device_pv1_year_energy": {
-        "name": "Yearly device PV1"
+        "name": "PV1 yearly energy"
+      },
+      "device_pv2_day_energy": {
+        "name": "PV2 daily energy"
       },
       "device_pv2_month_energy": {
-        "name": "Monthly device PV2"
+        "name": "PV2 monthly energy"
       },
       "device_pv2_week_energy": {
-        "name": "Weekly device PV2"
+        "name": "PV2 weekly energy"
       },
       "device_pv2_year_energy": {
-        "name": "Yearly device PV2"
+        "name": "PV2 yearly energy"
+      },
+      "device_pv3_day_energy": {
+        "name": "PV3 daily energy"
       },
       "device_pv3_month_energy": {
-        "name": "Monthly device PV3"
+        "name": "PV3 monthly energy"
       },
       "device_pv3_week_energy": {
-        "name": "Weekly device PV3"
+        "name": "PV3 weekly energy"
       },
       "device_pv3_year_energy": {
-        "name": "Yearly device PV3"
+        "name": "PV3 yearly energy"
+      },
+      "device_pv4_day_energy": {
+        "name": "PV4 daily energy"
       },
       "device_pv4_month_energy": {
-        "name": "Monthly device PV4"
+        "name": "PV4 monthly energy"
       },
       "device_pv4_week_energy": {
-        "name": "Weekly device PV4"
+        "name": "PV4 weekly energy"
       },
       "device_pv4_year_energy": {
-        "name": "Yearly device PV4"
+        "name": "PV4 yearly energy"
       },
       "device_today_battery_charge": {
         "name": "Device battery charge today"
@@ -362,13 +374,13 @@
         "name": "Home consumption power"
       },
       "home_month_energy": {
-        "name": "Monthly load"
+        "name": "Home consumption monthly energy"
       },
       "home_week_energy": {
-        "name": "Weekly load"
+        "name": "Home consumption weekly energy"
       },
       "home_year_energy": {
-        "name": "Yearly load"
+        "name": "Home consumption yearly energy"
       },
       "last_offline": {
         "name": "Last offline"
@@ -599,7 +611,7 @@
         "name": "PV yield total"
       },
       "total_revenue": {
-        "name": "Total revenue"
+        "name": "Total savings"
       },
       "weather_plan": {
         "name": "Weather plan"

@@ -78,7 +78,7 @@ rules:
   test-coverage:
     status: done
     comment: >-
-      161 source-only unit tests (parser, period contract, MQTT
+      184 source-only unit tests (parser, period contract, MQTT
       protocol, reauth, MQTT stability, battery-pack lifecycle) plus
       HA-fixture tests in tests/ha/ for config-flow and entry setup
       lifecycle. CI separates the two via the ha-fixture-tests job in

@@ -96,6 +96,8 @@ Zusatzbatterien werden getrennt vom Hauptgerät angelegt. Pro erkannter Batterie
 - Ladeleistung
 - Entladeleistung
 - Firmware-Version
+- Seriennummer
+- Firmware-Version und Seriennummer als Home-Assistant-Geräteinformation, wenn verfügbar
 - Kommunikationsstatus als Attribute
 
 ### Smart-Meter

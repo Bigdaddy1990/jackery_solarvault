@@ -2,7 +2,7 @@
 
 import calendar
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import json
 from pathlib import Path
 import re
@@ -121,6 +121,46 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
 def normalize_account(value: str) -> str:
     """Normalize user-facing account identifiers before auth and unique IDs."""
     return value.strip()
+
+
+def utc_now() -> datetime:
+    """Return the current UTC time as a timezone-aware datetime."""
+    return datetime.now(UTC)
+
+
+def parse_utc_datetime(value: Any) -> datetime:
+    """Parse a Jackery timestamp and normalize it to timezone-aware UTC."""
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, int | float) and not isinstance(value, bool):
+        timestamp = float(value)
+        if abs(timestamp) >= 100_000_000_000:
+            timestamp /= 1000
+        try:
+            parsed = datetime.fromtimestamp(timestamp, UTC)
+        except (OSError, OverflowError, ValueError) as err:
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+    elif isinstance(value, str):
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("timestamp must not be empty")
+        with contextlib.suppress(ValueError, OSError, OverflowError):
+            timestamp = float(normalized)
+            if abs(timestamp) >= 100_000_000_000:
+                timestamp /= 1000
+            return datetime.fromtimestamp(timestamp, UTC)
+        if normalized.endswith("Z"):
+            normalized = f"{normalized[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as err:
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+    else:
+        raise ValueError(f"unsupported UTC timestamp: {value!r}")
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def append_unique_entity(

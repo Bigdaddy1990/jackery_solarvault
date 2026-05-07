@@ -96,6 +96,8 @@ Expansion batteries are created separately from the main unit. For each detected
 - Charging power
 - Discharging power
 - Firmware version
+- Serial number
+- Firmware version and serial number as Home Assistant device info, when available
 - Communication status as attributes
 
 ### Smart meter
@@ -198,33 +200,34 @@ MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## Period rules and data quality (verbindliche Regeln)
+## Period rules and data quality
 
 The integration honours the same period boundaries that the Jackery app
 itself uses, localised to the user's Home Assistant timezone:
 
-* **Woche = Montag bis Sonntag** (ISO 8601)
-* **Monat = Kalendermonat** (1. bis Monatsletzter)
-* **Jahr = Kalenderjahr** (1. Januar bis 31. Dezember)
+* **Week = Monday to Sunday** (ISO 8601; German reference: **Woche = Montag bis Sonntag**)
+* **Month = calendar month** (German reference: **Monat = Kalendermonat**)
+* **Year = calendar year** (German reference: **Jahr = Kalenderjahr**)
 
 The integration must never silently fix one period using an unrelated period:
-**keine Wochenwerte zur Reparatur** von Monats- oder Jahres-Totals.
-Für fehlerhafte Jahreswerte sind nur **same-endpoint Monatswerte** aus
-expliziten Monatsabfragen desselben Kalenderjahres erlaubt. Gesamtwerte
-für Erzeugung/CO2 werden damit nur nach oben abgesichert; liefert Jackery
-später korrekte, höhere Lifetime-Werte, gewinnen diese automatisch.
-`Gesamt Ersparnis` ist die Ausnahme: sie wird aus selbst genutzter AC-Energie
-berechnet, damit PV-Ertrag in Euro nicht als Ersparnis gezählt wird. Nicht
-auflösbare Widersprüche erscheinen als Home Assistant **Repair**-Eintrag und
-in der **Diagnose**.
+**weekly values are not used to repair monthly or yearly totals**. For broken
+yearly values, only **same-endpoint monthly values** from explicit monthly
+queries in the same calendar year may be used. Generation and CO2 lifetime
+totals are only guarded upward this way; if Jackery later returns correct,
+higher lifetime values, those values win automatically. `Total savings` is the
+exception: it is calculated from self-consumed AC energy so PV revenue is not
+counted as savings. Contradictions that cannot be resolved are surfaced through
+a Home Assistant **Repair** issue and the diagnostics export (**Diagnose**).
+The German short form used in earlier issue analysis is: **keine Wochenwerte zur Reparatur**;
+for yearly repairs only **same-endpoint Monatswerte** are
+allowed.
 
 ## Diagnostics privacy
 
 Topic paths and account identifiers are redacted in diagnostics and the
 `mqtt_status` payload. The exported topic looks like
-`hb/app/**REDACTED**/` instead of the raw subscription path. Counters
-für **verworfene Payloads** ("dropped messages") werden separat
-mitgeführt.
+`hb/app/**REDACTED**/` instead of the raw subscription path. Counters for
+**dropped payloads** (**verworfene Payloads**) are tracked separately.
 
 ## Raw payload debug logging
 
