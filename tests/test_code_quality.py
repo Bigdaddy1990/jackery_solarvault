@@ -1529,6 +1529,16 @@ def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
         ast.parse(source, filename=str(path), feature_version=(3, 13))
 
 
+def test_pre_commit_python_target_matches_ha_minimum() -> None:
+    """Keep pre-commit autofixes from rewriting code with newer-only syntax."""
+    config = pathlib.Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
+
+    assert "python: python3.13" in config
+    assert "--py313-plus" in config
+    assert "python3.14" not in config
+    assert "--py314-plus" not in config
+
+
 def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
     """Implement test strict work instructions and repair roadmap are present."""
     instructions = pathlib.Path("docs/STRICT_WORK_INSTRUCTIONS.md").read_text(

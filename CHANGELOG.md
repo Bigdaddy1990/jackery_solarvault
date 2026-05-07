@@ -22,6 +22,7 @@ context.
 
 ### Fixed
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
+- Pre-commit now targets Python 3.13 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.13.
 
 ## [2.3.3] - 2026-05-05
 
