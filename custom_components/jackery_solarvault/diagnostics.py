@@ -6,9 +6,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from . import JackeryConfigEntry
 from .const import REDACT_KEYS
 from .coordinator import JackerySolarVaultCoordinator
 
@@ -38,7 +38,7 @@ def _redacted_payload_map(
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Get config entry diagnostics."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data

@@ -31,7 +31,7 @@ from .const import (
     FLOW_STEP_REAUTH_CONFIRM,
     FLOW_STEP_USER,
 )
-from .util import entry_bool_option
+from .util import config_entry_bool_option
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,17 +74,17 @@ class JackeryOptionsFlow(OptionsFlow):
             clean = {k: v for k, v in user_input.items() if v not in (None, "")}
             return self.async_create_entry(title="", data=clean)
 
-        current_create_derived = entry_bool_option(
+        current_create_derived = config_entry_bool_option(
             self._entry,
             CONF_CREATE_SMART_METER_DERIVED_SENSORS,
             DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
         )
-        current_create_calculated_power = entry_bool_option(
+        current_create_calculated_power = config_entry_bool_option(
             self._entry,
             CONF_CREATE_CALCULATED_POWER_SENSORS,
             DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
         )
-        current_create_savings_details = entry_bool_option(
+        current_create_savings_details = config_entry_bool_option(
             self._entry,
             CONF_CREATE_SAVINGS_DETAIL_SENSORS,
             DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,

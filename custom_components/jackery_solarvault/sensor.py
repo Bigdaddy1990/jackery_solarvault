@@ -88,7 +88,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CURRENCY_EURO,
     PERCENTAGE,
@@ -104,6 +103,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from . import JackeryConfigEntry
 from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_LABELS,
@@ -288,6 +288,7 @@ from .util import (
     append_unique_entity,
     calculated_smart_meter_power,
     compact_json,
+    config_entry_bool_option,
     directional_power_value,
     effective_period_total_value,
     effective_trend_series_values,
@@ -2138,24 +2139,24 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[SensorEntity] = []
     seen_unique_ids: set[str] = set()
-    create_smart_meter_derived = entry_bool_option(
+    create_smart_meter_derived = config_entry_bool_option(
         entry,
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     )
-    create_calculated_power = entry_bool_option(
+    create_calculated_power = config_entry_bool_option(
         entry,
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     )
-    create_savings_details = entry_bool_option(
+    create_savings_details = config_entry_bool_option(
         entry,
         CONF_CREATE_SAVINGS_DETAIL_SENSORS,
         DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
