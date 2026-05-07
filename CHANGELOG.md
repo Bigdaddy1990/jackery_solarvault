@@ -23,6 +23,7 @@ context.
 ### Fixed
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
 - Pre-commit now targets Python 3.13 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.13.
+- The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
 
 ## [2.3.3] - 2026-05-05
 

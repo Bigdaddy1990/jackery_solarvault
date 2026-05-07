@@ -6,7 +6,6 @@ from datetime import timedelta
 import logging
 from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -54,9 +53,7 @@ from .const import (
     STALE_HELPER_VENDOR_TOKENS,
     STALE_NET_POWER_SUFFIX,
 )
-
-if TYPE_CHECKING:
-    from .coordinator import JackerySolarVaultCoordinator
+from .coordinator import JackerySolarVaultCoordinator
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -167,8 +164,6 @@ def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
 
 def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
     """Return runtime coordinators for loaded Jackery config entries."""
-    from .coordinator import JackerySolarVaultCoordinator
-
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -296,8 +291,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up Jackery SolarVault from a config entry."""
-    from .coordinator import JackerySolarVaultCoordinator
-
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
     # longer part of the documented app/HTTP/MQTT data model.
@@ -531,8 +524,6 @@ async def _async_update_listener(
 
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
-    from .coordinator import JackerySolarVaultCoordinator
-
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()

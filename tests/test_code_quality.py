@@ -1499,8 +1499,8 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             )
 
 
-def test_init_annotations_are_deferred_for_type_checking_only_coordinator() -> None:
-    """Avoid runtime NameError from coordinator annotations during HA test collection."""
+def test_init_annotations_are_safe_after_pre_commit_autofix() -> None:
+    """Avoid HA collection NameError after pre-commit annotation rewrites."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     init_tree = ast.parse(init_source)
 
@@ -1508,10 +1508,8 @@ def test_init_annotations_are_deferred_for_type_checking_only_coordinator() -> N
     assert isinstance(init_tree.body[1], ast.ImportFrom)
     assert init_tree.body[1].module == "__future__"
     assert any(alias.name == "annotations" for alias in init_tree.body[1].names)
-    assert (
-        "if TYPE_CHECKING:\n    from .coordinator import JackerySolarVaultCoordinator"
-        in init_source
-    )
+    assert "from typing import TYPE_CHECKING" not in init_source
+    assert "from .coordinator import JackerySolarVaultCoordinator" in init_source
     assert (
         "def _loaded_coordinators(hass: HomeAssistant) "
         "-> list[JackerySolarVaultCoordinator]" in init_source
