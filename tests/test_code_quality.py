@@ -1499,6 +1499,25 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             )
 
 
+def test_init_annotations_are_deferred_for_type_checking_only_coordinator() -> None:
+    """Avoid runtime NameError from coordinator annotations during HA test collection."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    init_tree = ast.parse(init_source)
+
+    assert isinstance(init_tree.body[0], ast.Expr)
+    assert isinstance(init_tree.body[1], ast.ImportFrom)
+    assert init_tree.body[1].module == "__future__"
+    assert any(alias.name == "annotations" for alias in init_tree.body[1].names)
+    assert (
+        "if TYPE_CHECKING:\n    from .coordinator import JackerySolarVaultCoordinator"
+        in init_source
+    )
+    assert (
+        "def _loaded_coordinators(hass: HomeAssistant) "
+        "-> list[JackerySolarVaultCoordinator]" in init_source
+    )
+
+
 def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
     """Catch accidental syntax that only works on a different Python branch."""
     for path in _python_sources():
