@@ -160,7 +160,7 @@ class JackeryStandbySwitch(JackeryEntity, SwitchEntity):
         try:
             value = int(raw)
             return value == 1
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return safe_bool(raw)
 
     async def async_turn_on(self, **kwargs) -> None:

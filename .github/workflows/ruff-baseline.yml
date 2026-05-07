@@ -3,7 +3,7 @@ name: Ruff baseline (web only)
 on: { workflow_dispatch: {} }
 permissions: { contents: write }
 env:
-  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.13' }}
 jobs:
   baseline:
     if: >-
