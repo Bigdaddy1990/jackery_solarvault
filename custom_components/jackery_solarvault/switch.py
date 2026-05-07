@@ -1,6 +1,7 @@
 """Switch platform for Jackery SolarVault writable controls."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -93,12 +94,12 @@ class JackeryEpsSwitch(JackeryEntity, SwitchEntity):
         raw = self._properties.get(FIELD_SW_EPS)
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_eps(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_eps(self._device_id, False)
         await self.coordinator.async_request_refresh()
@@ -127,12 +128,12 @@ class JackeryAutoStandbySwitch(JackeryEntity, SwitchEntity):
             return None
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_auto_standby(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_auto_standby(self._device_id, False)
         await self.coordinator.async_request_refresh()
@@ -160,15 +161,15 @@ class JackeryStandbySwitch(JackeryEntity, SwitchEntity):
         try:
             value = int(raw)
             return value == 1
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_standby(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_standby(self._device_id, False)
         await self.coordinator.async_request_refresh()
@@ -197,12 +198,12 @@ class JackeryFollowMeterSwitch(JackeryEntity, SwitchEntity):
             )
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_follow_meter(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_follow_meter(self._device_id, False)
         await self.coordinator.async_request_refresh()
@@ -229,12 +230,12 @@ class JackeryOffGridShutdownSwitch(JackeryEntity, SwitchEntity):
             raw = task_plan_value(self._task_plan, FIELD_OFF_GRID_DOWN)
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_off_grid_shutdown(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_off_grid_shutdown(self._device_id, False)
         await self.coordinator.async_request_refresh()
@@ -263,12 +264,12 @@ class JackeryStormWarningSwitch(JackeryEntity, SwitchEntity):
             raw = task_plan_value(self._task_plan, FIELD_WPS)
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         await self.coordinator.async_set_storm_warning(self._device_id, True)
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         await self.coordinator.async_set_storm_warning(self._device_id, False)
         await self.coordinator.async_request_refresh()

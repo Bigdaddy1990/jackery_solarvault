@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install ruff
         run: python -m pip install ruff
       - name: Lint
@@ -52,11 +52,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install unit-test deps
-        run: python -m pip install pytest pytest-asyncio PyYAML
+        run: python -m pip install mypy pytest pytest-asyncio PyYAML
       - name: Compile integration and tests
         run: python -m compileall -q custom_components tests
+      - name: Type check integration
+        run: python -m mypy custom_components/jackery_solarvault
       - name: Run pure unit tests without HA plugin autoload
         run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p no:cacheprovider -o addopts="" tests/test_*.py
 
@@ -68,7 +70,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install Home Assistant test dependencies
         run: python -m pip install -r requirements-test.txt
       - name: Run HA fixture tests

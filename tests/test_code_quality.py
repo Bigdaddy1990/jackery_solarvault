@@ -1566,20 +1566,19 @@ def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
     for path in _python_sources():
         source = path.read_text(encoding="utf-8")
         ast.parse(source, filename=str(path))
-        # HA 2026 currently runs Python 3.14 in the user's diagnostics, but the
-        # integration should not accidentally depend on 3.14-only syntax while
-        # still being packaged for broad custom-component usage.
-        ast.parse(source, filename=str(path), feature_version=(3, 13))
+        # HA 2026 and this repository target Python 3.14 explicitly. Keep
+        # the parser check aligned with the packaged minimum version.
+        ast.parse(source, filename=str(path), feature_version=(3, 14))
 
 
 def test_pre_commit_python_target_matches_ha_minimum() -> None:
     """Keep pre-commit autofixes from rewriting code with newer-only syntax."""
     config = pathlib.Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
 
-    assert "python: python3.13" in config
-    assert "--py313-plus" in config
-    assert "python3.14" not in config
-    assert "--py314-plus" not in config
+    assert "python: python3.14" in config
+    assert "--py314-plus" in config
+    assert "python3.13" not in config
+    assert "--py313-plus" not in config
 
 
 def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:

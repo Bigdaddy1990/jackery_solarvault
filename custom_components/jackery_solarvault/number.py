@@ -93,44 +93,44 @@ class JackeryNumberDescription(NumberEntityDescription):
 
 async def _set_soc_charge(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the SOC charge limit on a device."""
-    return await coord.async_set_soc_limits(dev_id, charge_limit=value)
+    await coord.async_set_soc_limits(dev_id, charge_limit=value)
 
 
 async def _set_soc_discharge(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the SOC discharge limit on a device."""
-    return await coord.async_set_soc_limits(dev_id, discharge_limit=value)
+    await coord.async_set_soc_limits(dev_id, discharge_limit=value)
 
 
 async def _set_max_feed_grid(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the maximum grid feed-in power on a device."""
-    return await coord.async_set_max_feed_grid(dev_id, value)
+    await coord.async_set_max_feed_grid(dev_id, value)
 
 
 async def _set_max_output_power(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the maximum output power on a device."""
-    return await coord.async_set_max_output_power(dev_id, value)
+    await coord.async_set_max_output_power(dev_id, value)
 
 
 async def _set_default_power(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the default-load power preference on a device."""
-    return await coord.async_set_default_power(dev_id, value)
+    await coord.async_set_default_power(dev_id, value)
 
 
 async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
+) -> None:
     """Set the single-tariff electricity price on a device."""
-    return await coord.async_set_single_price(dev_id, value)
+    await coord.async_set_single_price(dev_id, value)
 
 
 async def _set_max_power_experimental(
