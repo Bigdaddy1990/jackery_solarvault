@@ -17,7 +17,7 @@
     "custom_components.jackery_solarvault",
     "gmqtt"
   ],
-  "quality_scale": "gold",
+  "quality_scale": "platinum",
   "requirements": [
     "gmqtt>=0.7.0"
   ],

@@ -133,6 +133,7 @@ rules:
       MQTT path uses gmqtt directly (not aiohttp). HTTP API uses an
       independently-managed aiohttp session bound to the entry lifecycle.
   strict-typing:
-    status: todo
+    status: done
     comment: >-
-      Annotations present throughout; mypy --strict not yet wired into CI.
+      Source package passes mypy with disallow_untyped_defs and
+      disallow_incomplete_defs enabled for the integration.

@@ -1,7 +1,7 @@
 """DataUpdateCoordinator for Jackery SolarVault."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import date, datetime, timedelta
 import json
@@ -2801,7 +2801,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache: dict[str, tuple[float, Any]],
             cache_key: str,
             ttl_sec: int,
-            fetcher,  # zero-arg async callable
+            fetcher: Callable[[], Awaitable[Any]],
             default: Any,
         ) -> Any:
             """Generic TTL cache helper operating on any dict."""
@@ -2825,7 +2825,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             sys_id: str,
             cache_key: str,
             ttl_sec: int,
-            fetcher,  # callable(sys_id) -> awaitable
+            fetcher: Callable[[str], Awaitable[Any]],
             default: Any,
         ) -> Any:
             """System-scoped TTL cache wrapper."""
