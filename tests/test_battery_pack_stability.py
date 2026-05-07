@@ -97,7 +97,8 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     assert "tuple[list[dict[str, Any]], int, list[int]]" in body, body
     assert "return packs, 0, []" in body, body
     # Cleanup must compute elapsed seconds against now
-    assert "dt_util.utcnow" in body, body
+    assert "utc_now()" in body, body
+    assert "parse_utc_datetime" in body, body
     # Dropped pack indices must be tracked
     assert "dropped_indices" in body, body
 

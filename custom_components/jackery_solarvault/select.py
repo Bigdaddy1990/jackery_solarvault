@@ -4,12 +4,12 @@ import logging
 import re
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import JackeryConfigEntry
 from .const import (
     AUTO_OFF_HOURS,
     DEFAULT_STORM_WARNING_MINUTES,
@@ -183,7 +183,7 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the platform from a config entry."""

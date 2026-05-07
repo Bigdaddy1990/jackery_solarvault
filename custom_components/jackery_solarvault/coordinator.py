@@ -237,8 +237,10 @@ from .util import (
     format_data_quality_warning,
     guard_statistic_totals_from_year,
     normalized_data_quality_warnings,
+    parse_utc_datetime,
     safe_float,
     trend_series_points,
+    utc_now,
     year_payload_appears_current_month_only,
 )
 
@@ -1334,7 +1336,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Packs that were never seen online (no commState) are also
         # tagged once on first discovery to give the stale-cleanup a
         # baseline.
-        now_iso = dt_util.utcnow().isoformat()
+        now_iso = utc_now().isoformat()
         for pack in merged:
             comm_state = str(pack.get(FIELD_COMM_STATE) or "")
             if comm_state == "1" or PACK_FIELD_LAST_SEEN_AT not in pack:
@@ -1367,7 +1369,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         if not packs:
             return packs, 0, []
-        now = dt_util.utcnow()
+        now = utc_now()
         kept: list[dict[str, Any]] = []
         stale = 0
         dropped_indices: list[int] = []
@@ -1378,7 +1380,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 kept.append(pack)
                 continue
             try:
-                seen_at = datetime.fromisoformat(last_seen)
+                seen_at = parse_utc_datetime(last_seen)
             except ValueError:
                 # Corrupt timestamp; keep but rewrite so future passes
                 # have a clean baseline.

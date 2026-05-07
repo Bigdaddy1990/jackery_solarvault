@@ -2,7 +2,7 @@
 
 import calendar
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import json
 from pathlib import Path
 import re
@@ -99,6 +99,28 @@ from .const import (
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
+
+
+def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+    """Return a boolean config-entry option with setup-data fallback."""
+    return bool(entry.options.get(key, entry.data.get(key, default)))
+
+
+def utc_now() -> datetime:
+    """Return the current timezone-aware UTC timestamp.
+
+    Home Assistant deprecated ``dt_util.utcnow()``; keeping UTC stamping here
+    gives coordinator lifecycle code one non-deprecated source of truth.
+    """
+    return datetime.now(UTC)
+
+
+def parse_utc_datetime(value: str) -> datetime:
+    """Parse an ISO timestamp and normalize legacy naive values to UTC."""
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def append_unique_entity(
