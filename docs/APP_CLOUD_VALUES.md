@@ -1,8 +1,4 @@
-# Werte aus APP-Cloud
-
-> Hinweis: Diese Datei bleibt als deutsch benannter Kompatibilitaetspfad erhalten.
-> Der kanonische, verlinkte Pfad ist `docs/APP_CLOUD_VALUES.md`.
-
+# Jackery App Cloud Values
 
 falsch:
 

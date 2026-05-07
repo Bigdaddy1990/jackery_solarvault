@@ -61,6 +61,15 @@ def _state_class_keyword(call: ast.Call) -> str | None:
     return None
 
 
+def _device_class_keyword(call: ast.Call) -> str | None:
+    for keyword in call.keywords:
+        if keyword.arg == "device_class":
+            value = keyword.value
+            if isinstance(value, ast.Attribute):
+                return value.attr
+    return None
+
+
 def _string_tuple_pairs_keyword(
     call: ast.Call,
     name: str,
@@ -91,6 +100,17 @@ def _stat_description_calls() -> list[ast.Call]:
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "JackeryStatSensorDescription"
+    ]
+
+
+def _savings_detail_description_calls() -> list[ast.Call]:
+    tree = ast.parse(SENSOR_PATH.read_text(encoding="utf-8"))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "JackerySavingsDetailSensorDescription"
     ]
 
 
@@ -446,6 +466,60 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
             "this year",
         ):
             assert forbidden not in source
+
+
+def test_savings_detail_cumulative_energy_sensors_use_total_state_class() -> None:
+    """Savings detail kWh sensors are cumulative year/app totals, not measurements."""
+    calls = _savings_detail_description_calls()
+    found: dict[str, tuple[str | None, str | None]] = {}
+    for call in calls:
+        key = _const_keyword(call, "key")
+        if isinstance(key, str):
+            found[key] = (_device_class_keyword(call), _state_class_keyword(call))
+
+    energy_keys = {
+        key
+        for key, (device_class, _state_class) in found.items()
+        if device_class == "ENERGY"
+    }
+    assert energy_keys == {
+        "savings_energy",
+        "savings_pv_year_energy",
+        "savings_device_grid_input_year_energy",
+        "savings_device_grid_output_year_energy",
+        "savings_device_grid_net_output_year_energy",
+        "savings_basis_ac_year_energy",
+        "savings_home_consumption_year_energy",
+        "savings_ct_public_export_year_energy",
+        "savings_battery_charge_year_energy",
+        "savings_battery_discharge_year_energy",
+        "savings_battery_loss_year_energy",
+        "savings_pv_not_savings_year_energy",
+    }
+    for key in energy_keys:
+        assert found[key][1] == "TOTAL", key
+    assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
+    assert found["savings_price"] == (None, "MEASUREMENT")
+
+
+def test_savings_price_rounding_uses_named_precision_constant() -> None:
+    """Savings price precision should be named, not an unexplained literal."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+
+    assert "SAVINGS_PRICE_PRECISION = 5" in sensor_source
+    assert "round(value, SAVINGS_PRICE_PRECISION)" in sensor_source
+    assert "round(value, 5)" not in sensor_source
+
+
+def test_conversion_loss_required_component_check_uses_components_values() -> None:
+    """Conversion-loss sensor should validate all component values directly."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("BATTERY_PACK_SENSOR_DESCRIPTIONS", 1)[0]
+
+    assert "if any(value is None for value in c.values()):" in block
+    assert "required = (" not in block
 
 
 def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:

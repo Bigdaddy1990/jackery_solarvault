@@ -11,6 +11,22 @@ context.
 
 ## [Unreleased]
 
+### Added
+- Optional savings-calculation detail sensors expose calculated savings, self-consumed AC energy, price, grid-side energy, home consumption, export, battery charge/discharge gap and estimated live loss power.
+- Setup/options now include a dedicated switch for the savings calculation detail entities.
+
+### Changed
+- Removed the raw payload debug log checkbox from setup/options and the remaining stale option code; payload-debug JSONL now requires the dedicated Home Assistant payload-debug logger to be set explicitly to DEBUG.
+- Normalized German/English entity names for house consumption, battery discharge and PV yield sensors.
+- Renamed `docs/Werte aus APP-Cloud.md` to `docs/APP_CLOUD_VALUES.md` and linked it from the READMEs.
+
+### Fixed
+- Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
+- Pre-commit now targets Python 3.13 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.13.
+- The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
+- Recorder is now declared as an optional `after_dependencies` manifest entry instead of a required dependency, preventing Home Assistant fixture tests from bootstrapping recorder during config-flow collection.
+- Config-flow entries use the account as the entry title again, and HA fixture login mocks now preserve token side effects while stubbing discovery calls.
+
 ## [2.3.3] - 2026-05-05
 
 ### Fixed

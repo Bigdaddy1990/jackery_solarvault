@@ -1,9 +1,9 @@
 # .github/workflows/ruff-baseline.yml
 name: Ruff baseline (web only)
 on: { workflow_dispatch: {} }
-permissions: { contents: write, pull-requests: write, actions: write, checks: write }
+permissions: { contents: write }
 env:
-  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.13' }}
 jobs:
   baseline:
     if: >-
@@ -21,7 +21,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install --upgrade pip ruff
       - run: |
-          ruff check . --fix all || true
+          ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --add-noqa || true
           ruff check . --extend-select RUF100 --fix || true
@@ -29,9 +29,14 @@ jobs:
           ruff check . --preview || true
           ruff format .
 
-      - uses: peter-evans/create-pull-request@v8
-        with:
-          branch: chore/ruff-baseline
-          title: "chore: ruff baseline (format+fix)"
-          commit-message: "chore: ruff baseline (format+fix)"
-          body: "Automated ruff baseline via GitHub Actions."
+      - name: Commit baseline changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No ruff baseline changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: ruff baseline (format+fix)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

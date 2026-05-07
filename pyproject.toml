@@ -14,15 +14,15 @@ keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "tele
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
-  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
 dynamic = ["version", "dependencies", "optional-dependencies"]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 
 [options]
-python_requires = ">=3.14"
+python_requires = ">=3.13"
 
 [project.urls]
 Homepage = "https://github.com/BigDaddy1990/jackery_solarvault"
@@ -59,7 +59,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py313"
 line-length = 88
 src = ["custom_components", "scripts", "tests"]
 indent-width = 4
@@ -136,7 +136,7 @@ parametrize-values-row-type = "list"
 parametrize-values-type = "list"
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true

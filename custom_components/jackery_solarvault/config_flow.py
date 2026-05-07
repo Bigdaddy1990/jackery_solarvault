@@ -13,11 +13,11 @@ import voluptuous as vol
 from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_DEBUG_PAYLOAD_LOG,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_DEBUG_PAYLOAD_LOG,
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
@@ -38,6 +38,11 @@ def _normalize_account(value: str) -> str:
     return value.strip()
 
 
+def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
+    """Return a boolean option, falling back to setup data then defaults."""
+    return bool(entry.options.get(key, entry.data.get(key, default)))
+
+
 USER_SCHEMA = vol.Schema({
     vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1)),
     vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
@@ -48,6 +53,10 @@ USER_SCHEMA = vol.Schema({
     vol.Optional(
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         default=DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    ): bool,
+    vol.Optional(
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        default=DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     ): bool,
 })
 
@@ -67,23 +76,20 @@ class JackeryOptionsFlow(OptionsFlow):
             clean = {k: v for k, v in user_input.items() if v not in (None, "")}
             return self.async_create_entry(title="", data=clean)
 
-        current_create_derived = self._entry.options.get(
+        current_create_derived = _entry_bool_option(
+            self._entry,
             CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-            ),
+            DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
         )
-        current_create_calculated_power = self._entry.options.get(
+        current_create_calculated_power = _entry_bool_option(
+            self._entry,
             CONF_CREATE_CALCULATED_POWER_SENSORS,
-            self._entry.data.get(
-                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-            ),
+            DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
         )
-        current_debug_payload_log = self._entry.options.get(
-            CONF_DEBUG_PAYLOAD_LOG,
-            DEFAULT_DEBUG_PAYLOAD_LOG,
+        current_create_savings_details = _entry_bool_option(
+            self._entry,
+            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
         )
         schema = vol.Schema({
             vol.Optional(
@@ -94,13 +100,9 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_CREATE_CALCULATED_POWER_SENSORS,
                 default=current_create_calculated_power,
             ): bool,
-            # Off by default. When False the integration deletes any
-            # leftover JSONL on the next setup. Only enable when actively
-            # debugging a parser/source bug; the file grows ~2 MB/day
-            # of Jackery telemetry on a typical SolarVault.
             vol.Optional(
-                CONF_DEBUG_PAYLOAD_LOG,
-                default=current_debug_payload_log,
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                default=current_create_savings_details,
             ): bool,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
@@ -148,7 +150,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
-                    title=f"Jackery ({account})",
+                    title=account,
                     data={
                         CONF_USERNAME: account,
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
@@ -161,6 +163,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_CREATE_CALCULATED_POWER_SENSORS: user_input.get(
                             CONF_CREATE_CALCULATED_POWER_SENSORS,
                             DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+                        ),
+                        CONF_CREATE_SAVINGS_DETAIL_SENSORS: user_input.get(
+                            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
                         ),
                     },
                 )

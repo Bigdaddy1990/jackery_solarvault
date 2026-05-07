@@ -1,10 +1,11 @@
 """Jackery SolarVault integration."""
 
+from __future__ import annotations
+
 from datetime import timedelta
 import logging
 from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -23,18 +24,18 @@ from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_DEBUG_PAYLOAD_LOG,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_DEBUG_PAYLOAD_LOG,
     DEFAULT_SCAN_INTERVAL_SEC,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
-    PAYLOAD_DEBUG_LOG_FILENAME,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
+    SAVINGS_DETAIL_SENSOR_SUFFIXES,
     SERVICE_DELETE_STORM_ALERT,
     SERVICE_FIELD_ALERT_ID,
     SERVICE_FIELD_DEVICE_ID,
@@ -52,9 +53,7 @@ from .const import (
     STALE_HELPER_VENDOR_TOKENS,
     STALE_NET_POWER_SUFFIX,
 )
-
-if TYPE_CHECKING:
-    from .coordinator import JackerySolarVaultCoordinator
+from .coordinator import JackerySolarVaultCoordinator
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -158,48 +157,6 @@ async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
         )
 
 
-def _async_purge_stale_payload_debug_log(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> None:
-    """Remove a leftover payload-debug JSONL when the option is now off.
-
-    The previous implementation kept writing the JSONL based on the
-    integration's debug-logger level, which silently inherited from any
-    parent the user enabled. After upgrading to the explicit opt-in,
-    we delete the leftover file once on every setup so the user's HA
-    config root is not polluted with a multi-MB file they never asked
-    for. If the file does not exist, this is a no-op.
-
-    The deletion is best-effort: an OSError just logs at INFO and moves
-    on, never blocking integration setup.
-    """
-    enabled = entry.options.get(CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG)
-    if enabled:
-        return
-    try:
-        candidates = [
-            Path(hass.config.path(PAYLOAD_DEBUG_LOG_FILENAME)),
-            Path(hass.config.path(f"{PAYLOAD_DEBUG_LOG_FILENAME}.1")),
-        ]
-        for path in candidates:
-            if path.is_file():
-                size = path.stat().st_size
-                path.unlink()
-                _LOGGER.info(
-                    "Jackery: removed stale payload-debug log %s (%d bytes). "
-                    "Enable 'debug_payload_log' in the integration options "
-                    "if you want it back.",
-                    path,
-                    size,
-                )
-    except OSError as err:
-        _LOGGER.info(
-            "Jackery: could not remove payload-debug log: %s "
-            "(this does not block setup)",
-            err,
-        )
-
-
 def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
     """Return a boolean option while preserving older setup-stored values."""
     return bool(entry.options.get(key, entry.data.get(key, default)))
@@ -207,8 +164,6 @@ def _entry_bool_option(entry: ConfigEntry, key: str, default: bool) -> bool:
 
 def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
     """Return runtime coordinators for loaded Jackery config entries."""
-    from .coordinator import JackerySolarVaultCoordinator
-
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -336,10 +291,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up Jackery SolarVault from a config entry."""
-    from .coordinator import JackerySolarVaultCoordinator
-
-    # Clean up the previous payload-debug log if the user has not opted in.
-    _async_purge_stale_payload_debug_log(hass, entry)
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
     # longer part of the documented app/HTTP/MQTT data model.
@@ -357,6 +308,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ):
         await _async_remove_calculated_power_sensors(hass, entry)
+    if not _entry_bool_option(
+        entry,
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    ):
+        await _async_remove_savings_detail_sensors(hass, entry)
     await _async_remove_duplicate_binary_sensors(hass, entry)
     session = async_get_clientsession(hass)
 
@@ -485,6 +442,25 @@ async def _async_remove_calculated_power_sensors(
             registry.async_remove(ent.entity_id)
 
 
+async def _async_remove_savings_detail_sensors(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Remove optional savings-calculation detail sensors when disabled."""
+    registry = er.async_get(hass)
+    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
+        uid = ent.unique_id or ""
+        if ent.domain == "sensor" and any(
+            uid.endswith(suffix) for suffix in SAVINGS_DETAIL_SENSOR_SUFFIXES
+        ):
+            _LOGGER.info(
+                "Removing disabled savings detail sensor %s (%s)",
+                ent.entity_id,
+                ent.unique_id,
+            )
+            registry.async_remove(ent.entity_id)
+
+
 async def _async_remove_duplicate_binary_sensors(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -548,8 +524,6 @@ async def _async_update_listener(
 
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
-    from .coordinator import JackerySolarVaultCoordinator
-
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()

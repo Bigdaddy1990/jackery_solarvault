@@ -27,15 +27,32 @@ def auto_enable_custom_integrations(
 
 @pytest.fixture
 def mock_jackery_login() -> Generator[None]:
-    """Stub the JackeryApi.async_login call across the test.
+    """Stub Jackery auth and discovery calls across the test.
 
-    Avoids hitting the real cloud during config-flow tests and keeps
-    them deterministic. Tests that need to drive specific API
-    responses can override this fixture or patch other API methods
-    on top of it.
+    ``async_login`` normally stores a token that later discovery calls need.
+    The fake keeps that side effect so tests can exercise setup without real
+    cloud I/O.
     """
-    with patch(
-        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
-        return_value=None,
+
+    async def _fake_login(api) -> str:
+        api._token = "test-token"
+        api._mqtt_user_id = "test-user"
+        api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+        api._mqtt_mac_id = api._resolve_login_mac_id()
+        return api._token
+
+    with (
+        patch(
+            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+            new=_fake_login,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
+            return_value=[],
+        ),
+        patch(
+            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
+            return_value=[],
+        ),
     ):
         yield

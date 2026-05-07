@@ -57,6 +57,7 @@ Benötigt werden:
 - Jackery-Cloud Passwort
 - optional: berechnete Smart-Meter-Sensoren aktivieren/deaktivieren
 - optional: berechnete Leistungssensoren aktivieren/deaktivieren
+- optional: Detail-Sensoren zur Ersparnis-Berechnung aktivieren/deaktivieren
 
 Geräte-ID, System-ID, MQTT-macId und Region werden aus den Cloud-/MQTT-Daten abgeleitet und im UI nicht mehr manuell abgefragt.
 
@@ -153,7 +154,7 @@ Details zu den erforderlichen Parametern siehe `services.yaml` oder den HA Dev-T
 - Monat = Kalendermonat.
 - Jahr = Kalenderjahr.
 - Gesamtwerte/Lifetime-Werte für Erzeugung und CO2 kommen aus den dokumentierten App-/HTTP-/MQTT-Gesamtfeldern und werden nur mit expliziten Monatswerten desselben Endpoints abgesichert, wenn Jackery den aktuellen Monat als Jahreswert liefert.
-- `Gesamt Ersparnis` wird wenn möglich aus selbst genutzter AC-Energie berechnet, nicht aus PV-Ertrag in Euro. Ein fehlender, zu niedriger oder PV-Ertrag-förmiger Cloud-Wert wird ersetzt; ein höherer plausibler Cloud-Gesamtwert bleibt erhalten.
+- `Gesamtersparnis` wird wenn möglich aus selbst genutzter AC-Energie berechnet, nicht aus PV-Ertrag in Euro. Ein fehlender, zu niedriger oder PV-Ertrag-förmiger Cloud-Wert wird ersetzt; ein höherer plausibler Cloud-Gesamtwert bleibt erhalten. Aktiviere die Detail-Sensoren zur Ersparnis-Berechnung, um Zwischenwerte und die geschätzte Verlustleistung als Entitäten zu sehen. Details stehen in [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md).
 - Es gibt ausdrücklich keine Wochenwerte zur Reparatur von Monats-, Jahres- oder Gesamtwerten. Monatswerte dürfen nur Jahreswerte desselben Endpoint-Typs und Kalenderjahres absichern.
 - Am Monatsanfang kann der Wochenwert höher als der Monatswert sein, wenn die laufende Woche noch Tage aus dem Vormonat enthält. Das ist kein Fehler.
 - Wenn Jackery widersprüchliche Daten liefert, z. B. Jahreswert kleiner als eine komplett im selben Jahr liegende Woche oder Gesamtertrag kleiner als Jahresertrag, ändert die Integration keine Entity-Werte heimlich. Stattdessen erzeugt sie einen Repair-Hinweis und legt Details im Diagnose-Export unter `data_quality` ab.

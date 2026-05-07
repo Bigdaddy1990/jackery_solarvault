@@ -1,14 +1,14 @@
 {
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
-  "after_dependencies": [],
+  "after_dependencies": [
+    "recorder"
+  ],
   "codeowners": [
     "@Bigdaddy1990"
   ],
   "config_flow": true,
-  "dependencies": [
-    "recorder"
-  ],
+  "dependencies": [],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_push",

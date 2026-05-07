@@ -2,6 +2,7 @@
 
 import ast
 import importlib.util
+import json
 import pathlib
 import re
 import sys
@@ -49,6 +50,16 @@ util = _load_util_module()
 
 def _python_sources() -> list[pathlib.Path]:
     return sorted(CUSTOM_COMPONENT.glob("*.py"))
+
+
+def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
+    """HA fixture collection should not hard-require recorder setup."""
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert "recorder" not in manifest.get("dependencies", [])
+    assert "recorder" in manifest.get("after_dependencies", [])
 
 
 def test_no_duplicate_literal_dict_keys() -> None:
@@ -1048,6 +1059,40 @@ def test_coordinator_imports_all_field_constants_it_references() -> None:
     assert not missing, f"Missing .const imports in coordinator.py: {missing}"
 
 
+def test_coordinator_lazy_imports_mqtt_client_for_collection_without_gmqtt() -> None:
+    """HA config-flow collection should not require optional MQTT deps."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    module_mqtt_imports = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "mqtt_push"
+        and any(alias.name == "JackeryMqttPushClient" for alias in node.names)
+    ]
+    assert module_mqtt_imports == []
+    assert "if TYPE_CHECKING:" in source
+    assert "self._mqtt: JackeryMqttPushClient | None = None" in source
+
+    start_mqtt = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_start_mqtt"
+    )
+    lazy_imports = [
+        node
+        for node in ast.walk(start_mqtt)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "mqtt_push"
+        and any(alias.name == "JackeryMqttPushClient" for alias in node.names)
+    ]
+    assert len(lazy_imports) == 1
+    assert "except ModuleNotFoundError as err:" in source
+    assert 'err.name != "gmqtt"' in source
+    assert "Jackery MQTT push is unavailable because gmqtt is not installed" in source
+
+
 def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -> None:
     """Service IDs may include whitespace in UI/API input, then handlers strip them."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
@@ -1346,22 +1391,55 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
         )
 
 
-def test_payload_debug_file_is_gated_by_explicit_user_optin() -> None:
-    """Raw payload logging must require an explicit user opt-in.
+def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
+    """Options defaults should share one fallback path from options/data/defaults."""
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
+    options_block = config_flow_source.split("class JackeryOptionsFlow", 1)[1].split(
+        "class JackeryConfigFlow", 1
+    )[0]
 
-    Previous gating via ``_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)``
-    silently inherited the DEBUG level from the parent integration
-    logger, so enabling debug logging for unrelated reasons would
-    start writing multi-MB JSONL files in the HA config root.
+    assert "def _entry_bool_option(" in config_flow_source
+    assert options_block.count("_entry_bool_option(") == 3
+    assert ".options.get(" not in options_block
 
-    The current contract:
-    1. ``CONF_DEBUG_PAYLOAD_LOG`` exists in const.py and defaults to
-       ``False``.
-    2. ``_async_payload_debug_event`` checks the entry option, NOT the
-       logger level.
-    3. ``__init__.py`` deletes any leftover JSONL on setup when the
-       option is off, so upgrading users immediately stop seeing the
-       file.
+
+def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
+    """Sensor setup should share one fallback path from options/data/defaults."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
+        "# ---------------------------------------------------------------------------\n# Entities",
+        1,
+    )[0]
+
+    assert "def _entry_bool_option(" in sensor_source
+    assert setup_block.count("_entry_bool_option(") == 3
+    assert ".options.get(" not in setup_block
+
+
+def test_no_unresolved_git_merge_conflict_markers() -> None:
+    """Catch real merge conflict markers without flagging reStructuredText tables."""
+    marker_prefixes = ("<<<<<<< ", ">>>>>>> ")
+    for path in pathlib.Path(".").rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            assert not line.startswith(marker_prefixes), f"{path}:{line_number}: {line}"
+            assert line != "=======", f"{path}:{line_number}: {line}"
+
+
+def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
+    """Raw payload logging must use HA logger controls without a stale option.
+
+    The setup/options checkbox was removed, but the JSONL writer must still avoid
+    inheriting DEBUG from the parent integration logger. Requiring DEBUG to be
+    set directly on the dedicated payload-debug logger keeps the feature
+    available for diagnostics without a hidden ``debug_payload_log`` option.
     """
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
@@ -1369,21 +1447,18 @@ def test_payload_debug_file_is_gated_by_explicit_user_optin() -> None:
     )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
-    # 1. Constants exist with sane defaults
-    assert 'CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"' in const_source
-    assert "DEFAULT_DEBUG_PAYLOAD_LOG: Final = False" in const_source
+    assert "CONF_DEBUG_PAYLOAD_LOG" not in const_source
+    assert "DEFAULT_DEBUG_PAYLOAD_LOG" not in const_source
+    assert "CONF_DEBUG_PAYLOAD_LOG" not in coordinator_source
+    assert "DEFAULT_DEBUG_PAYLOAD_LOG" not in coordinator_source
+    assert "debug_payload_log" not in init_source
+    assert "_async_purge_stale_payload_debug_log" not in init_source
 
-    # 2. Coordinator gates on entry options, NOT on logger level
-    assert "CONF_DEBUG_PAYLOAD_LOG, DEFAULT_DEBUG_PAYLOAD_LOG" in coordinator_source
-    assert "self.entry.options.get(" in coordinator_source
+    assert "_PAYLOAD_DEBUG_LOGGER.level != logging.DEBUG" in coordinator_source
     assert (
         "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):"
         not in coordinator_source
     )
-
-    # 3. Setup-time cleanup of stale JSONL when opt-in is off
-    assert "_async_purge_stale_payload_debug_log" in init_source
-    assert "path.unlink()" in init_source
 
 
 def test_no_direct_blocking_file_io_inside_async_functions() -> None:
@@ -1469,6 +1544,23 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             )
 
 
+def test_init_annotations_are_safe_after_pre_commit_autofix() -> None:
+    """Avoid HA collection NameError after pre-commit annotation rewrites."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    init_tree = ast.parse(init_source)
+
+    assert isinstance(init_tree.body[0], ast.Expr)
+    assert isinstance(init_tree.body[1], ast.ImportFrom)
+    assert init_tree.body[1].module == "__future__"
+    assert any(alias.name == "annotations" for alias in init_tree.body[1].names)
+    assert "from typing import TYPE_CHECKING" not in init_source
+    assert "from .coordinator import JackerySolarVaultCoordinator" in init_source
+    assert (
+        "def _loaded_coordinators(hass: HomeAssistant) "
+        "-> list[JackerySolarVaultCoordinator]" in init_source
+    )
+
+
 def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
     """Catch accidental syntax that only works on a different Python branch."""
     for path in _python_sources():
@@ -1478,6 +1570,16 @@ def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
         # integration should not accidentally depend on 3.14-only syntax while
         # still being packaged for broad custom-component usage.
         ast.parse(source, filename=str(path), feature_version=(3, 13))
+
+
+def test_pre_commit_python_target_matches_ha_minimum() -> None:
+    """Keep pre-commit autofixes from rewriting code with newer-only syntax."""
+    config = pathlib.Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
+
+    assert "python: python3.13" in config
+    assert "--py313-plus" in config
+    assert "python3.14" not in config
+    assert "--py314-plus" not in config
 
 
 def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
@@ -1539,6 +1641,18 @@ def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
     assert not pathlib.Path("brands/logo.svg").exists()
     assert "logo.svg" not in readme
     assert "/homeassistant/.cache/brands/integrations/jackery/" in readme
+
+
+def test_legacy_app_cloud_values_doc_path_is_preserved() -> None:
+    """Keep the old German doc path available while README links use the new path."""
+    legacy = pathlib.Path("docs/Werte aus APP-Cloud.md")
+    canonical = pathlib.Path("docs/APP_CLOUD_VALUES.md")
+
+    assert legacy.is_file()
+    assert canonical.is_file()
+    legacy_text = legacy.read_text(encoding="utf-8")
+    assert "docs/APP_CLOUD_VALUES.md" in legacy_text
+    assert "Berechnung fuer `systemStatistic.totalRevenue`" in legacy_text
 
 
 def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:

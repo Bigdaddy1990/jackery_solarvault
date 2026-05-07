@@ -192,3 +192,7 @@ Veuillez soumettre les rapports de bugs et les demandes de fonctionnalités via 
 ## Licence
 
 Licence MIT. Voir [LICENSE](../LICENSE).
+
+## Calculation details
+
+Savings calculation and cloud-value guards are documented in [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md).

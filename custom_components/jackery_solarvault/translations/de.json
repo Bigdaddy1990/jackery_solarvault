@@ -21,12 +21,14 @@
       "user": {
         "data": {
           "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen",
+          "create_savings_detail_sensors": "Berechnungsdetails zur Ersparnis erstellen",
           "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
           "password": "Passwort",
           "username": "E-Mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, netzseitigen Ein-/Ausgang, Hausverbrauch, \u00f6ffentliche Einspeisung, Batterie-Lade-/Entladedifferenz und gesch\u00e4tzte aktuelle Verlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
         "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Ger\u00e4t, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zus\u00e4tzlich zu den App-Werten einen vorzeichenbehafteten Nettowert f\u00fcr Dashboards brauchst.\n\nJackery erlaubt \u00fcblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
@@ -171,16 +173,16 @@
         "name": "Anzahl Batterien"
       },
       "battery_discharge_month_energy": {
-        "name": "Batterieentladung Monatswert"
+        "name": "Batterieentladung Monatsenergie"
       },
       "battery_discharge_power": {
-        "name": "Hauptbatterie Entladeleistung"
+        "name": "Batterie Leistung"
       },
       "battery_discharge_week_energy": {
-        "name": "Batterieentladung Wochenwert"
+        "name": "Batterieentladung Wochenenergie"
       },
       "battery_discharge_year_energy": {
-        "name": "Batterieentladung Jahreswert"
+        "name": "Batterieentladung Jahresenergie"
       },
       "battery_net_power": {
         "name": "Hauptbatterie Nettoleistung"
@@ -226,6 +228,9 @@
       },
       "charge_plan_power": {
         "name": "Ladeplan-Leistung"
+      },
+      "conversion_loss_power": {
+        "name": "Gesch\u00e4tzte Verlustleistung"
       },
       "country_code": {
         "name": "L\u00e4ndercode"
@@ -309,7 +314,7 @@
         "name": "Netzseite\u2192Batterie heute"
       },
       "device_today_pv_energy": {
-        "name": "PV heute"
+        "name": "PV-Ertrag heute"
       },
       "device_today_pv_to_battery": {
         "name": "PV\u2192Batterie heute"
@@ -357,13 +362,13 @@
         "name": "Hausverbrauch aktuell"
       },
       "home_month_energy": {
-        "name": "Monatsverbrauch"
+        "name": "Hausverbrauch Monatsenergie"
       },
       "home_week_energy": {
-        "name": "Wochenverbrauch"
+        "name": "Hausverbrauch Wochenenergie"
       },
       "home_year_energy": {
-        "name": "Jahresverbrauch"
+        "name": "Hausverbrauch Jahresenergie"
       },
       "last_offline": {
         "name": "Zuletzt offline"
@@ -448,6 +453,48 @@
       },
       "reboot_flag": {
         "name": "Neustart-Flag"
+      },
+      "savings_basis_ac_year_energy": {
+        "name": "Ersparnisbasis AC-Jahresenergie"
+      },
+      "savings_battery_charge_year_energy": {
+        "name": "Batterieladung Jahresenergie (Berechnung)"
+      },
+      "savings_battery_discharge_year_energy": {
+        "name": "Batterieentladung Jahresenergie (Berechnung)"
+      },
+      "savings_battery_loss_year_energy": {
+        "name": "Batterieverlust Jahresenergie"
+      },
+      "savings_calculated_total": {
+        "name": "Berechnete Ersparnis"
+      },
+      "savings_ct_public_export_year_energy": {
+        "name": "\u00d6ffentliche Einspeisung Jahresenergie"
+      },
+      "savings_device_grid_input_year_energy": {
+        "name": "Ger\u00e4t Netzbezug Jahresenergie"
+      },
+      "savings_device_grid_net_output_year_energy": {
+        "name": "Ger\u00e4t Netzausgang netto Jahresenergie"
+      },
+      "savings_device_grid_output_year_energy": {
+        "name": "Ger\u00e4t Netzausgang Jahresenergie"
+      },
+      "savings_energy": {
+        "name": "Selbst genutzte AC-Energie"
+      },
+      "savings_home_consumption_year_energy": {
+        "name": "Hausverbrauch Jahresenergie (Berechnung)"
+      },
+      "savings_price": {
+        "name": "Ersparnis-Strompreis"
+      },
+      "savings_pv_not_savings_year_energy": {
+        "name": "Nicht als Ersparnis gez\u00e4hlte PV-Energie"
+      },
+      "savings_pv_year_energy": {
+        "name": "PV-Ertrag Jahresenergie"
       },
       "smart_meter_export_month_energy": {
         "name": "Smart-Meter Netzeinspeisung Monatswert"
@@ -543,16 +590,16 @@
         "name": "Heute PV-Ertrag"
       },
       "today_load": {
-        "name": "Heute Verbrauch"
+        "name": "Hausverbrauch heute"
       },
       "total_carbon_saved": {
         "name": "Gesamt CO\u2082 eingespart"
       },
       "total_generation": {
-        "name": "Gesamt PV-Ertrag"
+        "name": "PV-Ertrag gesamt"
       },
       "total_revenue": {
-        "name": "Gesamt Ersparnis"
+        "name": "Gesamtersparnis"
       },
       "weather_plan": {
         "name": "Unwetterplan"
@@ -624,13 +671,13 @@
       "init": {
         "data": {
           "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen",
-          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
-          "debug_payload_log": "Rohdaten-Debuglog schreiben (fortgeschritten)"
+          "create_savings_detail_sensors": "Berechnungsdetails zur Ersparnis erstellen",
+          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
-          "debug_payload_log": "Standardmaessig aus. Wenn aktiviert, wird jede (anonymisierte) Jackery-API/MQTT-Antwort in jackery_solarvault_payload_debug.jsonl im HA-Konfigverzeichnis angehaengt. Nur fuer Parser-/Quellfehler sinnvoll - die Datei waechst taeglich um mehrere MB. Beim Deaktivieren wird die Datei beim naechsten Start geloescht."
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, netzseitigen Ein-/Ausgang, Hausverbrauch, \u00f6ffentliche Einspeisung, Batterie-Lade-/Entladedifferenz und gesch\u00e4tzte aktuelle Verlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",
         "title": "Jackery Optionen"

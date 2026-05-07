@@ -114,18 +114,7 @@ CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
 CONF_REGION_CODE: Final = "region_code"
 CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
-# Explicit opt-in for the raw payload-debug JSONL writer.
-# Default: False. The previous gating via `_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)`
-# was unreliable: `_PAYLOAD_DEBUG_LOGGER` lives under
-# `custom_components.jackery_solarvault.payload_debug` and inherits its
-# effective level from any ancestor that the user sets to DEBUG (e.g.
-# enabling debug logging for the integration as a whole). With this
-# explicit option the JSONL is only written when the user actively
-# checks the box in the integration's options — turning DEBUG on for
-# the integration logger no longer triggers MB-sized files in the HA
-# config root.
-CONF_DEBUG_PAYLOAD_LOG: Final = "debug_payload_log"
-DEFAULT_DEBUG_PAYLOAD_LOG: Final = False
+CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 
 
 # Config-flow step, error and abort identifiers.
@@ -143,6 +132,7 @@ DEFAULT_SCAN_INTERVAL_SEC: Final = 30
 MIN_SCAN_INTERVAL_SEC: Final = 15
 DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS: Final = True
 DEFAULT_CREATE_CALCULATED_POWER_SENSORS: Final = False
+DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
 UPDATE_INTERVAL: Final = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
 # Slow-metric refresh cadences (decoupled from the fast property polling).
@@ -942,6 +932,23 @@ CALCULATED_POWER_SENSOR_SUFFIXES: Final = {
     "_battery_net_power",
     "_battery_stack_net_power",
     "_grid_net_power",
+}
+SAVINGS_DETAIL_SENSOR_SUFFIXES: Final = {
+    "_savings_calculated_total",
+    "_savings_energy",
+    "_savings_price",
+    "_savings_pv_year_energy",
+    "_savings_device_grid_input_year_energy",
+    "_savings_device_grid_output_year_energy",
+    "_savings_device_grid_net_output_year_energy",
+    "_savings_basis_ac_year_energy",
+    "_savings_home_consumption_year_energy",
+    "_savings_ct_public_export_year_energy",
+    "_savings_battery_charge_year_energy",
+    "_savings_battery_discharge_year_energy",
+    "_savings_battery_loss_year_energy",
+    "_savings_pv_not_savings_year_energy",
+    "_conversion_loss_power",
 }
 DUPLICATE_BINARY_SENSOR_SUFFIXES: Final = {"_eps_enabled"}
 CT_PERIOD_SENSOR_SUFFIXES: Final = {
