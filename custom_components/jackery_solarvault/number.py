@@ -77,7 +77,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     source_section: str = PAYLOAD_PROPERTIES
     none_fallback: float | None = None
     setter: (
-        Callable[[JackerySolarVaultCoordinator, str, Any], Awaitable[Any]] | None
+        Callable[[JackerySolarVaultCoordinator, str, Any], Awaitable[None]] | None
     ) = None
     dynamic_max: Callable[[dict[str, Any]], float] | None = None
     dynamic_unit: Callable[[dict[str, Any]], str] | None = None
@@ -102,28 +102,28 @@ async def _set_soc_discharge(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the SOC discharge limit on a device."""
-    await coord.async_set_soc_limits(dev_id, discharge_limit=value)
+    await coord.async_set_soc_limits(dev_id, discharge_limit=int(value))
 
 
 async def _set_max_feed_grid(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the maximum grid feed-in power on a device."""
-    await coord.async_set_max_feed_grid(dev_id, value)
+    await coord.async_set_max_feed_grid(dev_id, int(value))
 
 
 async def _set_max_output_power(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the maximum output power on a device."""
-    await coord.async_set_max_output_power(dev_id, value)
+    await coord.async_set_max_output_power(dev_id, int(value))
 
 
 async def _set_default_power(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the default-load power preference on a device."""
-    await coord.async_set_default_power(dev_id, value)
+    await coord.async_set_default_power(dev_id, int(value))
 
 
 async def _set_single_price(
