@@ -12,8 +12,6 @@ Trends:   /v1/device/stat/sys/pv/trends       (?systemId&beginDate&endDate&dateT
 Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import binascii

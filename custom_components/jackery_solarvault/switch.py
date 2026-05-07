@@ -1,7 +1,5 @@
 """Switch platform for Jackery SolarVault writable controls."""
 
-from __future__ import annotations
-
 from collections.abc import Awaitable, Callable
 import logging
 from typing import Any
