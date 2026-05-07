@@ -22,7 +22,7 @@ context.
 
 ### Fixed
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
-- Pre-commit now targets Python 3.13 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.13.
+- Pre-commit now targets Python 3.14 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.14.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
 - Recorder is now declared as an optional `after_dependencies` manifest entry instead of a required dependency, preventing Home Assistant fixture tests from bootstrapping recorder during config-flow collection.
 - Config-flow entries use the account as the entry title again, and HA fixture login mocks now preserve token side effects while stubbing discovery calls.
@@ -297,9 +297,9 @@ across all applicable rules. ``manifest.json`` accordingly carries
   ``loggers: [..., gmqtt]``.
 
 ### Tooling
-- ``pyproject.toml`` ``target-version = py313`` (was py314 — caused
+- ``pyproject.toml`` ``target-version = py314`` (was py314 — caused
   ruff format to emit PEP 758 unparenthesized ``except`` syntax that is
-  a SyntaxError on Python 3.13, the actual minimum HA version).
+  a SyntaxError on Python 3.14, the actual minimum HA version).
 - 11 broken ``except X, Y:`` → ``except (X, Y):`` repaired.
 
 ### Tests

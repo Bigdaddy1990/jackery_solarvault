@@ -1566,8 +1566,8 @@ def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
     for path in _python_sources():
         source = path.read_text(encoding="utf-8")
         ast.parse(source, filename=str(path))
-        # HA 2026 and this repository target Python 3.14 explicitly. Keep
-        # the parser check aligned with the packaged minimum version.
+        # HA 2026 currently runs Python 3.14 in the user's diagnostics, but the
+        # integration is intentionally packaged for Python 3.14+ only.
         ast.parse(source, filename=str(path), feature_version=(3, 14))
 
 

@@ -183,7 +183,7 @@ logger:
 ## Voraussetzungen
 
 - Home Assistant 2025.8.0 oder neuer
-- Python 3.13+ (wird über Home Assistant bereitgestellt)
+- Python 3.14+ (wird über Home Assistant bereitgestellt)
 - Jackery-Cloud-Account
 - SolarVault online über WLAN oder Ethernet
 - HACS für die empfohlene Installation

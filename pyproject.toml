@@ -217,7 +217,7 @@ include = ["custom_components*"]
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-tests = { file = ["requirements_test.txt"] }
+tests = { file = ["requirements-test.txt"] }
 
 [tool.pylint.TYPECHECK]
 ignored-classes = ["_CountingAttr"]

@@ -180,7 +180,7 @@ logger:
 ## Prérequis
 
 - Home Assistant 2025.8.0 ou plus récent
-- Python 3.13+ (fourni par Home Assistant)
+- Python 3.14+ (fourni par Home Assistant)
 - Compte cloud Jackery
 - SolarVault en ligne via Wi-Fi ou Ethernet
 - HACS pour l'installation recommandée
