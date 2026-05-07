@@ -73,8 +73,6 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -119,12 +117,12 @@ from .const import (
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_META,
+    APP_SAVINGS_CALC_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
-    APP_SAVINGS_CALC_META,
     APP_STAT_PV1_ENERGY,
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
@@ -955,6 +953,17 @@ def _period_start(reset_period: StatResetPeriod) -> datetime:
     return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+@dataclass(frozen=True, kw_only=True)
+class JackeryStatSensorDescription(SensorEntityDescription):
+    """Sensor description sourcing from the statistic dict."""
+
+    stat_key: str
+    transform: Callable[[Any], Any] = _identity
+    section: str = PAYLOAD_STATISTIC  # statistic | price | system
+    fallback_sources: tuple[tuple[str, str], ...] = ()
+    reset_period: StatResetPeriod | None = None
+
+
 def _period_from_stat_description(
     description: JackeryStatSensorDescription,
 ) -> StatResetPeriod | None:
@@ -969,17 +978,6 @@ def _period_from_stat_description(
     if key.endswith("_year_energy"):
         return DATE_TYPE_YEAR
     return None
-
-
-@dataclass(frozen=True, kw_only=True)
-class JackeryStatSensorDescription(SensorEntityDescription):
-    """Sensor description sourcing from the statistic dict."""
-
-    stat_key: str
-    transform: Callable[[Any], Any] = _identity
-    section: str = PAYLOAD_STATISTIC  # statistic | price | system
-    fallback_sources: tuple[tuple[str, str], ...] = ()
-    reset_period: StatResetPeriod | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

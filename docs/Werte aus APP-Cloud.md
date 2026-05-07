@@ -76,9 +76,3 @@ Absicherung in der Integration:
   korrigierten Wert und Quelle nachvollziehbar zeigen.
 - Der Ersparnis-Sensor traegt `_savings_calculation` mit Formel, Rohwert,
   veroeffentlichtem Wert und den verwendeten Energiekomponenten.
-
-
-
-
-
-
