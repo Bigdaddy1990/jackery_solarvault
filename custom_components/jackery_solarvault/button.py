@@ -3,11 +3,11 @@
 import logging
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import JackeryConfigEntry
 from .const import FIELD_REBOOT, PAYLOAD_PROPERTIES
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
@@ -24,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the platform from a config entry."""

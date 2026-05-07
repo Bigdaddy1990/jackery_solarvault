@@ -1032,7 +1032,7 @@ def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -
         "description_placeholders", 1
     )[0]
     service_schema_block = init_source.split("RENAME_SCHEMA =", 1)[1].split(
-        "CONFIG_SCHEMA", 1
+        "def _loaded_coordinators", 1
     )[0]
 
     assert "str.strip" not in user_schema
@@ -1401,6 +1401,7 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
     )[0]
 
     assert "from .util import config_entry_bool_option" in config_flow_source
+    assert "def _entry_bool_option(" not in config_flow_source
     assert options_block.count("config_entry_bool_option(") == 3
     assert ".options.get(" not in options_block
 
@@ -1413,7 +1414,8 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
         1,
     )[0]
 
-    assert "config_entry_bool_option," in sensor_source
+    assert "config_entry_bool_option" in sensor_source
+    assert "def _entry_bool_option(" not in sensor_source
     assert setup_block.count("config_entry_bool_option(") == 3
     assert ".options.get(" not in setup_block
 

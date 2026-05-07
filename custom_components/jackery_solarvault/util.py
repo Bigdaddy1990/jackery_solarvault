@@ -2,7 +2,7 @@
 
 import calendar
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 import json
 from pathlib import Path
 import re
