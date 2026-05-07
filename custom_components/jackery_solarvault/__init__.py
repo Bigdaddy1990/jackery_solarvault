@@ -1,7 +1,5 @@
 """Jackery SolarVault integration."""
 
-from __future__ import annotations
-
 from datetime import timedelta
 import logging
 from pathlib import Path
@@ -60,7 +58,7 @@ from .coordinator import JackerySolarVaultCoordinator
 # alias lets type-checkers see through ``entry.runtime_data`` to the
 # concrete coordinator type without sprinkling cast/getattr around
 # the integration. PEP 695 syntax requires Python 3.12+; HA 2025.x
-# already requires Python 3.13.
+# already requires Python 3.14.
 type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
 
 _LOGGER = logging.getLogger(__name__)

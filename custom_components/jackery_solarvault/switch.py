@@ -1,5 +1,6 @@
 """Switch platform for Jackery SolarVault writable controls."""
 
+from collections.abc import Awaitable, Callable
 import logging
 from typing import Any
 
@@ -75,7 +76,35 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class JackeryEpsSwitch(JackeryEntity, SwitchEntity):
+class _JackeryWritableSwitch(JackeryEntity, SwitchEntity):
+    """Base class for Jackery switches that write a boolean cloud/MQTT value."""
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        key_suffix: str,
+        setter: Callable[[str, bool], Awaitable[None]],
+    ) -> None:
+        """Initialise the switch and its write callback."""
+        super().__init__(coordinator, device_id, key_suffix)
+        self._setter = setter
+
+    async def _async_write_state(self, enabled: bool) -> None:
+        """Write a boolean state and refresh Home Assistant after the command."""
+        await self._setter(self._device_id, enabled)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._async_write_state(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._async_write_state(False)
+
+
+class JackeryEpsSwitch(_JackeryWritableSwitch):
     """EPS output enable/disable switch (MQTT cmd=107, actionId=3023)."""
 
     _attr_translation_key = "eps_output"
@@ -86,7 +115,9 @@ class JackeryEpsSwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "eps_output")
+        super().__init__(
+            coordinator, device_id, "eps_output", coordinator.async_set_eps
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -94,18 +125,8 @@ class JackeryEpsSwitch(JackeryEntity, SwitchEntity):
         raw = self._properties.get(FIELD_SW_EPS)
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_eps(self._device_id, True)
-        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_eps(self._device_id, False)
-        await self.coordinator.async_request_refresh()
-
-
-class JackeryAutoStandbySwitch(JackeryEntity, SwitchEntity):
+class JackeryAutoStandbySwitch(_JackeryWritableSwitch):
     """Auto-standby switch (MQTT cmd=121, actionId=3021)."""
 
     _attr_translation_key = "auto_standby_set"
@@ -116,7 +137,12 @@ class JackeryAutoStandbySwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "auto_standby_set")
+        super().__init__(
+            coordinator,
+            device_id,
+            "auto_standby_set",
+            coordinator.async_set_auto_standby,
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -128,18 +154,8 @@ class JackeryAutoStandbySwitch(JackeryEntity, SwitchEntity):
             return None
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_auto_standby(self._device_id, True)
-        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_auto_standby(self._device_id, False)
-        await self.coordinator.async_request_refresh()
-
-
-class JackeryStandbySwitch(JackeryEntity, SwitchEntity):
+class JackeryStandbySwitch(_JackeryWritableSwitch):
     """Manual standby switch (MQTT cmd=107, actionId=3023)."""
 
     _attr_translation_key = "standby"
@@ -150,7 +166,9 @@ class JackeryStandbySwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "standby")
+        super().__init__(
+            coordinator, device_id, "standby", coordinator.async_set_standby
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -164,18 +182,8 @@ class JackeryStandbySwitch(JackeryEntity, SwitchEntity):
         except TypeError, ValueError:
             return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_standby(self._device_id, True)
-        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_standby(self._device_id, False)
-        await self.coordinator.async_request_refresh()
-
-
-class JackeryFollowMeterSwitch(JackeryEntity, SwitchEntity):
+class JackeryFollowMeterSwitch(_JackeryWritableSwitch):
     """Smart-meter following switch (MQTT cmd=121, actionId=3044)."""
 
     _attr_translation_key = "follow_meter"
@@ -186,7 +194,9 @@ class JackeryFollowMeterSwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "follow_meter")
+        super().__init__(
+            coordinator, device_id, "follow_meter", coordinator.async_set_follow_meter
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -198,18 +208,8 @@ class JackeryFollowMeterSwitch(JackeryEntity, SwitchEntity):
             )
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_follow_meter(self._device_id, True)
-        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_follow_meter(self._device_id, False)
-        await self.coordinator.async_request_refresh()
-
-
-class JackeryOffGridShutdownSwitch(JackeryEntity, SwitchEntity):
+class JackeryOffGridShutdownSwitch(_JackeryWritableSwitch):
     """Off-grid shutdown switch (MQTT cmd=121, actionId=3039)."""
 
     _attr_translation_key = "off_grid_shutdown"
@@ -220,7 +220,12 @@ class JackeryOffGridShutdownSwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "off_grid_shutdown")
+        super().__init__(
+            coordinator,
+            device_id,
+            "off_grid_shutdown",
+            coordinator.async_set_off_grid_shutdown,
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -230,18 +235,8 @@ class JackeryOffGridShutdownSwitch(JackeryEntity, SwitchEntity):
             raw = task_plan_value(self._task_plan, FIELD_OFF_GRID_DOWN)
         return safe_bool(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_off_grid_shutdown(self._device_id, True)
-        await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_off_grid_shutdown(self._device_id, False)
-        await self.coordinator.async_request_refresh()
-
-
-class JackeryStormWarningSwitch(JackeryEntity, SwitchEntity):
+class JackeryStormWarningSwitch(_JackeryWritableSwitch):
     """Storm warning switch (MQTT cmd=0, actionId=3036)."""
 
     _attr_translation_key = "storm_warning"
@@ -252,7 +247,9 @@ class JackeryStormWarningSwitch(JackeryEntity, SwitchEntity):
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, "storm_warning")
+        super().__init__(
+            coordinator, device_id, "storm_warning", coordinator.async_set_storm_warning
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -263,13 +260,3 @@ class JackeryStormWarningSwitch(JackeryEntity, SwitchEntity):
         if raw is None:
             raw = task_plan_value(self._task_plan, FIELD_WPS)
         return safe_bool(raw)
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self.coordinator.async_set_storm_warning(self._device_id, True)
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self.coordinator.async_set_storm_warning(self._device_id, False)
-        await self.coordinator.async_request_refresh()
