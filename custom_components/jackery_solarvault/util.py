@@ -1,5 +1,7 @@
 """Shared helpers for Jackery SolarVault entities."""
 
+from __future__ import annotations
+
 import calendar
 import contextlib
 from datetime import date, datetime, timedelta
@@ -391,6 +393,26 @@ def safe_bool(value: Any) -> bool | None:
         return int(value) != 0
     except TypeError, ValueError:
         return None
+
+
+def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+    """Return a config-entry boolean option with safe legacy value parsing."""
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key, data.get(key, default))
+    parsed = safe_bool(value)
+    return default if parsed is None else parsed
+
+
+def jackery_online_state(value: Any) -> bool | None:
+    """Return a parsed Jackery online/offline marker, or None when unknown."""
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"online", "connected", "available"}:
+            return True
+        if normalized in {"offline", "disconnected", "unavailable"}:
+            return False
+    return safe_bool(value)
 
 
 # ---------------------------------------------------------------------------

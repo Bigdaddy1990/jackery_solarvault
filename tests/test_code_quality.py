@@ -915,12 +915,12 @@ def test_entry_bool_option_calls_use_config_key_and_default() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "_entry_bool_option"
+        and node.func.id == "entry_bool_option"
     ]
     assert calls
     for call in calls:
         assert len(call.args) == 3, (
-            f"_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+            f"entry_bool_option call at line {call.lineno} must pass entry, key, default"
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1032,7 +1032,7 @@ def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -
         "description_placeholders", 1
     )[0]
     service_schema_block = init_source.split("RENAME_SCHEMA =", 1)[1].split(
-        "def _entry_bool_option", 1
+        "CONFIG_SCHEMA", 1
     )[0]
 
     assert "str.strip" not in user_schema
@@ -1400,8 +1400,8 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
         "class JackeryConfigFlow", 1
     )[0]
 
-    assert "def _entry_bool_option(" in config_flow_source
-    assert options_block.count("_entry_bool_option(") == 3
+    assert "from .util import entry_bool_option" in config_flow_source
+    assert options_block.count("entry_bool_option(") == 3
     assert ".options.get(" not in options_block
 
 
@@ -1413,8 +1413,8 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
         1,
     )[0]
 
-    assert "def _entry_bool_option(" in sensor_source
-    assert setup_block.count("_entry_bool_option(") == 3
+    assert "entry_bool_option," in sensor_source
+    assert setup_block.count("entry_bool_option(") == 3
     assert ".options.get(" not in setup_block
 
 

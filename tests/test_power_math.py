@@ -1323,3 +1323,24 @@ def test_month_series_does_not_use_compact_year_expansion() -> None:
         util.trend_series_total(source, "device_battery_stat_month", "totalDischarge")
         == 13.26
     )
+
+
+def test_entry_bool_option_parses_legacy_string_values() -> None:
+    """Boolean options must not treat legacy string 'false' as truthy."""
+
+    class Entry:
+        options = {"enabled": "false"}
+        data = {"enabled": True, "fallback": "yes"}
+
+    assert util.entry_bool_option(Entry(), "enabled", True) is False
+    assert util.entry_bool_option(Entry(), "fallback", False) is True
+    assert util.entry_bool_option(Entry(), "missing", True) is True
+
+
+def test_jackery_online_state_parses_numeric_and_text_markers() -> None:
+    """Entity availability must handle Jackery string markers safely."""
+    assert util.jackery_online_state("0") is False
+    assert util.jackery_online_state("1") is True
+    assert util.jackery_online_state("offline") is False
+    assert util.jackery_online_state("online") is True
+    assert util.jackery_online_state("unknown") is None
