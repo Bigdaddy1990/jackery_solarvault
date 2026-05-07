@@ -73,6 +73,8 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -290,6 +292,7 @@ from .util import (
     directional_power_value,
     effective_period_total_value,
     effective_trend_series_values,
+    entry_bool_option,
     first_power_value,
     jackery_corrected_home_consumption_power,
     jackery_grid_side_input_power,
