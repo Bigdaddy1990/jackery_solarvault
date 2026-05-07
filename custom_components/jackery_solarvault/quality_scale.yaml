@@ -135,5 +135,8 @@ rules:
   strict-typing:
     status: done
     comment: >-
+      Source modules pass python -m mypy custom_components/jackery_solarvault
+      under the integration's strict Home Assistant typing profile on
+      Python 3.14.
       Source package passes mypy with disallow_untyped_defs and
       disallow_incomplete_defs enabled for the integration.
