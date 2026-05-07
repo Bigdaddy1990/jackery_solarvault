@@ -25,6 +25,7 @@ context.
 - Pre-commit now targets Python 3.13 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.13.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
 - Recorder is now declared as an optional `after_dependencies` manifest entry instead of a required dependency, preventing Home Assistant fixture tests from bootstrapping recorder during config-flow collection.
+- Config-flow entries use the account as the entry title again, and HA fixture login mocks now preserve token side effects while stubbing discovery calls.
 
 ## [2.3.3] - 2026-05-05
 

@@ -150,7 +150,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
-                    title=f"Jackery ({account})",
+                    title=account,
                     data={
                         CONF_USERNAME: account,
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
