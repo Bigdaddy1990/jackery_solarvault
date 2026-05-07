@@ -73,7 +73,6 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 import json
