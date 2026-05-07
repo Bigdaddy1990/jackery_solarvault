@@ -1,5 +1,7 @@
 """Shared helpers for Jackery SolarVault entities."""
 
+from __future__ import annotations
+
 import calendar
 import contextlib
 from datetime import date, datetime, timedelta
