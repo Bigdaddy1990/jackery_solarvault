@@ -179,7 +179,7 @@ class JackeryStandbySwitch(_JackeryWritableSwitch):
         try:
             value = int(raw)
             return value == 1
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return safe_bool(raw)
 
 

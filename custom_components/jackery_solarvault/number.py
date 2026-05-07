@@ -95,7 +95,7 @@ async def _set_soc_charge(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the SOC charge limit on a device."""
-    await coord.async_set_soc_limits(dev_id, charge_limit=int(value))
+    await coord.async_set_soc_limits(dev_id, charge_limit=value)
 
 
 async def _set_soc_discharge(
