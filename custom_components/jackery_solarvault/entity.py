@@ -1,5 +1,7 @@
 """Shared entity base class."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -34,6 +36,7 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .util import jackery_online_state
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -156,5 +159,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         if online is None:
             online = self._system.get(FIELD_ONLINE_STATE)
         if online is not None:
-            return bool(online)
+            parsed_online = jackery_online_state(online)
+            if parsed_online is not None:
+                return parsed_online
         return self._device_id in (self.coordinator.data or {})
