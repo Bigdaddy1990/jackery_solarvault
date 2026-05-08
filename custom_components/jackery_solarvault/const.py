@@ -32,10 +32,11 @@ MQTT_SILENT_THRESHOLD_SEC: Final = 300
 # coordinator removes it from PAYLOAD_BATTERY_PACKS. The Jackery cloud
 # never explicitly emits "pack-removed"; a pack that has been physically
 # unplugged simply stops appearing in MQTT updates while sometimes being
-# echoed on HTTP for a while. 7 days is conservative — daily power
-# outages or WiFi blips do NOT trigger removal, but a permanently-removed
-# pack is cleaned up within a week.
-BATTERY_PACK_STALE_THRESHOLD_SEC: Final = 7 * 24 * 3600
+# echoed on HTTP for a while. 30 days covers seasonal off-line periods
+# (e.g. backup packs that hibernate over the summer) so a temporarily
+# disconnected pack is not removed and re-added on every cycle, while
+# permanently-removed packs are still cleaned up within a month.
+BATTERY_PACK_STALE_THRESHOLD_SEC: Final = 30 * 24 * 3600
 
 # Internal field name used by the coordinator to remember when a pack
 # last reported as online. Not exposed as an entity attribute.
@@ -121,12 +122,15 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 FLOW_STEP_USER: Final = "user"
 FLOW_STEP_INIT: Final = "init"
 FLOW_STEP_REAUTH_CONFIRM: Final = "reauth_confirm"
+FLOW_STEP_RECONFIGURE: Final = "reconfigure"
 FLOW_ERROR_BASE: Final = "base"
 FLOW_ERROR_INVALID_AUTH: Final = "invalid_auth"
 FLOW_ERROR_CANNOT_CONNECT: Final = "cannot_connect"
 FLOW_ERROR_ACCOUNT_REQUIRED: Final = "account_required"
 FLOW_ABORT_REAUTH_ENTRY_MISSING: Final = "reauth_entry_missing"
 FLOW_ABORT_REAUTH_SUCCESSFUL: Final = "reauth_successful"
+FLOW_ABORT_RECONFIGURE_SUCCESSFUL: Final = "reconfigure_successful"
+FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH: Final = "reconfigure_account_mismatch"
 
 DEFAULT_SCAN_INTERVAL_SEC: Final = 30
 MIN_SCAN_INTERVAL_SEC: Final = 15
@@ -141,6 +145,14 @@ UPDATE_INTERVAL: Final = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 SLOW_METRICS_INTERVAL_SEC: Final = 300  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
+
+# Adaptive polling: when MQTT delivered an inbound message within the
+# live threshold, we skip the fast polling tick so HTTP only runs as a
+# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. ``cloud_push``
+# integrations are expected to lean on push and treat polling as a
+# fallback — these constants encode that contract.
+MQTT_LIVE_THRESHOLD_SEC: Final = 60
+ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
 
 REQUEST_TIMEOUT_SEC: Final = 15
 
@@ -437,7 +449,6 @@ FIELD_POWER_PRICE_RESOURCE: Final = "powerPriceResource"
 FIELD_LOGIN_ALLOWED: Final = "loginAllowed"
 
 MAIN_PROPERTY_ALIAS_PAIRS: Final = (
-    (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW),
     (FIELD_SOC_CHARGE_LIMIT, FIELD_SOC_CHG_LIMIT),
     (FIELD_SOC_DISCHARGE_LIMIT, FIELD_SOC_DISCHG_LIMIT),
 )
@@ -937,17 +948,9 @@ SAVINGS_DETAIL_SENSOR_SUFFIXES: Final = {
     "_savings_calculated_total",
     "_savings_energy",
     "_savings_price",
-    "_savings_pv_year_energy",
-    "_savings_device_grid_input_year_energy",
-    "_savings_device_grid_output_year_energy",
-    "_savings_device_grid_net_output_year_energy",
-    "_savings_basis_ac_year_energy",
-    "_savings_home_consumption_year_energy",
-    "_savings_ct_public_export_year_energy",
-    "_savings_battery_charge_year_energy",
-    "_savings_battery_discharge_year_energy",
     "_savings_battery_loss_year_energy",
-    "_savings_pv_not_savings_year_energy",
+    "_savings_conversion_loss_year_energy",
+    "_savings_pv_residual_year_energy",
     "_conversion_loss_power",
 }
 DUPLICATE_BINARY_SENSOR_SUFFIXES: Final = {"_eps_enabled"}
@@ -1034,6 +1037,21 @@ NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = {
 REMOVED_SENSOR_SUFFIXES: Final = {
     "_grid_side_in_power",
     "_grid_side_out_power",
+    "_max_grid_power",
+    "_today_battery_charge",
+    "_today_battery_discharge",
+    "_today_generation",
+    "_savings_pv_year_energy",
+    "_savings_device_grid_input_year_energy",
+    "_savings_device_grid_output_year_energy",
+    "_savings_device_grid_net_output_year_energy",
+    "_savings_basis_ac_year_energy",
+    "_savings_home_consumption_year_energy",
+    "_savings_ct_public_export_year_energy",
+    "_savings_battery_charge_year_energy",
+    "_savings_battery_discharge_year_energy",
+    "_savings_pv_not_savings_year_energy",
+    "_savings_pv_surplus_loss_year_energy",
     "_smart_meter_import_today_energy",
     "_smart_meter_export_today_energy",
 }

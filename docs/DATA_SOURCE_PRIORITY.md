@@ -13,7 +13,7 @@ Assistant entity states explainable.
 | App statistic endpoint | Today/week/month/year energy totals | Use the matching documented app period; year values may be guarded by same-endpoint month payloads when Jackery returns the current month as the year. |
 | App chart series | HA statistic graph / period bucket diagnostics | Sum the documented series for period total sensors. |
 | Same-endpoint month backfill | Guarded year lower bound | Only for elapsed months of the same calendar year and same endpoint family. |
-| Lifetime app statistic | Total generation/revenue/carbon | Preferred source for generation/carbon; guarded so those values cannot be lower than the corrected current-year PV total. `totalRevenue` is calculated from self-consumed AC energy when enough year-flow data is available. |
+| Lifetime app statistic | Total generation/revenue/carbon | Preferred source for generation/carbon; guarded so those values cannot be lower than the corrected current-year PV total. `totalRevenue` remains the raw app KPI; calculated savings are exposed separately via `_savings_calculation`. |
 
 
 ## Minimal entity diagnostic attributes
@@ -67,8 +67,9 @@ value as a lower bound only. A genuine lifetime total from the cloud is kept
 when it is higher; a month-only total is raised so Home Assistant does not see a
 false total drop.
 
-`systemStatistic.totalRevenue` / `total_revenue` is not PV revenue. It is a
-savings value and therefore uses year-flow data when available:
+`systemStatistic.totalRevenue` / `total_revenue` remains the raw Jackery app
+savings KPI. It can look like PV revenue, so the integration exposes a separate
+calculated savings detail from year-flow data when available:
 
 - Start with `device_home_stat_year.totalOutGridEnergy`, the device grid-side
   AC output after inverter and battery effects, and subtract
@@ -80,12 +81,9 @@ savings value and therefore uses year-flow data when available:
 - Multiply by `price.singlePrice`; if the price payload is missing, derive the
   tariff from PV year revenue divided by PV year kWh.
 
-The cloud `totalRevenue` value is replaced when it is missing, lower than the
-calculated current-year savings, or shaped like PV revenue instead of savings.
-A higher cloud value is kept when the total-generation value also indicates a
-genuine higher total, so future corrected Jackery totals are not overwritten.
-The entity exposes `_savings_calculation` for the raw cloud value, calculation
-method, components, and publication decision.
+The cloud `totalRevenue` value is not replaced. The entity exposes
+`_savings_calculation` for the raw cloud value, calculated value, method,
+components, and whether older versions would have replaced the cloud value.
 
 ## Period ranges
 

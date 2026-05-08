@@ -123,14 +123,28 @@ rules:
       strings.json + en.json + de.json define the matching exceptions
       block.
   icon-translations: done
-  reconfiguration-flow: done
-  repair-issues: done
+  reconfiguration-flow:
+    status: done
+    comment: >-
+      JackeryConfigFlow.async_step_reconfigure lets users update password
+      and optional sensor toggles without removing the entry. The
+      account email must match the entry's unique_id; mismatched accounts
+      abort with a translated reason so the unique-id contract stays
+      stable across reconfigure round-trips.
+  repair-issues:
+    status: done
+    comment: >-
+      app_data_inconsistency is created with is_fixable=True and routed
+      through repairs.py. The fix flow confirms with the user, then
+      calls coordinator.async_request_refresh() so transient cloud
+      contradictions clear themselves; the issue auto-resolves on the
+      next consistent payload.
   stale-devices:
     status: done
     comment: >-
       Battery-pack cleanup runs on every coordinator merge:
       _drop_stale_battery_packs removes packs that have been silent past
-      BATTERY_PACK_STALE_THRESHOLD_SEC (7 days). Stale-helper cleanup
+      BATTERY_PACK_STALE_THRESHOLD_SEC (30 days). Stale-helper cleanup
       runs at startup. Stale-pack count is exposed in diagnostics.
 
   # ----------------- Platinum -----------------

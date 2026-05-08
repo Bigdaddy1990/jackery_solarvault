@@ -166,9 +166,9 @@ def test_parse_utc_datetime_normalizes_iso_z_and_naive_values() -> None:
     assert util.parse_utc_datetime("2026-05-06T10:23:07Z").isoformat() == (
         "2026-05-06T10:23:07+00:00"
     )
-    assert util.parse_utc_datetime(
-        util.datetime(2026, 5, 6, 10, 23, 7)
-    ).isoformat() == ("2026-05-06T10:23:07+00:00")
+    assert util.parse_utc_datetime(util.datetime(2026, 5, 6, 10, 23, 7)).isoformat() == (
+        "2026-05-06T10:23:07+00:00"
+    )
 
 
 def test_parse_utc_datetime_rejects_invalid_values() -> None:
@@ -1007,8 +1007,9 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         "months": [4, 5],
     }
     assert payload["statistic"]["totalGeneration"] == 228.02
-    assert payload["statistic"]["totalRevenue"] == 46.72
+    assert payload["statistic"]["totalRevenue"] == "23.96"
     assert payload["statistic"]["totalCarbon"] == 227.33
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.72
     assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 166.86
     assert payload["statistic"]["_savings_calculation"]["source_energy"] == {
         "pv_year_kwh": 228.02,
@@ -1021,6 +1022,9 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         "battery_charge_year_kwh": 68.01,
         "battery_discharge_year_kwh": 54.53,
         "battery_charge_discharge_gap_kwh": 13.48,
+        "conversion_loss_year_kwh": 47.68,
+        "conversion_loss_year_kwh_signed": 47.68,
+        "pv_residual_after_self_consumption_year_kwh": 61.16,
         "pv_not_savings_ac_energy_kwh": 61.16,
     }
 
@@ -1085,7 +1089,7 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
 
 
 def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
-    """A PV-revenue shaped cloud total is replaced by self-consumption savings."""
+    """A PV-revenue shaped cloud total is kept raw beside calculated savings."""
     payload = {
         "price": {"singlePrice": "0.28"},
         "statistic": {
@@ -1116,7 +1120,9 @@ def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == 46.75
+    assert payload["statistic"]["totalRevenue"] == "63.86"
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.75
+    assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]
     assert (
         payload["statistic"]["_savings_calculation"]["decision"]
         == "cloud_total_matches_pv_revenue_not_savings"
@@ -1153,7 +1159,8 @@ def test_total_savings_subtracts_ct_export_when_available() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == 44.8
+    assert payload["statistic"]["totalRevenue"] == "63.86"
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 44.8
     assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 160.0
     assert (
         payload["statistic"]["_savings_calculation"]["method"]

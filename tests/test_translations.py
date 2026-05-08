@@ -31,3 +31,26 @@ def test_language_files_cover_all_string_keys() -> None:
             )
         )
         assert _leaf_paths(translated) == base_paths, lang
+
+
+def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
+    """Battery power labels must not hide batOutPw vs stackOutPw semantics."""
+    de = json.loads(
+        (TRANSLATION_ROOT / "translations" / "de.json").read_text(encoding="utf-8")
+    )
+    en = json.loads(
+        (TRANSLATION_ROOT / "translations" / "en.json").read_text(encoding="utf-8")
+    )
+
+    assert de["entity"]["sensor"]["battery_discharge_power"]["name"] == (
+        "Hauptbatterie Entladeleistung"
+    )
+    assert de["entity"]["sensor"]["stack_out_power"]["name"] == (
+        "Batteriesystem Entladeleistung"
+    )
+    assert en["entity"]["sensor"]["battery_discharge_power"]["name"] == (
+        "Main battery discharge power"
+    )
+    assert en["entity"]["sensor"]["stack_out_power"]["name"] == (
+        "Battery system discharge power"
+    )

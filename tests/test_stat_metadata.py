@@ -156,9 +156,6 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
     """Implement test app period stat descriptions use total with reset period."""
     expected: dict[str, str] = {
         "today_load": "day",
-        "today_battery_charge": "day",
-        "today_battery_discharge": "day",
-        "today_generation": "day",
         "device_today_pv_energy": "day",
         "device_today_battery_charge": "day",
         "device_today_battery_discharge": "day",
@@ -242,15 +239,21 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
     expected = {
         "device_today_pv_energy": (("device_pv_stat_day", "totalSolarEnergy"),),
         "device_today_battery_charge": (("device_battery_stat_day", "totalCharge"),),
-        "device_today_battery_discharge": (
-            ("device_battery_stat_day", "totalDischarge"),
-        ),
         "device_today_ongrid_input": (("device_home_stat_day", "totalInGridEnergy"),),
         "device_today_ongrid_output": (("device_home_stat_day", "totalOutGridEnergy"),),
     }
     for key, fallback in expected.items():
         assert metadata[key]["section"] == "device_statistic", key
         assert metadata[key]["fallback_sources"] == fallback, key
+
+    assert (
+        metadata["device_today_battery_discharge"]["section"]
+        == "device_battery_stat_day"
+    )
+    assert metadata["device_today_battery_discharge"]["stat_key"] == "totalDischarge"
+    assert metadata["device_today_battery_discharge"]["fallback_sources"] == (
+        ("device_statistic", "batDisChgEgy"),
+    )
 
 
 def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None:
@@ -367,15 +370,8 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         assert suffix in const_source
 
 
-# App-stat sensors that are intentionally disabled by default because they
-# duplicate a per-device sensor on single-device systems. New installs only
-# show the canonical (`device_today_*`) entity; existing installs keep their
-# enabled state via HA's registry preservation rule.
-INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset({
-    "today_battery_charge",
-    "today_battery_discharge",
-    "today_generation",
-})
+# App-stat duplicates should be removed rather than kept as disabled entities.
+INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset()
 
 
 def test_app_sensor_descriptions_are_not_disabled_by_default() -> None:
@@ -468,8 +464,8 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
             assert forbidden not in source
 
 
-def test_savings_detail_cumulative_energy_sensors_use_total_state_class() -> None:
-    """Savings detail kWh sensors are cumulative year/app totals, not measurements."""
+def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
+    """Existing statistics-compatible savings details keep their state class."""
     calls = _savings_detail_description_calls()
     found: dict[str, tuple[str | None, str | None]] = {}
     for call in calls:
@@ -484,20 +480,14 @@ def test_savings_detail_cumulative_energy_sensors_use_total_state_class() -> Non
     }
     assert energy_keys == {
         "savings_energy",
-        "savings_pv_year_energy",
-        "savings_device_grid_input_year_energy",
-        "savings_device_grid_output_year_energy",
-        "savings_device_grid_net_output_year_energy",
-        "savings_basis_ac_year_energy",
-        "savings_home_consumption_year_energy",
-        "savings_ct_public_export_year_energy",
-        "savings_battery_charge_year_energy",
-        "savings_battery_discharge_year_energy",
         "savings_battery_loss_year_energy",
-        "savings_pv_not_savings_year_energy",
+        "savings_conversion_loss_year_energy",
+        "savings_pv_residual_year_energy",
     }
-    for key in energy_keys:
-        assert found[key][1] == "TOTAL", key
+    assert found["savings_energy"][1] == "TOTAL"
+    assert found["savings_battery_loss_year_energy"][1] == "TOTAL"
+    assert found["savings_conversion_loss_year_energy"][1] is None
+    assert found["savings_pv_residual_year_energy"][1] is None
     assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
     assert found["savings_price"] == (None, "MEASUREMENT")
 
@@ -537,9 +527,6 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
     """Implement test stat state class matrix for totals periods and prices."""
     matrix = {
         "today_load": ("TOTAL", "day"),
-        "today_battery_charge": ("TOTAL", "day"),
-        "today_battery_discharge": ("TOTAL", "day"),
-        "today_generation": ("TOTAL", "day"),
         "total_generation": ("TOTAL_INCREASING", None),
         "total_revenue": ("TOTAL", None),
         "total_carbon_saved": ("TOTAL_INCREASING", None),
@@ -595,14 +582,13 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
     assert "if begin_iso is None:" in sensor_source
 
 
-def test_period_sensors_publish_none_when_data_is_stale() -> None:
-    """Stale-period guard returns None instead of yesterday's total.
+def test_period_sensors_do_not_publish_stale_period_totals() -> None:
+    """Stale-period guard never exposes yesterday's total as today's value.
 
     ``_refresh_cache`` must publish None when the wall clock has
     crossed a period boundary but the source data still belongs to
-    the previous period. Without this guard, yesterday's total would
-    be published against today's bucket and cause an artificial
-    spike+drop in the energy dashboard.
+    the previous period. Daily sensors publish 0 for the new day instead
+    of going unknown after midnight.
     """
     sensor_source = (
         Path(__file__).resolve().parents[1]
@@ -613,17 +599,21 @@ def test_period_sensors_publish_none_when_data_is_stale() -> None:
     # The helper exists
     assert "def _is_period_data_stale(self) -> bool:" in sensor_source
     # And is consulted in _refresh_cache before assigning native_value
-    assert "if self._reset_period and self._is_period_data_stale():" in sensor_source
-    # The stale path explicitly publishes None
-    # Ruff format may slightly tweak whitespace; do a tolerant search
+    assert (
+        "stale_period = self._reset_period and self._is_period_data_stale()"
+        in sensor_source
+    )
+    # The stale path explicitly publishes 0 for day sensors and None for
+    # longer periods.
     import re
 
     flat = re.sub(r"\s+", " ", sensor_source)
-    expected = (
-        "if self._reset_period and self._is_period_data_stale(): "
-        "self._cached_native_value = None"
+    assert ("raw = 0 if self._reset_period == DATE_TYPE_DAY else None") in flat, (
+        "daily stale-period guard does not emit a zero fallback"
     )
-    assert expected in flat, "stale-period guard does not emit None"
+    assert (
+        'attrs["stale_period_fallback"] = "zero_until_fresh_day_data"'
+    ) in sensor_source
 
 
 def test_total_revenue_state_class_compatible_with_monetary_device_class() -> None:

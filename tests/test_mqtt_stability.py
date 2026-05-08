@@ -3,7 +3,7 @@
 These pure-source tests guard the long-running stability of the broker
 session against accidental regressions:
 
-1. Reconnect is configured with infinite retries + bounded delay.
+1. gmqtt auto-reconnect is disabled so broker protocol rejections do not loop.
 2. Every successful (re-)connect re-subscribes ALL configured topics.
 3. Every successful (re-)connect runs the snapshot-pull callback so the
    coordinator immediately has fresh state.
@@ -27,16 +27,11 @@ def _read(name: str) -> str:
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
-def test_mqtt_client_uses_infinite_reconnect_with_bounded_delay() -> None:
-    """Gmqtt must be configured for infinite reconnects."""
+def test_mqtt_client_disables_internal_reconnect_loop() -> None:
+    """Coordinator throttling must own reconnects after broker rejections."""
     src = _read("mqtt_push.py")
-    # Look for the reconnect_retries / reconnect_delay set_config call
-    assert '"reconnect_retries": -1' in src, src
-    # Bounded delay so a flapping broker does not hammer the network
-    delay_match = re.search(r'"reconnect_delay":\s*(\d+)', src)
-    assert delay_match is not None, src
-    delay = int(delay_match.group(1))
-    assert 1 <= delay <= 60, f"reconnect_delay={delay} outside reasonable range"
+    assert '"reconnect_retries": 0' in src, src
+    assert '"reconnect_delay"' not in src, src
 
 
 def test_every_connect_resubscribes_all_topics() -> None:
@@ -162,8 +157,8 @@ def test_silent_detector_only_active_when_connected() -> None:
     assert "return False" in body, body
 
 
-def test_keepalive_is_set_on_both_connect_paths() -> None:
-    """Both fresh-connect and reconnect codepaths must set keepalive.
+def test_keepalive_is_set_on_connect() -> None:
+    """The gmqtt connect call must set keepalive.
 
     Without keepalive the broker tear-down on intermittent network
     glitches takes 60+ minutes (TCP default).
@@ -172,7 +167,7 @@ def test_keepalive_is_set_on_both_connect_paths() -> None:
     keepalive_lines = [
         line.strip() for line in src.splitlines() if "keepalive=" in line
     ]
-    assert len(keepalive_lines) >= 2, keepalive_lines
+    assert keepalive_lines == ["keepalive=MQTT_KEEPALIVE_SEC,"]
 
 
 def test_silent_threshold_logic_unit() -> None:

@@ -19,6 +19,8 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DOMAIN,
+    FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
+    FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
     FLOW_ERROR_ACCOUNT_REQUIRED,
@@ -27,6 +29,7 @@ from .const import (
     FLOW_ERROR_INVALID_AUTH,
     FLOW_STEP_INIT,
     FLOW_STEP_REAUTH_CONFIRM,
+    FLOW_STEP_RECONFIGURE,
     FLOW_STEP_USER,
 )
 from .util import config_entry_bool_option
@@ -170,6 +173,109 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id=FLOW_STEP_USER,
             data_schema=USER_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle a user-initiated reconfigure of an existing entry.
+
+        HA's reconfigure flow lets the user change credentials and toggle
+        the calculated-sensor options without removing the entry. The
+        normalized account from user input must match the entry that
+        triggered the flow; otherwise we abort to keep unique-id semantics
+        stable across the reconfigure round-trip.
+        """
+        entry_id = self.context.get("entry_id")
+        entry = (
+            self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
+        )
+        if entry is None:
+            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            account = _normalize_account(user_input[CONF_USERNAME])
+            if not account:
+                errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
+            elif account.lower() != str(entry.unique_id or "").lower():
+                return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
+            else:
+                session = async_get_clientsession(self.hass)
+                api = JackeryApi(
+                    session=session,
+                    account=account,
+                    password=user_input[CONF_PASSWORD],
+                )
+                try:
+                    await api.async_login()
+                except JackeryAuthError:
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+                except JackeryError as err:
+                    _LOGGER.error(
+                        "Cannot connect to Jackery during reconfigure: %s", err
+                    )
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data={
+                            CONF_USERNAME: account,
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        },
+                        options={
+                            CONF_CREATE_SMART_METER_DERIVED_SENSORS: user_input.get(
+                                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+                            ),
+                            CONF_CREATE_CALCULATED_POWER_SENSORS: user_input.get(
+                                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+                            ),
+                            CONF_CREATE_SAVINGS_DETAIL_SENSORS: user_input.get(
+                                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+                            ),
+                        },
+                        reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
+                    )
+
+        current_options = entry.options or {}
+        schema = vol.Schema({
+            vol.Required(
+                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
+            ): vol.All(str, vol.Length(min=1)),
+            vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+            vol.Optional(
+                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                default=current_options.get(
+                    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+                ),
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                default=current_options.get(
+                    CONF_CREATE_CALCULATED_POWER_SENSORS,
+                    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+                ),
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                default=current_options.get(
+                    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+                ),
+            ): bool,
+        })
+        return self.async_show_form(
+            step_id=FLOW_STEP_RECONFIGURE,
+            data_schema=schema,
+            description_placeholders={
+                "username": str(entry.data.get(CONF_USERNAME, "")),
+            },
             errors=errors,
         )
 

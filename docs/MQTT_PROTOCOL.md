@@ -7,7 +7,7 @@ bypass (19. April 2026).
 
 ```
 Host:      emqx.jackeryapp.com:8883
-Protocol:  MQTT v3.1.1 over TLS 1.2
+Protocol:  MQTT over TLS 1.2 (runtime uses gmqtt default protocol version)
 Keep-Alive: 60s
 QoS:       0 (At most once)
 Clean Session: Yes

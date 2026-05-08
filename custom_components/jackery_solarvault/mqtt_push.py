@@ -12,7 +12,6 @@ import ssl
 from typing import Any
 
 from gmqtt import Client as MQTTClient
-from gmqtt.mqtt.constants import MQTTv311
 from homeassistant.core import HomeAssistant
 
 from .const import (
@@ -97,8 +96,18 @@ class JackeryMqttPushClient:
 
             client = self._build_client(client_id=client_id)
             client.set_auth_credentials(username, password)
-            with contextlib.suppress(Exception):  # gmqtt versions differ here.
-                client.set_config({"reconnect_retries": -1, "reconnect_delay": 3})
+            try:
+                client.set_config({"reconnect_retries": 0})
+            except Exception as err:
+                # gmqtt versions differ on the set_config signature; older
+                # releases reject the dict form. Log at debug so the
+                # incompatibility surfaces if reconnect-retry behaviour
+                # diverges from this integration's expectations.
+                _LOGGER.debug(
+                    "Jackery MQTT: gmqtt.set_config rejected reconnect_retries=0 "
+                    "(library default will apply): %s",
+                    err,
+                )
 
             client.on_connect = self._on_connect
             client.on_disconnect = self._on_disconnect
@@ -201,22 +210,18 @@ class JackeryMqttPushClient:
 
     @staticmethod
     async def _connect_client(client: MQTTClient, ssl_context: ssl.SSLContext) -> None:
-        """Connect with MQTT 3.1.1, falling back for older gmqtt signatures."""
-        try:
-            await client.connect(
-                MQTT_HOST,
-                port=MQTT_PORT,
-                ssl=ssl_context,
-                keepalive=MQTT_KEEPALIVE_SEC,
-                version=MQTTv311,
-            )
-        except TypeError:
-            await client.connect(
-                MQTT_HOST,
-                port=MQTT_PORT,
-                ssl=ssl_context,
-                keepalive=MQTT_KEEPALIVE_SEC,
-            )
+        """Connect with gmqtt's default protocol version.
+
+        Jackery's broker rejects forced MQTT 3.1.1 on some accounts with
+        CONNACK rc=1. gmqtt defaults to the protocol version it supports best,
+        while the coordinator handles throttled reconnect attempts.
+        """
+        await client.connect(
+            MQTT_HOST,
+            port=MQTT_PORT,
+            ssl=ssl_context,
+            keepalive=MQTT_KEEPALIVE_SEC,
+        )
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
         """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
@@ -431,6 +436,15 @@ class JackeryMqttPushClient:
             return None
         now = datetime.now(tz=then.tzinfo)
         return max(0.0, (now - then).total_seconds())
+
+    @property
+    def seconds_since_last_message(self) -> float | None:
+        """Public read-only view of the last-message age helper.
+
+        Coordinator-side adaptive polling reads this property to gate
+        fast HTTP ticks while MQTT push is delivering fresh frames.
+        """
+        return self._seconds_since_last_message()
 
     def _mqtt_silent_for_too_long(self) -> bool:
         """Return True when the broker is "connected" but no message arrives.

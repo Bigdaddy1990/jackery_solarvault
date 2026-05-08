@@ -146,7 +146,7 @@ For details about the required parameters, see `services.yaml` or the HA Develop
 - Stack input/output refers to the expansion battery stack or the power flow between the main unit and the expansion batteries.
 - Smart meter values come from the connected meter and are handled separately from the main unit values.
 - The `Current house consumption` sensor calculates the instantaneous consumption from Jackery's reported live house consumption (`otherLoadPw`) and only uses smart meter net power minus Jackery grid-side input plus Jackery grid-side output as a fallback. This prevents SolarVault feed-in from being incorrectly subtracted from house consumption.
-- `Total savings` is not PV revenue. When year-flow data is available, the integration calculates savings from SolarVault grid-side AC output after inverter/battery effects, subtracts grid-side input and CT public export if present, bounds the result by house consumption, and multiplies it by the configured electricity price. Enable `Create savings calculation detail sensors` to expose the intermediate values and the estimated live loss power as entities.
+- `App total savings` is the raw Jackery app KPI and may look like PV revenue. `Calculated savings` is the local value from SolarVault grid-side AC output after inverter/battery effects, grid-side input, optional CT public export, house consumption, and the configured electricity price. Enable `Create savings calculation detail sensors` to expose the intermediate values, battery-system loss energy, inverter/conversion loss energy, and the calculated live inverter/conversion loss power as entities.
 - Daily/weekly/monthly/yearly energy sensors use `state_class: total` with the appropriate `last_reset` for the respective app period. They are period values, not lifetime monotonically increasing counters.
 - Weekly, monthly, and yearly values are calculated identically from the respective app chart series. The series depends on the payload: PV/home trend totals usually use `y`, battery charge/discharge uses `y1`/`y2`, device grid-side input/output uses `y1`/`y2`, and PV1..PV4 uses `y1`..`y4`. Server total fields are now only used as fallback/diagnostic values because monthly/yearly total fields may be misleading depending on the payload.
 
@@ -156,7 +156,7 @@ For details about the required parameters, see `services.yaml` or the HA Develop
 - Month = calendar month.
 - Year = calendar year.
 - Total/lifetime generation and carbon values prefer the documented app/HTTP/MQTT total fields. If Jackery reports the current month as the year/total, the integration raises those values with explicit same-endpoint month payloads from the same calendar year.
-- Total savings is calculated from self-consumed AC energy when possible, not from PV generation revenue. A cloud value that is missing, below the calculated current-year savings, or shaped like PV revenue is replaced; a higher plausible cloud total is kept. The detailed calculation is documented in [`docs/APP_CLOUD_VALUES.md`](docs/APP_CLOUD_VALUES.md).
+- App total savings remains the raw cloud value. Calculated savings is calculated from self-consumed AC energy when possible, not from PV generation revenue. The detailed calculation is documented in [`docs/APP_CLOUD_VALUES.md`](docs/APP_CLOUD_VALUES.md).
 - Weekly values are explicitly not used to repair monthly, yearly, or total values. Monthly values may only guard yearly values when they come from the same endpoint family and explicit calendar-month app requests.
 - At the start of a month, the weekly value can be higher than the monthly value if the current week still includes days from the previous month. That is not a bug.
 - If Jackery provides contradictory data that cannot be resolved by the guarded same-endpoint month backfill, the integration creates a repair notice and stores details in the diagnostics export under `data_quality`.
@@ -214,10 +214,11 @@ The integration must never silently fix one period using an unrelated period:
 yearly values, only **same-endpoint monthly values** from explicit monthly
 queries in the same calendar year may be used. Generation and CO2 lifetime
 totals are only guarded upward this way; if Jackery later returns correct,
-higher lifetime values, those values win automatically. `Total savings` is the
-exception: it is calculated from self-consumed AC energy so PV revenue is not
-counted as savings. Contradictions that cannot be resolved are surfaced through
-a Home Assistant **Repair** issue and the diagnostics export (**Diagnose**).
+higher lifetime values, those values win automatically. `App total savings`
+keeps the raw app value; the separate calculated savings detail uses
+self-consumed AC energy so PV revenue is not counted as savings.
+Contradictions that cannot be resolved are surfaced through a Home Assistant
+**Repair** issue and the diagnostics export (**Diagnose**).
 The German short form used in earlier issue analysis is: **keine Wochenwerte zur Reparatur**;
 for yearly repairs only **same-endpoint Monatswerte** are
 allowed.

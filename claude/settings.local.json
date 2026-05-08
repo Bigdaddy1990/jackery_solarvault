@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -3 -c \"import ast; ast.parse\\(open\\(r'D:\\\\\\\\Downloads\\\\\\\\Clause\\\\\\\\custom_components\\\\\\\\jackery_solarvault\\\\\\\\sensor.py', encoding='utf-8'\\).read\\(\\)\\); print\\('sensor.py parses OK'\\)\")",
+      "Bash(py -3 -m pytest D:\\\\Downloads\\\\Clause\\\\tests -c D:\\\\Downloads\\\\Clause\\\\pytest.ini -x --tb=short -q)",
+      "Bash(cd /d D:\\\\Downloads\\\\Clause)",
+      "Bash(py -3 -m pytest tests -c pytest.ini -x --tb=short -q)",
+      "Bash(py -3 -m pytest tests --ignore=tests/ha --tb=short -q)",
+      "mcp__Desktop_Commander__read_file",
+      "Bash(Get-Content -Path \"D:\\\\Downloads\\\\Clause\\\\custom_components\\\\jackery_solarvault\\\\util.py\")",
+      "Bash(Select-Object -First 200)",
+      "mcp__Windows-MCP__PowerShell"
+    ]
+  }
+}

@@ -43,7 +43,6 @@ fallbacks read the unmerged HTTP layer when MQTT has not delivered yet.
 | `soc_charge_limit` | `FIELD_SOC_CHG_LIMIT` = `socChgLimit`, `FIELD_SOC_CHARGE_LIMIT` = `socChargeLimit` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
 | `soc_discharge_limit` | `FIELD_SOC_DISCHG_LIMIT` = `socDischgLimit`, `FIELD_SOC_DISCHARGE_LIMIT` = `socDischargeLimit` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
 | `max_output_power` | `FIELD_MAX_OUT_PW` = `maxOutPw` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
-| `max_grid_power` | `FIELD_MAX_GRID_STD_PW` = `maxGridStdPw` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
 | `max_inverter_power` | `FIELD_MAX_INV_STD_PW` = `maxInvStdPw` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
 | `battery_count` | `FIELD_BAT_NUM` = `batNum` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
 | `battery_state` | `FIELD_BAT_STATE` = `batState` | MQTT_PROTOCOL.md `DevicePropertyChange` / `UploadCombineData` |
@@ -81,9 +80,6 @@ same-endpoint month backfill before sensors read the payload.
 | Entity key | Section (`source_section`) | Stat key | HTTP path | Chart series |
 |---|---|---|---|---|
 | `today_load` | `statistic` | `todayLoad` | `/v1/device/stat/systemStatistic` | `—` |
-| `today_battery_charge` | `statistic` | `todayBatteryChg` | `/v1/device/stat/systemStatistic` | `—` |
-| `today_battery_discharge` | `statistic` | `todayBatteryDisChg` | `/v1/device/stat/systemStatistic` | `—` |
-| `today_generation` | `statistic` | `todayGeneration` | `/v1/device/stat/systemStatistic` | `—` |
 | `total_generation` | `statistic` | `totalGeneration` | `/v1/device/stat/systemStatistic` | `—` |
 | `total_revenue` | `statistic` | `totalRevenue` | `/v1/device/stat/systemStatistic` | `—` |
 | `total_carbon_saved` | `statistic` | `totalCarbon` | `/v1/device/stat/systemStatistic` | `—` |
@@ -124,20 +120,20 @@ same-endpoint month backfill before sensors read the payload.
 | `power_price` | `price` | `singlePrice` | `/v1/device/dynamic/powerPriceConfig` | `—` |
 | `device_today_pv_energy` | `device_statistic` | `pvEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_battery_charge` | `device_statistic` | `batChgEgy` | `/v1/device/stat/deviceStatistic` | `—` |
-| `device_today_battery_discharge` | `device_statistic` | `batDisChgEgy` | `/v1/device/stat/deviceStatistic` | `—` |
+| `device_today_battery_discharge` | `device_battery_stat_day` | `totalDischarge` | `/v1/device/stat/battery` | `—` |
 | `device_today_ongrid_input` | `device_statistic` | `inOngridEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_ongrid_output` | `device_statistic` | `outOngridEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_ongrid_to_battery` | `device_statistic` | `ongridOtBatEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_pv_to_battery` | `device_statistic` | `pvOtBatEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 | `device_today_battery_to_ongrid` | `device_statistic` | `batOtGridEgy` | `/v1/device/stat/deviceStatistic` | `—` |
 
-`total_revenue` is published from `statistic.totalRevenue`, but the coordinator
-may replace that raw cloud field with calculated house-side savings. The
+`total_revenue` is published from raw `statistic.totalRevenue`. The coordinator
+also attaches calculated house-side savings under `_savings_calculation`. The
 calculation uses `device_home_stat_year.totalOutGridEnergy`, optional
 `device_home_stat_year.totalInGridEnergy`, optional
 `device_ct_stat_year.totalOutCtEnergy`, `home_trends_year.totalHomeEgy`, and
 `price.singlePrice`; details are exposed on the entity as
-`savings_calculation`. Optional detail entities expose each `_savings_calculation` component using the stable `savings_*` keys, plus `conversion_loss_power` as a live estimated residual from the power balance.
+`savings_calculation`. Optional detail entities expose each `_savings_calculation` component using the stable `savings_*` keys, plus `conversion_loss_power` as a live calculated residual from the power balance.
 
 ## Smart-Meter / CT live values (MQTT only)
 

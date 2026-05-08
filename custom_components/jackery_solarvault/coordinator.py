@@ -40,6 +40,7 @@ from .const import (
     ACTION_ID_SUBDEVICE_3037,
     ACTION_ID_TEMP_UNIT,
     ACTION_ID_WORK_MODEL,
+    ADAPTIVE_KEEPALIVE_INTERVAL_SEC,
     APP_CHART_STAT_METRICS,
     APP_CHART_STAT_PERIODS,
     APP_PERIOD_DATE_TYPES,
@@ -166,6 +167,7 @@ from .const import (
     MQTT_CREDENTIAL_PASSWORD,
     MQTT_CREDENTIAL_USER_ID,
     MQTT_CREDENTIAL_USERNAME,
+    MQTT_LIVE_THRESHOLD_SEC,
     MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
     MQTT_MESSAGE_CONTROL_COMBINE,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -309,6 +311,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     """
 
     _PRICE_OVERRIDE_TTL_SEC = 600
+    _PROPERTY_OVERRIDE_TTL_SEC = 120
 
     _CT_METER_KEYS = CT_METER_KEYS
     _SUBDEVICE_HINT_KEYS = SUBDEVICE_HINT_KEYS
@@ -387,10 +390,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # statistic cadence.
         self._subdevice_query_interval_sec = interval_sec
         self._price_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._property_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._periodic_refresh_unsub: Any | None = None
         self._periodic_refresh_task: asyncio.Task[None] | None = None
         self._mqtt_backfill_task: asyncio.Task[None] | None = None
         self._skipped_refresh_ticks = 0
+        # Adaptive polling: when MQTT push is live, fast polling ticks are
+        # skipped and a full HTTP refresh only runs every keep-alive window.
+        # Initialise to ``-inf`` so the first tick after setup always runs
+        # and primes the interval bookkeeping.
+        self._last_periodic_refresh_completed_monotonic: float = float("-inf")
         # Dedup cache for payload-debug records:
         # (kind, channel, message_type) -> (last_signature, last_emit_monotonic).
         # Bounded by the number of distinct topics the device publishes
@@ -411,6 +420,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # statistic_id, value is the JSON signature of the last published
         # (starts, states) tuple.
         self._stat_import_last_sig: dict[str, str] = {}
+        # Throttle external-statistics import to slow-metric cadence so the
+        # recorder is not invoked on every fast polling tick. The first
+        # tick always runs because the initial value is ``-inf``.
+        self._last_stat_import_monotonic: float = float("-inf")
 
     async def _async_payload_debug_event(
         self, event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]]
@@ -650,10 +663,37 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "Jackery: skipping polling tick because previous refresh is still running"
             )
             return
+        if self._should_skip_tick_for_live_mqtt():
+            self._skipped_refresh_ticks += 1
+            _LOGGER.debug(
+                "Jackery: skipping polling tick because MQTT push is live "
+                "(last keep-alive %.0fs ago)",
+                time.monotonic() - self._last_periodic_refresh_completed_monotonic,
+            )
+            return
         self._periodic_refresh_task = self.hass.async_create_task(
             self._async_periodic_refresh(),
             name=f"{DOMAIN}_fixed_rate_refresh",
         )
+
+    def _should_skip_tick_for_live_mqtt(self) -> bool:
+        """Return True when MQTT push is live and the keep-alive window holds.
+
+        When MQTT delivers state at < ``MQTT_LIVE_THRESHOLD_SEC`` cadence
+        we let it carry the load and only HTTP-poll every
+        ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC`` for slow metrics. The fast
+        polling tick still runs unaltered when MQTT is silent or while
+        the keep-alive window has elapsed since the last full refresh.
+        """
+        if self._mqtt is None:
+            return False
+        elapsed = self._mqtt.seconds_since_last_message
+        if elapsed is None or elapsed > MQTT_LIVE_THRESHOLD_SEC:
+            return False
+        since_last_refresh = (
+            time.monotonic() - self._last_periodic_refresh_completed_monotonic
+        )
+        return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
 
     async def _async_periodic_refresh(self) -> None:
         """Perform one scheduled refresh and keep errors inside the coordinator."""
@@ -663,6 +703,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         except Exception as err:
             _LOGGER.debug("Jackery scheduled refresh failed: %s", err)
             return
+        finally:
+            self._last_periodic_refresh_completed_monotonic = time.monotonic()
         elapsed = time.monotonic() - started
         interval_sec = self._configured_update_interval.total_seconds()
         if elapsed > interval_sec:
@@ -815,9 +857,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if topic.endswith("/device") or topic.endswith("/config"):
             if body:
                 if is_subdevice:
-                    touched = self._merge_subdevice_data(updated, body) or touched
+                    touched = (
+                        self._merge_subdevice_data(updated, body, device_id=device_id)
+                        or touched
+                    )
                 else:
-                    props = self._merge_main_properties(
+                    props = self._merge_main_properties_for_device(
+                        device_id,
                         current.get(PAYLOAD_PROPERTIES) or {},
                         body,
                     )
@@ -894,7 +940,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             and body
         ):
-            props = self._merge_main_properties(
+            props = self._merge_main_properties_for_device(
+                device_id,
                 current.get(PAYLOAD_PROPERTIES) or {},
                 body,
             )
@@ -910,7 +957,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             source = body if body else payload
             if isinstance(source, dict):
-                touched = self._merge_subdevice_data(updated, source) or touched
+                touched = (
+                    self._merge_subdevice_data(updated, source, device_id=device_id)
+                    or touched
+                )
 
         if not touched:
             return
@@ -1045,6 +1095,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         return cls._sync_property_aliases(merged)
 
+    def _active_property_overrides(self, device_id: str) -> dict[str, Any]:
+        """Return unexpired local writes that should beat stale snapshots."""
+        override = self._property_overrides.get(device_id)
+        if override is None:
+            return {}
+        override_ts, updates = override
+        if time.monotonic() - override_ts >= self._PROPERTY_OVERRIDE_TTL_SEC:
+            self._property_overrides.pop(device_id, None)
+            return {}
+        return dict(updates)
+
+    def _merge_main_properties_for_device(
+        self,
+        device_id: str,
+        base: dict[str, Any],
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge main properties while preserving recent local setter writes."""
+        merged = self._merge_main_properties(base, updates)
+        overrides = self._active_property_overrides(device_id)
+        if not overrides:
+            return merged
+        return self._merge_main_properties(merged, overrides)
+
     @staticmethod
     def _find_dict_with_any_key(
         obj: Any,
@@ -1109,7 +1183,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -1207,7 +1281,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -1220,6 +1294,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self,
         updated: dict[str, Any],
         source: dict[str, Any],
+        *,
+        device_id: str | None = None,
     ) -> bool:
         """Route accessory data to accessory sections instead of main props."""
         touched = False
@@ -1245,8 +1321,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # indices. The merge runs synchronously; the actual
                 # async_remove_device call happens in the post-update
                 # cleanup hook below.
-                device_id = self._resolve_device_id_from_payload(updated)
-                if device_id:
+                removal_device_id = self._resolve_device_id_from_payload(updated)
+                if removal_device_id:
+                    if device_id is None:
+                        device_id = removal_device_id
                     for pack_index in dropped_indices:
                         identifier = (
                             DOMAIN,
@@ -1270,10 +1348,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if key in self._SUBDEVICE_MAIN_MIRROR_KEYS
         }
         if mirror:
-            props = self._merge_main_properties(
-                updated.get(PAYLOAD_PROPERTIES) or {},
-                mirror,
-            )
+            if device_id is None:
+                props = self._merge_main_properties(
+                    updated.get(PAYLOAD_PROPERTIES) or {},
+                    mirror,
+                )
+            else:
+                props = self._merge_main_properties_for_device(
+                    device_id,
+                    updated.get(PAYLOAD_PROPERTIES) or {},
+                    mirror,
+                )
             updated[PAYLOAD_PROPERTIES] = props
             touched = True
 
@@ -1627,10 +1712,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         if not updates or not self.data or device_id not in self.data:
             return
+        clean_updates = self._sanitize_main_properties(updates)
+        active = self._active_property_overrides(device_id)
+        active.update(clean_updates)
+        self._property_overrides[device_id] = (time.monotonic(), active)
         new_data = dict(self.data)
         entry = dict(new_data[device_id])
         props = self._sanitize_main_properties(entry.get(PAYLOAD_PROPERTIES) or {})
-        props = self._merge_dict_values(props, self._sanitize_main_properties(updates))
+        props = self._merge_dict_values(props, clean_updates)
         entry[PAYLOAD_PROPERTIES] = props
         new_data[device_id] = entry
         self._push_partial_update(new_data)
@@ -2573,7 +2662,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -2600,7 +2689,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self.hass,
             DOMAIN,
             issue_id,
-            is_fixable=False,
+            is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key=REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY,
             translation_placeholders={
@@ -2612,6 +2701,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 ),
                 "examples": examples or "unknown",
             },
+            data={"entry_id": self.entry.entry_id},
         )
 
     async def _async_import_app_chart_statistics(
@@ -3342,7 +3432,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             http_props = self._sanitize_main_properties(
                 payload.get(PAYLOAD_PROPERTIES) or {}
             )
-            merged_props = self._merge_main_properties(
+            merged_props = self._merge_main_properties_for_device(
+                dev_id,
                 old_entry.get(PAYLOAD_PROPERTIES) or {},
                 http_props,
             )
@@ -3433,7 +3524,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             await self._async_ensure_mqtt()
         await self._async_update_data_quality_issue(result)
-        await self._async_import_app_chart_statistics(result)
+        # External-statistics import only runs at the slow-metric cadence
+        # (server-side chart updates also operate at ~5 min granularity)
+        # so the recorder is not woken up on every fast polling tick.
+        now_monotonic = time.monotonic()
+        if (
+            now_monotonic - self._last_stat_import_monotonic
+            >= SLOW_METRICS_INTERVAL_SEC
+        ):
+            await self._async_import_app_chart_statistics(result)
+            self._last_stat_import_monotonic = now_monotonic
         self._schedule_mqtt_backfill_queries(result)
         # Drain queued device-registry removals from the stale-pack
         # cleanup. Fire-and-forget on the same task so a registry

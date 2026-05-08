@@ -327,7 +327,7 @@ def safe_float(value: Any) -> float | None:
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -341,10 +341,10 @@ def safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
@@ -451,7 +451,7 @@ def safe_bool(value: Any) -> bool | None:
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -1263,9 +1263,31 @@ def _calculated_savings_from_year(
     if battery_charge is not None and battery_discharge is not None:
         battery_gap = max(0.0, battery_charge - battery_discharge)
 
-    pv_not_savings_energy = None
+    conversion_loss_energy = None
+    conversion_loss_energy_signed = None
+    if (
+        year_generation is not None
+        and battery_charge is not None
+        and battery_discharge is not None
+    ):
+        conversion_loss_energy_signed = (
+            max(0.0, year_generation)
+            + max(0.0, device_input or 0.0)
+            + max(0.0, battery_discharge)
+            - max(0.0, device_output)
+            - max(0.0, battery_charge)
+        )
+        # The published state stays clamped to ``≥ 0`` because a power-loss
+        # sensor must never go negative; the raw signed residual is kept
+        # alongside as a diagnostic so users can spot measurement asymmetry
+        # or missing sources rather than seeing the value silently absorbed.
+        conversion_loss_energy = max(0.0, conversion_loss_energy_signed)
+
+    pv_residual_after_self_consumption_energy = None
     if year_generation is not None:
-        pv_not_savings_energy = max(0.0, year_generation - savings_energy)
+        pv_residual_after_self_consumption_energy = max(
+            0.0, year_generation - savings_energy
+        )
 
     calculated_total = round(savings_energy * price, 2)
     return {
@@ -1287,7 +1309,17 @@ def _calculated_savings_from_year(
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
             "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
-            "pv_not_savings_ac_energy_kwh": _round_stat_value(pv_not_savings_energy),
+            "conversion_loss_year_kwh": _round_stat_value(conversion_loss_energy),
+            "conversion_loss_year_kwh_signed": _round_stat_value(
+                conversion_loss_energy_signed
+            ),
+            "pv_residual_after_self_consumption_year_kwh": _round_stat_value(
+                pv_residual_after_self_consumption_energy
+            ),
+            # Legacy diagnostic key retained in attributes for one release.
+            "pv_not_savings_ac_energy_kwh": _round_stat_value(
+                pv_residual_after_self_consumption_energy
+            ),
         },
     }
 
@@ -1502,11 +1534,11 @@ def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
 
     The Jackery ``systemStatistic`` endpoint can suffer the same month-only bug
     as the app year charts. Generation and carbon remain lower-bound guarded by
-    the corrected PV year total. ``totalRevenue`` is different: it represents
-    savings and must not equal raw PV revenue when part of the energy is stored,
-    exported, or lost in conversion. When enough year-flow data is available we
-    calculate savings from grid-side AC output after conversion losses, bounded
-    by house consumption and reduced by CT export if a CT period payload exists.
+    the corrected PV year total. ``totalRevenue`` itself stays the raw app KPI
+    because Jackery often reports PV revenue there. A separate
+    ``_savings_calculation`` payload exposes the real local savings calculated
+    from grid-side AC output after conversion losses, bounded by house
+    consumption and reduced by CT export if a CT period payload exists.
     """
     statistic = payload.get(PAYLOAD_STATISTIC)
     pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
@@ -1565,13 +1597,9 @@ def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
             savings["raw_cloud_total"] = raw_revenue
             savings["pv_revenue_candidates"] = candidates
             savings["decision"] = reason
-            if publish_calculated:
-                out[APP_STAT_TOTAL_REVENUE] = round(calculated_revenue, 2)
-                savings["published_value"] = round(calculated_revenue, 2)
-                savings["published_value_source"] = "calculated_savings"
-            else:
-                savings["published_value"] = raw_revenue
-                savings["published_value_source"] = "cloud_total"
+            savings["would_replace_cloud_total"] = publish_calculated
+            savings["published_value"] = raw_revenue
+            savings["published_value_source"] = "cloud_total"
             out[APP_SAVINGS_CALC_META] = savings
 
     raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))

@@ -61,9 +61,9 @@ home_energy_*                 /v1/device/stat/sys/home/trends (home_trends_*)   
 Lifetime totals (``total_generation``, ``total_revenue``, ``total_carbon``)
 prefer ``/v1/device/stat/systemStatistic``. Per
 ``DATA_SOURCE_PRIORITY.md`` generation/carbon are guarded against broken
-month-only cloud totals. ``total_revenue`` is additionally calculated from
-year energy flows when available, because savings are self-consumed AC energy,
-not raw PV generation revenue.
+month-only cloud totals. ``total_revenue`` stays the raw Jackery app savings
+KPI, while the separate ``_savings_calculation`` metadata and optional detail
+sensor expose the locally calculated savings from self-consumed AC energy.
 
 Unique IDs follow ``UNIQUE_ID_CONTRACT.md`` strictly:
 ``<device_id>_<stable_key_suffix>`` for the main device and
@@ -127,9 +127,6 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
-    APP_STAT_TODAY_BATTERY_CHARGE,
-    APP_STAT_TODAY_BATTERY_DISCHARGE,
-    APP_STAT_TODAY_GENERATION,
     APP_STAT_TODAY_LOAD,
     APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
@@ -203,7 +200,6 @@ from .const import (
     FIELD_LOAD_PW,
     FIELD_LONGITUDE,
     FIELD_MAC,
-    FIELD_MAX_GRID_STD_PW,
     FIELD_MAX_INV_STD_PW,
     FIELD_MAX_IOT_NUM,
     FIELD_MAX_OUT_PW,
@@ -326,10 +322,24 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
+
+
+def _signed_diff(merged_value: Any, http_value: Any) -> int | None:
+    """Return ``merged - http`` as int when both inputs parse, else None.
+
+    Used to surface MQTT-vs-HTTP drift in net-power sensor attributes so
+    users (and the data-quality repair) can see when the two transports
+    disagree on the same field.
+    """
+    merged_int = safe_int(merged_value)
+    http_int = safe_int(http_value)
+    if merged_int is None or http_int is None:
+        return None
+    return merged_int - http_int
 
 
 def _identity(value: Any) -> Any:
@@ -691,14 +701,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         key="max_output_power",
         translation_key="max_output_power",
         getter=_prop(FIELD_MAX_OUT_PW),
-        device_class=SensorDeviceClass.POWER,
-        native_unit_of_measurement=UnitOfPower.WATT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    JackerySensorDescription(
-        key="max_grid_power",
-        translation_key="max_grid_power",
-        getter=_prop(FIELD_MAX_GRID_STD_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1099,50 +1101,6 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-    ),
-    # Disabled by default since 2.4.0 — duplicates device_today_battery_charge
-    # for single-device systems. The device-scoped sensor is the canonical one.
-    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_BATTERY_CHARGE
-    JackeryStatSensorDescription(
-        key="today_battery_charge",
-        translation_key="today_battery_charge",
-        stat_key=APP_STAT_TODAY_BATTERY_CHARGE,
-        transform=safe_float,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        reset_period=DATE_TYPE_DAY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        entity_registry_enabled_default=False,
-    ),
-    # Disabled by default since 2.4.0 — duplicates device_today_battery_discharge
-    # for single-device systems. The device-scoped sensor is the canonical one.
-    # Existing installs keep this entity enabled (HA convention preserves
-    # registry_enabled state for already-known entities).
-    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_BATTERY_DISCHARGE
-    JackeryStatSensorDescription(
-        key="today_battery_discharge",
-        translation_key="today_battery_discharge",
-        stat_key=APP_STAT_TODAY_BATTERY_DISCHARGE,
-        transform=safe_float,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        reset_period=DATE_TYPE_DAY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        entity_registry_enabled_default=False,
-    ),
-    # Disabled by default since 2.4.0 — duplicates device_today_pv_energy
-    # for single-device systems. The device-scoped sensor is the canonical one.
-    # Source: /v1/device/stat/systemStatistic field APP_STAT_TODAY_GENERATION
-    JackeryStatSensorDescription(
-        key="today_generation",
-        translation_key="today_generation",
-        stat_key=APP_STAT_TODAY_GENERATION,
-        transform=safe_float,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        reset_period=DATE_TYPE_DAY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        entity_registry_enabled_default=False,
     ),
     # Source: /v1/device/stat/systemStatistic field APP_STAT_TOTAL_GENERATION
     JackeryStatSensorDescription(
@@ -1679,14 +1637,16 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/deviceStatistic field APP_DEVICE_STAT_BATTERY_DISCHARGE
+    # Source: /v1/device/stat/battery dateType=day field APP_STAT_TOTAL_DISCHARGE.
+    # The deviceStatistic field APP_DEVICE_STAT_BATTERY_DISCHARGE can mirror
+    # APP_DEVICE_STAT_BATTERY_TO_GRID on some accounts, so it is only fallback.
     JackeryStatSensorDescription(
         key="device_today_battery_discharge",
         translation_key="device_today_battery_discharge",
-        stat_key=APP_DEVICE_STAT_BATTERY_DISCHARGE,
-        section=PAYLOAD_DEVICE_STATISTIC,
+        stat_key=APP_STAT_TOTAL_DISCHARGE,
+        section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
         fallback_sources=(
-            (f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_DISCHARGE),
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_DISCHARGE),
         ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
@@ -1796,87 +1756,6 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         icon="mdi:currency-eur",
     ),
     JackerySavingsDetailSensorDescription(
-        key="savings_pv_year_energy",
-        translation_key="savings_pv_year_energy",
-        path=("source_energy", "pv_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:solar-power-variant",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_device_grid_input_year_energy",
-        translation_key="savings_device_grid_input_year_energy",
-        path=("source_energy", "device_grid_side_input_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:transmission-tower-import",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_device_grid_output_year_energy",
-        translation_key="savings_device_grid_output_year_energy",
-        path=("source_energy", "device_grid_side_output_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:transmission-tower-export",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_device_grid_net_output_year_energy",
-        translation_key="savings_device_grid_net_output_year_energy",
-        path=("source_energy", "device_grid_side_net_output_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:transmission-tower",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_basis_ac_year_energy",
-        translation_key="savings_basis_ac_year_energy",
-        path=("source_energy", "savings_basis_ac_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:home-import-outline",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_home_consumption_year_energy",
-        translation_key="savings_home_consumption_year_energy",
-        path=("source_energy", "home_consumption_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:home-lightning-bolt",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_ct_public_export_year_energy",
-        translation_key="savings_ct_public_export_year_energy",
-        path=("source_energy", "ct_public_export_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:transmission-tower-export",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_battery_charge_year_energy",
-        translation_key="savings_battery_charge_year_energy",
-        path=("source_energy", "battery_charge_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:battery-arrow-up",
-    ),
-    JackerySavingsDetailSensorDescription(
-        key="savings_battery_discharge_year_energy",
-        translation_key="savings_battery_discharge_year_energy",
-        path=("source_energy", "battery_discharge_year_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        icon="mdi:battery-arrow-down",
-    ),
-    JackerySavingsDetailSensorDescription(
         key="savings_battery_loss_year_energy",
         translation_key="savings_battery_loss_year_energy",
         path=("source_energy", "battery_charge_discharge_gap_kwh"),
@@ -1886,11 +1765,18 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         icon="mdi:battery-alert-variant-outline",
     ),
     JackerySavingsDetailSensorDescription(
-        key="savings_pv_not_savings_year_energy",
-        translation_key="savings_pv_not_savings_year_energy",
-        path=("source_energy", "pv_not_savings_ac_energy_kwh"),
+        key="savings_conversion_loss_year_energy",
+        translation_key="savings_conversion_loss_year_energy",
+        path=("source_energy", "conversion_loss_year_kwh"),
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-off",
+    ),
+    JackerySavingsDetailSensorDescription(
+        key="savings_pv_residual_year_energy",
+        translation_key="savings_pv_residual_year_energy",
+        path=("source_energy", "pv_residual_after_self_consumption_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant-outline",
     ),
@@ -2124,7 +2010,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
 
 class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
-    """Live estimated unassigned conversion/loss power from the power balance."""
+    """Live calculated unassigned conversion/loss power from the power balance."""
 
     _attr_translation_key = "conversion_loss_power"
     _attr_device_class = SensorDeviceClass.POWER
@@ -2138,47 +2024,62 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "conversion_loss_power")
 
+    def _battery_power_components(self) -> tuple[float | None, float | None, str]:
+        props = self._properties
+        stack_in = safe_float(props.get(FIELD_STACK_IN_PW))
+        stack_out = safe_float(props.get(FIELD_STACK_OUT_PW))
+        if stack_in is not None and stack_out is not None:
+            return stack_in, stack_out, "stackInPw/stackOutPw"
+        return (
+            safe_float(props.get(FIELD_BAT_IN_PW)),
+            safe_float(props.get(FIELD_BAT_OUT_PW)),
+            "batInPw/batOutPw",
+        )
+
     def _components(self) -> dict[str, float | None]:
         props = self._properties
-        ct = self._payload.get(PAYLOAD_CT_METER) or {}
-        if not isinstance(ct, dict):
-            ct = {}
-        home = jackery_corrected_home_consumption_power(ct, props)
+        battery_charge_power, battery_discharge_power, _source = (
+            self._battery_power_components()
+        )
         return {
             "pv_power": safe_float(props.get(FIELD_PV_PW)),
-            "battery_charge_power": safe_float(props.get(FIELD_BAT_IN_PW)),
-            "battery_discharge_power": safe_float(props.get(FIELD_BAT_OUT_PW)),
+            "battery_charge_power": battery_charge_power,
+            "battery_discharge_power": battery_discharge_power,
             "grid_side_input_power": safe_float(jackery_grid_side_input_power(props)),
             "grid_side_output_power": safe_float(jackery_grid_side_output_power(props)),
-            "home_consumption_power": home.value if home is not None else None,
         }
 
     @property
     def native_value(self) -> float | None:
-        """Return estimated positive residual power."""
+        """Return calculated positive residual power."""
         c = self._components()
         if any(value is None for value in c.values()):
             return None
         produced = (
             c["pv_power"] + c["battery_discharge_power"] + c["grid_side_input_power"]
         )
-        consumed = (
-            c["home_consumption_power"]
-            + c["battery_charge_power"]
-            + c["grid_side_output_power"]
-        )
+        consumed = c["battery_charge_power"] + c["grid_side_output_power"]
         return round(max(0.0, produced - consumed), 2)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return formula and source components."""
+        battery_charge_power, battery_discharge_power, battery_source = (
+            self._battery_power_components()
+        )
         return {
             "formula": (
                 "max(pv_power + battery_discharge_power + grid_side_input_power "
-                "- home_consumption_power - battery_charge_power "
-                "- grid_side_output_power, 0)"
+                "- battery_charge_power - grid_side_output_power, 0)"
             ),
-            "scope": "estimated residual from mixed AC/DC live power fields",
+            "scope": "calculated residual from SolarVault DC/AC live power fields",
+            "battery_power_source": battery_source,
+            "stackInPw": self._properties.get(FIELD_STACK_IN_PW),
+            "stackOutPw": self._properties.get(FIELD_STACK_OUT_PW),
+            "batInPw": self._properties.get(FIELD_BAT_IN_PW),
+            "batOutPw": self._properties.get(FIELD_BAT_OUT_PW),
+            "selected_battery_charge_power": battery_charge_power,
+            "selected_battery_discharge_power": battery_discharge_power,
             **self._components(),
         }
 
@@ -2421,6 +2322,8 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         """
         if self._reset_period is None:
             return None
+        if self._reset_period == DATE_TYPE_DAY and self._is_period_data_stale():
+            return _period_start(self._reset_period)
         # Prefer the begin_date stamped on the source by the coordinator
         # (`source[APP_REQUEST_META][APP_REQUEST_BEGIN_DATE]`), fall
         # back to wall-clock period start for sources that have no
@@ -2552,17 +2455,23 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         fb_total = _trend_series_sum(fb_source, fb_section, fb_stat_key)
                     if fb_total is not None:
                         raw = fb_total
+                        section = fb_section
+                        stat_key = fb_stat_key
+                        source = fb_source
+                        series_key = _trend_series_key(section, stat_key)
                         break
 
-            # Stale-period guard: if the wall clock has crossed into a
-            # new period boundary but the source still carries the
-            # previous period's begin_date, refuse to publish the
-            # stale value as the new period's bucket. Returning None
-            # makes HA Recorder write "unavailable" for that brief
-            # window — much safer than letting yesterday's total
-            # masquerade as today's reading.
-            if self._reset_period and self._is_period_data_stale():
-                self._cached_native_value = None
+            # Stale-period guard: if the wall clock has crossed into a new
+            # period boundary but the source still carries the previous
+            # period's begin_date, do not publish yesterday's total as the
+            # new period. Daily sensors publish 0 for the fresh day so HA
+            # does not show them as unknown after midnight.
+            stale_period = self._reset_period and self._is_period_data_stale()
+            if stale_period:
+                raw = 0 if self._reset_period == DATE_TYPE_DAY else None
+                self._cached_native_value = (
+                    self.entity_description.transform(raw) if raw is not None else None
+                )
             else:
                 self._cached_native_value = (
                     self.entity_description.transform(raw) if raw is not None else None
@@ -2625,6 +2534,11 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         attrs["cloud_year_appears_incomplete"] = (
                             len(nonzero_months) == 1 and nonzero_months[0] > 0
                         )
+            if stale_period:
+                attrs["stale_period_data"] = True
+                attrs["stale_period_begin_date"] = self._period_begin_from_meta()
+                if self._reset_period == DATE_TYPE_DAY:
+                    attrs["stale_period_fallback"] = "zero_until_fresh_day_data"
             self._cached_attrs = attrs
             return
 
@@ -2635,6 +2549,9 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 fb_source = self._source_for_section(fb_section)
                 raw = fb_source.get(fb_stat_key)
                 if raw is not None:
+                    section = fb_section
+                    stat_key = fb_stat_key
+                    source = fb_source
                     break
         self._cached_native_value = (
             self.entity_description.transform(raw) if raw is not None else None
@@ -2653,6 +2570,19 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         savings = source.get(APP_SAVINGS_CALC_META)
         if stat_key == APP_STAT_TOTAL_REVENUE and isinstance(savings, dict):
             self._cached_attrs["savings_calculation"] = savings
+        # APP cloud quirk: ``todayLoad`` historically equals the inverter's
+        # on-grid output for the day, not the real household consumption.
+        # Flag the caveat in attributes so dashboards do not mistake it
+        # for a smart-meter total. The smart_meter_derived sensors expose
+        # the real home consumption when the option is enabled.
+        if stat_key == APP_STAT_TODAY_LOAD:
+            self._cached_attrs["cloud_field"] = "todayLoad"
+            self._cached_attrs["cloud_caveat"] = (
+                "Jackery cloud reports the inverter's on-grid output for "
+                "today; this is not smart-meter home consumption. For "
+                "actual consumption enable the smart_meter_derived option "
+                "and use the home_consumption sensor."
+            )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -2742,6 +2672,8 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
                 raw = self._pack.get(alias)
         if raw is None and field == FIELD_VERSION:
             raw = self._pack.get(FIELD_CURRENT_VERSION)
+        if raw is None and field == FIELD_DEVICE_SN:
+            raw = self._pack.get(FIELD_DEV_SN) or self._pack.get(FIELD_SN)
         if raw is None and field == FIELD_UPDATE_STATUS:
             raw = self._pack.get(FIELD_IS_FIRMWARE_UPGRADE)
         if raw is None:
@@ -2974,7 +2906,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
             try:
                 json.dumps(v)
                 attrs[k] = v
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 attrs[k] = str(v)
         return attrs
 
@@ -3081,8 +3013,7 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return diagnostic attributes for the current state."""
-        http_props = self._http_properties
-        props = http_props or self._properties
+        http_props = self._http_properties or {}
         merged = self._properties
         return {
             "formula": "batOutPw - batInPw",
@@ -3091,10 +3022,14 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
             "negative": "battery charge",
             "batOutPw": merged.get(FIELD_BAT_OUT_PW),
             "batInPw": merged.get(FIELD_BAT_IN_PW),
-            "http_batOutPw": props.get(FIELD_BAT_OUT_PW),
-            "http_batInPw": props.get(FIELD_BAT_IN_PW),
-            "merged_batOutPw": merged.get(FIELD_BAT_OUT_PW),
-            "merged_batInPw": merged.get(FIELD_BAT_IN_PW),
+            "http_batOutPw": http_props.get(FIELD_BAT_OUT_PW),
+            "http_batInPw": http_props.get(FIELD_BAT_IN_PW),
+            "mqtt_minus_http_batInPw": _signed_diff(
+                merged.get(FIELD_BAT_IN_PW), http_props.get(FIELD_BAT_IN_PW)
+            ),
+            "mqtt_minus_http_batOutPw": _signed_diff(
+                merged.get(FIELD_BAT_OUT_PW), http_props.get(FIELD_BAT_OUT_PW)
+            ),
             "stackOutPw": merged.get(FIELD_STACK_OUT_PW),
             "stackInPw": merged.get(FIELD_STACK_IN_PW),
         }
@@ -3128,7 +3063,7 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return diagnostic attributes for the current state."""
         props = self._properties
-        http_props = self._http_properties
+        http_props = self._http_properties or {}
         return {
             "formula": "stackOutPw - stackInPw",
             "source": "main_device_stack_bus",
@@ -3136,10 +3071,14 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
             "negative": "complete battery stack charge",
             "stackOutPw": props.get(FIELD_STACK_OUT_PW),
             "stackInPw": props.get(FIELD_STACK_IN_PW),
-            "merged_batOutPw": props.get(FIELD_BAT_OUT_PW),
-            "merged_batInPw": props.get(FIELD_BAT_IN_PW),
-            "http_batOutPw": http_props.get(FIELD_BAT_OUT_PW),
-            "http_batInPw": http_props.get(FIELD_BAT_IN_PW),
+            "http_stackOutPw": http_props.get(FIELD_STACK_OUT_PW),
+            "http_stackInPw": http_props.get(FIELD_STACK_IN_PW),
+            "mqtt_minus_http_stackInPw": _signed_diff(
+                props.get(FIELD_STACK_IN_PW), http_props.get(FIELD_STACK_IN_PW)
+            ),
+            "mqtt_minus_http_stackOutPw": _signed_diff(
+                props.get(FIELD_STACK_OUT_PW), http_props.get(FIELD_STACK_OUT_PW)
+            ),
             "battery_pack_outPw_sum": sum(
                 safe_int(pack.get(FIELD_OUT_PW)) or 0
                 for pack in (self._payload.get(PAYLOAD_BATTERY_PACKS) or [])

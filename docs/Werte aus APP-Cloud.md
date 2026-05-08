@@ -34,13 +34,13 @@ Batterie raus: 4=33,54kWh 5=20,99kWh Jahr=54,53kWh
 
 PV Gesamt: 4=146,51kWh PV-ertrag4=41,04€ ; 5=81,51kWh PV-ertrag 5=22,82€ ; Jahr=228,02kWh PV-ertrag=63,86€
 
-Wichtig: `PV-ertrag` ist nicht dasselbe wie `Gesamt Ersparnis`.
+Wichtig: `PV-ertrag` ist nicht dasselbe wie `Berechnete Ersparnis`.
 Der PV-Ertrag in Euro ist `PV-kWh * Strompreis` fuer die PV-Periode. Die
 Ersparnis zaehlt dagegen nur Energie, die das Haus tatsaechlich vom SolarVault
 nutzt. PV-Anteile, die ins oeffentliche Netz gehen, im Akku verbleiben oder als
 Umrichter-/Batterieverlust verloren gehen, duerfen nicht als Ersparnis zaehlen.
 
-Berechnung fuer `systemStatistic.totalRevenue` / `Gesamt Ersparnis`:
+Berechnung fuer `_savings_calculation.calculated_total` / `Berechnete Ersparnis`:
 
 - Basis ist die netzseitige AC-Ausgabe des Geraets nach Umrichter-/
   Akkueffekten: `device_home_stat_year.totalOutGridEnergy` minus
@@ -55,9 +55,18 @@ Berechnung fuer `systemStatistic.totalRevenue` / `Gesamt Ersparnis`:
   gezaehlt werden.
 - Der Euro-Wert ist `Ersparnis-kWh * price.singlePrice`. Wenn der Preis nicht
   direkt vorhanden ist, wird er aus `PV-ertrag / PV-kWh` abgeleitet.
-- Batterie rein/raus wird als Plausibilitaets-/Diagnosewert mitgefuehrt; die
-  eigentliche Ersparnis nutzt die AC-Ausgabe, damit Umrichter- und
+- Batterie rein/raus wird als Plausibilitaets-/Diagnosewert mitgefuehrt. Die
+  Differenz `Batterie rein - Batterie raus` wird als
+  `Batteriesystem Verlustenergie Jahr` exponiert. Das ist eine Jahresenergie
+  in kWh, keine Momentanleistung.
+- Die eigentliche Ersparnis nutzt die AC-Ausgabe, damit Umrichter- und
   Batterie-/Speicherverluste nicht doppelt gezaehlt werden.
+- `PV-Restenergie nach Eigenverbrauch` ist `PV-Jahresenergie - selbst genutzte
+  AC-Energie`. Das ist ein Restwert, keine Verlustleistung und nicht automatisch
+  oeffentliche Netzeinspeisung. Oeffentliche Netzeinspeisung ist nur dann
+  separat bekannt, wenn `device_ct_stat_year.totalOutCtEnergy` geliefert wird.
+  Verluste bleiben eigene berechnete Verlustwerte: Batteriesystem-Verlustenergie
+  und Wechselrichter-/Umwandlungsverlustenergie.
 
 Absicherung in der Integration:
 
@@ -71,16 +80,14 @@ Absicherung in der Integration:
   `/v1/device/stat/sys/home/trends` fuer Hausverbrauch.
 - `systemStatistic.totalGeneration` und `totalCarbon` werden nicht abgesenkt,
   sondern nur auf den korrigierten PV-Jahreswert als Lower Bound angehoben.
-- `systemStatistic.totalRevenue` wird separat aus den Jahresflusswerten fuer
-  Haus-Eigenverbrauch berechnet, wenn diese Werte vorhanden sind. Ein
-  Cloud-Wert, der nur PV-Ertrag abbildet oder unter der berechneten aktuellen
-  Jahres-Ersparnis liegt, wird ersetzt. Ein hoeherer plausibler Cloud-Gesamtwert
-  bleibt erhalten, damit zukuenftig korrekte Jackery-Gesamtwerte nicht
-  ueberschrieben werden.
+- `systemStatistic.totalRevenue` bleibt als `App-Gesamtersparnis` der rohe
+  Jackery-Cloudwert. Die lokal berechnete Ersparnis wird separat unter
+  `_savings_calculation.calculated_total` abgelegt und ueber den optionalen
+  Detail-Sensor `Berechnete Ersparnis` exponiert.
 - Jeder korrigierte Jahrespayload traegt `_year_month_backfill`; korrigierte
   Gesamtwerte tragen `_total_lower_bound_guard`, damit Diagnoseexporte Rohwert,
   korrigierten Wert und Quelle nachvollziehbar zeigen.
-- Der Ersparnis-Sensor traegt `_savings_calculation` mit Formel, Rohwert,
-  veroeffentlichtem Wert und den verwendeten Energiekomponenten. Optional
-  koennen diese Zwischenwerte und die geschaetzte aktuelle Verlustleistung als
+- Der App-Gesamtersparnis-Sensor traegt `_savings_calculation` mit Formel,
+  Rohwert, berechnetem Wert und den verwendeten Energiekomponenten. Optional
+  koennen diese Zwischenwerte und die berechnete aktuelle Verlustleistung als
   eigene Home-Assistant-Entitaeten aktiviert werden.

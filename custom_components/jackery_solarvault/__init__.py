@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 import logging
 from pathlib import Path
@@ -139,8 +140,19 @@ def _copy_cached_jackery_brand_images(source_dirs: tuple[str, ...]) -> list[str]
     return copied
 
 
+_BRAND_CACHE_HASS_DATA_KEY = f"{DOMAIN}_brand_cache_synced"
+
+
 async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
-    """Install cached Jackery brand PNGs without blocking the event loop."""
+    """Install cached Jackery brand PNGs without blocking the event loop.
+
+    Runs at most once per HA process: ``async_setup`` itself only fires on
+    HA boot, but a dedicated flag guards against re-entry from tests or
+    manual ``async_setup`` calls. Subsequent boots re-check size cheaply.
+    """
+    if hass.data.get(_BRAND_CACHE_HASS_DATA_KEY):
+        return
+    hass.data[_BRAND_CACHE_HASS_DATA_KEY] = True
     source_dirs = (
         hass.config.path(
             ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN
@@ -340,9 +352,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: fixed polling interval set to %ss", interval_sec)
 
+    # Discovery must run first (MQTT subscriptions and the first refresh
+    # both rely on the device list it produces). The HTTP first refresh and
+    # the MQTT connect afterwards are independent and run in parallel to
+    # cut the observed config-entry setup time roughly in half on slow
+    # cloud connections.
     await coordinator.async_discover()
-    await coordinator.async_config_entry_first_refresh()
-    await coordinator.async_start_mqtt()
+    refresh_result, mqtt_result = await asyncio.gather(
+        coordinator.async_config_entry_first_refresh(),
+        coordinator.async_start_mqtt(),
+        return_exceptions=True,
+    )
+    if isinstance(refresh_result, BaseException):
+        raise refresh_result
+    if isinstance(mqtt_result, BaseException):
+        # MQTT failure must not block setup — push is an optional channel
+        # on top of polling. Log and continue.
+        _LOGGER.warning(
+            "Jackery MQTT push could not start during setup: %s", mqtt_result
+        )
 
     entry.runtime_data = coordinator
     # Do not prune optional runtime sensors here: app/MQTT/Combine backed

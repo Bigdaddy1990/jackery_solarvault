@@ -32,6 +32,7 @@ from .const import (
     FIELD_MAX_FEED_GRID,
     FIELD_MAX_GRID_STD_PW,
     FIELD_MAX_OUT_PW,
+    FIELD_MODEL_CODE,
     FIELD_SINGLE_CURRENCY,
     FIELD_SINGLE_CURRENCY_CODE,
     FIELD_SINGLE_PRICE,
@@ -40,6 +41,8 @@ from .const import (
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
     FIELD_SYSTEM_ID,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DISCOVERY,
     PAYLOAD_PRICE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
@@ -81,6 +84,9 @@ class JackeryNumberDescription(NumberEntityDescription):
     ) = None
     dynamic_max: Callable[[dict[str, Any]], float] | None = None
     dynamic_unit: Callable[[dict[str, Any]], str] | None = None
+    allowed_values: (
+        Callable[[dict[str, Any]], tuple[float, ...]] | tuple[float, ...] | None
+    ) = None
     value_transform: Callable[[float], Any] = lambda v: int(round(v))
     validate_range: bool = False
     raise_on_setter_error: bool = True
@@ -109,7 +115,7 @@ async def _set_max_feed_grid(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the maximum grid feed-in power on a device."""
-    await coord.async_set_max_feed_grid(dev_id, int(value))
+    await coord.async_set_max_feed_grid(dev_id, 800 if int(value) <= 800 else 2500)
 
 
 async def _set_max_output_power(
@@ -162,12 +168,27 @@ async def _set_max_power_experimental(
 
 
 def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
-    """800W if device max-out is ≤800W, else 2500W (German balcony rule)."""
+    """Return the feed-in choices exposed by the SolarVault app."""
     props = payload.get(PAYLOAD_PROPERTIES) or {}
+    for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
+        feed_limit = safe_int(props.get(key))
+        if feed_limit is not None and feed_limit > 800:
+            return 2500.0
+    for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
+        meta = payload.get(section) or {}
+        if str(meta.get(FIELD_MODEL_CODE) or "") == "3002":
+            return 2500.0
     max_out_int = safe_int(props.get(FIELD_MAX_OUT_PW))
     if max_out_int is None:
         max_out_int = 2500
     return 800.0 if max_out_int <= 800 else 2500.0
+
+
+def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
+    """Jackery's app exposes feed-in as a binary 800/2500W selection."""
+    if _max_feed_grid_dynamic_max(payload) <= 800:
+        return (800.0,)
+    return (800.0, 2500.0)
 
 
 def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
@@ -235,12 +256,13 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         mode=NumberMode.SLIDER,
         entity_category=EntityCategory.CONFIG,
         icon="mdi:transmission-tower-export",
-        native_min_value=0,
+        native_min_value=800,
         native_max_value=2500,
-        native_step=10,
+        native_step=1700,
         source_keys=(FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW),
         setter=_set_max_feed_grid,
         dynamic_max=_max_feed_grid_dynamic_max,
+        allowed_values=_max_feed_grid_allowed_values,
         validate_range=True,
     ),
     JackeryNumberDescription(
@@ -326,6 +348,15 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
 
+    def _allowed_values(self) -> tuple[float, ...]:
+        """Return exact values accepted by a discrete Jackery number."""
+        allowed = self.entity_description.allowed_values
+        if allowed is None:
+            return ()
+        if callable(allowed):
+            return allowed(self._payload)
+        return allowed
+
     async def async_set_native_value(self, value: float) -> None:
         """Forward a numeric write to the device."""
         if self.entity_description.validate_range and (
@@ -335,6 +366,12 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 f"{self.entity_description.key} must be between "
                 f"{self.native_min_value:.0f} and "
                 f"{self.native_max_value:.0f}"
+            )
+        allowed = self._allowed_values()
+        if allowed and int(round(value)) not in {int(round(v)) for v in allowed}:
+            allowed_text = ", ".join(f"{int(v)}" for v in allowed)
+            raise ValueError(
+                f"{self.entity_description.key} must be one of: {allowed_text}"
             )
         if self.entity_description.setter is None:
             return

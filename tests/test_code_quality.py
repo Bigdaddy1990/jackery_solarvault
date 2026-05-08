@@ -760,6 +760,29 @@ def test_optional_number_setter_failures_are_logged_before_suppression() -> None
     assert "self.entity_description.raise_on_setter_error" in number_source
 
 
+def test_max_feed_grid_is_not_aliased_to_grid_standard_limit() -> None:
+    """maxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    alias_block = const_source.split("MAIN_PROPERTY_ALIAS_PAIRS", 1)[1].split(
+        "TASK_PLAN_BODY",
+        1,
+    )[0]
+
+    assert "(FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW)" not in alias_block
+
+
+def test_property_setters_keep_local_override_during_stale_refresh_window() -> None:
+    """Fresh local writes should beat stale HTTP/MQTT snapshots briefly."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "_PROPERTY_OVERRIDE_TTL_SEC" in coordinator_source
+    assert "self._property_overrides" in coordinator_source
+    assert "def _merge_main_properties_for_device(" in coordinator_source
+    assert "return self._merge_main_properties(merged, overrides)" in coordinator_source
+
+
 def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
     """Avoid duplicate entries caused by whitespace/case drift in usernames."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
@@ -1653,7 +1676,7 @@ def test_legacy_app_cloud_values_doc_path_is_preserved() -> None:
     assert canonical.is_file()
     legacy_text = legacy.read_text(encoding="utf-8")
     assert "docs/APP_CLOUD_VALUES.md" in legacy_text
-    assert "Berechnung fuer `systemStatistic.totalRevenue`" in legacy_text
+    assert "Berechnung fuer `_savings_calculation.calculated_total`" in legacy_text
 
 
 def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
