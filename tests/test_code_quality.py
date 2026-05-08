@@ -1591,9 +1591,12 @@ def test_init_annotations_are_safe_after_pre_commit_autofix() -> None:
     init_tree = ast.parse(init_source)
 
     assert isinstance(init_tree.body[0], ast.Expr)
-    assert isinstance(init_tree.body[1], ast.ImportFrom)
-    assert init_tree.body[1].module == "__future__"
-    assert any(alias.name == "annotations" for alias in init_tree.body[1].names)
+    future_annotations = (
+        isinstance(init_tree.body[1], ast.ImportFrom)
+        and init_tree.body[1].module == "__future__"
+        and any(alias.name == "annotations" for alias in init_tree.body[1].names)
+    )
+    assert future_annotations or sys.version_info >= (3, 14)
     assert "from typing import TYPE_CHECKING" not in init_source
     assert "from .coordinator import JackerySolarVaultCoordinator" in init_source
     assert (
