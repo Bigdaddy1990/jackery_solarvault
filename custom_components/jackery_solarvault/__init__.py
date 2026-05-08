@@ -1,6 +1,7 @@
 """Jackery SolarVault integration."""
 
 import asyncio
+import contextlib
 from datetime import timedelta
 import logging
 from pathlib import Path
@@ -351,39 +352,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: fixed polling interval set to %ss", interval_sec)
 
-    # Discovery must run first (MQTT subscriptions and the first refresh
-    # both rely on the device list it produces). The HTTP first refresh and
-    # the MQTT connect afterwards are independent and run in parallel to
-    # cut the observed config-entry setup time roughly in half on slow
-    # cloud connections.
-    await coordinator.async_discover()
-    setup_results = cast(
-        list[None | BaseException],
-        await asyncio.gather(
-            coordinator.async_config_entry_first_refresh(),
-            coordinator.async_start_mqtt(),
-            return_exceptions=True,
-        ),
-    )
-    refresh_result, mqtt_result = setup_results
-    if isinstance(refresh_result, BaseException):
-        raise refresh_result
-    if isinstance(mqtt_result, BaseException):
-        # MQTT failure must not block setup — push is an optional channel
-        # on top of polling. Log and continue.
-        _LOGGER.warning(
-            "Jackery MQTT push could not start during setup: %s", mqtt_result
+    try:
+        # Discovery must run first (MQTT subscriptions and the first refresh
+        # both rely on the device list it produces). The HTTP first refresh and
+        # the MQTT connect afterwards are independent and run in parallel to
+        # cut the observed config-entry setup time roughly in half on slow
+        # cloud connections. If any mandatory setup step fails, shut down the
+        # partially initialized coordinator so MQTT and timer tasks cannot leak.
+        await coordinator.async_discover()
+        setup_results = cast(
+            list[None | BaseException],
+            await asyncio.gather(
+                coordinator.async_config_entry_first_refresh(),
+                coordinator.async_start_mqtt(),
+                return_exceptions=True,
+            ),
         )
+        refresh_result, mqtt_result = setup_results
+        if isinstance(refresh_result, BaseException):
+            raise refresh_result
+        if isinstance(mqtt_result, BaseException):
+            # MQTT failure must not block setup — push is an optional channel
+            # on top of polling. Log and continue.
+            _LOGGER.warning(
+                "Jackery MQTT push could not start during setup: %s", mqtt_result
+            )
 
-    entry.runtime_data = coordinator
-    # Do not prune optional runtime sensors here: app/MQTT/Combine backed
-    # properties can arrive after the first refresh and would otherwise be
-    # removed incorrectly.
+        entry.runtime_data = coordinator
+        # Do not prune optional runtime sensors here: app/MQTT/Combine backed
+        # properties can arrive after the first refresh and would otherwise be
+        # removed incorrectly.
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    coordinator.async_start_periodic_refresh()
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        coordinator.async_start_periodic_refresh()
 
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    except BaseException:
+        with contextlib.suppress(BaseException):
+            await coordinator.async_shutdown()
+        if entry.runtime_data is coordinator:
+            entry.runtime_data = None  # type: ignore[assignment]
+        raise
     return True
 
 
