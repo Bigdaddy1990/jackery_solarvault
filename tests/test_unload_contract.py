@@ -40,12 +40,15 @@ def test_coordinator_shutdown_is_success_gated() -> None:
     function = _async_unload_entry()
     shutdown_line = _call_line(function, "async_shutdown")
 
-    success_blocks = [
+    failure_blocks = [
         node
         for node in ast.walk(function)
         if isinstance(node, ast.If)
-        and isinstance(node.test, ast.Name)
-        and node.test.id == "unload_ok"
-        and node.lineno < shutdown_line <= getattr(node, "end_lineno", node.lineno)
+        and isinstance(node.test, ast.UnaryOp)
+        and isinstance(node.test.op, ast.Not)
+        and isinstance(node.test.operand, ast.Name)
+        and node.test.operand.id == "unload_ok"
+        and node.lineno < shutdown_line
+        and any(isinstance(stmt, ast.Return) for stmt in node.body)
     ]
-    assert success_blocks, "async_shutdown must be inside if unload_ok"
+    assert failure_blocks, "async_shutdown must be after if not unload_ok return"
