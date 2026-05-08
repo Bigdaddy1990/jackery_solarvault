@@ -201,7 +201,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
