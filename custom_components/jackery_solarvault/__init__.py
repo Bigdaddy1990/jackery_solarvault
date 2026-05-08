@@ -162,9 +162,13 @@ async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
         f"/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
         f"/config/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
     )
-    copied = await hass.async_add_executor_job(
-        _copy_cached_jackery_brand_images, source_dirs
-    )
+    try:
+        copied = await hass.async_add_executor_job(
+            _copy_cached_jackery_brand_images, source_dirs
+        )
+    except OSError as err:
+        _LOGGER.debug("Jackery: cached brand image sync skipped: %s", err)
+        return
     if copied:
         _LOGGER.info(
             "Jackery: copied cached brand image(s) into local integration brand folder: %s",
@@ -565,13 +569,12 @@ async def _async_update_listener(
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    # Keep the coordinator alive if HA rolls back a failed platform unload.
+    if not unload_ok:
+        return False
+
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
-
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    # Note: entry.runtime_data is reset by HA on unload; explicit clear
-    # only happens on success to avoid leaking the coordinator if unload
-    # rolls back.
-    if unload_ok:
-        entry.runtime_data = None  # type: ignore[assignment]
-    return unload_ok
+    entry.runtime_data = None  # type: ignore[assignment]
+    return True
