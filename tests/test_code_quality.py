@@ -1658,6 +1658,24 @@ def test_generated_payload_debug_logs_are_ignored() -> None:
     assert "jackery_solarvault_payload_debug.jsonl.1" in gitignore
 
 
+def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
+    """Failed setup must not leak MQTT clients, timers or runtime_data."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+
+    assert "import contextlib" in init_source
+    assert "try:" in init_source
+    assert "# Discovery must run first" in init_source
+    assert "except BaseException:" in init_source
+    assert "with contextlib.suppress(BaseException):" in init_source
+    assert "await coordinator.async_shutdown()" in init_source
+    assert "if entry.runtime_data is coordinator:" in init_source
+    assert "entry.runtime_data = None" in init_source
+    assert (
+        "await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)"
+        in init_source
+    )
+
+
 def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
     """Use HA's cached Jackery brand PNGs, not stale root SVG placeholders."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
