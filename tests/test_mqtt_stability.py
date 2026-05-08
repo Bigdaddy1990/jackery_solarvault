@@ -98,9 +98,52 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     )
     assert on_disc_match is not None
     body = on_disc_match.group(0)
-    # The handler must check whether last_error already carries a 'connect rc='
-    # signature and bail out without overwriting it.
-    assert "connect rc=" in body, body
+    # The handler must preserve connect-failure signatures and bail out
+    # without overwriting them.
+    assert "_is_connect_failure_error" in body, body
+    assert "connect rc=" in src, src
+
+
+def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> None:
+    """A rejected broker connection must not call gmqtt.disconnect afterward.
+
+    gmqtt writes a DISCONNECT packet when asked to disconnect. After CONNACK
+    0x88/server-unavailable the socket is already closed, so calling it during
+    cleanup logs "[TRYING WRITE TO CLOSED SOCKET]".
+    """
+    src = _read("mqtt_push.py")
+    stop_match = re.search(
+        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        src,
+        re.S,
+    )
+    assert stop_match is not None
+    body = stop_match.group(0)
+    assert "was_connected = self._connected" in body, body
+    assert "if not was_connected:" in body, body
+    assert body.index("if not was_connected:") < body.index("client.disconnect()")
+
+
+def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
+    """MQTT push is optional; transient broker refusals should not warn twice."""
+    mqtt_src = _read("mqtt_push.py")
+    coordinator_src = _read("coordinator.py")
+
+    assert "class _GmqttConnectionNoiseFilter" in mqtt_src
+    assert 'message.startswith("[CONNACK] 0x")' in mqtt_src
+    assert '"[DISCONNECTED] max number of failed connection attempts achieved"' in (
+        mqtt_src
+    )
+    assert "logger=_GMQTT_LOGGER" in mqtt_src
+    assert '_LOGGER.debug("Jackery MQTT connect setup failed: %s", err)' in mqtt_src
+    assert "Jackery MQTT initial connect did not complete" in coordinator_src
+    assert '_LOGGER.warning("Jackery MQTT initial connect did not complete' not in (
+        coordinator_src
+    )
+    assert (
+        '_LOGGER.warning(\n                    "Jackery MQTT TLS/connect check failed'
+        not in (coordinator_src)
+    )
 
 
 def test_diagnostics_exposes_stale_subscription_signals() -> None:

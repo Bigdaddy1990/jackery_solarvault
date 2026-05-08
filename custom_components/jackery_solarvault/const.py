@@ -898,6 +898,9 @@ MQTT_CONNACK_REASONS: Final = {
     3: "server unavailable",
     4: "bad user name or password",
     5: "not authorized",
+    134: "bad user name or password",
+    135: "not authorized",
+    136: "server unavailable",
 }
 
 # Subdevice type markers observed in MQTT_PROTOCOL.md. devType=1 is a

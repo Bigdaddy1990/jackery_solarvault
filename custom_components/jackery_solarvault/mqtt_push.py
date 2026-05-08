@@ -30,6 +30,23 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_GMQTT_LOGGER = logging.getLogger(f"{__name__}.gmqtt")
+
+
+class _GmqttConnectionNoiseFilter(logging.Filter):
+    """Suppress gmqtt connection-refusal duplicates handled by this integration."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False for expected gmqtt refusal noise."""
+        message = record.getMessage()
+        return not (
+            message.startswith("[CONNACK] 0x")
+            or message
+            == "[DISCONNECTED] max number of failed connection attempts achieved"
+        )
+
+
+_GMQTT_LOGGER.addFilter(_GmqttConnectionNoiseFilter())
 
 
 class JackeryMqttPushClient:
@@ -133,7 +150,7 @@ class JackeryMqttPushClient:
                 self._last_error = f"connect failed: {err}"
                 self._connected = False
                 self._connected_event.set()
-                _LOGGER.warning("Jackery MQTT connect setup failed: %s", err)
+                _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
 
     @staticmethod
     def _credential_fingerprint(client_id: str, username: str, password: str) -> str:
@@ -201,11 +218,14 @@ class JackeryMqttPushClient:
         client = self._client
         if client is None:
             return
+        was_connected = self._connected
         self._client = None
         self._fingerprint = None
         self._topics = []
         self._connected = False
         self._connected_event.clear()
+        if not was_connected:
+            return
         with contextlib.suppress(Exception):
             result = client.disconnect()
             if inspect.isawaitable(result):
@@ -215,9 +235,12 @@ class JackeryMqttPushClient:
     def _build_client(*, client_id: str) -> MQTTClient:
         """Create a gmqtt client while staying compatible with older releases."""
         try:
-            return MQTTClient(client_id, clean_session=True)
+            return MQTTClient(client_id, clean_session=True, logger=_GMQTT_LOGGER)
         except TypeError:
-            return MQTTClient(client_id)
+            try:
+                return MQTTClient(client_id, logger=_GMQTT_LOGGER)
+            except TypeError:
+                return MQTTClient(client_id)
 
     @staticmethod
     async def _connect_client(client: MQTTClient, ssl_context: ssl.SSLContext) -> None:
@@ -288,7 +311,10 @@ class JackeryMqttPushClient:
                 _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
             else:
                 self._last_connect_failure_signature = message
-                _LOGGER.warning("Jackery MQTT connect failed: %s", message)
+                if self._is_connect_auth_failure_rc(rc):
+                    _LOGGER.warning("Jackery MQTT connect failed: %s", message)
+                else:
+                    _LOGGER.debug("Jackery MQTT connect failed: %s", message)
             return
 
         self._connected = True
@@ -316,21 +342,27 @@ class JackeryMqttPushClient:
                 return int(arg)
         return 0
 
+    @staticmethod
+    def _is_connect_auth_failure_rc(rc: int) -> bool:
+        """Return True for CONNACK codes that mean credentials are rejected."""
+        return rc in (4, 5, 134, 135)
+
     def _on_disconnect(self, _client: MQTTClient, *args: Any) -> None:
         """Gmqtt disconnect callback."""
         self._connected = False
         self._last_disconnect_at = self._utc_now_iso()
+        if self._is_connect_failure_error(self._last_error):
+            # Preserve the actionable connect failure for callers waiting on
+            # the initial broker check. Some brokers close immediately after
+            # a rejected CONNACK, and gmqtt reports that as a clean disconnect.
+            self._connected_event.set()
+            return
         self._connected_event.clear()
         error = self._extract_disconnect_error(args)
         if error:
             self._last_error = f"disconnect: {error}"
             _LOGGER.debug("Jackery MQTT disconnected: %s", error)
         else:
-            if str(self._last_error or "").startswith("connect rc="):
-                # Preserve the actionable CONNACK reason for callers waiting
-                # on auth/permission failures. Some brokers close the socket
-                # cleanly immediately after the rejected CONNACK.
-                return
             self._last_error = None
             _LOGGER.info("Jackery MQTT disconnected cleanly")
 
@@ -340,6 +372,11 @@ class JackeryMqttPushClient:
             if isinstance(arg, BaseException):
                 return str(arg)
         return None
+
+    @staticmethod
+    def _is_connect_failure_error(error: str | None) -> bool:
+        """Return True when disconnect should not hide a failed connect."""
+        return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _on_message(
         self,

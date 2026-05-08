@@ -603,6 +603,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return (
             "connect rc=4" in text
             or "connect rc=5" in text
+            or "connect rc=134" in text
+            or "connect rc=135" in text
+            or "code 134" in text
+            or "code 135" in text
             or "bad user name or password" in text
             or "not authorized" in text
         )
@@ -628,7 +632,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             await self._async_ensure_mqtt(force=True, wait_connected=True)
         except RuntimeError as err:
-            _LOGGER.warning("Jackery MQTT initial connect did not complete: %s", err)
+            _LOGGER.debug(
+                "Jackery MQTT initial connect did not complete; "
+                "HTTP polling remains active: %s",
+                err,
+            )
             return
 
     async def _async_mqtt_connected(self) -> None:
@@ -803,6 +811,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._mqtt_fingerprint is not None and fingerprint != self._mqtt_fingerprint:
             _LOGGER.info("Jackery MQTT: credential session changed, reconnecting")
 
+        self._last_mqtt_connect_attempt = time.monotonic()
         await self._mqtt.async_start(
             client_id=creds[MQTT_CREDENTIAL_CLIENT_ID],
             username=creds[MQTT_CREDENTIAL_USERNAME],
@@ -818,14 +827,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     mqtt_last_error
                 ):
                     raise
-                _LOGGER.warning(
-                    "Jackery MQTT TLS/connect check failed "
-                    "(chain+hostname verified; strict AKID check suppressed if supported): %s",
+                _LOGGER.debug(
+                    "Jackery MQTT connect check did not complete "
+                    "(TLS chain+hostname verified when the broker accepted TCP; "
+                    "strict AKID check suppressed if supported): %s",
                     err,
                 )
                 raise
         self._mqtt_fingerprint = fingerprint
-        self._last_mqtt_connect_attempt = time.monotonic()
 
     async def _async_handle_mqtt_message(
         self,
@@ -1196,7 +1205,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -1294,7 +1303,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -2708,7 +2717,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
