@@ -153,3 +153,30 @@ def test_reconfigure_preserves_stored_login_context() -> None:
     assert "**entry.data" in body, body
     assert "CONF_USERNAME: account" in body, body
     assert "CONF_PASSWORD: user_input[CONF_PASSWORD]" in body, body
+
+
+def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> None:
+    """Credential validation must use hidden app login context from entry.data."""
+    src = _read("config_flow.py")
+    assert "CONF_MQTT_MAC_ID" in src
+    assert "CONF_REGION_CODE" in src
+
+    reconfigure = re.search(
+        r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert reconfigure is not None, "async_step_reconfigure not found"
+    reconfigure_body = reconfigure.group(0)
+    assert "mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID)" in reconfigure_body
+    assert "region_code=entry.data.get(CONF_REGION_CODE)" in reconfigure_body
+
+    reauth = re.search(
+        r"async def async_step_reauth_confirm.*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert reauth is not None, "async_step_reauth_confirm not found"
+    reauth_body = reauth.group(0)
+    assert "mqtt_mac_id=self._reauth_entry.data.get(CONF_MQTT_MAC_ID)" in reauth_body
+    assert "region_code=self._reauth_entry.data.get(CONF_REGION_CODE)" in reauth_body
