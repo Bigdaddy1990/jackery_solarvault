@@ -150,7 +150,7 @@ def test_reconfigure_preserves_stored_login_context() -> None:
     assert match is not None, "async_step_reconfigure not found"
     body = match.group(0)
     assert "async_update_reload_and_abort" in body, body
-    assert "**entry.data" in body, body
+    assert "data_updates={" in body, body
     assert "CONF_USERNAME: account" in body, body
     assert "CONF_PASSWORD: user_input[CONF_PASSWORD]" in body, body
 

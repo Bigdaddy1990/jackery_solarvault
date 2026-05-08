@@ -33,6 +33,26 @@ def test_language_files_cover_all_string_keys() -> None:
         assert _leaf_paths(translated) == base_paths, lang
 
 
+def test_service_actions_use_translation_files() -> None:
+    """Service action labels belong in translations, not services.yaml."""
+    services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
+    strings = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
+    icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
+
+    for hardcoded_key in ("  name:", "  description:"):
+        assert hardcoded_key not in services_yaml
+
+    expected_services = {
+        "rename_system",
+        "refresh_weather_plan",
+        "delete_storm_alert",
+    }
+    assert set(strings["services"]) == expected_services
+    assert set(icons["services"]) == expected_services
+    for service_id in expected_services:
+        assert "service" in icons["services"][service_id]
+
+
 def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     """Battery power labels must not hide batOutPw vs stackOutPw semantics."""
     de = json.loads(

@@ -199,9 +199,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         triggered the flow; otherwise we abort to keep unique-id semantics
         stable across the reconfigure round-trip.
         """
-        entry_id = self.context.get("entry_id")
-        entry = self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
-        if entry is None:
+        try:
+            entry = self._get_reconfigure_entry()
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -213,6 +213,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             elif account.lower() != str(entry.unique_id or "").lower():
                 return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
             else:
+                await self.async_set_unique_id(account.lower())
+                self._abort_if_unique_id_mismatch()
                 session = async_get_clientsession(self.hass)
                 api = JackeryApi(
                     session=session,
@@ -233,8 +235,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     return self.async_update_reload_and_abort(
                         entry,
-                        data={
-                            **entry.data,
+                        data_updates={
                             CONF_USERNAME: account,
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },

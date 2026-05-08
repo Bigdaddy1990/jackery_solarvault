@@ -1,4 +1,5 @@
 {
+  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "This Jackery account is already configured.",
@@ -683,6 +684,46 @@
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
         "title": "Jackery options"
       }
+    }
+  },
+  "services": {
+    "delete_storm_alert": {
+      "description": "Delete a specific weather or storm alert by alert ID over MQTT.",
+      "fields": {
+        "alert_id": {
+          "description": "Alert identifier from the weather plan diagnostic attributes, usually storm[].alertId.",
+          "name": "Alert ID"
+        },
+        "device_id": {
+          "description": "Numeric Jackery device ID. It is visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Delete storm alert"
+    },
+    "refresh_weather_plan": {
+      "description": "Query the current weather and storm plan from the device. The response is exposed in the Weather plan diagnostic sensor attributes.",
+      "fields": {
+        "device_id": {
+          "description": "Numeric Jackery device ID. It is visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Refresh weather and storm plan"
+    },
+    "rename_system": {
+      "description": "Rename a Jackery SolarVault system through the Jackery cloud API. The name is shown in the Jackery app and Home Assistant device info.",
+      "fields": {
+        "new_name": {
+          "description": "New display name, 1 to 64 characters.",
+          "name": "New name"
+        },
+        "system_id": {
+          "description": "Numeric Jackery system ID. It is visible in diagnostics under raw_api.system_list_response.data[].id.",
+          "name": "System ID"
+        }
+      },
+      "name": "Rename SolarVault system"
     }
   }
 }

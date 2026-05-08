@@ -602,14 +602,14 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
 def test_readme_documents_period_and_data_quality_behavior() -> None:
     """Users should get the same period/source rules that the code enforces."""
     readme = pathlib.Path("README.md").read_text(encoding="utf-8")
-    assert "Woche = Montag bis Sonntag" in readme
-    assert "Monat = Kalendermonat" in readme
-    assert "Jahr = Kalenderjahr" in readme
-    assert "keine Wochenwerte zur Reparatur" in readme
-    assert "same-endpoint Monatswerte" in readme
-    assert "Repair" in readme and "Diagnose" in readme
+    assert "Week: Monday to Sunday" in readme
+    assert "Month: calendar month" in readme
+    assert "Year: calendar year" in readme
+    assert "Weekly values are not used to repair monthly" in readme
+    assert "same-endpoint monthly values" in readme
+    assert "repair issue" in readme and "diagnostics export" in readme
     assert "hb/app/**REDACTED**/" in readme
-    assert "verworfene Payloads" in readme
+    assert "dropped payloads" in readme
 
 
 def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:

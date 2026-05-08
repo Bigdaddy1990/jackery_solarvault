@@ -1,4 +1,5 @@
 {
+  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
@@ -683,6 +684,46 @@
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",
         "title": "Jackery Optionen"
       }
+    }
+  },
+  "services": {
+    "delete_storm_alert": {
+      "description": "Löscht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID über MQTT.",
+      "fields": {
+        "alert_id": {
+          "description": "Alert-ID aus den Diagnoseattributen des Unwetterplans, normalerweise storm[].alertId.",
+          "name": "Alert-ID"
+        },
+        "device_id": {
+          "description": "Numerische Jackery-Geräte-ID. Sie ist in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId sichtbar.",
+          "name": "Geräte-ID"
+        }
+      },
+      "name": "Unwetterwarnung löschen"
+    },
+    "refresh_weather_plan": {
+      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Gerät ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
+      "fields": {
+        "device_id": {
+          "description": "Numerische Jackery-Geräte-ID. Sie ist in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId sichtbar.",
+          "name": "Geräte-ID"
+        }
+      },
+      "name": "Wetter- und Unwetterplan aktualisieren"
+    },
+    "rename_system": {
+      "description": "Benennt ein Jackery-SolarVault-System über die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Geräteinformationen.",
+      "fields": {
+        "new_name": {
+          "description": "Neuer Anzeigename, 1 bis 64 Zeichen.",
+          "name": "Neuer Name"
+        },
+        "system_id": {
+          "description": "Numerische Jackery-System-ID. Sie ist in der Diagnose unter raw_api.system_list_response.data[].id sichtbar.",
+          "name": "System-ID"
+        }
+      },
+      "name": "SolarVault-System umbenennen"
     }
   }
 }

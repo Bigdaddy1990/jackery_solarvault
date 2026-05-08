@@ -590,9 +590,11 @@ async def _async_update_listener(
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
-    await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     # Keep the successful teardown explicitly gated by unload_ok so future
     # changes cannot stop the coordinator while HA still has loaded platforms.
+    if not unload_ok:
+        return False
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
     entry.runtime_data = None  # type: ignore[assignment]

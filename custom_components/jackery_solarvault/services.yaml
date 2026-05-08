@@ -1,22 +1,11 @@
 rename_system:
-  name: Rename SolarVault system
-  description: >
-    Rename a Jackery SolarVault system via the Jackery cloud API
-    (PUT /v1/device/system/name). Affects the label shown in the Jackery
-    app and the Home Assistant device name.
   fields:
     system_id:
-      name: System ID
-      description: >
-        The numeric system ID (visible in diagnostics under
-        raw_api.system_list_response.data[].id).
       required: true
       example: "595364183558991872"
       selector:
         text:
     new_name:
-      name: New name
-      description: The new display name (1–64 characters).
       required: true
       example: "Balkonkraftwerk Süd"
       selector:
@@ -24,42 +13,21 @@ rename_system:
 
 
 refresh_weather_plan:
-  name: Refresh weather / storm plan
-  description: >
-    Query the current weather/storm plan from the device over MQTT
-    (messageType=QueryWeatherPlan, cmd=23). The response is exposed in the
-    diagnostic sensor "Weather plan" attributes.
   fields:
     device_id:
-      name: Device ID
-      description: >
-        The numeric device ID (visible in diagnostics under
-        raw_api.system_list_response.data[].devices[].deviceId).
       required: true
       example: "573702884982521856"
       selector:
         text:
 
 delete_storm_alert:
-  name: Delete storm alert
-  description: >
-    Delete a specific weather/storm alert by `alertId` over MQTT
-    (messageType=CancelWeatherAlert, actionId=3035).
   fields:
     device_id:
-      name: Device ID
-      description: >
-        The numeric device ID (visible in diagnostics under
-        raw_api.system_list_response.data[].devices[].deviceId).
       required: true
       example: "573702884982521856"
       selector:
         text:
     alert_id:
-      name: Alert ID
-      description: >
-        Alert identifier from the `weather_plan` diagnostic attributes
-        (`storm[].alertId`).
       required: true
       example: "A1746110400"
       selector:

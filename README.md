@@ -1,179 +1,200 @@
-# Jackery SolarVault 3 Pro Max Home Assistant Integration
+# Jackery SolarVault for Home Assistant
 
-**🌍 Language / Sprache / Idioma / Langue:**
-[🇬🇧 English](./README.md) · [🇩🇪 Deutsch](./docs/README.de.md) · [🇫🇷 Français](./docs/README.fr.md) · [🇪🇸 Español](./docs/README.es.md)
-
----
+Languages:
+[English](./README.md) · [Deutsch](./docs/README.de.md) · [Français](./docs/README.fr.md) · [Español](./docs/README.es.md)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+Community integration for Jackery SolarVault systems, especially SolarVault 3 Pro Max. It reads live values, energy statistics and configurable settings from the Jackery cloud, and uses MQTT push for fast live updates and control commands.
 
-Community integration for Jackery SolarVault systems, especially SolarVault 3 Pro Max. The integration reads live values, energy statistics, and configurable parameters from the Jackery cloud and uses MQTT push for fast status updates and control commands.
+This integration is not an official Jackery product and is not affiliated with Jackery Inc.
 
-> ⚠️ This integration is not an official Jackery product and is not affiliated with Jackery Inc.
+## What it provides
 
+- Automatic system and device discovery through your Jackery cloud account.
+- Main unit, smart meter and expansion batteries as separate Home Assistant devices.
+- Live power sensors for battery, PV total, PV channels, grid import/export, EPS, stack power and smart meter phases.
+- Energy sensors for Jackery app periods: day, week, month and year.
+- Configurable entities for EPS, standby, limits, output power, smart meter follow mode, storm warning, temperature unit and electricity price.
+- Device restart button and cloud services for system name and storm-alert management.
+- Diagnostics for raw redacted data, MQTT status, firmware, system limits and data-quality warnings.
 
-## Features
+## Requirements
 
-- Automatic device and system discovery through the Jackery account
-- Regular HTTP refresh of standard values at a fixed 30-second interval
-- MQTT push for live status, smart meter, expansion batteries, and control commands
-- Main unit, smart meter, and expansion batteries as separate Home Assistant devices
-- Support for up to 5 expansion batteries
-- Live power: battery, total PV, PV channels, grid import, grid export, EPS, and expansion battery stack
-- Energy statistics: day, week, month, and year for PV, consumption, and battery
-- Long-term values suitable for the Energy Dashboard only for cumulative total/daily values; weekly/monthly/yearly values are display-only values
-- Smart meter power including phase values, if a smart meter is connected
-- Configuration via entities: EPS, charge/discharge limits, feed-in power limit, maximum output power, energy consumption mode, auto-off, smart meter follow, storm warning, temperature unit, electricity price, and standby
-- Restart button for the device
-- Diagnostic entities for online status, firmware, system limits, grid standard, country code, raw data, and MQTT state
+- Home Assistant 2025.8.0 or newer.
+- Python 3.14 or newer, as provided by Home Assistant.
+- A Jackery cloud account.
+- SolarVault online through Wi-Fi or Ethernet.
+- HACS for the recommended installation method.
 
-## Installation via HACS
+## Recommended Jackery Account Setup
+
+Jackery effectively allows only one active session per account. If the official Jackery app and Home Assistant use the same account at the same time, tokens and MQTT credentials can rotate. That may cause expired-token errors, MQTT authentication errors or temporary stale data.
+
+Recommended setup:
+
+1. Create a second Jackery account.
+2. Share the SolarVault with that second account in the Jackery app.
+3. Use the second account only for Home Assistant.
+
+## Installation
+
+### HACS
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
 
 1. Open HACS.
-2. Open the three-dot menu in the top right.
+2. Open the three-dot menu.
 3. Select `Custom repositories`.
-4. Enter the repository URL `https://github.com/Bigdaddy1990/jackery_solarvault` and choose the category `Integration`.
+4. Add `https://github.com/Bigdaddy1990/jackery_solarvault` as an `Integration`.
 5. Search for `Jackery SolarVault` and install it.
 6. Restart Home Assistant.
-7. Go to Settings → Devices & services → Add integration → `Jackery SolarVault`.
+7. Go to `Settings > Devices & services > Add integration`.
+8. Select `Jackery SolarVault`.
 
-## Manual installation
+### Manual
 
 1. Download the ZIP from the [Releases page](https://github.com/Bigdaddy1990/jackery_solarvault/releases).
-2. Copy the folder `custom_components/jackery_solarvault` to `<HA-config>/custom_components/`.
+2. Copy `custom_components/jackery_solarvault` to `<HA-config>/custom_components/`.
 3. Restart Home Assistant.
-4. Add the integration via Settings → Devices & services.
+4. Add `Jackery SolarVault` from `Settings > Devices & services`.
 
-## Setup
+## Setup and Options
 
-Required:
+The setup flow asks for:
 
-- Jackery cloud email address
-- Jackery cloud password
-- optional: enable/disable calculated smart meter sensors
-- optional: enable/disable calculated power sensors
-- optional: enable/disable savings calculation detail sensors
+- Jackery cloud email address.
+- Jackery cloud password.
+- Whether calculated smart-meter sensors should be created.
+- Whether calculated net-power sensors should be created.
+- Whether savings-calculation detail sensors should be created.
 
-Device ID, system ID, MQTT macId, and region are derived from the cloud/MQTT data and are no longer requested manually in the UI.
+Device ID, system ID, MQTT `macId` and region are derived from cloud and MQTT data. They are not entered manually.
 
-## Important note about Jackery login
+The same options can be changed later from the integration options. Credentials can be updated through Home Assistant's reconfigure or reauth flow without deleting the integration.
 
-Jackery effectively allows only one active session per account. If the official app and Home Assistant are logged in with the same account at the same time, tokens and MQTT credentials may rotate. This can lead to expired tokens or MQTT authentication errors.
+## Devices and Entities
 
-Recommended:
+### Main SolarVault Device
 
-1. Create a second Jackery account.
-2. Share the SolarVault with the second account in the Jackery app via sharing/QR code.
-3. Use the second account in Home Assistant.
+Typical sensors:
 
-## Entities
+- State of charge.
+- Battery charge and discharge power.
+- PV total power and PV1 to PV4 power.
+- Grid import, grid export and grid net power.
+- Grid-side input and output power.
+- EPS power.
+- Stack charge and discharge power.
+- Other load power.
+- Electricity price.
+- App day/week/month/year energy values.
+- Active alarm count.
 
-### Standard sensors
+Typical controls:
 
-- Total SOC and internal battery
-- Battery charging power and battery discharging power
-- Total PV power and PV channels 1-4
-- Grid import, grid export, and net grid power
-- Grid-side input/output power
-- EPS power
-- Expansion battery charging/discharging power
-- Other load power
-- Electricity price
-- Active alarms
-- Daily/weekly/monthly/yearly values for PV, consumption, and battery
+- EPS output.
+- Standby.
+- Auto-off in off-grid mode and auto-off time.
+- Charge and discharge limits.
+- Feed-in power limit.
+- Maximum output power.
+- Default output power.
+- Follow smart meter.
+- Energy consumption mode.
+- Price mode and flat-rate price.
+- Temperature unit.
+- Storm warning and warning lead time.
+- Restart.
 
-### Expansion batteries
+### Expansion Batteries
 
-Expansion batteries are created separately from the main unit. For each detected battery, the following is shown where available:
+Expansion batteries are created as separate devices when Jackery provides their data. Up to five batteries are supported. Depending on the payload, each battery can expose:
 
-- SOC
-- Cell temperature
-- Charging power
-- Discharging power
-- Firmware version
-- Serial number
-- Firmware version and serial number as Home Assistant device info, when available
-- Communication status as attributes
+- State of charge.
+- Cell temperature.
+- Charge and discharge power.
+- Firmware version.
+- Serial number.
+- Communication status attributes.
 
-### Smart meter
+### Smart Meter
 
-The smart meter is created as its own device under the SolarVault. Supported values:
+When a Jackery smart meter is connected, it is created as its own device. It can expose:
 
-- Total power
-- Phase 1 power
-- Phase 2 power
-- Phase 3 power
-- Available raw values as attributes
-
-### Configurable entities
-
-- EPS output
-- Standby
-- Auto-off in off-grid mode (with auto-off time)
-- Charge and discharge limit
-- Feed-in power limit
-- Maximum output power
-- Default output power
-- Follow smart meter
-- Energy consumption mode
-- Electricity price mode
-- Flat-rate price
-- Temperature unit
-- Storm warning and warning lead time
-- Restart
+- Total meter power.
+- Phase 1, phase 2 and phase 3 power.
+- Raw meter attributes for diagnostics.
+- Calculated home-consumption sensors when the option is enabled.
 
 ## Services
 
-The integration registers three services in the `jackery_solarvault` namespace:
+The integration registers these services under `jackery_solarvault`:
 
 | Service | Purpose |
 |---|---|
-| `jackery_solarvault.rename_system` | Rename the system (SolarVault device) in the cloud |
-| `jackery_solarvault.refresh_weather_plan` | Fetch the current storm warning plan from the cloud server |
-| `jackery_solarvault.delete_storm_alert` | Delete an active storm alert via cloud command |
+| `jackery_solarvault.rename_system` | Rename the SolarVault system in the Jackery cloud |
+| `jackery_solarvault.refresh_weather_plan` | Fetch the current storm-warning plan |
+| `jackery_solarvault.delete_storm_alert` | Delete an active storm alert through a cloud command |
 
-For details about the required parameters, see `services.yaml` or the HA Developer Tools → Services editor.
+Use `services.yaml` or `Developer Tools > Services` in Home Assistant for the required service parameters.
 
-## Reading energy and power sensors correctly
+## Energy Dashboard and Sensor Meaning
 
-- Battery discharging power shows what the battery is delivering.
-- Net grid is grid import minus grid export. This value does not have to match the battery discharging power because house load, PV, smart meter, and internal regulation sit in between.
-- Stack input/output refers to the expansion battery stack or the power flow between the main unit and the expansion batteries.
-- Smart meter values come from the connected meter and are handled separately from the main unit values.
-- The `Current house consumption` sensor calculates the instantaneous consumption from Jackery's reported live house consumption (`otherLoadPw`) and only uses smart meter net power minus Jackery grid-side input plus Jackery grid-side output as a fallback. This prevents SolarVault feed-in from being incorrectly subtracted from house consumption.
-- `App total savings` is the raw Jackery app KPI and may look like PV revenue. `Calculated savings` is the local value from SolarVault grid-side AC output after inverter/battery effects, grid-side input, optional CT public export, house consumption, and the configured electricity price. Enable `Create savings calculation detail sensors` to expose the intermediate values, battery-system loss energy, inverter/conversion loss energy, and the calculated live inverter/conversion loss power as entities.
-- Daily/weekly/monthly/yearly energy sensors use `state_class: total` with the appropriate `last_reset` for the respective app period. They are period values, not lifetime monotonically increasing counters.
-- Weekly, monthly, and yearly values are calculated identically from the respective app chart series. The series depends on the payload: PV/home trend totals usually use `y`, battery charge/discharge uses `y1`/`y2`, device grid-side input/output uses `y1`/`y2`, and PV1..PV4 uses `y1`..`y4`. Server total fields are now only used as fallback/diagnostic values because monthly/yearly total fields may be misleading depending on the payload.
+Use the energy sensors carefully. Jackery exposes several values that sound similar but have different meanings.
 
-### Periods, totals, and warnings
+- Battery discharge power is what the battery is delivering.
+- Grid net power is grid import minus grid export. It does not have to match battery discharge power because PV, house load, smart meter values and internal regulation sit in between.
+- Stack input/output describes the expansion-battery stack or the power flow between the main unit and expansion batteries.
+- Smart meter values come from the connected meter and are handled separately from main-unit values.
+- `Current house consumption` uses Jackery's live house-load value (`otherLoadPw`) when available. If that value is missing, the integration falls back to smart-meter net power minus Jackery grid-side input plus Jackery grid-side output.
+- `Daily on-grid output (Jackery cloud)` is the Jackery `todayLoad` field. It is not reliable as real household consumption. For household consumption, use the calculated smart-meter/home-consumption sensors when available.
+- `App total savings` is the raw Jackery app KPI. It may look like PV revenue. `Calculated savings` is the local estimate based on self-consumed AC energy, grid-side input/output, optional public export, house consumption and the configured electricity price.
 
-- Week = Monday to Sunday.
-- Month = calendar month.
-- Year = calendar year.
-- Total/lifetime generation and carbon values prefer the documented app/HTTP/MQTT total fields. If Jackery reports the current month as the year/total, the integration raises those values with explicit same-endpoint month payloads from the same calendar year.
-- App total savings remains the raw cloud value. Calculated savings is calculated from self-consumed AC energy when possible, not from PV generation revenue. The detailed calculation is documented in [`docs/APP_CLOUD_VALUES.md`](docs/APP_CLOUD_VALUES.md).
-- Weekly values are explicitly not used to repair monthly, yearly, or total values. Monthly values may only guard yearly values when they come from the same endpoint family and explicit calendar-month app requests.
-- At the start of a month, the weekly value can be higher than the monthly value if the current week still includes days from the previous month. That is not a bug.
-- If Jackery provides contradictory data that cannot be resolved by the guarded same-endpoint month backfill, the integration creates a repair notice and stores details in the diagnostics export under `data_quality`.
+For Home Assistant Energy Dashboard configuration, prefer real cumulative/day values and the calculated home-consumption sensors. Do not treat week, month or year period sensors as lifetime utility meters.
 
-## Polling and updates
+Savings calculation details are documented in [`docs/APP_CLOUD_VALUES.md`](docs/APP_CLOUD_VALUES.md).
 
-Fast HTTP polling runs at a fixed 30-second interval. Slow cloud statistics are intentionally queried less frequently because Jackery does not update these data server-side every second.
+## Period Rules and Data Quality
 
-MQTT push updates live values independently of polling as soon as the broker is connected.
+The integration uses the same local period boundaries as the Jackery app:
 
-The MQTT TLS connection actively verifies the broker certificate chain. The file ``custom_components/jackery_solarvault/jackery_ca.crt`` is included as a documented trust anchor for ``emqx.jackeryapp.com`` because Jackery does not have the broker signed by a public CA. On Python 3.10+/OpenSSL 3.x, the Strict flag ``VERIFY_X509_STRICT`` is additionally disabled in a targeted way because the server certificate does not provide the ``Authority Key Identifier`` extension. Hostname verification, chain verification, and signature verification remain active (``CERT_REQUIRED`` + ``check_hostname = True``). There is no automatic fallback to ``tls_insecure`` or ``CERT_NONE`` — TLS errors remain visible. The diagnostics export shows ``tls_custom_ca_loaded``, ``tls_x509_strict_disabled``, and ``tls_certificate_source`` under ``mqtt_status``, among other fields, so the TLS configuration can be checked without debug logging. Background information and change rules for this strategy are documented in ``docs/STRICT_WORK_INSTRUCTIONS.md``.
+- Week: Monday to Sunday.
+- Month: calendar month.
+- Year: calendar year.
 
-MQTT diagnostics data contains only redacted topic paths (`hb/app/**REDACTED**/...`), counters, and timestamps for connection, last message, last publish, and discarded payloads. The Jackery `userId` part of the topic is not included in the diagnostics export.
+Important behavior:
 
-## Debug logging
+- Period sensors are period totals, not lifetime counters.
+- Weekly values are not used to repair monthly, yearly or lifetime values.
+- When Jackery returns a current-month value as a yearly or lifetime generation/carbon value, the integration may guard it upward with explicit same-endpoint monthly values from the same calendar year.
+- `App total savings` stays the raw cloud value. The calculated savings value is separate.
+- At the start of a month, a weekly value can be higher than the monthly value if the current week includes days from the previous month. That is expected.
+- If Jackery returns contradictory data that cannot be guarded safely, the integration creates a Home Assistant repair issue and stores details in the diagnostics export under `data_quality`.
 
-For troubleshooting:
+## Polling, MQTT and TLS
+
+MQTT push is the primary live update path once connected. HTTP polling remains as startup, fallback and keep-alive path:
+
+- Fast HTTP refresh uses a 30-second base interval.
+- When MQTT is live, fast HTTP ticks are skipped and a full HTTP refresh is kept to a slower keep-alive cadence.
+- Slow cloud statistics and price/config data are queried less frequently because the Jackery cloud does not update them every second.
+
+The MQTT TLS connection verifies the broker certificate chain and hostname. The integration includes `custom_components/jackery_solarvault/jackery_ca.crt` as a trust anchor for `emqx.jackeryapp.com` because the Jackery broker certificate is not signed by a public CA. There is no automatic insecure TLS fallback. TLS status is visible in the diagnostics export.
+
+Implementation details for the TLS handling are documented in [`docs/STRICT_WORK_INSTRUCTIONS.md`](docs/STRICT_WORK_INSTRUCTIONS.md).
+
+## Diagnostics and Troubleshooting
+
+For authentication or MQTT problems, download diagnostics from:
+
+`Settings > Devices & services > Jackery SolarVault > three-dot menu > Download diagnostics`
+
+Sensitive fields are redacted. MQTT topic paths are exported as `hb/app/**REDACTED**/...`; the raw Jackery user ID is not included. The diagnostics export also contains counters for dropped payloads, MQTT connection timestamps and data-quality warnings.
+
+Enable normal debug logging when investigating a problem:
 
 ```yaml
 logger:
@@ -182,59 +203,7 @@ logger:
     custom_components.jackery_solarvault: debug
 ```
 
-## Requirements
-
-- Home Assistant 2025.8.0 or newer
-- Python 3.14+ (provided by Home Assistant)
-- Jackery cloud account
-- SolarVault online via Wi-Fi or Ethernet
-- HACS for the recommended installation method
-
-## Contributing
-
-Please submit bug reports and feature requests through [GitHub Issues](https://github.com/Bigdaddy1990/jackery_solarvault/issues). For authentication or MQTT issues, a diagnostics export from HA (Settings → Devices & services → Jackery SolarVault → three dots → Download diagnostics) is very helpful. Sensitive fields are automatically redacted; nevertheless, briefly review a diagnostics export before sharing it.
-
-## License
-
-MIT License. See [LICENSE](LICENSE).
-
----
-
-## Period rules and data quality
-
-The integration honours the same period boundaries that the Jackery app
-itself uses, localised to the user's Home Assistant timezone:
-
-* **Week = Monday to Sunday** (ISO 8601; German reference: **Woche = Montag bis Sonntag**)
-* **Month = calendar month** (German reference: **Monat = Kalendermonat**)
-* **Year = calendar year** (German reference: **Jahr = Kalenderjahr**)
-
-The integration must never silently fix one period using an unrelated period:
-**weekly values are not used to repair monthly or yearly totals**. For broken
-yearly values, only **same-endpoint monthly values** from explicit monthly
-queries in the same calendar year may be used. Generation and CO2 lifetime
-totals are only guarded upward this way; if Jackery later returns correct,
-higher lifetime values, those values win automatically. `App total savings`
-keeps the raw app value; the separate calculated savings detail uses
-self-consumed AC energy so PV revenue is not counted as savings.
-Contradictions that cannot be resolved are surfaced through a Home Assistant
-**Repair** issue and the diagnostics export (**Diagnose**).
-The German short form used in earlier issue analysis is: **keine Wochenwerte zur Reparatur**;
-for yearly repairs only **same-endpoint Monatswerte** are
-allowed.
-
-## Diagnostics privacy
-
-Topic paths and account identifiers are redacted in diagnostics and the
-`mqtt_status` payload. The exported topic looks like
-`hb/app/**REDACTED**/` instead of the raw subscription path. Counters for
-**dropped payloads** (**verworfene Payloads**) are tracked separately.
-
-## Raw payload debug logging
-
-Raw HTTP/MQTT payloads are only written to
-`/config/jackery_solarvault_payload_debug.jsonl` when the dedicated
-DEBUG logger is enabled by the user:
+Raw HTTP/MQTT payload debug logging is separate and intentionally opt-in. It only writes `/config/jackery_solarvault_payload_debug.jsonl` when this dedicated logger is set to `debug`:
 
 ```yaml
 logger:
@@ -242,13 +211,21 @@ logger:
     custom_components.jackery_solarvault.payload_debug: debug
 ```
 
-The file is throttled (`PAYLOAD_DEBUG_THROTTLE_SEC = 60 s`) and rotated
-at 2 MB to `jackery_solarvault_payload_debug.jsonl.1`. Both file names
-are listed in `.gitignore`. On normal installations the file does not
-exist.
+The payload debug file is throttled and rotated to `jackery_solarvault_payload_debug.jsonl.1` at 2 MB. On normal installations it does not exist.
 
-## Brand assets
+Home Assistant brand icons are loaded from the local brand cache at `/homeassistant/.cache/brands/integrations/jackery/` when available.
 
-The integration uses Home Assistant's brand cache at
-`/homeassistant/.cache/brands/integrations/jackery/` for icon/logo
-delivery, instead of bundling stale placeholders.
+## Reference Documentation
+
+- [`docs/APP_CLOUD_VALUES.md`](docs/APP_CLOUD_VALUES.md): Jackery app/cloud values and savings calculation.
+- [`docs/DATA_SOURCE_PRIORITY.md`](docs/DATA_SOURCE_PRIORITY.md): MQTT, HTTP and app-statistics source priority.
+- [`docs/MQTT_PROTOCOL.md`](docs/MQTT_PROTOCOL.md): MQTT topics and payload contracts.
+- [`docs/APP_POLLING_MQTT.md`](docs/APP_POLLING_MQTT.md): HTTP and MQTT polling details.
+
+## Contributing
+
+Please submit bug reports and feature requests through [GitHub Issues](https://github.com/Bigdaddy1990/jackery_solarvault/issues). For authentication, MQTT or data-quality problems, include a Home Assistant diagnostics export when possible. Sensitive fields are automatically redacted, but still review the file before sharing it publicly.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
