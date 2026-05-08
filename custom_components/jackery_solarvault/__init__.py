@@ -595,7 +595,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     if not unload_ok:
         return False
 
-    if isinstance(coordinator, JackerySolarVaultCoordinator):
-        await coordinator.async_shutdown()
-    entry.runtime_data = None  # type: ignore[assignment]
-    return True
+    if unload_ok:
+        if isinstance(coordinator, JackerySolarVaultCoordinator):
+            await coordinator.async_shutdown()
+        entry.runtime_data = None  # type: ignore[assignment]
+        return True
+    return False
