@@ -1441,7 +1441,9 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
 
     assert "from .util import config_entry_bool_option" in config_flow_source
     assert "def _entry_bool_option(" not in config_flow_source
-    assert options_block.count("config_entry_bool_option(") == 3
+    assert "current_options = _current_option_values(self._entry)" in options_block
+    assert "def _current_option_values(entry: ConfigEntry)" in config_flow_source
+    assert "config_entry_bool_option(entry, key, default)" in config_flow_source
     assert ".options.get(" not in options_block
 
 
@@ -1693,9 +1695,10 @@ def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
         'hass.config.path(\n            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN'
         in init_source
     )
+    init_source_collapsed = re.sub(r"\s+", " ", init_source)
     assert (
-        "await hass.async_add_executor_job(\n        _copy_cached_jackery_brand_images, source_dirs\n    )"
-        in init_source
+        "await hass.async_add_executor_job( _copy_cached_jackery_brand_images, source_dirs )"
+        in init_source_collapsed
     )
     assert pathlib.Path("custom_components/jackery_solarvault/brand/.gitkeep").exists()
     assert not pathlib.Path("brands/icon.svg").exists()
