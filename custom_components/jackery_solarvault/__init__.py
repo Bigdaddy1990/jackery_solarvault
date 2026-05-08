@@ -1,5 +1,7 @@
 """Jackery SolarVault integration."""
 
+from __future__ import annotations
+
 import asyncio
 from datetime import timedelta
 import logging
@@ -358,7 +360,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     # cloud connections.
     await coordinator.async_discover()
     setup_results = cast(
-        "tuple[object, object]",
+        list[None | BaseException],
         await asyncio.gather(
             coordinator.async_config_entry_first_refresh(),
             coordinator.async_start_mqtt(),
