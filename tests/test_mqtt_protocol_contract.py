@@ -170,3 +170,14 @@ def test_mqtt_protocol_md_is_pure_api_reference() -> None:
     # Sanity: the API-reference content must still be there
     assert "hb/app" in protocol, "topic structure missing"
     assert "DevicePropertyChange" in protocol, "command reference missing"
+
+
+def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
+    """PUT/POST retry paths must use the refreshed token after re-login."""
+    api_path = ROOT / "custom_components" / "jackery_solarvault" / "api.py"
+    for name in ("_put_json", "_post_form"):
+        source = _function_source(api_path, name)
+        assert "def _request_headers()" in source
+        assert "headers=_request_headers()" in source
+        assert "self._token = None" in source
+        assert "await self._ensure_token()" in source
