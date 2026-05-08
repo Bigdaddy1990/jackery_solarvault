@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -293,6 +293,11 @@ def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
     )
 
 
+def _raise_config_entry_auth_failed(message: str, err: JackeryAuthError) -> NoReturn:
+    """Raise HA reauth trigger for rejected Jackery credentials."""
+    raise ConfigEntryAuthFailed(f"{message}. Re-authentication is required.") from err
+
+
 class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Polls all known Jackery devices.
 
@@ -517,10 +522,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             systems = await self.api.async_get_system_list()
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(
-                "Jackery credentials were rejected during system discovery. "
-                "Re-authentication is required."
-            ) from err
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected during system discovery", err
+            )
         except JackeryError as err:
             raise UpdateFailed(f"system/list failed: {err}") from err
 
@@ -696,16 +700,24 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
 
     async def _async_periodic_refresh(self) -> None:
-        """Perform one scheduled refresh and keep errors inside the coordinator."""
+        """Perform one scheduled refresh and keep transient errors local.
+
+        Authentication failures must keep bubbling through Home Assistant's
+        coordinator machinery so the config entry can enter its reauth flow.
+        Transient refresh failures deliberately do not advance the adaptive
+        MQTT keep-alive timestamp; otherwise one failed HTTP keep-alive would
+        suppress retries for the full adaptive window while MQTT is live.
+        """
         started = time.monotonic()
         try:
             await self.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             _LOGGER.debug("Jackery scheduled refresh failed: %s", err)
             return
-        finally:
-            self._last_periodic_refresh_completed_monotonic = time.monotonic()
-        elapsed = time.monotonic() - started
+        self._last_periodic_refresh_completed_monotonic = time.monotonic()
+        elapsed = self._last_periodic_refresh_completed_monotonic - started
         interval_sec = self._configured_update_interval.total_seconds()
         if elapsed > interval_sec:
             _LOGGER.debug(
@@ -1859,6 +1871,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             creds = await self.api.async_get_mqtt_credentials()
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected while preparing an MQTT command", err
+            )
         except JackeryError as err:
             raise HomeAssistantError(
                 f"Could not build Jackery MQTT credentials: {err}"
@@ -1912,6 +1928,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     # rebuilds credentials before we reconnect.
                     try:
                         await self.api.async_login()
+                    except JackeryAuthError as relogin_err:
+                        _raise_config_entry_auth_failed(
+                            "Jackery credentials were rejected while refreshing "
+                            "MQTT command credentials",
+                            relogin_err,
+                        )
                     except JackeryError as relogin_err:
                         _LOGGER.debug(
                             "Jackery re-login before MQTT command retry failed: %s",
@@ -2181,11 +2203,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             or current.get(FIELD_CURRENCY_CODE)
             or "€"
         )
-        await self.api.async_set_single_mode(
-            system_id=system_id,
-            single_price=float(price_value),
-            currency=str(currency),
-        )
+        try:
+            await self.api.async_set_single_mode(
+                system_id=system_id,
+                single_price=float(price_value),
+                currency=str(currency),
+            )
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected while saving the single tariff", err
+            )
         self._invalidate_system_cache(system_id, PAYLOAD_PRICE)
         self._apply_local_price_patch(
             device_id,
@@ -2207,6 +2234,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
             try:
                 latest = await self.api.async_get_power_price(system_id)
+            except JackeryAuthError as err:
+                _raise_config_entry_auth_failed(
+                    "Jackery credentials were rejected while reading the current tariff",
+                    err,
+                )
             except JackeryError as err:
                 raise HomeAssistantError(
                     f"Cannot switch to single tariff for {device_id}: {err}"
@@ -2249,6 +2281,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             sources = self._valid_price_sources(
                 await self.api.async_get_price_sources(system_id)
+            )
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected while reading price sources", err
             )
         except JackeryError as err:
             _LOGGER.debug("price source fetch failed for %s: %s", device_id, err)
@@ -2345,11 +2381,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "platformCompanyId/country."
             )
 
-        await self.api.async_set_dynamic_mode(
-            system_id=system_id,
-            platform_company_id=int(company_id),
-            system_region=str(region),
-        )
+        try:
+            await self.api.async_set_dynamic_mode(
+                system_id=system_id,
+                platform_company_id=int(company_id),
+                system_region=str(region),
+            )
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected while saving the dynamic tariff", err
+            )
         self._invalidate_system_cache(system_id, PAYLOAD_PRICE)
         self._apply_local_price_patch(
             device_id,
@@ -2387,11 +2428,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "Dynamic tariff requires provider selection. Use the "
                 "'Electricity price provider' select entity first."
             )
-        await self.api.async_set_dynamic_mode(
-            system_id=system_id,
-            platform_company_id=int(company_id),
-            system_region=str(region),
-        )
+        try:
+            await self.api.async_set_dynamic_mode(
+                system_id=system_id,
+                platform_company_id=int(company_id),
+                system_region=str(region),
+            )
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected while saving the dynamic tariff", err
+            )
         self._invalidate_system_cache(system_id, PAYLOAD_PRICE)
         self._apply_local_price_patch(device_id, {FIELD_DYNAMIC_OR_SINGLE: 1})
 
@@ -3405,10 +3451,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             try:
                 payload = await self.api.async_get_device_property(dev_id)
             except JackeryAuthError as err:
-                raise ConfigEntryAuthFailed(
-                    "Jackery credentials were rejected during property refresh. "
-                    "Re-authentication is required."
-                ) from err
+                _raise_config_entry_auth_failed(
+                    "Jackery credentials were rejected during property refresh", err
+                )
             except JackeryError as err:
                 if "code=20000" in str(err):
                     invalid_device_ids.append(dev_id)
@@ -3430,10 +3475,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     sys_id,
                 )
             except JackeryAuthError as err:
-                raise ConfigEntryAuthFailed(
-                    "Jackery credentials were rejected while fetching extended device data. "
-                    "Re-authentication is required."
-                ) from err
+                _raise_config_entry_auth_failed(
+                    "Jackery credentials were rejected while fetching extended "
+                    "device data",
+                    err,
+                )
 
             old_entry = {}
             if self.data:
@@ -3493,10 +3539,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 try:
                     sys_data = await _fetch_system(sys_id)
                 except JackeryAuthError as err:
-                    raise ConfigEntryAuthFailed(
-                        "Jackery credentials were rejected while fetching system data. "
-                        "Re-authentication is required."
-                    ) from err
+                    _raise_config_entry_auth_failed(
+                        "Jackery credentials were rejected while fetching system data",
+                        err,
+                    )
                 entry.update(sys_data)
             override = self._price_overrides.get(dev_id)
             if override:

@@ -218,3 +218,50 @@ def test_silent_threshold_logic_unit() -> None:
     assert silent(True, None, fresh, now) is False
     # Connected but never received a message AND been connected for 15 min: silent
     assert silent(True, None, stale, now) is True
+
+
+def test_periodic_refresh_does_not_suppress_reauth_failures() -> None:
+    """Scheduled polling must not swallow ConfigEntryAuthFailed.
+
+    The periodic task is the steady-state path where expired credentials are
+    most likely to surface. If it catches auth failures as generic exceptions,
+    Home Assistant cannot start the reauth flow.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_periodic_refresh\(self\).*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+    assert "except ConfigEntryAuthFailed:" in body, body
+    assert (
+        "raise"
+        in body.split("except ConfigEntryAuthFailed:", 1)[1].split(
+            "except Exception", 1
+        )[0]
+    ), body
+
+
+def test_failed_periodic_refresh_does_not_advance_mqtt_keepalive() -> None:
+    """Only successful HTTP refreshes may extend the adaptive keep-alive window.
+
+    When MQTT is live, a failed HTTP keep-alive must be retried on the next tick
+    instead of being treated like a completed refresh for five minutes.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_periodic_refresh\(self\).*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+    assert "finally:" not in body, body
+    assert "self._last_periodic_refresh_completed_monotonic = time.monotonic()" in body
+    assignment_offset = body.index(
+        "self._last_periodic_refresh_completed_monotonic = time.monotonic()"
+    )
+    generic_except_offset = body.index("except Exception as err:")
+    assert assignment_offset > generic_except_offset, body

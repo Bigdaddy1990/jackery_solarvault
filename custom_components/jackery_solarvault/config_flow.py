@@ -220,6 +220,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     return self.async_update_reload_and_abort(
                         entry,
                         data={
+                            **entry.data,
                             CONF_USERNAME: account,
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },

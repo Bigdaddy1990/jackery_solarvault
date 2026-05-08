@@ -1753,3 +1753,30 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     )
     assert '"tls_custom_ca_loaded": self._tls_custom_ca_loaded' in mqtt_source
     assert 'diag["tls_certificate_verification"] = "enabled"' in coordinator_source
+
+
+def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> None:
+    """Control writes/background helpers must propagate auth failures to HA reauth."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+    repairs_source = (CUSTOM_COMPONENT / "repairs.py").read_text(encoding="utf-8")
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+
+    assert "def _raise_config_entry_auth_failed(" in coordinator_source
+    for context in (
+        "while preparing an MQTT command",
+        "while refreshing MQTT command credentials",
+        "while saving the single tariff",
+        "while reading the current tariff",
+        "while reading price sources",
+        "while saving the dynamic tariff",
+    ):
+        assert context in coordinator_source
+    periodic_block = coordinator_source.split("async def _async_periodic_refresh", 1)[
+        1
+    ].split("async def async_shutdown", 1)[0]
+    assert "except ConfigEntryAuthFailed:" in periodic_block
+    assert "raise" in periodic_block
+    assert "except ConfigEntryAuthFailed:" in repairs_source
+    assert "except JackeryAuthError:" in number_source

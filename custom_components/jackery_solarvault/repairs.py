@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 import voluptuous as vol
 
 from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
@@ -55,6 +56,8 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             return
         try:
             await coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 

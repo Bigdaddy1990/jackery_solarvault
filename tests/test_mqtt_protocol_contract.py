@@ -145,6 +145,17 @@ def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     assert "MQTT_USERNAME_SEPARATOR" in api_source
 
 
+def test_setup_passes_configured_login_context_to_api() -> None:
+    """Setup must honor stored app login context for cloud and MQTT parity."""
+    init_source = _read(
+        ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
+    )
+    assert "CONF_MQTT_MAC_ID" in init_source
+    assert "CONF_REGION_CODE" in init_source
+    assert "mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID)" in init_source
+    assert "region_code=entry.data.get(CONF_REGION_CODE)" in init_source
+
+
 def test_mqtt_protocol_md_is_pure_api_reference() -> None:
     """MQTT_PROTOCOL.md must remain a pure reverse-engineering reference.
 
