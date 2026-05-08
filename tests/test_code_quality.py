@@ -817,6 +817,22 @@ def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
     )
 
 
+def test_redact_keys_cover_mqtt_credential_aliases() -> None:
+    """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    redact_block = const_source.split("REDACT_KEYS: Final =", 1)[1].split(")", 1)[0]
+
+    for key_name in (
+        "FIELD_MQTT_PASSWORD",
+        "FIELD_USER_ID",
+        "MQTT_CREDENTIAL_CLIENT_ID",
+        "MQTT_CREDENTIAL_PASSWORD",
+        "MQTT_CREDENTIAL_USER_ID",
+        "MQTT_CREDENTIAL_USERNAME",
+    ):
+        assert key_name in redact_block
+
+
 def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
     """MQTT topics contain the Jackery userId and must be redacted in diagnostics."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
