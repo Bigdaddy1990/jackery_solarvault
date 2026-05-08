@@ -19,10 +19,10 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DOMAIN,
-    FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
-    FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
+    FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
+    FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
     FLOW_ERROR_ACCOUNT_REQUIRED,
     FLOW_ERROR_BASE,
     FLOW_ERROR_CANNOT_CONNECT,
@@ -188,9 +188,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         stable across the reconfigure round-trip.
         """
         entry_id = self.context.get("entry_id")
-        entry = (
-            self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
-        )
+        entry = self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
         if entry is None:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 

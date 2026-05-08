@@ -7,6 +7,7 @@ from datetime import timedelta
 import logging
 from pathlib import Path
 import shutil
+from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -358,11 +359,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     # cut the observed config-entry setup time roughly in half on slow
     # cloud connections.
     await coordinator.async_discover()
-    refresh_result, mqtt_result = await asyncio.gather(
-        coordinator.async_config_entry_first_refresh(),
-        coordinator.async_start_mqtt(),
-        return_exceptions=True,
+    setup_results = cast(
+        "tuple[object, object]",
+        await asyncio.gather(
+            coordinator.async_config_entry_first_refresh(),
+            coordinator.async_start_mqtt(),
+            return_exceptions=True,
+        ),
     )
+    refresh_result, mqtt_result = setup_results
     if isinstance(refresh_result, BaseException):
         raise refresh_result
     if isinstance(mqtt_result, BaseException):
