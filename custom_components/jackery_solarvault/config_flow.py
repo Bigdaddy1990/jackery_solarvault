@@ -38,10 +38,36 @@ from .util import config_entry_bool_option
 
 _LOGGER = logging.getLogger(__name__)
 
+_OPTION_DEFAULTS: dict[str, bool] = {
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+}
+
 
 def _normalize_account(value: str) -> str:
     """Normalize user-facing account identifiers before auth and unique IDs."""
     return value.strip()
+
+
+def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
+    """Return current option values with legacy setup-data fallback."""
+    return {
+        key: config_entry_bool_option(entry, key, default)
+        for key, default in _OPTION_DEFAULTS.items()
+    }
+
+
+def _flow_options(
+    user_input: dict[str, Any],
+    current_options: dict[str, bool] | None = None,
+) -> dict[str, bool]:
+    """Build complete options, preserving current values when fields are omitted."""
+    current = current_options or {}
+    return {
+        key: user_input.get(key, current.get(key, default))
+        for key, default in _OPTION_DEFAULTS.items()
+    }
 
 
 USER_SCHEMA = vol.Schema({
@@ -73,25 +99,22 @@ class JackeryOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Step init."""
+        current_options = _current_option_values(self._entry)
         if user_input is not None:
-            clean = {k: v for k, v in user_input.items() if v not in (None, "")}
-            return self.async_create_entry(title="", data=clean)
+            return self.async_create_entry(
+                title="",
+                data=_flow_options(user_input, current_options),
+            )
 
-        current_create_derived = config_entry_bool_option(
-            self._entry,
-            CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-            DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-        )
-        current_create_calculated_power = config_entry_bool_option(
-            self._entry,
-            CONF_CREATE_CALCULATED_POWER_SENSORS,
-            DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-        )
-        current_create_savings_details = config_entry_bool_option(
-            self._entry,
-            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-        )
+        current_create_derived = current_options[
+            CONF_CREATE_SMART_METER_DERIVED_SENSORS
+        ]
+        current_create_calculated_power = current_options[
+            CONF_CREATE_CALCULATED_POWER_SENSORS
+        ]
+        current_create_savings_details = current_options[
+            CONF_CREATE_SAVINGS_DETAIL_SENSORS
+        ]
         schema = vol.Schema({
             vol.Optional(
                 CONF_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -156,20 +179,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_USERNAME: account,
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
-                    options={
-                        CONF_CREATE_SMART_METER_DERIVED_SENSORS: user_input.get(
-                            CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                            DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-                        ),
-                        CONF_CREATE_CALCULATED_POWER_SENSORS: user_input.get(
-                            CONF_CREATE_CALCULATED_POWER_SENSORS,
-                            DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-                        ),
-                        CONF_CREATE_SAVINGS_DETAIL_SENSORS: user_input.get(
-                            CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                            DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-                        ),
-                    },
+                    options=_flow_options(user_input),
                 )
 
         return self.async_show_form(
@@ -228,24 +238,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_USERNAME: account,
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
-                        options={
-                            CONF_CREATE_SMART_METER_DERIVED_SENSORS: user_input.get(
-                                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                                DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-                            ),
-                            CONF_CREATE_CALCULATED_POWER_SENSORS: user_input.get(
-                                CONF_CREATE_CALCULATED_POWER_SENSORS,
-                                DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-                            ),
-                            CONF_CREATE_SAVINGS_DETAIL_SENSORS: user_input.get(
-                                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                                DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-                            ),
-                        },
+                        options=_flow_options(
+                            user_input, _current_option_values(entry)
+                        ),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
 
-        current_options = entry.options or {}
+        current_options = _current_option_values(entry)
         schema = vol.Schema({
             vol.Required(
                 CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
@@ -253,24 +252,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
             vol.Optional(
                 CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                default=current_options.get(
-                    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-                    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-                ),
+                default=current_options[CONF_CREATE_SMART_METER_DERIVED_SENSORS],
             ): bool,
             vol.Optional(
                 CONF_CREATE_CALCULATED_POWER_SENSORS,
-                default=current_options.get(
-                    CONF_CREATE_CALCULATED_POWER_SENSORS,
-                    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-                ),
+                default=current_options[CONF_CREATE_CALCULATED_POWER_SENSORS],
             ): bool,
             vol.Optional(
                 CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                default=current_options.get(
-                    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-                    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-                ),
+                default=current_options[CONF_CREATE_SAVINGS_DETAIL_SENSORS],
             ): bool,
         })
         return self.async_show_form(
