@@ -1181,7 +1181,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return True
         action_id = payload.get(FIELD_ACTION_ID)
         try:
-            if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
+except (TypeError, ValueError):
+            pass
                 return True
         except TypeError, ValueError:
             pass
