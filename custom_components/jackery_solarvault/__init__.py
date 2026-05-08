@@ -591,7 +591,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     """Unload a config entry."""
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-     # Keep the successful teardown explicitly gated by unload_ok so future
+    # Keep the successful teardown explicitly gated by unload_ok so future
     # changes cannot stop the coordinator while HA still has loaded platforms.
     if unload_ok:
         if isinstance(coordinator, JackerySolarVaultCoordinator):
