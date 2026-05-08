@@ -1780,3 +1780,16 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
     assert "raise" in periodic_block
     assert "except ConfigEntryAuthFailed:" in repairs_source
     assert "except JackeryAuthError:" in number_source
+
+
+def test_brand_cache_sync_is_best_effort() -> None:
+    """Read-only custom component mounts must not block integration setup."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    copy_block = init_source.split("def _copy_cached_jackery_brand_images", 1)[1].split(
+        "_BRAND_CACHE_HASS_DATA_KEY", 1
+    )[0]
+
+    assert "except OSError as err:" in copy_block
+    assert "return copied" in copy_block
+    assert "continue" in copy_block
+    assert "must not prevent the integration from loading" in copy_block
