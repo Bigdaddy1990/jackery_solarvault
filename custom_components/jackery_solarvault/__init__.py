@@ -116,6 +116,10 @@ def _copy_cached_jackery_brand_images(source_dirs: tuple[str, ...]) -> list[str]
     systems, while this custom integration uses domain ``jackery_solarvault``.
     Copying the cached PNG files keeps the UI on HA's local brand source instead
     of shipping hand-made SVG stand-ins.
+
+    Brand synchronization is best-effort. Some HA deployments mount custom
+    components read-only or with restrictive permissions; a failed cache copy
+    must not prevent the integration from loading.
     """
     target_dir = Path(__file__).with_name("brand")
     copied: list[str] = []
@@ -123,7 +127,15 @@ def _copy_cached_jackery_brand_images(source_dirs: tuple[str, ...]) -> list[str]
         source_dir = Path(raw_source_dir)
         if not source_dir.is_dir():
             continue
-        target_dir.mkdir(exist_ok=True)
+        try:
+            target_dir.mkdir(exist_ok=True)
+        except OSError as err:
+            _LOGGER.debug(
+                "Jackery: cannot prepare local brand cache directory %s: %s",
+                target_dir,
+                err,
+            )
+            return copied
         for filename in BRAND_IMAGE_FILENAMES:
             source_file = source_dir / filename
             if not source_file.is_file():
@@ -136,7 +148,16 @@ def _copy_cached_jackery_brand_images(source_dirs: tuple[str, ...]) -> list[str]
                     same_size = False
                 if same_size:
                     continue
-            shutil.copy2(source_file, target_file)
+            try:
+                shutil.copy2(source_file, target_file)
+            except OSError as err:
+                _LOGGER.debug(
+                    "Jackery: cannot copy cached brand image %s to %s: %s",
+                    source_file,
+                    target_file,
+                    err,
+                )
+                continue
             copied.append(filename)
         break
     return copied
