@@ -761,7 +761,7 @@ def test_optional_number_setter_failures_are_logged_before_suppression() -> None
 
 
 def test_max_feed_grid_is_not_aliased_to_grid_standard_limit() -> None:
-    """maxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
+    """MaxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     alias_block = const_source.split("MAIN_PROPERTY_ALIAS_PAIRS", 1)[1].split(
         "TASK_PLAN_BODY",
