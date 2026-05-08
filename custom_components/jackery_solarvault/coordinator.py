@@ -2702,7 +2702,16 @@ except (TypeError, ValueError):
                 ),
                 "examples": examples or "unknown",
             },
-            data={"entry_id": self.entry.entry_id},
+            data={
+                "entry_id": self.entry.entry_id,
+                "count": str(len(warnings)),
+                "metric": str(
+                    first.get(DATA_QUALITY_KEY_LABEL)
+                    or first.get(DATA_QUALITY_KEY_METRIC_KEY)
+                    or "unknown"
+                ),
+                "examples": examples or "unknown",
+            },
         )
 
     async def _async_import_app_chart_statistics(

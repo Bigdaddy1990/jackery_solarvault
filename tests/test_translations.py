@@ -54,3 +54,15 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     assert en["entity"]["sensor"]["stack_out_power"]["name"] == (
         "Battery system discharge power"
     )
+
+
+def test_repair_issue_translations_are_fixable_or_descriptive() -> None:
+    """Repair issues must define exactly one of description or fix_flow."""
+    for path in (
+        TRANSLATION_ROOT / "strings.json",
+        TRANSLATION_ROOT / "translations" / "en.json",
+        TRANSLATION_ROOT / "translations" / "de.json",
+    ):
+        strings = json.loads(path.read_text(encoding="utf-8"))
+        for issue in strings.get("issues", {}).values():
+            assert ("description" in issue) ^ ("fix_flow" in issue), path
