@@ -15,6 +15,8 @@ from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_MQTT_MAC_ID,
+    CONF_REGION_CODE,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -206,6 +208,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     session=session,
                     account=account,
                     password=user_input[CONF_PASSWORD],
+                    mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                    region_code=entry.data.get(CONF_REGION_CODE),
                 )
                 try:
                     await api.async_login()
@@ -302,6 +306,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 session=session,
                 account=self._reauth_entry.data[CONF_USERNAME],
                 password=user_input[CONF_PASSWORD],
+                mqtt_mac_id=self._reauth_entry.data.get(CONF_MQTT_MAC_ID),
+                region_code=self._reauth_entry.data.get(CONF_REGION_CODE),
             )
             try:
                 await api.async_login()
