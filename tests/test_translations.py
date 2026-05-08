@@ -36,7 +36,9 @@ def test_language_files_cover_all_string_keys() -> None:
 def test_service_actions_use_translation_files() -> None:
     """Service action labels belong in translations, not services.yaml."""
     services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
-    strings = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
+    strings = json.loads(
+        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8")
+    )
     icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
 
     for hardcoded_key in ("  name:", "  description:"):
