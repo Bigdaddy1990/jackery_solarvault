@@ -183,9 +183,13 @@ async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
         f"/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
         f"/config/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
     )
-    copied = await hass.async_add_executor_job(
-        _copy_cached_jackery_brand_images, source_dirs
-    )
+    try:
+        copied = await hass.async_add_executor_job(
+            _copy_cached_jackery_brand_images, source_dirs
+        )
+    except OSError as err:
+        _LOGGER.debug("Jackery: cached brand image sync skipped: %s", err)
+        return
     if copied:
         _LOGGER.info(
             "Jackery: copied cached brand image(s) into local integration brand folder: %s",
@@ -586,13 +590,12 @@ async def _async_update_listener(
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload a config entry."""
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
-
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    # Shut down the coordinator only after platforms accepted the unload. If a
-    # platform vetoes unloading, HA keeps the entry loaded and entities must not
-    # be left with a stopped coordinator.
-    if unload_ok:
-        if isinstance(coordinator, JackerySolarVaultCoordinator):
-            await coordinator.async_shutdown()
-        entry.runtime_data = None  # type: ignore[assignment]
-    return unload_ok
+    # Keep the coordinator alive if HA rolls back a failed platform unload.
+    if not unload_ok:
+        return False
+
+    if isinstance(coordinator, JackerySolarVaultCoordinator):
+        await coordinator.async_shutdown()
+    entry.runtime_data = None  # type: ignore[assignment]
+    return True
