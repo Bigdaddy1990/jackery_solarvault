@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import UTC, datetime
+import hashlib
 import inspect
 import json
 import logging
@@ -47,7 +48,7 @@ class JackeryMqttPushClient:
         self._connect_callback = connect_callback
         self._lock = asyncio.Lock()
         self._client: MQTTClient | None = None
-        self._fingerprint: tuple[str, str, str] | None = None
+        self._fingerprint: str | None = None
         self._topics: list[str] = []
         self._connected_event = asyncio.Event()
         self._connected = False
@@ -74,7 +75,7 @@ class JackeryMqttPushClient:
         user_id: str,
     ) -> None:
         """Start MQTT connection or reconfigure it when credentials changed."""
-        fingerprint = (client_id, username, password)
+        fingerprint = self._credential_fingerprint(client_id, username, password)
         async with self._lock:
             if self._client is not None and self._fingerprint == fingerprint:
                 if self._connected:
@@ -133,6 +134,16 @@ class JackeryMqttPushClient:
                 self._connected = False
                 self._connected_event.set()
                 _LOGGER.warning("Jackery MQTT connect setup failed: %s", err)
+
+    @staticmethod
+    def _credential_fingerprint(client_id: str, username: str, password: str) -> str:
+        """Return a stable non-secret signature for MQTT credential changes."""
+        hasher = hashlib.sha256()
+        for value in (client_id, username, password):
+            encoded = value.encode()
+            hasher.update(len(encoded).to_bytes(4, "big"))
+            hasher.update(encoded)
+        return hasher.hexdigest()
 
     async def async_stop(self) -> None:
         """Stop MQTT connection."""
