@@ -26,6 +26,8 @@ from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_MQTT_MAC_ID,
+    CONF_REGION_CODE,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -328,6 +330,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         session=session,
         account=entry.data[CONF_USERNAME],
         password=entry.data[CONF_PASSWORD],
+        mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+        region_code=entry.data.get(CONF_REGION_CODE),
     )
     try:
         await api.async_login()

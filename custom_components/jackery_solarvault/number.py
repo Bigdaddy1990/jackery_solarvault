@@ -22,7 +22,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .api import JackeryError
+from .api import JackeryAuthError, JackeryError
 from .const import (
     FIELD_CURRENCY,
     FIELD_CURRENCY_CODE,
@@ -380,6 +380,8 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             await self.entity_description.setter(
                 self.coordinator, self._device_id, wire_value
             )
+        except JackeryAuthError:
+            raise
         except Exception as err:
             if self.entity_description.raise_on_setter_error:
                 raise

@@ -137,3 +137,19 @@ def test_reauth_step_uses_only_password_field_not_username() -> None:
     # account they're re-authenticating.
     assert "description_placeholders=" in body, body
     assert "username" in body, body
+
+
+def test_reconfigure_preserves_stored_login_context() -> None:
+    """Reconfigure must not drop hidden compatibility data from entry.data."""
+    src = _read("config_flow.py")
+    match = re.search(
+        r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert match is not None, "async_step_reconfigure not found"
+    body = match.group(0)
+    assert "async_update_reload_and_abort" in body, body
+    assert "**entry.data" in body, body
+    assert "CONF_USERNAME: account" in body, body
+    assert "CONF_PASSWORD: user_input[CONF_PASSWORD]" in body, body
