@@ -700,7 +700,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
 
     async def _async_periodic_refresh(self) -> None:
-        """Perform one scheduled refresh and keep errors inside the coordinator."""
+        """Perform one scheduled refresh and keep transient errors local.
+
+        Authentication failures must keep bubbling through Home Assistant's
+        coordinator machinery so the config entry can enter its reauth flow.
+        Transient refresh failures deliberately do not advance the adaptive
+        MQTT keep-alive timestamp; otherwise one failed HTTP keep-alive would
+        suppress retries for the full adaptive window while MQTT is live.
+        """
         started = time.monotonic()
         try:
             await self.async_request_refresh()
@@ -709,9 +716,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         except Exception as err:
             _LOGGER.debug("Jackery scheduled refresh failed: %s", err)
             return
-        finally:
-            self._last_periodic_refresh_completed_monotonic = time.monotonic()
-        elapsed = time.monotonic() - started
+        self._last_periodic_refresh_completed_monotonic = time.monotonic()
+        elapsed = self._last_periodic_refresh_completed_monotonic - started
         interval_sec = self._configured_update_interval.total_seconds()
         if elapsed > interval_sec:
             _LOGGER.debug(
