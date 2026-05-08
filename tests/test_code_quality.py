@@ -761,7 +761,7 @@ def test_optional_number_setter_failures_are_logged_before_suppression() -> None
 
 
 def test_max_feed_grid_is_not_aliased_to_grid_standard_limit() -> None:
-    """maxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
+    """MaxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     alias_block = const_source.split("MAIN_PROPERTY_ALIAS_PAIRS", 1)[1].split(
         "TASK_PLAN_BODY",
@@ -815,6 +815,22 @@ def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
             "class JackeryConfigFlow", 1
         )[0]
     )
+
+
+def test_redact_keys_cover_mqtt_credential_aliases() -> None:
+    """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    redact_block = const_source.split("REDACT_KEYS: Final =", 1)[1].split(")", 1)[0]
+
+    for key_name in (
+        "FIELD_MQTT_PASSWORD",
+        "FIELD_USER_ID",
+        "MQTT_CREDENTIAL_CLIENT_ID",
+        "MQTT_CREDENTIAL_PASSWORD",
+        "MQTT_CREDENTIAL_USER_ID",
+        "MQTT_CREDENTIAL_USERNAME",
+    ):
+        assert key_name in redact_block
 
 
 def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:

@@ -26,16 +26,19 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
     """
 
     def __init__(self, entry_id: str | None) -> None:
+        """Store the config-entry ID associated with the repair issue."""
         self._entry_id = entry_id
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> data_entry_flow.FlowResult:
+        """Start the confirmation-only repair flow."""
         return await self.async_step_confirm()
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> data_entry_flow.FlowResult:
+        """Confirm acknowledgement and trigger a best-effort refresh."""
         if user_input is not None:
             await self._async_force_refresh()
             return self.async_create_entry(data={})
