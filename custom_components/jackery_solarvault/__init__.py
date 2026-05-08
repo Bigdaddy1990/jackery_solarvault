@@ -595,7 +595,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     if not unload_ok:
         return False
 
-    if isinstance(coordinator, JackerySolarVaultCoordinator):
-        await coordinator.async_shutdown()
-    entry.runtime_data = None  # type: ignore[assignment]
-    return True
+    # Keep the successful teardown explicitly gated by unload_ok so future
+    # changes cannot stop the coordinator while HA still has loaded platforms.
+    if unload_ok:
+        if isinstance(coordinator, JackerySolarVaultCoordinator):
+            await coordinator.async_shutdown()
+        entry.runtime_data = None  # type: ignore[assignment]
+        return True
+    return False
