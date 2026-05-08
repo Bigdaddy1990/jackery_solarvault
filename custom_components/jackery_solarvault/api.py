@@ -1003,14 +1003,17 @@ class JackeryApi:
         """Generic JSON PUT helper with token re-login on expiry."""
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
-        headers = self._headers(with_token=True)
-        headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
+
+        def _request_headers() -> dict[str, str]:
+            headers = self._headers(with_token=True)
+            headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
+            return headers
 
         async def _do() -> tuple[int, dict]:
             async with self._session.put(
                 url,
                 json=payload,
-                headers=headers,
+                headers=_request_headers(),
                 timeout=REQUEST_TIMEOUT_SEC,
             ) as resp:
                 status = resp.status
@@ -1090,15 +1093,19 @@ class JackeryApi:
         """Generic form-urlencoded POST with auto re-login on expiry."""
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
-        headers = self._headers(with_token=True)
-        headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
+
+        def _request_headers() -> dict[str, str]:
+            headers = self._headers(with_token=True)
+            headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
+            return headers
+
         body = {k: str(v) for k, v in fields.items()}
 
         async def _do() -> tuple[int, dict]:
             async with self._session.post(
                 url,
                 data=body,
-                headers=headers,
+                headers=_request_headers(),
                 timeout=REQUEST_TIMEOUT_SEC,
             ) as resp:
                 status = resp.status
