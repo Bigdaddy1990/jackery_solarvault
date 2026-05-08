@@ -180,3 +180,36 @@ def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> N
     reauth_body = reauth.group(0)
     assert "mqtt_mac_id=self._reauth_entry.data.get(CONF_MQTT_MAC_ID)" in reauth_body
     assert "region_code=self._reauth_entry.data.get(CONF_REGION_CODE)" in reauth_body
+
+
+def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None:
+    """Reconfigure/options submissions must not reset omitted toggles to defaults."""
+    src = _read("config_flow.py")
+
+    assert "def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:" in src
+    assert "config_entry_bool_option(entry, key, default)" in src
+    assert "def _flow_options(" in src
+    assert "current.get(key, default)" in src
+    assert "data=_flow_options(user_input, current_options)" in src
+    assert "options=_flow_options(" in src
+    assert "user_input, _current_option_values(entry)" in src
+
+    reconfigure = re.search(
+        r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
+        src,
+        re.S,
+    )
+    assert reconfigure is not None, "async_step_reconfigure not found"
+    reconfigure_body = reconfigure.group(0)
+    assert "current_options = _current_option_values(entry)" in reconfigure_body
+    assert "entry.options or {}" not in reconfigure_body
+
+    options_flow = re.search(
+        r"class JackeryOptionsFlow.*?(?=\n\nclass JackeryConfigFlow)",
+        src,
+        re.S,
+    )
+    assert options_flow is not None, "JackeryOptionsFlow not found"
+    options_body = options_flow.group(0)
+    assert "current_options = _current_option_values(self._entry)" in options_body
+    assert "clean =" not in options_body
