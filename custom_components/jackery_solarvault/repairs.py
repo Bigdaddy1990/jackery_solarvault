@@ -25,24 +25,31 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
     kept informed about the underlying source of truth.
     """
 
-    def __init__(self, entry_id: str | None) -> None:
-        """Store the config-entry ID associated with the repair issue."""
+    def __init__(
+        self, entry_id: str | None, description_placeholders: dict[str, str]
+    ) -> None:
+        """Initialize the repair flow for one config entry."""
         self._entry_id = entry_id
+        self._description_placeholders = description_placeholders
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> data_entry_flow.FlowResult:
-        """Start the confirmation-only repair flow."""
+        """Route the initial repair step to the confirmation form."""
         return await self.async_step_confirm()
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> data_entry_flow.FlowResult:
-        """Confirm acknowledgement and trigger a best-effort refresh."""
+        """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
             return self.async_create_entry(data={})
-        return self.async_show_form(step_id="confirm", data_schema=vol.Schema({}))
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=vol.Schema({}),
+            description_placeholders=self._description_placeholders,
+        )
 
     async def _async_force_refresh(self) -> None:
         coordinator = self._coordinator()
@@ -72,8 +79,14 @@ async def async_create_fix_flow(
 ) -> RepairsFlow:
     """Return the matching repair flow for an issue raised by this integration."""
     if issue_id.endswith(f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"):
-        entry_id = (data or {}).get("entry_id")
-        return AppDataInconsistencyRepairFlow(entry_id)
+        issue_data = data or {}
+        entry_id = issue_data.get("entry_id")
+        description_placeholders = {
+            "count": str(issue_data.get("count", "unknown")),
+            "metric": str(issue_data.get("metric", "unknown")),
+            "examples": str(issue_data.get("examples", "unknown")),
+        }
+        return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
     raise data_entry_flow.UnknownFlow(
         f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
     )

@@ -188,9 +188,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         stable across the reconfigure round-trip.
         """
         entry_id = self.context.get("entry_id")
-        entry = (
-            self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
-        )
+        entry = self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
         if entry is None:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 

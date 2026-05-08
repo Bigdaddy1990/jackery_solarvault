@@ -584,7 +584,7 @@
         "name": "Zeitzone"
       },
       "today_load": {
-        "name": "Tägliche Netzeinspeisung (Jackery-Cloud)"
+        "name": "T\u00e4gliche Netzeinspeisung (Jackery-Cloud)"
       },
       "total_carbon_saved": {
         "name": "Gesamt CO\u2082 eingespart"
@@ -656,11 +656,10 @@
   },
   "issues": {
     "app_data_inconsistency": {
-      "description": "Jackery hat widerspr\u00fcchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.",
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Best\u00e4tige, um einen Refresh aus der Jackery-Cloud zu erzwingen. Vor\u00fcbergehende Inkonsistenzen verschwinden, sobald ein frischer konsistenter Payload eintrifft. Falls die Warnung erneut auftritt, im Integrations-Tracker einen Bericht mit Diagnose-Dump anlegen.",
+            "description": "Jackery hat widerspr\u00fcchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.\n\nBest\u00e4tige, um einen Refresh aus der Jackery-Cloud zu erzwingen. Vor\u00fcbergehende Inkonsistenzen verschwinden, sobald ein frischer konsistenter Payload eintrifft. Falls die Warnung erneut auftritt, im Integrations-Tracker einen Bericht mit Diagnose-Dump anlegen.",
             "title": "Jackery-Cloud-Refresh erzwingen"
           }
         }
