@@ -2331,6 +2331,7 @@ async def async_setup_entry(
                 )
         return entities
 
+    @callback
     def _add_new_entities() -> None:
         entities = _collect_entities()
         if entities:
