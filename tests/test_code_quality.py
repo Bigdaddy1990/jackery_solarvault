@@ -1278,9 +1278,9 @@ def test_services_setup_is_idempotent_and_callback_typed() -> None:
         "SERVICE_REFRESH_WEATHER_PLAN",
         "SERVICE_DELETE_STORM_ALERT",
     ):
-        assert f"hass.services.has_service(DOMAIN, {service_const})" in setup_block, (
-            service_const
-        )
+        assert (
+            f"hass.services.has_service(DOMAIN, {service_const})" in setup_block
+        ), service_const
         assert (
             f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"
             in setup_block
@@ -1583,9 +1583,7 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
 
     assert "from .util import config_entry_bool_option" in config_flow_source
     assert "def _entry_bool_option(" not in config_flow_source
-    assert (
-        "current_options = _current_option_values(self.config_entry)" in options_block
-    )
+    assert "current_options = _current_option_values(self.config_entry)" in options_block
     assert "def _current_option_values(entry: ConfigEntry)" in config_flow_source
     assert "config_entry_bool_option(entry, key, default)" in config_flow_source
     assert ".options.get(" not in options_block
@@ -1937,9 +1935,9 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
 def test_brand_cache_sync_is_best_effort() -> None:
     """Read-only custom component mounts must not block integration setup."""
     brand_source = (CUSTOM_COMPONENT / "brand.py").read_text(encoding="utf-8")
-    copy_block = brand_source.split("def _copy_cached_jackery_brand_images", 1)[
-        1
-    ].split("_BRAND_CACHE_HASS_DATA_KEY", 1)[0]
+    copy_block = brand_source.split("def _copy_cached_jackery_brand_images", 1)[1].split(
+        "_BRAND_CACHE_HASS_DATA_KEY", 1
+    )[0]
 
     assert "except OSError as err:" in copy_block
     assert "return copied" in copy_block
