@@ -1,176 +1,202 @@
-# Intégration Home Assistant Jackery SolarVault 3 Pro Max
+# Jackery SolarVault pour Home Assistant
 
-**🌍 Language / Sprache / Idioma / Langue :**
-[🇬🇧 English](../README.md) · [🇩🇪 Deutsch](./README.de.md) · [🇫🇷 Français](./README.fr.md) · [🇪🇸 Español](./README.es.md)
-
----
+Langues :
+[English](../README.md) · [Deutsch](./README.de.md) · [Français](./README.fr.md) · [Español](./README.es.md)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
+Intégration communautaire pour les systèmes Jackery SolarVault, en particulier SolarVault 3 Pro Max. Elle lit les valeurs en direct, les statistiques d'énergie et les paramètres configurables depuis le cloud Jackery, et utilise le push MQTT pour les mises à jour rapides et les commandes de contrôle.
 
-Intégration communautaire pour les systèmes Jackery SolarVault, en particulier SolarVault 3 Pro Max. L'intégration lit les valeurs en direct, les statistiques d'énergie et les paramètres configurables depuis le cloud Jackery, et utilise le push MQTT pour les changements d'état rapides et les commandes de contrôle.
+Cette intégration n'est pas un produit officiel Jackery et n'est pas affiliée à Jackery Inc.
 
-> ⚠️ Cette intégration n'est pas un produit officiel Jackery et n'a aucun lien avec Jackery Inc.
+## Ce que fournit l'intégration
 
+- Détection automatique du système et des appareils via le compte cloud Jackery.
+- Unité principale, smart meter et batteries d'extension comme appareils Home Assistant séparés.
+- Capteurs de puissance en direct pour la batterie, le PV total, les canaux PV, l'import/export réseau, l'EPS, la puissance de pile et les phases du smart meter.
+- Capteurs d'énergie pour les périodes de l'application Jackery : jour, semaine, mois et année.
+- Entités configurables pour l'EPS, la veille, les limites, la puissance de sortie, le suivi du smart meter, l'alerte tempête, l'unité de température et le prix de l'électricité.
+- Bouton de redémarrage de l'appareil et services cloud pour le nom du système et la gestion des alertes tempête.
+- Diagnostics pour les données brutes expurgées, l'état MQTT, le firmware, les limites système et les avertissements de qualité des données.
 
-## Fonctionnalités
+## Prérequis
 
-- Détection automatique des appareils et du système via le compte Jackery
-- Actualisation HTTP régulière des valeurs standard avec un intervalle fixe de 30 secondes
-- Push MQTT pour l'état en direct, le smart meter, les batteries d'extension et les commandes de contrôle
-- Appareil principal, smart meter et batteries d'extension comme appareils Home Assistant séparés
-- Prise en charge de jusqu'à 5 batteries d'extension
-- Puissance en direct : batterie, PV total, canaux PV, import réseau, export réseau, EPS et pile de batteries d'extension
-- Statistiques d'énergie : jour, semaine, mois et année pour le PV, la consommation et la batterie
-- Valeurs à long terme compatibles avec le tableau de bord Énergie uniquement pour les valeurs cumulatives totales/journalières ; les valeurs hebdomadaires/mensuelles/annuelles sont de simples valeurs d'affichage
-- Puissance du smart meter avec valeurs par phase si un smart meter est connecté
-- Configuration via des entités : EPS, limites de charge/décharge, limite de puissance d'injection, puissance de sortie maximale, mode de consommation d'énergie, arrêt automatique, suivi du smart meter, alerte tempête, unité de température, prix de l'électricité et veille
-- Bouton de redémarrage de l'appareil
-- Entités de diagnostic pour l'état en ligne, le firmware, les limites système, la norme réseau, le code pays, les données brutes et l'état MQTT
+- Home Assistant 2025.8.0 ou plus récent.
+- Python 3.14 ou plus récent, fourni par Home Assistant.
+- Un compte cloud Jackery.
+- SolarVault en ligne via Wi-Fi ou Ethernet.
+- HACS pour la méthode d'installation recommandée.
 
-## Installation via HACS
+## Configuration de compte Jackery recommandée
+
+Jackery n'autorise en pratique qu'une seule session active par compte. Si l'application officielle Jackery et Home Assistant utilisent le même compte en même temps, les jetons et identifiants MQTT peuvent être renouvelés. Cela peut provoquer des erreurs de jeton expiré, des erreurs d'authentification MQTT ou des données temporairement obsolètes.
+
+Configuration recommandée :
+
+1. Créer un deuxième compte Jackery.
+2. Partager le SolarVault avec ce deuxième compte dans l'application Jackery.
+3. Utiliser ce deuxième compte uniquement pour Home Assistant.
+
+## Installation
+
+### HACS
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
 
 1. Ouvrir HACS.
-2. Ouvrir le menu à trois points en haut à droite.
+2. Ouvrir le menu à trois points.
 3. Sélectionner `Custom repositories`.
-4. Saisir l'URL du dépôt `https://github.com/Bigdaddy1990/jackery_solarvault` et choisir la catégorie `Integration`.
+4. Ajouter `https://github.com/Bigdaddy1990/jackery_solarvault` comme `Integration`.
 5. Rechercher `Jackery SolarVault` et l'installer.
 6. Redémarrer Home Assistant.
-7. Aller dans Paramètres → Appareils et services → Ajouter une intégration → `Jackery SolarVault`.
+7. Aller dans `Paramètres > Appareils et services > Ajouter une intégration`.
+8. Sélectionner `Jackery SolarVault`.
 
-## Installation manuelle
+### Manuelle
 
 1. Télécharger le ZIP depuis la [page des releases](https://github.com/Bigdaddy1990/jackery_solarvault/releases).
-2. Copier le dossier `custom_components/jackery_solarvault` dans `<HA-config>/custom_components/`.
+2. Copier `custom_components/jackery_solarvault` dans `<HA-config>/custom_components/`.
 3. Redémarrer Home Assistant.
-4. Ajouter l'intégration via Paramètres → Appareils et services.
+4. Ajouter `Jackery SolarVault` depuis `Paramètres > Appareils et services`.
 
-## Configuration
+## Configuration et options
 
-Requis :
+Le flux de configuration demande :
 
-- adresse e-mail du cloud Jackery
-- mot de passe du cloud Jackery
-- facultatif : activer/désactiver les capteurs smart meter calculés
-- facultatif : activer/désactiver les capteurs de puissance calculés
+- L'adresse e-mail du cloud Jackery.
+- Le mot de passe du cloud Jackery.
+- Si les capteurs calculés du smart meter doivent être créés.
+- Si les capteurs calculés de puissance nette doivent être créés.
+- Si les capteurs de détail du calcul d'économies doivent être créés.
 
-L'ID de l'appareil, l'ID système, la macId MQTT et la région sont déduits des données cloud/MQTT et ne sont plus demandés manuellement dans l'interface utilisateur.
+L'ID d'appareil, l'ID système, le `macId` MQTT et la région sont déduits des données cloud et MQTT. Ils ne sont pas saisis manuellement.
 
-## Remarque importante concernant la connexion Jackery
+Les mêmes options peuvent être modifiées plus tard dans les options de l'intégration. Les identifiants peuvent être mis à jour via les flux de reconfiguration ou de réauthentification de Home Assistant sans supprimer l'intégration.
 
-Jackery n'autorise en pratique qu'une seule session active par compte. Si l'application officielle et Home Assistant sont connectés simultanément avec le même compte, les jetons et les identifiants MQTT peuvent être renouvelés. Cela peut entraîner l'expiration de jetons ou des erreurs d'authentification MQTT.
+## Appareils et entités
 
-Recommandé :
+### Appareil SolarVault principal
 
-1. Créer un deuxième compte Jackery.
-2. Partager le SolarVault avec le deuxième compte dans l'application Jackery via le partage/code QR.
-3. Utiliser le deuxième compte dans Home Assistant.
+Capteurs typiques :
 
-## Entités
+- État de charge.
+- Puissance de charge et de décharge de la batterie.
+- Puissance PV totale et puissance PV1 à PV4.
+- Import réseau, export réseau et puissance réseau nette.
+- Puissance d'entrée et de sortie côté réseau.
+- Puissance EPS.
+- Puissance de charge et de décharge de la pile.
+- Autre puissance de charge.
+- Prix de l'électricité.
+- Valeurs d'application jour/semaine/mois/année.
+- Nombre d'alarmes actives.
 
-### Capteurs standard
+Contrôles typiques :
 
-- SOC total et batterie interne
-- Puissance de charge de la batterie et puissance de décharge de la batterie
-- Puissance PV totale et canaux PV 1-4
-- Import réseau, export réseau et puissance réseau nette
-- Puissance d'entrée/sortie côté réseau
-- Puissance EPS
-- Puissance de charge/décharge des batteries d'extension
-- Autre puissance de charge
-- Prix de l'électricité
-- Alarmes actives
-- Valeurs journalières/hebdomadaires/mensuelles/annuelles pour le PV, la consommation et la batterie
+- Sortie EPS.
+- Veille.
+- Arrêt automatique en mode hors réseau et délai d'arrêt automatique.
+- Limites de charge et de décharge.
+- Limite de puissance d'injection.
+- Puissance de sortie maximale.
+- Puissance de sortie par défaut.
+- Suivi du smart meter.
+- Mode de consommation d'énergie.
+- Mode de prix et prix forfaitaire.
+- Unité de température.
+- Alerte tempête et délai de préalerte.
+- Redémarrage.
 
 ### Batteries d'extension
 
-Les batteries d'extension sont créées séparément de l'appareil principal. Pour chaque batterie détectée, les informations suivantes sont affichées lorsque disponibles :
+Les batteries d'extension sont créées comme appareils séparés lorsque Jackery fournit leurs données. Jusqu'à cinq batteries sont prises en charge. Selon le payload, chaque batterie peut exposer :
 
-- SOC
-- Température des cellules
-- Puissance de charge
-- Puissance de décharge
-- Version du firmware
-- Numéro de série
-- Version du firmware et numéro de série comme informations d'appareil Home Assistant lorsque disponibles
-- État de communication sous forme d'attributs
+- État de charge.
+- Température des cellules.
+- Puissance de charge et de décharge.
+- Version du firmware.
+- Numéro de série.
+- État de communication sous forme d'attributs.
 
 ### Smart meter
 
-Le smart meter est créé comme appareil distinct sous le SolarVault. Valeurs prises en charge :
+Lorsqu'un smart meter Jackery est connecté, il est créé comme appareil séparé. Il peut exposer :
 
-- Puissance totale
-- Puissance phase 1
-- Puissance phase 2
-- Puissance phase 3
-- Valeurs brutes disponibles sous forme d'attributs
-
-### Entités configurables
-
-- Sortie EPS
-- Veille
-- Arrêt automatique en mode îlot (avec durée d'arrêt automatique)
-- Limite de charge et de décharge
-- Limite de puissance d'injection
-- Puissance de sortie maximale
-- Puissance de sortie standard
-- Suivi du smart meter
-- Mode de consommation d'énergie
-- Mode de prix de l'électricité
-- Prix au tarif unique
-- Unité de température
-- Alerte tempête et délai de préalerte
-- Redémarrage
+- Puissance totale du compteur.
+- Puissance phase 1, phase 2 et phase 3.
+- Attributs bruts du compteur pour le diagnostic.
+- Capteurs calculés de consommation du foyer lorsque l'option est activée.
 
 ## Services
 
-L'intégration enregistre trois services dans l'espace de noms `jackery_solarvault` :
+L'intégration enregistre ces services sous `jackery_solarvault` :
 
 | Service | Objectif |
 |---|---|
-| `jackery_solarvault.rename_system` | Renommer le système (appareil SolarVault) dans le cloud |
-| `jackery_solarvault.refresh_weather_plan` | Récupérer le plan actuel d'alerte tempête depuis le serveur cloud |
+| `jackery_solarvault.rename_system` | Renommer le système SolarVault dans le cloud Jackery |
+| `jackery_solarvault.refresh_weather_plan` | Récupérer le plan actuel d'alerte tempête |
 | `jackery_solarvault.delete_storm_alert` | Supprimer une alerte tempête active via une commande cloud |
 
-Pour plus de détails sur les paramètres requis, voir `services.yaml` ou l'éditeur Services dans les outils de développement HA.
+Utilisez `Outils de développement > Actions` dans Home Assistant pour les paramètres des services. Les actions `refresh_weather_plan` et `delete_storm_alert` affichent un sélecteur d'appareil filtré sur les appareils Jackery : choisissez l'unité principale SolarVault. Les automatisations peuvent aussi transmettre directement le `device_id` numérique brut de Jackery, visible dans l'export de diagnostic. `rename_system` conserve un champ texte parce qu'un système Jackery couvre plusieurs appareils Home Assistant et est identifié par l'ID système numérique dans les diagnostics.
 
-## Bien lire les capteurs d'énergie et de puissance
+Lorsque deux comptes Jackery sont configurés, chaque action est automatiquement routée vers l'entrée cloud qui possède l'ID système ou appareil demandé.
+
+## Tableau de bord Énergie et signification des capteurs
+
+Utilisez les capteurs d'énergie avec attention. Jackery expose plusieurs valeurs qui semblent proches mais qui n'ont pas la même signification.
 
 - La puissance de décharge de la batterie indique ce que la batterie fournit.
-- Le réseau net correspond à l'import réseau moins l'export réseau. Cette valeur n'a pas forcément à correspondre à la puissance de décharge de la batterie, car la charge de la maison, le PV, le smart meter et la régulation interne se trouvent entre les deux.
-- L'entrée/sortie de la pile se rapporte à la pile de batteries d'extension ou au flux de puissance entre l'appareil principal et les batteries d'extension.
-- Les valeurs du smart meter proviennent du compteur connecté et sont gérées séparément des valeurs de l'appareil principal.
-- Le capteur `Consommation actuelle de la maison` calcule la consommation instantanée à partir de la consommation domestique en direct signalée par Jackery (`otherLoadPw`) et n'utilise la puissance nette du smart meter moins l'entrée côté réseau Jackery plus la sortie côté réseau Jackery qu'en solution de secours. Cela évite que l'injection du SolarVault soit déduite à tort de la consommation de la maison.
-- Les capteurs d'énergie journaliers/hebdomadaires/mensuels/annuels utilisent `state_class: total` avec le `last_reset` adapté à la période d'application correspondante. Ce sont des valeurs de période, pas des compteurs à vie croissants de façon monotone.
-- Les valeurs hebdomadaires, mensuelles et annuelles sont calculées de façon identique à partir de la série de graphique correspondante de l'application. La série dépend du payload : les valeurs totales de tendance PV/maison utilisent généralement `y`, la charge/décharge de la batterie utilise `y1`/`y2`, l'entrée/sortie côté réseau de l'appareil utilise `y1`/`y2`, et PV1..PV4 utilisent `y1`..`y4`. Les champs de total serveur ne sont plus utilisés que comme valeurs de secours/diagnostic, car les champs de total mensuels/annuels peuvent être trompeurs selon le payload.
+- La puissance réseau nette correspond à l'import réseau moins l'export réseau. Elle ne doit pas forcément correspondre à la puissance de décharge de la batterie, car le PV, la charge du foyer, les valeurs du smart meter et la régulation interne se trouvent entre les deux.
+- L'entrée/sortie de pile décrit la pile de batteries d'extension ou le flux de puissance entre l'unité principale et les batteries d'extension.
+- Les valeurs du smart meter proviennent du compteur connecté et sont traitées séparément des valeurs de l'unité principale.
+- `Consommation actuelle du foyer` utilise la charge du foyer en direct de Jackery (`otherLoadPw`) lorsqu'elle est disponible. Si cette valeur manque, l'intégration utilise en secours la puissance nette du smart meter moins l'entrée côté réseau Jackery plus la sortie côté réseau Jackery.
+- `Sortie réseau quotidienne (cloud Jackery)` correspond au champ Jackery `todayLoad`. Ce n'est pas une mesure fiable de la consommation réelle du foyer. Pour la consommation du foyer, utilisez les capteurs calculés de smart meter/consommation du foyer lorsqu'ils sont disponibles.
+- `Économies totales de l'application` est le KPI brut de l'application Jackery. Il peut ressembler à un revenu PV. `Économies calculées` est l'estimation locale basée sur l'énergie AC autoconsommée, l'entrée/sortie côté réseau, l'export public optionnel, la consommation du foyer et le prix d'électricité configuré.
 
-### Périodes, totaux et avertissements
+Pour la configuration du tableau de bord Énergie de Home Assistant, privilégiez les vraies valeurs cumulatives/journalières et les capteurs calculés de consommation du foyer. Ne traitez pas les capteurs de période semaine, mois ou année comme des compteurs de service à vie.
 
-- Semaine = lundi à dimanche.
-- Mois = mois calendaire.
-- Année = année calendaire.
-- Les valeurs totales/lifetime proviennent des champs totaux documentés de l'application/HTTP/MQTT et ne sont pas assemblées à partir des valeurs hebdomadaires, mensuelles ou annuelles.
-- Il n'y a explicitement aucune utilisation des valeurs hebdomadaires pour réparer des valeurs mensuelles, annuelles ou totales, ni des valeurs mensuelles pour réparer des valeurs annuelles ou totales.
-- Au début d'un mois, la valeur hebdomadaire peut être supérieure à la valeur mensuelle si la semaine en cours contient encore des jours du mois précédent. Ce n'est pas un bug.
-- Si Jackery fournit des données contradictoires, par exemple une valeur annuelle inférieure à une semaine complète située dans la même année ou une production totale inférieure à la production annuelle, l'intégration ne modifie pas silencieusement les valeurs des entités. Elle crée plutôt une notification de réparation et stocke les détails dans l'export de diagnostic sous `data_quality`.
+Les détails du calcul d'économies sont documentés dans [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md).
 
-## Polling et mises à jour
+## Règles de période et qualité des données
 
-Le polling HTTP rapide s'exécute avec un intervalle fixe de 30 secondes. Les statistiques cloud lentes sont volontairement interrogées moins souvent, car Jackery ne met pas ces données à jour côté serveur chaque seconde.
+L'intégration utilise les mêmes limites de période locales que l'application Jackery :
 
-Le push MQTT met à jour les valeurs en direct indépendamment du polling dès que le broker est connecté.
+- Semaine : lundi à dimanche.
+- Mois : mois calendaire.
+- Année : année calendaire.
 
-La connexion TLS MQTT vérifie activement la chaîne de certificats du broker. Le fichier ``custom_components/jackery_solarvault/jackery_ca.crt`` est fourni comme ancre de confiance documentée pour ``emqx.jackeryapp.com``, car Jackery ne fait pas signer le broker par une CA publique. Avec Python 3.10+/OpenSSL 3.x, le drapeau strict ``VERIFY_X509_STRICT`` est également désactivé de manière ciblée, car le certificat serveur ne fournit pas l'extension ``Authority Key Identifier``. La vérification du nom d'hôte, la vérification de chaîne et la vérification de signature restent actives (``CERT_REQUIRED`` + ``check_hostname = True``). Il n'existe aucun repli automatique vers ``tls_insecure`` ou ``CERT_NONE`` — les erreurs TLS restent visibles. L'export de diagnostic affiche notamment ``tls_custom_ca_loaded``, ``tls_x509_strict_disabled`` et ``tls_certificate_source`` sous ``mqtt_status``, afin que la configuration TLS soit compréhensible sans journalisation de débogage. Le contexte et les règles de modification de cette stratégie sont documentés dans ``docs/STRICT_WORK_INSTRUCTIONS.md``.
+Comportement important :
 
-Les données de diagnostic MQTT ne contiennent que des chemins de topics expurgés (`hb/app/**REDACTED**/...`), des compteurs et des horodatages pour la connexion, le dernier message, la dernière publication et les payloads rejetés. La partie `userId` Jackery du topic n'est pas incluse dans l'export de diagnostic.
+- Les capteurs de période sont des totaux de période, pas des compteurs à vie.
+- Les valeurs hebdomadaires ne sont pas utilisées pour réparer les valeurs mensuelles, annuelles ou totales.
+- Lorsque Jackery renvoie une valeur du mois courant comme valeur annuelle ou totale de production/carbone, l'intégration peut la protéger vers le haut avec des valeurs mensuelles explicites du même endpoint et de la même année calendaire.
+- `Économies totales de l'application` reste la valeur cloud brute. La valeur d'économies calculées est séparée.
+- Au début d'un mois, une valeur hebdomadaire peut être supérieure à la valeur mensuelle si la semaine en cours inclut des jours du mois précédent. C'est attendu.
+- Si Jackery renvoie des données contradictoires qui ne peuvent pas être protégées proprement, l'intégration crée un problème de réparation Home Assistant et stocke les détails dans l'export de diagnostic sous `data_quality`.
 
-## Journalisation de débogage
+## Polling, MQTT et TLS
 
-Pour l'analyse des erreurs :
+Le push MQTT est le chemin principal pour les mises à jour en direct dès qu'il est connecté. Le polling HTTP reste utilisé au démarrage, comme secours et comme keep-alive :
+
+- Le rafraîchissement HTTP rapide utilise un intervalle de base de 30 secondes.
+- Lorsque MQTT est actif, les cycles HTTP rapides sont ignorés et un rafraîchissement HTTP complet est conservé avec une cadence de keep-alive plus lente.
+- Les statistiques cloud lentes ainsi que les données de prix/configuration sont interrogées moins souvent, car le cloud Jackery ne les met pas à jour chaque seconde.
+
+La connexion TLS MQTT vérifie la chaîne de certificats du broker et le nom d'hôte. L'intégration inclut `custom_components/jackery_solarvault/jackery_ca.crt` comme ancre de confiance pour `emqx.jackeryapp.com`, car le certificat du broker Jackery n'est pas signé par une CA publique. Il n'existe aucun fallback automatique vers un TLS non sécurisé. L'état TLS est visible dans l'export de diagnostic.
+
+Les détails techniques du traitement TLS sont documentés dans [`STRICT_WORK_INSTRUCTIONS.md`](STRICT_WORK_INSTRUCTIONS.md).
+
+## Diagnostics et dépannage
+
+Pour les problèmes d'authentification ou de MQTT, téléchargez les diagnostics depuis :
+
+`Paramètres > Appareils et services > Jackery SolarVault > menu à trois points > Télécharger les diagnostics`
+
+Les champs sensibles sont expurgés. Les chemins de topics MQTT sont exportés sous la forme `hb/app/**REDACTED**/...` ; l'ID utilisateur Jackery brut n'est pas inclus. L'export de diagnostic contient aussi des compteurs de payloads rejetés, les horodatages de connexion MQTT et les avertissements de qualité des données.
+
+Activez la journalisation debug normale lors de l'analyse d'un problème :
 
 ```yaml
 logger:
@@ -179,22 +205,29 @@ logger:
     custom_components.jackery_solarvault: debug
 ```
 
-## Prérequis
+La journalisation debug des payloads HTTP/MQTT bruts est séparée et volontairement disponible uniquement par opt-in. Elle n'écrit `/config/jackery_solarvault_payload_debug.jsonl` que lorsque ce logger dédié est réglé sur `debug` :
 
-- Home Assistant 2025.8.0 ou plus récent
-- Python 3.14+ (fourni par Home Assistant)
-- Compte cloud Jackery
-- SolarVault en ligne via Wi-Fi ou Ethernet
-- HACS pour l'installation recommandée
+```yaml
+logger:
+  logs:
+    custom_components.jackery_solarvault.payload_debug: debug
+```
+
+Le fichier de debug des payloads est limité en fréquence et tourne vers `jackery_solarvault_payload_debug.jsonl.1` à 2 Mo. Sur une installation normale, il n'existe pas.
+
+Les icônes de marque Home Assistant sont chargées depuis le cache de marque local `/homeassistant/.cache/brands/integrations/jackery/` lorsqu'il est disponible.
+
+## Documentation de référence
+
+- [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md) : valeurs Jackery app/cloud et calcul des économies.
+- [`DATA_SOURCE_PRIORITY.md`](DATA_SOURCE_PRIORITY.md) : priorité des sources MQTT, HTTP et statistiques de l'application.
+- [`MQTT_PROTOCOL.md`](MQTT_PROTOCOL.md) : topics MQTT et contrats de payload.
+- [`APP_POLLING_MQTT.md`](APP_POLLING_MQTT.md) : détails du polling HTTP et MQTT.
 
 ## Contribuer
 
-Veuillez soumettre les rapports de bugs et les demandes de fonctionnalités via les [GitHub Issues](https://github.com/Bigdaddy1990/jackery_solarvault/issues). En cas de problèmes d'authentification ou MQTT, un export de diagnostic depuis HA (Paramètres → Appareils et services → Jackery SolarVault → trois points → Télécharger les diagnostics) est très utile. Les champs sensibles sont automatiquement expurgés ; vérifiez tout de même brièvement un export de diagnostic avant de le partager.
+Veuillez soumettre les rapports de bugs et les demandes de fonctionnalités via les [GitHub Issues](https://github.com/Bigdaddy1990/jackery_solarvault/issues). Pour les problèmes d'authentification, de MQTT ou de qualité des données, joignez si possible un export de diagnostic Home Assistant. Les champs sensibles sont automatiquement expurgés, mais vérifiez tout de même le fichier avant de le partager publiquement.
 
 ## Licence
 
 Licence MIT. Voir [LICENSE](../LICENSE).
-
-## Calculation details
-
-Savings calculation and cloud-value guards are documented in [`APP_CLOUD_VALUES.md`](APP_CLOUD_VALUES.md).
