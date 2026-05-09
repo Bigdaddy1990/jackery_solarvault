@@ -7,7 +7,7 @@ bypass (19. April 2026).
 
 ```
 Host:      emqx.jackeryapp.com:8883
-Protocol:  MQTT over TLS 1.2 (runtime uses gmqtt default protocol version)
+Protocol:  MQTT over TLS 1.2 (runtime uses aiomqtt default protocol version, MQTT 3.1.1)
 Keep-Alive: 60s
 QoS:       0 (At most once)
 Clean Session: Yes
@@ -196,7 +196,7 @@ The integration must keep these MQTT rules aligned with this document and
    `<userId>@APP`, the username is `<userId>@<macId>`, and the password is
    derived with the app AES-CBC formula above.
 
-2. **Library**: Use the async-native `gmqtt` client.
+2. **Library**: Use the async-native `aiomqtt` client (asyncio wrapper around `paho-mqtt`).
 
 3. **Client flow**:
    - REST login → get `userId`, `mqttPassWord`

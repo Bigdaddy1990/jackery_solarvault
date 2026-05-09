@@ -301,6 +301,36 @@ def _raise_config_entry_auth_failed(message: str, err: JackeryAuthError) -> NoRe
 class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Polls all known Jackery devices.
 
+    Architecture
+    ------------
+    The coordinator runs three parallel data paths and merges them into the
+    single ``data`` dict that HA platforms consume:
+
+    1. **HTTP polling** (``_async_update_data``) refreshes device properties
+       on the configured interval and caches slow per-system metrics (alarms,
+       statistics, weather plan, price config, period trends) behind TTL
+       windows so we do not hammer the cloud faster than it updates.
+    2. **MQTT push** (``_async_handle_mqtt_message``) merges UploadCombineData,
+       DevicePropertyChange, weather and subdevice telemetry into the same
+       per-device payload as the HTTP path. When MQTT is live the periodic
+       refresh skips most fast HTTP ticks (``_should_skip_tick_for_live_mqtt``).
+    3. **Optimistic local patches** (``_apply_local_*``) apply user-driven
+       writes (``async_set_*``) to the cached payload immediately so the UI
+       reflects the change before the cloud confirms; a short TTL window
+       protects them from a stale HTTP refresh that would otherwise overwrite
+       them with the pre-write value.
+
+    Battery packs are merged from MQTT subdevice frames and HTTP responses
+    (``_merge_battery_pack_lists``), stamped with ``_last_seen_at``, and
+    aged out via ``_drop_stale_battery_packs`` once the threshold expires.
+    Dropped pack indices feed ``async_cleanup_pending_device_removals`` to
+    keep HA's device registry in sync (Quality-Scale Gold dynamic-devices).
+
+    Service-action and entity setters dispatch through ``_async_publish_command``
+    which targets MQTT first and falls back to HTTP. All paths surface
+    ``ConfigEntryAuthFailed`` on credential rejection so HA opens the reauth
+    flow without removing the entry.
+
     `data` shape:
         {
           "<deviceId>": {
@@ -617,10 +647,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             try:
                 from .mqtt_push import JackeryMqttPushClient
             except ModuleNotFoundError as err:
-                if err.name != "gmqtt":
+                if err.name != "aiomqtt":
                     raise
                 _LOGGER.warning(
-                    "Jackery MQTT push is unavailable because gmqtt is not installed"
+                    "Jackery MQTT push is unavailable because aiomqtt is not installed"
                 )
                 return
 
@@ -628,6 +658,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self.hass,
                 self._async_handle_mqtt_message,
                 self._async_mqtt_connected,
+                disconnect_callback=self._async_handle_mqtt_disconnect,
             )
         try:
             await self._async_ensure_mqtt(force=True, wait_connected=True)
@@ -644,6 +675,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self._async_query_system_info_for_missing(force=True, ensure_mqtt=False)
         await self._async_query_weather_plan_for_missing(force=True, ensure_mqtt=False)
         await self._async_query_subdevices_for_missing(force=True, ensure_mqtt=False)
+
+    async def _async_handle_mqtt_disconnect(self) -> None:
+        """Recover from a server-side MQTT drop without flooding the log.
+
+        Some Jackery broker disconnects (server-side TCP reset, Errno 104)
+        cause aiomqtt's session task to exit with an MqttError. Recreating
+        the client immediately on disconnect tears down the prior session
+        cleanly and queues a fresh broker session, respecting
+        ``MQTT_RECONNECT_THROTTLE_SEC`` so a flapping link cannot cause
+        reconnect storms.
+        """
+        if self._mqtt is None:
+            return
+        # Reset the throttle window so the upcoming attempt actually runs.
+        self._last_mqtt_connect_attempt = 0.0
+        try:
+            await self._async_ensure_mqtt(force=True)
+        except JackeryAuthError:
+            raise
+        except Exception as err:
+            _LOGGER.debug(
+                "Jackery MQTT auto-reconnect after disconnect failed: %s", err
+            )
 
     @property
     def configured_update_interval(self) -> timedelta:
@@ -1076,6 +1130,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         model_code = meta.get(FIELD_MODEL_CODE) or disc.get(FIELD_MODEL_CODE)
         return FIELD_MAX_OUT_PW in props or str(model_code) == "3002"
 
+    # ------------------------------------------------------------------
+    # Property merging & payload helpers
+    # ------------------------------------------------------------------
+
     @staticmethod
     def _merge_dict_values(
         base: dict[str, Any],
@@ -1191,6 +1249,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         }
         return cls._sync_property_aliases(clean)
 
+    # ------------------------------------------------------------------
+    # Subdevice & battery-pack management
+    # ------------------------------------------------------------------
+
     @classmethod
     def _is_subdevice_payload(
         cls,
@@ -1205,7 +1267,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -1303,7 +1365,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -1797,6 +1859,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self.data = new_data
         self.last_update_success = True
         self.async_update_listeners()
+
+    # ------------------------------------------------------------------
+    # Background queries & device commands
+    # ------------------------------------------------------------------
 
     async def _async_query_system_info_for_missing(
         self,
@@ -2609,6 +2675,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         except Exception as err:
             _LOGGER.debug("Jackery MQTT backfill query failed: %s", err)
 
+    # ------------------------------------------------------------------
+    # Statistics import & data-quality reporting
+    # ------------------------------------------------------------------
+
     def _local_statistic_start(self, bucket_date: date) -> datetime:
         """Return a UTC timestamp for a local app-statistic bucket date."""
         timezone = dt_util.get_time_zone(self.hass.config.time_zone)
@@ -2717,7 +2787,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -2897,6 +2967,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         len(statistics),
                         statistic_id,
                     )
+
+    # ------------------------------------------------------------------
+    # Coordinator update cycle (periodic merge of HTTP + MQTT + caches)
+    # ------------------------------------------------------------------
 
     async def _async_update_data(
         self, _retry_discovery_once: bool = True
@@ -3607,6 +3681,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             except Exception as err:
                 _LOGGER.debug("Jackery: device-registry cleanup deferred: %s", err)
         return result
+
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:

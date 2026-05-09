@@ -1,6 +1,7 @@
 """Jackery SolarVault integration."""
 
 import asyncio
+from collections.abc import Iterable
 import contextlib
 from datetime import timedelta
 import logging
@@ -63,33 +64,85 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Set up Jackery SolarVault from a config entry."""
-    # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
-    # entry-version side effects while still removing entities that are no
-    # longer part of the documented app/HTTP/MQTT data model.
-    await _async_remove_removed_sensors(hass, entry)
+def _async_clean_legacy_entities(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> None:
+    """Drop entity-registry entries from older releases or disabled options.
+
+    Keep entity-registry cleanup explicit and setup-local. This avoids hidden
+    entry-version side effects while still removing entities that are no
+    longer part of the documented app/HTTP/MQTT data model.
+    """
+    _async_remove_entities_with_suffixes(
+        hass,
+        entry,
+        domain="sensor",
+        suffixes=REMOVED_SENSOR_SUFFIXES,
+        log_label="removed Jackery sensor",
+    )
+    _async_remove_entities_with_suffixes(
+        hass,
+        entry,
+        domain="sensor",
+        suffixes=CT_PERIOD_SENSOR_SUFFIXES,
+        log_label="removed CT period sensor",
+    )
     if not config_entry_bool_option(
         entry,
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     ):
-        await _async_remove_smart_meter_derived_sensors(hass, entry)
+        _async_remove_entities_with_suffixes(
+            hass,
+            entry,
+            domain="sensor",
+            suffixes=SMART_METER_DERIVED_SENSOR_SUFFIXES,
+            log_label="disabled calculated smart-meter sensor",
+        )
     if not config_entry_bool_option(
         entry,
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ):
-        await _async_remove_calculated_power_sensors(hass, entry)
+        _async_remove_entities_with_suffixes(
+            hass,
+            entry,
+            domain="sensor",
+            suffixes=CALCULATED_POWER_SENSOR_SUFFIXES,
+            log_label="disabled calculated power sensor",
+        )
     if not config_entry_bool_option(
         entry,
         CONF_CREATE_SAVINGS_DETAIL_SENSORS,
         DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     ):
-        await _async_remove_savings_detail_sensors(hass, entry)
-    await _async_remove_duplicate_binary_sensors(hass, entry)
-    session = async_get_clientsession(hass)
+        _async_remove_entities_with_suffixes(
+            hass,
+            entry,
+            domain="sensor",
+            suffixes=SAVINGS_DETAIL_SENSOR_SUFFIXES,
+            log_label="disabled savings detail sensor",
+        )
+    _async_remove_entities_with_suffixes(
+        hass,
+        entry,
+        domain="binary_sensor",
+        suffixes=DUPLICATE_BINARY_SENSOR_SUFFIXES,
+        log_label="duplicate binary sensor",
+    )
 
+
+async def _async_authenticate(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> JackeryApi:
+    """Build the API client and run the initial login.
+
+    Bad credentials raise ``ConfigEntryAuthFailed`` so HA routes the entry
+    into the re-auth flow without removing it. Transient cloud errors raise
+    ``ConfigEntryNotReady`` so HA retries setup after the configured backoff
+    instead of marking the entry as failed.
+    """
+    session = async_get_clientsession(hass)
     api = JackeryApi(
         session=session,
         account=entry.data[CONF_USERNAME],
@@ -100,20 +153,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     try:
         await api.async_login()
     except JackeryAuthError as err:
-        # Bad credentials -> trigger re-auth flow so user can update password
-        # without removing/re-adding the integration.
         raise ConfigEntryAuthFailed(
             f"Jackery login rejected the credentials: {err}"
         ) from err
     except JackeryError as err:
-        # Network hickup, server overload, transient error.
-        # HA will retry async_setup_entry in 30s instead of marking it failed.
         raise ConfigEntryNotReady(
             f"Cannot reach Jackery cloud right now: {err}"
         ) from err
+    return api
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
+    """Set up Jackery SolarVault from a config entry."""
+    _async_clean_legacy_entities(hass, entry)
+    api = await _async_authenticate(hass, entry)
 
     interval_sec = DEFAULT_SCAN_INTERVAL_SEC
-
     coordinator = JackerySolarVaultCoordinator(
         hass, entry, api, timedelta(seconds=interval_sec)
     )
@@ -127,15 +182,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # cloud connections. If any mandatory setup step fails, shut down the
         # partially initialized coordinator so MQTT and timer tasks cannot leak.
         await coordinator.async_discover()
-        setup_results = cast(
-            list[None | BaseException],
+        # asyncio.gather(return_exceptions=True) widens the result element
+        # type to ``T | BaseException``; the cast surfaces that contract for
+        # mypy without changing runtime behaviour.
+        refresh_result, mqtt_result = cast(
+            tuple[None | BaseException, None | BaseException],
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
                 return_exceptions=True,
             ),
         )
-        refresh_result, mqtt_result = setup_results
         if isinstance(refresh_result, BaseException):
             raise refresh_result
         if isinstance(mqtt_result, BaseException):
@@ -158,117 +215,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         with contextlib.suppress(BaseException):
             await coordinator.async_shutdown()
         if entry.runtime_data is coordinator:
-            entry.runtime_data = None  # type: ignore[assignment]
+            entry.runtime_data = None
         raise
     return True
-
-
-async def _async_remove_smart_meter_derived_sensors(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Remove optional calculated smart-meter sensors when disabled."""
-    registry = er.async_get(hass)
-    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        uid = ent.unique_id or ""
-        if ent.domain == "sensor" and any(
-            uid.endswith(suffix) for suffix in SMART_METER_DERIVED_SENSOR_SUFFIXES
-        ):
-            _LOGGER.info(
-                "Removing disabled calculated smart-meter sensor %s (%s)",
-                ent.entity_id,
-                ent.unique_id,
-            )
-            registry.async_remove(ent.entity_id)
-
-
-async def _async_remove_calculated_power_sensors(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Remove optional calculated net-power sensors when disabled."""
-    registry = er.async_get(hass)
-    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        uid = ent.unique_id or ""
-        if ent.domain == "sensor" and any(
-            uid.endswith(suffix) for suffix in CALCULATED_POWER_SENSOR_SUFFIXES
-        ):
-            _LOGGER.info(
-                "Removing disabled calculated power sensor %s (%s)",
-                ent.entity_id,
-                ent.unique_id,
-            )
-            registry.async_remove(ent.entity_id)
-
-
-async def _async_remove_savings_detail_sensors(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Remove optional savings-calculation detail sensors when disabled."""
-    registry = er.async_get(hass)
-    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        uid = ent.unique_id or ""
-        if ent.domain == "sensor" and any(
-            uid.endswith(suffix) for suffix in SAVINGS_DETAIL_SENSOR_SUFFIXES
-        ):
-            _LOGGER.info(
-                "Removing disabled savings detail sensor %s (%s)",
-                ent.entity_id,
-                ent.unique_id,
-            )
-            registry.async_remove(ent.entity_id)
-
-
-async def _async_remove_duplicate_binary_sensors(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Remove read-only binary sensors duplicated by config switches."""
-    registry = er.async_get(hass)
-    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        uid = ent.unique_id or ""
-        if ent.domain == "binary_sensor" and any(
-            uid.endswith(suffix) for suffix in DUPLICATE_BINARY_SENSOR_SUFFIXES
-        ):
-            _LOGGER.info(
-                "Removing duplicate binary sensor %s (%s)",
-                ent.entity_id,
-                ent.unique_id,
-            )
-            registry.async_remove(ent.entity_id)
 
 
 # -----------------------------------------------------------------------------
 # Registry cleanup helpers
 # -----------------------------------------------------------------------------
-async def _async_remove_removed_sensors(
+
+
+def _async_remove_entities_with_suffixes(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
+    *,
+    domain: str,
+    suffixes: Iterable[str],
+    log_label: str,
 ) -> None:
-    """Remove sensor entities that have been removed from the integration.
+    """Remove entity-registry entries whose unique_id ends with any suffix.
 
-    Drop stale entity-registry entries whose source is no longer part of the
-    documented app/HTTP/MQTT data model.
+    Unique IDs for this integration follow ``<device_id>_<key_suffix>`` per
+    docs/UNIQUE_ID_CONTRACT.md, so suffix matching is the right way to drop
+    legacy or option-disabled entities without scanning HA-wide registry
+    entries owned by other integrations.
+
+    Synchronous because the entity registry is already in-memory; the helper
+    only schedules removals against it. Setup-local cleanup deliberately
+    avoids hidden entry-version side effects.
     """
+    suffix_tuple = tuple(suffixes)
+    if not suffix_tuple:
+        return
     registry = er.async_get(hass)
     for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        uid = ent.unique_id or ""
-        # Consider only sensors. Unique IDs are of the form
-        # <device_id>_<sensor_key>, so we can match suffixes.
-        if ent.domain != "sensor":
+        if ent.domain != domain:
             continue
-        if any(uid.endswith(suffix) for suffix in REMOVED_SENSOR_SUFFIXES):
+        uid = ent.unique_id or ""
+        if any(uid.endswith(suffix) for suffix in suffix_tuple):
             _LOGGER.info(
-                "Removing removed Jackery sensor %s (%s)",
-                ent.entity_id,
-                ent.unique_id,
-            )
-            registry.async_remove(ent.entity_id)
-        # CT period sensors are not exposed by the active app data model.
-        elif any(uid.endswith(suffix) for suffix in CT_PERIOD_SENSOR_SUFFIXES):
-            _LOGGER.info(
-                "Removing removed CT period sensor %s (%s)",
+                "Removing %s %s (%s)",
+                log_label,
                 ent.entity_id,
                 ent.unique_id,
             )
@@ -278,6 +265,12 @@ async def _async_remove_removed_sensors(
 async def _async_update_listener(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
+    """Reload the entry when the user toggles options.
+
+    The optional sensor toggles change which platform entities exist, so a
+    full reload is the simplest way to apply them. ``add_update_listener``
+    in ``async_setup_entry`` wires this listener and removes it on unload.
+    """
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -291,5 +284,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
         return False
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
-    entry.runtime_data = None  # type: ignore[assignment]
+    entry.runtime_data = None
     return True

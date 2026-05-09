@@ -1174,7 +1174,7 @@ def test_coordinator_imports_all_field_constants_it_references() -> None:
     assert not missing, f"Missing .const imports in coordinator.py: {missing}"
 
 
-def test_coordinator_lazy_imports_mqtt_client_for_collection_without_gmqtt() -> None:
+def test_coordinator_lazy_imports_mqtt_client_for_collection_without_aiomqtt() -> None:
     """HA config-flow collection should not require optional MQTT deps."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
@@ -1204,8 +1204,10 @@ def test_coordinator_lazy_imports_mqtt_client_for_collection_without_gmqtt() -> 
     ]
     assert len(lazy_imports) == 1
     assert "except ModuleNotFoundError as err:" in source
-    assert 'err.name != "gmqtt"' in source
-    assert "Jackery MQTT push is unavailable because gmqtt is not installed" in source
+    assert 'err.name != "aiomqtt"' in source
+    assert "Jackery MQTT push is unavailable because aiomqtt is not installed" in (
+        source
+    )
 
 
 def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -> None:

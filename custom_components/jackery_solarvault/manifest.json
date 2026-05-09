@@ -15,11 +15,11 @@
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
   "loggers": [
     "custom_components.jackery_solarvault",
-    "gmqtt"
+    "aiomqtt"
   ],
   "quality_scale": "platinum",
   "requirements": [
-    "gmqtt>=0.7.0"
+    "aiomqtt>=2.3.0"
   ],
   "version": "2.3.4"
 }

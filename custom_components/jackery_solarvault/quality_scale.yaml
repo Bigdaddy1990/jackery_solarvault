@@ -156,7 +156,7 @@ rules:
   inject-websession:
     status: exempt
     comment: >-
-      MQTT path uses gmqtt directly (not aiohttp). HTTP API uses an
+      MQTT path uses aiomqtt directly (not aiohttp). HTTP API uses an
       independently-managed aiohttp session bound to the entry lifecycle.
   strict-typing:
     status: done

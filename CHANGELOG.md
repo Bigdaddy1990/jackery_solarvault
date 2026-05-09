@@ -18,6 +18,7 @@ context.
 - Expansion battery firmware version and serial number are documented as entity values and device-registry metadata when Jackery provides them.
 
 ### Changed
+- Replaced the unmaintained `gmqtt` MQTT client with `aiomqtt` (asyncio wrapper around `paho-mqtt`, the same backend Home Assistant Core uses for its MQTT integration). The integration's public behavior, diagnostics fields, topic layout, TLS handling, reconnect throttling and adaptive polling are unchanged. `manifest.json` now requires `aiomqtt>=2.3.0` and exposes the `aiomqtt` logger; `MQTT_CLIENT_LIBRARY` reports `aiomqtt` in diagnostics. Several gmqtt-specific workarounds (manual `_was_connected` tracking, `set_config` version fallback, `[TRYING WRITE TO CLOSED SOCKET]` log filter, three-way `MQTTClient(...)` TypeError fallback) are no longer needed and have been removed.
 - Removed the raw payload debug log checkbox from setup/options and the remaining stale option code; payload-debug JSONL now requires the dedicated Home Assistant payload-debug logger to be set explicitly to DEBUG.
 - Normalized German/English entity names for house consumption, battery discharge and PV yield sensors.
 - Moved the canonical cloud-value documentation to `docs/APP_CLOUD_VALUES.md`, linked it from the READMEs and kept `docs/Werte aus APP-Cloud.md` as a compatibility path.

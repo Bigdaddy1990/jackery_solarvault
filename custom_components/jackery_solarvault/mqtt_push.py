@@ -5,14 +5,15 @@ from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import UTC, datetime
 import hashlib
-import inspect
 import json
 import logging
 from pathlib import Path
 import ssl
 from typing import Any
 
-from gmqtt import Client as MQTTClient
+import aiomqtt
+from aiomqtt import Client as MQTTClient, MqttError
+from aiomqtt.exceptions import MqttCodeError
 from homeassistant.core import HomeAssistant
 
 from .const import (
@@ -30,23 +31,12 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-_GMQTT_LOGGER = logging.getLogger(f"{__name__}.gmqtt")
-
-
-class _GmqttConnectionNoiseFilter(logging.Filter):
-    """Suppress gmqtt connection-refusal duplicates handled by this integration."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Return False for expected gmqtt refusal noise."""
-        message = record.getMessage()
-        return not (
-            message.startswith("[CONNACK] 0x")
-            or message
-            == "[DISCONNECTED] max number of failed connection attempts achieved"
-        )
-
-
-_GMQTT_LOGGER.addFilter(_GmqttConnectionNoiseFilter())
+# aiomqtt and paho-mqtt log under their own module names. Keep them at WARNING
+# so transient connect/disconnect noise stays out of normal HA logs unless the
+# user opts in via the integration's own debug logger. The connect-failure
+# pathway below differentiates auth rejections (warning) from transient
+# refusals (debug) on its own.
+logging.getLogger("aiomqtt").setLevel(logging.WARNING)
 
 
 class JackeryMqttPushClient:
@@ -57,14 +47,17 @@ class JackeryMqttPushClient:
         hass: HomeAssistant,
         message_callback: Callable[[str, dict[str, Any]], Awaitable[None]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
+        disconnect_callback: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         self._hass = hass
         self._loop = hass.loop
         self._message_callback = message_callback
         self._connect_callback = connect_callback
+        self._disconnect_callback = disconnect_callback
         self._lock = asyncio.Lock()
         self._client: MQTTClient | None = None
+        self._runner_task: asyncio.Task[None] | None = None
         self._fingerprint: str | None = None
         self._topics: list[str] = []
         self._connected_event = asyncio.Event()
@@ -94,7 +87,7 @@ class JackeryMqttPushClient:
         """Start MQTT connection or reconfigure it when credentials changed."""
         fingerprint = self._credential_fingerprint(client_id, username, password)
         async with self._lock:
-            if self._client is not None and self._fingerprint == fingerprint:
+            if self._runner_task is not None and self._fingerprint == fingerprint:
                 if self._connected:
                     return
                 _LOGGER.info(
@@ -112,45 +105,34 @@ class JackeryMqttPushClient:
             self._last_error = None
             self._last_connect_failure_signature = None
 
-            client = self._build_client(client_id=client_id)
-            client.set_auth_credentials(username, password)
-            try:
-                client.set_config({"reconnect_retries": 0})
-            except Exception as err:
-                # gmqtt versions differ on the set_config signature; older
-                # releases reject the dict form. Log at debug so the
-                # incompatibility surfaces if reconnect-retry behaviour
-                # diverges from this integration's expectations.
-                _LOGGER.debug(
-                    "Jackery MQTT: gmqtt.set_config rejected reconnect_retries=0 "
-                    "(library default will apply): %s",
-                    err,
-                )
-
-            client.on_connect = self._on_connect
-            client.on_disconnect = self._on_disconnect
-            client.on_message = self._on_message
-
             ssl_context = await self._hass.async_add_executor_job(
                 self._build_ssl_context_blocking
             )
 
-            self._client = client
             self._fingerprint = fingerprint
             self._connect_attempts += 1
             _LOGGER.info(
-                "Jackery MQTT: connecting to %s:%s with gmqtt (TLS source=%s)",
+                "Jackery MQTT: connecting to %s:%s with aiomqtt (TLS source=%s)",
                 MQTT_HOST,
                 MQTT_PORT,
                 self._tls_certificate_source,
             )
-            try:
-                await self._connect_client(client, ssl_context)
-            except Exception as err:
-                self._last_error = f"connect failed: {err}"
-                self._connected = False
-                self._connected_event.set()
-                _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
+            self._runner_task = self._hass.async_create_background_task(
+                self._async_run_session(
+                    client_id=client_id,
+                    username=username,
+                    password=password,
+                    ssl_context=ssl_context,
+                ),
+                name="jackery_mqtt_runner",
+            )
+
+        # Best-effort wait so the caller (coordinator) sees connect-success or
+        # the first CONNACK rejection in diagnostics within a bounded window
+        # without holding the start-lock open. Reconnect-throttling stays the
+        # coordinator's job; we only surface the initial outcome here.
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(self._connected_event.wait(), timeout=12.0)
 
     @staticmethod
     def _credential_fingerprint(client_id: str, username: str, password: str) -> str:
@@ -177,15 +159,14 @@ class JackeryMqttPushClient:
     ) -> None:
         """Publish JSON payload to an MQTT topic."""
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-        async with self._lock:
-            client = self._client
-        if client is None:
-            raise RuntimeError("MQTT client is not running")
         if not self._connected:
             await self._async_wait_connected(timeout_sec=12.0)
+        client = self._client
+        if client is None:
+            raise RuntimeError("MQTT client is not running")
         try:
-            client.publish(topic, text, qos=qos, retain=retain)
-        except Exception as err:
+            await client.publish(topic, text, qos=qos, retain=retain)
+        except MqttError as err:
             self._connected = False
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
@@ -195,9 +176,7 @@ class JackeryMqttPushClient:
 
     async def async_wait_until_connected(self, timeout_sec: float = 15.0) -> None:
         """Public wait helper used by command paths that require a live link."""
-        async with self._lock:
-            client = self._client
-        if client is None:
+        if self._runner_task is None:
             raise RuntimeError("MQTT client is not running")
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
@@ -215,47 +194,163 @@ class JackeryMqttPushClient:
             raise RuntimeError(f"MQTT not connected yet ({self._last_error})")
 
     async def _async_stop_locked(self) -> None:
-        client = self._client
-        if client is None:
+        task = self._runner_task
+        if task is None:
             return
-        was_connected = self._connected
+        # The aiomqtt context manager handles socket teardown on cancel:
+        # a live session sends DISCONNECT; a rejected connect just lets the
+        # already-closed socket finalize.
+        self._runner_task = None
         self._client = None
         self._fingerprint = None
         self._topics = []
         self._connected = False
         self._connected_event.clear()
-        if not was_connected:
-            return
-        with contextlib.suppress(Exception):
-            result = client.disconnect()
-            if inspect.isawaitable(result):
-                await result
+        if not task.done():
+            task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
+            await task
 
-    @staticmethod
-    def _build_client(*, client_id: str) -> MQTTClient:
-        """Create a gmqtt client while staying compatible with older releases."""
-        try:
-            return MQTTClient(client_id, clean_session=True, logger=_GMQTT_LOGGER)
-        except TypeError:
-            try:
-                return MQTTClient(client_id, logger=_GMQTT_LOGGER)
-            except TypeError:
-                return MQTTClient(client_id)
+    async def _async_run_session(
+        self,
+        *,
+        client_id: str,
+        username: str,
+        password: str,
+        ssl_context: ssl.SSLContext,
+    ) -> None:
+        """Hold the broker session for one client lifetime.
 
-    @staticmethod
-    async def _connect_client(client: MQTTClient, ssl_context: ssl.SSLContext) -> None:
-        """Connect with gmqtt's default protocol version.
-
-        Jackery's broker rejects forced MQTT 3.1.1 on some accounts with
-        CONNACK rc=1. gmqtt defaults to the protocol version it supports best,
-        while the coordinator handles throttled reconnect attempts.
+        Reconnection is deliberately NOT done in this loop — the
+        coordinator owns it via ``MQTT_RECONNECT_THROTTLE_SEC`` so a
+        flapping link cannot trigger reconnect storms.
         """
-        await client.connect(
-            MQTT_HOST,
-            port=MQTT_PORT,
-            ssl=ssl_context,
-            keepalive=MQTT_KEEPALIVE_SEC,
-        )
+        connected = False
+        try:
+            async with aiomqtt.Client(
+                hostname=MQTT_HOST,
+                port=MQTT_PORT,
+                identifier=client_id,
+                username=username,
+                password=password,
+                tls_context=ssl_context,
+                keepalive=MQTT_KEEPALIVE_SEC,
+                clean_session=True,
+                logger=_LOGGER,
+            ) as client:
+                self._client = client
+                self._connected = True
+                connected = True
+                self._last_connect_at = self._utc_now_iso()
+                self._connected_event.set()
+                self._last_error = None
+                self._last_connect_failure_signature = None
+                _LOGGER.info(
+                    "Jackery MQTT connected; subscribing to %d topic(s) "
+                    "[TLS source=%s]",
+                    len(self._topics),
+                    self._tls_certificate_source,
+                )
+                for topic in self._topics:
+                    try:
+                        await client.subscribe(topic, qos=0)
+                    except MqttError as err:
+                        _LOGGER.warning(
+                            "Jackery MQTT subscribe failed for %s: %s", topic, err
+                        )
+                if self._connect_callback is not None:
+                    self._schedule_coroutine(
+                        self._connect_callback(), "connect snapshot"
+                    )
+                async for message in client.messages:
+                    self._handle_message(str(message.topic), message.payload)
+        except MqttCodeError as err:
+            # Broker rejected the CONNACK (rc != 0) or returned a non-zero
+            # MQTT-5 reason code. Preserve the actionable reason for callers
+            # waiting on the initial broker check.
+            self._handle_connect_failure(self._extract_mqtt_code(err))
+        except MqttError as err:
+            self._handle_disconnect_error(str(err), connected)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:  # noqa: BLE001 — surface unexpected errors
+            self._last_error = f"connect failed: {err}"
+            self._connected_event.set()
+            _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
+        finally:
+            was_connected = connected
+            self._client = None
+            self._connected = False
+            if was_connected:
+                self._last_disconnect_at = self._utc_now_iso()
+            if self._is_connect_failure_error(self._last_error):
+                # Preserve the actionable connect failure for callers waiting
+                # on the initial broker check. Some brokers close immediately
+                # after a rejected CONNACK and we already mapped the rc above.
+                self._connected_event.set()
+            else:
+                self._connected_event.clear()
+            # Notify the upper layer so it can throttle a fresh reconnect.
+            # Only fires when we actually had a live session — a CONNACK
+            # rejection routes through ``_handle_connect_failure`` and must
+            # not pretend the broker dropped a working connection.
+            if was_connected and self._disconnect_callback is not None:
+                self._schedule_coroutine(
+                    self._disconnect_callback(), "disconnect-recover"
+                )
+
+    def _handle_connect_failure(self, rc: int) -> None:
+        """Handle CONNACK rejection by mapping rc to actionable reason."""
+        self._connected = False
+        reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
+        message = f"connect rc={rc} ({reason})"
+        self._last_error = message
+        self._connected_event.set()
+        if message == self._last_connect_failure_signature:
+            _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
+            return
+        self._last_connect_failure_signature = message
+        if self._is_connect_auth_failure_rc(rc):
+            _LOGGER.warning("Jackery MQTT connect failed: %s", message)
+        else:
+            _LOGGER.debug("Jackery MQTT connect failed: %s", message)
+
+    def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
+        """Handle a passive disconnect or aiomqtt I/O failure mid-session."""
+        if self._is_connect_failure_error(self._last_error):
+            # Already mapped by ``_handle_connect_failure`` — keep the
+            # actionable reason instead of overwriting it with the generic
+            # disconnect message that some brokers emit immediately after a
+            # rejected CONNACK.
+            return
+        if was_connected:
+            self._last_error = f"disconnect: {error}"
+            _LOGGER.debug("Jackery MQTT disconnected: %s", error)
+        else:
+            self._last_error = f"connect failed: {error}"
+            _LOGGER.debug("Jackery MQTT connect setup failed: %s", error)
+
+    @staticmethod
+    def _extract_mqtt_code(err: MqttCodeError) -> int:
+        """Return the numeric reason code from an aiomqtt MqttCodeError."""
+        rc = getattr(err, "rc", None)
+        if isinstance(rc, int):
+            return rc
+        # ReasonCodes from paho-mqtt expose ``.value`` for MQTT-5 codes.
+        value = getattr(rc, "value", None)
+        if isinstance(value, int):
+            return value
+        return 0
+
+    @staticmethod
+    def _is_connect_auth_failure_rc(rc: int) -> bool:
+        """Return True for CONNACK codes that mean credentials are rejected."""
+        return rc in (4, 5, 134, 135)
+
+    @staticmethod
+    def _is_connect_failure_error(error: str | None) -> bool:
+        """Return True when disconnect should not hide a failed connect."""
+        return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
         """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
@@ -298,93 +393,12 @@ class JackeryMqttPushClient:
         self._tls_certificate_source = "+".join(source_parts)
         return ctx
 
-    def _on_connect(self, _client: MQTTClient, *args: Any) -> None:
-        """Gmqtt connect callback."""
-        rc = self._extract_connect_rc(args)
-        if rc != 0:
-            self._connected = False
-            reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
-            message = f"connect rc={rc} ({reason})"
-            self._last_error = message
-            self._connected_event.set()
-            if message == self._last_connect_failure_signature:
-                _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
-            else:
-                self._last_connect_failure_signature = message
-                if self._is_connect_auth_failure_rc(rc):
-                    _LOGGER.warning("Jackery MQTT connect failed: %s", message)
-                else:
-                    _LOGGER.debug("Jackery MQTT connect failed: %s", message)
-            return
-
-        self._connected = True
-        self._last_connect_at = self._utc_now_iso()
-        self._connected_event.set()
-        self._last_error = None
-        self._last_connect_failure_signature = None
-        _LOGGER.info(
-            "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
-            len(self._topics),
-            self._tls_certificate_source,
-        )
-        for topic in self._topics:
-            try:
-                _client.subscribe(topic, qos=0)
-            except Exception as err:
-                _LOGGER.warning("Jackery MQTT subscribe failed for %s: %s", topic, err)
-        if self._connect_callback is not None:
-            self._schedule_coroutine(self._connect_callback(), "connect snapshot")
-
-    @staticmethod
-    def _extract_connect_rc(args: tuple[Any, ...]) -> int:
-        for arg in args:
-            if isinstance(arg, int):
-                return int(arg)
-        return 0
-
-    @staticmethod
-    def _is_connect_auth_failure_rc(rc: int) -> bool:
-        """Return True for CONNACK codes that mean credentials are rejected."""
-        return rc in (4, 5, 134, 135)
-
-    def _on_disconnect(self, _client: MQTTClient, *args: Any) -> None:
-        """Gmqtt disconnect callback."""
-        self._connected = False
-        self._last_disconnect_at = self._utc_now_iso()
-        if self._is_connect_failure_error(self._last_error):
-            # Preserve the actionable connect failure for callers waiting on
-            # the initial broker check. Some brokers close immediately after
-            # a rejected CONNACK, and gmqtt reports that as a clean disconnect.
-            self._connected_event.set()
-            return
-        self._connected_event.clear()
-        error = self._extract_disconnect_error(args)
-        if error:
-            self._last_error = f"disconnect: {error}"
-            _LOGGER.debug("Jackery MQTT disconnected: %s", error)
-        else:
-            self._last_error = None
-            _LOGGER.info("Jackery MQTT disconnected cleanly")
-
-    @staticmethod
-    def _extract_disconnect_error(args: tuple[Any, ...]) -> str | None:
-        for arg in reversed(args):
-            if isinstance(arg, BaseException):
-                return str(arg)
-        return None
-
-    @staticmethod
-    def _is_connect_failure_error(error: str | None) -> bool:
-        """Return True when disconnect should not hide a failed connect."""
-        return str(error or "").startswith(("connect rc=", "connect failed:"))
-
-    def _on_message(
+    def _handle_message(
         self,
-        _client: MQTTClient,
         topic: str,
         payload: bytes | bytearray | str,
-        *_args: Any,
     ) -> None:
+        """Decode an inbound MQTT frame and route it to the coordinator."""
         try:
             if isinstance(payload, str):
                 text = payload
@@ -409,7 +423,7 @@ class JackeryMqttPushClient:
         self._messages_seen += 1
         self._last_message_at = self._utc_now_iso()
         self._last_message_error = None
-        self._schedule_coroutine(self._message_callback(str(topic), data), "message")
+        self._schedule_coroutine(self._message_callback(topic, data), "message")
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
         task = self._hass.async_create_task(coro, name=f"jackery_mqtt_{label}")
@@ -444,7 +458,7 @@ class JackeryMqttPushClient:
         """Return a redacted snapshot of the MQTT client state for diagnostics."""
         return {
             "connected": self._connected,
-            "started": self._client is not None,
+            "started": self._runner_task is not None,
             "messages_seen": self._messages_seen,
             "messages_dropped": self._messages_dropped,
             "topics": [self._redact_topic(topic) for topic in self._topics],
@@ -523,7 +537,7 @@ class JackeryMqttPushClient:
     @property
     def is_started(self) -> bool:
         """Return True once the connect/start lifecycle has run at least once."""
-        return self._client is not None
+        return self._runner_task is not None
 
     @property
     def is_connected(self) -> bool:

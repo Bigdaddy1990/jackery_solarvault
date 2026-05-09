@@ -3,7 +3,9 @@
 These pure-source tests guard the long-running stability of the broker
 session against accidental regressions:
 
-1. gmqtt auto-reconnect is disabled so broker protocol rejections do not loop.
+1. The MQTT engine does NOT implement an internal reconnect loop —
+   the coordinator owns reconnect throttling so broker protocol
+   rejections cannot loop.
 2. Every successful (re-)connect re-subscribes ALL configured topics.
 3. Every successful (re-)connect runs the snapshot-pull callback so the
    coordinator immediately has fresh state.
@@ -28,9 +30,23 @@ def _read(name: str) -> str:
 
 
 def test_mqtt_client_disables_internal_reconnect_loop() -> None:
-    """Coordinator throttling must own reconnects after broker rejections."""
+    """Coordinator throttling must own reconnects after broker rejections.
+
+    aiomqtt's context manager does not auto-reconnect by default. This test
+    guards against accidentally adding a ``while True``/auto-reconnect loop
+    around the session, which would race the coordinator-side throttle
+    (``MQTT_RECONNECT_THROTTLE_SEC``) and reproduce gmqtt's old issue of
+    looping on broker rejections.
+    """
     src = _read("mqtt_push.py")
-    assert '"reconnect_retries": 0' in src, src
+    coordinator_src = _read("coordinator.py")
+    # No internal loop around the aiomqtt context manager.
+    assert "while True" not in src, src
+    assert "while not self._" not in src, src
+    # Coordinator owns reconnect throttling.
+    assert "MQTT_RECONNECT_THROTTLE_SEC" in coordinator_src, coordinator_src
+    # No leftover gmqtt-era retry knobs.
+    assert '"reconnect_retries"' not in src, src
     assert '"reconnect_delay"' not in src, src
 
 
@@ -46,21 +62,21 @@ def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
 
 
 def test_every_connect_resubscribes_all_topics() -> None:
-    """The on_connect handler must iterate over self._topics + subscribe each.
+    """The session runner must iterate over self._topics + subscribe each.
 
     Without this, a reconnect after a network blip leaves the integration
     silently unsubscribed: the TCP session is back but no telemetry flows.
     """
     src = _read("mqtt_push.py")
-    on_connect_match = re.search(
-        r"def _on_connect\(self.*?(?=\n    def |\n    @|\nclass )",
+    runner_match = re.search(
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.S,
     )
-    assert on_connect_match is not None, "_on_connect not found"
-    body = on_connect_match.group(0)
+    assert runner_match is not None, "_async_run_session not found"
+    body = runner_match.group(0)
     assert "for topic in self._topics" in body, body
-    assert ".subscribe(" in body, body
+    assert "await client.subscribe(" in body, body
 
 
 def test_every_connect_triggers_snapshot_callback() -> None:
@@ -72,13 +88,13 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     values forward indefinitely.
     """
     src = _read("mqtt_push.py")
-    on_connect_match = re.search(
-        r"def _on_connect\(self.*?(?=\n    def |\n    @|\nclass )",
+    runner_match = re.search(
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.S,
     )
-    assert on_connect_match is not None
-    body = on_connect_match.group(0)
+    assert runner_match is not None
+    body = runner_match.group(0)
     assert "self._connect_callback" in body, body
     assert "_schedule_coroutine" in body, body
 
@@ -92,50 +108,87 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _on_disconnect\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
         src,
         re.S,
     )
-    assert on_disc_match is not None
+    assert on_disc_match is not None, "_handle_disconnect_error not found"
     body = on_disc_match.group(0)
     # The handler must preserve connect-failure signatures and bail out
     # without overwriting them.
     assert "_is_connect_failure_error" in body, body
     assert "connect rc=" in src, src
+    # And the connect-failure mapper itself must produce the rc=… signature
+    # so ``_is_connect_failure_error`` can detect it.
+    fail_match = re.search(
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        src,
+        re.S,
+    )
+    assert fail_match is not None, "_handle_connect_failure not found"
+    fail_body = fail_match.group(0)
+    assert "MQTT_CONNACK_REASONS" in fail_body, fail_body
+    assert 'f"connect rc={rc}' in fail_body, fail_body
 
 
 def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> None:
-    """A rejected broker connection must not call gmqtt.disconnect afterward.
+    """Stop-after-CONNACK-rejection must not write to a closed socket.
 
-    gmqtt writes a DISCONNECT packet when asked to disconnect. After CONNACK
-    0x88/server-unavailable the socket is already closed, so calling it during
-    cleanup logs "[TRYING WRITE TO CLOSED SOCKET]".
+    aiomqtt's ``async with`` context manager handles this case automatically:
+    on exit it only sends a DISCONNECT packet if the broker session was
+    actually established. After a rejected CONNACK the context exits via the
+    MqttCodeError path before any session is up, so no DISCONNECT is queued.
+    Conversely, a previously connected session whose link drops passively
+    (Errno 104) lets the ``async for`` raise MqttError, the context exits
+    cleanly, and the runner task ends — no leftover keepalive coroutine.
+
+    The contract: ``_async_stop_locked`` must NOT manually call
+    ``client.disconnect()`` (which gmqtt required and which produced the
+    ``[TRYING WRITE TO CLOSED SOCKET]`` spam). Cancelling the runner task is
+    sufficient because aiomqtt cleans up on cancel.
     """
     src = _read("mqtt_push.py")
     stop_match = re.search(
-        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
         src,
         re.S,
     )
     assert stop_match is not None
     body = stop_match.group(0)
-    assert "was_connected = self._connected" in body, body
-    assert "if not was_connected:" in body, body
-    assert body.index("if not was_connected:") < body.index("client.disconnect()")
+    # The legacy gmqtt-era manual-disconnect dance is gone.
+    assert "client.disconnect()" not in body, body
+    assert "client.disconnect" not in body, body
+    assert "_was_connected" not in body, body
+    # The runner task is what gets torn down; aiomqtt's context manager
+    # handles the socket lifecycle on cancel.
+    assert "task = self._runner_task" in body, body
+    assert "task.cancel()" in body, body
+    # No leftover legacy flag anywhere in the module.
+    assert "_was_connected" not in src, src
 
 
 def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
-    """MQTT push is optional; transient broker refusals should not warn twice."""
+    """MQTT push is optional; transient broker refusals should not warn twice.
+
+    With aiomqtt the engine no longer needs the ``_GmqttConnectionNoiseFilter``
+    whack-a-mole filter. Instead, ``_handle_connect_failure`` differentiates
+    auth rejections (warning, actionable) from transient refusals (debug)
+    based on the CONNACK rc, and ``_handle_disconnect_error`` keeps already-
+    mapped connect failures from being overwritten by generic disconnect text.
+    """
     mqtt_src = _read("mqtt_push.py")
     coordinator_src = _read("coordinator.py")
 
-    assert "class _GmqttConnectionNoiseFilter" in mqtt_src
-    assert 'message.startswith("[CONNACK] 0x")' in mqtt_src
-    assert '"[DISCONNECTED] max number of failed connection attempts achieved"' in (
-        mqtt_src
-    )
-    assert "logger=_GMQTT_LOGGER" in mqtt_src
+    # The legacy filter must be gone.
+    assert "_GmqttConnectionNoiseFilter" not in mqtt_src
+    assert "logger=_GMQTT_LOGGER" not in mqtt_src
+    # Connect failures have differentiated severity.
+    assert "_is_connect_auth_failure_rc" in mqtt_src
+    assert '_LOGGER.warning("Jackery MQTT connect failed: %s", message)' in mqtt_src
+    assert '_LOGGER.debug("Jackery MQTT connect failed: %s", message)' in mqtt_src
+    # Generic setup-error path stays at debug.
     assert '_LOGGER.debug("Jackery MQTT connect setup failed: %s", err)' in mqtt_src
+    # Coordinator-side messaging stays informational, not warn-spammy.
     assert "Jackery MQTT initial connect did not complete" in coordinator_src
     assert '_LOGGER.warning("Jackery MQTT initial connect did not complete' not in (
         coordinator_src
@@ -212,7 +265,7 @@ def test_silent_detector_only_active_when_connected() -> None:
 
 
 def test_keepalive_is_set_on_connect() -> None:
-    """The gmqtt connect call must set keepalive.
+    """The aiomqtt Client constructor must receive keepalive.
 
     Without keepalive the broker tear-down on intermittent network
     glitches takes 60+ minutes (TCP default).
@@ -285,6 +338,57 @@ def test_periodic_refresh_does_not_suppress_reauth_failures() -> None:
             "except Exception", 1
         )[0]
     ), body
+
+
+def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
+    """A server-side broker drop must trigger an immediate reconnect.
+
+    With aiomqtt, a passive disconnect (Errno 104 / ConnectionResetError)
+    raises MqttError out of the ``async for`` loop. The session task exits
+    via the ``finally`` block, which fires ``disconnect_callback`` only
+    when the session had actually been connected (rules out CONNACK
+    rejections). The coordinator's ``_async_handle_mqtt_disconnect``
+    then resets the throttle and calls ``_async_ensure_mqtt(force=True)``
+    to start a fresh session.
+    """
+    mqtt_src = _read("mqtt_push.py")
+    coord_src = _read("coordinator.py")
+
+    # MQTT client surfaces the disconnect_callback parameter.
+    assert (
+        "disconnect_callback: Callable[[], Awaitable[None]] | None = None" in mqtt_src
+    ), mqtt_src
+    assert "self._disconnect_callback = disconnect_callback" in mqtt_src, mqtt_src
+
+    # The session runner routes through the callback only after a real
+    # session — not after a CONNACK rejection.
+    runner_match = re.search(
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        mqtt_src,
+        re.S,
+    )
+    assert runner_match is not None
+    body = runner_match.group(0)
+    assert "was_connected = connected" in body, body
+    assert "self._disconnect_callback is not None" in body, body
+    assert '"disconnect-recover"' in body, body
+
+    # Coordinator wires the disconnect callback at client construction.
+    assert "disconnect_callback=self._async_handle_mqtt_disconnect" in coord_src, (
+        coord_src
+    )
+
+    # Recovery handler resets the throttle and force-reconnects.
+    handler_match = re.search(
+        r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
+        coord_src,
+        re.S,
+    )
+    assert handler_match is not None
+    handler_body = handler_match.group(0)
+    assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body
+    assert "_async_ensure_mqtt(force=True)" in handler_body, handler_body
+    assert "JackeryAuthError" in handler_body, handler_body
 
 
 def test_failed_periodic_refresh_does_not_advance_mqtt_keepalive() -> None:

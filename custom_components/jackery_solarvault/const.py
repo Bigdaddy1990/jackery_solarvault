@@ -863,7 +863,7 @@ REDACT_KEYS: Final = {
 }
 
 # MQTT client metadata and topic layout from MQTT_PROTOCOL.md.
-MQTT_CLIENT_LIBRARY: Final = "gmqtt"
+MQTT_CLIENT_LIBRARY: Final = "aiomqtt"
 MQTT_CLIENT_ID_SUFFIX: Final = "APP"
 MQTT_USERNAME_SEPARATOR: Final = "@"
 MQTT_MAC_ID_PREFIX: Final = "2"
