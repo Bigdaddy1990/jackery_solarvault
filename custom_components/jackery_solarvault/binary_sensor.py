@@ -110,6 +110,15 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         )
 
     @property
+    def available(self) -> bool:
+        """Return whether the entity is currently available."""
+        if self.entity_description.key == "online":
+            return self.coordinator.last_update_success and self._device_id in (
+                self.coordinator.data or {}
+            )
+        return super().available
+
+    @property
     def is_on(self) -> bool | None:
         """Return True when the entity is on."""
         return safe_bool(

@@ -2042,3 +2042,39 @@ def test_brand_runtime_sync_is_absent() -> None:
     assert "shutil.copy2" not in component_sources
     assert 'Path(__file__).with_name("brand")' not in component_sources
     assert "async_setup_services(hass)" in init_source
+
+
+def test_online_binary_sensor_remains_available_when_device_reports_offline() -> None:
+    """Connectivity entity should show off, not unavailable, for offline devices."""
+    src = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "JackeryBinarySensor":
+            class_src = ast.get_source_segment(src, node) or ""
+            break
+    else:
+        raise AssertionError("JackeryBinarySensor not found")
+
+    assert "def available(self) -> bool:" in class_src
+    assert 'self.entity_description.key == "online"' in class_src
+    assert "self.coordinator.last_update_success" in class_src
+    assert "return super().available" in class_src
+
+
+def test_number_entity_auth_errors_trigger_reauth() -> None:
+    """Entity writes must convert raw cloud auth failures to HA reauth errors."""
+    src = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "async_set_native_value"
+        ):
+            method_src = ast.get_source_segment(src, node) or ""
+            break
+    else:
+        raise AssertionError("JackeryNumber.async_set_native_value not found")
+
+    assert "except JackeryAuthError as err:" in method_src
+    assert "ConfigEntryAuthFailed(" in method_src
+    assert "from err" in method_src

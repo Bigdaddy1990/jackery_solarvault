@@ -395,8 +395,11 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             await self.entity_description.setter(
                 self.coordinator, self._device_id, wire_value
             )
-        except JackeryAuthError:
-            raise
+        except JackeryAuthError as err:
+            raise ConfigEntryAuthFailed(
+                "Jackery credentials were rejected while updating a number entity. "
+                "Re-authentication is required."
+            ) from err
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
