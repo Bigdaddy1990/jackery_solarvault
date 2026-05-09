@@ -364,4 +364,3 @@ across all applicable rules. ``manifest.json`` accordingly carries
 - `pyproject.toml` with full ruff and pytest configuration.
 - HACS validation, hassfest validation, ruff lint + format check, and
   unit-tests run on every PR via GitHub Actions.
-

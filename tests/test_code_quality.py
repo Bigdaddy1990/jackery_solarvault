@@ -487,11 +487,16 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
     assert 'devices = _redacted_payload_map(coordinator.data or {}, "device")' in source
+    assert "def async_get_device_diagnostics(" in source
+    assert "def _filtered_payload_map(" in source
+    assert '"device": _filtered_payload_map(' in source
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
         "sn: async_redact_data",
         "sn_or_id: async_redact_data",
+        '"device_id"',
+        '"identifiers"',
     ):
         assert forbidden not in source
     for prefix in (
@@ -503,6 +508,19 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
         "location_response",
     ):
         assert f'"{prefix}"' in source
+
+
+def test_device_diagnostics_filter_payloads_to_registry_device() -> None:
+    """Per-device diagnostics should expose only matching payload sections."""
+    source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
+    assert "from homeassistant.helpers.device_registry import DeviceEntry" in source
+    assert "def _jackery_device_ids(device: DeviceEntry)" in source
+    assert "if domain == DOMAIN" in source
+    assert "for device_id in device_ids" in source
+    assert "if device_id in payloads" in source
+    assert "coordinator.api.last_property_responses" in source
+    assert "coordinator.api.last_device_statistic_responses" in source
+    assert "coordinator.api.last_device_period_stat_responses" in source
 
 
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:

@@ -90,7 +90,12 @@ rules:
 
   # ----------------- Gold -----------------
   devices: done
-  diagnostics: done
+  diagnostics:
+    status: done
+    comment: >-
+      diagnostics.py implements both config-entry diagnostics and per-device
+      diagnostics. Both paths redact sensitive fields and anonymize outer
+      payload map keys so device IDs, serials and locations are not exposed.
   discovery-update-info:
     status: exempt
     comment: Cloud-polling integration; no LAN discovery applicable.
