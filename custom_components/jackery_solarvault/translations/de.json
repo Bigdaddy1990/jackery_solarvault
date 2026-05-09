@@ -1,5 +1,4 @@
 {
-  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
@@ -688,31 +687,31 @@
   },
   "services": {
     "delete_storm_alert": {
-      "description": "Löscht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID über MQTT.",
+      "description": "L\u00f6scht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID \u00fcber MQTT.",
       "fields": {
         "alert_id": {
           "description": "Alert-ID aus den Diagnoseattributen des Unwetterplans, normalerweise storm[].alertId.",
           "name": "Alert-ID"
         },
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Geräte-ID"
+          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Ger\u00e4te-ID"
         }
       },
-      "name": "Unwetterwarnung löschen"
+      "name": "Unwetterwarnung l\u00f6schen"
     },
     "refresh_weather_plan": {
-      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Gerät ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
+      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Ger\u00e4t ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Geräte-ID"
+          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Ger\u00e4te-ID"
         }
       },
       "name": "Wetter- und Unwetterplan aktualisieren"
     },
     "rename_system": {
-      "description": "Benennt ein Jackery-SolarVault-System über die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Geräteinformationen.",
+      "description": "Benennt ein Jackery-SolarVault-System \u00fcber die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Ger\u00e4teinformationen.",
       "fields": {
         "new_name": {
           "description": "Neuer Anzeigename, 1 bis 64 Zeichen.",
@@ -725,5 +724,6 @@
       },
       "name": "SolarVault-System umbenennen"
     }
-  }
+  },
+  "title": "Jackery SolarVault"
 }
