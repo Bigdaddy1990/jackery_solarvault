@@ -470,13 +470,70 @@ class JackeryApi:
         self, status: int, data: dict[str, Any] | Any
     ) -> bool:
         """Detect token-expired responses across backend variants."""
-        if status != 200 or not isinstance(data, dict):
+        if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
         if code == CODE_TOKEN_EXPIRED:
             return True
         msg = str(data.get(FIELD_MSG) or "").lower()
         return "token expires" in msg or "token expired" in msg
+
+    @staticmethod
+    def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
+        """Return True when a backend error payload looks authorization-related."""
+        if not isinstance(data, dict):
+            return False
+        parts = [
+            data.get(FIELD_MSG),
+            data.get("message"),
+            data.get("error"),
+            data.get(FIELD_RAW_TEXT),
+        ]
+        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
+        if not text:
+            return False
+        return any(
+            marker in text
+            for marker in (
+                "unauthorized",
+                "unauthorised",
+                "not authorized",
+                "not authorised",
+                "forbidden",
+                "invalid token",
+                "token invalid",
+                "token expires",
+                "token expired",
+                "login",
+                "log in",
+                "please login",
+                "please log in",
+                "auth",
+                "authentication",
+                "authorization",
+                "credential",
+            )
+        )
+
+    def _is_auth_failure_response(self, status: int, data: dict[str, Any] | Any) -> bool:
+        """Classify HTTP/API authorization failures for HA reauth handling."""
+        if status in (401, 403):
+            return True
+        if self._is_token_expired_response(status, data):
+            return True
+        if status != 200:
+            return self._response_has_auth_failure_text(data)
+        code = self._extract_code(data)
+        return code not in (CODE_OK, None) and self._response_has_auth_failure_text(
+            data
+        )
+
+    @staticmethod
+    def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
+        """Build a compact auth-failure message without exposing secrets."""
+        code = data.get(FIELD_CODE)
+        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
+        return f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
 
     async def _emit_payload_debug(
         self,
@@ -603,6 +660,10 @@ class JackeryApi:
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: {err}"
                 ) from err
 
+        if self._is_auth_failure_response(status, data):
+            raise JackeryAuthError(
+                self._auth_failure_message(HTTP_METHOD_GET, path, status, data)
+            )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
         code = self._extract_code(data)
@@ -1046,6 +1107,10 @@ class JackeryApi:
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: {err}"
                 ) from err
 
+        if self._is_auth_failure_response(status, data):
+            raise JackeryAuthError(
+                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
+            )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
         code = self._extract_code(data)
@@ -1138,6 +1203,10 @@ class JackeryApi:
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: {err}"
                 ) from err
 
+        if self._is_auth_failure_response(status, data):
+            raise JackeryAuthError(
+                self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+            )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
         code = self._extract_code(data)

@@ -188,7 +188,7 @@ Important behavior:
 MQTT push is the primary live update path once connected. HTTP polling remains as startup, fallback and keep-alive path:
 
 - Fast HTTP refresh uses a 30-second base interval.
-- When MQTT is live, fast HTTP ticks are skipped and a full HTTP refresh is kept to a slower keep-alive cadence.
+- When MQTT is live, fast HTTP refreshes are skipped and a full HTTP refresh is kept to a slower keep-alive cadence.
 - Slow cloud statistics and price/config data are queried less frequently because the Jackery cloud does not update them every second.
 
 The MQTT TLS connection verifies the broker certificate chain and hostname. The integration includes `custom_components/jackery_solarvault/jackery_ca.crt` as a trust anchor for `emqx.jackeryapp.com` because the Jackery broker certificate is not signed by a public CA. There is no automatic insecure TLS fallback. TLS status is visible in the diagnostics export.
@@ -222,7 +222,7 @@ logger:
 
 The payload debug file is throttled and rotated to `jackery_solarvault_payload_debug.jsonl.1` at 2 MB. On normal installations it does not exist.
 
-Home Assistant brand icons are loaded from the local brand cache at `/homeassistant/.cache/brands/integrations/jackery/` when available.
+Home Assistant brand icons are shipped in `custom_components/jackery_solarvault/brand/`; the integration does not write brand files at runtime.
 
 ## Reference Documentation
 

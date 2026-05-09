@@ -127,6 +127,8 @@ def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
 
     assert "recorder" not in manifest.get("dependencies", [])
     assert "recorder" in manifest.get("after_dependencies", [])
+    assert manifest["iot_class"] == "cloud_polling"
+    assert manifest["quality_scale"] == "gold"
 
 
 def test_no_duplicate_literal_dict_keys() -> None:
@@ -524,6 +526,18 @@ def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
         '"phone"',
     ):
         assert required in redaction_block
+
+
+def test_mqtt_diagnostics_do_not_expose_mac_id_suffix() -> None:
+    """Diagnostics may report credential source, but not device-correlating IDs."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'diag["credential_mac_id_source"] = self.api.mqtt_mac_id_source' in (
+        coordinator_source
+    )
+    assert "credential_mac_id_suffix" not in coordinator_source
 
 
 def test_data_source_priority_documents_minimal_attributes_and_payload_debug_log() -> (
@@ -1895,33 +1909,24 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
     )
 
 
-def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
-    """Use HA's cached Jackery brand PNGs, not stale root SVG placeholders."""
-    brand_source = (CUSTOM_COMPONENT / "brand.py").read_text(encoding="utf-8")
+def test_brand_assets_are_packaged_without_runtime_sync() -> None:
+    """Use packaged brand PNGs without mutating the custom component at runtime."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     readme = pathlib.Path("README.md").read_text(encoding="utf-8")
+    brand_dir = CUSTOM_COMPONENT / "brand"
 
-    assert 'BRAND_CACHE_INTEGRATION_DOMAIN = "jackery"' in brand_source
-    assert "BRAND_IMAGE_FILENAMES = (" in brand_source
-    assert '"icon.png"' in brand_source
-    assert '"logo.png"' in brand_source
-    assert (
-        "/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}"
-        in brand_source
-    )
-    assert (
-        'hass.config.path(\n            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN'
-        in brand_source
-    )
-    brand_source_collapsed = re.sub(r"\s+", " ", brand_source)
-    assert (
-        "await hass.async_add_executor_job( _copy_cached_jackery_brand_images, source_dirs )"
-        in brand_source_collapsed
-    )
-    assert pathlib.Path("custom_components/jackery_solarvault/brand/.gitkeep").exists()
+    assert not (CUSTOM_COMPONENT / "brand.py").exists()
+    assert "_async_ensure_cached_brand_images" not in init_source
+    assert "async_add_executor_job" not in init_source
+    assert (brand_dir / "icon.png").is_file()
+    assert (brand_dir / "icon@2x.png").is_file()
+    assert (brand_dir / "dark_icon.png").is_file()
+    assert (brand_dir / "dark_icon@2x.png").is_file()
     assert not pathlib.Path("brands/icon.svg").exists()
     assert not pathlib.Path("brands/logo.svg").exists()
     assert "logo.svg" not in readme
-    assert "/homeassistant/.cache/brands/integrations/jackery/" in readme
+    assert "custom_components/jackery_solarvault/brand/" in readme
+    assert "/homeassistant/.cache/brands/integrations/jackery/" not in readme
 
 
 def test_legacy_app_cloud_values_doc_path_is_preserved() -> None:
@@ -1993,23 +1998,29 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
         "while saving the dynamic tariff",
     ):
         assert context in coordinator_source
-    periodic_block = coordinator_source.split("async def _async_periodic_refresh", 1)[
-        1
-    ].split("async def async_shutdown", 1)[0]
-    assert "except ConfigEntryAuthFailed:" in periodic_block
-    assert "raise" in periodic_block
+    assert "async_track_time_interval" not in coordinator_source
+    assert "async def _async_periodic_refresh" not in coordinator_source
+    assert "update_interval=update_interval" in coordinator_source
+    update_block = coordinator_source.split("async def _async_update_data", 1)[1].split(
+        "# ------------------------------------------------------------------\n    # Diagnostics",
+        1,
+    )[0]
+    assert "_raise_config_entry_auth_failed" in update_block
     assert "except ConfigEntryAuthFailed:" in repairs_source
     assert "except JackeryAuthError:" in number_source
 
 
-def test_brand_cache_sync_is_best_effort() -> None:
-    """Read-only custom component mounts must not block integration setup."""
-    brand_source = (CUSTOM_COMPONENT / "brand.py").read_text(encoding="utf-8")
-    copy_block = brand_source.split("def _copy_cached_jackery_brand_images", 1)[
-        1
-    ].split("_BRAND_CACHE_HASS_DATA_KEY", 1)[0]
+def test_brand_runtime_sync_is_absent() -> None:
+    """Read-only custom component mounts are safe because setup writes no brand files."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    component_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in CUSTOM_COMPONENT.glob("*.py")
+        if path.name != "__pycache__"
+    )
 
-    assert "except OSError as err:" in copy_block
-    assert "return copied" in copy_block
-    assert "continue" in copy_block
-    assert "must not prevent the integration from loading" in copy_block
+    assert not (CUSTOM_COMPONENT / "brand.py").exists()
+    assert "_async_ensure_cached_brand_images" not in component_sources
+    assert "shutil.copy2" not in component_sources
+    assert 'Path(__file__).with_name("brand")' not in component_sources
+    assert "async_setup_services(hass)" in init_source

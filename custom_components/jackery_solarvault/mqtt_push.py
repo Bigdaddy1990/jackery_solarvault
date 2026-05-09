@@ -273,7 +273,7 @@ class JackeryMqttPushClient:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 — surface unexpected errors
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
@@ -504,7 +504,7 @@ class JackeryMqttPushClient:
         """Public read-only view of the last-message age helper.
 
         Coordinator-side adaptive polling reads this property to gate
-        fast HTTP ticks while MQTT push is delivering fresh frames.
+        fast HTTP refreshes while MQTT push is delivering fresh frames.
         """
         return self._seconds_since_last_message()
 

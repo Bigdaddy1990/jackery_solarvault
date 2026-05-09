@@ -15,7 +15,6 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import JackeryApi, JackeryAuthError, JackeryError
-from .brand import _async_ensure_cached_brand_images
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -59,7 +58,6 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up global Jackery SolarVault services."""
-    await _async_ensure_cached_brand_images(hass)
     async_setup_services(hass)
     return True
 
@@ -172,7 +170,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     coordinator = JackerySolarVaultCoordinator(
         hass, entry, api, timedelta(seconds=interval_sec)
     )
-    _LOGGER.info("Jackery: fixed polling interval set to %ss", interval_sec)
+    _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
     try:
         # Discovery must run first (MQTT subscriptions and the first refresh
@@ -208,8 +206,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # removed incorrectly.
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        coordinator.async_start_periodic_refresh()
-
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except BaseException:
         with contextlib.suppress(BaseException):

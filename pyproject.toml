@@ -64,8 +64,8 @@ line-length = 88
 src = ["custom_components", "scripts", "tests"]
 indent-width = 4
 show-fixes = true
-fix = true
-unsafe-fixes = true
+fix = false
+unsafe-fixes = false
 force-exclude = true
 output-format= "github"
 
@@ -161,9 +161,8 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
 no_implicit_optional = true
-# PLATINUM COMPLIANCE: minimal blanket disables. The previous list of 19
-# codes has been audited and reduced to the few that genuinely cannot be
-# fixed without invasive changes to Home Assistant's runtime contracts:
+# Strict typing is still in progress; keep these exceptions explicit until
+# they can be removed under the final Home Assistant typing profile.
 warn_return_any = true
 disable_error_code = [
   "no-any-return",  # HA core / aiohttp helpers return Any in many places

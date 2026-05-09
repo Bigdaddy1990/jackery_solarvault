@@ -215,7 +215,7 @@ logger:
 
 Le fichier de debug des payloads est limité en fréquence et tourne vers `jackery_solarvault_payload_debug.jsonl.1` à 2 Mo. Sur une installation normale, il n'existe pas.
 
-Les icônes de marque Home Assistant sont chargées depuis le cache de marque local `/homeassistant/.cache/brands/integrations/jackery/` lorsqu'il est disponible.
+Les icônes de marque Home Assistant sont incluses dans `custom_components/jackery_solarvault/brand/` ; l'intégration n'écrit pas de fichiers de marque à l'exécution.
 
 ## Documentation de référence
 

@@ -326,7 +326,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -2197,7 +2197,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    entities: list[SensorEntity] = []
     seen_unique_ids: set[str] = set()
     create_smart_meter_derived = config_entry_bool_option(
         entry,
@@ -2215,103 +2214,128 @@ async def async_setup_entry(
         DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     )
 
-    def _append_unique(entity: SensorEntity) -> None:
+    def _append_unique(entities: list[SensorEntity], entity: SensorEntity) -> None:
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="sensor", logger=_LOGGER
         )
 
-    for dev_id, payload in (coordinator.data or {}).items():
-        props = payload.get(PAYLOAD_PROPERTIES) or {}
+    def _collect_entities() -> list[SensorEntity]:
+        entities: list[SensorEntity] = []
+        for dev_id, payload in (coordinator.data or {}).items():
+            props = payload.get(PAYLOAD_PROPERTIES) or {}
 
-        # Add property-driven sensors. Do not suppress app/MQTT/Combine backed
-        # fields at setup: several keys arrive after the first refresh and the
-        # entity can stay unknown until the value is present.
-        for desc in SENSOR_DESCRIPTIONS:
-            _append_unique(JackerySensor(coordinator, dev_id, desc))
+            # Add property-driven sensors. Do not suppress app/MQTT/Combine backed
+            # fields at setup: several keys arrive after the first refresh and the
+            # entity can stay unknown until the value is present.
+            for desc in SENSOR_DESCRIPTIONS:
+                _append_unique(entities, JackerySensor(coordinator, dev_id, desc))
 
-        # Statistic / price / device_statistic sensors. Create app statistic
-        # entities only when the corresponding app payload contains a usable
-        # value; this avoids permanent "unknown" entities from empty/unsupported
-        # chart sections while still exposing every fetched app statistic.
-        for stat_desc in STAT_DESCRIPTIONS:
-            if not _stat_description_has_value(payload, stat_desc):
-                continue
-            _append_unique(JackeryStatSensor(coordinator, dev_id, stat_desc))
-
-        if create_calculated_power:
-            _append_unique(JackeryBatteryNetPowerSensor(coordinator, dev_id))
-            _append_unique(JackeryBatteryStackNetPowerSensor(coordinator, dev_id))
-            _append_unique(JackeryGridNetPowerSensor(coordinator, dev_id))
-
-        if create_savings_details:
-            for savings_desc in SAVINGS_DETAIL_SENSOR_DESCRIPTIONS:
+            # Statistic / price / device_statistic sensors. Create app statistic
+            # entities only when the corresponding app payload contains a usable
+            # value; this avoids permanent "unknown" entities from empty/unsupported
+            # chart sections while still exposing every fetched app statistic.
+            for stat_desc in STAT_DESCRIPTIONS:
+                if not _stat_description_has_value(payload, stat_desc):
+                    continue
                 _append_unique(
-                    JackerySavingsDetailSensor(coordinator, dev_id, savings_desc)
+                    entities, JackeryStatSensor(coordinator, dev_id, stat_desc)
                 )
-            _append_unique(JackeryConversionLossPowerSensor(coordinator, dev_id))
 
-        # Alarm sensor (even if empty, useful to see "0 active alarms")
-        if payload.get(PAYLOAD_ALARM) is not None:
-            _append_unique(JackeryAlarmSensor(coordinator, dev_id))
+            if create_calculated_power:
+                _append_unique(entities, JackeryBatteryNetPowerSensor(coordinator, dev_id))
+                _append_unique(
+                    entities, JackeryBatteryStackNetPowerSensor(coordinator, dev_id)
+                )
+                _append_unique(entities, JackeryGridNetPowerSensor(coordinator, dev_id))
 
-        # Firmware version from APP_POLLING_MQTT.md /v1/device/ota/list
-        if (payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION):
-            _append_unique(JackeryFirmwareSensor(coordinator, dev_id))
+            if create_savings_details:
+                for savings_desc in SAVINGS_DETAIL_SENSOR_DESCRIPTIONS:
+                    _append_unique(
+                        entities,
+                        JackerySavingsDetailSensor(coordinator, dev_id, savings_desc),
+                    )
+                _append_unique(
+                    entities, JackeryConversionLossPowerSensor(coordinator, dev_id)
+                )
 
-        # Add-on battery packs come from the app's MQTT BatteryPackSub model.
-        # Create the complete pack entity set once a pack exists or batNum
-        # announces it; individual values may arrive in later MQTT/OTA packets.
-        packs = payload.get(PAYLOAD_BATTERY_PACKS) or []
-        if isinstance(packs, list):
-            valid_packs = [pack for pack in packs if isinstance(pack, dict)]
-            bat_num = safe_int(props.get(FIELD_BAT_NUM))
-            if bat_num is None:
-                pack_count = min(5, len(valid_packs))
-            else:
-                # App model: main battery telemetry lives in HomeBody while
-                # add-on battery cards use BatteryPackSub entries. `batNum`
-                # is the expected pack/card count, not a reason to collapse
-                # the first pack into the main device.
-                pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
-            for index in range(1, pack_count + 1):
-                valid_packs[index - 1] if index <= len(valid_packs) else {}
-                for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
-                    if pack_desc.field == FIELD_CELL_TEMP and not any(
-                        FIELD_CELL_TEMP in item for item in valid_packs
-                    ):
+            # Alarm sensor (even if empty, useful to see "0 active alarms")
+            if payload.get(PAYLOAD_ALARM) is not None:
+                _append_unique(entities, JackeryAlarmSensor(coordinator, dev_id))
+
+            # Firmware version from APP_POLLING_MQTT.md /v1/device/ota/list
+            if (payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION):
+                _append_unique(entities, JackeryFirmwareSensor(coordinator, dev_id))
+
+            # Add-on battery packs come from the app's MQTT BatteryPackSub model.
+            # Create the complete pack entity set once a pack exists or batNum
+            # announces it; individual values may arrive in later MQTT/OTA packets.
+            packs = payload.get(PAYLOAD_BATTERY_PACKS) or []
+            if isinstance(packs, list):
+                valid_packs = [pack for pack in packs if isinstance(pack, dict)]
+                bat_num = safe_int(props.get(FIELD_BAT_NUM))
+                if bat_num is None:
+                    pack_count = min(5, len(valid_packs))
+                else:
+                    # App model: main battery telemetry lives in HomeBody while
+                    # add-on battery cards use BatteryPackSub entries. `batNum`
+                    # is the expected pack/card count, not a reason to collapse
+                    # the first pack into the main device.
+                    pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
+                for index in range(1, pack_count + 1):
+                    valid_packs[index - 1] if index <= len(valid_packs) else {}
+                    for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
+                        if pack_desc.field == FIELD_CELL_TEMP and not any(
+                            FIELD_CELL_TEMP in item for item in valid_packs
+                        ):
+                            continue
+                        _append_unique(
+                            entities,
+                            JackeryBatteryPackSensor(
+                                coordinator,
+                                dev_id,
+                                pack_index=index,
+                                description=pack_desc,
+                                enabled_default=pack_desc.entity_category
+                                != EntityCategory.DIAGNOSTIC,
+                            ),
+                        )
+
+            # Smart meter / CT values arrive through MQTT sub-device responses.
+            # Create them when discovery confirms a meter accessory, or when a
+            # CT payload was already received before entity setup.
+            if coordinator._has_smart_meter_accessory(payload) or payload.get(
+                PAYLOAD_CT_METER
+            ):
+                for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
+                    if ct_desc.calculation and not create_smart_meter_derived:
                         continue
                     _append_unique(
-                        JackeryBatteryPackSensor(
-                            coordinator,
-                            dev_id,
-                            pack_index=index,
-                            description=pack_desc,
-                            enabled_default=True,
-                        )
+                        entities,
+                        JackerySmartMeterSensor(coordinator, dev_id, ct_desc),
                     )
+                if create_smart_meter_derived:
+                    _append_unique(
+                        entities, JackeryHomeConsumptionPowerSensor(coordinator, dev_id)
+                    )
+            elif create_smart_meter_derived and any(
+                key in props and props.get(key) is not None
+                for key in (FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW)
+            ):
+                # Some firmware/API responses expose the live app house-load value
+                # directly before a CT payload has arrived. Keep the user-facing
+                # Hausverbrauch sensor available instead of waiting for CT data.
+                _append_unique(
+                    entities, JackeryHomeConsumptionPowerSensor(coordinator, dev_id)
+                )
+        return entities
 
-        # Smart meter / CT values arrive through MQTT sub-device responses.
-        # Create them when discovery confirms a meter accessory, or when a
-        # CT payload was already received before entity setup.
-        if coordinator._has_smart_meter_accessory(payload) or payload.get(
-            PAYLOAD_CT_METER
-        ):
-            for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
-                if ct_desc.calculation and not create_smart_meter_derived:
-                    continue
-                _append_unique(JackerySmartMeterSensor(coordinator, dev_id, ct_desc))
-            if create_smart_meter_derived:
-                _append_unique(JackeryHomeConsumptionPowerSensor(coordinator, dev_id))
-        elif create_smart_meter_derived and any(
-            key in props and props.get(key) is not None
-            for key in (FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW)
-        ):
-            # Some firmware/API responses expose the live app house-load value
-            # directly before a CT payload has arrived. Keep the user-facing
-            # Hausverbrauch sensor available instead of waiting for CT data.
-            _append_unique(JackeryHomeConsumptionPowerSensor(coordinator, dev_id))
+    def _add_new_entities() -> None:
+        entities = _collect_entities()
+        if entities:
+            async_add_entities(entities)
 
-    async_add_entities(entities)
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
 
 
 # ---------------------------------------------------------------------------
@@ -2331,9 +2355,10 @@ class JackerySensor(JackeryEntity, SensorEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
-        # App-backed values should not land in HA as disabled entities. The
-        # integration now skips non-app diagnostics instead of disabling them.
-        self._attr_entity_registry_enabled_default = True
+        self._attr_entity_registry_enabled_default = (
+            description.entity_registry_enabled_default
+            and description.entity_category != EntityCategory.DIAGNOSTIC
+        )
 
     @property
     def native_value(self) -> Any:
@@ -2387,6 +2412,10 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
+        self._attr_entity_registry_enabled_default = (
+            description.entity_registry_enabled_default
+            and description.entity_category != EntityCategory.DIAGNOSTIC
+        )
         self._reset_period = _period_from_stat_description(description)
         if self._reset_period is not None:
             # Period totals reset at the app's day/week/month/year boundary.
@@ -3067,7 +3096,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
             try:
                 json.dumps(v)
                 attrs[k] = v
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 attrs[k] = str(v)
         return attrs
 
@@ -3431,6 +3460,7 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:alert-circle-outline"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
@@ -3495,7 +3525,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 
@@ -3536,6 +3566,7 @@ class JackeryFirmwareSensor(JackeryEntity, SensorEntity):
 
     _attr_translation_key = "firmware_version"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
     _attr_icon = "mdi:chip"
 
     def __init__(

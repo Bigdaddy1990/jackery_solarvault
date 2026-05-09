@@ -19,13 +19,14 @@ from typing import Any
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
 from .const import (
     AUTO_OFF_HOURS,
     DEFAULT_STORM_WARNING_MINUTES,
+    DOMAIN,
     FIELD_CID,
     FIELD_COMPANY_NAME,
     FIELD_COUNTRY,
@@ -73,6 +74,23 @@ _AUTO_OFF_OPTIONS = [f"h_{hours}" for hours in AUTO_OFF_HOURS]
 _HOURS_TO_AUTO_OFF_OPTION = {hours: f"h_{hours}" for hours in AUTO_OFF_HOURS}
 _AUTO_OFF_OPTION_TO_HOURS = {f"h_{hours}": hours for hours in AUTO_OFF_HOURS}
 _OPTION_TO_PRICE_MODE = {v: k for k, v in PRICE_MODE_TO_OPTION.items()}
+
+
+def _raise_select_action_error(
+    entity: JackerySelect,
+    translation_key: str,
+    **placeholders: object,
+) -> None:
+    """Raise a translatable HA action error for a select entity."""
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key=translation_key,
+        translation_placeholders={
+            "entity": entity.entity_description.key,
+            "device_id": entity._device_id,
+            **{key: str(value) for key, value in placeholders.items()},
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -298,8 +316,17 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Forward the chosen option to the coordinator."""
-        await self.entity_description.select_fn(self, option)
-        await self.coordinator.async_request_refresh()
+        try:
+            await self.entity_description.select_fn(self, option)
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            _raise_select_action_error(self, "entity_action_failed", error=err)
+        except Exception as err:
+            _raise_select_action_error(self, "entity_action_failed", error=err)
 
     def _warn_unknown_once(self, value: Any) -> None:
         """Log an unmapped raw value once per instance / value combination."""
@@ -342,7 +369,7 @@ def _work_mode_current(entity: JackerySelect) -> str | None:
 async def _work_mode_select(entity: JackerySelect, option: str) -> None:
     mode = _OPTION_TO_WORK_MODE.get(option)
     if mode is None:
-        raise ValueError(f"Invalid work mode option: {option}")
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_work_model(entity._device_id, mode)
 
 
@@ -355,7 +382,7 @@ def _temp_unit_current(entity: JackerySelect) -> str | None:
 
 async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
     if option not in _OPTION_TO_TEMP_UNIT:
-        raise ValueError(f"Invalid temperature unit option: {option}")
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
         entity._device_id, _OPTION_TO_TEMP_UNIT[option]
     )
@@ -384,7 +411,7 @@ def _island_auto_off_current(entity: JackerySelect) -> str | None:
 
 async def _island_auto_off_select(entity: JackerySelect, option: str) -> None:
     if option not in _AUTO_OFF_OPTION_TO_HOURS:
-        raise ValueError(f"Invalid island auto-off option: {option}")
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     hours = _AUTO_OFF_OPTION_TO_HOURS[option]
     await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)
 
@@ -418,7 +445,7 @@ def _storm_minutes_current(entity: JackerySelect) -> str | None:
 async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
     match = re.fullmatch(r"min_(\d+)", option)
     if not match:
-        raise ValueError(f"Invalid storm warning lead-time option: {option}")
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     minutes = int(match.group(1))
     await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
 
@@ -437,15 +464,16 @@ def _price_mode_current(entity: JackerySelect) -> str | None:
 async def _price_mode_select(entity: JackerySelect, option: str) -> None:
     mode = _OPTION_TO_PRICE_MODE.get(option)
     if mode is None:
-        raise ValueError(f"Invalid electricity price mode option: {option}")
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     if mode == 1:
         if (
             not _price_mode_dynamic_available(entity)
             and _price_mode_current_int(entity) != 1
         ):
-            raise HomeAssistantError(
-                "Dynamic tariff provider is not available yet. Wait for the "
-                "next refresh or use the electricity price provider entity."
+            _raise_select_action_error(
+                entity,
+                "dynamic_tariff_unavailable",
+                option=option,
             )
         await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
     elif mode == 2:
@@ -481,9 +509,11 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
 async def _price_provider_select(entity: JackerySelect, option: str) -> None:
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_label(source) == option:
-            await entity.coordinator.async_set_price_source(entity._device_id, source)
+            await entity.coordinator.async_set_price_source(
+                entity._device_id, source
+            )
             return
-    raise ValueError(f"Invalid electricity price provider option: {option}")
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 # ---------------------------------------------------------------------------
@@ -556,17 +586,18 @@ async def async_setup_entry(
 ) -> None:
     """Create description-driven select entities."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    entities: list[SelectEntity] = []
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entity: SelectEntity) -> None:
+    def _append_unique(entities: list[SelectEntity], entity: SelectEntity) -> None:
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="select", logger=_LOGGER
         )
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
-    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
+    def _gate(
+        key: str, payload: dict[str, Any], supports_advanced: bool
+    ) -> bool:
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -599,10 +630,21 @@ async def async_setup_entry(
             )
         return False
 
-    for dev_id, payload in (coordinator.data or {}).items():
-        supports_advanced = coordinator.device_supports_advanced(dev_id)
-        for description in SELECT_DESCRIPTIONS:
-            if _gate(description.key, payload, supports_advanced):
-                _append_unique(JackerySelect(coordinator, dev_id, description))
+    def _collect_entities() -> list[SelectEntity]:
+        entities: list[SelectEntity] = []
+        for dev_id, payload in (coordinator.data or {}).items():
+            supports_advanced = coordinator.device_supports_advanced(dev_id)
+            for description in SELECT_DESCRIPTIONS:
+                if _gate(description.key, payload, supports_advanced):
+                    _append_unique(
+                        entities, JackerySelect(coordinator, dev_id, description)
+                    )
+        return entities
 
-    async_add_entities(entities)
+    def _add_new_entities() -> None:
+        entities = _collect_entities()
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))

@@ -371,51 +371,35 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         assert suffix in const_source
 
 
-# App-stat duplicates should be removed rather than kept as disabled entities.
-INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset()
+# Diagnostic/raw entities should stay available for users who need them without
+# being enabled by default on every new install.
+INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset({"power_price"})
 
 
-def test_app_sensor_descriptions_are_not_disabled_by_default() -> None:
-    """Disabled-by-default flag must be a deliberate, documented choice.
-
-    The ``INTENTIONALLY_DISABLED_BY_DEFAULT`` set above lists every key
-    that may carry ``entity_registry_enabled_default=False``. Any other
-    occurrence — accidental or otherwise — would silently hide a sensor
-    from new installs and is rejected by this test.
-    """
+def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
+    """Diagnostic app sensors must not be enabled by default."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    binary_source = (COMPONENT_PATH / "binary_sensor.py").read_text(encoding="utf-8")
 
-    assert "self._attr_entity_registry_enabled_default = True" in sensor_source, (
-        "JackeryStatSensor must default-enable its entity_registry flag"
-    )
+    assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source
+    assert "description.entity_category != EntityCategory.DIAGNOSTIC" in binary_source
+    assert "enabled_default=pack_desc.entity_category" in sensor_source
+    assert "_attr_entity_registry_enabled_default = False" in sensor_source
 
-    # Locate every JackeryStatSensorDescription block that opts out of
-    # the default. Each must be paired with a key that's whitelisted.
-    # Constraint: the key= and the disabled flag must appear inside the
-    # SAME constructor call. The non-greedy match below is bounded by a
-    # closing `),` (end of the description) so we never sweep across
-    # multiple descriptions.
     import re
 
     pattern = re.compile(
-        r"JackeryStatSensorDescription\(\s*\n"
+        r"Jackery(?:Stat)?SensorDescription\(\s*\n"
         r'\s*key="([^"]+)"'
         r"(?:(?!\n    \),).)*?"
-        r"entity_registry_enabled_default=False",
+        r"entity_category=EntityCategory\.DIAGNOSTIC",
         re.MULTILINE | re.DOTALL,
     )
     found = set(pattern.findall(sensor_source))
-    unexpected = found - INTENTIONALLY_DISABLED_BY_DEFAULT
-    assert not unexpected, (
-        f"JackeryStatSensorDescription opts out of default-enabled for "
-        f"unexpected keys: {sorted(unexpected)}. Add them to "
-        f"INTENTIONALLY_DISABLED_BY_DEFAULT with a comment explaining why, "
-        f"or remove the entity_registry_enabled_default=False line."
-    )
     missing = INTENTIONALLY_DISABLED_BY_DEFAULT - found
     assert not missing, (
-        f"Whitelisted keys missing the entity_registry_enabled_default=False "
-        f"flag: {sorted(missing)}. Either add the flag back or remove from "
+        f"Whitelisted diagnostic keys no longer diagnostic: {sorted(missing)}. "
+        f"Either add the entity category back or remove from "
         f"INTENTIONALLY_DISABLED_BY_DEFAULT."
     )
 

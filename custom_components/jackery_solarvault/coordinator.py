@@ -10,9 +10,8 @@ import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -312,8 +311,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
        windows so we do not hammer the cloud faster than it updates.
     2. **MQTT push** (``_async_handle_mqtt_message``) merges UploadCombineData,
        DevicePropertyChange, weather and subdevice telemetry into the same
-       per-device payload as the HTTP path. When MQTT is live the periodic
-       refresh skips most fast HTTP ticks (``_should_skip_tick_for_live_mqtt``).
+       per-device payload as the HTTP path. When MQTT is live the coordinator
+       refresh skips most fast HTTP calls (``_should_skip_refresh_for_live_mqtt``).
     3. **Optimistic local patches** (``_apply_local_*``) apply user-driven
        writes (``async_set_*``) to the cached payload immediately so the UI
        reflects the change before the cloud confirms; a short TTL window
@@ -389,7 +388,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             hass,
             _LOGGER,
             name=f"{DOMAIN} ({entry.title})",
-            update_interval=None,
+            update_interval=update_interval,
         )
         self.api = api
         self.api.payload_debug_callback = self._async_payload_debug_event
@@ -401,6 +400,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # own cadence to avoid long update cycles.
         self._slow_metrics_interval_sec = max(SLOW_METRICS_INTERVAL_SEC, interval_sec)
         self._price_config_interval_sec = max(PRICE_CONFIG_INTERVAL_SEC, interval_sec)
+        self._last_discovery_refresh_monotonic: float = float("-inf")
 
         # Mapping deviceId -> {systemId, system_meta, device_meta}
         self._device_index: dict[str, dict[str, Any]] = {}
@@ -426,15 +426,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._subdevice_query_interval_sec = interval_sec
         self._price_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._property_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
-        self._periodic_refresh_unsub: Any | None = None
-        self._periodic_refresh_task: asyncio.Task[None] | None = None
         self._mqtt_backfill_task: asyncio.Task[None] | None = None
         self._skipped_refresh_ticks = 0
-        # Adaptive polling: when MQTT push is live, fast polling ticks are
-        # skipped and a full HTTP refresh only runs every keep-alive window.
-        # Initialise to ``-inf`` so the first tick after setup always runs
-        # and primes the interval bookkeeping.
-        self._last_periodic_refresh_completed_monotonic: float = float("-inf")
+        # Adaptive polling: when MQTT push is live, fast HTTP refreshes are
+        # short-circuited and a full HTTP refresh only runs every keep-alive
+        # window. Initialise to ``-inf`` so the first coordinator refresh after
+        # setup always runs and primes the interval bookkeeping.
+        self._last_http_refresh_completed_monotonic: float = float("-inf")
         # Dedup cache for payload-debug records:
         # (kind, channel, message_type) -> (last_signature, last_emit_monotonic).
         # Bounded by the number of distinct topics the device publishes
@@ -456,8 +454,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # (starts, states) tuple.
         self._stat_import_last_sig: dict[str, str] = {}
         # Throttle external-statistics import to slow-metric cadence so the
-        # recorder is not invoked on every fast polling tick. The first
-        # tick always runs because the initial value is ``-inf``.
+        # recorder is not invoked on every fast HTTP refresh. The first
+        # coordinator refresh always runs because the initial value is ``-inf``.
         self._last_stat_import_monotonic: float = float("-inf")
 
     async def _async_payload_debug_event(
@@ -546,7 +544,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def async_discover(self) -> None:
         """Populate _device_index from config or /v1/device/system/list."""
-        self._device_index.clear()
+        new_index: dict[str, dict[str, Any]] = {}
 
         # Primary: confirmed system/list endpoint (SolarVault + friends)
         try:
@@ -578,16 +576,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 dev_id = dev.get(FIELD_DEVICE_ID) or dev.get(FIELD_ID)
                 if not dev_id:
                     continue
-                self._device_index[str(dev_id)] = {
+                new_index[str(dev_id)] = {
                     FIELD_SYSTEM_ID: str(sys_id) if sys_id else None,
                     PAYLOAD_SYSTEM_META: system_meta,
                     PAYLOAD_DEVICE_META: dict(dev),
                 }
 
-        if self._device_index:
+        if new_index:
+            self._device_index = new_index
+            self._last_discovery_refresh_monotonic = time.monotonic()
             _LOGGER.info(
                 "Jackery: discovered %d device(s) from /v1/device/system/list",
-                len(self._device_index),
+                len(new_index),
             )
             return
 
@@ -602,16 +602,50 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 or dev.get(FIELD_DEVICE_SN)
             )
             if dev_id:
-                self._device_index[str(dev_id)] = {
+                new_index[str(dev_id)] = {
                     FIELD_SYSTEM_ID: None,
                     PAYLOAD_SYSTEM_META: {},
                     PAYLOAD_DEVICE_META: dict(dev),
                 }
 
-        if not self._device_index:
+        self._device_index = new_index
+        self._last_discovery_refresh_monotonic = time.monotonic()
+        if not new_index:
             _LOGGER.error(
                 "Jackery: no devices found on either /v1/device/system/list "
                 "or /v1/device/bind/list."
+            )
+
+    async def _async_refresh_discovery_if_due(self) -> None:
+        """Refresh discovery metadata periodically for runtime device additions."""
+        now = time.monotonic()
+        if (
+            now - self._last_discovery_refresh_monotonic
+            < self._slow_metrics_interval_sec
+        ):
+            return
+        old_device_ids = set(self._device_index)
+        self._last_discovery_refresh_monotonic = now
+        try:
+            await self.async_discover()
+        except ConfigEntryAuthFailed:
+            raise
+        except JackeryAuthError as err:
+            _raise_config_entry_auth_failed(
+                "Jackery credentials were rejected during device rediscovery", err
+            )
+        except JackeryError as err:
+            _LOGGER.debug("Jackery runtime discovery refresh failed: %s", err)
+            return
+        except UpdateFailed as err:
+            _LOGGER.debug("Jackery runtime discovery refresh failed: %s", err)
+            return
+        new_device_ids = set(self._device_index) - old_device_ids
+        if new_device_ids:
+            _LOGGER.info(
+                "Jackery: runtime discovery added %d device(s): %s",
+                len(new_device_ids),
+                ", ".join(sorted(new_device_ids)),
             )
 
     @staticmethod
@@ -701,105 +735,37 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's fixed polling interval."""
+        """Return the integration's coordinator polling interval."""
         return self._configured_update_interval
 
-    def async_start_periodic_refresh(self) -> None:
-        """Start fixed-rate polling independent of coordinator listener state."""
-        if self._periodic_refresh_unsub is not None:
-            return
-        self._periodic_refresh_unsub = async_track_time_interval(
-            self.hass,
-            self._handle_periodic_refresh_tick,
-            self._configured_update_interval,
-        )
-        _LOGGER.info(
-            "Jackery: fixed-rate polling started every %ss",
-            int(self._configured_update_interval.total_seconds()),
-        )
-
-    @callback
-    def _handle_periodic_refresh_tick(self, _now: Any) -> None:
-        """Run one refresh tick, skipping instead of piling up overlapping polls."""
-        if (
-            self._periodic_refresh_task is not None
-            and not self._periodic_refresh_task.done()
-        ):
-            self._skipped_refresh_ticks += 1
-            _LOGGER.debug(
-                "Jackery: skipping polling tick because previous refresh is still running"
-            )
-            return
-        if self._should_skip_tick_for_live_mqtt():
-            self._skipped_refresh_ticks += 1
-            _LOGGER.debug(
-                "Jackery: skipping polling tick because MQTT push is live "
-                "(last keep-alive %.0fs ago)",
-                time.monotonic() - self._last_periodic_refresh_completed_monotonic,
-            )
-            return
-        self._periodic_refresh_task = self.hass.async_create_task(
-            self._async_periodic_refresh(),
-            name=f"{DOMAIN}_fixed_rate_refresh",
-        )
-
-    def _should_skip_tick_for_live_mqtt(self) -> bool:
+    def _should_skip_refresh_for_live_mqtt(self) -> bool:
         """Return True when MQTT push is live and the keep-alive window holds.
 
         When MQTT delivers state at < ``MQTT_LIVE_THRESHOLD_SEC`` cadence
         we let it carry the load and only HTTP-poll every
-        ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC`` for slow metrics. The fast
-        polling tick still runs unaltered when MQTT is silent or while
-        the keep-alive window has elapsed since the last full refresh.
+        ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC`` for slow metrics. The coordinator
+        refresh still runs unaltered when MQTT is silent or while the
+        keep-alive window has elapsed since the last full refresh.
         """
+        if not self.data:
+            return False
         if self._mqtt is None:
             return False
         elapsed = self._mqtt.seconds_since_last_message
         if elapsed is None or elapsed > MQTT_LIVE_THRESHOLD_SEC:
             return False
         since_last_refresh = (
-            time.monotonic() - self._last_periodic_refresh_completed_monotonic
+            time.monotonic() - self._last_http_refresh_completed_monotonic
         )
         return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
 
-    async def _async_periodic_refresh(self) -> None:
-        """Perform one scheduled refresh and keep transient errors local.
-
-        Authentication failures must keep bubbling through Home Assistant's
-        coordinator machinery so the config entry can enter its reauth flow.
-        Transient refresh failures deliberately do not advance the adaptive
-        MQTT keep-alive timestamp; otherwise one failed HTTP keep-alive would
-        suppress retries for the full adaptive window while MQTT is live.
-        """
-        started = time.monotonic()
-        try:
-            await self.async_request_refresh()
-        except ConfigEntryAuthFailed:
-            raise
-        except Exception as err:
-            _LOGGER.debug("Jackery scheduled refresh failed: %s", err)
-            return
-        self._last_periodic_refresh_completed_monotonic = time.monotonic()
-        elapsed = self._last_periodic_refresh_completed_monotonic - started
-        interval_sec = self._configured_update_interval.total_seconds()
-        if elapsed > interval_sec:
-            _LOGGER.debug(
-                "Jackery polling cycle overran interval: %.2fs > %.2fs",
-                elapsed,
-                interval_sec,
-            )
-
     async def async_shutdown(self) -> None:
         """Stop MQTT client on integration unload."""
-        if self._periodic_refresh_unsub is not None:
-            self._periodic_refresh_unsub()
-            self._periodic_refresh_unsub = None
-        for task in (self._periodic_refresh_task, self._mqtt_backfill_task):
+        for task in (self._mqtt_backfill_task,):
             if task is not None and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
-        self._periodic_refresh_task = None
         self._mqtt_backfill_task = None
         if self._mqtt is not None:
             await self._mqtt.async_stop()
@@ -1267,7 +1233,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -1365,7 +1331,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -1850,15 +1816,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._push_partial_update(new_data)
 
     def _push_partial_update(self, new_data: dict[str, dict[str, Any]]) -> None:
-        """Push updated coordinator data without rescheduling the poll timer.
-
-        DataUpdateCoordinator.async_set_updated_data() resets the next scheduled
-        refresh relative to "now". With frequent MQTT pushes, that can delay
-        polling indefinitely and make the configured scan interval ineffective.
-        """
-        self.data = new_data
-        self.last_update_success = True
-        self.async_update_listeners()
+        """Push updated coordinator data through HA's coordinator mechanism."""
+        self.async_set_updated_data(new_data)
 
     # ------------------------------------------------------------------
     # Background queries & device commands
@@ -2787,7 +2746,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -2969,7 +2928,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     )
 
     # ------------------------------------------------------------------
-    # Coordinator update cycle (periodic merge of HTTP + MQTT + caches)
+    # Coordinator update cycle (merge of HTTP + MQTT + caches)
     # ------------------------------------------------------------------
 
     async def _async_update_data(
@@ -2979,6 +2938,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await self.async_discover()
             if not self._device_index:
                 raise UpdateFailed("No Jackery devices found.")
+
+        await self._async_refresh_discovery_if_due()
+
+        if self._should_skip_refresh_for_live_mqtt():
+            self._skipped_refresh_ticks += 1
+            _LOGGER.debug(
+                "Jackery: skipping coordinator HTTP refresh because MQTT push is live "
+                "(last keep-alive %.0fs ago)",
+                time.monotonic() - self._last_http_refresh_completed_monotonic,
+            )
+            return self.data or {}
+
+        started = time.monotonic()
 
         # Per-system calls honour their own refresh intervals. Inside a
         # single update cycle we call each endpoint at most once; across
@@ -3043,6 +3015,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return last_value
             try:
                 value = await fetcher()
+            except JackeryAuthError:
+                raise
             except JackeryError as err:
                 _LOGGER.debug("%s failed: %s", cache_key, err)
                 if entry is not None:
@@ -3663,7 +3637,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self._async_update_data_quality_issue(result)
         # External-statistics import only runs at the slow-metric cadence
         # (server-side chart updates also operate at ~5 min granularity)
-        # so the recorder is not woken up on every fast polling tick.
+        # so the recorder is not woken up on every fast HTTP refresh.
         now_monotonic = time.monotonic()
         if (
             now_monotonic - self._last_stat_import_monotonic
@@ -3680,6 +3654,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 await self.async_cleanup_pending_device_removals()
             except Exception as err:
                 _LOGGER.debug("Jackery: device-registry cleanup deferred: %s", err)
+        self._last_http_refresh_completed_monotonic = time.monotonic()
+        elapsed = self._last_http_refresh_completed_monotonic - started
+        interval_sec = self._configured_update_interval.total_seconds()
+        if elapsed > interval_sec:
+            _LOGGER.debug(
+                "Jackery polling cycle overran interval: %.2fs > %.2fs",
+                elapsed,
+                interval_sec,
+            )
         return result
 
     # ------------------------------------------------------------------
@@ -3694,12 +3677,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         diag = dict(self._mqtt.diagnostics)
         diag["enabled"] = True
         diag["credential_mac_id_source"] = self.api.mqtt_mac_id_source
-        if self.api.mqtt_mac_id:
-            diag["credential_mac_id_suffix"] = self.api.mqtt_mac_id[-6:]
         diag["slow_metrics_interval_seconds"] = self._slow_metrics_interval_sec
         diag["price_interval_seconds"] = self._price_config_interval_sec
         diag["subdevice_query_interval_seconds"] = self._subdevice_query_interval_sec
-        diag["fixed_rate_polling_seconds"] = int(
+        diag["coordinator_polling_seconds"] = int(
             self._configured_update_interval.total_seconds()
         )
         diag["tls_certificate_verification"] = "enabled"

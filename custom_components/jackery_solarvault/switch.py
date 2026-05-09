@@ -15,10 +15,12 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
 from .const import (
+    DOMAIN,
     FIELD_AUTO_STANDBY,
     FIELD_FOLLOW_METER,
     FIELD_IS_AUTO_STANDBY,
@@ -53,7 +55,7 @@ def _standby_is_on(raw: Any) -> bool | None:
         return None
     try:
         return int(raw) == 1
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return safe_bool(raw)
 
 
@@ -83,9 +85,9 @@ class JackerySwitchDescription(SwitchEntityDescription):
     source_section: str = PAYLOAD_PROPERTIES
     fallback_section: str | None = None
     use_task_plan_fallback: bool = False
-    setter: (
-        Callable[[JackerySolarVaultCoordinator, str, bool], Awaitable[None]] | None
-    ) = None
+    setter: Callable[
+        [JackerySolarVaultCoordinator, str, bool], Awaitable[None]
+    ] | None = None
     is_on_transform: Callable[[Any], bool | None] = safe_bool
 
 
@@ -218,6 +220,18 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
+    def _raise_action_error(self, error: object) -> None:
+        """Raise a translatable HA action error for this switch."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="entity_action_failed",
+            translation_placeholders={
+                "entity": self.entity_description.key,
+                "device_id": self._device_id,
+                "error": str(error),
+            },
+        )
+
     @property
     def is_on(self) -> bool | None:
         """Return True when the entity is on."""
@@ -246,15 +260,37 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """Turn the entity on."""
         if self.entity_description.setter is None:
             return
-        await self.entity_description.setter(self.coordinator, self._device_id, True)
-        await self.coordinator.async_request_refresh()
+        try:
+            await self.entity_description.setter(
+                self.coordinator, self._device_id, True
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         if self.entity_description.setter is None:
             return
-        await self.entity_description.setter(self.coordinator, self._device_id, False)
-        await self.coordinator.async_request_refresh()
+        try:
+            await self.entity_description.setter(
+                self.coordinator, self._device_id, False
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +305,9 @@ async def async_setup_entry(
 ) -> None:
     """Create description-driven switch entities."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    entities: list[SwitchEntity] = []
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entity: SwitchEntity) -> None:
+    def _append_unique(entities: list[SwitchEntity], entity: SwitchEntity) -> None:
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
@@ -282,23 +317,33 @@ async def async_setup_entry(
     # SolarVault devices; otherwise gate them by the observed property keys.
     gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
         "eps_output": lambda props, _adv: FIELD_SW_EPS in props,
-        "auto_standby_set": lambda props, adv: (
-            adv or FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props
-        ),
+        "auto_standby_set": lambda props, adv: adv
+        or FIELD_IS_AUTO_STANDBY in props
+        or FIELD_AUTO_STANDBY in props,
         "standby": lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
         "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
         "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
         "storm_warning": lambda props, adv: adv or FIELD_WPS in props,
     }
 
-    for dev_id, payload in (coordinator.data or {}).items():
-        props = payload.get(PAYLOAD_PROPERTIES) or {}
-        supports_advanced = coordinator.device_supports_advanced(dev_id)
-        for description in SWITCH_DESCRIPTIONS:
-            predicate = gating.get(description.key)
-            if predicate is not None and predicate(props, supports_advanced):
-                _append_unique(
-                    JackeryDescriptionSwitch(coordinator, dev_id, description)
-                )
+    def _collect_entities() -> list[SwitchEntity]:
+        entities: list[SwitchEntity] = []
+        for dev_id, payload in (coordinator.data or {}).items():
+            props = payload.get(PAYLOAD_PROPERTIES) or {}
+            supports_advanced = coordinator.device_supports_advanced(dev_id)
+            for description in SWITCH_DESCRIPTIONS:
+                predicate = gating.get(description.key)
+                if predicate is not None and predicate(props, supports_advanced):
+                    _append_unique(
+                        entities,
+                        JackeryDescriptionSwitch(coordinator, dev_id, description),
+                    )
+        return entities
 
-    async_add_entities(entities)
+    def _add_new_entities() -> None:
+        entities = _collect_entities()
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))

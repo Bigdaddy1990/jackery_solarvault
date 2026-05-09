@@ -1,4 +1,5 @@
 {
+  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "This Jackery account is already configured.",
@@ -641,6 +642,27 @@
     "delete_storm_alert_failed": {
       "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
     },
+    "dynamic_tariff_unavailable": {
+      "message": "Dynamic tariff is not available for {entity} on device {device_id}. Wait for the next refresh or choose an electricity price provider first."
+    },
+    "entity_action_failed": {
+      "message": "Could not update {entity} for device {device_id}: {error}"
+    },
+    "invalid_number_allowed_values": {
+      "message": "{entity} for device {device_id} must be one of: {allowed_values}"
+    },
+    "invalid_number_range": {
+      "message": "{entity} for device {device_id} must be between {min} and {max}"
+    },
+    "invalid_select_option": {
+      "message": "{option} is not a valid option for {entity} on device {device_id}"
+    },
+    "invalid_text_value": {
+      "message": "{entity} for device {device_id} must not be empty"
+    },
+    "missing_system_id": {
+      "message": "Cannot update device {device_id}: missing systemId"
+    },
     "mqtt_command_failed": {
       "message": "Jackery MQTT command failed ({error}). Last MQTT error: {mqtt_last_error}"
     },
@@ -724,6 +746,5 @@
       },
       "name": "Rename SolarVault system"
     }
-  },
-  "title": "Jackery SolarVault"
+  }
 }

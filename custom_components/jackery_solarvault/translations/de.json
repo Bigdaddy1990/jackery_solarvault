@@ -1,4 +1,5 @@
 {
+  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
@@ -641,6 +642,27 @@
     "delete_storm_alert_failed": {
       "message": "Sturm-Warnung {alert_id} f\u00fcr Ger\u00e4t {device_id} konnte nicht gel\u00f6scht werden: {error}"
     },
+    "dynamic_tariff_unavailable": {
+      "message": "Dynamischer Tarif ist f\u00fcr {entity} auf Ger\u00e4t {device_id} nicht verf\u00fcgbar. Warte auf den n\u00e4chsten Refresh oder w\u00e4hle zuerst einen Strompreisanbieter."
+    },
+    "entity_action_failed": {
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} konnte nicht aktualisiert werden: {error}"
+    },
+    "invalid_number_allowed_values": {
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} muss einer dieser Werte sein: {allowed_values}"
+    },
+    "invalid_number_range": {
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} muss zwischen {min} und {max} liegen"
+    },
+    "invalid_select_option": {
+      "message": "{option} ist keine g\u00fcltige Option f\u00fcr {entity} auf Ger\u00e4t {device_id}"
+    },
+    "invalid_text_value": {
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} darf nicht leer sein"
+    },
+    "missing_system_id": {
+      "message": "Ger\u00e4t {device_id} kann nicht aktualisiert werden: systemId fehlt"
+    },
     "mqtt_command_failed": {
       "message": "Jackery MQTT-Befehl fehlgeschlagen ({error}). Letzter MQTT-Fehler: {mqtt_last_error}"
     },
@@ -687,31 +709,31 @@
   },
   "services": {
     "delete_storm_alert": {
-      "description": "L\u00f6scht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID \u00fcber MQTT.",
+      "description": "Löscht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID über MQTT.",
       "fields": {
         "alert_id": {
           "description": "Alert-ID aus den Diagnoseattributen des Unwetterplans, normalerweise storm[].alertId.",
           "name": "Alert-ID"
         },
         "device_id": {
-          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Ger\u00e4te-ID"
+          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Geräte-ID"
         }
       },
-      "name": "Unwetterwarnung l\u00f6schen"
+      "name": "Unwetterwarnung löschen"
     },
     "refresh_weather_plan": {
-      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Ger\u00e4t ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
+      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Gerät ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Ger\u00e4te-ID"
+          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Geräte-ID"
         }
       },
       "name": "Wetter- und Unwetterplan aktualisieren"
     },
     "rename_system": {
-      "description": "Benennt ein Jackery-SolarVault-System \u00fcber die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Ger\u00e4teinformationen.",
+      "description": "Benennt ein Jackery-SolarVault-System über die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Geräteinformationen.",
       "fields": {
         "new_name": {
           "description": "Neuer Anzeigename, 1 bis 64 Zeichen.",
@@ -724,6 +746,5 @@
       },
       "name": "SolarVault-System umbenennen"
     }
-  },
-  "title": "Jackery SolarVault"
+  }
 }

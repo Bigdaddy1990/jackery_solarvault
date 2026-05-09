@@ -11,13 +11,13 @@
   "dependencies": [],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
   "integration_type": "hub",
-  "iot_class": "cloud_push",
+  "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
   "loggers": [
     "custom_components.jackery_solarvault",
     "aiomqtt"
   ],
-  "quality_scale": "platinum",
+  "quality_scale": "gold",
   "requirements": [
     "aiomqtt>=2.3.0"
   ],

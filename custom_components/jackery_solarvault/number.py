@@ -19,11 +19,13 @@ from homeassistant.components.number import (
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
 from .api import JackeryAuthError, JackeryError
 from .const import (
+    DOMAIN,
     FIELD_CURRENCY,
     FIELD_CURRENCY_CODE,
     FIELD_DEFAULT_PW,
@@ -320,6 +322,20 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
+    def _raise_action_error(
+        self, translation_key: str, **placeholders: object
+    ) -> None:
+        """Raise a translatable HA action error for this entity."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=translation_key,
+            translation_placeholders={
+                "entity": self.entity_description.key,
+                "device_id": self._device_id,
+                **{key: str(value) for key, value in placeholders.items()},
+            },
+        )
+
     def _section(self) -> dict[str, Any]:
         """Read the configured payload section (properties/price/...)."""
         return self._payload.get(self.entity_description.source_section) or {}
@@ -362,16 +378,17 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
         ):
-            raise ValueError(
-                f"{self.entity_description.key} must be between "
-                f"{self.native_min_value:.0f} and "
-                f"{self.native_max_value:.0f}"
+            self._raise_action_error(
+                "invalid_number_range",
+                min=f"{self.native_min_value:.0f}",
+                max=f"{self.native_max_value:.0f}",
             )
         allowed = self._allowed_values()
         if allowed and int(round(value)) not in {int(round(v)) for v in allowed}:
             allowed_text = ", ".join(f"{int(v)}" for v in allowed)
-            raise ValueError(
-                f"{self.entity_description.key} must be one of: {allowed_text}"
+            self._raise_action_error(
+                "invalid_number_allowed_values",
+                allowed_values=allowed_text,
             )
         if self.entity_description.setter is None:
             return
@@ -382,9 +399,22 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             )
         except JackeryAuthError:
             raise
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            if self.entity_description.raise_on_setter_error:
+                self._raise_action_error("entity_action_failed", error=err)
+            _LOGGER.debug(
+                "Ignoring optional Jackery number setter failure for %s/%s: %s",
+                self._device_id,
+                self.entity_description.key,
+                err,
+            )
         except Exception as err:
             if self.entity_description.raise_on_setter_error:
-                raise
+                self._raise_action_error("entity_action_failed", error=err)
             _LOGGER.debug(
                 "Ignoring optional Jackery number setter failure for %s/%s: %s",
                 self._device_id,
@@ -406,10 +436,9 @@ async def async_setup_entry(
 ) -> None:
     """Create description-driven number entities."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    entities: list[NumberEntity] = []
     seen_unique_ids: set[str] = set()
 
-    def _append(entity: NumberEntity) -> None:
+    def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
         )
@@ -439,10 +468,19 @@ async def async_setup_entry(
         "single_tariff_price_set": _has_price_or_system,
     }
 
-    for dev_id, payload in (coordinator.data or {}).items():
-        for description in NUMBER_DESCRIPTIONS:
-            predicate = gating.get(description.key)
-            if predicate is None or predicate(payload):
-                _append(JackeryNumber(coordinator, dev_id, description))
+    def _collect_entities() -> list[NumberEntity]:
+        entities: list[NumberEntity] = []
+        for dev_id, payload in (coordinator.data or {}).items():
+            for description in NUMBER_DESCRIPTIONS:
+                predicate = gating.get(description.key)
+                if predicate is None or predicate(payload):
+                    _append(entities, JackeryNumber(coordinator, dev_id, description))
+        return entities
 
-    async_add_entities(entities)
+    def _add_new_entities() -> None:
+        entities = _collect_entities()
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))

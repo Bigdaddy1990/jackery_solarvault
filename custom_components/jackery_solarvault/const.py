@@ -144,10 +144,10 @@ PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 
 # Adaptive polling: when MQTT delivered an inbound message within the
-# live threshold, we skip the fast polling tick so HTTP only runs as a
-# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. ``cloud_push``
-# integrations are expected to lean on push and treat polling as a
-# fallback — these constants encode that contract.
+# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
+# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
+# cloud_polling because HTTP polling is the startup, fallback and keep-alive
+# data path; MQTT push is an optional live enhancement.
 MQTT_LIVE_THRESHOLD_SEC: Final = 60
 ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
 
@@ -812,6 +812,8 @@ REDACT_KEYS: Final = {
     FIELD_MQTT_PASSWORD,
     FIELD_DEVICE_ID,
     FIELD_SYSTEM_ID,
+    FIELD_DEVICE_NAME,
+    FIELD_SYSTEM_NAME,
     "mqttPassword",
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,

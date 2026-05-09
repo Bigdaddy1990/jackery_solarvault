@@ -64,18 +64,29 @@ async def async_setup_entry(
 ) -> None:
     """Set up the platform from a config entry."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    entities: list[BinarySensorEntity] = []
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entity: BinarySensorEntity) -> None:
+    def _append_unique(
+        entities: list[BinarySensorEntity], entity: BinarySensorEntity
+    ) -> None:
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="binary_sensor", logger=_LOGGER
         )
 
-    for dev_id, _payload in (coordinator.data or {}).items():
-        for desc in BINARY_DESCRIPTIONS:
-            _append_unique(JackeryBinarySensor(coordinator, dev_id, desc))
-    async_add_entities(entities)
+    def _collect_entities() -> list[BinarySensorEntity]:
+        entities: list[BinarySensorEntity] = []
+        for dev_id, _payload in (coordinator.data or {}).items():
+            for desc in BINARY_DESCRIPTIONS:
+                _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
+        return entities
+
+    def _add_new_entities() -> None:
+        entities = _collect_entities()
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
 
 
 class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
@@ -92,6 +103,10 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
+        self._attr_entity_registry_enabled_default = (
+            description.entity_registry_enabled_default
+            and description.entity_category != EntityCategory.DIAGNOSTIC
+        )
 
     @property
     def is_on(self) -> bool | None:

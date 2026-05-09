@@ -19,9 +19,9 @@ rules:
   appropriate-polling:
     status: done
     comment: >-
-      30 s coordinator interval matches the Jackery app polling rate. MQTT
-      push reduces effective polling load further. Confirmed against
-      docs/APP_POLLING_MQTT.md.
+      30 s DataUpdateCoordinator interval matches the Jackery app polling rate.
+      MQTT push is optional and can short-circuit HTTP refreshes between
+      keep-alive windows. Confirmed against docs/APP_POLLING_MQTT.md.
   brands: done
   common-modules: done
   config-flow-test-coverage:
@@ -93,7 +93,7 @@ rules:
   diagnostics: done
   discovery-update-info:
     status: exempt
-    comment: Cloud-push integration; no LAN discovery applicable.
+    comment: Cloud-polling integration; no LAN discovery applicable.
   discovery:
     status: exempt
     comment: Cloud-only — no zeroconf/SSDP/Bluetooth surface.
@@ -159,10 +159,9 @@ rules:
       MQTT path uses aiomqtt directly (not aiohttp). HTTP API uses an
       independently-managed aiohttp session bound to the entry lifecycle.
   strict-typing:
-    status: done
+    status: todo
     comment: >-
-      Source modules pass python -m mypy custom_components/jackery_solarvault
-      under the integration's strict Home Assistant typing profile on
-      Python 3.14.
-      Source package passes mypy with disallow_untyped_defs and
-      disallow_incomplete_defs enabled for the integration.
+      Strict typing is not claimed as complete while pyproject.toml still uses
+      ignore_missing_imports and integration-level mypy error-code exceptions.
+      Re-enable this only after a current mypy run is documented with the final
+      Home Assistant typing profile.

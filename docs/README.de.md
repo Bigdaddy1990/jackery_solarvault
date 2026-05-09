@@ -223,7 +223,7 @@ logger:
 
 Die Payload-Debug-Datei wird gedrosselt und bei 2 MB nach `jackery_solarvault_payload_debug.jsonl.1` rotiert. Auf normalen Installationen existiert sie nicht.
 
-Home-Assistant-Brand-Icons werden, wenn vorhanden, aus dem lokalen Brand-Cache unter `/homeassistant/.cache/brands/integrations/jackery/` geladen.
+Home-Assistant-Brand-Icons werden in `custom_components/jackery_solarvault/brand/` mitgeliefert; die Integration schreibt zur Laufzeit keine Brand-Dateien.
 
 ## Referenzdokumentation
 

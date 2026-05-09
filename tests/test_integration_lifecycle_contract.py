@@ -7,7 +7,6 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 INIT = COMPONENT / "__init__.py"
-BRAND = COMPONENT / "brand.py"
 
 
 def _read_init() -> str:
@@ -26,11 +25,14 @@ def _function_source(name: str, *, source_path: Path | None = None) -> str:
     return match.group(0)
 
 
-def test_cached_brand_sync_is_non_blocking_best_effort() -> None:
-    """Brand-cache filesystem errors must not block integration setup."""
-    body = _function_source("_async_ensure_cached_brand_images", source_path=BRAND)
-    assert "except OSError" in body, body
-    assert "return" in body, body
+def test_async_setup_does_not_mutate_brand_assets() -> None:
+    """Brand assets are packaged, not copied into the integration at runtime."""
+    init_source = _read_init()
+    body = _function_source("async_setup")
+
+    assert "_async_ensure_cached_brand_images" not in init_source
+    assert "brand.py" not in init_source
+    assert "async_setup_services(hass)" in body, body
 
 
 def test_unload_keeps_coordinator_alive_when_platform_unload_fails() -> None:

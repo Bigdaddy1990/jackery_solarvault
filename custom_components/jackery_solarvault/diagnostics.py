@@ -48,7 +48,7 @@ async def async_get_config_entry_diagnostics(
             "update_interval_seconds": (
                 int(coordinator.configured_update_interval.total_seconds())
             ),
-            "fixed_rate_polling": True,
+            "coordinator_polling": True,
         },
         "login_response": async_redact_data(
             coordinator.api.last_login_response or {}, REDACT_KEYS

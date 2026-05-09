@@ -316,28 +316,16 @@ def test_silent_threshold_logic_unit() -> None:
     assert silent(True, None, stale, now) is True
 
 
-def test_periodic_refresh_does_not_suppress_reauth_failures() -> None:
-    """Scheduled polling must not swallow ConfigEntryAuthFailed.
-
-    The periodic task is the steady-state path where expired credentials are
-    most likely to surface. If it catches auth failures as generic exceptions,
-    Home Assistant cannot start the reauth flow.
-    """
+def test_coordinator_refresh_does_not_suppress_reauth_failures() -> None:
+    """Scheduled coordinator polling must not wrap auth failures."""
     src = _read("coordinator.py")
-    match = re.search(
-        r"async def _async_periodic_refresh\(self\).*?(?=\n    async def |\n    @|\nclass )",
-        src,
-        re.S,
-    )
+    assert "async def _async_periodic_refresh" not in src
+    assert "async_track_time_interval" not in src
+    assert "update_interval=update_interval" in src
+    match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.S)
     assert match is not None
     body = match.group(0)
-    assert "except ConfigEntryAuthFailed:" in body, body
-    assert (
-        "raise"
-        in body.split("except ConfigEntryAuthFailed:", 1)[1].split(
-            "except Exception", 1
-        )[0]
-    ), body
+    assert "_raise_config_entry_auth_failed" in body, body
 
 
 def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
@@ -391,24 +379,40 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     assert "JackeryAuthError" in handler_body, handler_body
 
 
-def test_failed_periodic_refresh_does_not_advance_mqtt_keepalive() -> None:
+def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     """Only successful HTTP refreshes may extend the adaptive keep-alive window.
 
-    When MQTT is live, a failed HTTP keep-alive must be retried on the next tick
-    instead of being treated like a completed refresh for five minutes.
+    When MQTT is live, a failed HTTP keep-alive must be retried on the next
+    coordinator refresh instead of being treated like a completed refresh for
+    five minutes.
     """
     src = _read("coordinator.py")
     match = re.search(
-        r"async def _async_periodic_refresh\(self\).*?(?=\n    async def |\n    @|\nclass )",
+        r"async def _async_update_data\(.*?(?=\n    # --)",
         src,
         re.S,
     )
     assert match is not None
     body = match.group(0)
     assert "finally:" not in body, body
-    assert "self._last_periodic_refresh_completed_monotonic = time.monotonic()" in body
+    assert "self._last_http_refresh_completed_monotonic = time.monotonic()" in body
     assignment_offset = body.index(
-        "self._last_periodic_refresh_completed_monotonic = time.monotonic()"
+        "self._last_http_refresh_completed_monotonic = time.monotonic()"
     )
-    generic_except_offset = body.index("except Exception as err:")
-    assert assignment_offset > generic_except_offset, body
+    skip_return_offset = body.index("return self.data or {}")
+    assert assignment_offset > skip_return_offset, body
+
+    skip_match = re.search(
+        r"def _should_skip_refresh_for_live_mqtt\(self\).*?(?=\n    async def )",
+        src,
+        re.S,
+    )
+    assert skip_match is not None
+    skip_body = skip_match.group(0)
+    assert "if not self.data:" in skip_body, skip_body
+    assert (
+        "return False"
+        in skip_body.split("if not self.data:", 1)[1].split(
+            "if self._mqtt is None:", 1
+        )[0]
+    ), skip_body

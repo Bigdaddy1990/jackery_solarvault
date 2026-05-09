@@ -215,7 +215,7 @@ logger:
 
 El archivo de debug de payloads se limita y rota a `jackery_solarvault_payload_debug.jsonl.1` al llegar a 2 MB. En instalaciones normales no existe.
 
-Los iconos de marca de Home Assistant se cargan desde la caché de marca local `/homeassistant/.cache/brands/integrations/jackery/` cuando está disponible.
+Los iconos de marca de Home Assistant se incluyen en `custom_components/jackery_solarvault/brand/`; la integración no escribe archivos de marca en tiempo de ejecución.
 
 ## Documentación de referencia
 
