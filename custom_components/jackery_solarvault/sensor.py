@@ -326,7 +326,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:
         try:
             return round(float(value) / divisor, 2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     return _f
@@ -1159,7 +1159,14 @@ def _stat_description_has_value(
                 fallback_source, section, stat_key
             ):
                 return True
-        return bool(_day_period_sibling_has_value(payload, description.section, description.stat_key, reset_period=reset_period))
+        return bool(
+            _day_period_sibling_has_value(
+                payload,
+                description.section,
+                description.stat_key,
+                reset_period=reset_period,
+            )
+        )
     if source.get(description.stat_key) is not None:
         return True
     for section, stat_key in description.fallback_sources:
@@ -1176,7 +1183,14 @@ def _stat_description_has_value(
             reset_period=reset_period,
         ):
             return True
-    return bool(_day_period_sibling_has_value(payload, description.section, description.stat_key, reset_period=reset_period))
+    return bool(
+        _day_period_sibling_has_value(
+            payload,
+            description.section,
+            description.stat_key,
+            reset_period=reset_period,
+        )
+    )
 
 
 STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
@@ -2702,7 +2716,9 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             self._cached_attrs["fallback"] = day_bucket_fallback
         if stale_period:
             self._cached_attrs["stale_period_data"] = True
-            self._cached_attrs["stale_period_begin_date"] = self._period_begin_from_meta()
+            self._cached_attrs["stale_period_begin_date"] = (
+                self._period_begin_from_meta()
+            )
             if self._reset_period == DATE_TYPE_DAY:
                 self._cached_attrs["stale_period_fallback"] = (
                     "zero_until_fresh_day_data"
@@ -3051,7 +3067,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
             try:
                 json.dumps(v)
                 attrs[k] = v
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 attrs[k] = str(v)
         return attrs
 
@@ -3479,7 +3495,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except (TypeError, ValueError, OSError):
+        except TypeError, ValueError, OSError:
             return None
 
 

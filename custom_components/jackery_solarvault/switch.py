@@ -53,7 +53,7 @@ def _standby_is_on(raw: Any) -> bool | None:
         return None
     try:
         return int(raw) == 1
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return safe_bool(raw)
 
 
@@ -83,9 +83,9 @@ class JackerySwitchDescription(SwitchEntityDescription):
     source_section: str = PAYLOAD_PROPERTIES
     fallback_section: str | None = None
     use_task_plan_fallback: bool = False
-    setter: Callable[
-        [JackerySolarVaultCoordinator, str, bool], Awaitable[None]
-    ] | None = None
+    setter: (
+        Callable[[JackerySolarVaultCoordinator, str, bool], Awaitable[None]] | None
+    ) = None
     is_on_transform: Callable[[Any], bool | None] = safe_bool
 
 
@@ -246,18 +246,14 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """Turn the entity on."""
         if self.entity_description.setter is None:
             return
-        await self.entity_description.setter(
-            self.coordinator, self._device_id, True
-        )
+        await self.entity_description.setter(self.coordinator, self._device_id, True)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
         if self.entity_description.setter is None:
             return
-        await self.entity_description.setter(
-            self.coordinator, self._device_id, False
-        )
+        await self.entity_description.setter(self.coordinator, self._device_id, False)
         await self.coordinator.async_request_refresh()
 
 
@@ -286,9 +282,9 @@ async def async_setup_entry(
     # SolarVault devices; otherwise gate them by the observed property keys.
     gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
         "eps_output": lambda props, _adv: FIELD_SW_EPS in props,
-        "auto_standby_set": lambda props, adv: adv
-        or FIELD_IS_AUTO_STANDBY in props
-        or FIELD_AUTO_STANDBY in props,
+        "auto_standby_set": lambda props, adv: (
+            adv or FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props
+        ),
         "standby": lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
         "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
         "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
