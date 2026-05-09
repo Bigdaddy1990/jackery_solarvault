@@ -15,6 +15,7 @@ COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordina
 INIT_PATH = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
 API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "api.py"
+COMPONENT_PATH = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _eval_static_string(node: ast.AST, constants: dict[str, str]) -> str | None:
@@ -448,9 +449,8 @@ def test_external_app_chart_statistics_are_period_scoped() -> None:
 def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
     """Implement test period sensor translations do not use this period wording."""
     for path in (
-        ROOT / "custom_components" / "jackery_solarvault" / "strings.json",
-        ROOT / "custom_components" / "jackery_solarvault" / "translations" / "de.json",
-        ROOT / "custom_components" / "jackery_solarvault" / "translations" / "en.json",
+        COMPONENT_PATH / "strings.json",
+        *sorted((COMPONENT_PATH / "translations").glob("*.json")),
     ):
         source = path.read_text(encoding="utf-8")
         for forbidden in (
@@ -460,6 +460,12 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
             "this week",
             "this month",
             "this year",
+            "esta semana",
+            "este mes",
+            "este año",
+            "cette semaine",
+            "ce mois",
+            "cette année",
         ):
             assert forbidden not in source
 

@@ -52,6 +52,73 @@ def _python_sources() -> list[pathlib.Path]:
     return sorted(CUSTOM_COMPONENT.glob("*.py"))
 
 
+def _translation_sources() -> dict[str, str]:
+    """Return strings.json and every locale translation file."""
+    paths = [
+        CUSTOM_COMPONENT / "strings.json",
+        *sorted((CUSTOM_COMPONENT / "translations").glob("*.json")),
+    ]
+    return {
+        path.relative_to(CUSTOM_COMPONENT).as_posix(): path.read_text(encoding="utf-8")
+        for path in paths
+    }
+
+
+def _exception_names(node: ast.AST | None) -> set[str]:
+    """Return simple exception names from an except handler type expression."""
+    if isinstance(node, ast.Name):
+        return {node.id}
+    if isinstance(node, ast.Tuple):
+        return {item.id for item in node.elts if isinstance(item, ast.Name)}
+    return set()
+
+
+def _handler_aborts_reauth_entry_missing(handler: ast.ExceptHandler) -> bool:
+    """Return whether an except handler aborts with the missing reauth entry reason."""
+    for node in ast.walk(ast.Module(body=handler.body, type_ignores=[])):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "async_abort"
+        ):
+            continue
+        for keyword in node.keywords:
+            if (
+                keyword.arg == "reason"
+                and isinstance(keyword.value, ast.Name)
+                and keyword.value.id == "FLOW_ABORT_REAUTH_ENTRY_MISSING"
+            ):
+                return True
+    return False
+
+
+def _reauth_entry_lookup_is_guarded(config_tree: ast.Module) -> bool:
+    """Return whether _get_reauth_entry is guarded against missing entries."""
+    for node in ast.walk(config_tree):
+        if not (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "async_step_reauth_confirm"
+        ):
+            continue
+        for try_node in (
+            child for child in ast.walk(node) if isinstance(child, ast.Try)
+        ):
+            calls_reauth_entry = any(
+                isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Attribute)
+                and child.func.attr == "_get_reauth_entry"
+                for child in ast.walk(ast.Module(body=try_node.body, type_ignores=[]))
+            )
+            if not calls_reauth_entry:
+                continue
+            for handler in try_node.handlers:
+                if {"KeyError", "RuntimeError"} <= _exception_names(
+                    handler.type
+                ) and _handler_aborts_reauth_entry_missing(handler):
+                    return True
+    return False
+
+
 def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
     """HA fixture collection should not hard-require recorder setup."""
     manifest = json.loads(
@@ -544,7 +611,7 @@ def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None
         encoding="utf-8"
     )
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
-    strings_source = (CUSTOM_COMPONENT / "strings.json").read_text(encoding="utf-8")
+    translation_sources = _translation_sources()
     data_priority = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(
         encoding="utf-8"
     )
@@ -562,10 +629,11 @@ def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None
     assert "normalized_data_quality_warnings" in util_source
     assert "format_data_quality_warning" in util_source
     assert "DATA_QUALITY_KEY_SOURCE_VALUE" in const_source
-    assert "app_data_inconsistency" in strings_source
-    assert "{examples}" in strings_source
-    assert "{source_section}" not in strings_source
-    assert "{reference_section}" not in strings_source
+    for path, source in translation_sources.items():
+        assert "app_data_inconsistency" in source, path
+        assert "{examples}" in source, path
+        assert "{source_section}" not in source, path
+        assert "{reference_section}" not in source, path
     assert "same-endpoint month backfill" in data_priority
     assert "data_quality" in data_priority
 
@@ -644,20 +712,18 @@ def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8"
     )
-    strings_source = (CUSTOM_COMPONENT / "strings.json").read_text(encoding="utf-8")
-    de_source = (CUSTOM_COMPONENT / "translations/de.json").read_text(encoding="utf-8")
-    en_source = (CUSTOM_COMPONENT / "translations/en.json").read_text(encoding="utf-8")
+    config_flow_tree = ast.parse(config_flow_source)
+    translation_sources = _translation_sources()
 
     # Reauth uses HA's _get_reauth_entry() helper (HA 2024.6+) wrapped in a
     # try/except for (KeyError, RuntimeError) to abort cleanly when the
     # entry has gone away while the reauth flow was sitting on screen.
     assert "self._get_reauth_entry()" in config_flow_source
-    assert "(KeyError, RuntimeError)" in config_flow_source
+    assert _reauth_entry_lookup_is_guarded(config_flow_tree)
     assert "FLOW_ABORT_REAUTH_ENTRY_MISSING" in config_flow_source
-    assert "async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)" in config_flow_source
     assert "assert self._reauth_entry is not None" not in config_flow_source
-    for source in (strings_source, de_source, en_source):
-        assert "reauth_entry_missing" in source
+    for path, source in translation_sources.items():
+        assert "reauth_entry_missing" in source, path
 
 
 def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:

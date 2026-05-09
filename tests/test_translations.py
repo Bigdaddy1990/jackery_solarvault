@@ -58,25 +58,38 @@ def test_service_actions_use_translation_files() -> None:
 
 def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     """Battery power labels must not hide batOutPw vs stackOutPw semantics."""
-    de = json.loads(
-        (TRANSLATION_ROOT / "translations" / "de.json").read_text(encoding="utf-8")
-    )
-    en = json.loads(
-        (TRANSLATION_ROOT / "translations" / "en.json").read_text(encoding="utf-8")
-    )
+    expected = {
+        "de": (
+            "Hauptbatterie Entladeleistung",
+            "Batteriesystem Entladeleistung",
+        ),
+        "en": (
+            "Main battery discharge power",
+            "Battery system discharge power",
+        ),
+        "es": (
+            "Potencia de descarga de la batería principal",
+            "Potencia de descarga del sistema de baterías",
+        ),
+        "fr": (
+            "Puissance de décharge de la batterie principale",
+            "Puissance de décharge du système de batteries",
+        ),
+    }
 
-    assert de["entity"]["sensor"]["battery_discharge_power"]["name"] == (
-        "Hauptbatterie Entladeleistung"
-    )
-    assert de["entity"]["sensor"]["stack_out_power"]["name"] == (
-        "Batteriesystem Entladeleistung"
-    )
-    assert en["entity"]["sensor"]["battery_discharge_power"]["name"] == (
-        "Main battery discharge power"
-    )
-    assert en["entity"]["sensor"]["stack_out_power"]["name"] == (
-        "Battery system discharge power"
-    )
+    for lang, (main_battery, battery_system) in expected.items():
+        translation = json.loads(
+            (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert (
+            translation["entity"]["sensor"]["battery_discharge_power"]["name"]
+            == main_battery
+        ), lang
+        assert (
+            translation["entity"]["sensor"]["stack_out_power"]["name"] == battery_system
+        ), lang
 
 
 def test_repair_issue_translations_are_fixable_or_descriptive() -> None:

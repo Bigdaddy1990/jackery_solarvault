@@ -12,8 +12,8 @@ rules:
     comment: >-
       async_setup registers all three service actions once per domain and
       forwards work to the loaded config-entry coordinators. services.yaml
-      defines the action schema, translations/en.json and translations/de.json
-      define labels/descriptions, and icons.json defines action icons.
+      defines the action schema, translations/*.json define
+      labels/descriptions, and icons.json defines action icons.
       Entity-native setters remain exposed via number/switch/select/button/text
       platforms where possible.
   appropriate-polling:
@@ -39,8 +39,8 @@ rules:
     comment: >-
       README.md and localized README files document rename_system,
       refresh_weather_plan and delete_storm_alert; services.yaml defines their
-      field schemas and translations/en.json + translations/de.json define the
-      user-facing action and field text.
+      field schemas and translations/*.json define the user-facing action and
+      field text.
   docs-high-level-description: done
   docs-installation-instructions: done
   docs-removal-instructions: done
@@ -77,7 +77,7 @@ rules:
       Implemented in JackeryConfigFlow.async_step_reauth /
       async_step_reauth_confirm. Five sites in coordinator.py and one
       in __init__.py raise ConfigEntryAuthFailed which Home Assistant
-      routes back to the reauth UI step. Translations cover EN and DE.
+      routes back to the reauth UI step. Translations cover EN, DE, ES and FR.
   test-coverage:
     status: done
     comment: >-
@@ -123,10 +123,9 @@ rules:
       All five user-facing exceptions (3 service-action handlers in
       __init__.py, 2 MQTT-command paths in coordinator.py) carry
       translation_domain=DOMAIN + translation_key + placeholders.
-      translations/en.json and translations/de.json define the matching
-      exceptions block; strings.json is kept only as a local parity fixture
-      for tests and is not relied on by Home Assistant custom integration
-      loading.
+      translations/*.json define the matching exceptions block; strings.json is
+      kept only as a local parity fixture for tests and is not relied on by
+      Home Assistant custom integration loading.
   icon-translations: done
   reconfiguration-flow:
     status: done
