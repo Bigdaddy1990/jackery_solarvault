@@ -24,7 +24,6 @@ jobs:
     env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
       HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -53,8 +52,6 @@ jobs:
           uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
-        with:
-         version: ">=0.4.0"
       - run: ruff check --fix
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
