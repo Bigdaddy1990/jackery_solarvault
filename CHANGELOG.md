@@ -24,6 +24,7 @@ context.
 
 ### Fixed
 - Restored the missing `parse_utc_datetime` / `utc_now` helpers used by battery-pack stale cleanup so Home Assistant can import the integration again.
+- PV1..PV4 day-energy entities no longer stay as restored/unavailable after midnight when Jackery returns an empty `dateType=day` PV payload; they are kept active from the week/month chart support and use today's chart bucket as fallback.
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
 - Pre-commit now targets Python 3.14 again so CI autofixes do not remove deferred annotations or introduce Python 3.14-only syntax while the project minimum remains 3.14.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.

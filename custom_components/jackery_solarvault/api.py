@@ -780,15 +780,14 @@ class JackeryApi:
         data = await self._get_json(path, params=params)
         self.last_device_period_stat_responses[f"{path}:{device_id}:{date_type}"] = data
         payload = self._payload_dict(data, path)
-        if payload:
-            payload.setdefault(
-                APP_REQUEST_META,
-                {
-                    k: v
-                    for k, v in params.items()
-                    if k not in {FIELD_DEVICE_ID, FIELD_SYSTEM_ID}
-                },
-            )
+        payload.setdefault(
+            APP_REQUEST_META,
+            {
+                k: v
+                for k, v in params.items()
+                if k not in {FIELD_DEVICE_ID, FIELD_SYSTEM_ID}
+            },
+        )
         return payload
 
     async def async_get_device_pv_stat(

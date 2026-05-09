@@ -695,7 +695,7 @@
           "name": "Alert-ID"
         },
         "device_id": {
-          "description": "Numerische Jackery-Geräte-ID. Sie ist in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId sichtbar.",
+          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "Geräte-ID"
         }
       },
@@ -705,7 +705,7 @@
       "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Gerät ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
       "fields": {
         "device_id": {
-          "description": "Numerische Jackery-Geräte-ID. Sie ist in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId sichtbar.",
+          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "Geräte-ID"
         }
       },

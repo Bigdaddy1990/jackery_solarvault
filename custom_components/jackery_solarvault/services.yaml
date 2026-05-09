@@ -18,7 +18,8 @@ refresh_weather_plan:
       required: true
       example: "573702884982521856"
       selector:
-        text:
+        device:
+          integration: jackery_solarvault
 
 delete_storm_alert:
   fields:
@@ -26,7 +27,8 @@ delete_storm_alert:
       required: true
       example: "573702884982521856"
       selector:
-        text:
+        device:
+          integration: jackery_solarvault
     alert_id:
       required: true
       example: "A1746110400"

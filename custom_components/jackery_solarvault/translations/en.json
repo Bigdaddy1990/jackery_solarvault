@@ -695,7 +695,7 @@
           "name": "Alert ID"
         },
         "device_id": {
-          "description": "Numeric Jackery device ID. It is visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId.",
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly (visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "Device ID"
         }
       },
@@ -705,7 +705,7 @@
       "description": "Query the current weather and storm plan from the device. The response is exposed in the Weather plan diagnostic sensor attributes.",
       "fields": {
         "device_id": {
-          "description": "Numeric Jackery device ID. It is visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId.",
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly (visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "Device ID"
         }
       },

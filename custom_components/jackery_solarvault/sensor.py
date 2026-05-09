@@ -116,6 +116,8 @@ from .const import (
     APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_BEGIN_DATE_ALT,
+    APP_REQUEST_END_DATE,
+    APP_REQUEST_END_DATE_ALT,
     APP_REQUEST_META,
     APP_SAVINGS_CALC_META,
     APP_SECTION_BATTERY_STAT,
@@ -137,7 +139,9 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_UNIT,
     APP_TOTAL_GUARD_META,
+    APP_UNIT_KWH,
     APP_YEAR_BACKFILL_META,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -322,7 +326,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -1060,6 +1064,83 @@ def _stat_section_has_values(
     return any(key != APP_REQUEST_META for key in source)
 
 
+def _day_section_prefix(section: str) -> str | None:
+    """Return the prefix for a ``*_day`` app-period section."""
+    suffix = f"_{DATE_TYPE_DAY}"
+    if not section.endswith(suffix):
+        return None
+    return section[: -len(suffix)]
+
+
+def _day_period_sibling_has_value(
+    payload: dict[str, Any],
+    section: str,
+    stat_key: str,
+    *,
+    reset_period: StatResetPeriod | None,
+) -> bool:
+    """Return True when week/month/year charts prove a day sensor is supported."""
+    if reset_period != DATE_TYPE_DAY:
+        return False
+    prefix = _day_section_prefix(section)
+    if prefix is None:
+        return False
+    for date_type in (DATE_TYPE_MONTH, DATE_TYPE_WEEK, DATE_TYPE_YEAR):
+        sibling_section = f"{prefix}_{date_type}"
+        sibling_source = payload.get(sibling_section)
+        if isinstance(sibling_source, dict) and trend_series_has_value(
+            sibling_source,
+            sibling_section,
+            stat_key,
+        ):
+            return True
+    return False
+
+
+def _request_date(
+    source: dict[str, Any],
+    primary_key: str,
+    alternate_key: str,
+) -> date | None:
+    """Parse one ISO date from a payload request metadata block."""
+    request = source.get(APP_REQUEST_META)
+    if not isinstance(request, dict):
+        return None
+    raw = request.get(primary_key) or request.get(alternate_key)
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _chart_value_for_day(
+    source: dict[str, Any],
+    section: str,
+    stat_key: str,
+    *,
+    today: date,
+) -> float | None:
+    """Return today's value from a week/month/year app chart payload."""
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit != APP_UNIT_KWH:
+        return None
+    begin = _request_date(source, APP_REQUEST_BEGIN_DATE, APP_REQUEST_BEGIN_DATE_ALT)
+    if begin is None:
+        return None
+    end = _request_date(source, APP_REQUEST_END_DATE, APP_REQUEST_END_DATE_ALT)
+    if today < begin or (end is not None and today > end):
+        return None
+    values = effective_trend_series_values(source, section, stat_key)
+    if not isinstance(values, list):
+        return None
+    index = (today - begin).days
+    if index < 0 or index >= len(values):
+        return None
+    return safe_float(values[index])
+
+
 def _stat_description_has_value(
     payload: dict[str, Any],
     description: JackeryStatSensorDescription,
@@ -1068,6 +1149,7 @@ def _stat_description_has_value(
     source = payload.get(description.section)
     if not isinstance(source, dict):
         return False
+    reset_period = _period_from_stat_description(description)
     if _trend_series_key(description.section, description.stat_key) is not None:
         if trend_series_has_value(source, description.section, description.stat_key):
             return True
@@ -1077,6 +1159,13 @@ def _stat_description_has_value(
                 fallback_source, section, stat_key
             ):
                 return True
+        if _day_period_sibling_has_value(
+            payload,
+            description.section,
+            description.stat_key,
+            reset_period=reset_period,
+        ):
+            return True
         return False
     if source.get(description.stat_key) is not None:
         return True
@@ -1087,6 +1176,20 @@ def _stat_description_has_value(
             and fallback_source.get(stat_key) is not None
         ):
             return True
+        if _day_period_sibling_has_value(
+            payload,
+            section,
+            stat_key,
+            reset_period=reset_period,
+        ):
+            return True
+    if _day_period_sibling_has_value(
+        payload,
+        description.section,
+        description.stat_key,
+        reset_period=reset_period,
+    ):
+        return True
     return False
 
 
@@ -2400,6 +2503,31 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
+    def _current_day_bucket_from_period_chart(
+        self,
+        section: str,
+        stat_key: str,
+    ) -> tuple[float, str, dict[str, Any]] | None:
+        """Use today's week/month chart bucket when the day endpoint is empty."""
+        if self._reset_period != DATE_TYPE_DAY:
+            return None
+        prefix = _day_section_prefix(section)
+        if prefix is None:
+            return None
+        today = dt_util.now().date()
+        for date_type in (DATE_TYPE_MONTH, DATE_TYPE_WEEK):
+            candidate_section = f"{prefix}_{date_type}"
+            candidate_source = self._source_for_section(candidate_section)
+            value = _chart_value_for_day(
+                candidate_source,
+                candidate_section,
+                stat_key,
+                today=today,
+            )
+            if value is not None:
+                return value, candidate_section, candidate_source
+        return None
+
     def _resolve_period_value(
         self,
         source: dict[str, Any],
@@ -2544,6 +2672,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         # ---- non-period stat path (totalGeneration, todayLoad, price, ...)
         raw = source.get(stat_key)
+        day_bucket_fallback: str | None = None
         if raw is None:
             for fb_section, fb_stat_key in self.entity_description.fallback_sources:
                 fb_source = self._source_for_section(fb_section)
@@ -2553,6 +2682,27 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                     stat_key = fb_stat_key
                     source = fb_source
                     break
+        if raw is None:
+            day_sources = (
+                (section, stat_key),
+                *self.entity_description.fallback_sources,
+            )
+            for candidate_section, candidate_stat_key in day_sources:
+                bucket = self._current_day_bucket_from_period_chart(
+                    candidate_section,
+                    candidate_stat_key,
+                )
+                if bucket is None:
+                    continue
+                raw, bucket_section, bucket_source = bucket
+                section = bucket_section
+                stat_key = candidate_stat_key
+                source = bucket_source
+                day_bucket_fallback = f"current_day_bucket_from_{bucket_section}"
+                break
+        stale_period = self._reset_period and self._is_period_data_stale()
+        if stale_period:
+            raw = 0 if self._reset_period == DATE_TYPE_DAY else None
         self._cached_native_value = (
             self.entity_description.transform(raw) if raw is not None else None
         )
@@ -2562,6 +2712,15 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             "source_section": section,
             "source_key": stat_key,
         }
+        if day_bucket_fallback is not None:
+            self._cached_attrs["fallback"] = day_bucket_fallback
+        if stale_period:
+            self._cached_attrs["stale_period_data"] = True
+            self._cached_attrs["stale_period_begin_date"] = self._period_begin_from_meta()
+            if self._reset_period == DATE_TYPE_DAY:
+                self._cached_attrs["stale_period_fallback"] = (
+                    "zero_until_fresh_day_data"
+                )
         total_guard = source.get(APP_TOTAL_GUARD_META)
         if isinstance(total_guard, dict):
             corrected = total_guard.get("corrected")
@@ -2906,7 +3065,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
             try:
                 json.dumps(v)
                 attrs[k] = v
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 attrs[k] = str(v)
         return attrs
 
@@ -3334,7 +3493,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 

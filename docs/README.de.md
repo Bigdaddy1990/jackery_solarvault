@@ -139,7 +139,17 @@ Die Integration registriert diese Services unter `jackery_solarvault`:
 | `jackery_solarvault.refresh_weather_plan` | Aktuellen Unwetter-Warnplan abrufen |
 | `jackery_solarvault.delete_storm_alert` | Aktive Unwetterwarnung per Cloud-Befehl löschen |
 
-Die benötigten Parameter stehen in `services.yaml` oder in Home Assistant unter `Entwicklerwerkzeuge > Dienste`.
+Die Parameter werden in Home Assistant unter `Entwicklerwerkzeuge > Aktionen`
+gewählt. `refresh_weather_plan` und `delete_storm_alert` zeigen einen
+Geräte-Picker, der auf Jackery-Geräte gefiltert ist – wähle dort die
+SolarVault-Haupteinheit. Automationen können alternativ direkt die rohe
+numerische Jackery-`device_id` aus dem Diagnose-Export übergeben.
+`rename_system` erwartet die numerische System-ID aus der Diagnose, weil ein
+Jackery-System mehrere Home-Assistant-Geräte umfasst.
+
+Bei zwei konfigurierten Jackery-Konten leitet die Integration jede Aktion
+automatisch an den Cloud-Eintrag weiter, dem die übergebene System-/Geräte-ID
+gehört.
 
 ## Energy Dashboard und Sensorbedeutung
 

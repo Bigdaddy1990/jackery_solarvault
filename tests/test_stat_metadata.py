@@ -616,6 +616,31 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
     ) in sensor_source
 
 
+def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
+    """Empty day endpoints must not leave existing PV day entities restored only."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+
+    assert "def _day_period_sibling_has_value" in sensor_source
+    assert "for date_type in (DATE_TYPE_MONTH, DATE_TYPE_WEEK, DATE_TYPE_YEAR):" in (
+        sensor_source
+    )
+    assert "reset_period = _period_from_stat_description(description)" in sensor_source
+    assert "reset_period=reset_period" in sensor_source
+
+
+def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
+    """Day sensors use today's month/week bucket when the day endpoint is empty."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    stat_block = sensor_source.split(
+        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackeryBatteryPackSensor", 1)[0]
+
+    assert "def _chart_value_for_day" in sensor_source
+    assert "def _current_day_bucket_from_period_chart" in stat_block
+    assert "_current_day_bucket_from_period_chart(" in stat_block
+    assert "current_day_bucket_from_" in stat_block
+
+
 def test_total_revenue_state_class_compatible_with_monetary_device_class() -> None:
     """MONETARY device_class only allows state_class=TOTAL or None.
 

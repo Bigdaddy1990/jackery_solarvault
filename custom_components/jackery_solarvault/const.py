@@ -1,6 +1,5 @@
 """Constants for the Jackery SolarVault integration."""
 
-from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "jackery_solarvault"
@@ -133,11 +132,9 @@ FLOW_ABORT_RECONFIGURE_SUCCESSFUL: Final = "reconfigure_successful"
 FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH: Final = "reconfigure_account_mismatch"
 
 DEFAULT_SCAN_INTERVAL_SEC: Final = 30
-MIN_SCAN_INTERVAL_SEC: Final = 15
 DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS: Final = True
 DEFAULT_CREATE_CALCULATED_POWER_SENSORS: Final = False
 DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
-UPDATE_INTERVAL: Final = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
 # Slow-metric refresh cadences (decoupled from the fast property polling).
 # These values match the server-side update rhythm we observed in the
@@ -218,7 +215,6 @@ FIELD_DEVICE_SECRET: Final = "deviceSecret"
 FIELD_RANDOM_SALT: Final = "randomSalt"
 FIELD_SYSTEM_SN: Final = "systemSn"
 FIELD_SYSTEM_NAME: Final = "systemName"
-FIELD_SYSTEM_STATE: Final = "systemState"
 FIELD_MODEL_NAME: Final = "modelName"
 FIELD_DEV_MODEL: Final = "devModel"
 FIELD_ONLINE_STATUS: Final = "onlineStatus"
@@ -455,8 +451,6 @@ MAIN_PROPERTY_ALIAS_PAIRS: Final = (
 
 TASK_PLAN_BODY: Final = FIELD_BODY
 TASK_PLAN_TASKS: Final = "tasks"
-STORM_MINUTES_FIELDS: Final = (FIELD_WPC, FIELD_MINS_INTERVAL)
-STORM_ENABLE_FIELDS: Final = (FIELD_WPS,)
 
 # MQTT subdevice routing and mirroring keys documented in MQTT_PROTOCOL.md.
 CT_METER_KEYS: Final = frozenset({
@@ -705,9 +699,6 @@ APP_STAT_TOTAL_TREND_CHARGE_ENERGY: Final = "totalChgEgy"
 APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: Final = "totalDisChgEgy"
 APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
 APP_STAT_TODAY_LOAD: Final = "todayLoad"
-APP_STAT_TODAY_BATTERY_CHARGE: Final = "todayBatteryChg"
-APP_STAT_TODAY_BATTERY_DISCHARGE: Final = "todayBatteryDisChg"
-APP_STAT_TODAY_GENERATION: Final = "todayGeneration"
 APP_STAT_TOTAL_GENERATION: Final = "totalGeneration"
 APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
 APP_STAT_TOTAL_CARBON: Final = "totalCarbon"
@@ -794,7 +785,6 @@ STORM_MINUTES_DEFAULT: Final = tuple(
     [hour * 60 for hour in range(1, 25)] + [2880, 4320]
 )
 PRICE_MODE_TO_OPTION: Final = {1: "dynamic", 2: "single"}
-UNKNOWN_OPTION_PREFIX: Final = "unknown_"
 
 # Diagnostics redaction keys. Keep this set broad because app/MQTT payloads can
 # include personal account data, device IDs, locations and tariff credentials.
@@ -907,7 +897,6 @@ MQTT_CONNACK_REASONS: Final = {
 # BatteryPackSub query target, devType=2 is a combined subdevice group, and
 # devType=3 is the Smart-Meter/CT accessory group. subType=2 appears on the
 # system/accessory metadata for the Shelly 3EM/CT path.
-SUBDEVICE_TYPE_BATTERY_PACK: Final = "1"
 SUBDEVICE_TYPE_COMBINE: Final = "2"
 SUBDEVICE_TYPE_SMART_METER: Final = "3"
 SMART_METER_SUBTYPE: Final = SUBDEVICE_TYPE_COMBINE
@@ -969,43 +958,22 @@ CT_PERIOD_SENSOR_SUFFIXES: Final = {
     "_smart_meter_export_month_energy",
     "_smart_meter_export_year_energy",
 }
-LEGACY_NUMBER_SENSOR_SUFFIXES: Final = {
-    "_work_mode_set",
-    "_temp_unit_set",
-    "_off_grid_time_set",
-    "_storm_warning_minutes_set",
-    "_max_power_experimental",
-}
-LEGACY_LIFETIME_SENSOR_SUFFIXES: Final = {
-    "_lifetime_pv_energy",
-    "_lifetime_battery_charge",
-    "_lifetime_battery_discharge",
-    "_lifetime_grid_import",
-    "_lifetime_grid_export",
-    "_lifetime_ongrid_to_battery",
-    "_lifetime_pv_to_battery",
-    "_lifetime_battery_to_grid",
-}
-STALE_PERIOD_SENSOR_SUFFIXES: Final = {
+# Documentation-only sensor suffix sets. These constants are intentionally
+# kept (and exercised by source-only contract tests in tests/test_stat_metadata.py)
+# so the historical sensor migrations remain discoverable when reviewing diffs.
+# The sets are not used at runtime — they are deliberately dead code that
+# documents which sensor surfaces have been removed in past releases.
+LEGACY_PV_TODAY_SENSOR_SUFFIX: Final = "_pv_today_energy"
+SYSTEM_PV_TODAY_SENSOR_SUFFIX: Final = "_system_pv_today_energy"
+STALE_PERIOD_SENSOR_SUFFIXES: Final = frozenset({
     "_grid_import_week_energy",
     "_grid_import_month_energy",
     "_grid_import_year_energy",
     "_grid_export_week_energy",
     "_grid_export_month_energy",
     "_grid_export_year_energy",
-}
-LEGACY_AUTO_OFF_GRID_SELECT_SUFFIX: Final = "_auto_off_grid_mode"
-LEGACY_PV_TODAY_SENSOR_SUFFIX: Final = "_pv_today_energy"
-SYSTEM_PV_TODAY_SENSOR_SUFFIX: Final = "_system_pv_today_energy"
-BATTERY_PACK_UID_MARKER: Final = "_battery_pack_"
-BATTERY_PACK_CELL_TEMPERATURE_SUFFIX: Final = "_cell_temperature"
-STALE_ENERGY_HELPER_PREFIX: Final = "sensor.energy_"
-STALE_NET_POWER_SUFFIX: Final = "_net_power"
-STALE_HELPER_VENDOR_TOKENS: Final = ("solarvault", "jackery")
-STALE_HELPER_BATTERY_TOKENS: Final = ("battery", "batterie")
-STALE_HELPER_CHARGE_TOKENS: Final = ("charge", "lade")
-STALE_HELPER_DISCHARGE_TOKENS: Final = ("discharge", "entlade")
-FORMER_DISABLED_APP_SENSOR_SUFFIXES: Final = {
+})
+FORMER_DISABLED_APP_SENSOR_SUFFIXES: Final = frozenset({
     "_eps_in_power",
     "_eps_out_power",
     "_stack_in_power",
@@ -1026,8 +994,8 @@ FORMER_DISABLED_APP_SENSOR_SUFFIXES: Final = {
     "_energy_plan_power",
     "_charge_plan_power",
     "_function_enable_flags",
-}
-NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = {
+})
+NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = frozenset({
     "_last_online",
     "_last_offline",
     "_last_update",
@@ -1040,7 +1008,7 @@ NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = {
     "_raw_properties",
     "_weather_plan",
     "_task_plan",
-}
+})
 REMOVED_SENSOR_SUFFIXES: Final = {
     "_grid_side_in_power",
     "_grid_side_out_power",
@@ -1112,7 +1080,6 @@ ACTION_ID_TEMP_UNIT: Final = 3041  # cmd=121 ControlCombine
 ACTION_ID_DEFAULT_PW: Final = 3043  # cmd=121 ControlCombine
 ACTION_ID_FOLLOW_METER_PW: Final = 3044  # cmd=121 ControlCombine
 ACTION_ID_QUERY_COMBINE_DATA: Final = 3019  # cmd=120 QueryCombineData
-ACTION_ID_WPS_ENABLED: Final = ACTION_ID_QUERY_COMBINE_DATA
 ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020  # cmd=23 QueryWeatherPlan
 ACTION_ID_EPS_ENABLED: Final = 3023  # cmd=107 DevicePropertyChange (EPS toggle)
 ACTION_ID_STANDBY: Final = (

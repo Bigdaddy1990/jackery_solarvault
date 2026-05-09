@@ -1,10 +1,18 @@
-"""Switch platform for Jackery SolarVault writable controls."""
+"""Switch platform for Jackery SolarVault writable controls.
+
+Description-driven entities; one generic class handles every writable
+boolean control. The pattern mirrors number.py: each switch is described by
+a frozen dataclass that captures payload source key(s), an optional fallback
+section, an optional task-plan fallback and the coordinator setter that pushes
+the new state to the cloud / MQTT command path.
+"""
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -19,6 +27,7 @@ from .const import (
     FIELD_SW_EPS,
     FIELD_WPS,
     PAYLOAD_PROPERTIES,
+    PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
@@ -33,12 +42,236 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Description
+# ---------------------------------------------------------------------------
+
+
+def _standby_is_on(raw: Any) -> bool | None:
+    """Treat the raw autoStandby integer flag as on=1 / off=0."""
+    if raw is None:
+        return None
+    try:
+        return int(raw) == 1
+    except (TypeError, ValueError):
+        return safe_bool(raw)
+
+
+@dataclass(frozen=True, kw_only=True)
+class JackerySwitchDescription(SwitchEntityDescription):
+    """Describes a Jackery writable switch.
+
+    The description captures everything that previously lived in a hand-
+    written subclass:
+
+    * ``source_keys`` — payload field(s) that hold the current state. The
+      first one that is present wins.
+    * ``source_section`` — payload section that owns ``source_keys`` (defaults
+      to ``properties`` because most controls live there).
+    * ``fallback_section`` — optional second payload section to consult before
+      falling back to the task plan (used by the storm-warning switch which
+      may surface ``wps`` from ``properties`` *or* ``weather_plan``).
+    * ``use_task_plan_fallback`` — read ``task_plan_value`` for the same keys
+      when neither section provides a value.
+    * ``setter`` — coroutine that pushes the new boolean state to the cloud /
+      MQTT command path.
+    * ``is_on_transform`` — optional override for special-case interpretation
+      of the raw value (defaults to ``safe_bool``).
+    """
+
+    source_keys: tuple[str, ...]
+    source_section: str = PAYLOAD_PROPERTIES
+    fallback_section: str | None = None
+    use_task_plan_fallback: bool = False
+    setter: Callable[
+        [JackerySolarVaultCoordinator, str, bool], Awaitable[None]
+    ] | None = None
+    is_on_transform: Callable[[Any], bool | None] = safe_bool
+
+
+# ---------------------------------------------------------------------------
+# Setter helpers
+# ---------------------------------------------------------------------------
+
+
+async def _set_eps(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the EPS output on a device."""
+    await coord.async_set_eps(dev_id, value)
+
+
+async def _set_auto_standby(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle auto-standby on a device."""
+    await coord.async_set_auto_standby(dev_id, value)
+
+
+async def _set_standby(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle manual standby on a device."""
+    await coord.async_set_standby(dev_id, value)
+
+
+async def _set_follow_meter(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle smart-meter following on a device."""
+    await coord.async_set_follow_meter(dev_id, value)
+
+
+async def _set_off_grid_shutdown(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle off-grid shutdown on a device."""
+    await coord.async_set_off_grid_shutdown(dev_id, value)
+
+
+async def _set_storm_warning(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle storm warning on a device."""
+    await coord.async_set_storm_warning(dev_id, value)
+
+
+# ---------------------------------------------------------------------------
+# Description registry
+# ---------------------------------------------------------------------------
+
+SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
+    JackerySwitchDescription(
+        key="eps_output",
+        translation_key="eps_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-plug",
+        source_keys=(FIELD_SW_EPS,),
+        setter=_set_eps,
+    ),
+    JackerySwitchDescription(
+        key="auto_standby_set",
+        translation_key="auto_standby_set",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-sleep",
+        source_keys=(FIELD_IS_AUTO_STANDBY,),
+        use_task_plan_fallback=True,
+        setter=_set_auto_standby,
+    ),
+    JackerySwitchDescription(
+        key="standby",
+        translation_key="standby",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-sleep",
+        source_keys=(FIELD_AUTO_STANDBY,),
+        setter=_set_standby,
+        is_on_transform=_standby_is_on,
+    ),
+    JackerySwitchDescription(
+        key="follow_meter",
+        translation_key="follow_meter",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:gauge",
+        source_keys=(FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER),
+        use_task_plan_fallback=True,
+        setter=_set_follow_meter,
+    ),
+    JackerySwitchDescription(
+        key="off_grid_shutdown",
+        translation_key="off_grid_shutdown",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-off",
+        source_keys=(FIELD_OFF_GRID_DOWN,),
+        use_task_plan_fallback=True,
+        setter=_set_off_grid_shutdown,
+    ),
+    JackerySwitchDescription(
+        key="storm_warning",
+        translation_key="storm_warning",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:weather-lightning-rainy",
+        source_keys=(FIELD_WPS,),
+        fallback_section=PAYLOAD_WEATHER_PLAN,
+        use_task_plan_fallback=True,
+        setter=_set_storm_warning,
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Generic entity
+# ---------------------------------------------------------------------------
+
+
+class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
+    """Generic description-driven Jackery switch."""
+
+    entity_description: JackerySwitchDescription
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        description: JackerySwitchDescription,
+    ) -> None:
+        """Initialise the entity from the coordinator and description."""
+        super().__init__(coordinator, device_id, description.key)
+        self.entity_description = description
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the entity is on."""
+        description = self.entity_description
+        section = self._payload.get(description.source_section) or {}
+        raw: Any = None
+        for key in description.source_keys:
+            value = section.get(key)
+            if value is not None:
+                raw = value
+                break
+        if raw is None and description.fallback_section is not None:
+            fallback = self._payload.get(description.fallback_section) or {}
+            for key in description.source_keys:
+                value = fallback.get(key)
+                if value is not None:
+                    raw = value
+                    break
+        if raw is None and description.use_task_plan_fallback:
+            raw = task_plan_value(self._task_plan, *description.source_keys)
+        if raw is None:
+            return None
+        return description.is_on_transform(raw)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        if self.entity_description.setter is None:
+            return
+        await self.entity_description.setter(
+            self.coordinator, self._device_id, True
+        )
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        if self.entity_description.setter is None:
+            return
+        await self.entity_description.setter(
+            self.coordinator, self._device_id, False
+        )
+        await self.coordinator.async_request_refresh()
+
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the platform from a config entry."""
+    """Create description-driven switch entities."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     entities: list[SwitchEntity] = []
     seen_unique_ids: set[str] = set()
@@ -48,215 +281,28 @@ async def async_setup_entry(
             entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
 
+    # APP_POLLING_MQTT.md documents SolarVault advanced controls as app
+    # state plus MQTT command paths. Create those entities eagerly for known
+    # SolarVault devices; otherwise gate them by the observed property keys.
+    gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
+        "eps_output": lambda props, _adv: FIELD_SW_EPS in props,
+        "auto_standby_set": lambda props, adv: adv
+        or FIELD_IS_AUTO_STANDBY in props
+        or FIELD_AUTO_STANDBY in props,
+        "standby": lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
+        "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
+        "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
+        "storm_warning": lambda props, adv: adv or FIELD_WPS in props,
+    }
+
     for dev_id, payload in (coordinator.data or {}).items():
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         supports_advanced = coordinator.device_supports_advanced(dev_id)
-        if FIELD_SW_EPS in props:
-            _append_unique(JackeryEpsSwitch(coordinator, dev_id))
-        # APP_POLLING_MQTT.md documents SolarVault advanced controls as app
-        # state plus MQTT command paths. Create the entities eagerly for known
-        # SolarVault devices; otherwise gate them by the observed property keys.
-        if supports_advanced:
-            _append_unique(JackeryStandbySwitch(coordinator, dev_id))
-            _append_unique(JackeryAutoStandbySwitch(coordinator, dev_id))
-            _append_unique(JackeryFollowMeterSwitch(coordinator, dev_id))
-            _append_unique(JackeryOffGridShutdownSwitch(coordinator, dev_id))
-            _append_unique(JackeryStormWarningSwitch(coordinator, dev_id))
-        else:
-            if FIELD_AUTO_STANDBY in props:
-                _append_unique(JackeryStandbySwitch(coordinator, dev_id))
-            if FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props:
-                _append_unique(JackeryAutoStandbySwitch(coordinator, dev_id))
-            if FIELD_IS_FOLLOW_METER_PW in props:
-                _append_unique(JackeryFollowMeterSwitch(coordinator, dev_id))
-            if FIELD_OFF_GRID_DOWN in props:
-                _append_unique(JackeryOffGridShutdownSwitch(coordinator, dev_id))
-            if FIELD_WPS in props:
-                _append_unique(JackeryStormWarningSwitch(coordinator, dev_id))
+        for description in SWITCH_DESCRIPTIONS:
+            predicate = gating.get(description.key)
+            if predicate is not None and predicate(props, supports_advanced):
+                _append_unique(
+                    JackeryDescriptionSwitch(coordinator, dev_id, description)
+                )
+
     async_add_entities(entities)
-
-
-class _JackeryWritableSwitch(JackeryEntity, SwitchEntity):
-    """Base class for Jackery switches that write a boolean cloud/MQTT value."""
-
-    def __init__(
-        self,
-        coordinator: JackerySolarVaultCoordinator,
-        device_id: str,
-        key_suffix: str,
-        setter: Callable[[str, bool], Awaitable[None]],
-    ) -> None:
-        """Initialise the switch and its write callback."""
-        super().__init__(coordinator, device_id, key_suffix)
-        self._setter = setter
-
-    async def _async_write_state(self, enabled: bool) -> None:
-        """Write a boolean state and refresh Home Assistant after the command."""
-        await self._setter(self._device_id, enabled)
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the entity on."""
-        await self._async_write_state(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
-        await self._async_write_state(False)
-
-
-class JackeryEpsSwitch(_JackeryWritableSwitch):
-    """EPS output enable/disable switch (MQTT cmd=107, actionId=3023)."""
-
-    _attr_translation_key = "eps_output"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:power-plug"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator, device_id, "eps_output", coordinator.async_set_eps
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_SW_EPS)
-        return safe_bool(raw)
-
-
-class JackeryAutoStandbySwitch(_JackeryWritableSwitch):
-    """Auto-standby switch (MQTT cmd=121, actionId=3021)."""
-
-    _attr_translation_key = "auto_standby_set"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:power-sleep"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator,
-            device_id,
-            "auto_standby_set",
-            coordinator.async_set_auto_standby,
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_IS_AUTO_STANDBY)
-        if raw is None:
-            raw = task_plan_value(self._task_plan, FIELD_IS_AUTO_STANDBY)
-        if raw is None:
-            return None
-        return safe_bool(raw)
-
-
-class JackeryStandbySwitch(_JackeryWritableSwitch):
-    """Manual standby switch (MQTT cmd=107, actionId=3023)."""
-
-    _attr_translation_key = "standby"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:power-sleep"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator, device_id, "standby", coordinator.async_set_standby
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_AUTO_STANDBY)
-        if raw is None:
-            return None
-        try:
-            value = int(raw)
-            return value == 1
-        except TypeError, ValueError:
-            return safe_bool(raw)
-
-
-class JackeryFollowMeterSwitch(_JackeryWritableSwitch):
-    """Smart-meter following switch (MQTT cmd=121, actionId=3044)."""
-
-    _attr_translation_key = "follow_meter"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:gauge"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator, device_id, "follow_meter", coordinator.async_set_follow_meter
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_IS_FOLLOW_METER_PW)
-        if raw is None:
-            raw = task_plan_value(
-                self._task_plan, FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER
-            )
-        return safe_bool(raw)
-
-
-class JackeryOffGridShutdownSwitch(_JackeryWritableSwitch):
-    """Off-grid shutdown switch (MQTT cmd=121, actionId=3039)."""
-
-    _attr_translation_key = "off_grid_shutdown"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:power-off"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator,
-            device_id,
-            "off_grid_shutdown",
-            coordinator.async_set_off_grid_shutdown,
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_OFF_GRID_DOWN)
-        if raw is None:
-            raw = task_plan_value(self._task_plan, FIELD_OFF_GRID_DOWN)
-        return safe_bool(raw)
-
-
-class JackeryStormWarningSwitch(_JackeryWritableSwitch):
-    """Storm warning switch (MQTT cmd=0, actionId=3036)."""
-
-    _attr_translation_key = "storm_warning"
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:weather-lightning-rainy"
-
-    def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
-    ) -> None:
-        """Initialise the entity from the coordinator and description."""
-        super().__init__(
-            coordinator, device_id, "storm_warning", coordinator.async_set_storm_warning
-        )
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return True when the entity is on."""
-        raw = self._properties.get(FIELD_WPS)
-        if raw is None:
-            raw = self._weather_plan.get(FIELD_WPS)
-        if raw is None:
-            raw = task_plan_value(self._task_plan, FIELD_WPS)
-        return safe_bool(raw)

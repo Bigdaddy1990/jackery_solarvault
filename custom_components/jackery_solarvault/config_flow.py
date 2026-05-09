@@ -1,12 +1,17 @@
 """Config flow for Jackery SolarVault."""
 
+from collections.abc import Mapping
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
@@ -91,15 +96,13 @@ USER_SCHEMA = vol.Schema({
 class JackeryOptionsFlow(OptionsFlow):
     """Handle the Jackery SolarVault jackery options flow."""
 
-    def __init__(self, entry: ConfigEntry) -> None:
-        """Initialise the entity from the coordinator and description."""
-        self._entry = entry
+    # No __init__: HA injects self.config_entry automatically since 2024.11.
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Step init."""
-        current_options = _current_option_values(self._entry)
+        current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
                 title="",
@@ -137,13 +140,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
-        """Initialise the entity from the coordinator and description."""
-        self._reauth_entry: ConfigEntry | None = None
-
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial user-driven config flow step."""
         errors: dict[str, str] = {}
 
@@ -190,7 +189,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle a user-initiated reconfigure of an existing entry.
 
         HA's reconfigure flow lets the user change credentials and toggle
@@ -201,7 +200,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -273,21 +272,19 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reauth(self, entry_data: dict[str, Any]) -> FlowResult:
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
         """Handle reauth started by ConfigEntryAuthFailed."""
-        entry_id = self.context.get("entry_id")
-        if not entry_id:
-            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
-        self._reauth_entry = self.hass.config_entries.async_get_entry(entry_id)
-        if self._reauth_entry is None:
-            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Prompt the user for a fresh password and re-test against Jackery."""
-        if self._reauth_entry is None:
+        try:
+            entry = self._get_reauth_entry()
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
 
@@ -295,10 +292,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             session = async_get_clientsession(self.hass)
             api = JackeryApi(
                 session=session,
-                account=self._reauth_entry.data[CONF_USERNAME],
+                account=entry.data[CONF_USERNAME],
                 password=user_input[CONF_PASSWORD],
-                mqtt_mac_id=self._reauth_entry.data.get(CONF_MQTT_MAC_ID),
-                region_code=self._reauth_entry.data.get(CONF_REGION_CODE),
+                mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                region_code=entry.data.get(CONF_REGION_CODE),
             )
             try:
                 await api.async_login()
@@ -308,15 +305,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
-                self.hass.config_entries.async_update_entry(
-                    self._reauth_entry,
-                    data={
-                        **self._reauth_entry.data,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                    },
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
                 )
-                await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
-                return self.async_abort(reason=FLOW_ABORT_REAUTH_SUCCESSFUL)
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
@@ -324,7 +317,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
             }),
             description_placeholders={
-                "username": self._reauth_entry.data[CONF_USERNAME],
+                "username": entry.data[CONF_USERNAME],
             },
             errors=errors,
         )
@@ -333,4 +326,4 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(entry: ConfigEntry) -> JackeryOptionsFlow:
         """Return the options flow handler for this entry."""
-        return JackeryOptionsFlow(entry)
+        return JackeryOptionsFlow()

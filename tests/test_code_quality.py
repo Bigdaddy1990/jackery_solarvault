@@ -576,6 +576,7 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
         (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8")
     )
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
     for service in (
@@ -591,11 +592,16 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
     assert set(services["delete_storm_alert"]["fields"]) == {"device_id", "alert_id"}
 
     assert 'SERVICE_NUMERIC_ID_PATTERN: Final = r"^\\s*[0-9]+\\s*$"' in const_source
-    assert "SERVICE_FIELD_SYSTEM_ID): vol.All(" in init_source
-    assert "SERVICE_FIELD_DEVICE_ID): vol.All(" in init_source
-    assert "cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in init_source
-    assert "SERVICE_FIELD_ALERT_ID): vol.All(" in init_source
-    assert "SERVICE_NON_EMPTY_TEXT_PATTERN" in init_source
+    # Schemas live in services.py alongside the handlers that consume them.
+    assert "SERVICE_FIELD_SYSTEM_ID): vol.All(" in services_source
+    assert "SERVICE_FIELD_DEVICE_ID): vol.All(" in services_source
+    # System rename keeps the strict numeric-id contract; device-id schemas
+    # accept HA device-registry IDs (UUID-style) too, so the device selector
+    # in services.yaml can hand them through unchanged.
+    assert "cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in services_source
+    assert "SERVICE_FIELD_ALERT_ID): vol.All(" in services_source
+    assert "SERVICE_NON_EMPTY_TEXT_PATTERN" in services_source
+    assert "str.strip" not in services_source
     assert "str.strip" not in init_source
 
 
@@ -642,7 +648,11 @@ def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
     de_source = (CUSTOM_COMPONENT / "translations/de.json").read_text(encoding="utf-8")
     en_source = (CUSTOM_COMPONENT / "translations/en.json").read_text(encoding="utf-8")
 
-    assert 'self.context.get("entry_id")' in config_flow_source
+    # Reauth uses HA's _get_reauth_entry() helper (HA 2024.6+) wrapped in a
+    # try/except for (KeyError, RuntimeError) to abort cleanly when the
+    # entry has gone away while the reauth flow was sitting on screen.
+    assert "self._get_reauth_entry()" in config_flow_source
+    assert "(KeyError, RuntimeError)" in config_flow_source
     assert "FLOW_ABORT_REAUTH_ENTRY_MISSING" in config_flow_source
     assert "async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)" in config_flow_source
     assert "assert self._reauth_entry is not None" not in config_flow_source
@@ -1062,7 +1072,7 @@ def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8"
     )
-    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     user_schema = config_flow_source.split("USER_SCHEMA =", 1)[1].split(
         "class JackeryConfigFlow", 1
@@ -1070,7 +1080,7 @@ def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -
     reauth_schema = config_flow_source.split("data_schema=vol.Schema", 1)[1].split(
         "description_placeholders", 1
     )[0]
-    service_schema_block = init_source.split("RENAME_SCHEMA =", 1)[1].split(
+    service_schema_block = services_source.split("RENAME_SCHEMA =", 1)[1].split(
         "def _loaded_coordinators", 1
     )[0]
 
@@ -1135,14 +1145,146 @@ def test_coordinator_lazy_imports_mqtt_client_for_collection_without_gmqtt() -> 
 def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -> None:
     """Service IDs may include whitespace in UI/API input, then handlers strip them."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert 'SERVICE_NUMERIC_ID_PATTERN: Final = r"^\\s*[0-9]+\\s*$"' in const_source
-    assert "vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in init_source
-    assert "system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()" in init_source
-    assert "device_id = call.data[SERVICE_FIELD_DEVICE_ID].strip()" in init_source
-    assert "alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()" in init_source
-    assert "str.strip" not in init_source
+    # System rename keeps the strict numeric-id pattern; device-id handlers
+    # tolerate HA device-registry UUIDs that the device selector emits.
+    assert "vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in services_source
+    assert "call.data[SERVICE_FIELD_SYSTEM_ID].strip()" in services_source
+    assert "call.data[SERVICE_FIELD_DEVICE_ID].strip()" in services_source
+    assert "call.data[SERVICE_FIELD_ALERT_ID].strip()" in services_source
+    assert "str.strip" not in services_source
+
+
+def test_services_yaml_uses_device_selector_for_device_id_fields() -> None:
+    """services.yaml must use HA's device selector for jackery_solarvault devices.
+
+    The picker filters by ``integration: jackery_solarvault`` so users
+    cannot pick a device from another integration. system_id stays a text
+    selector because a Jackery system maps to multiple HA devices and the
+    selector cannot represent that scope.
+    """
+    services = yaml.safe_load(
+        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8")
+    )
+
+    refresh_field = services["refresh_weather_plan"]["fields"]["device_id"]
+    delete_field = services["delete_storm_alert"]["fields"]["device_id"]
+    rename_field = services["rename_system"]["fields"]["system_id"]
+
+    for field in (refresh_field, delete_field):
+        assert field.get("required") is True
+        device_selector = (field.get("selector") or {}).get("device") or {}
+        assert device_selector.get("integration") == "jackery_solarvault", (
+            "device_id field must filter the picker to this integration"
+        )
+
+    # System rename uses a text selector by design.
+    assert "text" in (rename_field.get("selector") or {})
+
+
+def test_services_routes_actions_to_owning_coordinator_for_multi_account() -> None:
+    """Service-action handlers must route to the coordinator that owns the id.
+
+    The previous implementation iterated over every loaded coordinator and
+    accepted the first non-failing call, which sent service-action requests
+    to the wrong account whenever two Jackery accounts were configured at
+    once. The current implementation maps the request to the owning entry by
+    looking the id up inside ``coordinator.data`` (devices) or
+    ``coordinator.data[device_id][PAYLOAD_SYSTEM]`` (systems) before
+    forwarding to the API.
+    """
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    # Lookup helpers exist and are typed against the runtime coordinator.
+    assert (
+        "def _coordinator_for_device(\n"
+        "    hass: HomeAssistant, device_id: str\n"
+        ") -> JackerySolarVaultCoordinator | None:" in services_source
+    )
+    assert (
+        "def _coordinator_for_system(\n"
+        "    hass: HomeAssistant, system_id: str\n"
+        ") -> JackerySolarVaultCoordinator | None:" in services_source
+    )
+
+    # System lookup walks the system payload section and matches FIELD_ID
+    # or FIELD_SYSTEM_ID — both are needed because the cloud surfaces the
+    # same id under either key depending on endpoint.
+    system_block = services_source.split("def _coordinator_for_system", 1)[1].split(
+        "\n\n# ", 1
+    )[0]
+    assert "PAYLOAD_SYSTEM" in system_block
+    assert "FIELD_ID" in system_block
+    assert "FIELD_SYSTEM_ID" in system_block
+
+    # Device lookup uses the coordinator.data dict membership check.
+    device_block = services_source.split("def _coordinator_for_device", 1)[1].split(
+        "\ndef _coordinator_for_system", 1
+    )[0]
+    assert "device_id in (coordinator.data or {})" in device_block
+
+    # Each handler resolves the coordinator before invoking the cloud call;
+    # missing-entry paths must raise a translated ServiceValidationError.
+    for handler in (
+        "_async_handle_rename",
+        "_async_handle_refresh_weather_plan",
+        "_async_handle_delete_storm_alert",
+    ):
+        block = services_source.split(f"async def {handler}", 1)[1].split(
+            "\n\nasync def ", 1
+        )[0]
+        assert "coordinator is None" in block, handler
+        assert "raise ServiceValidationError(" in block, handler
+        assert "translation_domain=DOMAIN" in block, handler
+
+
+def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
+    """The device selector hands the handler an HA device-registry UUID.
+
+    Translate it back to the Jackery numeric id by reading the matching
+    ``(DOMAIN, jackery_device_id)`` identifier off the DeviceEntry. Legacy
+    automations that still pass a raw Jackery numeric id must keep working
+    too — the resolver returns the input unchanged if the device-registry
+    miss tells us we're not looking at an HA UUID.
+    """
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "from homeassistant.helpers import" in services_source
+    assert "device_registry as dr" in services_source
+
+    block = services_source.split("def _resolve_jackery_device_id", 1)[1].split(
+        "\ndef _coordinator_for_device", 1
+    )[0]
+    assert "dr.async_get(hass).async_get(raw)" in block
+    assert "device.identifiers" in block
+    assert "DOMAIN" in block
+    # Legacy fallback: when the registry has no matching DeviceEntry,
+    # treat the input as a raw Jackery id.
+    assert "return raw" in block
+
+
+def test_services_setup_is_idempotent_and_callback_typed() -> None:
+    """async_setup_services must be a sync @callback and skip already-registered services."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+    setup_block = services_source.split("def async_setup_services", 1)[1]
+
+    assert "@callback" in services_source.split("async_setup_services", 1)[0][-200:]
+    # Re-entry safe: HA fires async_setup multiple times in some test setups,
+    # so each registration is gated on has_service.
+    for service_const in (
+        "SERVICE_RENAME_SYSTEM",
+        "SERVICE_REFRESH_WEATHER_PLAN",
+        "SERVICE_DELETE_STORM_ALERT",
+    ):
+        assert (
+            f"hass.services.has_service(DOMAIN, {service_const})" in setup_block
+        ), service_const
+        assert (
+            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"
+            in setup_block
+        ), service_const
 
 
 def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> (
@@ -1441,7 +1583,7 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
 
     assert "from .util import config_entry_bool_option" in config_flow_source
     assert "def _entry_bool_option(" not in config_flow_source
-    assert "current_options = _current_option_values(self._entry)" in options_block
+    assert "current_options = _current_option_values(self.config_entry)" in options_block
     assert "def _current_option_values(entry: ConfigEntry)" in config_flow_source
     assert "config_entry_bool_option(entry, key, default)" in config_flow_source
     assert ".options.get(" not in options_block
@@ -1590,6 +1732,7 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
 def test_init_annotations_are_safe_after_pre_commit_autofix() -> None:
     """Avoid HA collection NameError after pre-commit annotation rewrites."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
     init_tree = ast.parse(init_source)
 
     assert isinstance(init_tree.body[0], ast.Expr)
@@ -1601,10 +1744,14 @@ def test_init_annotations_are_safe_after_pre_commit_autofix() -> None:
     assert future_annotations or sys.version_info >= (3, 14)
     assert "from typing import TYPE_CHECKING" not in init_source
     assert "from .coordinator import JackerySolarVaultCoordinator" in init_source
+    # Service-action routing lives in services.py; the helper is private
+    # there but must keep its typed signature so multi-account lookups
+    # remain mypy-clean.
     assert (
         "def _loaded_coordinators(hass: HomeAssistant) "
-        "-> list[JackerySolarVaultCoordinator]" in init_source
+        "-> list[JackerySolarVaultCoordinator]" in services_source
     )
+    assert "from .coordinator import JackerySolarVaultCoordinator" in services_source
 
 
 def test_all_python_sources_parse_with_current_and_ha_target_grammar() -> None:
@@ -1680,25 +1827,25 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
 
 def test_brand_assets_use_home_assistant_cached_jackery_brand() -> None:
     """Use HA's cached Jackery brand PNGs, not stale root SVG placeholders."""
-    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    brand_source = (CUSTOM_COMPONENT / "brand.py").read_text(encoding="utf-8")
     readme = pathlib.Path("README.md").read_text(encoding="utf-8")
 
-    assert 'BRAND_CACHE_INTEGRATION_DOMAIN = "jackery"' in init_source
-    assert "BRAND_IMAGE_FILENAMES = (" in init_source
-    assert '"icon.png"' in init_source
-    assert '"logo.png"' in init_source
+    assert 'BRAND_CACHE_INTEGRATION_DOMAIN = "jackery"' in brand_source
+    assert "BRAND_IMAGE_FILENAMES = (" in brand_source
+    assert '"icon.png"' in brand_source
+    assert '"logo.png"' in brand_source
     assert (
         "/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}"
-        in init_source
+        in brand_source
     )
     assert (
         'hass.config.path(\n            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN'
-        in init_source
+        in brand_source
     )
-    init_source_collapsed = re.sub(r"\s+", " ", init_source)
+    brand_source_collapsed = re.sub(r"\s+", " ", brand_source)
     assert (
         "await hass.async_add_executor_job( _copy_cached_jackery_brand_images, source_dirs )"
-        in init_source_collapsed
+        in brand_source_collapsed
     )
     assert pathlib.Path("custom_components/jackery_solarvault/brand/.gitkeep").exists()
     assert not pathlib.Path("brands/icon.svg").exists()
@@ -1787,8 +1934,8 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
 
 def test_brand_cache_sync_is_best_effort() -> None:
     """Read-only custom component mounts must not block integration setup."""
-    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
-    copy_block = init_source.split("def _copy_cached_jackery_brand_images", 1)[1].split(
+    brand_source = (CUSTOM_COMPONENT / "brand.py").read_text(encoding="utf-8")
+    copy_block = brand_source.split("def _copy_cached_jackery_brand_images", 1)[1].split(
         "_BRAND_CACHE_HASS_DATA_KEY", 1
     )[0]
 

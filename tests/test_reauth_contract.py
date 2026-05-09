@@ -55,9 +55,9 @@ def test_reauth_handler_updates_existing_entry_and_reloads() -> None:
     )
     assert match is not None, "async_step_reauth_confirm not found"
     body = match.group(0)
-    # It must use update_entry + reload, not create_entry
-    assert "async_update_entry" in body, body
-    assert "async_reload" in body, body
+    # It must use the HA-blessed update-and-reload helper, not async_create_entry.
+    # async_update_reload_and_abort handles update_entry + reload + abort atomically.
+    assert "async_update_reload_and_abort" in body, body
     assert "async_create_entry" not in body, body
     # Password rotation: new password is written into entry.data
     assert "CONF_PASSWORD" in body
@@ -178,8 +178,8 @@ def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> N
     )
     assert reauth is not None, "async_step_reauth_confirm not found"
     reauth_body = reauth.group(0)
-    assert "mqtt_mac_id=self._reauth_entry.data.get(CONF_MQTT_MAC_ID)" in reauth_body
-    assert "region_code=self._reauth_entry.data.get(CONF_REGION_CODE)" in reauth_body
+    assert "mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID)" in reauth_body
+    assert "region_code=entry.data.get(CONF_REGION_CODE)" in reauth_body
 
 
 def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None:
@@ -211,5 +211,5 @@ def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None
     )
     assert options_flow is not None, "JackeryOptionsFlow not found"
     options_body = options_flow.group(0)
-    assert "current_options = _current_option_values(self._entry)" in options_body
+    assert "current_options = _current_option_values(self.config_entry)" in options_body
     assert "clean =" not in options_body

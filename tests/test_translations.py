@@ -6,6 +6,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
+LANGUAGES = ("en", "de", "es", "fr")
 
 
 def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
@@ -24,7 +25,7 @@ def test_language_files_cover_all_string_keys() -> None:
     base = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
     base_paths = _leaf_paths(base)
 
-    for lang in ("en", "de"):
+    for lang in LANGUAGES:
         translated = json.loads(
             (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
                 encoding="utf-8"
@@ -80,11 +81,12 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
 
 def test_repair_issue_translations_are_fixable_or_descriptive() -> None:
     """Repair issues must define exactly one of description or fix_flow."""
-    for path in (
-        TRANSLATION_ROOT / "strings.json",
-        TRANSLATION_ROOT / "translations" / "en.json",
-        TRANSLATION_ROOT / "translations" / "de.json",
-    ):
+    paths = [TRANSLATION_ROOT / "strings.json"]
+    paths.extend(
+        TRANSLATION_ROOT / "translations" / f"{lang}.json" for lang in LANGUAGES
+    )
+
+    for path in paths:
         strings = json.loads(path.read_text(encoding="utf-8"))
         for issue in strings.get("issues", {}).values():
             assert ("description" in issue) ^ ("fix_flow" in issue), path

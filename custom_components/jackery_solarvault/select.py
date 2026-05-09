@@ -39,7 +39,6 @@ from .const import (
     PRICE_MODE_TO_OPTION,
     STORM_MINUTES_DEFAULT,
     TEMP_UNIT_TO_OPTION,
-    UNKNOWN_OPTION_PREFIX,
     WORK_MODE_READ_ALIASES,
     WORK_MODE_TO_OPTION,
 )
@@ -245,21 +244,14 @@ class JackeryWorkModeSelect(JackeryEntity, SelectEntity):
     _attr_translation_key = "work_mode_select"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:tune-variant"
+    _attr_options = list(_OPTION_TO_WORK_MODE.keys())
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "work_mode_select")
-
-    @property
-    def options(self) -> list[str]:
-        """Return the list of available options."""
-        opts = list(_OPTION_TO_WORK_MODE.keys())
-        current = self.current_option
-        if current and current not in opts:
-            opts.append(current)
-        return opts
+        self._warned_unknown_modes: set[int] = set()
 
     @property
     def current_option(self) -> str | None:
@@ -275,22 +267,23 @@ class JackeryWorkModeSelect(JackeryEntity, SelectEntity):
         value = safe_int(raw)
         if value is None:
             return None
-        option = WORK_MODE_TO_OPTION.get(value)
-        if option is None:
-            option = WORK_MODE_READ_ALIASES.get(value)
+        option = WORK_MODE_TO_OPTION.get(value) or WORK_MODE_READ_ALIASES.get(value)
         if option is not None:
             return option
-        return f"{UNKNOWN_OPTION_PREFIX}{value}"
+        if value not in self._warned_unknown_modes:
+            self._warned_unknown_modes.add(value)
+            _LOGGER.warning(
+                "Jackery work mode %s is not mapped to a translated option; "
+                "reporting as unknown",
+                value,
+            )
+        return None
 
     async def async_select_option(self, option: str) -> None:
         """Select option."""
-        if option in _OPTION_TO_WORK_MODE:
-            mode = _OPTION_TO_WORK_MODE[option]
-        else:
-            match = re.fullmatch(rf"{UNKNOWN_OPTION_PREFIX}([-+]?\d+)", option)
-            if not match:
-                raise ValueError(f"Invalid work mode option: {option}")
-            mode = int(match.group(1))
+        mode = _OPTION_TO_WORK_MODE.get(option)
+        if mode is None:
+            raise ValueError(f"Invalid work mode option: {option}")
         await self.coordinator.async_set_work_model(self._device_id, mode)
         await self.coordinator.async_request_refresh()
 
@@ -428,12 +421,14 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
     _attr_translation_key = "electricity_price_mode"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:cash-multiple"
+    _attr_options = [PRICE_MODE_TO_OPTION[1], PRICE_MODE_TO_OPTION[2]]
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "electricity_price_mode")
+        self._warned_unknown_modes: set[int] = set()
 
     def _current_mode(self) -> int | None:
         raw = self._price.get(FIELD_DYNAMIC_OR_SINGLE)
@@ -458,18 +453,6 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
         return bool(_price_sources_from_payload(self._payload))
 
     @property
-    def options(self) -> list[str]:
-        """Return the list of available options."""
-        opts: list[str] = [
-            PRICE_MODE_TO_OPTION[1],
-            PRICE_MODE_TO_OPTION[2],
-        ]
-        current = self.current_option
-        if current and current not in opts:
-            opts.append(current)
-        return opts
-
-    @property
     def current_option(self) -> str | None:
         """Return the currently-selected option."""
         mode = self._current_mode()
@@ -478,7 +461,14 @@ class JackeryElectricityPriceModeSelect(JackeryEntity, SelectEntity):
         option = PRICE_MODE_TO_OPTION.get(mode)
         if option is not None:
             return option
-        return f"{UNKNOWN_OPTION_PREFIX}{mode}"
+        if mode not in self._warned_unknown_modes:
+            self._warned_unknown_modes.add(mode)
+            _LOGGER.warning(
+                "Jackery electricity price mode %s is not mapped to a translated "
+                "option; reporting as unknown",
+                mode,
+            )
+        return None
 
     async def async_select_option(self, option: str) -> None:
         """Select option."""

@@ -4,24 +4,17 @@ import asyncio
 import contextlib
 from datetime import timedelta
 import logging
-from pathlib import Path
-import shutil
 from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryNotReady,
-    HomeAssistantError,
-    ServiceValidationError,
-)
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import voluptuous as vol
 
 from .api import JackeryApi, JackeryAuthError, JackeryError
+from .brand import _async_ensure_cached_brand_images
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -39,24 +32,10 @@ from .const import (
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
-    SERVICE_DELETE_STORM_ALERT,
-    SERVICE_FIELD_ALERT_ID,
-    SERVICE_FIELD_DEVICE_ID,
-    SERVICE_FIELD_NEW_NAME,
-    SERVICE_FIELD_SYSTEM_ID,
-    SERVICE_NON_EMPTY_TEXT_PATTERN,
-    SERVICE_NUMERIC_ID_PATTERN,
-    SERVICE_REFRESH_WEATHER_PLAN,
-    SERVICE_RENAME_SYSTEM,
     SMART_METER_DERIVED_SENSOR_SUFFIXES,
-    STALE_ENERGY_HELPER_PREFIX,
-    STALE_HELPER_BATTERY_TOKENS,
-    STALE_HELPER_CHARGE_TOKENS,
-    STALE_HELPER_DISCHARGE_TOKENS,
-    STALE_HELPER_VENDOR_TOKENS,
-    STALE_NET_POWER_SUFFIX,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .services import async_setup_services
 from .util import config_entry_bool_option
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
@@ -69,143 +48,6 @@ type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
 
 _LOGGER = logging.getLogger(__name__)
 
-RENAME_SCHEMA = vol.Schema({
-    vol.Required(SERVICE_FIELD_SYSTEM_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-    ),
-    vol.Required(SERVICE_FIELD_NEW_NAME): vol.All(
-        cv.string,
-        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
-        vol.Length(max=64),
-    ),
-})
-REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema({
-    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-    ),
-})
-DELETE_STORM_ALERT_SCHEMA = vol.Schema({
-    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
-    ),
-    vol.Required(SERVICE_FIELD_ALERT_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
-    ),
-})
-
-
-BRAND_IMAGE_FILENAMES = (
-    "icon.png",
-    "icon@2x.png",
-    "dark_icon.png",
-    "dark_icon@2x.png",
-    "logo.png",
-    "logo@2x.png",
-    "dark_logo.png",
-    "dark_logo@2x.png",
-)
-BRAND_CACHE_INTEGRATION_DOMAIN = "jackery"
-
-
-def _copy_cached_jackery_brand_images(source_dirs: tuple[str, ...]) -> list[str]:
-    """Copy official cached Jackery brand PNGs into the custom integration brand folder.
-
-    Home Assistant 2026.3+ serves custom integration brand images from
-    custom_components/<domain>/brand/. The Jackery brand already exists in the
-    server-side brands cache as integration domain ``jackery`` on affected HA
-    systems, while this custom integration uses domain ``jackery_solarvault``.
-    Copying the cached PNG files keeps the UI on HA's local brand source instead
-    of shipping hand-made SVG stand-ins.
-
-    Brand synchronization is best-effort. Some HA deployments mount custom
-    components read-only or with restrictive permissions; a failed cache copy
-    must not prevent the integration from loading.
-    """
-    target_dir = Path(__file__).with_name("brand")
-    copied: list[str] = []
-    for raw_source_dir in source_dirs:
-        source_dir = Path(raw_source_dir)
-        if not source_dir.is_dir():
-            continue
-        try:
-            target_dir.mkdir(exist_ok=True)
-        except OSError as err:
-            _LOGGER.debug(
-                "Jackery: cannot prepare local brand cache directory %s: %s",
-                target_dir,
-                err,
-            )
-            return copied
-        for filename in BRAND_IMAGE_FILENAMES:
-            source_file = source_dir / filename
-            if not source_file.is_file():
-                continue
-            target_file = target_dir / filename
-            if target_file.is_file():
-                try:
-                    same_size = source_file.stat().st_size == target_file.stat().st_size
-                except OSError:
-                    same_size = False
-                if same_size:
-                    continue
-            try:
-                shutil.copy2(source_file, target_file)
-            except OSError as err:
-                _LOGGER.debug(
-                    "Jackery: cannot copy cached brand image %s to %s: %s",
-                    source_file,
-                    target_file,
-                    err,
-                )
-                continue
-            copied.append(filename)
-        break
-    return copied
-
-
-_BRAND_CACHE_HASS_DATA_KEY = f"{DOMAIN}_brand_cache_synced"
-
-
-async def _async_ensure_cached_brand_images(hass: HomeAssistant) -> None:
-    """Install cached Jackery brand PNGs without blocking the event loop.
-
-    Runs at most once per HA process: ``async_setup`` itself only fires on
-    HA boot, but a dedicated flag guards against re-entry from tests or
-    manual ``async_setup`` calls. Subsequent boots re-check size cheaply.
-    """
-    if hass.data.get(_BRAND_CACHE_HASS_DATA_KEY):
-        return
-    hass.data[_BRAND_CACHE_HASS_DATA_KEY] = True
-    source_dirs = (
-        hass.config.path(
-            ".cache", "brands", "integrations", BRAND_CACHE_INTEGRATION_DOMAIN
-        ),
-        f"/homeassistant/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
-        f"/config/.cache/brands/integrations/{BRAND_CACHE_INTEGRATION_DOMAIN}",
-    )
-    try:
-        copied = await hass.async_add_executor_job(
-            _copy_cached_jackery_brand_images, source_dirs
-        )
-    except OSError as err:
-        _LOGGER.debug("Jackery: cached brand image sync skipped: %s", err)
-        return
-    if copied:
-        _LOGGER.info(
-            "Jackery: copied cached brand image(s) into local integration brand folder: %s",
-            ", ".join(copied),
-        )
-
-
-def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
-    """Return runtime coordinators for loaded Jackery config entries."""
-    coordinators: list[JackerySolarVaultCoordinator] = []
-    for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
-        coordinator = getattr(loaded_entry, "runtime_data", None)
-        if isinstance(coordinator, JackerySolarVaultCoordinator):
-            coordinators.append(coordinator)
-    return coordinators
-
 
 # This integration is config-entry-only — there is no YAML configuration
 # surface. The `cv.config_entry_only_config_schema` helper documents
@@ -217,110 +59,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up global Jackery SolarVault services."""
     await _async_ensure_cached_brand_images(hass)
-
-    if not hass.services.has_service(DOMAIN, SERVICE_RENAME_SYSTEM):
-
-        async def _handle_rename(call: ServiceCall) -> None:
-            system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()
-            new_name = call.data[SERVICE_FIELD_NEW_NAME].strip()
-            last_err: Exception | None = None
-            for coord in _loaded_coordinators(hass):
-                try:
-                    await coord.api.async_set_system_name(system_id, new_name)
-                    await coord.async_request_refresh()
-                    return
-                except JackeryError as err:
-                    last_err = err
-                    _LOGGER.debug(
-                        "rename_system via %s failed: %s",
-                        coord.entry.entry_id,
-                        err,
-                    )
-                    continue
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="rename_system_failed",
-                translation_placeholders={
-                    "system_id": str(system_id),
-                    "error": str(last_err or "no loaded Jackery entry"),
-                },
-            )
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_RENAME_SYSTEM,
-            _handle_rename,
-            schema=RENAME_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_REFRESH_WEATHER_PLAN):
-
-        async def _handle_refresh_weather_plan(call: ServiceCall) -> None:
-            device_id = call.data[SERVICE_FIELD_DEVICE_ID].strip()
-            last_err: Exception | None = None
-            for coord in _loaded_coordinators(hass):
-                try:
-                    await coord.async_query_weather_plan(device_id)
-                    return
-                except (JackeryError, LookupError) as err:
-                    last_err = err
-                    _LOGGER.debug(
-                        "refresh_weather_plan via %s failed: %s",
-                        coord.entry.entry_id,
-                        err,
-                    )
-                    continue
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="refresh_weather_plan_failed",
-                translation_placeholders={
-                    "device_id": str(device_id),
-                    "error": str(last_err or "no loaded Jackery entry"),
-                },
-            )
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REFRESH_WEATHER_PLAN,
-            _handle_refresh_weather_plan,
-            schema=REFRESH_WEATHER_PLAN_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_DELETE_STORM_ALERT):
-
-        async def _handle_delete_storm_alert(call: ServiceCall) -> None:
-            device_id = call.data[SERVICE_FIELD_DEVICE_ID].strip()
-            alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()
-            last_err: Exception | None = None
-            for coord in _loaded_coordinators(hass):
-                try:
-                    await coord.async_delete_storm_alert(device_id, alert_id)
-                    return
-                except (JackeryError, LookupError) as err:
-                    last_err = err
-                    _LOGGER.debug(
-                        "delete_storm_alert via %s failed: %s",
-                        coord.entry.entry_id,
-                        err,
-                    )
-                    continue
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="delete_storm_alert_failed",
-                translation_placeholders={
-                    "device_id": str(device_id),
-                    "alert_id": str(alert_id),
-                    "error": str(last_err or "no loaded Jackery entry"),
-                },
-            )
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_DELETE_STORM_ALERT,
-            _handle_delete_storm_alert,
-            schema=DELETE_STORM_ALERT_SCHEMA,
-        )
-
+    async_setup_services(hass)
     return True
 
 
@@ -329,7 +68,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     # Keep entity-registry cleanup explicit and setup-local. This avoids hidden
     # entry-version side effects while still removing entities that are no
     # longer part of the documented app/HTTP/MQTT data model.
-    await _async_remove_stale_energy_helpers(hass)
     await _async_remove_removed_sensors(hass, entry)
     if not config_entry_bool_option(
         entry,
@@ -425,53 +163,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     return True
 
 
-async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
-    """Remove known stale Energy helper sensors that were created without a unit."""
-    registry = er.async_get(hass)
-    to_remove: list[str] = []
-    for ent in registry.entities.values():
-        entity_id = ent.entity_id or ""
-        if not entity_id.startswith(STALE_ENERGY_HELPER_PREFIX):
-            continue
-        if not entity_id.endswith(STALE_NET_POWER_SUFFIX):
-            continue
-        lowered = entity_id.lower()
-        # Any stale helper referencing SolarVault/Jackery net-power entities
-        # should be removed when it no longer has a valid unit.
-        if any(token in lowered for token in STALE_HELPER_VENDOR_TOKENS):
-            state = hass.states.get(entity_id)
-            unit = (
-                None if state is None else state.attributes.get("unit_of_measurement")
-            )
-            if unit in (None, ""):
-                to_remove.append(entity_id)
-                continue
-        # Broken helper pattern seen in user logs:
-        # energy_<battery_discharge>_<battery_charge>_net_power
-        # Keep this locale-agnostic (DE/EN), because helper IDs depend on UI
-        # language at creation time.
-        if not any(token in lowered for token in STALE_HELPER_BATTERY_TOKENS):
-            continue
-        if not any(token in lowered for token in STALE_HELPER_CHARGE_TOKENS):
-            continue
-        if not any(token in lowered for token in STALE_HELPER_DISCHARGE_TOKENS):
-            continue
-        state = hass.states.get(entity_id)
-        unit = None if state is None else state.attributes.get("unit_of_measurement")
-        if unit in (None, ""):
-            to_remove.append(entity_id)
-
-    for entity_id in to_remove:
-        _LOGGER.info(
-            "Removing stale Energy helper without unit: %s (please recreate with Jackery battery_net_power)",
-            entity_id,
-        )
-        registry.async_remove(entity_id)
-
-
 async def _async_remove_smart_meter_derived_sensors(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
 ) -> None:
     """Remove optional calculated smart-meter sensors when disabled."""
     registry = er.async_get(hass)
@@ -490,7 +184,7 @@ async def _async_remove_smart_meter_derived_sensors(
 
 async def _async_remove_calculated_power_sensors(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
 ) -> None:
     """Remove optional calculated net-power sensors when disabled."""
     registry = er.async_get(hass)
@@ -509,7 +203,7 @@ async def _async_remove_calculated_power_sensors(
 
 async def _async_remove_savings_detail_sensors(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
 ) -> None:
     """Remove optional savings-calculation detail sensors when disabled."""
     registry = er.async_get(hass)
@@ -528,7 +222,7 @@ async def _async_remove_savings_detail_sensors(
 
 async def _async_remove_duplicate_binary_sensors(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
 ) -> None:
     """Remove read-only binary sensors duplicated by config switches."""
     registry = er.async_get(hass)
@@ -550,7 +244,7 @@ async def _async_remove_duplicate_binary_sensors(
 # -----------------------------------------------------------------------------
 async def _async_remove_removed_sensors(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: JackeryConfigEntry,
 ) -> None:
     """Remove sensor entities that have been removed from the integration.
 
