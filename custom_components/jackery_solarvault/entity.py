@@ -134,9 +134,13 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or self._device_meta.get(FIELD_MODEL_NAME)
             or "SolarVault"
         )
-        sw_version = self._ota.get(FIELD_CURRENT_VERSION) or None
-        sn = self._device_meta.get(FIELD_DEVICE_SN) or self._discovery.get(
+        raw_sw_version = self._ota.get(FIELD_CURRENT_VERSION)
+        sw_version = str(raw_sw_version) if raw_sw_version is not None else None
+        raw_serial_number = self._device_meta.get(
             FIELD_DEVICE_SN
+        ) or self._discovery.get(FIELD_DEVICE_SN)
+        serial_number = (
+            str(raw_serial_number) if raw_serial_number is not None else None
         )
 
         return DeviceInfo(
@@ -144,7 +148,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             manufacturer=MANUFACTURER,
             name=str(name),
             model=str(model),
-            serial_number=sn,
+            serial_number=serial_number,
             sw_version=sw_version,
         )
 
