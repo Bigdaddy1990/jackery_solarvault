@@ -389,6 +389,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER,
             name=f"{DOMAIN} ({entry.title})",
             update_interval=update_interval,
+            config_entry=entry,
+            always_update=False,
         )
         self.api = api
         self.api.payload_debug_callback = self._async_payload_debug_event
