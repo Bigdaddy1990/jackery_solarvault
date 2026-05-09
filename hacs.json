@@ -1,17 +1,16 @@
 {
+  "content_in_root": false,
   "country": [
     "DE",
     "AT",
     "CH",
     "US",
     "GB",
-    "NL",
     "FR",
     "ES",
-    "IT"
   ],
   "filename": "jackery_solarvault.zip",
-  "hide_default_branch": false,
+  "hide_default_branch": true,
   "homeassistant": "2025.8.0",
   "name": "Jackery SolarVault",
   "render_readme": true,
