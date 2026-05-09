@@ -322,9 +322,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
-    def _raise_action_error(
-        self, translation_key: str, **placeholders: object
-    ) -> None:
+    def _raise_action_error(self, translation_key: str, **placeholders: object) -> None:
         """Raise a translatable HA action error for this entity."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
