@@ -17,9 +17,9 @@
     "custom_components.jackery_solarvault",
     "aiomqtt"
   ],
-  "quality_scale": "gold",
+  "quality_scale": "custom",
   "requirements": [
     "aiomqtt>=2.3.0"
   ],
-  "version": "2.3.4"
+  "version": "0.1.0"
 }
