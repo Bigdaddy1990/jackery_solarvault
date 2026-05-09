@@ -1,30 +1,76 @@
-jackery_solarvault: Auto Version Tag
+name: Auto Version Tag
 
 on:
   push:
+    branches:
+      - main
     paths:
-      - "custom_components/jackery_solarvault/manifest.json"
+      - custom_components/jackery_solarvault/manifest.json
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: auto-version-tag-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  tag_version:
+  tag-version:
+    name: Tag manifest version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - jackery_solarvault: Extract version
-        id: get_version
+      - name: Extract manifest version
+        id: manifest
         run: |
-          VERSION=$(jq -r .version custom_components/jackery_solarvault/manifest.json)
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          version=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-      - jackery_solarvault: Create Git Tag
+          manifest_path = Path("custom_components/jackery_solarvault/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          version = manifest.get("version")
+          if not isinstance(version, str) or not version.strip():
+              raise SystemExit("manifest.json must contain a non-empty string version")
+          print(version.strip())
+          PY
+          )
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Manifest version '$version' is not a valid release version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure tag is new or already on this commit
+        id: tag
+        env:
+          TAG: ${{ steps.manifest.outputs.tag }}
         run: |
-          git config user.jackery_solarvault "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag "v${VERSION}" 2>/dev/null || echo "Tag already exists."
-          git push origin "v${VERSION}" || echo "Push failed or tag already exists."
+          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            tagged_sha=$(git rev-list -n 1 "$TAG")
+            if [ "$tagged_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag '$TAG' already exists at $tagged_sha, not $GITHUB_SHA"
+              exit 1
+            fi
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag '$TAG' already exists on this commit; nothing to do."
+            exit 0
+          fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push version tag
+        if: steps.tag.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.manifest.outputs.tag }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "refs/tags/$TAG"
