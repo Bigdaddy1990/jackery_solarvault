@@ -9,10 +9,6 @@
     "FR",
     "ES"
   ],
-  "filename": "jackery_solarvault.zip",
-  "hide_default_branch": true,
-  "homeassistant": "2025.8.0",
   "name": "Jackery SolarVault",
   "render_readme": true,
-  "zip_release": true
 }
