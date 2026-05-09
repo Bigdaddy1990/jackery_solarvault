@@ -515,7 +515,9 @@ class JackeryApi:
             )
         )
 
-    def _is_auth_failure_response(self, status: int, data: dict[str, Any] | Any) -> bool:
+    def _is_auth_failure_response(
+        self, status: int, data: dict[str, Any] | Any
+    ) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in (401, 403):
             return True
@@ -533,7 +535,9 @@ class JackeryApi:
         """Build a compact auth-failure message without exposing secrets."""
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
-        return f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
+        return (
+            f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
+        )
 
     async def _emit_payload_debug(
         self,

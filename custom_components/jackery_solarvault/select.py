@@ -509,9 +509,7 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
 async def _price_provider_select(entity: JackerySelect, option: str) -> None:
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_label(source) == option:
-            await entity.coordinator.async_set_price_source(
-                entity._device_id, source
-            )
+            await entity.coordinator.async_set_price_source(entity._device_id, source)
             return
     _raise_select_action_error(entity, "invalid_select_option", option=option)
 
@@ -595,9 +593,7 @@ async def async_setup_entry(
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
-    def _gate(
-        key: str, payload: dict[str, Any], supports_advanced: bool
-    ) -> bool:
+    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
