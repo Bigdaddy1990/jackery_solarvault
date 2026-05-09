@@ -5,8 +5,8 @@ All notable changes to this integration are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-After 2.1.0 the changelog is generated automatically by Release Drafter from
-PR titles and labels. Manual entries below 2.1.0 are kept for historical
+After 0.1.0 the changelog is generated automatically by Release Drafter from
+PR titles and labels. Manual entries below 0.1.0 are kept for historical
 context.
 
 ## [Unreleased]
@@ -31,8 +31,6 @@ context.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
 - Recorder is now declared as an optional `after_dependencies` manifest entry instead of a required dependency, preventing Home Assistant fixture tests from bootstrapping recorder during config-flow collection.
 - Config-flow entries use the account as the entry title again, and HA fixture login mocks now preserve token side effects while stubbing discovery calls.
-
-## [2.3.3] - 2026-05-05
 
 ### Fixed
 - **Midnight race condition for ``today_*`` and lifetime sensors.**
@@ -96,11 +94,6 @@ context.
   ``test_period_sensors_publish_none_when_data_is_stale``.
 - 161 → 164 tests, all green.
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.3.3...HEAD
-[2.3.3]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.3.3
-
-## [2.3.2] - 2026-05-05
-
 ### Fixed
 - **Payload-debug JSONL written despite debug=off (root-cause fix).**
   The previous gating used ``_PAYLOAD_DEBUG_LOGGER.isEnabledFor(DEBUG)``,
@@ -133,10 +126,6 @@ context.
   ``test_payload_debug_file_is_gated_by_explicit_user_optin`` and
   rewritten as a contract for the new behaviour.
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.3.2...HEAD
-[2.3.2]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.3.2
-
-## [2.3.1] - 2026-05-05
 
 ### Fixed
 - **CI ruff F821**: `config_flow.py` and `sensor.py` gained the
@@ -200,8 +189,6 @@ was rewritten as a whitelist contract: any future
 an entry in `INTENTIONALLY_DISABLED_BY_DEFAULT`, preventing
 silent regressions.
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.3.1...HEAD
-[2.3.1]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.3.1
 
 ## [2.3.0] - 2026-05-05
 
@@ -250,10 +237,6 @@ across all applicable rules. ``manifest.json`` accordingly carries
 - New ``tests/ha/test_config_flow_ha.py`` (5 cases) and
   ``tests/ha/test_setup_entry_ha.py`` (2 cases).
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.3.0...HEAD
-[2.3.0]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.3.0
-
-## [2.2.0] - 2026-05-05
 
 ### Added
 - **Silver-tier reauth flow** is now formally documented and test-locked.
@@ -312,10 +295,6 @@ across all applicable rules. ``manifest.json`` accordingly carries
   ``test_mqtt_stability.py``, ``test_battery_pack_stability.py``.
 - Full suite: 131 → 157 tests, all green. ruff check + format clean.
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.2.0...HEAD
-[2.2.0]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.2.0
-
-## [2.1.0] - 2026-05-05
 
 ### Added
 - `docs/SENSOR_SOURCE_PATHS.md` auto-generated entity-to-source-path map.
@@ -386,5 +365,3 @@ across all applicable rules. ``manifest.json`` accordingly carries
 - HACS validation, hassfest validation, ruff lint + format check, and
   unit-tests run on every PR via GitHub Actions.
 
-[Unreleased]: https://github.com/Bigdaddy1990/jackery_solarvault/compare/v2.1.0...HEAD
-[2.1.0]: https://github.com/Bigdaddy1990/jackery_solarvault/releases/tag/v2.1.0
