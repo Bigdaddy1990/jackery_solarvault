@@ -1,56 +1,55 @@
 {
-  "title": "Jackery SolarVault",
   "config": {
     "abort": {
-      "already_configured": "Esta cuenta de Jackery ya está configurada.",
-      "reauth_entry_missing": "No se encontró la entrada de Jackery para volver a autenticarse.",
-      "reauth_successful": "La reautenticación se completó correctamente.",
-      "reconfigure_account_mismatch": "El nuevo correo electrónico no coincide con la cuenta de Jackery configurada. Usa el correo original o elimina primero la entrada.",
-      "reconfigure_successful": "Configuración actualizada."
+      "already_configured": "Esta cuenta de Jackery ya est\u00e1 configurada.",
+      "reauth_entry_missing": "No se encontr\u00f3 la entrada de Jackery para volver a autenticarse.",
+      "reauth_successful": "La reautenticaci\u00f3n se complet\u00f3 correctamente.",
+      "reconfigure_account_mismatch": "El nuevo correo electr\u00f3nico no coincide con la cuenta de Jackery configurada. Usa el correo original o elimina primero la entrada.",
+      "reconfigure_successful": "Configuraci\u00f3n actualizada."
     },
     "error": {
-      "account_required": "La cuenta no puede estar vacía.",
+      "account_required": "La cuenta no puede estar vac\u00eda.",
       "cannot_connect": "No se pudo conectar a iot.jackeryapp.com.",
-      "invalid_auth": "Correo electrónico o contraseña no válidos."
+      "invalid_auth": "Correo electr\u00f3nico o contrase\u00f1a no v\u00e1lidos."
     },
     "step": {
       "reauth_confirm": {
         "data": {
-          "password": "Contraseña"
+          "password": "Contrase\u00f1a"
         },
-        "description": "La contraseña guardada para {username} ya no funciona. Introduce la contraseña actual para restaurar la conexión.",
+        "description": "La contrase\u00f1a guardada para {username} ya no funciona. Introduce la contrase\u00f1a actual para restaurar la conexi\u00f3n.",
         "title": "Volver a autenticar Jackery"
       },
       "reconfigure": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
-          "password": "Contraseña",
-          "username": "Correo electrónico"
+          "password": "Contrase\u00f1a",
+          "username": "Correo electr\u00f3nico"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery."
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery."
         },
-        "description": "Actualiza la contraseña y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID único de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
+        "description": "Actualiza la contrase\u00f1a y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID \u00fanico de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
         "title": "Reconfigurar Jackery SolarVault"
       },
       "user": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
-          "password": "Contraseña",
-          "username": "Correo electrónico"
+          "password": "Contrase\u00f1a",
+          "username": "Correo electr\u00f3nico"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery."
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery."
         },
-        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la región y las credenciales MQTT se detectan automáticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Actívalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesión activa por cuenta. Si también quieres usar la app móvil al mismo tiempo, crea una cuenta secundaria en la app de Jackery y comparte allí el sistema mediante código QR. El código QR lo genera la app de Jackery y la API de la nube no lo expone a Home Assistant.",
+        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la regi\u00f3n y las credenciales MQTT se detectan autom\u00e1ticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Act\u00edvalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesi\u00f3n activa por cuenta. Si tambi\u00e9n quieres usar la app m\u00f3vil al mismo tiempo, crea una cuenta secundaria en la app de Jackery y comparte all\u00ed el sistema mediante c\u00f3digo QR. El c\u00f3digo QR lo genera la app de Jackery y la API de la nube no lo expone a Home Assistant.",
         "title": "Jackery SolarVault"
       }
     }
@@ -67,7 +66,7 @@
         "name": "Ethernet conectado"
       },
       "online": {
-        "name": "En línea"
+        "name": "En l\u00ednea"
       }
     },
     "button": {
@@ -77,27 +76,27 @@
     },
     "number": {
       "default_power_set": {
-        "name": "Potencia de salida estándar"
+        "name": "Potencia de salida est\u00e1ndar"
       },
       "max_feed_grid": {
-        "name": "Potencia máxima de inyección"
+        "name": "Potencia m\u00e1xima de inyecci\u00f3n"
       },
       "max_output_power_set": {
-        "name": "Potencia máxima de salida"
+        "name": "Potencia m\u00e1xima de salida"
       },
       "single_tariff_price_set": {
-        "name": "Precio de tarifa única"
+        "name": "Precio de tarifa \u00fanica"
       },
       "soc_charge_limit_set": {
-        "name": "Límite de carga"
+        "name": "L\u00edmite de carga"
       },
       "soc_discharge_limit_set": {
-        "name": "Límite de descarga"
+        "name": "L\u00edmite de descarga"
       }
     },
     "select": {
       "auto_off_island_mode": {
-        "name": "Autoapagado (sin conexión a red)",
+        "name": "Autoapagado (sin conexi\u00f3n a red)",
         "state": {
           "h_12": "12 h",
           "h_2": "2 h",
@@ -108,7 +107,7 @@
       "electricity_price_mode": {
         "name": "Modo de precio de electricidad",
         "state": {
-          "dynamic": "Precio dinámico de electricidad",
+          "dynamic": "Precio din\u00e1mico de electricidad",
           "single": "Tarifa fija"
         }
       },
@@ -116,7 +115,7 @@
         "name": "Proveedor de precio de electricidad"
       },
       "storm_warning_minutes_select": {
-        "name": "Tiempo de antelación de alerta de tormenta",
+        "name": "Tiempo de antelaci\u00f3n de alerta de tormenta",
         "state": {
           "min_1020": "17 h",
           "min_1080": "18 h",
@@ -154,7 +153,7 @@
         }
       },
       "work_mode_select": {
-        "name": "Modo de uso de energía",
+        "name": "Modo de uso de energ\u00eda",
         "state": {
           "ai_smart": "Modo inteligente IA",
           "custom": "Modo personalizado",
@@ -168,91 +167,91 @@
         "name": "Indicadores de capacidad"
       },
       "activation_date": {
-        "name": "Fecha de activación"
+        "name": "Fecha de activaci\u00f3n"
       },
       "alarm_count": {
         "name": "Alarmas activas"
       },
       "auto_standby": {
-        "name": "Modo de espera automático"
+        "name": "Modo de espera autom\u00e1tico"
       },
       "battery_charge_month_energy": {
-        "name": "Carga mensual de batería"
+        "name": "Carga mensual de bater\u00eda"
       },
       "battery_charge_power": {
-        "name": "Potencia de carga de la batería principal"
+        "name": "Potencia de carga de la bater\u00eda principal"
       },
       "battery_charge_week_energy": {
-        "name": "Carga semanal de batería"
+        "name": "Carga semanal de bater\u00eda"
       },
       "battery_charge_year_energy": {
-        "name": "Carga anual de batería"
+        "name": "Carga anual de bater\u00eda"
       },
       "battery_count": {
-        "name": "Número de baterías"
+        "name": "N\u00famero de bater\u00edas"
       },
       "battery_discharge_month_energy": {
-        "name": "Energía mensual de descarga de batería"
+        "name": "Energ\u00eda mensual de descarga de bater\u00eda"
       },
       "battery_discharge_power": {
-        "name": "Potencia de descarga de la batería principal"
+        "name": "Potencia de descarga de la bater\u00eda principal"
       },
       "battery_discharge_week_energy": {
-        "name": "Energía semanal de descarga de batería"
+        "name": "Energ\u00eda semanal de descarga de bater\u00eda"
       },
       "battery_discharge_year_energy": {
-        "name": "Energía anual de descarga de batería"
+        "name": "Energ\u00eda anual de descarga de bater\u00eda"
       },
       "battery_net_power": {
-        "name": "Potencia neta de la batería principal"
+        "name": "Potencia neta de la bater\u00eda principal"
       },
       "battery_pack_cell_temperature": {
-        "name": "Temperatura de celda del paquete de batería"
+        "name": "Temperatura de celda del paquete de bater\u00eda"
       },
       "battery_pack_charge_power": {
-        "name": "Potencia de carga del paquete de batería"
+        "name": "Potencia de carga del paquete de bater\u00eda"
       },
       "battery_pack_communication_state": {
-        "name": "Estado de comunicación del paquete de batería"
+        "name": "Estado de comunicaci\u00f3n del paquete de bater\u00eda"
       },
       "battery_pack_discharge_power": {
-        "name": "Potencia de descarga del paquete de batería"
+        "name": "Potencia de descarga del paquete de bater\u00eda"
       },
       "battery_pack_firmware_version": {
-        "name": "Versión de firmware del paquete de batería"
+        "name": "Versi\u00f3n de firmware del paquete de bater\u00eda"
       },
       "battery_pack_serial_number": {
-        "name": "Número de serie del paquete de batería"
+        "name": "N\u00famero de serie del paquete de bater\u00eda"
       },
       "battery_pack_soc": {
-        "name": "SOC del paquete de batería"
+        "name": "SOC del paquete de bater\u00eda"
       },
       "battery_pack_update_status": {
-        "name": "Estado de actualización del paquete de batería"
+        "name": "Estado de actualizaci\u00f3n del paquete de bater\u00eda"
       },
       "battery_soc": {
-        "name": "Nivel total de batería"
+        "name": "Nivel total de bater\u00eda"
       },
       "battery_soc_internal": {
-        "name": "Nivel de la batería principal"
+        "name": "Nivel de la bater\u00eda principal"
       },
       "battery_stack_net_power": {
-        "name": "Potencia neta del sistema de baterías"
+        "name": "Potencia neta del sistema de bater\u00edas"
       },
       "battery_state": {
-        "name": "Estado de la batería"
+        "name": "Estado de la bater\u00eda"
       },
       "cell_temperature": {
-        "name": "Temperatura de celda de la batería principal"
+        "name": "Temperatura de celda de la bater\u00eda principal"
       },
       "charge_plan_power": {
         "name": "Potencia del plan de carga"
       },
       "conversion_loss_power": {
-        "name": "Potencia calculada de pérdida del inversor/conversión"
+        "name": "Potencia calculada de p\u00e9rdida del inversor/conversi\u00f3n"
       },
       "country_code": {
-        "name": "Código de país"
+        "name": "C\u00f3digo de pa\u00eds"
       },
       "ct_state": {
         "name": "Estado CT"
@@ -279,61 +278,61 @@
         "name": "Salida anual del dispositivo en red"
       },
       "device_pv1_day_energy": {
-        "name": "Energía diaria FV1"
+        "name": "Energ\u00eda diaria FV1"
       },
       "device_pv1_month_energy": {
-        "name": "Energía mensual FV1"
+        "name": "Energ\u00eda mensual FV1"
       },
       "device_pv1_week_energy": {
-        "name": "Energía semanal FV1"
+        "name": "Energ\u00eda semanal FV1"
       },
       "device_pv1_year_energy": {
-        "name": "Energía anual FV1"
+        "name": "Energ\u00eda anual FV1"
       },
       "device_pv2_day_energy": {
-        "name": "Energía diaria FV2"
+        "name": "Energ\u00eda diaria FV2"
       },
       "device_pv2_month_energy": {
-        "name": "Energía mensual FV2"
+        "name": "Energ\u00eda mensual FV2"
       },
       "device_pv2_week_energy": {
-        "name": "Energía semanal FV2"
+        "name": "Energ\u00eda semanal FV2"
       },
       "device_pv2_year_energy": {
-        "name": "Energía anual FV2"
+        "name": "Energ\u00eda anual FV2"
       },
       "device_pv3_day_energy": {
-        "name": "Energía diaria FV3"
+        "name": "Energ\u00eda diaria FV3"
       },
       "device_pv3_month_energy": {
-        "name": "Energía mensual FV3"
+        "name": "Energ\u00eda mensual FV3"
       },
       "device_pv3_week_energy": {
-        "name": "Energía semanal FV3"
+        "name": "Energ\u00eda semanal FV3"
       },
       "device_pv3_year_energy": {
-        "name": "Energía anual FV3"
+        "name": "Energ\u00eda anual FV3"
       },
       "device_pv4_day_energy": {
-        "name": "Energía diaria FV4"
+        "name": "Energ\u00eda diaria FV4"
       },
       "device_pv4_month_energy": {
-        "name": "Energía mensual FV4"
+        "name": "Energ\u00eda mensual FV4"
       },
       "device_pv4_week_energy": {
-        "name": "Energía semanal FV4"
+        "name": "Energ\u00eda semanal FV4"
       },
       "device_pv4_year_energy": {
-        "name": "Energía anual FV4"
+        "name": "Energ\u00eda anual FV4"
       },
       "device_today_battery_charge": {
-        "name": "Carga de batería del dispositivo hoy"
+        "name": "Carga de bater\u00eda del dispositivo hoy"
       },
       "device_today_battery_discharge": {
-        "name": "Descarga de batería del dispositivo hoy"
+        "name": "Descarga de bater\u00eda del dispositivo hoy"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Dispositivo batería→red hoy"
+        "name": "Dispositivo bater\u00eda\u2192red hoy"
       },
       "device_today_ongrid_input": {
         "name": "Entrada en red del dispositivo hoy"
@@ -342,16 +341,16 @@
         "name": "Salida en red del dispositivo hoy"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Dispositivo red→batería hoy"
+        "name": "Dispositivo red\u2192bater\u00eda hoy"
       },
       "device_today_pv_energy": {
         "name": "FV del dispositivo hoy"
       },
       "device_today_pv_to_battery": {
-        "name": "Dispositivo FV→batería hoy"
+        "name": "Dispositivo FV\u2192bater\u00eda hoy"
       },
       "energy_plan_power": {
-        "name": "Potencia del plan de energía"
+        "name": "Potencia del plan de energ\u00eda"
       },
       "eps_in_power": {
         "name": "Potencia de entrada EPS"
@@ -366,7 +365,7 @@
         "name": "Estado del puerto Ethernet"
       },
       "firmware_version": {
-        "name": "Versión de firmware"
+        "name": "Versi\u00f3n de firmware"
       },
       "follow_meter_state": {
         "name": "Estado de seguimiento del medidor"
@@ -384,7 +383,7 @@
         "name": "Salida de red"
       },
       "grid_standard": {
-        "name": "Estándar de red"
+        "name": "Est\u00e1ndar de red"
       },
       "grid_state": {
         "name": "Estado de red"
@@ -393,22 +392,22 @@
         "name": "Potencia de consumo del hogar"
       },
       "home_month_energy": {
-        "name": "Energía mensual de consumo del hogar"
+        "name": "Energ\u00eda mensual de consumo del hogar"
       },
       "home_week_energy": {
-        "name": "Energía semanal de consumo del hogar"
+        "name": "Energ\u00eda semanal de consumo del hogar"
       },
       "home_year_energy": {
-        "name": "Energía anual de consumo del hogar"
+        "name": "Energ\u00eda anual de consumo del hogar"
       },
       "last_offline": {
-        "name": "Última vez sin conexión"
+        "name": "\u00daltima vez sin conexi\u00f3n"
       },
       "last_online": {
-        "name": "Última vez en línea"
+        "name": "\u00daltima vez en l\u00ednea"
       },
       "last_update": {
-        "name": "Última actualización"
+        "name": "\u00daltima actualizaci\u00f3n"
       },
       "latitude": {
         "name": "Latitud"
@@ -417,31 +416,31 @@
         "name": "Longitud"
       },
       "mac_address": {
-        "name": "Dirección MAC"
+        "name": "Direcci\u00f3n MAC"
       },
       "max_feed_grid_read": {
-        "name": "Potencia máxima de inyección (runtime)"
+        "name": "Potencia m\u00e1xima de inyecci\u00f3n (runtime)"
       },
       "max_inverter_power": {
-        "name": "Potencia máxima del inversor"
+        "name": "Potencia m\u00e1xima del inversor"
       },
       "max_iot_num": {
-        "name": "Máx. dispositivos IoT"
+        "name": "M\u00e1x. dispositivos IoT"
       },
       "max_output_power": {
-        "name": "Potencia máxima de salida"
+        "name": "Potencia m\u00e1xima de salida"
       },
       "max_system_input_power": {
-        "name": "Potencia máxima de entrada del sistema"
+        "name": "Potencia m\u00e1xima de entrada del sistema"
       },
       "max_system_output_power": {
-        "name": "Potencia máxima de salida del sistema"
+        "name": "Potencia m\u00e1xima de salida del sistema"
       },
       "off_grid_shutdown_state": {
-        "name": "Estado de apagado sin conexión a red"
+        "name": "Estado de apagado sin conexi\u00f3n a red"
       },
       "off_grid_time": {
-        "name": "Temporizador de apagado sin conexión a red"
+        "name": "Temporizador de apagado sin conexi\u00f3n a red"
       },
       "ongrid_state": {
         "name": "Estado conectado a red"
@@ -465,16 +464,16 @@
         "name": "FV4"
       },
       "pv_month_energy": {
-        "name": "Energía FV mensual"
+        "name": "Energ\u00eda FV mensual"
       },
       "pv_power_total": {
         "name": "Potencia FV total"
       },
       "pv_week_energy": {
-        "name": "Energía FV semanal"
+        "name": "Energ\u00eda FV semanal"
       },
       "pv_year_energy": {
-        "name": "Energía FV anual"
+        "name": "Energ\u00eda FV anual"
       },
       "raw_properties": {
         "name": "Propiedades brutas"
@@ -483,61 +482,61 @@
         "name": "Indicador de reinicio"
       },
       "savings_battery_loss_year_energy": {
-        "name": "Energía anual perdida del sistema de baterías"
+        "name": "Energ\u00eda anual perdida del sistema de bater\u00edas"
       },
       "savings_calculated_total": {
         "name": "Ahorro calculado"
       },
       "savings_conversion_loss_year_energy": {
-        "name": "Energía anual perdida del inversor/conversión"
+        "name": "Energ\u00eda anual perdida del inversor/conversi\u00f3n"
       },
       "savings_energy": {
-        "name": "Energía CA autoconsumida"
+        "name": "Energ\u00eda CA autoconsumida"
       },
       "savings_price": {
         "name": "Precio de ahorro"
       },
       "savings_pv_residual_year_energy": {
-        "name": "Energía FV residual anual tras autoconsumo"
+        "name": "Energ\u00eda FV residual anual tras autoconsumo"
       },
       "smart_meter_export_month_energy": {
-        "name": "Exportación mensual a red del Smart Meter"
+        "name": "Exportaci\u00f3n mensual a red del Smart Meter"
       },
       "smart_meter_export_week_energy": {
-        "name": "Exportación semanal a red del Smart Meter"
+        "name": "Exportaci\u00f3n semanal a red del Smart Meter"
       },
       "smart_meter_export_year_energy": {
-        "name": "Exportación anual a red del Smart Meter"
+        "name": "Exportaci\u00f3n anual a red del Smart Meter"
       },
       "smart_meter_gross_phase_export_power": {
-        "name": "Potencia bruta de exportación por fase del Smart Meter"
+        "name": "Potencia bruta de exportaci\u00f3n por fase del Smart Meter"
       },
       "smart_meter_gross_phase_flow_power": {
         "name": "Potencia bruta de flujo por fase del Smart Meter"
       },
       "smart_meter_gross_phase_import_power": {
-        "name": "Potencia bruta de importación por fase del Smart Meter"
+        "name": "Potencia bruta de importaci\u00f3n por fase del Smart Meter"
       },
       "smart_meter_import_month_energy": {
-        "name": "Importación mensual de red del Smart Meter"
+        "name": "Importaci\u00f3n mensual de red del Smart Meter"
       },
       "smart_meter_import_week_energy": {
-        "name": "Importación semanal de red del Smart Meter"
+        "name": "Importaci\u00f3n semanal de red del Smart Meter"
       },
       "smart_meter_import_year_energy": {
-        "name": "Importación anual de red del Smart Meter"
+        "name": "Importaci\u00f3n anual de red del Smart Meter"
       },
       "smart_meter_net_export_power": {
-        "name": "Potencia neta de exportación del Smart Meter"
+        "name": "Potencia neta de exportaci\u00f3n del Smart Meter"
       },
       "smart_meter_net_import_power": {
-        "name": "Potencia neta de importación del Smart Meter"
+        "name": "Potencia neta de importaci\u00f3n del Smart Meter"
       },
       "smart_meter_panel_charging_energy": {
-        "name": "Energía de carga del panel del Smart Meter"
+        "name": "Energ\u00eda de carga del panel del Smart Meter"
       },
       "smart_meter_panel_discharging_energy": {
-        "name": "Energía de descarga del panel del Smart Meter"
+        "name": "Energ\u00eda de descarga del panel del Smart Meter"
       },
       "smart_meter_phase_1_power": {
         "name": "Potencia fase 1 del Smart Meter"
@@ -552,16 +551,16 @@
         "name": "Potencia neta del Smart Meter"
       },
       "soc_charge_limit": {
-        "name": "Límite de carga"
+        "name": "L\u00edmite de carga"
       },
       "soc_discharge_limit": {
-        "name": "Límite de descarga"
+        "name": "L\u00edmite de descarga"
       },
       "stack_in_power": {
-        "name": "Potencia de carga del sistema de baterías"
+        "name": "Potencia de carga del sistema de bater\u00edas"
       },
       "stack_out_power": {
-        "name": "Potencia de descarga del sistema de baterías"
+        "name": "Potencia de descarga del sistema de bater\u00edas"
       },
       "standby_power": {
         "name": "Potencia en espera"
@@ -570,7 +569,7 @@
         "name": "Alerta de tormenta habilitada"
       },
       "storm_warning_minutes": {
-        "name": "Tiempo de antelación de alerta de tormenta"
+        "name": "Tiempo de antelaci\u00f3n de alerta de tormenta"
       },
       "system_state": {
         "name": "Estado del sistema"
@@ -588,25 +587,25 @@
         "name": "Salida diaria a red (nube de Jackery)"
       },
       "total_carbon_saved": {
-        "name": "CO₂ total ahorrado"
+        "name": "CO\u2082 total ahorrado"
       },
       "total_generation": {
-        "name": "Producción FV total"
+        "name": "Producci\u00f3n FV total"
       },
       "total_revenue": {
         "name": "Ahorro total de la app"
       },
       "weather_plan": {
-        "name": "Plan meteorológico"
+        "name": "Plan meteorol\u00f3gico"
       },
       "wifi_ip": {
-        "name": "Dirección IP"
+        "name": "Direcci\u00f3n IP"
       },
       "wifi_name": {
         "name": "Nombre WiFi"
       },
       "wifi_signal": {
-        "name": "Señal WiFi"
+        "name": "Se\u00f1al WiFi"
       },
       "work_mode": {
         "name": "Modo de trabajo"
@@ -623,7 +622,7 @@
         "name": "Seguir Smart Meter"
       },
       "off_grid_shutdown": {
-        "name": "Autoapagado (modo sin conexión a red)"
+        "name": "Autoapagado (modo sin conexi\u00f3n a red)"
       },
       "standby": {
         "name": "Espera"
@@ -664,13 +663,13 @@
       "message": "No se puede actualizar el dispositivo {device_id}: falta systemId"
     },
     "mqtt_command_failed": {
-      "message": "El comando MQTT de Jackery falló ({error}). Último error MQTT: {mqtt_last_error}"
+      "message": "El comando MQTT de Jackery fall\u00f3 ({error}). \u00daltimo error MQTT: {mqtt_last_error}"
     },
     "mqtt_missing_device_sn": {
       "message": "No se puede enviar el comando MQTT de Jackery para {device_id}: falta deviceSn"
     },
     "refresh_weather_plan_failed": {
-      "message": "No se pudo actualizar el plan meteorológico para el dispositivo {device_id}: {error}"
+      "message": "No se pudo actualizar el plan meteorol\u00f3gico para el dispositivo {device_id}: {error}"
     },
     "rename_system_failed": {
       "message": "No se pudo cambiar el nombre del sistema Jackery {system_id}: {error}"
@@ -681,12 +680,12 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery devolvió estadísticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera métrica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuración de payload jackery_solarvault_payload_debug.jsonl y los diagnósticos para comparar valores brutos, series de gráficos analizadas y secciones de origen documentadas en APP_POLLING_MQTT.md y DATA_SOURCE_PRIORITY.md.\n\nConfirma para forzar una actualización desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integración con el volcado de diagnóstico.",
-            "title": "Forzar actualización de la nube de Jackery"
+            "description": "Jackery devolvi\u00f3 estad\u00edsticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera m\u00e9trica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuraci\u00f3n de payload jackery_solarvault_payload_debug.jsonl y los diagn\u00f3sticos para comparar valores brutos, series de gr\u00e1ficos analizadas y secciones de origen documentadas en APP_POLLING_MQTT.md y DATA_SOURCE_PRIORITY.md.\n\nConfirma para forzar una actualizaci\u00f3n desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integraci\u00f3n con el volcado de diagn\u00f3stico.",
+            "title": "Forzar actualizaci\u00f3n de la nube de Jackery"
           }
         }
       },
-      "title": "Las estadísticas de la app de Jackery son incoherentes"
+      "title": "Las estad\u00edsticas de la app de Jackery son incoherentes"
     }
   },
   "options": {
@@ -694,57 +693,58 @@
       "init": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery."
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery."
         },
-        "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usan la potencia neta del Smart Meter más la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
+        "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usan la potencia neta del Smart Meter m\u00e1s la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
         "title": "Opciones de Jackery"
       }
     }
   },
   "services": {
     "delete_storm_alert": {
-      "description": "Elimina una alerta meteorológica o de tormenta específica por ID de alerta mediante MQTT.",
+      "description": "Elimina una alerta meteorol\u00f3gica o de tormenta espec\u00edfica por ID de alerta mediante MQTT.",
       "fields": {
         "alert_id": {
-          "description": "Identificador de alerta de los atributos de diagnóstico del plan meteorológico, normalmente storm[].alertId.",
+          "description": "Identificador de alerta de los atributos de diagn\u00f3stico del plan meteorol\u00f3gico, normalmente storm[].alertId.",
           "name": "ID de alerta"
         },
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en los diagnósticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambi\u00e9n pueden pasar directamente el ID num\u00e9rico del dispositivo Jackery (visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de dispositivo"
         }
       },
       "name": "Eliminar alerta de tormenta"
     },
     "refresh_weather_plan": {
-      "description": "Consulta el plan meteorológico y de tormentas actual del dispositivo. La respuesta se expone en los atributos del sensor de diagnóstico Plan meteorológico.",
+      "description": "Consulta el plan meteorol\u00f3gico y de tormentas actual del dispositivo. La respuesta se expone en los atributos del sensor de diagn\u00f3stico Plan meteorol\u00f3gico.",
       "fields": {
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en los diagnósticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambi\u00e9n pueden pasar directamente el ID num\u00e9rico del dispositivo Jackery (visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de dispositivo"
         }
       },
-      "name": "Actualizar plan meteorológico y de tormentas"
+      "name": "Actualizar plan meteorol\u00f3gico y de tormentas"
     },
     "rename_system": {
-      "description": "Cambia el nombre de un sistema Jackery SolarVault mediante la API de la nube de Jackery. El nombre se muestra en la app de Jackery y en la información del dispositivo de Home Assistant.",
+      "description": "Cambia el nombre de un sistema Jackery SolarVault mediante la API de la nube de Jackery. El nombre se muestra en la app de Jackery y en la informaci\u00f3n del dispositivo de Home Assistant.",
       "fields": {
         "new_name": {
           "description": "Nuevo nombre visible, de 1 a 64 caracteres.",
           "name": "Nuevo nombre"
         },
         "system_id": {
-          "description": "ID numérico del sistema Jackery. Está visible en los diagnósticos bajo raw_api.system_list_response.data[].id.",
+          "description": "ID num\u00e9rico del sistema Jackery. Est\u00e1 visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].id.",
           "name": "ID del sistema"
         }
       },
       "name": "Cambiar nombre del sistema SolarVault"
     }
-  }
+  },
+  "title": "Jackery SolarVault"
 }
