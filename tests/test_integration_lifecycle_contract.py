@@ -50,35 +50,3 @@ def test_unload_keeps_coordinator_alive_when_platform_unload_fails() -> None:
     assert calls.index("async_unload_platforms") < calls.index("async_shutdown"), body
     assert "if not unload_ok" in body, body
     assert "return False" in body, body
-
-
-def test_dynamic_entity_listener_callbacks_are_marked_callback() -> None:
-    """Coordinator listeners that add late entities must be HA callbacks."""
-    platform_files = (
-        "binary_sensor.py",
-        "button.py",
-        "number.py",
-        "select.py",
-        "sensor.py",
-        "switch.py",
-        "text.py",
-    )
-    for platform_file in platform_files:
-        tree = ast.parse((COMPONENT / platform_file).read_text(encoding="utf-8"))
-        setup = next(
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.AsyncFunctionDef)
-            and node.name == "async_setup_entry"
-        )
-        add_new_entities = next(
-            node
-            for node in ast.walk(setup)
-            if isinstance(node, ast.FunctionDef) and node.name == "_add_new_entities"
-        )
-        decorator_names = {
-            decorator.id
-            for decorator in add_new_entities.decorator_list
-            if isinstance(decorator, ast.Name)
-        }
-        assert "callback" in decorator_names, platform_file

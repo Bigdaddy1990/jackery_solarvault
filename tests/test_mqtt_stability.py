@@ -199,6 +199,20 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
     )
 
 
+def test_aiomqtt_passive_reset_log_is_filtered() -> None:
+    """Expected broker socket resets should not surface as HA error log spam."""
+    src = _read("mqtt_push.py")
+
+    assert "_AioMqttPassiveDisconnectFilter" in src
+    assert '"failed to receive on socket"' in src
+    assert '"Errno 104"' in src
+    assert '"Connection reset by peer"' in src
+    assert '"WinError 10054"' in src
+    assert "_AIOMQTT_LOGGER.addFilter(" in src
+    assert "logger=_AIOMQTT_LOGGER" in src
+    assert "logger=_LOGGER" not in src
+
+
 def test_diagnostics_exposes_stale_subscription_signals() -> None:
     """Diagnostics must surface ``seconds_since_last_message`` + flag."""
     src = _read("mqtt_push.py")

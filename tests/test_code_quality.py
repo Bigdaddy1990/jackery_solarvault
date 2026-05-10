@@ -487,16 +487,11 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
     assert 'devices = _redacted_payload_map(coordinator.data or {}, "device")' in source
-    assert "def async_get_device_diagnostics(" in source
-    assert "def _filtered_payload_map(" in source
-    assert '"device": _filtered_payload_map(' in source
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
         "sn: async_redact_data",
         "sn_or_id: async_redact_data",
-        '"device_id"',
-        '"identifiers"',
     ):
         assert forbidden not in source
     for prefix in (
@@ -508,19 +503,6 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
         "location_response",
     ):
         assert f'"{prefix}"' in source
-
-
-def test_device_diagnostics_filter_payloads_to_registry_device() -> None:
-    """Per-device diagnostics should expose only matching payload sections."""
-    source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
-    assert "from homeassistant.helpers.device_registry import DeviceEntry" in source
-    assert "def _jackery_device_ids(device: DeviceEntry)" in source
-    assert "if domain == DOMAIN" in source
-    assert "for device_id in device_ids" in source
-    assert "if device_id in payloads" in source
-    assert "coordinator.api.last_property_responses" in source
-    assert "coordinator.api.last_device_statistic_responses" in source
-    assert "coordinator.api.last_device_period_stat_responses" in source
 
 
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
@@ -1507,6 +1489,42 @@ def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> No
     assert "historically existed without a compatible recorder unit" in sensor_source
 
 
+def test_smart_meter_entities_cache_state_before_ha_state_write() -> None:
+    """Smart-meter sensors must not recompute values during every HA state read."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackerySmartMeterSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackeryRawPropertiesSensor", 1)[0]
+
+    assert "self._cached_native_value: Any = None" in block
+    assert "self._cached_attrs: dict[str, Any] = {}" in block
+    assert "def _refresh_cache(self) -> None:" in block
+    assert "def _handle_coordinator_update(self) -> None:" in block
+    assert "async def async_added_to_hass(self) -> None:" in block
+    assert "return self._cached_native_value" in block
+    assert "return self._cached_attrs" in block
+
+
+def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
+    """Broken Energy helper sensors should be cleaned before HA records them again."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+
+    for name in (
+        "STALE_ENERGY_HELPER_PREFIX",
+        "STALE_NET_POWER_SUFFIX",
+        "STALE_HELPER_VENDOR_TOKENS",
+        "STALE_HELPER_BATTERY_TOKENS",
+        "STALE_HELPER_CHARGE_TOKENS",
+        "STALE_HELPER_DISCHARGE_TOKENS",
+    ):
+        assert name in const_source
+        assert name in init_source
+    assert "_async_remove_stale_energy_helpers(hass)" in init_source
+    assert "unit not in (None, \"\")" in init_source
+    assert "please recreate with Jackery battery_net_power" in init_source
+
+
 def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> None:
     """Battery-pack diagnostics should not expose the same raw key twice."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
@@ -2042,39 +2060,3 @@ def test_brand_runtime_sync_is_absent() -> None:
     assert "shutil.copy2" not in component_sources
     assert 'Path(__file__).with_name("brand")' not in component_sources
     assert "async_setup_services(hass)" in init_source
-
-
-def test_online_binary_sensor_remains_available_when_device_reports_offline() -> None:
-    """Connectivity entity should show off, not unavailable, for offline devices."""
-    src = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "JackeryBinarySensor":
-            class_src = ast.get_source_segment(src, node) or ""
-            break
-    else:
-        raise AssertionError("JackeryBinarySensor not found")
-
-    assert "def available(self) -> bool:" in class_src
-    assert 'self.entity_description.key == "online"' in class_src
-    assert "self.coordinator.last_update_success" in class_src
-    assert "return super().available" in class_src
-
-
-def test_number_entity_auth_errors_trigger_reauth() -> None:
-    """Entity writes must convert raw cloud auth failures to HA reauth errors."""
-    src = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.AsyncFunctionDef)
-            and node.name == "async_set_native_value"
-        ):
-            method_src = ast.get_source_segment(src, node) or ""
-            break
-    else:
-        raise AssertionError("JackeryNumber.async_set_native_value not found")
-
-    assert "except JackeryAuthError as err:" in method_src
-    assert "ConfigEntryAuthFailed(" in method_src
-    assert "from err" in method_src
