@@ -1,4 +1,5 @@
 {
+  "title": "Jackery SolarVault",
   "config": {
     "abort": {
       "already_configured": "This Jackery account is already configured.",
@@ -745,6 +746,5 @@
       },
       "name": "Rename SolarVault system"
     }
-  },
-  "title": "Jackery SolarVault"
+  }
 }

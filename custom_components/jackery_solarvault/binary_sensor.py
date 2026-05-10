@@ -11,7 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
@@ -80,7 +80,6 @@ async def async_setup_entry(
                 _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
         return entities
 
-    @callback
     def _add_new_entities() -> None:
         entities = _collect_entities()
         if entities:
@@ -108,15 +107,6 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
             description.entity_registry_enabled_default
             and description.entity_category != EntityCategory.DIAGNOSTIC
         )
-
-    @property
-    def available(self) -> bool:
-        """Return whether the entity is currently available."""
-        if self.entity_description.key == "online":
-            return self.coordinator.last_update_success and self._device_id in (
-                self.coordinator.data or {}
-            )
-        return super().available
 
     @property
     def is_on(self) -> bool | None:

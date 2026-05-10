@@ -62,6 +62,7 @@ from .const import (
     FIELD_CODE,
     FIELD_COUNTRY_CODE,
     FIELD_CURRENCY,
+    FIELD_CURRENT_VERSION,
     FIELD_DATA,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
@@ -69,6 +70,7 @@ from .const import (
     FIELD_ID,
     FIELD_IN_PW,
     FIELD_IP,
+    FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_LOGIN_TYPE,
     FIELD_MAC_ID,
     FIELD_MAX_POWER,
@@ -87,7 +89,12 @@ from .const import (
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_NAME,
     FIELD_SYSTEM_REGION,
+    FIELD_TARGET_MODULE_VERSION,
+    FIELD_TARGET_VERSION,
     FIELD_TOKEN,
+    FIELD_UPDATE_CONTENT,
+    FIELD_UPDATE_STATUS,
+    FIELD_UPGRADE_TYPE,
     FIELD_USER_ID,
     FIELD_VERSION,
     HOME_TRENDS_PATH,
@@ -980,6 +987,9 @@ class JackeryApi:
                     FIELD_IP,
                     FIELD_OP,
                     FIELD_VERSION,
+                    FIELD_CURRENT_VERSION,
+                    FIELD_IS_FIRMWARE_UPGRADE,
+                    FIELD_UPDATE_STATUS,
                 )
             ):
                 return [raw]
@@ -1051,8 +1061,40 @@ class JackeryApi:
             OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
         )
         self.last_ota_responses[device_sn] = data
+        raw = data.get(FIELD_DATA)
+        if isinstance(raw, list):
+            items = self._payload_list(data, OTA_LIST_PATH)
+            if items:
+                return items[0]
+        if isinstance(raw, dict):
+            raw_body = raw.get(FIELD_BODY)
+            candidates: list[Any] = [
+                raw_body if isinstance(raw_body, dict) else None,
+                raw,
+            ]
+            if isinstance(raw_body, list):
+                candidates.extend(raw_body)
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                if any(
+                    key in candidate
+                    for key in (
+                        FIELD_CURRENT_VERSION,
+                        FIELD_VERSION,
+                        FIELD_TARGET_VERSION,
+                        FIELD_TARGET_MODULE_VERSION,
+                        FIELD_UPDATE_STATUS,
+                        FIELD_UPDATE_CONTENT,
+                        FIELD_IS_FIRMWARE_UPGRADE,
+                        FIELD_UPGRADE_TYPE,
+                    )
+                ):
+                    return candidate
         items = self._payload_list(data, OTA_LIST_PATH)
-        return items[0] if items else {}
+        if items:
+            return items[0]
+        return {}
 
     async def async_get_location(self, device_id: str | int) -> dict:
         """GET /v1/device/location — GPS coordinates set by the user."""

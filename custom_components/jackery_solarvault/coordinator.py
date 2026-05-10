@@ -108,6 +108,7 @@ from .const import (
     FIELD_IP,
     FIELD_IS_AUTO_STANDBY,
     FIELD_IS_CLOUD,
+    FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_LOGIN_ALLOWED,
     FIELD_MAX_FEED_GRID,
@@ -140,6 +141,7 @@ from .const import (
     FIELD_SW_EPS,
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_REGION,
+    FIELD_TARGET_MODULE_VERSION,
     FIELD_TARGET_VERSION,
     FIELD_TEMP_UNIT,
     FIELD_TIMESTAMP,
@@ -147,6 +149,7 @@ from .const import (
     FIELD_UPDATE_CONTENT,
     FIELD_UPDATE_STATUS,
     FIELD_UPDATES,
+    FIELD_UPGRADE_TYPE,
     FIELD_VERSION,
     FIELD_WNAME,
     FIELD_WORK_MODEL,
@@ -389,8 +392,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER,
             name=f"{DOMAIN} ({entry.title})",
             update_interval=update_interval,
-            config_entry=entry,
-            always_update=False,
         )
         self.api = api
         self.api.payload_debug_callback = self._async_payload_debug_event
@@ -1655,7 +1656,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if current_version is not None:
             pack[FIELD_VERSION] = current_version
             pack[FIELD_CURRENT_VERSION] = current_version
-        for key in (FIELD_TARGET_VERSION, FIELD_UPDATE_STATUS, FIELD_UPDATE_CONTENT):
+        for key in (
+            FIELD_IS_FIRMWARE_UPGRADE,
+            FIELD_TARGET_VERSION,
+            FIELD_TARGET_MODULE_VERSION,
+            FIELD_UPDATE_STATUS,
+            FIELD_UPDATE_CONTENT,
+            FIELD_UPGRADE_TYPE,
+        ):
             if key in ota and ota.get(key) is not None:
                 pack[key] = ota.get(key)
 

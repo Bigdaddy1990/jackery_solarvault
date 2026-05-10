@@ -5,10 +5,9 @@ from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntry
 
 from . import JackeryConfigEntry
-from .const import DOMAIN, REDACT_KEYS
+from .const import REDACT_KEYS
 from .coordinator import JackerySolarVaultCoordinator
 
 
@@ -34,33 +33,6 @@ def _redacted_payload_map(
         else:
             redacted[label] = async_redact_data({"value": payload}, REDACT_KEYS)
     return redacted
-
-
-def _jackery_device_ids(device: DeviceEntry) -> tuple[str, ...]:
-    """Return Jackery cloud device IDs attached to a device-registry entry."""
-    return tuple(
-        str(identifier)
-        for domain, identifier in sorted(
-            device.identifiers, key=lambda item: (item[0], str(item[1]))
-        )
-        if domain == DOMAIN
-    )
-
-
-def _filtered_payload_map(
-    payloads: Mapping[Any, Any],
-    device_ids: tuple[str, ...],
-    prefix: str,
-) -> dict[str, Any]:
-    """Return redacted diagnostics for only the requested device IDs."""
-    return _redacted_payload_map(
-        {
-            device_id: payloads[device_id]
-            for device_id in device_ids
-            if device_id in payloads
-        },
-        prefix,
-    )
 
 
 async def async_get_config_entry_diagnostics(
@@ -126,50 +98,4 @@ async def async_get_config_entry_diagnostics(
         "options": async_redact_data(dict(entry.options), REDACT_KEYS),
         "devices": devices,
         "raw_api": raw,
-    }
-
-
-async def async_get_device_diagnostics(
-    hass: HomeAssistant, entry: JackeryConfigEntry, device: DeviceEntry
-) -> dict[str, Any]:
-    """Get diagnostics for one Home Assistant device-registry device."""
-    coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    device_ids = _jackery_device_ids(device)
-
-    return {
-        "entry_data": async_redact_data(dict(entry.data), REDACT_KEYS),
-        "options": async_redact_data(dict(entry.options), REDACT_KEYS),
-        "device": _filtered_payload_map(coordinator.data or {}, device_ids, "device"),
-        "raw_api": {
-            "property_responses": _filtered_payload_map(
-                coordinator.api.last_property_responses,
-                device_ids,
-                "property_response",
-            ),
-            "device_statistic_responses": _filtered_payload_map(
-                coordinator.api.last_device_statistic_responses,
-                device_ids,
-                "device_statistic_response",
-            ),
-            "device_period_stat_responses": _filtered_payload_map(
-                coordinator.api.last_device_period_stat_responses,
-                device_ids,
-                "device_period_stat_response",
-            ),
-            "battery_pack_responses": _filtered_payload_map(
-                coordinator.api.last_battery_pack_responses,
-                device_ids,
-                "battery_pack_response",
-            ),
-            "ota_responses": _filtered_payload_map(
-                coordinator.api.last_ota_responses,
-                device_ids,
-                "ota_response",
-            ),
-            "location_responses": _filtered_payload_map(
-                coordinator.api.last_location_responses,
-                device_ids,
-                "location_response",
-            ),
-        },
     }

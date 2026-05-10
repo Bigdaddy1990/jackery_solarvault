@@ -251,6 +251,37 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
     assert "_merge_dict_values" in body, body
 
 
+def test_battery_pack_ota_merge_preserves_pack_firmware_metadata() -> None:
+    """Per-pack OTA metadata must not drop update status fields.
+
+    Jackery can expose add-on battery update state as either ``updateStatus``
+    or the BatteryPackSub ``isFirmwareUpgrade`` flag. Both must survive the
+    coordinator merge so the disabled-by-default diagnostic entities do not
+    remain unknown when the cloud supplied the data.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"def _merge_pack_ota\(pack: dict\[str, Any\].*?(?=\n    @staticmethod)",
+        src,
+        re.S,
+    )
+    assert match is not None, "_merge_pack_ota not found"
+    body = match.group(0)
+
+    assert "FIELD_CURRENT_VERSION) or ota.get(FIELD_VERSION)" in body, body
+    assert "pack[FIELD_VERSION] = current_version" in body, body
+    assert "pack[FIELD_CURRENT_VERSION] = current_version" in body, body
+    for field in (
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_TARGET_VERSION",
+        "FIELD_TARGET_MODULE_VERSION",
+        "FIELD_UPDATE_STATUS",
+        "FIELD_UPDATE_CONTENT",
+        "FIELD_UPGRADE_TYPE",
+    ):
+        assert field in body, body
+
+
 # ---------- Gold-tier: dynamic-devices ----------------------------------
 
 

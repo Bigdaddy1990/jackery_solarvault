@@ -1129,6 +1129,45 @@ def test_api_read_endpoints_normalize_unexpected_payload_shapes() -> None:
     assert "return data.get(FIELD_DATA) or {}" not in api_source
 
 
+def test_ota_info_accepts_single_dict_payload_shapes() -> None:
+    """OTA responses may be a list, a single dict, or a dict body wrapper."""
+    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    block = api_source.split("async def async_get_ota_info", 1)[1].split(
+        "async def async_get_location", 1
+    )[0]
+
+    assert "items = self._payload_list(data, OTA_LIST_PATH)" in block
+    assert "raw = data.get(FIELD_DATA)" in block
+    assert "raw_body = raw.get(FIELD_BODY)" in block
+    for field in (
+        "FIELD_CURRENT_VERSION",
+        "FIELD_VERSION",
+        "FIELD_TARGET_VERSION",
+        "FIELD_TARGET_MODULE_VERSION",
+        "FIELD_UPDATE_STATUS",
+        "FIELD_UPDATE_CONTENT",
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_UPGRADE_TYPE",
+    ):
+        assert field in block
+
+
+def test_battery_pack_single_object_detection_accepts_firmware_only_payloads() -> None:
+    """Pack list fallback must keep BatteryPackSub firmware-only payloads."""
+    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    block = api_source.split("async def async_get_battery_pack_list", 1)[1].split(
+        "async def async_get_home_trends", 1
+    )[0]
+
+    for field in (
+        "FIELD_VERSION",
+        "FIELD_CURRENT_VERSION",
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_UPDATE_STATUS",
+    ):
+        assert field in block
+
+
 def test_api_payload_helper_paths_match_called_endpoint_constants() -> None:
     """Wrong helper path constants hide the real failing endpoint in diagnostics."""
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
@@ -1521,7 +1560,7 @@ def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
         assert name in const_source
         assert name in init_source
     assert "_async_remove_stale_energy_helpers(hass)" in init_source
-    assert "unit not in (None, \"\")" in init_source
+    assert 'unit not in (None, "")' in init_source
     assert "please recreate with Jackery battery_net_power" in init_source
 
 
@@ -1533,6 +1572,27 @@ def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> Non
     )[1].split("class JackerySmartMeterSensor", 1)[0]
 
     assert block.count("FIELD_OT,") == 1
+
+
+def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
+    """Pack firmware/update diagnostics must read the OTA-enriched fields."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+    )[1].split("class JackerySmartMeterSensor", 1)[0]
+
+    assert "raw = self._pack.get(FIELD_CURRENT_VERSION)" in block
+    assert "raw = self._pack.get(FIELD_IS_FIRMWARE_UPGRADE)" in block
+    for field in (
+        "FIELD_VERSION",
+        "FIELD_CURRENT_VERSION",
+        "FIELD_UPDATE_STATUS",
+        "FIELD_TARGET_VERSION",
+        "FIELD_TARGET_MODULE_VERSION",
+        "FIELD_UPDATE_CONTENT",
+        "FIELD_UPGRADE_TYPE",
+    ):
+        assert field in block
 
 
 def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
@@ -1925,6 +1985,26 @@ def test_generated_payload_debug_logs_are_ignored() -> None:
 
     assert "jackery_solarvault_payload_debug.jsonl" in gitignore
     assert "jackery_solarvault_payload_debug.jsonl.1" in gitignore
+
+
+def test_hacs_manifest_uses_current_supported_keys() -> None:
+    """Keep hacs.json compatible with the current HACS action schema."""
+    manifest = json.loads(pathlib.Path("hacs.json").read_text(encoding="utf-8"))
+    supported_keys = {
+        "content_in_root",
+        "country",
+        "filename",
+        "hacs",
+        "hide_default_branch",
+        "homeassistant",
+        "name",
+        "persistent_directory",
+        "zip_release",
+    }
+
+    assert "name" in manifest
+    assert not (set(manifest) - supported_keys)
+    assert "render_readme" not in manifest
 
 
 def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:

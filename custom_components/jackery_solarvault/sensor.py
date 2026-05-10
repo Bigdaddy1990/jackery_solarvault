@@ -2908,6 +2908,13 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         attrs: dict[str, Any] = {"pack_index": self._pack_index}
         for key in (
             FIELD_IS_FIRMWARE_UPGRADE,
+            FIELD_VERSION,
+            FIELD_CURRENT_VERSION,
+            FIELD_UPDATE_STATUS,
+            FIELD_TARGET_VERSION,
+            FIELD_TARGET_MODULE_VERSION,
+            FIELD_UPDATE_CONTENT,
+            FIELD_UPGRADE_TYPE,
             FIELD_COMM_STATE,
             FIELD_COMM_MODE,
             FIELD_EC,
