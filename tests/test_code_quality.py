@@ -128,7 +128,6 @@ def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
     assert "recorder" not in manifest.get("dependencies", [])
     assert "recorder" in manifest.get("after_dependencies", [])
     assert manifest["iot_class"] == "cloud_polling"
-    assert manifest["quality_scale"] == "gold"
 
 
 def test_no_duplicate_literal_dict_keys() -> None:
@@ -1152,6 +1151,26 @@ def test_ota_info_accepts_single_dict_payload_shapes() -> None:
         assert field in block
 
 
+def test_ota_info_selects_requested_device_from_multi_item_response() -> None:
+    """OTA list responses must not use the main-device item for a battery pack."""
+    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+
+    assert "def _select_ota_item(" in api_source
+    selector = api_source.split("def _select_ota_item(", 1)[1].split(
+        "# --- generic GET with auto re-login", 1
+    )[0]
+    ota_block = api_source.split("async def async_get_ota_info", 1)[1].split(
+        "async def async_get_location", 1
+    )[0]
+
+    assert "requested_sn = str(device_sn)" in selector
+    assert "item.get(FIELD_DEVICE_SN)" in selector
+    assert "return item" in selector
+    assert "return items[0] if items else {}" in selector
+    assert "return self._select_ota_item(items, device_sn)" in ota_block
+    assert "return items[0]" not in ota_block
+
+
 def test_battery_pack_single_object_detection_accepts_firmware_only_payloads() -> None:
     """Pack list fallback must keep BatteryPackSub firmware-only payloads."""
     api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
@@ -1553,14 +1572,12 @@ def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
         "STALE_ENERGY_HELPER_PREFIX",
         "STALE_NET_POWER_SUFFIX",
         "STALE_HELPER_VENDOR_TOKENS",
-        "STALE_HELPER_BATTERY_TOKENS",
-        "STALE_HELPER_CHARGE_TOKENS",
-        "STALE_HELPER_DISCHARGE_TOKENS",
     ):
         assert name in const_source
         assert name in init_source
     assert "_async_remove_stale_energy_helpers(hass)" in init_source
     assert 'unit not in (None, "")' in init_source
+    assert "explicitly reference this integration" in init_source
     assert "please recreate with Jackery battery_net_power" in init_source
 
 

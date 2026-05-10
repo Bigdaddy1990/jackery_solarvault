@@ -413,8 +413,25 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     assignment_offset = body.index(
         "self._last_http_refresh_completed_monotonic = time.monotonic()"
     )
-    skip_return_offset = body.index("return self.data or {}")
+    skip_return_offset = body.index("return snapshot")
     assert assignment_offset > skip_return_offset, body
+    skip_block = body.split("if self._should_skip_refresh_for_live_mqtt():", 1)[
+        1
+    ].split("started = time.monotonic()", 1)[0]
+    assert "snapshot = self.data or {}" in skip_block, skip_block
+    assert "self._schedule_mqtt_backfill_queries(snapshot)" in skip_block, skip_block
+    assert "_schedule_battery_pack_ota_enrichment(device_id)" in skip_block, skip_block
+
+    backfill_match = re.search(
+        r"async def _async_mqtt_backfill_queries\(.*?(?=\n    # --)",
+        src,
+        re.S,
+    )
+    assert backfill_match is not None
+    backfill_body = backfill_match.group(0)
+    assert backfill_body.index("_async_query_subdevices_for_missing") < (
+        backfill_body.index("_async_query_system_info_for_missing")
+    ), backfill_body
 
     skip_match = re.search(
         r"def _should_skip_refresh_for_live_mqtt\(self\).*?(?=\n    async def )",

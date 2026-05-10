@@ -6,8 +6,10 @@
     "CH",
     "US",
     "GB",
-    "FR",
-    "ES"
+    "NL",
+    "FR"
   ],
-  "name": "Jackery SolarVault"
+  "homeassistant": "2025.8.0",
+  "name": "Jackery SolarVault",
+  "zip_release": false
 }

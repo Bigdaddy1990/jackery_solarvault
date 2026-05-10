@@ -630,6 +630,18 @@ class JackeryApi:
         )
         return []
 
+    @staticmethod
+    def _select_ota_item(
+        items: list[dict[str, Any]],
+        device_sn: str,
+    ) -> dict[str, Any]:
+        """Return the OTA item matching the requested device serial."""
+        requested_sn = str(device_sn)
+        for item in items:
+            if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
+                return item
+        return items[0] if items else {}
+
     # --- generic GET with auto re-login ------------------------------------
     async def _get_json(self, path: str, params: dict | None = None) -> dict:
         await self._ensure_token()
@@ -1065,15 +1077,18 @@ class JackeryApi:
         if isinstance(raw, list):
             items = self._payload_list(data, OTA_LIST_PATH)
             if items:
-                return items[0]
+                return self._select_ota_item(items, device_sn)
         if isinstance(raw, dict):
             raw_body = raw.get(FIELD_BODY)
+            if isinstance(raw_body, list):
+                body_items = [item for item in raw_body if isinstance(item, dict)]
+                selected = self._select_ota_item(body_items, device_sn)
+                if selected:
+                    return selected
             candidates: list[Any] = [
                 raw_body if isinstance(raw_body, dict) else None,
                 raw,
             ]
-            if isinstance(raw_body, list):
-                candidates.extend(raw_body)
             for candidate in candidates:
                 if not isinstance(candidate, dict):
                     continue
@@ -1093,7 +1108,7 @@ class JackeryApi:
                     return candidate
         items = self._payload_list(data, OTA_LIST_PATH)
         if items:
-            return items[0]
+            return self._select_ota_item(items, device_sn)
         return {}
 
     async def async_get_location(self, device_id: str | int) -> dict:

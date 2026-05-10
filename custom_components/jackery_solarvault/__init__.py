@@ -34,9 +34,6 @@ from .const import (
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
     SMART_METER_DERIVED_SENSOR_SUFFIXES,
     STALE_ENERGY_HELPER_PREFIX,
-    STALE_HELPER_BATTERY_TOKENS,
-    STALE_HELPER_CHARGE_TOKENS,
-    STALE_HELPER_DISCHARGE_TOKENS,
     STALE_HELPER_VENDOR_TOKENS,
     STALE_NET_POWER_SUFFIX,
 )
@@ -244,23 +241,11 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         if unit not in (None, ""):
             continue
 
-        # Any stale helper referencing SolarVault/Jackery net-power entities
-        # should be removed when it no longer has a valid unit.
+        # Only stale helpers that explicitly reference this integration should
+        # be removed. A generic battery charge/discharge helper without a unit
+        # may belong to another integration or to a user-created template.
         if any(token in lowered for token in STALE_HELPER_VENDOR_TOKENS):
             to_remove.append(entity_id)
-            continue
-
-        # Broken helper pattern seen in user logs:
-        # energy_<battery_discharge>_<battery_charge>_net_power
-        # Keep this locale-agnostic (DE/EN), because helper IDs depend on UI
-        # language at creation time.
-        if not any(token in lowered for token in STALE_HELPER_BATTERY_TOKENS):
-            continue
-        if not any(token in lowered for token in STALE_HELPER_CHARGE_TOKENS):
-            continue
-        if not any(token in lowered for token in STALE_HELPER_DISCHARGE_TOKENS):
-            continue
-        to_remove.append(entity_id)
 
     for entity_id in to_remove:
         _LOGGER.info(

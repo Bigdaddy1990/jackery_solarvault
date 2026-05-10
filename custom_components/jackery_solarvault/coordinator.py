@@ -430,6 +430,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._price_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._property_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._mqtt_backfill_task: asyncio.Task[None] | None = None
+        self._battery_pack_ota_tasks: dict[str, asyncio.Task[None]] = {}
         self._skipped_refresh_ticks = 0
         # Adaptive polling: when MQTT push is live, fast HTTP refreshes are
         # short-circuited and a full HTTP refresh only runs every keep-alive
@@ -764,12 +765,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def async_shutdown(self) -> None:
         """Stop MQTT client on integration unload."""
-        for task in (self._mqtt_backfill_task,):
+        for task in (self._mqtt_backfill_task, *self._battery_pack_ota_tasks.values()):
             if task is not None and not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
         self._mqtt_backfill_task = None
+        self._battery_pack_ota_tasks.clear()
         if self._mqtt is not None:
             await self._mqtt.async_stop()
             self._mqtt = None
@@ -1021,6 +1023,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         new_data = dict(self.data)
         new_data[device_id] = updated
         self._push_partial_update(new_data)
+        if updated.get(PAYLOAD_BATTERY_PACKS):
+            self._schedule_battery_pack_ota_enrichment(device_id)
 
     def _resolve_device_id_from_mqtt(self, payload: dict[str, Any]) -> str | None:
         body = payload.get(FIELD_BODY)
@@ -1598,19 +1602,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         device_id: str,
         packs: list[dict[str, Any]],
         main_device_sn: str | None,
-    ) -> None:
+        *,
+        fetch_missing: bool = True,
+    ) -> bool:
         """Attach per-pack OTA metadata for packs learned through MQTT.
 
         Jackery exposes addon battery live data via MQTT BatteryPackSub, but
         firmware versions are read through /v1/device/ota/list by deviceSn.
         """
         if not packs:
-            return
+            return False
 
         per_dev = self._slow_cache.setdefault(f"dev:{device_id}", {})
         now = time.monotonic()
         tasks: list[Any] = []
         task_meta: list[tuple[int, str, str]] = []
+        changed = False
 
         for idx, pack in enumerate(packs[:5]):
             if not isinstance(pack, dict):
@@ -1631,24 +1638,105 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if cached and now - cached[0] < self._price_config_interval_sec:
                 cached_ota = cached[1]
                 if isinstance(cached_ota, dict):
+                    before = dict(packs[idx])
                     self._merge_pack_ota(packs[idx], cached_ota)
+                    changed = changed or packs[idx] != before
                 continue
 
+            if not fetch_missing:
+                continue
             tasks.append(self.api.async_get_ota_info(pack_sn))
             task_meta.append((idx, pack_sn, cache_key))
 
         if not tasks:
-            return
+            return changed
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for (idx, pack_sn, cache_key), res in zip(task_meta, results, strict=False):
             if isinstance(res, Exception):
                 _LOGGER.debug("Pack OTA fetch failed for %s: %s", pack_sn, res)
+                per_dev[cache_key] = (now, {})
                 continue
             if not isinstance(res, dict) or not res:
+                per_dev[cache_key] = (now, {})
                 continue
             per_dev[cache_key] = (now, res)
+            before = dict(packs[idx])
             self._merge_pack_ota(packs[idx], res)
+            changed = changed or packs[idx] != before
+        return changed
+
+    def _battery_pack_ota_fetch_due(self, device_id: str) -> bool:
+        """Return True when at least one known pack serial needs OTA refresh."""
+        payload = (self.data or {}).get(device_id) or {}
+        packs = payload.get(PAYLOAD_BATTERY_PACKS)
+        if not isinstance(packs, list):
+            return False
+        main_device_sn = self._resolve_device_sn(device_id)
+        per_dev = self._slow_cache.setdefault(f"dev:{device_id}", {})
+        now = time.monotonic()
+        for pack in packs[:5]:
+            if not isinstance(pack, dict):
+                continue
+            pack_sn = (
+                pack.get(FIELD_DEVICE_SN)
+                or pack.get(FIELD_DEV_SN)
+                or pack.get(FIELD_SN)
+            )
+            if not pack_sn:
+                continue
+            pack_sn = str(pack_sn)
+            if main_device_sn and pack_sn == str(main_device_sn):
+                continue
+            cached = per_dev.get(f"pack_ota:{pack_sn}")
+            if cached is None or now - cached[0] >= self._price_config_interval_sec:
+                return True
+        return False
+
+    def _schedule_battery_pack_ota_enrichment(self, device_id: str) -> None:
+        """Refresh per-pack OTA metadata without blocking the poll cycle."""
+        if not self._battery_pack_ota_fetch_due(device_id):
+            return
+        task = self._battery_pack_ota_tasks.get(device_id)
+        if task is not None and not task.done():
+            return
+        self._battery_pack_ota_tasks[device_id] = self.hass.async_create_task(
+            self._async_refresh_battery_pack_ota(device_id),
+            name=f"{DOMAIN}_battery_pack_ota_{device_id}",
+        )
+
+    async def _async_refresh_battery_pack_ota(self, device_id: str) -> None:
+        """Fetch per-pack OTA metadata and push a partial coordinator update."""
+        try:
+            payload = (self.data or {}).get(device_id) or {}
+            packs = payload.get(PAYLOAD_BATTERY_PACKS)
+            if not isinstance(packs, list) or not packs:
+                return
+            working_packs = [dict(pack) for pack in packs if isinstance(pack, dict)]
+            if not working_packs:
+                return
+            changed = await self._async_enrich_battery_pack_ota(
+                device_id,
+                working_packs,
+                self._resolve_device_sn(device_id),
+                fetch_missing=True,
+            )
+            if not changed or not self.data or device_id not in self.data:
+                return
+            new_data = dict(self.data)
+            entry = dict(new_data[device_id])
+            entry[PAYLOAD_BATTERY_PACKS] = self._merge_battery_pack_ota_lists(
+                entry.get(PAYLOAD_BATTERY_PACKS),
+                working_packs,
+            )
+            new_data[device_id] = entry
+            self._push_partial_update(new_data)
+        except Exception as err:
+            _LOGGER.debug("Jackery pack OTA background refresh failed: %s", err)
+        finally:
+            current = self._battery_pack_ota_tasks.get(device_id)
+            if current is asyncio.current_task():
+                self._battery_pack_ota_tasks.pop(device_id, None)
 
     @staticmethod
     def _merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
@@ -1666,6 +1754,53 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             if key in ota and ota.get(key) is not None:
                 pack[key] = ota.get(key)
+
+    @staticmethod
+    def _merge_battery_pack_ota_lists(
+        current: Any,
+        ota_updates: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge static OTA fields into packs without touching last-seen state."""
+        merged: list[dict[str, Any]] = [
+            dict(item) for item in current or [] if isinstance(item, dict)
+        ][:5]
+        index_by_sn: dict[str, int] = {}
+        for idx, item in enumerate(merged):
+            sn = (
+                item.get(FIELD_DEVICE_SN)
+                or item.get(FIELD_DEV_SN)
+                or item.get(FIELD_SN)
+            )
+            if sn:
+                index_by_sn[str(sn)] = idx
+
+        ota_keys = (
+            FIELD_VERSION,
+            FIELD_CURRENT_VERSION,
+            FIELD_IS_FIRMWARE_UPGRADE,
+            FIELD_TARGET_VERSION,
+            FIELD_TARGET_MODULE_VERSION,
+            FIELD_UPDATE_STATUS,
+            FIELD_UPDATE_CONTENT,
+            FIELD_UPGRADE_TYPE,
+        )
+        for update_idx, raw_update in enumerate(ota_updates[:5]):
+            if not isinstance(raw_update, dict):
+                continue
+            sn = (
+                raw_update.get(FIELD_DEVICE_SN)
+                or raw_update.get(FIELD_DEV_SN)
+                or raw_update.get(FIELD_SN)
+            )
+            target_idx = index_by_sn.get(str(sn)) if sn else None
+            if target_idx is None and update_idx < len(merged):
+                target_idx = update_idx
+            if target_idx is None:
+                continue
+            for key in ota_keys:
+                if key in raw_update and raw_update.get(key) is not None:
+                    merged[target_idx][key] = raw_update.get(key)
+        return merged[:5]
 
     @staticmethod
     def _is_smart_meter_accessory(item: dict[str, Any]) -> bool:
@@ -2638,9 +2773,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Refresh app-side MQTT-only data after the HTTP poll has completed."""
         try:
+            await self._async_query_subdevices_for_missing(snapshot=snapshot)
             await self._async_query_system_info_for_missing(snapshot=snapshot)
             await self._async_query_weather_plan_for_missing(snapshot=snapshot)
-            await self._async_query_subdevices_for_missing(snapshot=snapshot)
         except Exception as err:
             _LOGGER.debug("Jackery MQTT backfill query failed: %s", err)
 
@@ -2953,12 +3088,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         if self._should_skip_refresh_for_live_mqtt():
             self._skipped_refresh_ticks += 1
+            snapshot = self.data or {}
             _LOGGER.debug(
                 "Jackery: skipping coordinator HTTP refresh because MQTT push is live "
                 "(last keep-alive %.0fs ago)",
                 time.monotonic() - self._last_http_refresh_completed_monotonic,
             )
-            return self.data or {}
+            self._schedule_mqtt_backfill_queries(snapshot)
+            for device_id, payload in snapshot.items():
+                if payload.get(PAYLOAD_BATTERY_PACKS):
+                    self._schedule_battery_pack_ota_enrichment(device_id)
+            return snapshot
 
         started = time.monotonic()
 
@@ -3436,7 +3576,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
             packs = out.get(PAYLOAD_BATTERY_PACKS) or []
             if isinstance(packs, list) and packs:
-                await self._async_enrich_battery_pack_ota(dev_id, packs, dev_sn)
+                await self._async_enrich_battery_pack_ota(
+                    dev_id,
+                    packs,
+                    dev_sn,
+                    fetch_missing=False,
+                )
 
             async def _fetch_device_month(
                 prefix: str,
@@ -3572,7 +3717,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     dev_id,
                     battery_packs,
                     dev_sn,
+                    fetch_missing=False,
                 )
+                self._schedule_battery_pack_ota_enrichment(dev_id)
 
             period_payloads = {
                 self._app_period_section(prefix, date_type): extras.get(

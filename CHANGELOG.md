@@ -126,7 +126,6 @@ context.
   ``test_payload_debug_file_is_gated_by_explicit_user_optin`` and
   rewritten as a contract for the new behaviour.
 
-
 ### Fixed
 - **CI ruff F821**: `config_flow.py` and `sensor.py` gained the
   standard `from __future__ import annotations` header. Without it,
@@ -189,9 +188,6 @@ was rewritten as a whitelist contract: any future
 an entry in `INTENTIONALLY_DISABLED_BY_DEFAULT`, preventing
 silent regressions.
 
-
-## [2.3.0] - 2026-05-05
-
 This release crosses the Bronze/Silver line and reaches the Gold tier
 across all applicable rules. ``manifest.json`` accordingly carries
 ``quality_scale: gold``.
@@ -236,7 +232,6 @@ across all applicable rules. ``manifest.json`` accordingly carries
 - 161 source-only unit tests (was 157), all green.
 - New ``tests/ha/test_config_flow_ha.py`` (5 cases) and
   ``tests/ha/test_setup_entry_ha.py`` (2 cases).
-
 
 ### Added
 - **Silver-tier reauth flow** is now formally documented and test-locked.
@@ -294,7 +289,6 @@ across all applicable rules. ``manifest.json`` accordingly carries
 - 26 new tests across ``test_reauth_contract.py``,
   ``test_mqtt_stability.py``, ``test_battery_pack_stability.py``.
 - Full suite: 131 → 157 tests, all green. ruff check + format clean.
-
 
 ### Added
 - `docs/SENSOR_SOURCE_PATHS.md` auto-generated entity-to-source-path map.

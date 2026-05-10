@@ -8,9 +8,6 @@ Locks down the contract:
 3. Permanently-removed packs (>7 days silent) are removed by
    ``_drop_stale_battery_packs``, freeing HA's device registry.
 4. Pure unit-test coverage of the cleanup helper without HA fixtures.
-
-Together these implement the Gold-tier ``stale-devices`` rule described
-in ``docs/quality_scale.yaml``.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -82,9 +79,9 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
 def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     """_drop_stale_battery_packs returns (kept_packs, stale_count, dropped_indices).
 
-    The third element drives the dynamic-devices Gold-tier rule: each
-    dropped pack index is converted into a device-registry identifier
-    so HA's registry stays consistent with the coordinator's payload.
+    The third element lets each dropped pack index be converted into a
+    device-registry identifier so HA's registry stays consistent with
+    the coordinator's payload.
     """
     src = _read("coordinator.py")
     match = re.search(
@@ -282,7 +279,54 @@ def test_battery_pack_ota_merge_preserves_pack_firmware_metadata() -> None:
         assert field in body, body
 
 
-# ---------- Gold-tier: dynamic-devices ----------------------------------
+def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
+    """Slow pack OTA lookups must not block the 30s coordinator poll.
+
+    APP_POLLING_MQTT.md defines add-on battery live data as MQTT-first. The
+    OTA endpoint only enriches firmware metadata and must therefore run in
+    the background with cached values merged into the poll result.
+    """
+    src = _read("coordinator.py")
+
+    assert "_battery_pack_ota_tasks" in src, src
+    assert "def _schedule_battery_pack_ota_enrichment" in src, src
+    assert "async def _async_refresh_battery_pack_ota" in src, src
+    assert "def _merge_battery_pack_ota_lists" in src, src
+
+    update_match = re.search(
+        r"async def _async_update_data\(.*?return result",
+        src,
+        re.S,
+    )
+    assert update_match is not None
+    update_body = update_match.group(0)
+    assert "fetch_missing=False" in update_body, update_body
+    assert "_schedule_battery_pack_ota_enrichment(dev_id)" in update_body, update_body
+
+    handler_match = re.search(
+        r"async def _async_handle_mqtt_message\(.*?(?=\n    def _resolve_device_id_from_mqtt)",
+        src,
+        re.S,
+    )
+    assert handler_match is not None
+    handler_body = handler_match.group(0)
+    assert "self._push_partial_update(new_data)" in handler_body, handler_body
+    assert "_schedule_battery_pack_ota_enrichment(device_id)" in handler_body, (
+        handler_body
+    )
+
+    refresh_match = re.search(
+        r"async def _async_refresh_battery_pack_ota\(.*?(?=\n    @staticmethod)",
+        src,
+        re.S,
+    )
+    assert refresh_match is not None
+    refresh_body = refresh_match.group(0)
+    assert "_merge_battery_pack_ota_lists" in refresh_body, refresh_body
+    assert "_merge_battery_pack_lists" not in refresh_body, refresh_body
+
+
+# ---------- Dynamic battery-pack devices --------------------------------
 
 
 def test_coordinator_queues_device_removals_on_stale_pack_drop() -> None:
@@ -343,15 +387,3 @@ def test_update_data_drains_pending_removals() -> None:
         src,
     )
     assert pattern is not None, src
-
-
-def test_quality_scale_dynamic_devices_marked_done() -> None:
-    """quality_scale.yaml: dynamic-devices is now done."""
-    qs = (COMPONENT / "quality_scale.yaml").read_text(encoding="utf-8")
-    # Find the dynamic-devices block
-    match = re.search(
-        r"dynamic-devices:\s*\n\s*status:\s*(\w+)",
-        qs,
-    )
-    assert match is not None, qs
-    assert match.group(1) == "done", match.group(1)

@@ -157,7 +157,10 @@ for SolarVault and is only used as a fallback per APP_POLLING_MQTT.md.
 Per-pack fields documented in APP_POLLING_MQTT.md "Zusatzbatterie-Appmodell":
 `deviceSn`, `subType`, `commState`, `scanName`, `deviceName`,
 `commMode`, `batSoc`, `inPw`, `outPw`, `cellTemp`,
-`isFirmwareUpgrade`, `version`.
+`isFirmwareUpgrade`, `version`. Firmware/update diagnostics can also be
+enriched from `/v1/device/ota/list` fields such as `currentVersion`,
+`updateStatus`, `targetVersion`, `targetModuleVersion`, `updateContent`, and
+`upgradeType` when the pack serial number is available.
 
 ## Setters (number / select / switch / button / text)
 
