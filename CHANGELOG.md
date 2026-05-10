@@ -22,8 +22,17 @@ context.
 - Removed the raw payload debug log checkbox from setup/options and the remaining stale option code; payload-debug JSONL now requires the dedicated Home Assistant payload-debug logger to be set explicitly to DEBUG.
 - Normalized German/English entity names for house consumption, battery discharge and PV yield sensors.
 - Moved the canonical cloud-value documentation to `docs/APP_CLOUD_VALUES.md`, linked it from the READMEs and kept `docs/Werte aus APP-Cloud.md` as a compatibility path.
+- HACS metadata now follows the current non-zip custom-integration manifest shape (`zip_release: false`) and no longer uses unsupported `render_readme` metadata.
+- Quality-scale status is no longer enforced by the local test suite; classification remains a Home Assistant/HACS review concern.
 
 ### Fixed
+- Live MQTT adaptive polling no longer suppresses active app-protocol backfill. Even when the HTTP refresh is skipped because MQTT is live, the integration still schedules `QuerySubDeviceGroupProperty` for add-on batteries and the Smart Meter/CT path at the configured fast interval.
+- Add-on battery firmware enrichment no longer blocks the main coordinator refresh. Pack OTA metadata is fetched in the background, matched by pack `deviceSn`, cached, and merged into the existing pack payload.
+- Pack OTA metadata merges no longer refresh `_last_seen_at`, so firmware/update enrichment cannot accidentally keep a disconnected or removed add-on battery alive forever.
+- `/v1/device/ota/list` responses with multiple items now select the entry matching the requested `deviceSn` instead of blindly using the first item, preventing main-device firmware from masking add-on battery firmware.
+- Stale Energy helper cleanup is restricted to helpers that explicitly reference Jackery/SolarVault, avoiding broad removal of unrelated user-created battery charge/discharge helpers.
+- Smart Meter/CT entities cache their state and attributes before Home Assistant writes entity state, avoiding repeated expensive calculations during every state read.
+- Passive broker-side MQTT socket resets from `aiomqtt` are filtered from normal logs while keeping actionable MQTT errors visible in integration diagnostics.
 - Restored the missing `parse_utc_datetime` / `utc_now` helpers used by battery-pack stale cleanup so Home Assistant can import the integration again.
 - PV1..PV4 day-energy entities no longer stay as restored/unavailable after midnight when Jackery returns an empty `dateType=day` PV payload; they are kept active from the week/month chart support and use today's chart bucket as fallback.
 - Savings detail energy and calculated-savings total sensors now use cumulative `TOTAL` state classes instead of instantaneous measurement state classes.
@@ -31,6 +40,10 @@ context.
 - The integration imports `JackerySolarVaultCoordinator` at runtime so pre-commit annotation rewrites cannot leave Home Assistant test collection with an undefined coordinator annotation.
 - Recorder is now declared as an optional `after_dependencies` manifest entry instead of a required dependency, preventing Home Assistant fixture tests from bootstrapping recorder during config-flow collection.
 - Config-flow entries use the account as the entry title again, and HA fixture login mocks now preserve token side effects while stubbing discovery calls.
+
+### Tests
+- Removed local quality-scale assertions from the test suite.
+- Added regression coverage for live-MQTT skip still scheduling active MQTT backfill, non-blocking add-on battery OTA enrichment, OTA item selection by `deviceSn`, Smart Meter state caching, stale Energy helper cleanup, and HACS manifest key validation.
 
 ### Fixed
 - **Midnight race condition for ``today_*`` and lifetime sensors.**
