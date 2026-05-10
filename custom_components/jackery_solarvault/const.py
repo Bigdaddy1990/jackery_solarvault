@@ -975,6 +975,12 @@ STALE_PERIOD_SENSOR_SUFFIXES: Final = frozenset({
     "_grid_export_month_energy",
     "_grid_export_year_energy",
 })
+STALE_ENERGY_HELPER_PREFIX: Final = "sensor.energy_"
+STALE_NET_POWER_SUFFIX: Final = "_net_power"
+STALE_HELPER_VENDOR_TOKENS: Final = ("solarvault", "jackery")
+STALE_HELPER_BATTERY_TOKENS: Final = ("battery", "batterie")
+STALE_HELPER_CHARGE_TOKENS: Final = ("charge", "lade")
+STALE_HELPER_DISCHARGE_TOKENS: Final = ("discharge", "entlade")
 FORMER_DISABLED_APP_SENSOR_SUFFIXES: Final = frozenset({
     "_eps_in_power",
     "_eps_out_power",

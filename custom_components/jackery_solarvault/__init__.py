@@ -33,6 +33,12 @@ from .const import (
     REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
     SMART_METER_DERIVED_SENSOR_SUFFIXES,
+    STALE_ENERGY_HELPER_PREFIX,
+    STALE_HELPER_BATTERY_TOKENS,
+    STALE_HELPER_CHARGE_TOKENS,
+    STALE_HELPER_DISCHARGE_TOKENS,
+    STALE_HELPER_VENDOR_TOKENS,
+    STALE_NET_POWER_SUFFIX,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .services import async_setup_services
@@ -71,6 +77,7 @@ def _async_clean_legacy_entities(
     entry-version side effects while still removing entities that are no
     longer part of the documented app/HTTP/MQTT data model.
     """
+    _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
         hass,
         entry,
@@ -219,6 +226,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 # -----------------------------------------------------------------------------
 # Registry cleanup helpers
 # -----------------------------------------------------------------------------
+
+
+def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
+    """Remove known stale Energy helper sensors that were created without a unit."""
+    registry = er.async_get(hass)
+    to_remove: list[str] = []
+    for ent in registry.entities.values():
+        entity_id = ent.entity_id or ""
+        if not entity_id.startswith(STALE_ENERGY_HELPER_PREFIX):
+            continue
+        if not entity_id.endswith(STALE_NET_POWER_SUFFIX):
+            continue
+        lowered = entity_id.lower()
+        state = hass.states.get(entity_id)
+        unit = None if state is None else state.attributes.get("unit_of_measurement")
+        if unit not in (None, ""):
+            continue
+
+        # Any stale helper referencing SolarVault/Jackery net-power entities
+        # should be removed when it no longer has a valid unit.
+        if any(token in lowered for token in STALE_HELPER_VENDOR_TOKENS):
+            to_remove.append(entity_id)
+            continue
+
+        # Broken helper pattern seen in user logs:
+        # energy_<battery_discharge>_<battery_charge>_net_power
+        # Keep this locale-agnostic (DE/EN), because helper IDs depend on UI
+        # language at creation time.
+        if not any(token in lowered for token in STALE_HELPER_BATTERY_TOKENS):
+            continue
+        if not any(token in lowered for token in STALE_HELPER_CHARGE_TOKENS):
+            continue
+        if not any(token in lowered for token in STALE_HELPER_DISCHARGE_TOKENS):
+            continue
+        to_remove.append(entity_id)
+
+    for entity_id in to_remove:
+        _LOGGER.info(
+            "Removing stale Energy helper without unit: %s "
+            "(please recreate with Jackery battery_net_power)",
+            entity_id,
+        )
+        registry.async_remove(entity_id)
 
 
 def _async_remove_entities_with_suffixes(

@@ -2331,7 +2331,6 @@ async def async_setup_entry(
                 )
         return entities
 
-    @callback
     def _add_new_entities() -> None:
         entities = _collect_entities()
         if entities:
@@ -2934,6 +2933,8 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, f"smart_meter_{description.key}")
         self.entity_description = description
+        self._cached_native_value: Any = None
+        self._cached_attrs: dict[str, Any] = {}
 
     @staticmethod
     def _directional_value(
@@ -2959,12 +2960,8 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Calculate derived smart-meter powers from signed phase values."""
         return calculated_smart_meter_power(ct, calculation)
 
-    @property
-    def native_value(self) -> Any:
-        """Return the entity's current value."""
-        ct = self._payload.get(PAYLOAD_CT_METER) or {}
-        if not isinstance(ct, dict):
-            return None
+    def _value_from_ct(self, ct: dict[str, Any]) -> Any:
+        """Calculate the current value from a CT payload."""
         raw = None
 
         if self.entity_description.calculation:
@@ -2996,37 +2993,8 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         value = self.entity_description.transform(raw)
         return round(value, 2) if isinstance(value, float) else value
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device-registry metadata for this entity."""
-        ct = self._payload.get(PAYLOAD_CT_METER) or {}
-        if not isinstance(ct, dict):
-            ct = {}
-        base_name = (
-            self._system.get(FIELD_DEVICE_NAME)
-            or self._discovery.get(FIELD_DEVICE_NAME)
-            or self._properties.get(FIELD_WNAME)
-            or "SolarVault"
-        )
-        scan_name = str(ct.get(FIELD_SCAN_NAME) or "Smart Meter")
-        manufacturer = "Shelly" if "shelly" in scan_name.lower() else MANUFACTURER
-        model = scan_name if scan_name and scan_name != "Smart Meter" else "Smart Meter"
-        sn = ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_SN) or ct.get(FIELD_MAC)
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._device_id}_smart_meter")},
-            manufacturer=manufacturer,
-            name=f"{base_name} Smart Meter",
-            model=model,
-            serial_number=str(sn) if sn else None,
-            via_device=(DOMAIN, self._device_id),
-        )
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
-        ct = self._payload.get(PAYLOAD_CT_METER) or {}
-        if not isinstance(ct, dict):
-            return {}
+    def _attrs_from_ct(self, ct: dict[str, Any]) -> dict[str, Any]:
+        """Build diagnostic attributes from a CT payload."""
         attrs: dict[str, Any] = {}
         for key in CT_ATTRIBUTE_FIELDS:
             if key in ct:
@@ -3070,6 +3038,62 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
                 else "raw_field"
             )
         return attrs
+
+    def _refresh_cache(self) -> None:
+        """Recompute state and attributes once per coordinator update."""
+        ct = self._payload.get(PAYLOAD_CT_METER) or {}
+        if not isinstance(ct, dict):
+            self._cached_native_value = None
+            self._cached_attrs = {}
+            return
+        self._cached_native_value = self._value_from_ct(ct)
+        self._cached_attrs = self._attrs_from_ct(ct)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh cached Smart-Meter values before HA writes the new state."""
+        self._refresh_cache()
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """Prime the cache before CoordinatorEntity writes the initial state."""
+        self._refresh_cache()
+        await super().async_added_to_hass()
+
+    @property
+    def native_value(self) -> Any:
+        """Return the entity's current value."""
+        return self._cached_native_value
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device-registry metadata for this entity."""
+        ct = self._payload.get(PAYLOAD_CT_METER) or {}
+        if not isinstance(ct, dict):
+            ct = {}
+        base_name = (
+            self._system.get(FIELD_DEVICE_NAME)
+            or self._discovery.get(FIELD_DEVICE_NAME)
+            or self._properties.get(FIELD_WNAME)
+            or "SolarVault"
+        )
+        scan_name = str(ct.get(FIELD_SCAN_NAME) or "Smart Meter")
+        manufacturer = "Shelly" if "shelly" in scan_name.lower() else MANUFACTURER
+        model = scan_name if scan_name and scan_name != "Smart Meter" else "Smart Meter"
+        sn = ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_SN) or ct.get(FIELD_MAC)
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._device_id}_smart_meter")},
+            manufacturer=manufacturer,
+            name=f"{base_name} Smart Meter",
+            model=model,
+            serial_number=str(sn) if sn else None,
+            via_device=(DOMAIN, self._device_id),
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the current state."""
+        return self._cached_attrs
 
 
 class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):

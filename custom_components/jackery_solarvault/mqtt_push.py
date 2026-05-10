@@ -31,12 +31,34 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 # aiomqtt and paho-mqtt log under their own module names. Keep them at WARNING
 # so transient connect/disconnect noise stays out of normal HA logs unless the
 # user opts in via the integration's own debug logger. The connect-failure
 # pathway below differentiates auth rejections (warning) from transient
 # refusals (debug) on its own.
 logging.getLogger("aiomqtt").setLevel(logging.WARNING)
+
+
+class _AioMqttPassiveDisconnectFilter(logging.Filter):
+    """Hide expected passive broker reset noise from aiomqtt internals."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False for the known passive disconnect message."""
+        message = record.getMessage()
+        if "failed to receive on socket" not in message:
+            return True
+        return not any(
+            marker in message
+            for marker in (
+                "Errno 104",
+                "Connection reset by peer",
+                "WinError 10054",
+            )
+        )
+
+
+_AIOMQTT_LOGGER.addFilter(_AioMqttPassiveDisconnectFilter())
 
 
 class JackeryMqttPushClient:
@@ -236,7 +258,7 @@ class JackeryMqttPushClient:
                 tls_context=ssl_context,
                 keepalive=MQTT_KEEPALIVE_SEC,
                 clean_session=True,
-                logger=_LOGGER,
+                logger=_AIOMQTT_LOGGER,
             ) as client:
                 self._client = client
                 self._connected = True
