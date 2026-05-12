@@ -661,9 +661,7 @@ def test_total_revenue_state_class_compatible_with_monetary_device_class() -> No
     )
 
 
-def test_statistics_backfill_state_is_persistent_and_loaded_before_first_refresh() -> (
-    None
-):
+def test_statistics_backfill_state_is_persistent_and_loaded_before_first_refresh() -> None:
     """External-statistics backfill state survives HA restarts."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     init_source = INIT_PATH.read_text(encoding="utf-8")
@@ -673,21 +671,17 @@ def test_statistics_backfill_state_is_persistent_and_loaded_before_first_refresh
     assert "async_load_statistics_backfill_state" in coordinator_source
     assert "_async_save_statistics_backfill_state" in coordinator_source
     assert "statistics_backfill_diagnostics" in coordinator_source
-    assert init_source.index(
-        "async_load_statistics_backfill_state"
-    ) < init_source.index("async_discover()")
+    assert init_source.index("async_load_statistics_backfill_state") < init_source.index(
+        "async_discover()"
+    )
 
 
-def test_statistics_backfill_repairs_calendar_boundaries_before_current_import() -> (
-    None
-):
+def test_statistics_backfill_repairs_calendar_boundaries_before_current_import() -> None:
     """Missed month/year app buckets are reloaded before the current snapshot."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     repair_source = coordinator_source.split(
         "async def _async_import_and_repair_app_chart_statistics", 1
-    )[1].split(
-        "# ------------------------------------------------------------------", 1
-    )[0]
+    )[1].split("# ------------------------------------------------------------------", 1)[0]
 
     assert "app_month_request_kwargs" in coordinator_source
     assert "app_year_request_kwargs" in coordinator_source

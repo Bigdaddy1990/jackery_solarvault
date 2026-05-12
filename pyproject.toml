@@ -153,10 +153,6 @@ warn_unused_ignores = true
 sqlite_cache = false
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
-
-[[tool.mypy.overrides]]
 module = ["custom_components.jackery_solarvault.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

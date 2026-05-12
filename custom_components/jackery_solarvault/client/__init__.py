@@ -1,5 +1,7 @@
 """Standalone Jackery SolarVault protocol client library."""
 
+from typing import Any
+
 from .api import JackeryApi, JackeryApiError, JackeryAuthError, JackeryError
 
 __all__ = [
@@ -7,11 +9,11 @@ __all__ = [
     "JackeryApiError",
     "JackeryAuthError",
     "JackeryError",
-    "JackeryMqttPushClient",  # noqa: F822
+    "JackeryMqttPushClient",
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name == "JackeryMqttPushClient":
         from .mqtt_push import JackeryMqttPushClient
 
