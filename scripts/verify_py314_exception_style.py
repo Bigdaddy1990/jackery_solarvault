@@ -42,7 +42,7 @@ def _configured_line_length() -> int:
     pyproject = ROOT / "pyproject.toml"
     try:
         config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    except OSError, tomllib.TOMLDecodeError:
+    except (OSError, tomllib.TOMLDecodeError):
         return DEFAULT_LINE_LENGTH
     value = config.get("tool", {}).get("ruff", {}).get("line-length")
     return value if isinstance(value, int) and value > 0 else DEFAULT_LINE_LENGTH
@@ -128,8 +128,14 @@ def _fixed_header(header: str, *, line_length: int) -> str | None:
     return replacement
 
 
-def violations_in_text(source: str, *, line_length: int) -> list[tuple[int, str]]:
+def violations_in_text(
+    source: str,
+    *,
+    line_length: int | None = None,
+) -> list[tuple[int, str]]:
     """Return unnecessary old-style Python 3.14 exception formatting violations."""
+    if line_length is None:
+        line_length = _configured_line_length()
     lines = source.splitlines()
     violations: list[tuple[int, str]] = []
     for index, line in enumerate(lines):
@@ -141,8 +147,14 @@ def violations_in_text(source: str, *, line_length: int) -> list[tuple[int, str]
     return violations
 
 
-def fix_text(source: str, *, line_length: int) -> str:
+def fix_text(
+    source: str,
+    *,
+    line_length: int | None = None,
+) -> str:
     """Rewrite fixable old-style multi-exception headers to Python 3.14 style."""
+    if line_length is None:
+        line_length = _configured_line_length()
     lines = source.splitlines(keepends=True)
     plain_lines = [line.rstrip("\r\n") for line in lines]
     fixed: list[str] = []
