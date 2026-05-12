@@ -1,1 +1,1 @@
-aiomqtt>=2.3.0
+aiomqtt>=2.5.1
