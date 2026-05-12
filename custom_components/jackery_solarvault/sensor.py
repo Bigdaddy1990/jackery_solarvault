@@ -304,6 +304,7 @@ from .util import (
     trend_series_total,
 )
 
+
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
 PARALLEL_UPDATES = 0
@@ -331,7 +332,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -3135,7 +3136,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
             try:
                 json.dumps(v)
                 attrs[k] = v
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 attrs[k] = str(v)
         return attrs
 
@@ -3564,7 +3565,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 

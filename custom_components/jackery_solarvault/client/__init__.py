@@ -9,7 +9,7 @@ __all__ = [
     "JackeryApiError",
     "JackeryAuthError",
     "JackeryError",
-    "JackeryMqttPushClient",  # noqa: F822
+    "JackeryMqttPushClient",
 ]
 
 

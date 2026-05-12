@@ -27,7 +27,10 @@ INTEGRATION_COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
-    base = CLIENT_COMPONENT if name in {"mqtt_push.py"} else INTEGRATION_COMPONENT
+    if name in {"mqtt_push.py"}:
+        base = CLIENT_COMPONENT
+    else:
+        base = INTEGRATION_COMPONENT
     return (base / name).read_text(encoding="utf-8")
 
 

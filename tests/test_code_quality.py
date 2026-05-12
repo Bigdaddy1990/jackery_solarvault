@@ -438,6 +438,99 @@ def test_ci_runs_all_pure_tests_and_compileall() -> None:
     assert "tests/test_power_math.py" not in workflow
 
 
+def test_standalone_client_util_mirror_stays_in_sync() -> None:
+    """The bundled standalone client must expose the same pure helpers."""
+    assert (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8") == (
+        CLIENT_PACKAGE / "util.py"
+    ).read_text(encoding="utf-8")
+
+
+def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
+    """Cache dependency paths in workflows should not silently point at typos."""
+    missing: list[str] = []
+    for workflow in pathlib.Path(".github/workflows").glob("*.y*ml"):
+        source = workflow.read_text(encoding="utf-8")
+        for match in re.finditer(r"^\s{12}([^\s#][^\n#]*)$", source, re.MULTILINE):
+            candidate = match.group(1).strip()
+            if not candidate.startswith("requirements") or not candidate.endswith(".txt"):
+                continue
+            if not pathlib.Path(candidate).exists():
+                missing.append(f"{workflow}:{candidate}")
+    assert not missing
+
+
+def test_ruff_baseline_uses_pinned_python_314_exception_formatting() -> None:
+    """Ruff baseline must not drift back to pre-3.14 exception formatting."""
+    workflow = pathlib.Path(".github/workflows/ruff-baseline.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "RUFF_VERSION:" in workflow
+    assert "RUFF_TARGET_VERSION: py314" in workflow
+    assert '"ruff==${RUFF_VERSION}"' in workflow
+    assert "python -m pip install --upgrade pip ruff" not in workflow
+    assert "python -m ruff --version" in workflow
+    assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') == 7
+    assert (
+        'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"'
+        in workflow
+    )
+    assert "python scripts/verify_py314_exception_style.py" in workflow
+
+
+def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> None:
+    """The workflow guard should fail old no-``as`` multi-exception headers only."""
+    script = pathlib.Path("scripts/verify_py314_exception_style.py")
+    spec = importlib.util.spec_from_file_location(
+        "verify_py314_exception_style", script
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.violations_in_text(
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError):\n"
+        "    pass\n"
+    ) == [(3, "except (ValueError, TypeError):")]
+    assert module.violations_in_text(
+        "try:\n"
+        "    pass\n"
+        "except (\n"
+        "    ValueError,\n"
+        "    TypeError,\n"
+        "):\n"
+        "    pass\n"
+    ) == [
+        (
+            3,
+            "except (\n"
+            "    ValueError,\n"
+            "    TypeError,\n"
+            "):",
+        )
+    ]
+    assert (
+        module.violations_in_text(
+            "try:\n"
+            "    pass\n"
+            "except ValueError, TypeError:\n"
+            "    pass\n"
+        )
+        == []
+    )
+    assert (
+        module.violations_in_text(
+            "try:\n"
+            "    pass\n"
+            "except (ValueError, TypeError) as err:\n"
+            "    raise RuntimeError from err\n"
+        )
+        == []
+    )
+
+
 def test_period_source_diagnostics_stay_minimal() -> None:
     """Period sensors should expose calculation facts, not redundant contracts."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")

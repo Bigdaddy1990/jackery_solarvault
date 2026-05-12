@@ -9,9 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
-MQTT_PUSH_PATH = (
-    ROOT / "custom_components" / "jackery_solarvault" / "client" / "mqtt_push.py"
-)
+MQTT_PUSH_PATH = ROOT / "custom_components" / "jackery_solarvault" / "client" / "mqtt_push.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
 
 
@@ -127,12 +125,9 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
 
 def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     """The MQTT password must use the REST login userId/mqttPassWord/macId triple."""
-    api_source = _read(
-        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
-    )
+    api_source = _read(ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py")
     login = _function_source(
-        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py",
-        "async_login",
+        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py", "async_login"
     )
     credentials = _function_source(
         ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py",

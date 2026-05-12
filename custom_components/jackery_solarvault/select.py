@@ -1,4 +1,4 @@
-from __future__ import annotations  # noqa: D100
+from __future__ import annotations
 
 """Select platform for Jackery SolarVault preset-style controls.
 
@@ -12,26 +12,20 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
-from collections.abc import Awaitable, Callable  # noqa: E402
-from dataclasses import dataclass, field  # noqa: E402
-import logging  # noqa: E402
-import re  # noqa: E402
-from typing import Any, NoReturn  # noqa: E402
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+import logging
+import re
+from typing import Any, NoReturn
 
-from homeassistant.components.select import (  # noqa: E402
-    SelectEntity,
-    SelectEntityDescription,
-)
-from homeassistant.const import EntityCategory  # noqa: E402
-from homeassistant.core import HomeAssistant  # noqa: E402
-from homeassistant.exceptions import (  # noqa: E402
-    ConfigEntryAuthFailed,
-    HomeAssistantError,
-)
-from homeassistant.helpers.entity_platform import AddEntitiesCallback  # noqa: E402
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
+from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry  # noqa: E402
-from .const import (  # noqa: E402
+from . import JackeryConfigEntry
+from .const import (
     AUTO_OFF_HOURS,
     DEFAULT_STORM_WARNING_MINUTES,
     DOMAIN,
@@ -64,9 +58,9 @@ from .const import (  # noqa: E402
     WORK_MODE_READ_ALIASES,
     WORK_MODE_TO_OPTION,
 )
-from .coordinator import JackerySolarVaultCoordinator  # noqa: E402
-from .entity import JackeryEntity  # noqa: E402
-from .util import append_unique_entity, safe_int, task_plan_value  # noqa: E402
+from .coordinator import JackerySolarVaultCoordinator
+from .entity import JackeryEntity
+from .util import append_unique_entity, safe_int, task_plan_value
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on

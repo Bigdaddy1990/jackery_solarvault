@@ -302,6 +302,22 @@ def app_month_request_kwargs(year: int, month: int) -> dict[str, str]:
     }
 
 
+def app_year_request_kwargs(year: int) -> dict[str, str]:
+    """Return method kwargs for one explicit calendar-year app request."""
+    first = date(year, 1, 1)
+    last = date(year, 12, 31)
+    begin, end = app_period_date_bounds(
+        DATE_TYPE_YEAR,
+        begin_date=first,
+        end_date=last,
+    )
+    return {
+        APP_REQUEST_DATE_TYPE_ALT: DATE_TYPE_YEAR,
+        APP_REQUEST_BEGIN_DATE_ALT: begin,
+        APP_REQUEST_END_DATE_ALT: end,
+    }
+
+
 def safe_float(value: Any) -> float | None:
     """Convert a Jackery payload value to float, returning None on error.
 
@@ -327,7 +343,7 @@ def safe_float(value: Any) -> float | None:
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -341,10 +357,10 @@ def safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
@@ -451,7 +467,7 @@ def safe_bool(value: Any) -> bool | None:
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
