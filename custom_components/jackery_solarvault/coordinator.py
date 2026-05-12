@@ -2981,7 +2981,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_save_statistics_backfill_state(self) -> None:
         """Persist external-statistics repair state."""
-        await self._statistics_backfill_store.async_save(self._statistics_backfill_state)
+        await self._statistics_backfill_store.async_save(
+            self._statistics_backfill_state
+        )
 
     async def _async_ensure_statistics_backfill_state_loaded(self) -> None:
         """Load persistent repair state on demand."""
@@ -3019,9 +3021,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         if not isinstance(devices, dict):
             devices = {}
-            self._statistics_backfill_state[
-                _STATISTICS_BACKFILL_STORE_DEVICES
-            ] = devices
+            self._statistics_backfill_state[_STATISTICS_BACKFILL_STORE_DEVICES] = (
+                devices
+            )
         state = devices.setdefault(str(device_id), {})
         if not isinstance(state, dict):
             state = {}
@@ -3280,7 +3282,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         name_prefix = self._app_chart_name_prefix(device_id, payload)
         index = self._device_index.get(device_id) or {}
-        system_id = str(index.get(FIELD_SYSTEM_ID)) if index.get(FIELD_SYSTEM_ID) else None
+        system_id = (
+            str(index.get(FIELD_SYSTEM_ID)) if index.get(FIELD_SYSTEM_ID) else None
+        )
         prefixes = tuple(dict.fromkeys(metric[0] for metric in APP_CHART_STAT_METRICS))
         repaired_buckets = 0
         failed_buckets = 0
@@ -3289,7 +3293,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             (DATE_TYPE_MONTH, self._iter_calendar_months(from_date, to_date)),
             (
                 DATE_TYPE_YEAR,
-                [date(year, 1, 1) for year in self._iter_calendar_years(from_date, to_date)],
+                [
+                    date(year, 1, 1)
+                    for year in self._iter_calendar_years(from_date, to_date)
+                ],
             ),
         )
 
@@ -3326,7 +3333,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if fetched_source:
                         section_sources[section_prefix] = fetched_source
 
-                for section_prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
+                for (
+                    section_prefix,
+                    stat_key,
+                    metric_key,
+                    label,
+                ) in APP_CHART_STAT_METRICS:
                     section_source = section_sources.get(section_prefix)
                     if section_source is None:
                         continue
@@ -3387,7 +3399,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 repair_ok[device_id] = True
                 continue
             try:
-                repaired, failed = await self._async_repair_missing_app_chart_statistics(
+                (
+                    repaired,
+                    failed,
+                ) = await self._async_repair_missing_app_chart_statistics(
                     device_id,
                     payload,
                     from_date,

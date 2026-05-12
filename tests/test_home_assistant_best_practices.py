@@ -25,8 +25,7 @@ def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
     source = _read("config_flow.py")
     assert "FLOW_ABORT_RECONFIGURE_ENTRY_MISSING" in source
     assert (
-        "return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)"
-        in source
+        "return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)" in source
     )
 
 

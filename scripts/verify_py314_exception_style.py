@@ -42,7 +42,7 @@ def _configured_line_length() -> int:
     pyproject = ROOT / "pyproject.toml"
     try:
         config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError, tomllib.TOMLDecodeError:
         return DEFAULT_LINE_LENGTH
     value = config.get("tool", {}).get("ruff", {}).get("line-length")
     return value if isinstance(value, int) and value > 0 else DEFAULT_LINE_LENGTH
