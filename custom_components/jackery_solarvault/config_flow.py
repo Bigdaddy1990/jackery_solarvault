@@ -28,8 +28,8 @@ from .const import (
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
-    FLOW_ABORT_RECONFIGURE_ENTRY_MISSING,
     FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
+    FLOW_ABORT_RECONFIGURE_ENTRY_MISSING,
     FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
     FLOW_ERROR_ACCOUNT_REQUIRED,
     FLOW_ERROR_BASE,
@@ -201,7 +201,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -285,7 +285,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Prompt the user for a fresh password and re-test against Jackery."""
         try:
             entry = self._get_reauth_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
 
