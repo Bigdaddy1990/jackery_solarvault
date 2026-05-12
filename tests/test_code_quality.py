@@ -470,12 +470,16 @@ def test_ruff_baseline_uses_pinned_python_314_exception_formatting() -> None:
     assert '"ruff==${RUFF_VERSION}"' in workflow
     assert "python -m pip install --upgrade pip ruff" not in workflow
     assert "python -m ruff --version" in workflow
-    assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') == 7
+    assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') == 6
     assert (
         'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"'
         in workflow
     )
+    assert "python scripts/verify_py314_exception_style.py --fix" in workflow
     assert "python scripts/verify_py314_exception_style.py" in workflow
+    assert "--unsafe-fixes" in workflow
+    assert "--exit-zero" in workflow
+    assert "--output-format=concise" in workflow
 
 
 def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> None:
@@ -528,6 +532,28 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
             "    raise RuntimeError from err\n"
         )
         == []
+    )
+    assert module.fix_text(
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError):\n"
+        "    pass\n"
+    ) == (
+        "try:\n"
+        "    pass\n"
+        "except ValueError, TypeError:\n"
+        "    pass\n"
+    )
+    assert module.fix_text(
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError) as err:\n"
+        "    raise RuntimeError from err\n"
+    ) == (
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError) as err:\n"
+        "    raise RuntimeError from err\n"
     )
 
 
@@ -1157,23 +1183,17 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
 def test_all_api_json_decode_paths_catch_value_error() -> None:
     """aiohttp/json stacks may raise ValueError for malformed JSON payloads.
 
-    Each ``resp.json(...)`` call site must wrap a four-tuple of the relevant
-    decode/format exceptions: ``aiohttp.ContentTypeError``,
-    ``json.JSONDecodeError``, ``UnicodeDecodeError`` and ``ValueError``. The
-    test is tolerant to ruff format's multi-line layout (one type per line)
-    by collecting the full text of each ``except (...)`` block before
-    asserting on the contents.
+    Each ``resp.json(...)`` call site must catch the relevant decode/format
+    exceptions: ``aiohttp.ContentTypeError``, ``json.JSONDecodeError``,
+    ``UnicodeDecodeError`` and ``ValueError``. The test accepts both the
+    required parenthesized ``as err`` handler and Python 3.14's unparenthesized
+    no-``as`` multi-exception headers.
     """
     api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
-    # Collect every `except (...) ...` block, regardless of line wrapping.
     decode_blocks: list[str] = []
-    pattern = re.compile(
-        r"except\s*\(\s*aiohttp\.ContentTypeError\s*,[^)]+\)",
-        re.S,
-    )
-    for match in pattern.finditer(api_source):
-        # Normalise to a single line so each assertion is local and clear.
-        decode_blocks.append(re.sub(r"\s+", " ", match.group(0)))
+    for match in re.finditer(r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError", api_source):
+        block = api_source[match.start() : api_source.find(":", match.start()) + 1]
+        decode_blocks.append(re.sub(r"\s+", " ", block))
     assert len(decode_blocks) == 4, decode_blocks
     for block in decode_blocks:
         assert "json.JSONDecodeError" in block, block

@@ -1,8 +1,13 @@
 """Standalone Jackery SolarVault protocol client library."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .api import JackeryApi, JackeryApiError, JackeryAuthError, JackeryError
+
+if TYPE_CHECKING:
+    from .mqtt_push import JackeryMqttPushClient
+else:
+    JackeryMqttPushClient: Any
 
 __all__ = [
     "JackeryApi",
@@ -15,7 +20,7 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:
     if name == "JackeryMqttPushClient":
-        from .mqtt_push import JackeryMqttPushClient
+        from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 
-        return JackeryMqttPushClient
+        return _JackeryMqttPushClient
     raise AttributeError(name)

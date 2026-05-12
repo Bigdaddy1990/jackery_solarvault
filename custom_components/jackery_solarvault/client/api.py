@@ -657,12 +657,7 @@ class JackeryApi:
                 status = resp.status
                 try:
                     body = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ):
+                except aiohttp.ContentTypeError, json.JSONDecodeError, UnicodeDecodeError, ValueError:
                     body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, body
 
@@ -1140,12 +1135,7 @@ class JackeryApi:
                 status = resp.status
                 try:
                     body = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ):
+                except aiohttp.ContentTypeError, json.JSONDecodeError, UnicodeDecodeError, ValueError:
                     body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, body
 
@@ -1236,12 +1226,7 @@ class JackeryApi:
                 status = resp.status
                 try:
                     data = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ):
+                except aiohttp.ContentTypeError, json.JSONDecodeError, UnicodeDecodeError, ValueError:
                     data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, data
 
