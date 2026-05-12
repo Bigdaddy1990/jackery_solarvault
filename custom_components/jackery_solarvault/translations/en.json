@@ -1,0 +1,751 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This Jackery account is already configured.",
+      "reauth_entry_missing": "The Jackery entry for re-authentication was not found.",
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_entry_missing": "The Jackery entry for reconfiguration was not found.",
+      "reconfigure_account_mismatch": "The new email does not match the configured Jackery account. Use the original email or remove the entry first.",
+      "reconfigure_successful": "Configuration updated."
+    },
+    "error": {
+      "account_required": "Account must not be empty.",
+      "cannot_connect": "Could not connect to iot.jackeryapp.com.",
+      "invalid_auth": "Invalid email or password."
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        },
+        "description": "Your saved password for {username} no longer works. Enter the current password to restore the connection.",
+        "title": "Re-authenticate Jackery"
+      },
+      "reconfigure": {
+        "data": {
+          "create_calculated_power_sensors": "Create calculated net-power sensors",
+          "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "password": "Password",
+          "username": "Email"
+        },
+        "data_description": {
+          "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+        },
+        "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
+        "title": "Reconfigure Jackery SolarVault"
+      },
+      "user": {
+        "data": {
+          "create_calculated_power_sensors": "Create calculated net-power sensors",
+          "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "password": "Password",
+          "username": "Email"
+        },
+        "data_description": {
+          "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+        },
+        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. If you also want to use the mobile app concurrently, create a secondary account in the Jackery app and share the system there via QR code. The QR code is generated by the Jackery app and is not exposed by the cloud API to Home Assistant.",
+        "title": "Jackery SolarVault"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "eps_active": {
+        "name": "EPS active"
+      },
+      "eps_enabled": {
+        "name": "EPS enabled"
+      },
+      "eth_connected": {
+        "name": "Ethernet connected"
+      },
+      "online": {
+        "name": "Online"
+      }
+    },
+    "button": {
+      "reboot_device": {
+        "name": "Restart device"
+      }
+    },
+    "number": {
+      "default_power_set": {
+        "name": "Standard output power"
+      },
+      "max_feed_grid": {
+        "name": "Max feed-in power"
+      },
+      "max_output_power_set": {
+        "name": "Max output power"
+      },
+      "single_tariff_price_set": {
+        "name": "Single tariff price"
+      },
+      "soc_charge_limit_set": {
+        "name": "Charge limit"
+      },
+      "soc_discharge_limit_set": {
+        "name": "Discharge limit"
+      }
+    },
+    "select": {
+      "auto_off_island_mode": {
+        "name": "Auto-off (off-grid)",
+        "state": {
+          "h_12": "12 h",
+          "h_2": "2 h",
+          "h_24": "24 h",
+          "h_8": "8 h"
+        }
+      },
+      "electricity_price_mode": {
+        "name": "Electricity price mode",
+        "state": {
+          "dynamic": "Dynamic electricity price",
+          "single": "Flat tariff"
+        }
+      },
+      "electricity_price_provider": {
+        "name": "Electricity price provider"
+      },
+      "storm_warning_minutes_select": {
+        "name": "Storm warning lead time",
+        "state": {
+          "min_1020": "17 h",
+          "min_1080": "18 h",
+          "min_1140": "19 h",
+          "min_120": "2 h",
+          "min_1200": "20 h",
+          "min_1260": "21 h",
+          "min_1320": "22 h",
+          "min_1380": "23 h",
+          "min_1440": "24 h",
+          "min_180": "3 h",
+          "min_240": "4 h",
+          "min_2880": "48 h",
+          "min_300": "5 h",
+          "min_360": "6 h",
+          "min_420": "7 h",
+          "min_4320": "72 h",
+          "min_480": "8 h",
+          "min_540": "9 h",
+          "min_60": "1 h",
+          "min_600": "10 h",
+          "min_660": "11 h",
+          "min_720": "12 h",
+          "min_780": "13 h",
+          "min_840": "14 h",
+          "min_900": "15 h",
+          "min_960": "16 h"
+        }
+      },
+      "temp_unit_select": {
+        "name": "Temperature unit",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "work_mode_select": {
+        "name": "Energy usage mode",
+        "state": {
+          "ai_smart": "AI smart mode",
+          "custom": "Custom mode",
+          "self_use": "Self-consumption",
+          "tariff": "Tariff mode"
+        }
+      }
+    },
+    "sensor": {
+      "ability_bits": {
+        "name": "Capability flags"
+      },
+      "activation_date": {
+        "name": "Activation date"
+      },
+      "alarm_count": {
+        "name": "Active alarms"
+      },
+      "auto_standby": {
+        "name": "Auto standby mode"
+      },
+      "battery_charge_month_energy": {
+        "name": "Monthly battery charge"
+      },
+      "battery_charge_power": {
+        "name": "Main battery charge power"
+      },
+      "battery_charge_week_energy": {
+        "name": "Weekly battery charge"
+      },
+      "battery_charge_year_energy": {
+        "name": "Yearly battery charge"
+      },
+      "battery_count": {
+        "name": "Battery count"
+      },
+      "battery_discharge_month_energy": {
+        "name": "Battery discharge monthly energy"
+      },
+      "battery_discharge_power": {
+        "name": "Main battery discharge power"
+      },
+      "battery_discharge_week_energy": {
+        "name": "Battery discharge weekly energy"
+      },
+      "battery_discharge_year_energy": {
+        "name": "Battery discharge yearly energy"
+      },
+      "battery_net_power": {
+        "name": "Main battery net power"
+      },
+      "battery_pack_cell_temperature": {
+        "name": "Battery pack cell temperature"
+      },
+      "battery_pack_charge_power": {
+        "name": "Battery pack charge power"
+      },
+      "battery_pack_communication_state": {
+        "name": "Battery pack communication state"
+      },
+      "battery_pack_discharge_power": {
+        "name": "Battery pack discharge power"
+      },
+      "battery_pack_firmware_version": {
+        "name": "Battery pack firmware version"
+      },
+      "battery_pack_serial_number": {
+        "name": "Battery pack serial number"
+      },
+      "battery_pack_soc": {
+        "name": "Battery pack SOC"
+      },
+      "battery_pack_update_status": {
+        "name": "Battery pack update status"
+      },
+      "battery_soc": {
+        "name": "Total battery level"
+      },
+      "battery_soc_internal": {
+        "name": "Main battery level"
+      },
+      "battery_stack_net_power": {
+        "name": "Battery system net power"
+      },
+      "battery_state": {
+        "name": "Battery state"
+      },
+      "cell_temperature": {
+        "name": "Main battery cell temperature"
+      },
+      "charge_plan_power": {
+        "name": "Charge plan power"
+      },
+      "conversion_loss_power": {
+        "name": "Calculated inverter/conversion loss power"
+      },
+      "country_code": {
+        "name": "Country code"
+      },
+      "ct_state": {
+        "name": "CT state"
+      },
+      "default_power": {
+        "name": "Default load power"
+      },
+      "device_ongrid_input_month_energy": {
+        "name": "Monthly device on-grid input"
+      },
+      "device_ongrid_input_week_energy": {
+        "name": "Weekly device on-grid input"
+      },
+      "device_ongrid_input_year_energy": {
+        "name": "Yearly device on-grid input"
+      },
+      "device_ongrid_output_month_energy": {
+        "name": "Monthly device on-grid output"
+      },
+      "device_ongrid_output_week_energy": {
+        "name": "Weekly device on-grid output"
+      },
+      "device_ongrid_output_year_energy": {
+        "name": "Yearly device on-grid output"
+      },
+      "device_pv1_day_energy": {
+        "name": "PV1 daily energy"
+      },
+      "device_pv1_month_energy": {
+        "name": "PV1 monthly energy"
+      },
+      "device_pv1_week_energy": {
+        "name": "PV1 weekly energy"
+      },
+      "device_pv1_year_energy": {
+        "name": "PV1 yearly energy"
+      },
+      "device_pv2_day_energy": {
+        "name": "PV2 daily energy"
+      },
+      "device_pv2_month_energy": {
+        "name": "PV2 monthly energy"
+      },
+      "device_pv2_week_energy": {
+        "name": "PV2 weekly energy"
+      },
+      "device_pv2_year_energy": {
+        "name": "PV2 yearly energy"
+      },
+      "device_pv3_day_energy": {
+        "name": "PV3 daily energy"
+      },
+      "device_pv3_month_energy": {
+        "name": "PV3 monthly energy"
+      },
+      "device_pv3_week_energy": {
+        "name": "PV3 weekly energy"
+      },
+      "device_pv3_year_energy": {
+        "name": "PV3 yearly energy"
+      },
+      "device_pv4_day_energy": {
+        "name": "PV4 daily energy"
+      },
+      "device_pv4_month_energy": {
+        "name": "PV4 monthly energy"
+      },
+      "device_pv4_week_energy": {
+        "name": "PV4 weekly energy"
+      },
+      "device_pv4_year_energy": {
+        "name": "PV4 yearly energy"
+      },
+      "device_today_battery_charge": {
+        "name": "Device battery charge today"
+      },
+      "device_today_battery_discharge": {
+        "name": "Device battery discharge today"
+      },
+      "device_today_battery_to_ongrid": {
+        "name": "Device battery→on-grid today"
+      },
+      "device_today_ongrid_input": {
+        "name": "Device on-grid input today"
+      },
+      "device_today_ongrid_output": {
+        "name": "Device on-grid output today"
+      },
+      "device_today_ongrid_to_battery": {
+        "name": "Device on-grid→battery today"
+      },
+      "device_today_pv_energy": {
+        "name": "Device PV today"
+      },
+      "device_today_pv_to_battery": {
+        "name": "Device PV→battery today"
+      },
+      "energy_plan_power": {
+        "name": "Energy plan power"
+      },
+      "eps_in_power": {
+        "name": "EPS input power"
+      },
+      "eps_out_power": {
+        "name": "EPS output power"
+      },
+      "eps_switch_state": {
+        "name": "EPS switch state"
+      },
+      "eth_port": {
+        "name": "Ethernet port state"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "follow_meter_state": {
+        "name": "Follow meter state"
+      },
+      "function_enable_flags": {
+        "name": "Function enable flags"
+      },
+      "grid_in_power": {
+        "name": "On-grid input"
+      },
+      "grid_net_power": {
+        "name": "Grid-side net power"
+      },
+      "grid_out_power": {
+        "name": "On-grid output"
+      },
+      "grid_standard": {
+        "name": "Grid standard"
+      },
+      "grid_state": {
+        "name": "Grid state"
+      },
+      "home_consumption_power": {
+        "name": "Home consumption power"
+      },
+      "home_month_energy": {
+        "name": "Home consumption monthly energy"
+      },
+      "home_week_energy": {
+        "name": "Home consumption weekly energy"
+      },
+      "home_year_energy": {
+        "name": "Home consumption yearly energy"
+      },
+      "last_offline": {
+        "name": "Last offline"
+      },
+      "last_online": {
+        "name": "Last online"
+      },
+      "last_update": {
+        "name": "Last update"
+      },
+      "latitude": {
+        "name": "Latitude"
+      },
+      "longitude": {
+        "name": "Longitude"
+      },
+      "mac_address": {
+        "name": "MAC address"
+      },
+      "max_feed_grid_read": {
+        "name": "Max feed-in power (runtime)"
+      },
+      "max_inverter_power": {
+        "name": "Max inverter power"
+      },
+      "max_iot_num": {
+        "name": "Max IoT devices"
+      },
+      "max_output_power": {
+        "name": "Max output power"
+      },
+      "max_system_input_power": {
+        "name": "Max system input power"
+      },
+      "max_system_output_power": {
+        "name": "Max system output power"
+      },
+      "off_grid_shutdown_state": {
+        "name": "Off-grid shutdown state"
+      },
+      "off_grid_time": {
+        "name": "Off-grid shutdown timer"
+      },
+      "ongrid_state": {
+        "name": "On-grid state"
+      },
+      "other_load_power": {
+        "name": "Other load power"
+      },
+      "power_price": {
+        "name": "Power price"
+      },
+      "pv1_power": {
+        "name": "PV1"
+      },
+      "pv2_power": {
+        "name": "PV2"
+      },
+      "pv3_power": {
+        "name": "PV3"
+      },
+      "pv4_power": {
+        "name": "PV4"
+      },
+      "pv_month_energy": {
+        "name": "Monthly PV energy"
+      },
+      "pv_power_total": {
+        "name": "PV power total"
+      },
+      "pv_week_energy": {
+        "name": "Weekly PV energy"
+      },
+      "pv_year_energy": {
+        "name": "Yearly PV energy"
+      },
+      "raw_properties": {
+        "name": "Raw properties"
+      },
+      "reboot_flag": {
+        "name": "Reboot flag"
+      },
+      "savings_battery_loss_year_energy": {
+        "name": "Battery system loss yearly energy"
+      },
+      "savings_calculated_total": {
+        "name": "Calculated savings"
+      },
+      "savings_conversion_loss_year_energy": {
+        "name": "Inverter/conversion loss yearly energy"
+      },
+      "savings_energy": {
+        "name": "Self-consumed AC energy"
+      },
+      "savings_price": {
+        "name": "Savings price"
+      },
+      "savings_pv_residual_year_energy": {
+        "name": "PV residual after self-consumption yearly energy"
+      },
+      "smart_meter_export_month_energy": {
+        "name": "Monthly smart-meter grid export"
+      },
+      "smart_meter_export_week_energy": {
+        "name": "Weekly smart-meter grid export"
+      },
+      "smart_meter_export_year_energy": {
+        "name": "Yearly smart-meter grid export"
+      },
+      "smart_meter_gross_phase_export_power": {
+        "name": "Smart meter gross phase export power"
+      },
+      "smart_meter_gross_phase_flow_power": {
+        "name": "Smart meter gross phase flow power"
+      },
+      "smart_meter_gross_phase_import_power": {
+        "name": "Smart meter gross phase import power"
+      },
+      "smart_meter_import_month_energy": {
+        "name": "Monthly smart-meter grid import"
+      },
+      "smart_meter_import_week_energy": {
+        "name": "Weekly smart-meter grid import"
+      },
+      "smart_meter_import_year_energy": {
+        "name": "Yearly smart-meter grid import"
+      },
+      "smart_meter_net_export_power": {
+        "name": "Smart meter net export power"
+      },
+      "smart_meter_net_import_power": {
+        "name": "Smart meter net import power"
+      },
+      "smart_meter_panel_charging_energy": {
+        "name": "Smart Meter panel charging energy"
+      },
+      "smart_meter_panel_discharging_energy": {
+        "name": "Smart Meter panel discharging energy"
+      },
+      "smart_meter_phase_1_power": {
+        "name": "Smart meter phase 1 power"
+      },
+      "smart_meter_phase_2_power": {
+        "name": "Smart meter phase 2 power"
+      },
+      "smart_meter_phase_3_power": {
+        "name": "Smart meter phase 3 power"
+      },
+      "smart_meter_power": {
+        "name": "Smart meter net power"
+      },
+      "soc_charge_limit": {
+        "name": "Charge limit"
+      },
+      "soc_discharge_limit": {
+        "name": "Discharge limit"
+      },
+      "stack_in_power": {
+        "name": "Battery system charge power"
+      },
+      "stack_out_power": {
+        "name": "Battery system discharge power"
+      },
+      "standby_power": {
+        "name": "Standby power"
+      },
+      "storm_warning_enabled": {
+        "name": "Storm warning enabled"
+      },
+      "storm_warning_minutes": {
+        "name": "Storm warning lead time"
+      },
+      "system_state": {
+        "name": "System state"
+      },
+      "task_plan": {
+        "name": "Task plan"
+      },
+      "temp_unit": {
+        "name": "Temperature unit"
+      },
+      "timezone": {
+        "name": "Timezone"
+      },
+      "today_load": {
+        "name": "Daily on-grid output (Jackery cloud)"
+      },
+      "total_carbon_saved": {
+        "name": "Total CO₂ saved"
+      },
+      "total_generation": {
+        "name": "PV yield total"
+      },
+      "total_revenue": {
+        "name": "App total savings"
+      },
+      "weather_plan": {
+        "name": "Weather plan"
+      },
+      "wifi_ip": {
+        "name": "IP address"
+      },
+      "wifi_name": {
+        "name": "WiFi name"
+      },
+      "wifi_signal": {
+        "name": "WiFi signal"
+      },
+      "work_mode": {
+        "name": "Work mode"
+      }
+    },
+    "switch": {
+      "auto_standby_set": {
+        "name": "Auto-off (grid-connected)"
+      },
+      "eps_output": {
+        "name": "EPS output"
+      },
+      "follow_meter": {
+        "name": "Follow smart meter"
+      },
+      "off_grid_shutdown": {
+        "name": "Auto-off (off-grid mode)"
+      },
+      "standby": {
+        "name": "Standby"
+      },
+      "storm_warning": {
+        "name": "Storm warning"
+      }
+    },
+    "text": {
+      "system_name": {
+        "name": "System name"
+      }
+    }
+  },
+  "exceptions": {
+    "delete_storm_alert_failed": {
+      "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
+    },
+    "dynamic_tariff_unavailable": {
+      "message": "Dynamic tariff is not available for {entity} on device {device_id}. Wait for the next refresh or choose an electricity price provider first."
+    },
+    "entity_action_failed": {
+      "message": "Could not update {entity} for device {device_id}: {error}"
+    },
+    "invalid_number_allowed_values": {
+      "message": "{entity} for device {device_id} must be one of: {allowed_values}"
+    },
+    "invalid_number_range": {
+      "message": "{entity} for device {device_id} must be between {min} and {max}"
+    },
+    "invalid_select_option": {
+      "message": "{option} is not a valid option for {entity} on device {device_id}"
+    },
+    "invalid_text_value": {
+      "message": "{entity} for device {device_id} must not be empty"
+    },
+    "missing_system_id": {
+      "message": "Cannot update device {device_id}: missing systemId"
+    },
+    "mqtt_command_failed": {
+      "message": "Jackery MQTT command failed ({error}). Last MQTT error: {mqtt_last_error}"
+    },
+    "mqtt_missing_device_sn": {
+      "message": "Cannot send Jackery MQTT command for {device_id}: missing deviceSn"
+    },
+    "refresh_weather_plan_failed": {
+      "message": "Could not refresh weather plan for device {device_id}: {error}"
+    },
+    "rename_system_failed": {
+      "message": "Could not rename Jackery system {system_id}: {error}"
+    }
+  },
+  "issues": {
+    "app_data_inconsistency": {
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections from APP_POLLING_MQTT.md and DATA_SOURCE_PRIORITY.md.\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "title": "Force a Jackery cloud refresh"
+          }
+        }
+      },
+      "title": "Jackery app statistics are inconsistent"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "create_calculated_power_sensors": "Create calculated net-power sensors",
+          "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors"
+        },
+        "data_description": {
+          "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+        },
+        "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
+        "title": "Jackery options"
+      }
+    }
+  },
+  "services": {
+    "delete_storm_alert": {
+      "description": "Delete a specific weather or storm alert by alert ID over MQTT.",
+      "fields": {
+        "alert_id": {
+          "description": "Alert identifier from the weather plan diagnostic attributes, usually storm[].alertId.",
+          "name": "Alert ID"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly (visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Device ID"
+        }
+      },
+      "name": "Delete storm alert"
+    },
+    "refresh_weather_plan": {
+      "description": "Query the current weather and storm plan from the device. The response is exposed in the Weather plan diagnostic sensor attributes.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly (visible in diagnostics under raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Device ID"
+        }
+      },
+      "name": "Refresh weather and storm plan"
+    },
+    "rename_system": {
+      "description": "Rename a Jackery SolarVault system through the Jackery cloud API. The name is shown in the Jackery app and Home Assistant device info.",
+      "fields": {
+        "new_name": {
+          "description": "New display name, 1 to 64 characters.",
+          "name": "New name"
+        },
+        "system_id": {
+          "description": "Numeric Jackery system ID. It is visible in diagnostics under raw_api.system_list_response.data[].id.",
+          "name": "System ID"
+        }
+      },
+      "name": "Rename SolarVault system"
+    }
+  },
+  "title": "Jackery SolarVault"
+}

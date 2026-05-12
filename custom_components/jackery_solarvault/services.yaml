@@ -1,0 +1,36 @@
+rename_system:
+  fields:
+    system_id:
+      required: true
+      example: "595364183558991872"
+      selector:
+        text:
+    new_name:
+      required: true
+      example: "Balkonkraftwerk Süd"
+      selector:
+        text:
+
+
+refresh_weather_plan:
+  fields:
+    device_id:
+      required: true
+      example: "573702884982521856"
+      selector:
+        device:
+          integration: jackery_solarvault
+
+delete_storm_alert:
+  fields:
+    device_id:
+      required: true
+      example: "573702884982521856"
+      selector:
+        device:
+          integration: jackery_solarvault
+    alert_id:
+      required: true
+      example: "A1746110400"
+      selector:
+        text:

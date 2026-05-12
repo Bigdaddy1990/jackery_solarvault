@@ -22,11 +22,16 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
+CLIENT_COMPONENT = ROOT / "custom_components" / "jackery_solarvault" / "client"
+INTEGRATION_COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
-    return (COMPONENT / name).read_text(encoding="utf-8")
+    if name in {"mqtt_push.py"}:
+        base = CLIENT_COMPONENT
+    else:
+        base = INTEGRATION_COMPONENT
+    return (base / name).read_text(encoding="utf-8")
 
 
 def test_mqtt_client_disables_internal_reconnect_loop() -> None:

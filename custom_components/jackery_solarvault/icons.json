@@ -1,0 +1,13 @@
+{
+  "services": {
+    "delete_storm_alert": {
+      "service": "mdi:weather-lightning-rainy"
+    },
+    "refresh_weather_plan": {
+      "service": "mdi:cloud-refresh"
+    },
+    "rename_system": {
+      "service": "mdi:rename"
+    }
+  }
+}

@@ -11,6 +11,9 @@ import types
 import yaml
 
 CUSTOM_COMPONENT = pathlib.Path("custom_components/jackery_solarvault")
+CLIENT_PACKAGE = pathlib.Path("custom_components/jackery_solarvault/client")
+API_IMPLEMENTATION = CLIENT_PACKAGE / "api.py"
+MQTT_IMPLEMENTATION = CLIENT_PACKAGE / "mqtt_push.py"
 LOG_METHODS = {"debug", "info", "warning", "error", "exception"}
 PERCENT_PLACEHOLDER = re.compile(
     r"(?<!%)%(?:\([^)]+\))?[#0 +\-]*(?:\d+|\*)?(?:\.\d+)?[hlL]?[diouxXeEfFgGcrs]"
@@ -800,7 +803,7 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
     """Runtime guard paths should raise HA/domain errors, not AssertionError."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8"
     )
@@ -925,7 +928,7 @@ def test_redact_keys_cover_mqtt_credential_aliases() -> None:
 def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
     """MQTT topics contain the Jackery userId and must be redacted in diagnostics."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert 'REDACTED_VALUE: Final = "**REDACTED**"' in const_source
     assert "def _redact_topic(topic: str | None) -> str | None:" in mqtt_source
@@ -944,7 +947,7 @@ def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
 
 def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     """Diagnostics need actionable MQTT health data without exposing credentials."""
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
 
     for fragment in (
         "self._messages_dropped = 0",
@@ -970,7 +973,7 @@ def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reu
     None
 ):
     """Reject malformed MQTT seeds and avoid copy/pasted redaction literals."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "base64.b64decode(self._mqtt_seed_b64, validate=True)" in api_source
     assert "redacted[FIELD_TOKEN] = REDACTED_VALUE" in api_source
@@ -980,7 +983,7 @@ def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reu
 
 def test_api_trend_endpoints_use_shared_period_range_contract() -> None:
     """System trend helpers must not fall back to today..today for month/year."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "from .util import app_period_date_bounds" in api_source
     assert "date.today().isoformat()" not in api_source
@@ -1068,7 +1071,7 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
     by collecting the full text of each ``except (...)`` block before
     asserting on the contents.
     """
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     # Collect every `except (...) ...` block, regardless of line wrapping.
     decode_blocks: list[str] = []
     pattern = re.compile(
@@ -1087,7 +1090,7 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
 
 def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None:
     """Login should surface malformed cloud responses as JackeryApiError."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     login_block = api_source.split("async def async_login", 1)[1].split(
         "async def async_get_mqtt_credentials", 1
     )[0]
@@ -1098,7 +1101,7 @@ def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None
 
 def test_api_read_endpoints_normalize_unexpected_payload_shapes() -> None:
     """Dict/list API readers should not leak arbitrary data shapes to coordinator."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "def _payload_dict(data: dict[str, Any], path: str)" in api_source
     assert "def _payload_list(data: dict[str, Any], path: str)" in api_source
@@ -1130,7 +1133,7 @@ def test_api_read_endpoints_normalize_unexpected_payload_shapes() -> None:
 
 def test_ota_info_accepts_single_dict_payload_shapes() -> None:
     """OTA responses may be a list, a single dict, or a dict body wrapper."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     block = api_source.split("async def async_get_ota_info", 1)[1].split(
         "async def async_get_location", 1
     )[0]
@@ -1153,7 +1156,7 @@ def test_ota_info_accepts_single_dict_payload_shapes() -> None:
 
 def test_ota_info_selects_requested_device_from_multi_item_response() -> None:
     """OTA list responses must not use the main-device item for a battery pack."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "def _select_ota_item(" in api_source
     selector = api_source.split("def _select_ota_item(", 1)[1].split(
@@ -1173,7 +1176,7 @@ def test_ota_info_selects_requested_device_from_multi_item_response() -> None:
 
 def test_battery_pack_single_object_detection_accepts_firmware_only_payloads() -> None:
     """Pack list fallback must keep BatteryPackSub firmware-only payloads."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     block = api_source.split("async def async_get_battery_pack_list", 1)[1].split(
         "async def async_get_home_trends", 1
     )[0]
@@ -1189,7 +1192,7 @@ def test_battery_pack_single_object_detection_accepts_firmware_only_payloads() -
 
 def test_api_payload_helper_paths_match_called_endpoint_constants() -> None:
     """Wrong helper path constants hide the real failing endpoint in diagnostics."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     pv_block = api_source.split("async def async_get_pv_trends", 1)[1].split(
         "async def async_get_power_price", 1
@@ -1628,7 +1631,7 @@ def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
 def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> None:
     """Implement test payload debug log records raw types parsed floats and rotation."""
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
@@ -1875,7 +1878,7 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
 
 def test_api_method_calls_use_valid_positional_arity() -> None:
     """Coordinator/service paths must not call JackeryApi methods with impossible arity."""
-    api_tree = ast.parse((CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8"))
+    api_tree = ast.parse(API_IMPLEMENTATION.read_text(encoding="utf-8"))
     method_arity: dict[str, tuple[int, int | None]] = {}
     for cls in [
         node
@@ -2031,8 +2034,8 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
     assert "import contextlib" in init_source
     assert "try:" in init_source
     assert "# Discovery must run first" in init_source
-    assert "except BaseException:" in init_source
-    assert "with contextlib.suppress(BaseException):" in init_source
+    assert "except Exception:" in init_source
+    assert "with contextlib.suppress(Exception):" in init_source
     assert "await coordinator.async_shutdown()" in init_source
     assert "if entry.runtime_data is coordinator:" in init_source
     assert "entry.runtime_data = None" in init_source
@@ -2088,7 +2091,7 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
         encoding="utf-8"
     )
 
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )

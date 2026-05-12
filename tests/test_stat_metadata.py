@@ -14,7 +14,7 @@ SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 INIT_PATH = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
-API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "api.py"
+API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
 COMPONENT_PATH = ROOT / "custom_components" / "jackery_solarvault"
 
 
@@ -658,4 +658,36 @@ def test_total_revenue_state_class_compatible_with_monetary_device_class() -> No
     assert match.group(1) == "TOTAL", (
         f"total_revenue uses state_class={match.group(1)!r}; "
         "MONETARY device_class only allows TOTAL or None per HA validation"
+    )
+
+
+def test_statistics_backfill_state_is_persistent_and_loaded_before_first_refresh() -> None:
+    """External-statistics backfill state survives HA restarts."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    init_source = INIT_PATH.read_text(encoding="utf-8")
+
+    assert "from homeassistant.helpers.storage import Store" in coordinator_source
+    assert "_statistics_backfill_store = Store(" in coordinator_source
+    assert "async_load_statistics_backfill_state" in coordinator_source
+    assert "_async_save_statistics_backfill_state" in coordinator_source
+    assert "statistics_backfill_diagnostics" in coordinator_source
+    assert init_source.index("async_load_statistics_backfill_state") < init_source.index(
+        "async_discover()"
+    )
+
+
+def test_statistics_backfill_repairs_calendar_boundaries_before_current_import() -> None:
+    """Missed month/year app buckets are reloaded before the current snapshot."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    repair_source = coordinator_source.split(
+        "async def _async_import_and_repair_app_chart_statistics", 1
+    )[1].split("# ------------------------------------------------------------------", 1)[0]
+
+    assert "app_month_request_kwargs" in coordinator_source
+    assert "app_year_request_kwargs" in coordinator_source
+    assert "async def _async_repair_missing_app_chart_statistics" in coordinator_source
+    assert "_iter_calendar_months(from_date, to_date)" in coordinator_source
+    assert "_iter_calendar_years(from_date, to_date)" in coordinator_source
+    assert repair_source.index("_async_repair_missing_app_chart_statistics") < (
+        repair_source.index("_async_import_app_chart_statistics(snapshot)")
     )

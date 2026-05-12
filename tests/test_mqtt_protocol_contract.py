@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
-MQTT_PUSH_PATH = ROOT / "custom_components" / "jackery_solarvault" / "mqtt_push.py"
+MQTT_PUSH_PATH = ROOT / "custom_components" / "jackery_solarvault" / "client" / "mqtt_push.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
 
 
@@ -125,12 +125,12 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
 
 def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     """The MQTT password must use the REST login userId/mqttPassWord/macId triple."""
-    api_source = _read(ROOT / "custom_components" / "jackery_solarvault" / "api.py")
+    api_source = _read(ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py")
     login = _function_source(
-        ROOT / "custom_components" / "jackery_solarvault" / "api.py", "async_login"
+        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py", "async_login"
     )
     credentials = _function_source(
-        ROOT / "custom_components" / "jackery_solarvault" / "api.py",
+        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py",
         "async_get_mqtt_credentials",
     )
 
@@ -185,7 +185,7 @@ def test_mqtt_protocol_md_is_pure_api_reference() -> None:
 
 def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
     """PUT/POST retry paths must use the refreshed token after re-login."""
-    api_path = ROOT / "custom_components" / "jackery_solarvault" / "api.py"
+    api_path = ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
     for name in ("_put_json", "_post_form"):
         source = _function_source(api_path, name)
         assert "def _request_headers()" in source
