@@ -452,7 +452,9 @@ def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
         source = workflow.read_text(encoding="utf-8")
         for match in re.finditer(r"^\s{12}([^\s#][^\n#]*)$", source, re.MULTILINE):
             candidate = match.group(1).strip()
-            if not candidate.startswith("requirements") or not candidate.endswith(".txt"):
+            if not candidate.startswith("requirements") or not candidate.endswith(
+                ".txt"
+            ):
                 continue
             if not pathlib.Path(candidate).exists():
                 missing.append(f"{workflow}:{candidate}")
@@ -472,8 +474,7 @@ def test_ruff_baseline_uses_pinned_python_314_exception_formatting() -> None:
     assert "python -m ruff --version" in workflow
     assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') == 6
     assert (
-        'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"'
-        in workflow
+        'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"' in workflow
     )
     assert "python scripts/verify_py314_exception_style.py --fix" in workflow
     assert "python scripts/verify_py314_exception_style.py" in workflow
@@ -493,34 +494,19 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
     spec.loader.exec_module(module)
 
     assert module.violations_in_text(
-        "try:\n"
-        "    pass\n"
-        "except (ValueError, TypeError):\n"
-        "    pass\n"
+        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n"
     ) == [(3, "except (ValueError, TypeError):")]
     assert module.violations_in_text(
-        "try:\n"
-        "    pass\n"
-        "except (\n"
-        "    ValueError,\n"
-        "    TypeError,\n"
-        "):\n"
-        "    pass\n"
+        "try:\n    pass\nexcept (\n    ValueError,\n    TypeError,\n):\n    pass\n"
     ) == [
         (
             3,
-            "except (\n"
-            "    ValueError,\n"
-            "    TypeError,\n"
-            "):",
+            "except (\n    ValueError,\n    TypeError,\n):",
         )
     ]
     assert (
         module.violations_in_text(
-            "try:\n"
-            "    pass\n"
-            "except ValueError, TypeError:\n"
-            "    pass\n"
+            "try:\n    pass\nexcept ValueError, TypeError:\n    pass\n"
         )
         == []
     )
@@ -534,16 +520,8 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
         == []
     )
     assert module.fix_text(
-        "try:\n"
-        "    pass\n"
-        "except (ValueError, TypeError):\n"
-        "    pass\n"
-    ) == (
-        "try:\n"
-        "    pass\n"
-        "except ValueError, TypeError:\n"
-        "    pass\n"
-    )
+        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n"
+    ) == ("try:\n    pass\nexcept ValueError, TypeError:\n    pass\n")
     assert module.fix_text(
         "try:\n"
         "    pass\n"
@@ -1191,7 +1169,9 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
     """
     api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     decode_blocks: list[str] = []
-    for match in re.finditer(r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError", api_source):
+    for match in re.finditer(
+        r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError", api_source
+    ):
         block = api_source[match.start() : api_source.find(":", match.start()) + 1]
         decode_blocks.append(re.sub(r"\s+", " ", block))
     assert len(decode_blocks) == 4, decode_blocks
