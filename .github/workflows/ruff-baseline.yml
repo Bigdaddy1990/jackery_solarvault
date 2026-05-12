@@ -29,14 +29,48 @@ jobs:
       - name: Ruff baseline using explicit Python 3.14 target
         run: |
           set -o pipefail
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --fix || true
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --fix --unsafe-fixes || true
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --add-noqa || true
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --extend-select RUF100 --fix || true
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --output-format=github || true
-          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --preview || true
+
+          # First apply all safe and unsafe Ruff fixes. This handles rules such
+          # as SIM108 before the workflow falls back to baseline noqa markers.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
+            --fix \
+            --unsafe-fixes \
+            --output-format=concise \
+            --exit-zero
+
+          # Format before the local Python 3.14 guard so any formatter drift is
+          # converted back to the canonical exception style automatically.
           python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"
+          python scripts/verify_py314_exception_style.py --fix
+
+          # Only remaining non-fixable diagnostics become baseline noqa markers.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
+            --add-noqa \
+            --output-format=concise \
+            --exit-zero
+
+          # Remove stale noqa markers created by older baseline runs.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
+            --extend-select RUF100 \
+            --fix \
+            --output-format=concise \
+            --exit-zero
+
+          # Final formatting pass plus local guard keeps Python 3.14 exception
+          # headers stable even when Ruff's formatter output changes.
+          python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"
+          python scripts/verify_py314_exception_style.py --fix
           python scripts/verify_py314_exception_style.py
+
+          # Emit final diagnostics as GitHub annotations without failing the
+          # baseline job after fix/noqa generation has completed.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
+            --output-format=github \
+            --exit-zero
 
       - name: Commit baseline changes
         run: |
