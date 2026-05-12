@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -154,14 +155,36 @@ jobs:
             --preview \
             --output-format=github \
             --exit-zero
-      - name: Commit autofix changes
+      - name: Commit and push autofix changes
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
+          set -euo pipefail
+
           if [ -z "$(git status --porcelain)" ]; then
             echo "No autofix changes to commit."
             exit 0
           fi
+
+          target_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore: apply pre-commit autofix"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          # Another workflow run or maintainer may have pushed to the same branch
+          # while this job was formatting. Rebase the bot commit onto the latest
+          # remote tip before pushing, then retry if the remote moves again.
+          for attempt in 1 2 3; do
+            git fetch origin "${target_branch}"
+            git rebase "origin/${target_branch}"
+
+            if git push origin "HEAD:${target_branch}"; then
+              exit 0
+            fi
+
+            echo "Push attempt ${attempt} was not a fast-forward; retrying after rebase."
+          done
+
+          echo "Unable to push autofix changes after rebasing 3 times." >&2
+          exit 1
