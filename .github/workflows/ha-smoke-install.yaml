@@ -22,7 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
-            requirements_test.txt
+            requirements-test.txt
             pyproject.toml
 
       - name: Show Python environment

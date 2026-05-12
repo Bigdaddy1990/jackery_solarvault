@@ -4,6 +4,8 @@ on: { workflow_dispatch: {} }
 permissions: { contents: write }
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+  RUFF_VERSION: ${{ vars.RUFF_VERSION != '' && vars.RUFF_VERSION || '0.15.12' }}
+  RUFF_TARGET_VERSION: py314
 jobs:
   baseline:
     if: >-
@@ -19,15 +21,22 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install --upgrade pip ruff
-      - run: |
-          ruff check . --fix || true
-          ruff check . --fix --unsafe-fixes || true
-          ruff check . --add-noqa || true
-          ruff check . --extend-select RUF100 --fix || true
-          ruff check . --output-format=github || true
-          ruff check . --preview || true
-          ruff format .
+      - name: Install pinned Ruff with Python 3.14 support
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff==${RUFF_VERSION}"
+          python -m ruff --version
+      - name: Ruff baseline using explicit Python 3.14 target
+        run: |
+          set -o pipefail
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --fix || true
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --fix --unsafe-fixes || true
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --add-noqa || true
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --extend-select RUF100 --fix || true
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --output-format=github || true
+          python -m ruff check . --target-version "${RUFF_TARGET_VERSION}" --preview || true
+          python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"
+          python scripts/verify_py314_exception_style.py
 
       - name: Commit baseline changes
         run: |
