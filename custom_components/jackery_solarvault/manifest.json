@@ -19,7 +19,7 @@
   ],
   "quality_scale": "custom",
   "requirements": [
-    "aiomqtt>=2.3.0"
+    "aiomqtt>=2.5.1"
   ],
   "version": "0.1.1"
 }
