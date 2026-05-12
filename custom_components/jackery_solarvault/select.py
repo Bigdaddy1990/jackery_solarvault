@@ -10,8 +10,6 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
-from __future__ import annotations
-
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 import logging

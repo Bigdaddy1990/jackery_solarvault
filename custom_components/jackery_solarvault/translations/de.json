@@ -2,10 +2,10 @@
   "config": {
     "abort": {
       "already_configured": "Dieses Jackery-Konto ist bereits eingerichtet.",
-      "reauth_entry_missing": "Der Jackery-Eintrag für die erneute Anmeldung wurde nicht gefunden.",
+      "reauth_entry_missing": "Der Jackery-Eintrag f\u00fcr die erneute Anmeldung wurde nicht gefunden.",
       "reauth_successful": "Erneute Anmeldung erfolgreich.",
-      "reconfigure_entry_missing": "Der Jackery-Eintrag für die Neukonfiguration wurde nicht gefunden.",
-      "reconfigure_account_mismatch": "Die neue E-Mail passt nicht zum eingerichteten Jackery-Konto. Verwende die ursprüngliche E-Mail oder entferne den Eintrag zuerst.",
+      "reconfigure_account_mismatch": "Die neue E-Mail passt nicht zum eingerichteten Jackery-Konto. Verwende die urspr\u00fcngliche E-Mail oder entferne den Eintrag zuerst.",
+      "reconfigure_entry_missing": "Der Jackery-Eintrag f\u00fcr die Neukonfiguration wurde nicht gefunden.",
       "reconfigure_successful": "Konfiguration aktualisiert."
     },
     "error": {
@@ -18,7 +18,7 @@
         "data": {
           "password": "Passwort"
         },
-        "description": "Das gespeicherte Passwort für {username} funktioniert nicht mehr. Gib das aktuelle Passwort ein, um die Verbindung wiederherzustellen.",
+        "description": "Das gespeicherte Passwort f\u00fcr {username} funktioniert nicht mehr. Gib das aktuelle Passwort ein, um die Verbindung wiederherzustellen.",
         "title": "Jackery erneut anmelden"
       },
       "reconfigure": {
@@ -30,11 +30,11 @@
           "username": "E-Mail"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
-          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind."
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
-        "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum ursprünglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. Für einen Kontowechsel zuerst den Eintrag entfernen.",
+        "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum urspr\u00fcnglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. F\u00fcr einen Kontowechsel zuerst den Eintrag entfernen.",
         "title": "Jackery SolarVault neu konfigurieren"
       },
       "user": {
@@ -46,11 +46,11 @@
           "username": "E-Mail"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
-          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind."
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
-        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
+        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Ger\u00e4t, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zus\u00e4tzlich zu den App-Werten einen vorzeichenbehafteten Nettowert f\u00fcr Dashboards brauchst.\n\nJackery erlaubt \u00fcblicherweise nur eine aktive Sitzung pro Konto. Wenn du die mobile App parallel nutzen willst, lege in der Jackery-App ein Zweitkonto an und teile das System dort per QR-Code. Der QR-Code wird in der Jackery-App erzeugt und von der Cloud-API nicht an Home Assistant ausgeliefert.",
         "title": "Jackery SolarVault"
       }
     }
@@ -72,7 +72,7 @@
     },
     "button": {
       "reboot_device": {
-        "name": "Gerät neu starten"
+        "name": "Ger\u00e4t neu starten"
       }
     },
     "number": {
@@ -165,7 +165,7 @@
     },
     "sensor": {
       "ability_bits": {
-        "name": "Fähigkeits-Flags"
+        "name": "F\u00e4higkeits-Flags"
       },
       "activation_date": {
         "name": "Aktivierungsdatum"
@@ -252,7 +252,7 @@
         "name": "Berechnete Wechselrichter-/Umwandlungsverlustleistung"
       },
       "country_code": {
-        "name": "Ländercode"
+        "name": "L\u00e4ndercode"
       },
       "ct_state": {
         "name": "CT-Status"
@@ -333,7 +333,7 @@
         "name": "Batterieentladung heute"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Batterie→Netzseite heute"
+        "name": "Batterie\u2192Netzseite heute"
       },
       "device_today_ongrid_input": {
         "name": "Netzseite Eingang heute"
@@ -342,13 +342,13 @@
         "name": "Netzseite Ausgang heute"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Netzseite→Batterie heute"
+        "name": "Netzseite\u2192Batterie heute"
       },
       "device_today_pv_energy": {
         "name": "PV-Ertrag heute"
       },
       "device_today_pv_to_battery": {
-        "name": "PV→Batterie heute"
+        "name": "PV\u2192Batterie heute"
       },
       "energy_plan_power": {
         "name": "Energieplan-Leistung"
@@ -414,7 +414,7 @@
         "name": "Breitengrad"
       },
       "longitude": {
-        "name": "Längengrad"
+        "name": "L\u00e4ngengrad"
       },
       "mac_address": {
         "name": "MAC-Adresse"
@@ -426,7 +426,7 @@
         "name": "Max. Wechselrichterleistung"
       },
       "max_iot_num": {
-        "name": "Max. IoT-Geräte"
+        "name": "Max. IoT-Ger\u00e4te"
       },
       "max_output_power": {
         "name": "Max. Ausgangsleistung"
@@ -585,10 +585,10 @@
         "name": "Zeitzone"
       },
       "today_load": {
-        "name": "Tägliche Netzeinspeisung (Jackery-Cloud)"
+        "name": "T\u00e4gliche Netzeinspeisung (Jackery-Cloud)"
       },
       "total_carbon_saved": {
-        "name": "Gesamt CO₂ eingespart"
+        "name": "Gesamt CO\u2082 eingespart"
       },
       "total_generation": {
         "name": "PV-Ertrag gesamt"
@@ -640,37 +640,37 @@
   },
   "exceptions": {
     "delete_storm_alert_failed": {
-      "message": "Sturm-Warnung {alert_id} für Gerät {device_id} konnte nicht gelöscht werden: {error}"
+      "message": "Sturm-Warnung {alert_id} f\u00fcr Ger\u00e4t {device_id} konnte nicht gel\u00f6scht werden: {error}"
     },
     "dynamic_tariff_unavailable": {
-      "message": "Dynamischer Tarif ist für {entity} auf Gerät {device_id} nicht verfügbar. Warte auf den nächsten Refresh oder wähle zuerst einen Strompreisanbieter."
+      "message": "Dynamischer Tarif ist f\u00fcr {entity} auf Ger\u00e4t {device_id} nicht verf\u00fcgbar. Warte auf den n\u00e4chsten Refresh oder w\u00e4hle zuerst einen Strompreisanbieter."
     },
     "entity_action_failed": {
-      "message": "{entity} für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} konnte nicht aktualisiert werden: {error}"
     },
     "invalid_number_allowed_values": {
-      "message": "{entity} für Gerät {device_id} muss einer dieser Werte sein: {allowed_values}"
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} muss einer dieser Werte sein: {allowed_values}"
     },
     "invalid_number_range": {
-      "message": "{entity} für Gerät {device_id} muss zwischen {min} und {max} liegen"
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} muss zwischen {min} und {max} liegen"
     },
     "invalid_select_option": {
-      "message": "{option} ist keine gültige Option für {entity} auf Gerät {device_id}"
+      "message": "{option} ist keine g\u00fcltige Option f\u00fcr {entity} auf Ger\u00e4t {device_id}"
     },
     "invalid_text_value": {
-      "message": "{entity} für Gerät {device_id} darf nicht leer sein"
+      "message": "{entity} f\u00fcr Ger\u00e4t {device_id} darf nicht leer sein"
     },
     "missing_system_id": {
-      "message": "Gerät {device_id} kann nicht aktualisiert werden: systemId fehlt"
+      "message": "Ger\u00e4t {device_id} kann nicht aktualisiert werden: systemId fehlt"
     },
     "mqtt_command_failed": {
       "message": "Jackery MQTT-Befehl fehlgeschlagen ({error}). Letzter MQTT-Fehler: {mqtt_last_error}"
     },
     "mqtt_missing_device_sn": {
-      "message": "MQTT-Befehl für {device_id} kann nicht gesendet werden: deviceSn fehlt"
+      "message": "MQTT-Befehl f\u00fcr {device_id} kann nicht gesendet werden: deviceSn fehlt"
     },
     "refresh_weather_plan_failed": {
-      "message": "Wetterplan für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
+      "message": "Wetterplan f\u00fcr Ger\u00e4t {device_id} konnte nicht aktualisiert werden: {error}"
     },
     "rename_system_failed": {
       "message": "Jackery-System {system_id} konnte nicht umbenannt werden: {error}"
@@ -681,12 +681,12 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery hat widersprüchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.\n\nBestätige, um einen Refresh aus der Jackery-Cloud zu erzwingen. Vorübergehende Inkonsistenzen verschwinden, sobald ein frischer konsistenter Payload eintrifft. Falls die Warnung erneut auftritt, im Integrations-Tracker einen Bericht mit Diagnose-Dump anlegen.",
+            "description": "Jackery hat widerspr\u00fcchliche App-/Cloud-Statistiken geliefert. Es wurden {count} Warnung(en) erkannt. Erster betroffener Messwert: {metric}. Beispiele: {examples}. Entity-States werden nicht stillschweigend repariert; aktiviere Logger custom_components.jackery_solarvault.payload_debug=debug und nutze dann das Payload-Debuglog jackery_solarvault_payload_debug.jsonl sowie die Diagnose, um Rohwerte, geparste Chart-Serien und dokumentierte Quellbereiche aus APP_POLLING_MQTT.md und DATA_SOURCE_PRIORITY.md zu vergleichen.\n\nBest\u00e4tige, um einen Refresh aus der Jackery-Cloud zu erzwingen. Vor\u00fcbergehende Inkonsistenzen verschwinden, sobald ein frischer konsistenter Payload eintrifft. Falls die Warnung erneut auftritt, im Integrations-Tracker einen Bericht mit Diagnose-Dump anlegen.",
             "title": "Jackery-Cloud-Refresh erzwingen"
           }
         }
       },
-      "title": "Jackery-App-Statistiken sind widersprüchlich"
+      "title": "Jackery-App-Statistiken sind widerspr\u00fcchlich"
     }
   },
   "options": {
@@ -698,42 +698,42 @@
           "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
-          "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind."
+          "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
         },
-        "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zusätzlichen Rohwerte aus der Jackery-App.",
+        "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",
         "title": "Jackery Optionen"
       }
     }
   },
   "services": {
     "delete_storm_alert": {
-      "description": "Löscht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID über MQTT.",
+      "description": "L\u00f6scht eine bestimmte Wetter- oder Unwetterwarnung per Alert-ID \u00fcber MQTT.",
       "fields": {
         "alert_id": {
           "description": "Alert-ID aus den Diagnoseattributen des Unwetterplans, normalerweise storm[].alertId.",
           "name": "Alert-ID"
         },
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Geräte-ID"
+          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Ger\u00e4te-ID"
         }
       },
-      "name": "Unwetterwarnung löschen"
+      "name": "Unwetterwarnung l\u00f6schen"
     },
     "refresh_weather_plan": {
-      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Gerät ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
+      "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Ger\u00e4t ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Automationen können alternativ direkt die numerische Jackery-Geräte-ID übergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
-          "name": "Geräte-ID"
+          "description": "Jackery-Ger\u00e4t ausw\u00e4hlen. Automationen k\u00f6nnen alternativ direkt die numerische Jackery-Ger\u00e4te-ID \u00fcbergeben (sichtbar in der Diagnose unter raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "Ger\u00e4te-ID"
         }
       },
       "name": "Wetter- und Unwetterplan aktualisieren"
     },
     "rename_system": {
-      "description": "Benennt ein Jackery-SolarVault-System über die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Geräteinformationen.",
+      "description": "Benennt ein Jackery-SolarVault-System \u00fcber die Jackery-Cloud-API um. Der Name erscheint in der Jackery-App und in den Home-Assistant-Ger\u00e4teinformationen.",
       "fields": {
         "new_name": {
           "description": "Neuer Anzeigename, 1 bis 64 Zeichen.",

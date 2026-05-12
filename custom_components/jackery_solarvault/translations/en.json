@@ -4,8 +4,8 @@
       "already_configured": "This Jackery account is already configured.",
       "reauth_entry_missing": "The Jackery entry for re-authentication was not found.",
       "reauth_successful": "Re-authentication was successful.",
-      "reconfigure_entry_missing": "The Jackery entry for reconfiguration was not found.",
       "reconfigure_account_mismatch": "The new email does not match the configured Jackery account. Use the original email or remove the entry first.",
+      "reconfigure_entry_missing": "The Jackery entry for reconfiguration was not found.",
       "reconfigure_successful": "Configuration updated."
     },
     "error": {
@@ -333,7 +333,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -342,13 +342,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -588,7 +588,7 @@
         "name": "Daily on-grid output (Jackery cloud)"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "PV yield total"

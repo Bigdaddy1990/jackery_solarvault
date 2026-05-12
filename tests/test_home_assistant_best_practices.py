@@ -1,7 +1,5 @@
 """Regression checks for Home Assistant best-practice alignment."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

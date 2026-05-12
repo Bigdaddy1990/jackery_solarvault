@@ -11,8 +11,6 @@ accepted when the Python 3.14 one-line form would exceed Ruff's configured line
 length.
 """
 
-from __future__ import annotations
-
 import argparse
 from collections.abc import Iterable
 from pathlib import Path
