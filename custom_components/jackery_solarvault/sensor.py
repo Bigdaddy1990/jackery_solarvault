@@ -304,6 +304,7 @@ from .util import (
     trend_series_total,
 )
 
+
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
 PARALLEL_UPDATES = 0

@@ -452,9 +452,7 @@ def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
         source = workflow.read_text(encoding="utf-8")
         for match in re.finditer(r"^\s{12}([^\s#][^\n#]*)$", source, re.MULTILINE):
             candidate = match.group(1).strip()
-            if not candidate.startswith("requirements") or not candidate.endswith(
-                ".txt"
-            ):
+            if not candidate.startswith("requirements") or not candidate.endswith(".txt"):
                 continue
             if not pathlib.Path(candidate).exists():
                 missing.append(f"{workflow}:{candidate}")
@@ -474,7 +472,8 @@ def test_ruff_baseline_uses_pinned_python_314_exception_formatting() -> None:
     assert "python -m ruff --version" in workflow
     assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') == 6
     assert (
-        'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"' in workflow
+        'python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"'
+        in workflow
     )
     assert "python scripts/verify_py314_exception_style.py --fix" in workflow
     assert "python scripts/verify_py314_exception_style.py" in workflow
@@ -494,19 +493,34 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
     spec.loader.exec_module(module)
 
     assert module.violations_in_text(
-        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n"
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError):\n"
+        "    pass\n"
     ) == [(3, "except (ValueError, TypeError):")]
     assert module.violations_in_text(
-        "try:\n    pass\nexcept (\n    ValueError,\n    TypeError,\n):\n    pass\n"
+        "try:\n"
+        "    pass\n"
+        "except (\n"
+        "    ValueError,\n"
+        "    TypeError,\n"
+        "):\n"
+        "    pass\n"
     ) == [
         (
             3,
-            "except (\n    ValueError,\n    TypeError,\n):",
+            "except (\n"
+            "    ValueError,\n"
+            "    TypeError,\n"
+            "):",
         )
     ]
     assert (
         module.violations_in_text(
-            "try:\n    pass\nexcept ValueError, TypeError:\n    pass\n"
+            "try:\n"
+            "    pass\n"
+            "except ValueError, TypeError:\n"
+            "    pass\n"
         )
         == []
     )
@@ -520,8 +534,16 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
         == []
     )
     assert module.fix_text(
-        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n"
-    ) == ("try:\n    pass\nexcept ValueError, TypeError:\n    pass\n")
+        "try:\n"
+        "    pass\n"
+        "except (ValueError, TypeError):\n"
+        "    pass\n"
+    ) == (
+        "try:\n"
+        "    pass\n"
+        "except ValueError, TypeError:\n"
+        "    pass\n"
+    )
     assert module.fix_text(
         "try:\n"
         "    pass\n"
@@ -1169,9 +1191,7 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
     """
     api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     decode_blocks: list[str] = []
-    for match in re.finditer(
-        r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError", api_source
-    ):
+    for match in re.finditer(r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError", api_source):
         block = api_source[match.start() : api_source.find(":", match.start()) + 1]
         decode_blocks.append(re.sub(r"\s+", " ", block))
     assert len(decode_blocks) == 4, decode_blocks
@@ -2065,6 +2085,95 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py314-plus" in config
     assert "python3.13" not in config
     assert "--py313-plus" not in config
+
+
+
+
+
+
+def _load_py314_exception_guard_module():
+    """Load the local Python 3.14 exception-style guard script."""
+    spec = importlib.util.spec_from_file_location(
+        "verify_py314_exception_style",
+        pathlib.Path("scripts/verify_py314_exception_style.py"),
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_autofix_workflow_keeps_ruff_python314_format_stable() -> None:
+    """Autofix must use one pinned Ruff with an explicit Python 3.14 target."""
+    workflow = pathlib.Path(".github/workflows/autofix.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "RUFF_VERSION:" in workflow
+    assert "RUFF_TARGET_VERSION: py314" in workflow
+    assert '"ruff==${RUFF_VERSION}"' in workflow
+    assert "astral-sh/ruff-action" not in workflow
+    assert "pre-commit-ci/lite-action" not in workflow
+    assert "--target-version \"${RUFF_TARGET_VERSION}\"" in workflow
+    assert "--unsafe-fixes" in workflow
+    assert "--add-noqa" in workflow
+    assert (
+        "python scripts/verify_py314_exception_style.py --fix custom_components/"
+        in workflow
+    )
+    assert "python -m ruff format --check ${RUFF_PATHS}" in workflow
+    assert "ruff check --fix" not in workflow
+
+
+def test_validate_ruff_job_uses_same_python314_formatter_target() -> None:
+    """Validate must check exactly the formatter target that autofix writes."""
+    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'python -m pip install "ruff==0.15.12"' in workflow
+    assert "python -m ruff check custom_components/ tests/ --target-version py314" in workflow
+    assert (
+        "python -m ruff format --check custom_components/ tests/ --target-version py314"
+        in workflow
+    )
+    assert "run: ruff format --check custom_components/ tests/" not in workflow
+
+
+def test_py314_exception_guard_only_rewrites_headers_that_stay_formatted() -> None:
+    """The local guard must not fight Ruff's line-length-driven wrapping."""
+    guard = _load_py314_exception_guard_module()
+
+    short_old_style = """try:
+    value = parse()
+except (
+    TypeError,
+    ValueError,
+):
+    value = None
+"""
+    short_new_style = """try:
+    value = parse()
+except TypeError, ValueError:
+    value = None
+"""
+    assert guard.fix_text(short_old_style, line_length=88) == short_new_style
+    assert guard.violations_in_text(short_old_style, line_length=88)
+    assert not guard.violations_in_text(short_new_style, line_length=88)
+
+    long_ruff_style = """            try:
+                body = await resp.json(content_type=None)
+            except (
+                aiohttp.ContentTypeError,
+                json.JSONDecodeError,
+                UnicodeDecodeError,
+                ValueError,
+            ):
+                body = {}
+"""
+    assert guard.fix_text(long_ruff_style, line_length=88) == long_ruff_style
+    assert not guard.violations_in_text(long_ruff_style, line_length=88)
 
 
 def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
