@@ -38,12 +38,12 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
-      - name: Install ruff
-        run: python -m pip install ruff
+      - name: Install pinned ruff
+        run: python -m pip install "ruff==0.15.12"
       - name: Lint
-        run: ruff check custom_components/ tests/
+        run: python -m ruff check custom_components/ tests/ --target-version py314
       - name: Format check
-        run: ruff format --check custom_components/ tests/
+        run: python -m ruff format --check custom_components/ tests/ --target-version py314
 
   unit-tests:
     name: Unit / source-only tests
