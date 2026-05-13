@@ -29,15 +29,22 @@ Cette intégration n'est pas un produit officiel Jackery et n'est pas affiliée 
 - SolarVault en ligne via Wi-Fi ou Ethernet.
 - HACS pour la méthode d'installation recommandée.
 
-## Configuration de compte Jackery recommandée
+## Limitation connue : une seule session active par compte
 
-Jackery n'autorise en pratique qu'une seule session active par compte. Si l'application officielle Jackery et Home Assistant utilisent le même compte en même temps, les jetons et identifiants MQTT peuvent être renouvelés. Cela peut provoquer des erreurs de jeton expiré, des erreurs d'authentification MQTT ou des données temporairement obsolètes.
+Jackery n'autorise en pratique qu'une seule session active par compte. Si l'application officielle Jackery et Home Assistant utilisent le même compte en même temps, les jetons et identifiants MQTT sont renouvelés à chaque connexion. Cela provoque des erreurs de jeton expiré, des erreurs d'authentification MQTT (CONNACK rc=4/5/134/135) et des données temporairement obsolètes.
 
-Configuration recommandée :
+**Aucune solution de contournement fiable n'existe aujourd'hui.** Les versions précédentes de ce README recommandaient de créer un deuxième compte Jackery et de partager le SolarVault avec celui-ci. Cette recommandation a été retirée :
 
-1. Créer un deuxième compte Jackery.
-2. Partager le SolarVault avec ce deuxième compte dans l'application Jackery.
-3. Utiliser ce deuxième compte uniquement pour Home Assistant.
+- L'application Jackery ne propose actuellement **pas** de flux de partage/invitation pour le SolarVault (le partage d'appareil par QR code dans l'application ne concerne que les produits Portable/Explorer).
+- Plusieurs utilisateurs rapportent en outre que Jackery limite actuellement la création de nouveaux comptes.
+
+### Que faire à la place
+
+- Gardez l'application Jackery déconnectée (ou déconnectée du compte SolarVault) tant que Home Assistant est connecté. L'application reste utilisable pour d'autres appareils Jackery.
+- Si vous devez utiliser l'application brièvement, Home Assistant se rétablit en quelques minutes une fois la session de l'application terminée. L'intégration relance les connexions avec un délai de protection et déclenche le flux de réauthentification HA en cas de rejet persistant des identifiants.
+- Dans l'export de diagnostic, sous `mqtt_push`, les champs `last_connect_failure_signature` et `connect_attempts` permettent de confirmer la reprise.
+
+Si Jackery ajoute plus tard un flux de partage SolarVault officiel ou un mécanisme de compte de service documenté, cette section sera mise à jour.
 
 ## Installation
 

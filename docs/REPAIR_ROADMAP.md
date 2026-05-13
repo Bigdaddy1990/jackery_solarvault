@@ -7,8 +7,9 @@ actually runs, rather than preserving broken behavior with isolated unit tests.
 
 - Keep `pytest-homeassistant-custom-component` wired through
   `requirements-test.txt`.
-- Run the Home Assistant tests from `.github/workflows/validate.yml` with
-  `pytest-ha.ini`.
+- Run the Home Assistant tests from `.github/workflows/validate.yml` with an
+  inline ``pytest -o "addopts=..."`` override so ``pyproject.toml`` stays the
+  single source of pytest configuration.
 - Prefer tests that exercise `raw HTTP/MQTT payload -> parser -> coordinator
   data -> entity native value`.
 

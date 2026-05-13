@@ -29,15 +29,22 @@ Diese Integration ist kein offizielles Jackery-Produkt und steht in keiner Verbi
 - SolarVault online per WLAN oder Ethernet.
 - HACS für die empfohlene Installation.
 
-## Empfohlener Jackery-Account
+## Bekannte Einschränkung: nur eine aktive Sitzung pro Account
 
-Jackery erlaubt praktisch nur eine aktive Sitzung pro Account. Wenn die offizielle Jackery-App und Home Assistant denselben Account gleichzeitig nutzen, können Token und MQTT-Zugangsdaten rotieren. Das kann zu Token-Fehlern, MQTT-Authentifizierungsfehlern oder zeitweise veralteten Daten führen.
+Jackery erlaubt praktisch nur eine aktive Sitzung pro Account. Wenn die offizielle Jackery-App und Home Assistant denselben Account gleichzeitig nutzen, rotieren Token und MQTT-Zugangsdaten bei jedem Login. Das führt zu Token-Fehlern, MQTT-Authentifizierungsfehlern (CONNACK rc=4/5/134/135) und kurzzeitig veralteten Daten.
 
-Empfohlen:
+**Aktuell gibt es keinen zuverlässigen Workaround.** Frühere Versionen dieser README empfahlen, einen zweiten Jackery-Account anzulegen und den SolarVault dorthin zu teilen. Diese Empfehlung ist entfernt:
 
-1. Zweiten Jackery-Account erstellen.
-2. SolarVault in der Jackery-App mit diesem zweiten Account teilen.
-3. Den zweiten Account ausschließlich für Home Assistant verwenden.
+- Die Jackery-App bietet derzeit **keinen** SolarVault-Share-/Invite-Ablauf (der QR-Code-basierte Geräte-Share betrifft nur Portable-/Explorer-Geräte).
+- Mehrere Nutzer berichten zudem, dass Jackery die Anlage neuer Accounts aktuell einschränkt.
+
+### Was stattdessen tun
+
+- Halte die Jackery-App ausgeloggt (oder vom SolarVault-Account abgemeldet), solange Home Assistant verbunden ist. Für andere Jackery-Geräte ist die App weiterhin nutzbar.
+- Wenn die App kurz benötigt wird: Home Assistant erholt sich innerhalb weniger Minuten von selbst, sobald die App-Sitzung wieder beendet ist. Die Integration versucht den Reconnect mit Drosselung und öffnet bei dauerhafter Ablehnung den HA-Reauth-Flow.
+- Im Diagnose-Export unter `mqtt_push` zeigen `last_connect_failure_signature` und `connect_attempts`, ob die Wiederherstellung läuft.
+
+Sobald Jackery einen offiziellen SolarVault-Share-Flow oder ein dokumentiertes Service-Account-Verfahren anbietet, wird dieser Abschnitt aktualisiert.
 
 ## Installation
 

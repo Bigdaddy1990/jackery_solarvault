@@ -29,15 +29,22 @@ Esta integración no es un producto oficial de Jackery y no está afiliada a Jac
 - SolarVault en línea mediante Wi-Fi o Ethernet.
 - HACS para el método de instalación recomendado.
 
-## Configuración recomendada de la cuenta Jackery
+## Limitación conocida: una sola sesión activa por cuenta
 
-Jackery permite en la práctica solo una sesión activa por cuenta. Si la app oficial de Jackery y Home Assistant usan la misma cuenta al mismo tiempo, los tokens y las credenciales MQTT pueden rotar. Esto puede causar errores de token caducado, errores de autenticación MQTT o datos temporalmente obsoletos.
+Jackery permite en la práctica solo una sesión activa por cuenta. Si la app oficial de Jackery y Home Assistant usan la misma cuenta al mismo tiempo, los tokens y las credenciales MQTT rotan con cada inicio de sesión. Esto provoca errores de token caducado, errores de autenticación MQTT (CONNACK rc=4/5/134/135) y datos temporalmente obsoletos.
 
-Configuración recomendada:
+**Hoy no existe una solución alternativa fiable.** Versiones anteriores de este README recomendaban crear una segunda cuenta de Jackery y compartir el SolarVault con ella. Esa recomendación se ha retirado:
 
-1. Crear una segunda cuenta de Jackery.
-2. Compartir el SolarVault con esa segunda cuenta en la app de Jackery.
-3. Usar esa segunda cuenta solo para Home Assistant.
+- La app de Jackery actualmente **no** ofrece un flujo de compartición/invitación para el SolarVault (el reparto de dispositivo por QR en la app aplica solo a productos Portable/Explorer).
+- Varios usuarios informan además que Jackery está restringiendo la creación de nuevas cuentas.
+
+### Qué hacer en su lugar
+
+- Mantén la app de Jackery cerrada (o desconectada de la cuenta del SolarVault) mientras Home Assistant esté conectado. La app sigue siendo utilizable para otros dispositivos Jackery.
+- Si necesitas usar la app brevemente, Home Assistant se recupera en pocos minutos cuando la sesión de la app termina. La integración reintenta con limitación y solicita reautenticación a través de la UI cuando las credenciales se rechazan de forma persistente.
+- En el export de diagnóstico, bajo `mqtt_push`, los campos `last_connect_failure_signature` y `connect_attempts` permiten confirmar la recuperación.
+
+Si Jackery añade más adelante un flujo oficial de compartición del SolarVault o un mecanismo documentado de cuenta de servicio, esta sección se actualizará.
 
 ## Instalación
 
