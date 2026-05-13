@@ -9,7 +9,7 @@ description = "Solarvault integration for Home Assistant"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "AI-slop Engineering" }]
+authors = [{ name = "Bigdaddy1990" }]
 keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "telemetry"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -41,6 +41,7 @@ markers = [
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py", "tests.py"]
+norecursedirs = [".git", ".pytest_cache", "__pycache__", "pytest-cache-files-*"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = [
