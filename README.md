@@ -29,15 +29,22 @@ This integration is not an official Jackery product and is not affiliated with J
 - SolarVault online through Wi-Fi or Ethernet.
 - HACS for the recommended installation method.
 
-## Recommended Jackery Account Setup
+## Known Limitation: Single Active Session per Account
 
-Jackery effectively allows only one active session per account. If the official Jackery app and Home Assistant use the same account at the same time, tokens and MQTT credentials can rotate. That may cause expired-token errors, MQTT authentication errors or temporary stale data.
+Jackery effectively allows only one active session per account. If the official Jackery app and Home Assistant use the same account at the same time, tokens and MQTT credentials rotate on every login. That causes expired-token errors, MQTT authentication errors (CONNACK rc=4/5/134/135) and temporary stale data.
 
-Recommended setup:
+**No reliable workaround exists today.** Earlier versions of this README suggested creating a second Jackery account and sharing the SolarVault to it. That recommendation has been removed:
 
-1. Create a second Jackery account.
-2. Share the SolarVault with that second account in the Jackery app.
-3. Use the second account only for Home Assistant.
+- The Jackery app currently does **not** offer a SolarVault share/invite flow (the QR-code-based device-sharing in the app applies only to Portable/Explorer products).
+- Multiple users have reported that Jackery is also restricting new account creation.
+
+### What to do instead
+
+- Keep the Jackery app logged out (or signed out of the SolarVault account) while Home Assistant is connected. The app stays usable for unrelated Jackery devices.
+- If you need to use the app briefly, expect Home Assistant to recover after a few minutes once the app session ends. The integration retries on a throttled schedule and surfaces a reauth request through the UI when credentials are persistently rejected.
+- Watch the diagnostics export under `mqtt_push` for `last_connect_failure_signature` and `connect_attempts` to confirm the integration is recovering.
+
+If Jackery later adds a SolarVault sharing flow or a documented service-account mechanism, this section will be updated.
 
 ## Installation
 
