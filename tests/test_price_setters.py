@@ -1,7 +1,5 @@
 """Unit tests for coordinator price writer behavior."""
 
-from __future__ import annotations
-
 from homeassistant.exceptions import HomeAssistantError
 import pytest
 
