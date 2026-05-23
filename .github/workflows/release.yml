@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  BUN_CONFIG_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -16,23 +20,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
+
+      - name: Install Bun tooling
+        run: bun install --frozen-lockfile
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+
       - name: Verify manifest version matches tag
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('custom_components/jackery_solarvault/manifest.json'))['version'])")
-          if [ "$TAG" != "$MANIFEST_VERSION" ]; then
-            echo "::error::Tag '${TAG}' does not match manifest version '${MANIFEST_VERSION}'"
-            exit 1
-          fi
-          echo "Tag and manifest both at ${TAG}"
+        run: bun run release:verify-tag
 
       - name: Build release zip
-        run: |
-          cd custom_components/jackery_solarvault
-          zip -r "$GITHUB_WORKSPACE/jackery_solarvault.zip" . \
-            -x "*.pyc" "*/__pycache__/*" "*.pytest_cache*" "*.ruff_cache*"
-          cd "$GITHUB_WORKSPACE"
-          ls -la jackery_solarvault.zip
+        run: bun run release:zip
 
       - name: Publish release with auto-generated notes
         uses: softprops/action-gh-release@v3

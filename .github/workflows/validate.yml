@@ -13,12 +13,22 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+  BUN_VERSION: "1.2.14"
+  BUN_CONFIG_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
 jobs:
   hassfest:
     name: Home Assistant hassfest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
@@ -26,6 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
       - uses: hacs/action@main
         with:
           category: integration
@@ -35,32 +49,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
-      - name: Install pinned ruff
-        run: python -m pip install "ruff==0.15.12"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+            pyproject.toml
+            package.json
+      - name: Install pinned Ruff
+        run: bun run install:unit && python -m pip install "ruff==0.15.12"
       - name: Lint
-        run: python -m ruff check custom_components/ tests/ --target-version py314
+        run: bun run lint
       - name: Format check
-        run: python -m ruff format --check custom_components/ tests/ --target-version py314
+        run: bun run format:check
 
   unit-tests:
     name: Unit / source-only tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+            pyproject.toml
+            package.json
       - name: Install unit-test deps
-        run: python -m pip install mypy pytest pytest-asyncio PyYAML
+        run: bun run install:unit
       - name: Compile integration and tests
-        run: python -m compileall -q custom_components tests
-      - name: Type check integration
-        run: python -m mypy custom_components/jackery_solarvault
-      - name: Run pure unit tests without HA plugin autoload
-        run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q -p no:cacheprovider -o addopts="" tests/test_*.py
+        run: bun run ci
 
   ha-fixture-tests:
     name: HA fixture tests
@@ -68,10 +98,19 @@ jobs:
     if: ('tests/ha/**') != ''
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-test.txt
+            pyproject.toml
+            package.json
       - name: Install Home Assistant test dependencies
-        run: python -m pip install -r requirements-test.txt
+        run: bun run install:ha
       - name: Run HA fixture tests
-        run: pytest -q -p no:cacheprovider -c pytest-ha.ini tests/ha
+        run: bun run ha:test

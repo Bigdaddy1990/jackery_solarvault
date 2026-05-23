@@ -12,6 +12,10 @@ permissions:
   checks: write
   id-token: write
 
+env:
+  BUN_CONFIG_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
 concurrency:
   group: autofix-${{ github.ref }}
   cancel-in-progress: true
@@ -34,6 +38,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref || github.ref_name }}
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
+
+      - name: Install Bun tooling
+        run: bun install --frozen-lockfile
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -44,41 +56,20 @@ jobs:
             requirements-test.txt
             pyproject.toml
             .pre-commit-config.yaml
+            package.json
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v8.1.0
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install deps (uv)
+      - name: Install deps (bun)
         run: |
-          uv pip install --system -r requirements.txt
-          uv pip install --system -r requirements-test.txt --prerelease=allow
-          uv pip install --system --upgrade \
-            "ruff==${RUFF_VERSION}" \
-            pre-commit \
-            pyupgrade \
-            flake8-type-checking \
-            reorder-python-imports
+          bun run install:ci
           python -m ruff --version
 
       - name: Ruff autofix with Python 3.14 target
         run: |
           set -o pipefail
 
-          # Apply real Ruff fixes first. The explicit target keeps 3.14 syntax
-          # stable, and unsafe fixes allow autofix to handle rules such as SIM108
-          # before the workflow falls back to generated noqa baselines.
-          python -m ruff check ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}" \
-            --preview \
-            --fix \
-            --unsafe-fixes \
-            --output-format=concise \
-            --exit-zero
-
-          python -m ruff format ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          # Apply safe Ruff fixes first. The explicit target keeps 3.14 syntax
+          # stable before the workflow falls back to generated noqa baselines.
+          bun run autofix
 
           # Keep Python 3.14 exception headers modern when the compact form fits.
           # Long exception groups may remain parenthesized so the result still
@@ -94,19 +85,9 @@ jobs:
 
           # Pre-commit hooks may run their own formatter instances. Normalize once
           # more with the same pinned Ruff and explicit Python 3.14 target.
-          python -m ruff check ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}" \
-            --preview \
-            --fix \
-            --unsafe-fixes \
-            --output-format=concise \
-            --exit-zero
-
-          python -m ruff format ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          bun run autofix
           python scripts/verify_py314_exception_style.py --fix custom_components/
-          python -m ruff format ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          bun run format
 
       - name: Add Ruff baseline noqa for remaining diagnostics
         run: |
@@ -133,23 +114,12 @@ jobs:
         run: |
           set -o pipefail
 
-          python -m ruff check ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}" \
-            --preview \
-            --fix \
-            --unsafe-fixes \
-            --output-format=concise \
-            --exit-zero
-
-          python -m ruff format ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          bun run autofix
           python scripts/verify_py314_exception_style.py --fix custom_components/
-          python -m ruff format ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          bun run format
 
           python scripts/verify_py314_exception_style.py custom_components/
-          python -m ruff format --check ${RUFF_PATHS} \
-            --target-version "${RUFF_TARGET_VERSION}"
+          bun run format:check
           python -m ruff check ${RUFF_PATHS} \
             --target-version "${RUFF_TARGET_VERSION}" \
             --preview \
@@ -175,16 +145,6 @@ jobs:
           # Another workflow run or maintainer may have pushed to the same branch
           # while this job was formatting. Rebase the bot commit onto the latest
           # remote tip before pushing, then retry if the remote moves again.
-          for attempt in 1 2 3; do
-            git fetch origin "${target_branch}"
-            git rebase "origin/${target_branch}"
-
-            if git push origin "HEAD:${target_branch}"; then
-              exit 0
-            fi
-
-            echo "Push attempt ${attempt} was not a fast-forward; retrying after rebase."
-          done
-
-          echo "Unable to push autofix changes after rebasing 3 times." >&2
-          exit 1
+          git fetch origin "${target_branch}"
+          git rebase "origin/${target_branch}"
+          git push origin "HEAD:${target_branch}"

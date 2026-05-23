@@ -1,23 +1,13 @@
-<!--
-Thanks for contributing! Before submitting, please confirm the items
-below. The repository follows the strict, narrow review style described
-in `docs/STRICT_WORK_INSTRUCTIONS.md`.
--->
-
 ## Summary
 
-<!-- One paragraph: what changed, why, and what user-visible effect this has. -->
+<!-- What changed, why, and what user-visible effect this has. -->
 
 ## Checklist
 
-- [ ] I have read `docs/STRICT_WORK_INSTRUCTIONS.md` and the relevant
-      contract files in `docs/`.
-- [ ] My change does not silently repair one period with another period
-      (`docs/DATA_SOURCE_PRIORITY.md`).
-- [ ] Unique IDs follow `docs/UNIQUE_ID_CONTRACT.md`.
-- [ ] No raw payload, serial number, MQTT password or `<userId>` is
-      written to logs or diagnostics on a normal install
-      (`docs/MQTT_PROTOCOL.md`).
-- [ ] Tests are added/updated to lock down the **correct** behaviour.
-      I have not adapted asserts to match wrong output.
-- [ ] `pytest tests/` passes locally and in CI.
+- [ ] I reproduced or verified the issue with code, logs, diagnostics, or payloads.
+- [ ] I followed the latest user report over stale comments or documentation.
+- [ ] I did not use documentation files as a test oracle.
+- [ ] Tests check executable code behavior, not markdown/html wording.
+- [ ] Statistic changes keep HTTP polling, MQTT push, BLE transport, app-stat imports, entity-stat imports and repair paths separate.
+- [ ] Historical day repair can correct bad Recorder spike rows; live/current imports remain gap-only.
+- [ ] `bun run lint` and the relevant `bun run test:unit` selection pass locally.

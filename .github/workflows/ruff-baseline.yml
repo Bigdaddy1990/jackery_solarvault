@@ -6,6 +6,8 @@ env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
   RUFF_VERSION: ${{ vars.RUFF_VERSION != '' && vars.RUFF_VERSION || '0.15.12' }}
   RUFF_TARGET_VERSION: py314
+  BUN_CONFIG_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
 jobs:
   baseline:
     if: >-
@@ -18,30 +20,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
+      - run: bun install --frozen-lockfile
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install pinned Ruff with Python 3.14 support
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install "ruff==${RUFF_VERSION}"
+          bun run install:ruff-baseline
           python -m ruff --version
       - name: Ruff baseline using explicit Python 3.14 target
         run: |
           set -o pipefail
 
-          # First apply all safe and unsafe Ruff fixes. This handles rules such
-          # as SIM108 before the workflow falls back to baseline noqa markers.
-          python -m ruff check . \
-            --target-version "${RUFF_TARGET_VERSION}" \
-            --fix \
-            --unsafe-fixes \
-            --output-format=concise \
-            --exit-zero
+          # First apply safe Ruff fixes before the workflow falls back to
+          # baseline noqa markers for remaining diagnostics.
+          bun run autofix
 
           # Format before the local Python 3.14 guard so any formatter drift is
           # converted back to the canonical exception style automatically.
-          python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"
+          bun run format
           python scripts/verify_py314_exception_style.py --fix
 
           # Only remaining non-fixable diagnostics become baseline noqa markers.
@@ -61,7 +61,7 @@ jobs:
 
           # Final formatting pass plus local guard keeps Python 3.14 exception
           # headers stable even when Ruff's formatter output changes.
-          python -m ruff format . --target-version "${RUFF_TARGET_VERSION}"
+          bun run format
           python scripts/verify_py314_exception_style.py --fix
           python scripts/verify_py314_exception_style.py
 

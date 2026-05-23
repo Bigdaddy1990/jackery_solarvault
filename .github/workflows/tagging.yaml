@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+env:
+  BUN_CONFIG_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
 concurrency:
   group: auto-version-tag-${{ github.ref }}
   cancel-in-progress: false
@@ -25,52 +29,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
+
+      - name: Install Bun tooling
+        run: bun install --frozen-lockfile
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+
       - name: Extract manifest version
         id: manifest
-        run: |
-          version=$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          manifest_path = Path("custom_components/jackery_solarvault/manifest.json")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          version = manifest.get("version")
-          if not isinstance(version, str) or not version.strip():
-              raise SystemExit("manifest.json must contain a non-empty string version")
-          print(version.strip())
-          PY
-          )
-          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Manifest version '$version' is not a valid release version"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+        run: bun run manifest:github-output
 
       - name: Ensure tag is new or already on this commit
         id: tag
         env:
           TAG: ${{ steps.manifest.outputs.tag }}
-        run: |
-          if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
-            tagged_sha=$(git rev-list -n 1 "$TAG")
-            if [ "$tagged_sha" != "$GITHUB_SHA" ]; then
-              echo "::error::Tag '$TAG' already exists at $tagged_sha, not $GITHUB_SHA"
-              exit 1
-            fi
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Tag '$TAG' already exists on this commit; nothing to do."
-            exit 0
-          fi
-          echo "exists=false" >> "$GITHUB_OUTPUT"
+        run: bun run tagging:ensure-tag
 
       - name: Create and push version tag
         if: steps.tag.outputs.exists == 'false'
         env:
           TAG: ${{ steps.manifest.outputs.tag }}
           VERSION: ${{ steps.manifest.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $VERSION"
-          git push origin "refs/tags/$TAG"
+        run: bun run tagging:create-tag
