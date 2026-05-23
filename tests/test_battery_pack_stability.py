@@ -100,6 +100,20 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     assert "dropped_indices" in body, body
 
 
+def test_corrupt_pack_last_seen_is_rebased_for_future_stale_cleanup() -> None:
+    """A corrupt last-seen value should not make an offline pack immortal."""
+    src = _read("coordinator.py")
+    match = re.search(
+        r"def _drop_stale_battery_packs\(\s*cls.*?(?=\n    @|\n    async def )",
+        src,
+        re.S,
+    )
+    assert match is not None, "_drop_stale_battery_packs not found"
+    body = match.group(0)
+    assert "fixed = dict(pack)" in body, body
+    assert "fixed[PACK_FIELD_LAST_SEEN_AT] = now.isoformat()" in body, body
+
+
 def test_diagnostics_exposes_stale_pack_count() -> None:
     """Diagnostics must surface the cumulative stale-pack drop counter."""
     src = _read("coordinator.py")
@@ -227,6 +241,27 @@ def test_battery_pack_count_capped_at_five() -> None:
     assert body.count("[:5]") >= 2, body  # input + output
 
 
+def test_battery_pack_query_need_accepts_text_count_and_rejects_bad_values() -> None:
+    """BatNum is cloud payload data and must be parsed defensively."""
+    from custom_components.jackery_solarvault.const import (
+        FIELD_BAT_NUM,
+        PAYLOAD_PROPERTIES,
+    )
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
+
+    assert JackerySolarVaultCoordinator._battery_packs_need_query({
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: "2.0"}
+    })
+    assert not JackerySolarVaultCoordinator._battery_packs_need_query({
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: True}
+    })
+    assert not JackerySolarVaultCoordinator._battery_packs_need_query({
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: float("nan")}
+    })
+
+
 def test_battery_pack_merge_preserves_known_fields() -> None:
     """Incremental MQTT updates must not erase fields learned from HTTP/OTA.
 
@@ -282,7 +317,7 @@ def test_battery_pack_ota_merge_preserves_pack_firmware_metadata() -> None:
 def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     """Slow pack OTA lookups must not block the 30s coordinator poll.
 
-    APP_POLLING_MQTT.md defines add-on battery live data as MQTT-first. The
+    Add-on battery live data is MQTT-first. The
     OTA endpoint only enriches firmware metadata and must therefore run in
     the background with cached values merged into the poll result.
     """
