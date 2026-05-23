@@ -1,5 +1,7 @@
 """Unit tests for Jackery select helpers."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from custom_components.jackery_solarvault.const import (
