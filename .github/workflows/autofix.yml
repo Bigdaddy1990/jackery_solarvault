@@ -139,7 +139,15 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- .github/workflows; then
+            echo "::warning::Autofix changed .github/workflows; workflow edits need a maintainer commit."
+            git restore --worktree -- .github/workflows
+          fi
           git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No autofix changes to commit after excluding workflow edits."
+            exit 0
+          fi
           git commit -m "chore: apply pre-commit autofix"
 
           # Another workflow run or maintainer may have pushed to the same branch
