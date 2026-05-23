@@ -967,8 +967,8 @@ def test_statistics_backfill_state_is_removed() -> None:
     assert "def statistics_import_diagnostics" in coordinator_source
 
 
-def test_statistics_import_adds_only_current_payload_to_entity_history() -> None:
-    """Current payload buckets are imported without historical backfill paths."""
+def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
+    """Bounded HTTP backfill runs before current buckets for sum continuity."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     import_source = coordinator_source.split(
         "async def _async_import_current_app_chart_statistics_job", 1
@@ -993,6 +993,7 @@ def test_statistics_import_adds_only_current_payload_to_entity_history() -> None
     current_entity_import = import_source.index(
         "_async_import_current_app_chart_entity_statistics(snapshot)"
     )
+    http_backfill = import_source.index("_async_http_backfill_recent_day_statistics(")
     assert "_async_repair_missing_app_chart_statistics(" not in import_source
     assert "_statistics_repair_from_date(" not in import_source
     assert "_statistics_rolling_backfill_from_date(" not in import_source
@@ -1005,6 +1006,7 @@ def test_statistics_import_adds_only_current_payload_to_entity_history() -> None
         current_payload_source
     )
     assert "DATE_TYPE_YEAR" not in current_payload_source
+    assert http_backfill < current_import
     assert current_import < current_entity_import
 
 
@@ -1074,11 +1076,19 @@ def test_day_chart_sources_prefer_device_minute_curves_for_pv_and_battery() -> N
     assert "timeout_sec=system_trend_timeout_sec" in fetch_system
 
 
-def test_historical_statistics_fetch_path_is_removed() -> None:
-    """Historical statistics backfill must not exist."""
+def test_historical_statistics_fetch_path_is_bounded_http_backfill() -> None:
+    """Historical day backfill uses explicit HTTP app-stat requests."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "async def _async_fetch_historical_app_chart_source" not in (
+        coordinator_source
+    )
+    assert "async def _async_fetch_historical_day_chart_sources" in (coordinator_source)
+    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 7" in coordinator_source
+    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = 6 * 60 * 60" in (
+        coordinator_source
+    )
+    assert "app_period_request_kwargs(DATE_TYPE_DAY, today=target_day)" in (
         coordinator_source
     )
     assert "Skip historical app chart fetch" not in coordinator_source
@@ -1205,8 +1215,8 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
     }
 
 
-def test_day_external_history_backfill_is_removed() -> None:
-    """Day external statistics are imported from current payload only."""
+def test_day_external_history_backfill_uses_http_day_curves() -> None:
+    """Day external statistics may be repaired from historical HTTP curves."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "def _iter_calendar_days" not in coordinator_source
@@ -1224,9 +1234,16 @@ def test_day_external_history_backfill_is_removed() -> None:
     assert "APP_DAY_CHART_BUCKET_LABEL" in current_day_source
     assert "_day_chart_points_for_metric(" in current_day_source
 
+    backfill_source = coordinator_source.split(
+        "async def _async_import_historical_day_chart_statistics_for_device", 1
+    )[1].split("\n    async def _async_http_backfill_recent_day_statistics", 1)[0]
+    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in backfill_source
+    assert "_day_chart_points_for_metric(" in backfill_source
+    assert "_async_add_app_chart_statistics(" in backfill_source
 
-def test_historical_entity_statistics_repair_is_removed() -> None:
-    """Historical app buckets must not be fetched into entity statistics."""
+
+def test_historical_entity_statistics_repair_uses_http_day_curves() -> None:
+    """Historical day HTTP buckets can replace Recorder spike rows."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "async def _async_repair_missing_app_chart_statistics" not in (
@@ -1238,6 +1255,11 @@ def test_historical_entity_statistics_repair_is_removed() -> None:
     assert "replace_existing_hours=replace_existing_day_hours" not in (
         coordinator_source
     )
+    backfill_source = coordinator_source.split(
+        "async def _async_http_backfill_recent_day_statistics", 1
+    )[1].split("\n    async def _async_update_data_quality_issue", 1)[0]
+    assert "source_batches=[(DATE_TYPE_DAY, section_sources)]" in backfill_source
+    assert "replace_existing_hours=True" in backfill_source
 
 
 def test_entity_statistics_import_handles_day_week_month_not_year() -> None:
@@ -1299,8 +1321,8 @@ def test_statistics_repair_seed_path_is_removed() -> None:
     assert "_STATISTICS_BACKFILL_LAST_REPAIR" not in src
 
 
-def test_statistics_import_has_no_payload_fed_rolling_backfill() -> None:
-    """Automatic statistics import must not run extra historical backfills."""
+def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None:
+    """Automatic backfill is HTTP-only and does not restore old repair state."""
     src = COORDINATOR_PATH.read_text(encoding="utf-8")
     for removed in (
         "_STATISTICS_ROLLING_BACKFILL_WINDOW_DAYS",
@@ -1321,6 +1343,7 @@ def test_statistics_import_has_no_payload_fed_rolling_backfill() -> None:
     assert "_statistics_repair_from_date(device_id, today)" not in import_job
     assert "_statistics_rolling_backfill_from_date(" not in import_job
     assert "_async_repair_missing_app_chart_statistics(" not in import_job
+    assert "_async_http_backfill_recent_day_statistics(" in import_job
 
 
 def test_statistics_repair_source_matrix_is_removed() -> None:

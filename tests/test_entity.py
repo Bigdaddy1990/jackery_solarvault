@@ -1,5 +1,7 @@
 """Unit tests for shared Jackery entity metadata helpers."""
 
+from __future__ import annotations
+
 from types import SimpleNamespace
 from typing import Any
 

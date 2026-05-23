@@ -3403,8 +3403,8 @@ def test_ble_sink_calls_merge_with_correct_signature() -> None:
     )
 
 
-def test_historical_statistics_backfill_helpers_are_absent() -> None:
-    """No historical statistic backfill helpers should remain."""
+def test_historical_statistics_backfill_is_http_only() -> None:
+    """Historical statistic backfill must stay bounded to HTTP day curves."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     for removed in (
         "def _iter_calendar_months",
@@ -3415,6 +3415,11 @@ def test_historical_statistics_backfill_helpers_are_absent() -> None:
         "async def async_repair_statistics",
     ):
         assert removed not in source
+    assert "async def _async_fetch_historical_day_chart_sources" in source
+    assert "async def _async_http_backfill_recent_day_statistics" in source
+    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 7" in source
+    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = 6 * 60 * 60" in source
+    assert "_schedule_mqtt_backfill_queries" not in source
 
 
 def test_listener_gate_is_present_in_all_entity_platforms() -> None:
