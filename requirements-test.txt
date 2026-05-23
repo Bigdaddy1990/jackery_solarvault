@@ -3,3 +3,5 @@ pytest
 pytest-asyncio
 pytest-homeassistant-custom-component
 PyYAML
+Markdown
+certifi
