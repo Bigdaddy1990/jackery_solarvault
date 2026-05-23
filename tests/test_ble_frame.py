@@ -9,8 +9,6 @@ No real Bluetooth I/O happens here — everything is pure Python so the
 tests run on every supported platform without bleak or BlueZ.
 """
 
-from __future__ import annotations
-
 import pytest
 
 from custom_components.jackery_solarvault.client.ble import (
