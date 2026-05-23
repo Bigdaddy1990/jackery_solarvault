@@ -49,6 +49,9 @@ def test_service_actions_use_translation_files() -> None:
         "rename_system",
         "refresh_weather_plan",
         "delete_storm_alert",
+        "set_third_party_mqtt_config",
+        "query_third_party_mqtt_config",
+        "send_ble_command",
     }
     assert set(strings["services"]) == expected_services
     assert set(icons["services"]) == expected_services

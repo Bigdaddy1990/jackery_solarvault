@@ -6,6 +6,8 @@ as monotonically increasing lifetime counters.
 """
 
 import ast
+from datetime import UTC, datetime
+import json
 from pathlib import Path
 import re
 
@@ -234,17 +236,34 @@ def test_week_month_year_sensors_keep_same_source_family() -> None:
             assert metadata[key]["section"] == f"{prefix}_{period}", key
 
 
-def test_device_day_sensors_fallback_to_day_period_sources() -> None:
-    """Implement test device day sensors fallback to day period sources."""
+def test_device_day_sensors_prefer_day_period_sources() -> None:
+    """Day energy sensors must prefer dated period sources over stale totals."""
     metadata = _stat_description_metadata()
     expected = {
-        "device_today_pv_energy": (("device_pv_stat_day", "totalSolarEnergy"),),
-        "device_today_battery_charge": (("device_battery_stat_day", "totalCharge"),),
-        "device_today_ongrid_input": (("device_home_stat_day", "totalInGridEnergy"),),
-        "device_today_ongrid_output": (("device_home_stat_day", "totalOutGridEnergy"),),
+        "device_today_pv_energy": (
+            "device_pv_stat_day",
+            "totalSolarEnergy",
+            (("device_statistic", "pvEgy"),),
+        ),
+        "device_today_battery_charge": (
+            "device_battery_stat_day",
+            "totalCharge",
+            (("device_statistic", "batChgEgy"),),
+        ),
+        "device_today_ongrid_input": (
+            "device_home_stat_day",
+            "totalInGridEnergy",
+            (("device_statistic", "inOngridEgy"),),
+        ),
+        "device_today_ongrid_output": (
+            "device_home_stat_day",
+            "totalOutGridEnergy",
+            (("device_statistic", "outOngridEgy"),),
+        ),
     }
-    for key, fallback in expected.items():
-        assert metadata[key]["section"] == "device_statistic", key
+    for key, (section, stat_key, fallback) in expected.items():
+        assert metadata[key]["section"] == section, key
+        assert metadata[key]["stat_key"] == stat_key, key
         assert metadata[key]["fallback_sources"] == fallback, key
 
     assert (
@@ -254,6 +273,29 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
     assert metadata["device_today_battery_discharge"]["stat_key"] == "totalDischarge"
     assert metadata["device_today_battery_discharge"]["fallback_sources"] == (
         ("device_statistic", "batDisChgEgy"),
+    )
+
+
+def test_entity_statistics_metric_map_targets_existing_entities() -> None:
+    """Cloud-bucket repair keys must resolve to real stat sensor entities."""
+    from custom_components.jackery_solarvault.coordinator import (
+        _ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD,
+        DATE_TYPE_DAY,
+    )
+
+    metadata = _stat_description_metadata()
+    mapped_keys = {
+        entity_key
+        for periods in _ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD.values()
+        for entity_key in periods.values()
+    }
+
+    assert not (mapped_keys - set(metadata))
+    assert (
+        _ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD["battery_discharge_energy"][
+            DATE_TYPE_DAY
+        ]
+        == "device_today_battery_discharge"
     )
 
 
@@ -310,10 +352,9 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    assert "APP_POLLING_MQTT.md requires explicit app ranges" in coordinator_source
-    assert (
-        "app_period_request_kwargs(date_type, today=dt_util.now().date())"
-        in coordinator_source
+    assert "App statistic requests require explicit period ranges" in coordinator_source
+    assert "app_period_request_kwargs(date_type, today=self._local_today())" in (
+        coordinator_source
     )
     assert "app_period_date_bounds(" in api_source
     assert "begin = today - timedelta(days=today.weekday())" in util_source
@@ -371,6 +412,22 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         assert suffix in const_source
 
 
+def test_timestamp_sensor_uses_safe_integer_parser() -> None:
+    """Timestamp diagnostics must not cast raw cloud payloads directly."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    block = sensor_source.split("class JackeryTimestampSensor", 1)[1].split(
+        "\n\n# ---------------------------------------------------------------------------\n"
+        "# Generic system-meta sensor",
+        1,
+    )[0]
+
+    assert "raw_ts_ms = self._device_meta.get(self._source_key)" in block
+    assert "ts_ms = safe_int(raw_ts_ms)" in block
+    assert "datetime.fromtimestamp(ts_ms / 1000, tz=UTC)" in block
+    assert "except OSError, OverflowError, ValueError:" in block
+    assert "int(ts_ms)" not in block
+
+
 # Diagnostic/raw entities should stay available for users who need them without
 # being enabled by default on every new install.
 INTENTIONALLY_DISABLED_BY_DEFAULT: frozenset[str] = frozenset({"power_price"})
@@ -383,7 +440,8 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
 
     assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source
     assert "description.entity_category != EntityCategory.DIAGNOSTIC" in binary_source
-    assert "enabled_default=pack_desc.entity_category" in sensor_source
+    assert "pack_desc.entity_registry_enabled_default" in sensor_source
+    assert "pack_desc.entity_category" in sensor_source
     assert "_attr_entity_registry_enabled_default = False" in sensor_source
 
     import re
@@ -423,11 +481,170 @@ def test_external_app_chart_statistics_are_period_scoped() -> None:
     """Implement test external app chart statistics are period scoped."""
     source = CONST_PATH.read_text(encoding="utf-8")
 
+    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in source
     assert "DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY" in source
     assert "DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY" in source
     assert "DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY" in source
     assert 'DATE_TYPE_MONTH: "daily"' not in source
     assert 'DATE_TYPE_YEAR: "monthly"' not in source
+
+
+def test_app_chart_curves_use_official_recorder_imports() -> None:
+    """App chart buckets use official Recorder APIs only.
+
+    The previous ``unsafe-import cleanup`` and ``state-history restore``
+    paths wrote / deleted ``Statistics`` rows through
+    ``homeassistant.components.recorder.db_schema`` directly, which is not
+    part of the documented integration contract (see docs/ZIP baseline) and
+    is fragile across HA versions. They have been removed; what remains are
+    the official ``async_add_external_statistics`` /
+    ``async_import_statistics`` write paths.
+    """
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    util_source = (COMPONENT_PATH / "util.py").read_text(encoding="utf-8")
+    day_import = coordinator_source.split(
+        "async def _async_import_day_chart_statistics", 1
+    )[1].split("async def _async_import_app_chart_statistics", 1)[0]
+    period_import = coordinator_source.split(
+        "async def _async_import_app_chart_statistics", 1
+    )[1].split("async def _async_import_current_app_chart_statistics_job", 1)[0]
+
+    assert "def day_power_energy_points(" in util_source
+    assert "_async_import_day_chart_statistics(snapshot)" in coordinator_source
+    assert "bucket_minutes=60" in coordinator_source
+    assert "async_add_external_statistics" in coordinator_source
+    assert "_async_import_app_chart_entity_statistics_for_device" in coordinator_source
+    assert "_async_compiled_statistic_hour_starts" in coordinator_source
+    assert "_APP_CHART_ENTITY_KEY_BY_METRIC_PERIOD" not in coordinator_source
+    assert "source=RECORDER_DOMAIN" not in coordinator_source
+    assert "async_import_statistics" not in day_import
+    assert "async_import_statistics" not in period_import
+    assert 'source="recorder"' in coordinator_source
+    assert '"last_reset": reset_start' in coordinator_source
+    assert "date_type=DATE_TYPE_DAY" not in day_import
+    # Removed direct-write/delete paths must stay removed.
+    assert (
+        "_async_cleanup_unsafe_imported_hourly_statistics_once"
+        not in coordinator_source
+    )
+    assert (
+        "_async_restore_cleared_entity_statistics_from_states_once"
+        not in coordinator_source
+    )
+    assert "_hourly_statistics_from_state_rows" not in coordinator_source
+    assert "Statistics.id.in_(orphan_hour_ids)" not in coordinator_source
+    assert "_UNSAFE_ENTITY_STATISTICS_CLEANUP_VERSION" not in coordinator_source
+    assert "StatisticsShortTerm.id.in_(orphan_short_ids)" not in coordinator_source
+    assert "async_clear_statistics" not in coordinator_source
+    offset_reader = coordinator_source.split(
+        "async def _async_entity_statistic_offsets", 1
+    )[1].split("\n    async def _async_compiled_statistic_hour_starts", 1)[0]
+    assert "statistics_during_period" in offset_reader
+    assert "homeassistant.components.recorder.db_schema" not in offset_reader
+    assert "StatisticsMeta" not in offset_reader
+    assert '"last_reset"' in offset_reader
+
+
+def test_period_app_bucket_entity_import_fills_only_uncompiled_hours() -> None:
+    """Current period imports only fill hours HA has not compiled yet.
+
+    Week/month entity imports may only fill gaps left by HA — never overwrite
+    rows HA already covered via its 5-minute statistics run at HH:55.
+
+    The contributing rows below carry hours 2026-05-01, 05-02, 05-03.
+    HA already compiled 05-01 and 05-03 (they live in
+    ``compiled_hour_starts``); only 05-02 is a gap and may be written.
+    """
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    assert "if not contributions:" in coordinator_source
+    assert "statistics == []" not in coordinator_source
+
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_MONTH,
+        JackerySolarVaultCoordinator,
+    )
+
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_timezone = lambda: UTC
+
+    def start(day: int) -> datetime:
+        return datetime(2026, 5, day, tzinfo=UTC)
+
+    compiled = {
+        int(start(1).timestamp()),
+        int(start(3).timestamp()),
+    }
+    statistics = coordinator._entity_statistics_from_contributions(
+        [
+            (start(1), 22.29, DATE_TYPE_MONTH, True),
+            (start(2), 19.02, DATE_TYPE_MONTH, True),
+            (start(3), 18.12, DATE_TYPE_MONTH, True),
+        ],
+        compiled_hour_starts=compiled,
+        sum_offset=100.0,
+        state_offset=10.0,
+    )
+
+    # Only the gap hour 2026-05-02 is filled. state continues the entity's
+    # previous reset window (state_offset 10.0 + bucket 19.02 = 29.02);
+    # sum continues the previous monotonic total (100.0 + 19.02 = 119.02).
+    assert [(stat["state"], stat["sum"]) for stat in statistics] == [
+        (29.02, 119.02),
+    ]
+    assert [int(stat["start"].timestamp()) for stat in statistics] == [
+        int(start(2).timestamp()),
+    ]
+    assert {stat["last_reset"] for stat in statistics} == {start(1)}
+
+
+def test_historical_day_entity_repair_can_replace_compiled_spike_rows() -> None:
+    """Historical day repair rewrites first-run spike rows from app curves."""
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_DAY,
+        JackerySolarVaultCoordinator,
+    )
+
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_timezone = lambda: UTC
+
+    def hour(hour: int) -> datetime:
+        return datetime(2026, 5, 17, hour, tzinfo=UTC)
+
+    compiled = {
+        int(hour(19).timestamp()),
+        int(hour(20).timestamp()),
+    }
+    statistics = coordinator._entity_statistics_from_contributions(
+        [
+            (hour(19), 0.35, DATE_TYPE_DAY, True),
+            (hour(20), 0.42, DATE_TYPE_DAY, True),
+        ],
+        compiled_hour_starts=compiled,
+        replace_existing_hours=True,
+        sum_offset=3.0,
+        state_offset=1.0,
+    )
+
+    assert [(stat["state"], stat["sum"]) for stat in statistics] == [
+        (1.35, 3.35),
+        (1.77, 3.77),
+    ]
+    assert [int(stat["start"].timestamp()) for stat in statistics] == [
+        int(hour(19).timestamp()),
+        int(hour(20).timestamp()),
+    ]
+
+
+def test_fast_http_property_fetch_is_never_skipped() -> None:
+    """MQTT overlays HTTP values but must not suppress HTTP polling."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    method_source = coordinator_source.split("def _should_skip_fast_property_fetch", 1)[
+        1
+    ].split("async def async_shutdown", 1)[0]
+
+    assert "return False" in method_source
+    assert "MQTT_LIVE_THRESHOLD_SEC" not in coordinator_source
+    assert "ADAPTIVE_KEEPALIVE_INTERVAL_SEC" not in coordinator_source
 
 
 def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
@@ -518,7 +735,13 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
     matrix = {
         "today_load": ("TOTAL", "day"),
         "total_generation": ("TOTAL_INCREASING", None),
-        "total_revenue": ("TOTAL", None),
+        # total_revenue uses TOTAL_INCREASING per CHANGELOG "Three-part fix".
+        # The HA-validator restriction "MONETARY -> {TOTAL} only" does not
+        # apply here because the entity has no monetary device class.
+        # TOTAL_INCREASING lets the Recorder treat the
+        # midnight cloud transient as a reset rather than misreading it
+        # as a real loss.
+        "total_revenue": ("TOTAL_INCREASING", None),
         "total_carbon_saved": ("TOTAL_INCREASING", None),
         "power_price": (None, None),
     }
@@ -573,12 +796,19 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
 
 
 def test_period_sensors_do_not_publish_stale_period_totals() -> None:
-    """Stale-period guard never exposes yesterday's total as today's value.
+    """Stale-period guard publishes None for ALL periods (CHANGELOG fix).
 
-    ``_refresh_cache`` must publish None when the wall clock has
-    crossed a period boundary but the source data still belongs to
-    the previous period. Daily sensors publish 0 for the new day instead
-    of going unknown after midnight.
+    Per CHANGELOG "Three-part fix" / Midnight race: when the wall clock
+    has crossed a period boundary but the source data still has the
+    previous period's begin_date, ``native_value`` is set to ``None``
+    for ALL periods (including DAY). HA Recorder writes ``unavailable``
+    for that brief window and never sees an artificial spike+drop.
+
+    A previous ``raw = 0 if DAY else None`` carve-out (intended UX of
+    "show 0 for fresh day") reintroduced the midnight delta bug — the
+    Recorder saw ``state=0`` next to yesterday's positive value with
+    the same ``last_reset`` and computed a negative delta. Never
+    reintroduce the carve-out.
     """
     sensor_source = (
         Path(__file__).resolve().parents[1]
@@ -586,24 +816,55 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
         / "jackery_solarvault"
         / "sensor.py"
     ).read_text(encoding="utf-8")
-    # The helper exists
+    # The helper exists.
     assert "def _is_period_data_stale(self) -> bool:" in sensor_source
-    # And is consulted in _refresh_cache before assigning native_value
+    # And is consulted in _refresh_cache before assigning native_value.
     assert (
         "stale_period = self._reset_period and self._is_period_data_stale()"
         in sensor_source
     )
-    # The stale path explicitly publishes 0 for day sensors and None for
-    # longer periods.
-    import re
-
-    flat = re.sub(r"\s+", " ", sensor_source)
-    assert ("raw = 0 if self._reset_period == DATE_TYPE_DAY else None") in flat, (
-        "daily stale-period guard does not emit a zero fallback"
+    # All period sensors publish None (incl. DAY) when stale. NEVER a
+    # carve-out for DAY periods publishing 0.
+    assert "raw = 0 if self._reset_period == DATE_TYPE_DAY" not in sensor_source, (
+        "Stale-guard must not publish raw=0 for DAY — re-creates midnight spike."
     )
+    assert "if stale_period or future_period:" in sensor_source, (
+        "stale/future guard must collapse to a single None-assignment branch."
+    )
+    # Attribute is informative: "unavailable until the next refresh cycle
+    # lands within the local period".
     assert (
-        'attrs["stale_period_fallback"] = "zero_until_fresh_day_data"'
+        'attrs["stale_period_fallback"] = "unknown_until_local_period"'
     ) in sensor_source
+    assert "def _non_negative_period_raw(self, raw: Any) -> Any:" in sensor_source
+    assert "parsed is not None and parsed < 0" in sensor_source
+
+
+def test_period_sensors_do_not_publish_future_period_totals() -> None:
+    """Early next-period app payloads must not create negative Energy deltas."""
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    assert "def _is_period_data_future(self) -> bool:" in sensor_source
+    assert "data_begin > wall_clock_start.date()" in sensor_source
+    assert "if self._is_period_data_future():" in sensor_source
+    assert (
+        "future_period = self._reset_period and self._is_period_data_future()"
+        in sensor_source
+    )
+    # The stale/future branches collapse to a single None-assignment per
+    # the CHANGELOG three-part fix (None for ALL periods, including DAY).
+    assert (
+        "if stale_period or future_period:\n                raw = None" in sensor_source
+    )
+    assert 'attrs["future_period_data"] = True' in sensor_source
+    assert (
+        'attrs["future_period_fallback"] = "unknown_until_local_period"'
+        in sensor_source
+    )
+    assert 'self._cached_attrs["future_period_data"] = True' in sensor_source
+    assert (
+        'self._cached_attrs["future_period_fallback"] = "unknown_until_local_period"'
+        in sensor_source
+    )
 
 
 def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
@@ -616,6 +877,26 @@ def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
     )
     assert "reset_period = _period_from_stat_description(description)" in sensor_source
     assert "reset_period=reset_period" in sensor_source
+
+
+def test_zero_period_totals_create_entities_without_chart_series() -> None:
+    """Monday week payloads can have ``y: null`` but scalar total ``0``.
+
+    A scalar period total, including zero, is still a valid app statistic.
+    Entity creation must not require a non-empty chart series, otherwise
+    week entities disappear on Monday morning.
+    """
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+    helper = sensor_source.split("def _stat_description_has_value", 1)[1].split(
+        "\n\nSTAT_DESCRIPTIONS:",
+        1,
+    )[0]
+
+    assert "trend_series_has_value(" in helper
+    assert "effective_period_total_value(" in helper
+    assert helper.index("trend_series_has_value(") < helper.index(
+        "effective_period_total_value("
+    )
 
 
 def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
@@ -631,69 +912,423 @@ def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
     assert "current_day_bucket_from_" in stat_block
 
 
-def test_total_revenue_state_class_compatible_with_monetary_device_class() -> None:
-    """MONETARY device_class only allows state_class=TOTAL or None.
+def test_total_revenue_uses_total_increasing_without_monetary_class() -> None:
+    """``total_revenue`` must use TOTAL_INCREASING without MONETARY device_class.
 
-    HA's sensor entity validation logs an error and refuses to track
-    statistics for combinations like MONETARY + TOTAL_INCREASING:
+    History (CHANGELOG and 2026-05-16 user audit):
 
-        Entity ... is using state class 'total_increasing' which is
-        impossible considering device class ('monetary') it is using;
-        expected None or one of 'total'
+    * The CHANGELOG "Three-part fix" / Midnight race condition
+      explicitly sets ``state_class=TOTAL_INCREASING`` so the Recorder
+      treats the midnight cloud transient as a reset rather than as a
+      real loss (no negative spikes in CO2/Einnahmen).
+    * An earlier revert added ``device_class=MONETARY``, which triggers
+      HA's validator restriction "MONETARY only allows TOTAL or None"
+      and forced ``state_class=TOTAL``. That regression reintroduced
+      the midnight drop.
+    * The user pointed out that ``MONETARY`` is not part of the intended
+      entity model. Removing it eliminates the validator conflict and
+      restores TOTAL_INCREASING.
 
-    Lock that combination down so it can never regress (it did once
-    in 2.3.3 and was reverted in 2.3.4).
+    Lock the docs-compliant combination so it cannot regress again.
     """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     pattern = re.compile(
         r"JackeryStatSensorDescription\(\s*\n"
         r"(?:(?!\n    \),).)*?"
         r'key="total_revenue"'
-        r"(?:(?!\n    \),).)*?"
-        r"state_class=SensorStateClass\.(\w+)",
+        r"(?:(?!\n    \),).)*",
         re.S | re.M,
     )
     match = pattern.search(sensor_source)
     assert match is not None, "total_revenue description not found"
-    assert match.group(1) == "TOTAL", (
-        f"total_revenue uses state_class={match.group(1)!r}; "
-        "MONETARY device_class only allows TOTAL or None per HA validation"
+    block = match.group(0)
+    assert "SensorStateClass.TOTAL_INCREASING" in block, (
+        "total_revenue must use SensorStateClass.TOTAL_INCREASING per CHANGELOG "
+        '"Three-part fix" — TOTAL alone causes the midnight Recorder drop.'
+    )
+    assert "SensorDeviceClass.MONETARY" not in block, (
+        "total_revenue must NOT carry device_class=MONETARY. The integration "
+        "docs do not prescribe it, and it forces state_class back to TOTAL via "
+        "the HA-validator restriction, undoing the three-part fix."
     )
 
 
-def test_statistics_backfill_state_is_persistent_and_loaded_before_first_refresh() -> (
-    None
-):
-    """External-statistics backfill state survives HA restarts."""
+def test_statistics_backfill_state_is_removed() -> None:
+    """Extra statistics backfill state must not be loaded or persisted."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     init_source = INIT_PATH.read_text(encoding="utf-8")
 
-    assert "from homeassistant.helpers.storage import Store" in coordinator_source
-    assert "_statistics_backfill_store = Store(" in coordinator_source
-    assert "async_load_statistics_backfill_state" in coordinator_source
-    assert "_async_save_statistics_backfill_state" in coordinator_source
-    assert "statistics_backfill_diagnostics" in coordinator_source
-    assert init_source.index(
-        "async_load_statistics_backfill_state"
-    ) < init_source.index("async_discover()")
+    assert "from homeassistant.helpers.storage import Store" not in coordinator_source
+    assert "_statistics_backfill_store" not in coordinator_source
+    assert "async_load_statistics_backfill_state" not in coordinator_source
+    assert "_async_save_statistics_backfill_state" not in coordinator_source
+    assert "statistics_backfill_diagnostics" not in coordinator_source
+    assert "async_load_statistics_backfill_state" not in init_source
+    assert "def statistics_import_diagnostics" in coordinator_source
 
 
-def test_statistics_backfill_repairs_calendar_boundaries_before_current_import() -> (
-    None
-):
-    """Missed month/year app buckets are reloaded before the current snapshot."""
+def test_statistics_import_adds_only_current_payload_to_entity_history() -> None:
+    """Current payload buckets are imported without historical backfill paths."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
-    repair_source = coordinator_source.split(
-        "async def _async_import_and_repair_app_chart_statistics", 1
+    import_source = coordinator_source.split(
+        "async def _async_import_current_app_chart_statistics_job", 1
     )[1].split(
-        "# ------------------------------------------------------------------", 1
+        "\n    # ------------------------------------------------------------------", 1
     )[0]
 
-    assert "app_month_request_kwargs" in coordinator_source
-    assert "app_year_request_kwargs" in coordinator_source
-    assert "async def _async_repair_missing_app_chart_statistics" in coordinator_source
-    assert "_iter_calendar_months(from_date, to_date)" in coordinator_source
-    assert "_iter_calendar_years(from_date, to_date)" in coordinator_source
-    assert repair_source.index("_async_repair_missing_app_chart_statistics") < (
-        repair_source.index("_async_import_app_chart_statistics(snapshot)")
+    assert "async def _async_repair_missing_app_chart_statistics" not in (
+        coordinator_source
     )
+    assert "async def async_repair_statistics" not in coordinator_source
+    assert "_async_add_app_chart_entity_statistics" not in coordinator_source
+    assert "_STATISTICS_BACKFILL_LAST_ENTITY_REPAIR" not in coordinator_source
+    assert "_STATISTICS_BACKFILL_LAST_DAY_ENTITY_REPAIR" not in coordinator_source
+    assert "_STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION" not in coordinator_source
+    assert "_EXTERNAL_STATISTICS_REPAIR_VERSION" not in coordinator_source
+    assert "_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION" not in coordinator_source
+    assert "_ENTITY_STATISTICS_REPAIR_VERSION" not in coordinator_source
+    current_import = import_source.index(
+        "successful_devices = await self._async_import_app_chart_statistics(snapshot)"
+    )
+    current_entity_import = import_source.index(
+        "_async_import_current_app_chart_entity_statistics(snapshot)"
+    )
+    assert "_async_repair_missing_app_chart_statistics(" not in import_source
+    assert "_statistics_repair_from_date(" not in import_source
+    assert "_statistics_rolling_backfill_from_date(" not in import_source
+    current_payload_source = coordinator_source.split(
+        "def _current_app_chart_entity_source_batches", 1
+    )[1].split("\n    async def _async_import_current_app_chart_entity_statistics", 1)[
+        0
+    ]
+    assert "for date_type in (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH):" in (
+        current_payload_source
+    )
+    assert "DATE_TYPE_YEAR" not in current_payload_source
+    assert current_import < current_entity_import
+
+
+def test_day_entity_repair_can_replace_recorder_spikes() -> None:
+    """Daily ``sensor.*`` rows may replace Recorder spike rows."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    targets_fn = coordinator_source.split("def _entity_targets_for_app_points", 1)[
+        1
+    ].split("\n    def _completed_entity_app_points", 1)[0]
+    month_branch = targets_fn.split("if date_type == DATE_TYPE_MONTH:", 1)[1].split(
+        "return tuple(targets)", 1
+    )[0]
+
+    assert "if date_type == DATE_TYPE_DAY:" in targets_fn
+    assert "periods.get(DATE_TYPE_DAY)" in targets_fn
+    assert "day_key" not in month_branch
+    assert "periods.get(DATE_TYPE_MONTH)" in month_branch
+    assert "periods.get(DATE_TYPE_YEAR)" in month_branch
+
+    importer = coordinator_source.split(
+        "async def _async_import_app_chart_entity_statistics_for_device", 1
+    )[1].split("\n    def _current_app_chart_entity_source_batches", 1)[0]
+    assert "if date_type == DATE_TYPE_DAY:" in importer
+    assert "day_power_energy_points(" in importer
+    assert "_async_compiled_statistic_hour_starts" in importer
+    assert "compiled_hour_starts" in importer
+    assert "replace_existing_hours" in importer
+    assert "include_current_day_completed" in importer
+
+    current_import = coordinator_source.split(
+        "async def _async_import_current_app_chart_entity_statistics", 1
+    )[1].split("\n    async def _async_update_data_quality_issue", 1)[0]
+    day_call = current_import.split("if day_batches:", 1)[1].split(
+        "if period_batches:", 1
+    )[0]
+    assert "replace_existing_hours=True" in day_call
+    assert "include_current_day_completed=True" in day_call
+
+    assert "_DAY_ENTITY_STATISTICS_REPAIR_WINDOW_DAYS" not in coordinator_source
+
+
+def test_day_chart_sources_prefer_device_minute_curves_for_pv_and_battery() -> None:
+    """PV/battery day buckets must not depend on optional system trends."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    source_map = coordinator_source.split("_DAY_TREND_SOURCE_BY_METRIC_KEY = {", 1)[
+        1
+    ].split("\n}", 1)[0]
+    fallback_map = coordinator_source.split("_METRIC_SOURCE_FALLBACKS", 1)[1].split(
+        "\n}\n",
+        1,
+    )[0]
+    candidates_fn = coordinator_source.split("def _day_chart_source_candidates", 1)[
+        1
+    ].split("\n    def _day_chart_points_for_metric", 1)[0]
+    fetch_system = coordinator_source.split("async def _fetch_system", 1)[1].split(
+        "\n        async def _fetch_device_extras", 1
+    )[0]
+
+    assert '"pv_energy"' not in source_map
+    assert '"battery_charge_energy"' not in source_map
+    assert '"battery_discharge_energy"' not in source_map
+    assert '"home_energy"' in source_map
+    assert '"home_energy"' not in fallback_map
+    assert "_metric_source_candidates(" in candidates_fn
+    assert 'f"{candidate_prefix}_{DATE_TYPE_DAY}"' in candidates_fn
+    assert "system_trend_timeout_sec" in coordinator_source
+    assert "timeout_sec=system_trend_timeout_sec" in fetch_system
+
+
+def test_historical_statistics_fetch_path_is_removed() -> None:
+    """Historical statistics backfill must not exist."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+
+    assert "async def _async_fetch_historical_app_chart_source" not in (
+        coordinator_source
+    )
+    assert "Skip historical app chart fetch" not in coordinator_source
+    assert "period_start > today" not in coordinator_source
+
+
+def test_week_month_year_statistic_toggles_filter_imports() -> None:
+    """W/M/Y config-flow toggles gate the matching statistic imports.
+
+    When the user disables, say, year statistics in the options/reconfigure
+    flow, the coordinator must:
+
+    * Skip the YEAR branch when iterating ``APP_CHART_STAT_PERIODS`` in
+      ``_async_import_app_chart_statistics``.
+    * Skip the YEAR ``date_type`` filter in
+      ``_current_app_chart_entity_source_batches``.
+
+    DAY-hourly external statistics carry the Energy-Dashboard's hour-by-hour
+    breakdown and have no HA-vs-Cloud conflict — they stay always on.
+    """
+    const_source = (COMPONENT_PATH / "const.py").read_text(encoding="utf-8")
+    assert (
+        'CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"'
+    ) in const_source
+    assert (
+        'CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"'
+    ) in const_source
+    assert (
+        'CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"'
+    ) in const_source
+    assert "DEFAULT_ENABLE_WEEK_STATISTICS: Final = True" in const_source
+    assert "DEFAULT_ENABLE_MONTH_STATISTICS: Final = True" in const_source
+    assert "DEFAULT_ENABLE_YEAR_STATISTICS: Final = True" in const_source
+
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    assert "def _enabled_app_chart_date_types" in coordinator_source
+
+    import_fn = coordinator_source.split(
+        "async def _async_import_app_chart_statistics", 1
+    )[1].split("\n    async def _async_import_current_app_chart_statistics_job", 1)[0]
+    assert "enabled_date_types = self._enabled_app_chart_date_types()" in import_fn
+    assert "if date_type not in enabled_date_types:" in import_fn
+
+    assert "async def _async_repair_missing_app_chart_statistics" not in (
+        coordinator_source
+    )
+
+    current_source = coordinator_source.split(
+        "def _current_app_chart_entity_source_batches", 1
+    )[1].split("\n    async def _async_import_current_app_chart_entity_statistics", 1)[
+        0
+    ]
+    assert "enabled_date_types = self._enabled_app_chart_date_types()" in current_source
+
+    # Config-flow schemas expose the three toggles in both the options-flow
+    # and reconfigure entry points.
+    config_flow_source = (COMPONENT_PATH / "config_flow.py").read_text(encoding="utf-8")
+    for key in (
+        "CONF_ENABLE_WEEK_STATISTICS",
+        "CONF_ENABLE_MONTH_STATISTICS",
+        "CONF_ENABLE_YEAR_STATISTICS",
+    ):
+        # Both schemas (options-flow init + reconfigure) must reference each
+        # constant — at least two occurrences per key.
+        assert config_flow_source.count(key) >= 2, key
+
+    # Translations carry the new labels in every locale so HA renders them.
+    base = json.loads((COMPONENT_PATH / "strings.json").read_text(encoding="utf-8"))
+    for key in (
+        "enable_week_statistics",
+        "enable_month_statistics",
+        "enable_year_statistics",
+    ):
+        assert key in base["options"]["step"]["init"]["data"], (
+            f"{key} missing in strings.json options step"
+        )
+        assert key in base["config"]["step"]["reconfigure"]["data"], (
+            f"{key} missing in strings.json reconfigure step"
+        )
+
+    # Runtime: the helper honours the entry options. DAY stays on always.
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_DAY,
+        DATE_TYPE_MONTH,
+        DATE_TYPE_WEEK,
+        DATE_TYPE_YEAR,
+        JackerySolarVaultCoordinator,
+    )
+
+    class _StubEntry:
+        def __init__(self, options: dict[str, bool]) -> None:
+            self.options = options
+            self.data: dict[str, bool] = {}
+
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator.entry = _StubEntry({
+        "enable_week_statistics": True,
+        "enable_month_statistics": True,
+        "enable_year_statistics": True,
+    })
+    assert coordinator._enabled_app_chart_date_types() == {
+        DATE_TYPE_DAY,
+        DATE_TYPE_WEEK,
+        DATE_TYPE_MONTH,
+        DATE_TYPE_YEAR,
+    }
+
+    coordinator.entry = _StubEntry({
+        "enable_week_statistics": False,
+        "enable_month_statistics": False,
+        "enable_year_statistics": False,
+    })
+    assert coordinator._enabled_app_chart_date_types() == {DATE_TYPE_DAY}
+
+    coordinator.entry = _StubEntry({
+        "enable_week_statistics": True,
+        "enable_month_statistics": False,
+        "enable_year_statistics": True,
+    })
+    assert coordinator._enabled_app_chart_date_types() == {
+        DATE_TYPE_DAY,
+        DATE_TYPE_WEEK,
+        DATE_TYPE_YEAR,
+    }
+
+
+def test_day_external_history_backfill_is_removed() -> None:
+    """Day external statistics are imported from current payload only."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+
+    assert "def _iter_calendar_days" not in coordinator_source
+    assert "(DATE_TYPE_DAY, self._iter_calendar_days(from_date, to_date))" not in (
+        coordinator_source
+    )
+    assert "app_period_request_kwargs(DATE_TYPE_DAY, today=period_start)" not in (
+        coordinator_source
+    )
+
+    current_day_source = coordinator_source.split(
+        "async def _async_import_day_chart_statistics", 1
+    )[1].split("\n    def _enabled_app_chart_date_types", 1)[0]
+    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in current_day_source
+    assert "APP_DAY_CHART_BUCKET_LABEL" in current_day_source
+    assert "_day_chart_points_for_metric(" in current_day_source
+
+
+def test_historical_entity_statistics_repair_is_removed() -> None:
+    """Historical app buckets must not be fetched into entity statistics."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+
+    assert "async def _async_repair_missing_app_chart_statistics" not in (
+        coordinator_source
+    )
+    assert "if day_entity_source_batches:" not in coordinator_source
+    assert "if period_entity_source_batches:" not in coordinator_source
+    assert "replace_existing_day_hours: bool = True" not in coordinator_source
+    assert "replace_existing_hours=replace_existing_day_hours" not in (
+        coordinator_source
+    )
+
+
+def test_entity_statistics_import_handles_day_week_month_not_year() -> None:
+    """Entity-stats import fills current day/week/month; year remains external."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+
+    importer = coordinator_source.split(
+        "async def _async_import_app_chart_entity_statistics_for_device", 1
+    )[1].split("\n    def _current_app_chart_entity_source_batches", 1)[0]
+    assert "if date_type == DATE_TYPE_DAY:" in importer
+    assert "day_power_energy_points(" in importer
+    assert "_day_chart_points_for_metric(" not in importer
+    assert "payload: dict[str, Any]" not in importer
+    assert "payload=payload" not in importer
+
+    targets_fn = coordinator_source.split("def _entity_targets_for_app_points", 1)[
+        1
+    ].split("\n    def _completed_entity_app_points", 1)[0]
+    assert "if date_type == DATE_TYPE_DAY:" in targets_fn
+    assert "periods.get(DATE_TYPE_DAY)" in targets_fn
+    assert "periods.get(DATE_TYPE_WEEK)" in targets_fn
+    assert "periods.get(DATE_TYPE_MONTH)" in targets_fn
+
+    completed_fn = coordinator_source.split("def _completed_entity_app_points", 1)[
+        1
+    ].split("\n    def _entity_statistics_from_contributions", 1)[0]
+    assert "DATE_TYPE_DAY" in completed_fn
+    assert "include_current_day_completed" in completed_fn
+    assert "current_hour_start" in completed_fn
+    assert "date_type: str," not in completed_fn
+
+    assert "day_entity_source_batches.append" not in coordinator_source
+    assert "period_entity_source_batches.append" not in coordinator_source
+    assert "(DATE_TYPE_DAY, self._iter_calendar_days(from_date, to_date))" not in (
+        coordinator_source
+    )
+
+
+def test_period_time_math_uses_home_assistant_local_timezone() -> None:
+    """App day/week/month/year boundaries must not use UTC by accident."""
+    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
+    sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
+
+    assert "def _local_timezone(self)" in coordinator_source
+    assert "def _local_today(self)" in coordinator_source
+    assert "today=self._local_today()" in coordinator_source
+    assert "now = self._local_now()" in coordinator_source
+    assert "today = self._local_today()" in coordinator_source
+    assert "def _local_timezone(self)" in sensor_source
+    assert "_period_start(self._reset_period, self._local_timezone())" in sensor_source
+    assert "today = self._local_today()" in sensor_source
+
+
+def test_statistics_repair_seed_path_is_removed() -> None:
+    """First-run historical statistic seeding must not exist."""
+    src = COORDINATOR_PATH.read_text(encoding="utf-8")
+    assert "def _statistics_repair_from_date(" not in src
+    assert "_statistics_current_year_recovery_needed" not in src
+    assert "_STATISTICS_BACKFILL_LAST_REPAIR" not in src
+
+
+def test_statistics_import_has_no_payload_fed_rolling_backfill() -> None:
+    """Automatic statistics import must not run extra historical backfills."""
+    src = COORDINATOR_PATH.read_text(encoding="utf-8")
+    for removed in (
+        "_STATISTICS_ROLLING_BACKFILL_WINDOW_DAYS",
+        "_STATISTICS_ROLLING_BACKFILL_INTERVAL_SEC",
+        "self._last_statistics_rolling_backfill_monotonic",
+        "def _statistics_rolling_backfill_from_date",
+        "async def async_repair_statistics",
+        "_STATISTICS_BACKFILL_LAST_MANUAL_FROM",
+        "_STATISTICS_BACKFILL_LAST_SOURCE_COUNTS",
+    ):
+        assert removed not in src
+
+    import_job = src.split(
+        "async def _async_import_current_app_chart_statistics_job", 1
+    )[1].split(
+        "\n    # ------------------------------------------------------------------", 1
+    )[0]
+    assert "_statistics_repair_from_date(device_id, today)" not in import_job
+    assert "_statistics_rolling_backfill_from_date(" not in import_job
+    assert "_async_repair_missing_app_chart_statistics(" not in import_job
+
+
+def test_statistics_repair_source_matrix_is_removed() -> None:
+    """Backfill source matrix diagnostics must not exist."""
+    src = COORDINATOR_PATH.read_text(encoding="utf-8")
+    for removed in (
+        "source_counts: dict[str, dict[str, int]] = {}",
+        'source_key = f"{section_prefix}_{date_type}"',
+        "self._last_statistics_repair_source_counts",
+    ):
+        assert removed not in src

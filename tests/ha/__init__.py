@@ -8,7 +8,10 @@ and unload, service registration, and reauth.
 
 Run with::
 
-    pytest -c pytest-ha.ini tests/ha
+    pytest -q -p no:cacheprovider -c pytest-ha.ini tests/ha
+
+The dedicated ``pytest-ha.ini`` keeps this job lean and avoids the
+source-only coverage options from ``pyproject.toml``.
 
 The pure unit tests under ``tests/`` do NOT require this stack and
 remain runnable in the lightweight CI matrix.
