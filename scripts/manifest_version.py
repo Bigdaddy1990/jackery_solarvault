@@ -1,7 +1,5 @@
 """Read and validate the Home Assistant integration manifest version."""
 
-from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path

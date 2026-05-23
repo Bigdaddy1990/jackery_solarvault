@@ -1,7 +1,5 @@
 """Validate GitHub workflow and repository automation YAML files."""
 
-from __future__ import annotations
-
 from pathlib import Path
 import sys
 
