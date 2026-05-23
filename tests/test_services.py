@@ -1,5 +1,7 @@
 """Unit tests for integration service helpers."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import sys
 

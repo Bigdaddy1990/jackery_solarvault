@@ -1,5 +1,7 @@
 """Unit tests for Jackery device discovery filters."""
 
+from __future__ import annotations
+
 from custom_components.jackery_solarvault.const import (
     FIELD_BIND_KEY,
     FIELD_DEV_MODEL,
