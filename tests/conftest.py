@@ -7,8 +7,6 @@ pytest-asyncio autoloading. When pytest-asyncio is explicitly loaded, it remains
 responsible for async tests.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Mapping
 import inspect
