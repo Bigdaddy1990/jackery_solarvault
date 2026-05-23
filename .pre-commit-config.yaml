@@ -41,7 +41,7 @@ repos:
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.14
+    rev: v0.15.12
     hooks:
       - id: ruff-check
         args:
@@ -86,3 +86,12 @@ repos:
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
       - id: destroyed-symlinks
+
+  - repo: local
+    hooks:
+      - id: docs-html-build
+        name: build docs HTML with bun
+        entry: bun run docs:build
+        language: system
+        pass_filenames: false
+        files: ^docs/.*\.md$
