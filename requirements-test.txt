@@ -1,7 +1,7 @@
+certifi
+Markdown
 mypy
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component
 PyYAML
-Markdown
-certifi
