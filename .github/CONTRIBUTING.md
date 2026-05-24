@@ -116,4 +116,3 @@ If you have Home Assistant Core tooling available, also run the HACS validation 
 * Stay involved after opening the pull request by responding to feedback and rebasing on `main` until your contribution merges.
 
 We appreciate your help making jackery\_solarvault better for every pet family!
-
