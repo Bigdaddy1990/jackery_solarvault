@@ -11,3 +11,4 @@ annotatedyaml
 voluptuous
 yarl
 coverage
+bun
