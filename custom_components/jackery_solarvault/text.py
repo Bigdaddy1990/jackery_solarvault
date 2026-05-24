@@ -9,7 +9,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .api import JackeryAuthError, JackeryError
+from .client.api import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
     FIELD_DEVICE_NAME,
