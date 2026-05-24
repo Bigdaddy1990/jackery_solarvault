@@ -18,6 +18,7 @@ from aiomqtt.exceptions import MqttCodeError
 from ..const import (
     FIELD_BODY,
     FIELD_DATA,
+    MQTT_AUTH_FAILURE_TOLERANCE,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_HOST,
@@ -61,7 +62,7 @@ _AIOMQTT_LOGGER.addFilter(_AioMqttPassiveDisconnectFilter())
 
 
 class JackeryMqttPushClient:
-    """Async-native MQTT client for Jackery cloud topics in MQTT_PROTOCOL.md."""
+    """Async-native MQTT client for Jackery cloud topics in implementation notes §3."""
 
     def __init__(
         self,
@@ -72,7 +73,6 @@ class JackeryMqttPushClient:
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         self._hass = hass
-        self._loop = hass.loop
         self._message_callback = message_callback
         self._connect_callback = connect_callback
         self._disconnect_callback = disconnect_callback
@@ -94,6 +94,13 @@ class JackeryMqttPushClient:
         self._last_publish_at: str | None = None
         self._connect_attempts = 0
         self._last_connect_failure_signature: str | None = None
+        # Counter for consecutive CONNACK auth rejections (rc=4/5/134/135).
+        # Resets to 0 the moment the broker accepts a session. The coordinator
+        # uses this to differentiate a transient token-rotation race (the
+        # Jackery cloud rotates credentials when the official app logs in at
+        # the same time) from a persistent credential failure that warrants
+        # opening Home Assistant's reauth UI.
+        self._consecutive_auth_failures = 0
         self._tls_custom_ca_loaded = False
         self._tls_certificate_source = "not_built"
 
@@ -266,6 +273,9 @@ class JackeryMqttPushClient:
                 self._connected_event.set()
                 self._last_error = None
                 self._last_connect_failure_signature = None
+                # Successful broker handshake clears any transient auth-failure
+                # streak — the next rejection starts the tolerance count over.
+                self._consecutive_auth_failures = 0
                 _LOGGER.info(
                     "Jackery MQTT connected; subscribing to %d topic(s) "
                     "[TLS source=%s]",
@@ -327,12 +337,36 @@ class JackeryMqttPushClient:
         message = f"connect rc={rc} ({reason})"
         self._last_error = message
         self._connected_event.set()
+        if self._is_connect_auth_failure_rc(rc):
+            self._consecutive_auth_failures += 1
+        else:
+            # Non-auth rejection (e.g. server unavailable) does not count toward
+            # the auth-tolerance streak — the streak is for credential issues.
+            self._consecutive_auth_failures = 0
         if message == self._last_connect_failure_signature:
-            _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
+            if (
+                self._is_connect_auth_failure_rc(rc)
+                and self._consecutive_auth_failures == MQTT_AUTH_FAILURE_TOLERANCE
+            ):
+                _LOGGER.warning(
+                    "Jackery MQTT connect failed repeatedly: %s (streak=%d)",
+                    message,
+                    self._consecutive_auth_failures,
+                )
+            else:
+                _LOGGER.debug(
+                    "Jackery MQTT repeated connect failure: %s (streak=%d)",
+                    message,
+                    self._consecutive_auth_failures,
+                )
             return
         self._last_connect_failure_signature = message
         if self._is_connect_auth_failure_rc(rc):
-            _LOGGER.warning("Jackery MQTT connect failed: %s", message)
+            _LOGGER.debug(
+                "Jackery MQTT connect failed: %s (streak=%d)",
+                message,
+                self._consecutive_auth_failures,
+            )
         else:
             _LOGGER.debug("Jackery MQTT connect failed: %s", message)
 
@@ -434,7 +468,7 @@ class JackeryMqttPushClient:
             self._messages_dropped += 1
             self._last_message_error = "non-object JSON payload"
             return
-        # MQTT_PROTOCOL.md documents body-based routing; some broker variants
+        # implementation notes §3 documents body-based routing; some broker variants
         # send the same structure as data. Normalize before coordinator routing.
         if not isinstance(data.get(FIELD_BODY), dict):
             alt_body = data.get(FIELD_DATA)
@@ -474,19 +508,22 @@ class JackeryMqttPushClient:
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 
-    @property
-    def diagnostics(self) -> dict[str, Any]:
-        """Return a redacted snapshot of the MQTT client state for diagnostics."""
+    def diagnostics_snapshot(self, *, redact_topics: bool = True) -> dict[str, Any]:
+        """Return a snapshot of the MQTT client state for diagnostics."""
+
+        def topic_value(topic: str | None) -> str | None:
+            return self._redact_topic(topic) if redact_topics else topic
+
         return {
             "connected": self._connected,
             "started": self._runner_task is not None,
             "messages_seen": self._messages_seen,
             "messages_dropped": self._messages_dropped,
-            "topics": [self._redact_topic(topic) for topic in self._topics],
+            "topics": [topic_value(topic) for topic in self._topics],
             "topic_count": len(self._topics),
             "last_error": self._last_error,
             "last_message_error": self._last_message_error,
-            "last_published_topic": self._redact_topic(self._last_published_topic),
+            "last_published_topic": topic_value(self._last_published_topic),
             "last_connect_at": self._last_connect_at,
             "last_disconnect_at": self._last_disconnect_at,
             "last_message_at": self._last_message_at,
@@ -496,12 +533,19 @@ class JackeryMqttPushClient:
             "host": MQTT_HOST,
             "port": MQTT_PORT,
             "connect_attempts": self._connect_attempts,
+            "consecutive_auth_failures": self._consecutive_auth_failures,
+            "last_connect_failure_signature": self._last_connect_failure_signature,
             "tls_insecure": False,
             "tls_x509_strict_disabled": hasattr(ssl, "VERIFY_X509_STRICT"),
             "tls_custom_ca_loaded": self._tls_custom_ca_loaded,
             "tls_certificate_source": self._tls_certificate_source,
             "library": MQTT_CLIENT_LIBRARY,
         }
+
+    @property
+    def diagnostics(self) -> dict[str, Any]:
+        """Return a redacted snapshot of the MQTT client state for diagnostics."""
+        return self.diagnostics_snapshot()
 
     def _seconds_since_last_message(self) -> float | None:
         """Return seconds elapsed since the last inbound MQTT frame, or None.
@@ -528,6 +572,18 @@ class JackeryMqttPushClient:
         fast HTTP refreshes while MQTT push is delivering fresh frames.
         """
         return self._seconds_since_last_message()
+
+    @property
+    def consecutive_auth_failures(self) -> int:
+        """Public read-only view of the auth-failure streak counter.
+
+        The coordinator reads this to decide whether a transient credential
+        rejection should be tolerated (token-rotation race with the official
+        app) or surfaced as ``ConfigEntryAuthFailed`` so HA opens the reauth
+        flow. Increments on CONNACK rc=4/5/134/135, resets on the first
+        successful broker handshake.
+        """
+        return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
         """Return True when the broker is "connected" but no message arrives.
