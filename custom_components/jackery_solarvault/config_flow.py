@@ -191,7 +191,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 password=user_input[CONF_PASSWORD],
             )
             try:
-                await .client.api.async_login()
+                await api.async_login()
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
