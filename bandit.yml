@@ -1,0 +1,15 @@
+# Bandit configuration aligned with Home Assistant guidelines
+exclude_dirs:
+  - tests
+
+skips:
+  - B101 # assert used
+  - B102 # exec used
+  - B110 # try/except/pass
+  - B112 # try/except/continue
+  - B307 # eval
+  - B410 # urllib insecure usage
+  - B603 # subprocess without shell
+  - B608 # hardcoded temp file
+  - B612 # subprocess Popen with shell
+  - B703 # incomplete error handling

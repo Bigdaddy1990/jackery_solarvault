@@ -1,0 +1,72 @@
+# Codecov configuration for jackery_solarvault Integration
+# Reference: https://docs.codecov.com/docs/codecovyml-reference
+# Validate: curl -X POST --data-binary @.codecov.yml https://api.codecov.io/validate
+
+codecov:
+  bot: Bigdaddy1990
+  notify:
+    wait_for_ci: false
+  require_ci_to_pass: false
+
+comment:
+  behavior: default
+  hide_project_coverage: false
+  layout: "diff, flags, files"
+  require_base: false
+  require_changes: 0
+  require_head: true
+  show_carryforward_flags: false
+
+coverage:
+  precision: 2
+  round: down
+  range: [70.0, 100.0]
+  status:
+    changes: false
+    default_rules:
+      flag_coverage_not_uploaded_behavior: include
+    patch:
+      default:
+        base: auto
+        branches:
+          - main
+        flags:
+          - unittests
+        informational: true
+        only_pulls: false
+        paths:
+          - "custom_components/jackery_solarvault/"
+        target: 90.0
+        threshold: 1.0
+    project:
+      app:
+        paths:
+          - "custom_components/jackery_solarvault/"
+        target: auto
+        threshold: 1.0
+      default:
+        base: auto
+        branches:
+          - main
+        flags:
+          - unittests
+        informational: true
+        only_pulls: false
+        paths:
+          - "custom_components/jackery_solarvault/"
+        target: auto
+        threshold: 1.0
+
+flags:
+  unittests:
+    carryforward: false
+    paths:
+      - "custom_components/jackery_solarvault/"
+
+github_checks:
+  annotations: false
+
+ignore:
+  - "tests/**"
+  - "docs/**"
+  - "scripts/**"
