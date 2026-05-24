@@ -15,7 +15,7 @@ pathIgnorePatterns = ["vendor/**", "submodules/**", "fixtures/**"]
 coverage = true
 # to require 90% line-level and function-level coverage
 coverageThreshold = 0.9
-coverageThreshold = { line = 0.7, function = 0.8, statement = 0.9 }
+#coverageThreshold = { line = 0.7, function = 0.8, statement = 0.9 }
 coverageIgnoreSourcemaps = false
 coverageSkipTestFiles = false
 coveragePathIgnorePatterns = [
