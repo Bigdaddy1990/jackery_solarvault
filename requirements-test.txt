@@ -1,8 +1,13 @@
-certifi
-Markdown
 mypy
 pytest
 pytest-asyncio
-pytest-homeassistant-custom-component
+pytest-homeassistant-custom-component # follows daily HA version
 PyYAML
-ruff
+Markdown
+certifi
+ruff==0.15.12
+pytest-github-actions-annotate-failures
+annotatedyaml
+voluptuous
+yarl
+coverage
