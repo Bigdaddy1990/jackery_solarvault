@@ -46,6 +46,22 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 90
 
+# Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
+# logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
+# the official Jackery app can rotate broker sessions while HTTP credentials
+# remain valid, so the coordinator pauses MQTT and keeps HTTP polling alive.
+MQTT_AUTH_FAILURE_TOLERANCE: Final = 3
+
+# When the broker rejects credentials with CONNACK rc=4/5/134/135, the most
+# likely cause is that the official Jackery app just logged in with the same
+# ``<userId>@APP`` clientId and the broker rotated our credentials. Reconnect-
+# storms in that situation only deepen the conflict, so the coordinator pauses
+# MQTT entirely for ``MQTT_APP_CONFLICT_PAUSE_SEC`` after every rejection and
+# falls back to HTTP polling. The probe-reconnect after the pause confirms
+# whether the conflict cleared (app went offline / token settled). HA reauth is
+# left to HTTP auth failures; MQTT-only rejection must not stop the integration.
+MQTT_APP_CONFLICT_PAUSE_SEC: Final = 60
+
 # HTTP endpoint constants. Keep this list aligned with APP_POLLING_MQTT.md.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
@@ -72,6 +88,10 @@ DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...
 DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...
 DEVICE_METER_STAT_PATH: Final = (
     "/v1/device/stat/meter"  # ?deviceId=<smart-meter subdevice>
+)
+DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"  # ?deviceId&...
+DEVICE_SOCKET_STATISTIC_PATH: Final = (
+    "/v1/device/stat/smartSocketStatistic"  # ?smartSocketId=<socket accessory>
 )
 BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
 OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
@@ -115,6 +135,37 @@ CONF_REGION_CODE: Final = "region_code"
 CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
 CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
+# Experimental BLE transport (Phase 3a, read-only diagnostic listener).
+# When enabled, the coordinator subscribes to GATT notify on each known
+# SolarVault and surfaces the decoded/raw frames in diagnostics. See
+# local implementation notes §14 + client/ble.py for the wire-format reference.
+CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
+DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
+CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
+DEFAULT_ENABLE_BLE_WRITES: Final = False
+CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
+DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
+# Period-statistic toggles. The user can opt out of the DAY/WEEK/MONTH/YEAR
+# Recorder imports (both ``sensor.*`` entity rows and
+# ``jackery_solarvault:*_<period>_*`` external series). DAY-hourly external
+# stays always enabled because it carries the Energy-Dashboard hour-by-hour
+# breakdown and has no HA-vs-Cloud conflict. Defaults are ``True`` to
+# preserve current behaviour.
+CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
+DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
+CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
+DEFAULT_ENABLE_DAY_STATISTICS: Final = True
+CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"
+DEFAULT_ENABLE_WEEK_STATISTICS: Final = True
+CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"
+DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
+CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
+DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
+# Optional fallback for home-energy when sys/home/trends is empty.
+# Default stays False: device_home_stat is not the same metric family as
+# home_trends and must never silently replace it.
+CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = "enable_derived_home_energy_fallback"
+DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = False
 
 
 # Config-flow step, error and abort identifiers.
@@ -151,7 +202,6 @@ DEFAULT_STORM_WARNING_MINUTES: Final = 120
 # data path; MQTT push is an optional live enhancement.
 MQTT_LIVE_THRESHOLD_SEC: Final = 60
 ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
-
 REQUEST_TIMEOUT_SEC: Final = 15
 
 HTTP_METHOD_GET: Final = "GET"
@@ -160,7 +210,7 @@ HTTP_METHOD_PUT: Final = "PUT"
 HTTP_HEADER_CONTENT_TYPE: Final = "content-type"
 HTTP_CONTENT_TYPE_FORM: Final = "application/x-www-form-urlencoded"
 HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
-HTTP_RAW_TEXT_LIMIT: Final = 500
+HTTP_RAW_TEXT_LIMIT: Final = 1000
 
 # Shared payload section names. Coordinator, diagnostics and entity platforms use
 # the same normalized payload shape; keep the keys in one place so section names
@@ -184,8 +234,15 @@ PAYLOAD_TASK_PLAN: Final = "task_plan"
 PAYLOAD_PRICE_SOURCES: Final = "price_sources"
 PAYLOAD_BATTERY_PACKS: Final = "battery_packs"
 PAYLOAD_CT_METER: Final = "ct_meter"
+PAYLOAD_METER_HEADS: Final = "meter_heads"
+# Smart-plug subdevice payload bucket. Populated from the ``plugs`` array of
+# UploadSubDeviceGroupProperty (cmd=110, actionId=3032, devType=6 per the
+# app's ``HomeSubDeviceType`` enum) so downstream entity layers can iterate
+# the plug list with the same shape as battery packs.
+PAYLOAD_SMART_PLUGS: Final = "smart_plugs"
 PAYLOAD_NOTICE: Final = "notice"
 PAYLOAD_MQTT_LAST: Final = "mqtt_last"
+PAYLOAD_THIRD_PARTY_MQTT_CONFIG: Final = "third_party_mqtt_config"
 PAYLOAD_DATA_QUALITY: Final = "data_quality"
 
 # Internal normalized payload/cache keys. These are not Jackery wire keys, but
@@ -209,6 +266,7 @@ FIELD_UPDATES: Final = "updates"
 FIELD_SYSTEM_ID: Final = "systemId"
 FIELD_DEVICE_ID: Final = "deviceId"
 FIELD_DEV_ID: Final = "devId"
+FIELD_SMART_SOCKET_ID: Final = "smartSocketId"
 FIELD_DEVICE_NAME: Final = "deviceName"
 FIELD_DEVICE_SN: Final = "deviceSn"
 FIELD_DEV_SN: Final = "devSn"
@@ -223,6 +281,11 @@ FIELD_ONLINE_STATE: Final = "onlineState"
 FIELD_WNAME: Final = "wname"
 FIELD_MAC: Final = "mac"
 FIELD_WIP: Final = "wip"
+# Ethernet diagnostics. Present in the SolarVault HomeBody payload alongside
+# ``mac`` / ``wip`` (the Wi-Fi pair). Not exposed as entities by default;
+# available to diagnostics and to future entity descriptions that need them.
+FIELD_EIP: Final = "eip"
+FIELD_EMAC: Final = "emac"
 FIELD_CURRENT_VERSION: Final = "currentVersion"
 FIELD_TARGET_VERSION: Final = "targetVersion"
 FIELD_UPDATE_CONTENT: Final = "updateContent"
@@ -240,6 +303,7 @@ FIELD_PRODUCT_MODEL: Final = "productModel"
 FIELD_ONLINE: Final = "online"
 
 FIELD_REBOOT: Final = "reboot"
+FIELD_SCHE_PHASE: Final = "schePhase"
 FIELD_ETH_PORT: Final = "ethPort"
 FIELD_SW_EPS: Final = "swEps"
 FIELD_SW_EPS_STATE: Final = "swEpsState"
@@ -284,6 +348,13 @@ FIELD_BATTERY_PACK: Final = "batteryPack"
 FIELD_BATTERY_PACK_LIST: Final = "batteryPackList"
 FIELD_BATTERIES: Final = "batteries"
 FIELD_PACK_LIST: Final = "packList"
+# HomeSubBody sub-device arrays (verified against
+# ``com.hbxn.control.device.bean.home.HomeSubBody$PlugBody/CollectorBody/CtBody``
+# in the Jackery app smali). Each sub-array key in the MQTT
+# ``UploadSubDeviceGroupProperty`` payload matches the inner-class field name.
+FIELD_PLUGS: Final = "plugs"
+FIELD_COLLECTORS: Final = "collectors"
+FIELD_CTS: Final = "cts"
 FIELD_SN: Final = "sn"
 FIELD_MODEL: Final = "model"
 FIELD_COMM_STATE: Final = "commState"
@@ -334,8 +405,18 @@ FIELD_BAT_NUM: Final = "batNum"
 FIELD_BAT_STATE: Final = "batState"
 FIELD_BAT_SOC: Final = "batSoc"
 FIELD_CELL_TEMP: Final = "cellTemp"
+FIELD_IN_EGY: Final = "inEgy"  # Pack lifetime charged energy in Wh (BLE cmd=120)
 FIELD_IN_PW: Final = "inPw"
+FIELD_OUT_EGY: Final = "outEgy"  # Pack lifetime discharged energy in Wh (BLE cmd=120)
 FIELD_OUT_PW: Final = "outPw"
+FIELD_SWITCH_STATE: Final = "switchSta"  # PlugSub current on/off state (0/1)
+FIELD_SYS_SWITCH: Final = "sysSwitch"  # PlugSub desired on/off setter (0/1)
+FIELD_SOCKET_PRIORITY: Final = "socketPri"  # PlugSub priority enable flag
+FIELD_TODAY_ENERGY: Final = "todayEgy"
+FIELD_TOTAL_ENERGY: Final = "totalEgy"
+FIELD_USE_ENERGY: Final = "useEnergy"
+FIELD_CHARGING_ENERGY: Final = "chargingEnergy"
+FIELD_DISCHARGING_ENERGY: Final = "dischargingEnergy"
 FIELD_RB: Final = "rb"
 FIELD_IP: Final = "ip"
 FIELD_OP: Final = "op"
@@ -624,15 +705,19 @@ APP_CHART_DATE_TYPES: Final = (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
 
 # External statistic buckets. The normal entities stay period totals; these
 # bucket names identify HA-recorder series imported from the app chart arrays.
+EXTERNAL_STAT_BUCKET_DAY_HOURLY: Final = "day_hourly"
 EXTERNAL_STAT_BUCKET_WEEK_DAILY: Final = "week_daily"
 EXTERNAL_STAT_BUCKET_MONTH_DAILY: Final = "month_daily"
 EXTERNAL_STAT_BUCKET_YEAR_MONTHLY: Final = "year_monthly"
+APP_DAY_CHART_BUCKET_LABEL: Final = "hourly app day buckets from 5-minute power curves"
 APP_CHART_BUCKET_BY_DATE_TYPE: Final = {
+    DATE_TYPE_DAY: EXTERNAL_STAT_BUCKET_DAY_HOURLY,
     DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY,
     DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY,
     DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY,
 }
 APP_CHART_BUCKET_LABEL_BY_DATE_TYPE: Final = {
+    DATE_TYPE_DAY: "daily app chart buckets for the current day",
     DATE_TYPE_WEEK: "daily app chart buckets for the current week",
     DATE_TYPE_MONTH: "daily app chart buckets for the current month",
     DATE_TYPE_YEAR: "monthly app chart buckets for the current year",
@@ -860,11 +945,16 @@ REDACT_KEYS: Final = {
     FIELD_LONGITUDE,
     FIELD_LATITUDE,
     FIELD_REGION,
+    "base64_encoded",
+    "body_preview",
     "mqttUser",
     "mqttUsername",
     "mqttClientId",
     "mqtt_user",
     "mqtt_username",
+    "raw_bytes",
+    "raw_hex",
+    "trailer_hex",
 }
 
 # MQTT client metadata and topic layout from MQTT_PROTOCOL.md.
@@ -898,36 +988,68 @@ MQTT_CONNACK_REASONS: Final = {
     136: "server unavailable",
 }
 
-# Subdevice type markers observed in MQTT_PROTOCOL.md. devType=1 is a
-# BatteryPackSub query target, devType=2 is a combined subdevice group, and
-# devType=3 is the Smart-Meter/CT accessory group. subType=2 appears on the
-# system/accessory metadata for the Shelly 3EM/CT path.
+# Subdevice type markers observed in MQTT_PROTOCOL.md.. devType=1 is a
+# BatteryPackSub query target. All other concrete devType values are excluded
+# from battery-pack auto-detection so future grouped payloads cannot be
+# mistaken for add-on batteries.
 SUBDEVICE_TYPE_COMBINE: Final = "2"
 SUBDEVICE_TYPE_SMART_METER: Final = "3"
+SUBDEVICE_TYPE_METER_HEAD: Final = "4"
+SUBDEVICE_TYPE_METER: Final = "5"
+SUBDEVICE_TYPE_SOCKET: Final = "6"
+SUBDEVICE_TYPE_BREAKER: Final = "7"
+SUBDEVICE_TYPE_SMOKE: Final = "8"
+SUBDEVICE_TYPE_TEMP_HUMIDITY: Final = "9"
+SUBDEVICE_TYPE_WATER_LEAK: Final = "10"
 SMART_METER_SUBTYPE: Final = SUBDEVICE_TYPE_COMBINE
 NON_BATTERY_SUBDEVICE_TYPES: Final = frozenset({
     SUBDEVICE_TYPE_COMBINE,
     SUBDEVICE_TYPE_SMART_METER,
+    SUBDEVICE_TYPE_METER_HEAD,
+    SUBDEVICE_TYPE_METER,
+    SUBDEVICE_TYPE_SOCKET,
+    SUBDEVICE_TYPE_BREAKER,
+    SUBDEVICE_TYPE_SMOKE,
+    SUBDEVICE_TYPE_TEMP_HUMIDITY,
+    SUBDEVICE_TYPE_WATER_LEAK,
 })
 
 # Payload sections that must survive a slow HTTP refresh when they were last
 # updated via MQTT. These are integration payload keys, not MQTT message types.
 PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_CT_METER,
+    PAYLOAD_METER_HEADS,
+    PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
     PAYLOAD_TASK_PLAN,
     PAYLOAD_NOTICE,
     PAYLOAD_MQTT_LAST,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 
 # Service names and payload fields from services.yaml.
 SERVICE_RENAME_SYSTEM: Final = "rename_system"
 SERVICE_REFRESH_WEATHER_PLAN: Final = "refresh_weather_plan"
 SERVICE_DELETE_STORM_ALERT: Final = "delete_storm_alert"
+# Experimental — see coordinator.async_set/async_query_third_party_mqtt_config.
+SERVICE_SET_THIRD_PARTY_MQTT_CONFIG: Final = "set_third_party_mqtt_config"
+SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "query_third_party_mqtt_config"
+SERVICE_SEND_BLE_COMMAND: Final = "send_ble_command"
 SERVICE_FIELD_SYSTEM_ID: Final = "system_id"
 SERVICE_FIELD_NEW_NAME: Final = "new_name"
 SERVICE_FIELD_DEVICE_ID: Final = "device_id"
 SERVICE_FIELD_ALERT_ID: Final = "alert_id"
+SERVICE_FIELD_CMD: Final = "cmd"
+SERVICE_FIELD_FLAGS: Final = "flags"
+SERVICE_FIELD_BODY: Final = "body"
+SERVICE_FIELD_WAIT_FOR_ACK: Final = "wait_for_ack"
+SERVICE_FIELD_ACK_TIMEOUT: Final = "ack_timeout"
+SERVICE_FIELD_ENABLE: Final = "enable"
+SERVICE_FIELD_IP: Final = "ip"
+SERVICE_FIELD_PORT: Final = "port"
+SERVICE_FIELD_USERNAME: Final = "username"
+SERVICE_FIELD_PASSWORD: Final = "password"
+SERVICE_FIELD_TOKEN: Final = "token"
 SERVICE_NUMERIC_ID_PATTERN: Final = r"^\s*[0-9]+\s*$"
 SERVICE_NON_EMPTY_TEXT_PATTERN: Final = r".*\S.*"
 
@@ -956,9 +1078,11 @@ SAVINGS_DETAIL_SENSOR_SUFFIXES: Final = {
 }
 DUPLICATE_BINARY_SENSOR_SUFFIXES: Final = {"_eps_enabled"}
 CT_PERIOD_SENSOR_SUFFIXES: Final = {
+    "_smart_meter_import_day_energy",
     "_smart_meter_import_week_energy",
     "_smart_meter_import_month_energy",
     "_smart_meter_import_year_energy",
+    "_smart_meter_export_day_energy",
     "_smart_meter_export_week_energy",
     "_smart_meter_export_month_energy",
     "_smart_meter_export_year_energy",
@@ -971,9 +1095,11 @@ CT_PERIOD_SENSOR_SUFFIXES: Final = {
 LEGACY_PV_TODAY_SENSOR_SUFFIX: Final = "_pv_today_energy"
 SYSTEM_PV_TODAY_SENSOR_SUFFIX: Final = "_system_pv_today_energy"
 STALE_PERIOD_SENSOR_SUFFIXES: Final = frozenset({
+    "_grid_import_day_energy",
     "_grid_import_week_energy",
     "_grid_import_month_energy",
     "_grid_import_year_energy",
+    "_grid_export_day_energy",
     "_grid_export_week_energy",
     "_grid_export_month_energy",
     "_grid_export_year_energy",
@@ -1055,31 +1181,59 @@ PLATFORMS: Final = [
 MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE: Final = "DevicePropertyChange"
 MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"
 MQTT_MESSAGE_QUERY_COMBINE_DATA: Final = "QueryCombineData"
+MQTT_MESSAGE_QUERY_DEVICE_PROPERTY: Final = "QueryDeviceProperty"
 MQTT_MESSAGE_UPLOAD_COMBINE_DATA: Final = "UploadCombineData"
 MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA: Final = "UploadIncrementalCombineData"
 MQTT_MESSAGE_UPLOAD_WEATHER_PLAN: Final = "UploadWeatherPlan"
 MQTT_MESSAGE_QUERY_WEATHER_PLAN: Final = "QueryWeatherPlan"
 MQTT_MESSAGE_SEND_WEATHER_ALERT: Final = "SendWeatherAlert"
 MQTT_MESSAGE_CANCEL_WEATHER_ALERT: Final = "CancelWeatherAlert"
+MQTT_MESSAGE_UPLOAD_DEVICE_ALERT: Final = "UploadDeviceAlert"
 MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE: Final = "DownloadDeviceSchedule"
 MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = "QuerySubDeviceGroupProperty"
+MQTT_MESSAGE_CONTROL_SUB_DEVICE: Final = "ControlSubDevice"
+# Third-party MQTT bridge config — actionId 3046/3047 per
+# HomeCmdAction.smali. Officially "server-side blocked for SolarVault" per
+# implementation notes §15; the integration only exposes these via an explicit, opt-in
+# experimental service so users can verify whether the device firmware itself
+# honours the frame when the cloud broker relays it.
+MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"
+MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "QueryThirdPartMQTTConfig"
 
 MQTT_CMD_NONE: Final = 0
 MQTT_CMD_QUERY_WEATHER_PLAN: Final = 23
+MQTT_CMD_QUERY_DEVICE_PROPERTY: Final = 106
 MQTT_CMD_DEVICE_PROPERTY_CHANGE: Final = 107
 MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = 110
+MQTT_CMD_CONTROL_SUB_DEVICE: Final = 111
 MQTT_CMD_QUERY_COMBINE_DATA: Final = 120
 MQTT_CMD_CONTROL_COMBINE: Final = 121
+MQTT_CMD_UPLOAD_DEVICE_ALERT: Final = 122
+# Third-party MQTT bridge cmd values (HomeCmdAction.smali bleMsgType).
+MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113
+MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
 
 # --- MQTT action IDs (Jackery cloud command/upload protocol) ----------------
 # These IDs are sent in MQTT command payloads' `actionId` field. Keep them
 # aligned with the MQTT command tables in MQTT_PROTOCOL.md and APP_POLLING_MQTT.md.
 
 # Individual action IDs used in outbound commands:
-ACTION_ID_SOC_CHARGE_LIMIT: Final = 3022  # cmd=107 DevicePropertyChange
-ACTION_ID_SOC_DISCHARGE_LIMIT: Final = 3028  # cmd=107 DevicePropertyChange
+# 3028 DevicePropertyChange carries BOTH SOC limits (chg + dischg) in one
+# frame. The integration must not send a separate frame for the charge limit
+# alone — verified against the official app via Frida capture (2026-05-14).
+# Verified against the Jackery app smali ``HomeCmdAction.smali``: a single
+# actionId ``SET_CHARGE_DISCHARGE_LINE = 3028`` carries both SOC limits in
+# one DevicePropertyChange frame (body has ``socChgLimit`` and
+# ``socDischgLimit`` together). An earlier doc capture
+# (docs/MQTT_implementation notes PCAPNG) split this into 3022/3028, but 3022 is
+# actually ``CONTROL_AC_OFF_GRID_SWITCH`` (EPS) — sending a charge limit
+# under 3022 would hit the EPS action instead.
+ACTION_ID_SOC_LIMITS: Final = 3028  # cmd=107 DevicePropertyChange (chg + dischg)
 ACTION_ID_MAX_FEED_GRID: Final = 3029  # cmd=121 ControlCombine (800W rule)
-ACTION_ID_MAX_OUT_PW: Final = 3038  # cmd=121 ControlCombine
+# 3038 is DevicePropertyChange (cmd=107), NOT ControlCombine — verified via
+# Frida capture 2026-05-14. Earlier code routed it as ControlCombine which
+# the device silently dropped.
+ACTION_ID_MAX_OUT_PW: Final = 3038  # cmd=107 DevicePropertyChange
 ACTION_ID_AUTO_STANDBY: Final = 3021  # cmd=121 ControlCombine
 ACTION_ID_WORK_MODEL: Final = 3027  # cmd=121 ControlCombine
 ACTION_ID_OFF_GRID_DOWN: Final = 3039  # cmd=121 ControlCombine
@@ -1087,27 +1241,112 @@ ACTION_ID_OFF_GRID_TIME: Final = 3040  # cmd=121 ControlCombine
 ACTION_ID_TEMP_UNIT: Final = 3041  # cmd=121 ControlCombine
 ACTION_ID_DEFAULT_PW: Final = 3043  # cmd=121 ControlCombine
 ACTION_ID_FOLLOW_METER_PW: Final = 3044  # cmd=121 ControlCombine
+ACTION_ID_QUERY_DEVICE_PROPERTY: Final = 3011  # cmd=106 QueryDeviceProperty
 ACTION_ID_QUERY_COMBINE_DATA: Final = 3019  # cmd=120 QueryCombineData
 ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020  # cmd=23 QueryWeatherPlan
-ACTION_ID_EPS_ENABLED: Final = 3023  # cmd=107 DevicePropertyChange (EPS toggle)
-ACTION_ID_STANDBY: Final = (
-    ACTION_ID_EPS_ENABLED  # cmd=107 DevicePropertyChange (standby)
-)
+# 3022 = EPS-Switch (swEps 0/1), 3023 = Standby mode (autoStandby 1/2).
+# Earlier const swapped these IDs and aliased STANDBY to EPS — verified via
+# Frida capture 2026-05-14 against the official app.
+# Verified against the Jackery app smali ``HomeCmdAction.smali``:
+# actionId 3022 = ``CONTROL_AC_OFF_GRID_SWITCH`` (body field ``swEps`` —
+# the EPS output toggle), actionId 3023 = ``CONTROL_STANDBY``
+# (body field ``standby``). Earlier doc captures
+# (docs/MQTT_implementation notes PCAPNG) had these two swapped; the smali is
+# authoritative.
+ACTION_ID_EPS_ENABLED: Final = 3022  # cmd=107 DevicePropertyChange (EPS toggle)
+ACTION_ID_STANDBY: Final = 3023  # cmd=107 DevicePropertyChange (standby mode 1/2)
+ACTION_ID_CT_PHASE: Final = 3026  # cmd=111 ControlSubDevice (CT phase 1..4)
 ACTION_ID_REBOOT_DEVICE: Final = 3030  # cmd=107 DevicePropertyChange
 ACTION_ID_STORM_MINUTES: Final = 3034  # cmd=*** SendWeatherAlert
 ACTION_ID_DELETE_STORM_ALERT: Final = 3035  # cmd=*** CancelWeatherAlert
 ACTION_ID_STORM_WARNING: Final = 3036  # cmd=121 ControlCombine
+ACTION_ID_FAULT_ALARM_REPORT: Final = 3042  # cmd=122 UploadDeviceAlert
+# Verified against the Jackery app smali ``HomeCmdAction.smali``: each
+# ControlSubDevice intent has its own actionId — 3024 for the socket
+# on/off toggle (``SUB_CONTROL_SOCKET_SWITCH``), 3025 for the priority
+# toggle (``SUB_CONTROL_SOCKET_PRI_ENABLE``), 3026 for the CT phase setter
+# (``SUB_SET_CT_SCHEDULE_PHASE``). They are not consolidated into a single
+# actionId despite sharing cmd=111.
+ACTION_ID_CONTROL_SOCKET_SWITCH: Final = (
+    3024  # cmd=111 ControlSubDevice (Smart-Plug sysSwitch on/off)
+)
+ACTION_ID_CONTROL_SOCKET_PRIORITY: Final = (
+    3025  # cmd=111 ControlSubDevice (socketPri toggle)
+)
 ACTION_ID_SUBDEVICE_3014: Final = (
     3014  # cmd=110 QuerySubDeviceGroupProperty, battery packs
 )
 ACTION_ID_SUBDEVICE_3031: Final = (
     3031  # cmd=110 QuerySubDeviceGroupProperty, CT/smart meter
 )
+ACTION_ID_SUBDEVICE_3032: Final = (
+    3032  # cmd=110 QuerySubDeviceGroupProperty, smart plug / socket
+)
+ACTION_ID_SUBDEVICE_3033: Final = (
+    3033  # cmd=110 QuerySubDeviceGroupProperty, meter head
+)
 ACTION_ID_SUBDEVICE_3037: Final = (
     3037  # cmd=110 QuerySubDeviceGroupProperty, combined subdevices
 )
+# Third-party MQTT bridge — actionId 3046/3047 per HomeCmdAction.smali. Verified
+# 2026-05-14 as **server-side blocked for SolarVault** (the cloud REST relay
+# returns "invalid request"), but the device firmware itself has not been
+# tested over the direct MQTT-publish path; the integration exposes an
+# experimental service so users can probe that path.
+ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG: Final = 3046  # cmd=113 ThirdPartMQTTConfig
+ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = (
+    3047  # cmd=114 QueryThirdPartMQTTConfig
+)
+
+# Third-party MQTT bridge body keys per ``ThirdPartyMqttBody.smali``.
+FIELD_THIRD_PARTY_MQTT_ENABLE: Final = "enable"
+FIELD_THIRD_PARTY_MQTT_IP: Final = "ip"
+FIELD_THIRD_PARTY_MQTT_PORT: Final = "port"
+FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
+FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
+FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
+
+# Per-device BLE AES key — base64-encoded 32-byte value from the device entry
+# in ``/v1/device/system/list``. Used to encrypt/decrypt the DFED-framed BLE
+# packets (implementation notes §14, ``bb/c`` helper). Already in REDACT_KEYS.
+FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
+
+# Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
+# enum (one ordinal per type, 1..10). The Home Assistant integration uses the
+# numeric value as the ``devType`` body field for QuerySubDeviceGroupProperty
+# bodies and to route inbound UploadSubDeviceGroupProperty payloads. Keep this
+# table in sync with local implementation notes §3 and local implementation notes §2.
+SUBDEVICE_DEV_TYPE_BATTERY_PACK: Final = 1
+SUBDEVICE_DEV_TYPE_COMBO: Final = 2
+SUBDEVICE_DEV_TYPE_CT: Final = 3
+SUBDEVICE_DEV_TYPE_METER_HEAD: Final = 4
+SUBDEVICE_DEV_TYPE_METER: Final = 5
+SUBDEVICE_DEV_TYPE_SOCKET: Final = 6
+SUBDEVICE_DEV_TYPE_BREAKER: Final = 7
+SUBDEVICE_DEV_TYPE_SMOKE: Final = 8
+SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY: Final = 9
+SUBDEVICE_DEV_TYPE_WATER_LEAK: Final = 10
+
+# The app enum defines devTypes 5 and 7..10, but the SolarVault MQTT model
+# exposes no matching READ_SUB_DEVICE_* actionId or HomeSubBody array for them.
+SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION: Final = frozenset({
+    SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+    SUBDEVICE_DEV_TYPE_COMBO,
+    SUBDEVICE_DEV_TYPE_CT,
+    SUBDEVICE_DEV_TYPE_METER_HEAD,
+    SUBDEVICE_DEV_TYPE_SOCKET,
+})
+SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
+    SUBDEVICE_DEV_TYPE_METER,
+    SUBDEVICE_DEV_TYPE_BREAKER,
+    SUBDEVICE_DEV_TYPE_SMOKE,
+    SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
+    SUBDEVICE_DEV_TYPE_WATER_LEAK,
+})
 
 # Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
+MQTT_ACTION_IDS_DEVICE_PROPERTY: Final = frozenset({3011})
+MQTT_ACTION_IDS_ALARM: Final = frozenset({3042})
 MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({3015, 3016, 3017, 3018})
 MQTT_ACTION_IDS_COMBINE: Final = frozenset({
     3019,
@@ -1120,4 +1359,7 @@ MQTT_ACTION_IDS_COMBINE: Final = frozenset({
     3043,
     3044,
 })
-MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3033, 3037})
+# Inbound UploadSubDeviceGroupProperty action IDs the integration consumes.
+# 3014=battery pack, 3031=CT, 3032=socket (smart plug), 3033=meter head,
+# 3037=combo. See local implementation notes §2 "MQTT-Polling/Queries".
+MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3032, 3033, 3037})
