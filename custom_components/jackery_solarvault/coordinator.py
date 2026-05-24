@@ -16,7 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client.api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_DEFAULT_PW,
@@ -229,7 +229,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from .mqtt_push import JackeryMqttPushClient
+    from .client.mqtt_push import JackeryMqttPushClient
 
 from .util import (
     app_data_quality_warnings,
