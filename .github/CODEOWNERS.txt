@@ -1,0 +1,5 @@
+# Code owners for this repository
+# See: https://docs.github.com/articles/about-code-owners
+* @Bigdaddy1990
+custom_components/pawcontrol/  @Bigdaddy1990
+tests/  @Bigdaddy1990

@@ -1,6 +1,0 @@
-telemetry = true
-logLevel = "debug"
-
-[install]
-exact = true
-saveTextLockfile = true

@@ -1,0 +1,64 @@
+# CodeFactor Configuration for jackery_solarvault Integration
+# https://www.codefactor.io/
+
+version: 1
+
+exclude_paths:
+  - "tests/**"
+  - "docs/**"
+  - "scripts/**"
+  - "**/test*.py"
+  - "**/conftest.py"
+  - "**/*.md"
+
+rules:
+  # Python specific rules
+  python:
+    enabled: true
+    max_line_length: 88  # Match ruff config
+    max_complexity: 10   # Cyclomatic complexity
+    min_maintainability_index: 20
+
+  # Documentation
+  documentation:
+    enforce_docstrings: true
+
+  # Security
+  security:
+    enabled: true
+    check_passwords: true
+    check_secrets: true
+
+  # Code quality
+  quality:
+    max_function_length: 50
+    max_file_length: 500
+    max_class_length: 300
+    enforce_naming_convention: true
+
+# Advanced settings
+advanced:
+  language_specific:
+    python:
+      version: "3.14"
+      libraries:
+        - "homeassistant"
+        - "pytest"
+      ignore_decorators:
+        - "@property"
+        - "@cached_property"
+        - "@callback"
+
+  integrations:
+    github:
+      pr_comments: true
+      status_checks: true
+    codecov:
+      enabled: true
+
+# Custom ignore patterns for Home Assistant
+ignore_patterns:
+  - "# type: ignore"
+  - "# noqa"
+  - "# pragma: no cover"
+  - "if TYPE_CHECKING:"
