@@ -8,6 +8,15 @@
     },
     "rename_system": {
       "service": "mdi:rename"
+    },
+    "query_third_party_mqtt_config": {
+      "service": "mdi:message-text-clock"
+    },
+    "send_ble_command": {
+      "service": "mdi:bluetooth-transfer"
+    },
+    "set_third_party_mqtt_config": {
+      "service": "mdi:message-cog"
     }
   }
 }
