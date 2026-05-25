@@ -1,18 +1,24 @@
-name: PR Labeler
-
-on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
-
-permissions:
-  contents: read
-  pull-requests: write
-
-jobs:
-  label:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/labeler@v6
-        with:
-          configuration-path: .github/labeler.yml
-          sync-labels: true
+breaking:
+  - changed-files:
+      - any-glob-to-any-file: '**'
+      - any-glob-to-any-file: '!**'  # never auto-applied — manual only
+fix:
+  - head-branch: ['^fix/', '^bugfix/']
+feature:
+  - head-branch: ['^feature/', '^feat/']
+performance:
+  - head-branch: ['^perf/', '^performance/']
+documentation:
+  - head-branch: ['^docs/', '^doc/']
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', 'README*.md', '**/*.md']
+refactor:
+  - head-branch: ['^refactor/']
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ['tests/**']
+chore:
+  - head-branch: ['^chore/']
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['requirements*.txt', 'pyproject.toml', 'package.json', 'bunfig.toml', '.bun-version', '.pre-commit-config.yaml']
