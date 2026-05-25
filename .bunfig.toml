@@ -4,9 +4,9 @@ logLevel = "debug" # "debug" | "warn" | "error"
 smol = true
 # Disable automatic .env file loading
 env = false
-[install]
 exact = true
-saveTextLockfile = true
+optional = true
+auto = "auto"
 [console]
 depth = 3
 [test]
@@ -29,6 +29,5 @@ onlyFailures = true
 [test.reporter]
 dots = true
 junit = "test-results.xml"
-[install]
-optional = true
-auto = "auto"
+
+
