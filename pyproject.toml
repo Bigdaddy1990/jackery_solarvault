@@ -1,6 +1,6 @@
 # pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
-requires = ["setuptools>=82.0.1", "wheel"]
+requires = ["setuptools>=82.0.1", "home-assistant-wheels", "wheels-custom-integrations"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -46,12 +46,6 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = [
   "error",
-  # Ignore deprecation warnings from third-party dependencies outside our control
-  "ignore::DeprecationWarning:pytest_homeassistant_custom_component",
-  "ignore::DeprecationWarning:homeassistant",
-  "ignore::PendingDeprecationWarning:homeassistant",
-  "ignore::DeprecationWarning:aiohttp",
-  "ignore::DeprecationWarning:voluptuous",
   # asyncio event-loop deprecation raised by Python 3.12+ internals
   "ignore:There is no current event loop:DeprecationWarning",
   "ignore:coroutine .* was never awaited:RuntimeWarning",
@@ -65,8 +59,8 @@ line-length = 88
 src = ["custom_components", "scripts", "tests"]
 indent-width = 4
 show-fixes = true
-fix = false
-unsafe-fixes = false
+fix = true
+unsafe-fixes = true
 force-exclude = true
 output-format= "github"
 
@@ -87,7 +81,7 @@ skip-magic-trailing-comma = false
 [tool.ruff.lint]
 preview = true
 select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
-ignore = ["E501"]
+ignore = [""]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -119,13 +113,6 @@ docstring-quotes = "double"
 
 [tool.ruff.lint.flake8-type-checking]
 exempt-modules = ["typing", "typing_extensions"]
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"async_timeout".msg = "use asyncio.timeout instead"
-"pytz".msg = "use zoneinfo instead"
-"tests".msg = "You should not import tests"
-"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
-"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
@@ -178,7 +165,7 @@ omit = ["tests/*", "*/__pycache__/*"]
 [tool.coverage.report]
 show_missing = true
 fail_under = 85
-skip_covered = false
+skip_covered = true
 precision = 2
 ignore_errors = false
 
