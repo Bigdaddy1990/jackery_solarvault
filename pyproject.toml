@@ -45,12 +45,7 @@ norecursedirs = [".git", ".pytest_cache", "__pycache__", "pytest-cache-files-*"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = [
-  "error",
-  # asyncio event-loop deprecation raised by Python 3.12+ internals
-  "ignore:There is no current event loop:DeprecationWarning",
-  "ignore:coroutine .* was never awaited:RuntimeWarning",
-  # Ignore pytest-asyncio fixture deprecations when real plugin present
-  "ignore::pytest.PytestUnraisableExceptionWarning",
+  "error"
 ]
 
 [tool.ruff]
@@ -81,7 +76,7 @@ skip-magic-trailing-comma = false
 [tool.ruff.lint]
 preview = true
 select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
-ignore = [""]
+ignore = []
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
