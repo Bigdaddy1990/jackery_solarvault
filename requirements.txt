@@ -1,5 +1,6 @@
 aiomqtt>=2.5.1
 bluetooth
 bleak-retry-connector>=3.5.0
+cryptography>=47.0.0
 plugin-multicast
 upnp
