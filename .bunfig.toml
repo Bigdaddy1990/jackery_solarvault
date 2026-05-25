@@ -25,9 +25,7 @@ coveragePathIgnorePatterns = [
   "*.config.js"
 ]
 coverageReporter  = ["htmlcov", "xml"]  # default ["htmlcov"]
-onlyFailures = true
+onlyFailures = false
 [test.reporter]
 dots = true
 junit = "test-results.xml"
-
-
