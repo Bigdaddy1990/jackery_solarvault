@@ -1,0 +1,44 @@
+name: Marketplace validation
+
+on:
+  workflow_call:
+    inputs:
+      checkout-ref:
+        description: Optional ref to check out before running validation
+        required: false
+        type: string
+      category:
+        description: HACS category to validate
+        required: false
+        default: integration
+        type: string
+      ignore:
+        description: Optional comma-separated ignore list for HACS validation
+        required: false
+        default: brands
+        type: string
+    secrets: {}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Hassfest & HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkout-ref != '' && inputs.checkout-ref || github.ref }}
+
+      - name: Run Hassfest
+        uses: home-assistant/actions/hassfest@master
+
+      - name: Run HACS validation
+        uses: hacs/action@main
+        with:
+          category: ${{ inputs.category }}
+          ignore: ${{ inputs.ignore }}
+          repository: ${{ github.repository }}
