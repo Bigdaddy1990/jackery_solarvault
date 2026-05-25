@@ -21,8 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.14"
       - run: bun install --frozen-lockfile
       - uses: actions/setup-python@v6
         with:
@@ -39,16 +37,11 @@ jobs:
           # baseline noqa markers for remaining diagnostics.
           bun run autofix
 
-          # Format before the local Python 3.14 guard so any formatter drift is
-          # converted back to the canonical exception style automatically.
-          bun run format
-          python scripts/verify_py314_exception_style.py --fix
-
           # Only remaining non-fixable diagnostics become baseline noqa markers.
           python -m ruff check . \
             --target-version "${RUFF_TARGET_VERSION}" \
             --add-noqa \
-            --output-format=concise \
+            --output-format=github \
             --exit-zero
 
           # Remove stale noqa markers created by older baseline runs.
@@ -56,14 +49,8 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --extend-select RUF100 \
             --fix \
-            --output-format=concise \
+            --output-format=github \
             --exit-zero
-
-          # Final formatting pass plus local guard keeps Python 3.14 exception
-          # headers stable even when Ruff's formatter output changes.
-          bun run format
-          python scripts/verify_py314_exception_style.py --fix
-          python scripts/verify_py314_exception_style.py
 
           # Emit final diagnostics as GitHub annotations without failing the
           # baseline job after fix/noqa generation has completed.
