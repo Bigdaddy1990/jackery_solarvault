@@ -62,7 +62,7 @@ _AIOMQTT_LOGGER.addFilter(_AioMqttPassiveDisconnectFilter())
 
 
 class JackeryMqttPushClient:
-    """Async-native MQTT client for Jackery cloud topics in implementation notes §3."""
+    """Async-native MQTT client for Jackery cloud topics in PROTOCOL.md §3."""
 
     def __init__(
         self,
@@ -468,7 +468,7 @@ class JackeryMqttPushClient:
             self._messages_dropped += 1
             self._last_message_error = "non-object JSON payload"
             return
-        # implementation notes §3 documents body-based routing; some broker variants
+        # PROTOCOL.md §3 documents body-based routing; some broker variants
         # send the same structure as data. Normalize before coordinator routing.
         if not isinstance(data.get(FIELD_BODY), dict):
             alt_body = data.get(FIELD_DATA)
@@ -510,7 +510,6 @@ class JackeryMqttPushClient:
 
     def diagnostics_snapshot(self, *, redact_topics: bool = True) -> dict[str, Any]:
         """Return a snapshot of the MQTT client state for diagnostics."""
-
         def topic_value(topic: str | None) -> str | None:
             return self._redact_topic(topic) if redact_topics else topic
 

@@ -790,6 +790,7 @@ def test_ble_transport_sensor_attributes_do_not_expose_raw_payloads() -> None:
     )[0]
 
     assert 'attrs.pop("unrouted_frames_by_cmd", None)' in cls
+    assert 'attrs.pop("routed_frames_by_cmd", None)' in cls
     assert 'frame_attrs.pop("raw_hex", None)' in cls
     assert 'parsed_attrs.pop("body_preview", None)' in cls
     assert 'parsed_attrs.pop("trailer_hex", None)' in cls
@@ -843,21 +844,19 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
             assert field not in block
 
 
-def test_unredacted_diagnostics_option_is_options_flow_only() -> None:
-    """The unsafe raw-diagnostics switch belongs in options, not setup."""
-    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+def test_unredacted_diagnostics_is_dev_env_var_only() -> None:
+    """The unsafe raw-diagnostics switch must be env-var-only, never UI-toggleable.
+
+    Exposing it as a config-entry option lets a user check a box and then
+    share a diagnostics ZIP containing the raw ``bluetoothKey`` /
+    ``mqttPassWord`` / serial numbers. Gating it on ``JACKERY_DEV_MODE=1``
+    keeps it a deliberate developer action that survives an options-flow
+    accident.
+    """
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8"
     )
-
-    assert (
-        'CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"'
-        in const_source
-    )
-    assert "DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False" in const_source
-    assert (
-        "CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS"
-    ) in config_flow_source
+    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
 
     user_schema = config_flow_source.split("USER_SCHEMA = vol.Schema", 1)[1].split(
         "class JackeryOptionsFlow", 1
@@ -865,8 +864,22 @@ def test_unredacted_diagnostics_option_is_options_flow_only() -> None:
     options_block = config_flow_source.split("class JackeryOptionsFlow", 1)[1].split(
         "class JackeryConfigFlow", 1
     )[0]
+    reconfigure_block = config_flow_source.split("async_step_reconfigure", 1)[1].split(
+        "async_step_reauth", 1
+    )[0]
+    # Debug-only flags MUST be absent from every UI-facing schema block.
     assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" not in user_schema
-    assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" in options_block
+    assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" not in options_block
+    assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" not in reconfigure_block
+    assert "CONF_ENABLE_PAYLOAD_DEBUG_LOG" not in user_schema
+    assert "CONF_ENABLE_PAYLOAD_DEBUG_LOG" not in options_block
+    assert "CONF_ENABLE_PAYLOAD_DEBUG_LOG" not in reconfigure_block
+    # The constant names stay in const.py for backwards compatibility with
+    # existing config entries that still carry the option key, but the env
+    # var ``JACKERY_DEV_MODE=1`` is now the only switch that actually
+    # disables redaction at runtime.
+    assert "JACKERY_DEV_MODE" in util_source
+    assert "dev_mode_redactions_disabled" in util_source
 
 
 def test_unredacted_diagnostics_option_reaches_redaction_surfaces() -> None:
@@ -889,16 +902,29 @@ def test_unredacted_diagnostics_option_reaches_redaction_surfaces() -> None:
     )
 
 
-def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) -> None:
-    """The HAOS-friendly option should replace the env-var for local raw logs."""
-    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
+def test_payload_debug_redaction_is_env_var_only(monkeypatch) -> None:
+    """``diagnostic_redactions_disabled`` honours JACKERY_DEV_MODE only.
+
+    A previous design also let a config-entry option flip the redaction off,
+    but that surface is intentionally gone — exposing raw credentials must
+    require a deliberate developer action (env var on the HA process), not
+    a UI checkbox a user might toggle and then share the resulting export.
+    """
     entry = types.SimpleNamespace(
         options={"enable_unredacted_diagnostics": True},
         data={},
     )
 
+    # Without the env var: redaction stays on even if the legacy option key
+    # is still present in the entry's stored options.
+    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
+    assert util.diagnostic_redactions_disabled(entry) is False
+    assert util.diagnostic_redactions_disabled() is False
+
+    # With the env var: redaction is disabled regardless of the entry.
+    monkeypatch.setenv("JACKERY_DEV_MODE", "1")
     assert util.diagnostic_redactions_disabled(entry) is True
-    assert util.active_redact_keys(entry) == frozenset()
+    assert util.diagnostic_redactions_disabled() is True
 
     event = {
         "password": "account-secret",
@@ -1868,7 +1894,7 @@ def test_coordinator_lazy_imports_mqtt_client_for_collection_without_aiomqtt() -
     assert "if TYPE_CHECKING:" in source
     assert "self._mqtt: JackeryMqttPushClient | None = None" in source
     assert "def _load_mqtt_push_client() -> type[Any]:" in source
-    assert 'importlib.import_module(".mqtt_push", __package__)' in source
+    assert 'importlib.import_module(".client.mqtt_push", __package__)' in source
 
     start_mqtt = next(
         node
@@ -2788,6 +2814,58 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
     assert ".options.get(" not in options_block
 
 
+def test_reconfigure_does_not_mix_options_or_local_mqtt_credentials() -> None:
+    """Credential reconfigure must not ask for feature/statistic/MQTT options."""
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8"
+    )
+    reconfigure_block = config_flow_source.split("async_step_reconfigure", 1)[1].split(
+        "async_step_reauth",
+        1,
+    )[0]
+
+    assert "options=" not in reconfigure_block
+    assert "CONF_LOCAL_MQTT_ENABLE" not in reconfigure_block
+    assert "CONF_ENABLE_YEAR_STATISTICS" not in reconfigure_block
+    assert "CONF_CREATE_CALCULATED_POWER_SENSORS" not in reconfigure_block
+
+
+def test_local_mqtt_listener_has_diagnostics_and_no_setup_auto_push() -> None:
+    """Local MQTT must be observable without auto-writing undocumented config."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
+
+    setup_block = init_source.split("async def async_setup_entry", 1)[1].split(
+        "# -----------------------------------------------------------------------------",
+        1,
+    )[0]
+    assert "async_start_local_mqtt_listener()" in setup_block
+    assert "async_apply_local_mqtt_config_to_devices()" not in setup_block
+    assert "def local_mqtt_diagnostics(" in coordinator_source
+    assert '"message_count"' in coordinator_source
+    assert '"invalid_json_count"' in coordinator_source
+    assert "coordinator.local_mqtt_diagnostics" in diagnostics_source
+
+
+def test_enabled_optional_entities_clear_only_integration_disabled_flag() -> None:
+    """Options re-enable entities disabled by integration, not user-disabled ones."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+
+    assert "def _async_enable_integration_disabled_entities_with_suffixes(" in (
+        init_source
+    )
+    helper = init_source.split(
+        "def _async_enable_integration_disabled_entities_with_suffixes", 1
+    )[1].split("\n\nasync def _async_update_listener", 1)[0]
+    assert "ent.disabled_by != er.RegistryEntryDisabler.INTEGRATION" in helper
+    assert "registry.async_update_entity(ent.entity_id, disabled_by=None)" in helper
+
+
 def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
@@ -2828,13 +2906,14 @@ def test_no_unresolved_git_merge_conflict_markers() -> None:
             assert line != "=======", f"{path}:{line_number}: {line}"
 
 
-def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
-    """Raw payload logging must use HA logger controls without a stale option.
+def test_payload_debug_file_is_gated_by_env_var_and_dedicated_logger() -> None:
+    """Raw payload logging is dev-only: env var + exact child DEBUG logger.
 
-    The setup/options checkbox was removed, but the JSONL writer must still avoid
-    inheriting DEBUG from the parent integration logger. Requiring DEBUG to be
-    set directly on the dedicated payload-debug logger keeps the feature
-    available for diagnostics without a hidden ``debug_payload_log`` option.
+    The previous design also exposed a config-entry option, but a UI
+    checkbox is too easy to leave on by accident. Now the only way to
+    enable raw-payload JSONL capture is to set ``JACKERY_DEV_MODE=1`` on
+    the HA process *and* configure the dedicated payload-debug logger to
+    DEBUG.
     """
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
@@ -2849,6 +2928,10 @@ def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
     assert "debug_payload_log" not in init_source
     assert "_async_purge_stale_payload_debug_log" not in init_source
 
+    # Env-var gate replaces the old config-entry option in the coordinator.
+    assert "CONF_ENABLE_PAYLOAD_DEBUG_LOG" not in coordinator_source
+    assert "DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG" not in coordinator_source
+    assert "dev_mode_redactions_disabled" in coordinator_source
     assert "_PAYLOAD_DEBUG_LOGGER.level != logging.DEBUG" in coordinator_source
     assert (
         "if not _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG):"
@@ -3120,10 +3203,10 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
     assert "import contextlib" in init_source
     assert "try:" in init_source
     assert "# Discovery must run first" in init_source
-    assert "except Exception:" in init_source
+    assert "except Exception as err:" in init_source
     assert "with contextlib.suppress(Exception):" in init_source
     assert "await coordinator.async_shutdown()" in init_source
-    assert "if entry.runtime_data is coordinator:" in init_source
+    assert 'if getattr(entry, "runtime_data", None) is coordinator:' in init_source
     assert "entry.runtime_data = cast(Any, None)" in init_source
     assert (
         "await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)"
@@ -3133,6 +3216,28 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
     assert init_source.index(
         "await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)"
     ) < init_source.index("coordinator.async_start_statistics_imports()")
+
+
+def test_setup_entry_allows_cached_local_startup_when_cloud_login_times_out() -> None:
+    """Transient cloud login failures must not block cached BLE/local startup."""
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+    cache_source = (CUSTOM_COMPONENT / "discovery_cache.py").read_text(encoding="utf-8")
+
+    assert "trying cached " in init_source
+    assert "discovery and local transports" in init_source
+    assert (
+        "raise ConfigEntryNotReady("
+        not in init_source.split("async def _async_authenticate", 1)[1].split(
+            "async def async_setup_entry", 1
+        )[0]
+    )
+    assert "async_load_discovery_cache" in coordinator_source
+    assert "async_save_discovery_cache" in coordinator_source
+    assert "using cached discovery" in coordinator_source
+    assert "from homeassistant.helpers.storage import Store" in cache_source
 
 
 def test_brand_assets_are_packaged_without_runtime_sync() -> None:
@@ -3403,22 +3508,22 @@ def test_ble_sink_calls_merge_with_correct_signature() -> None:
     )
 
 
-def test_historical_statistics_backfill_is_http_only() -> None:
-    """Historical statistic backfill must stay bounded to HTTP day curves."""
+def test_historical_statistics_backfill_is_removed() -> None:
+    """Historical statistic backfill must stay removed."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     for removed in (
         "def _iter_calendar_months",
         "def _iter_calendar_weeks",
         "def _iter_calendar_days",
         "async def _async_fetch_historical_app_chart_source",
+        "async def _async_fetch_historical_day_chart_sources",
+        "async def _async_http_backfill_recent_day_statistics",
         "async def _async_repair_missing_app_chart_statistics",
         "async def async_repair_statistics",
+        "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
+        "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC",
     ):
         assert removed not in source
-    assert "async def _async_fetch_historical_day_chart_sources" in source
-    assert "async def _async_http_backfill_recent_day_statistics" in source
-    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 7" in source
-    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = 6 * 60 * 60" in source
     assert "_schedule_mqtt_backfill_queries" not in source
 
 
@@ -3506,8 +3611,8 @@ def test_ble_cmd_120_battery_pack_routing_is_narrow() -> None:
     assert "_merge_battery_pack_lifetime_from_ble" in source, (
         "battery-pack lifetime merge helper missing"
     )
-    # The sink must gate the cmd=120 branch on devType=BATTERY_PACK and
-    # presence of deviceSn — never blindly merge any cmd=120 frame.
+    # The sink must gate the cmd=120 branch through the narrow helper — never
+    # blindly merge any cmd=120 frame.
     import re
 
     sink_match = re.search(
@@ -3520,12 +3625,19 @@ def test_ble_cmd_120_battery_pack_routing_is_narrow() -> None:
     assert "MQTT_CMD_QUERY_COMBINE_DATA" in sink, (
         "cmd=120 branch must reference MQTT_CMD_QUERY_COMBINE_DATA"
     )
-    assert "SUBDEVICE_DEV_TYPE_BATTERY_PACK" in sink, (
-        "cmd=120 branch must gate on SUBDEVICE_DEV_TYPE_BATTERY_PACK"
+    assert "_is_battery_pack_lifetime_ble_payload(payload)" in sink, (
+        "cmd=120 branch must use the battery-pack lifetime guard"
     )
-    assert "FIELD_DEVICE_SN" in sink, (
+    helper = source.split("def _is_battery_pack_lifetime_ble_payload", 1)[1].split(
+        "\n    @staticmethod", 1
+    )[0]
+    assert "SUBDEVICE_DEV_TYPE_BATTERY_PACK" in helper, (
+        "cmd=120 helper must gate on SUBDEVICE_DEV_TYPE_BATTERY_PACK"
+    )
+    assert "FIELD_DEVICE_SN" in helper, (
         "cmd=120 branch must require deviceSn before merging"
     )
+    assert "FIELD_IN_EGY" in helper and "FIELD_OUT_EGY" in helper
 
 
 def test_battery_pack_lifetime_entities_exist() -> None:
@@ -3592,10 +3704,48 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert "unrouted_frames_by_cmd: dict[int, int]" in transport, (
         "BleListenerStats must declare unrouted_frames_by_cmd"
     )
+    assert "routed_frames_by_cmd: dict[int, int]" in transport, (
+        "BleListenerStats must declare routed_frames_by_cmd"
+    )
     coord = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    assert "routed = False" in coord, "BLE sink must track routed frames separately"
     assert "stats.unrouted_frames_by_cmd[cmd]" in coord, (
         "BLE sink must increment unrouted_frames_by_cmd"
     )
+    assert "stats.routed_frames_by_cmd[cmd]" in coord, (
+        "BLE sink must increment routed_frames_by_cmd"
+    )
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
+    )
+    assert '"routed_frames_by_cmd"' in coord, (
+        "ble_observations() must expose routed_frames_by_cmd in diagnostics"
+    )
+
+
+def test_slow_poll_failure_logs_exception_type() -> None:
+    """TimeoutError has an empty message; logs must still name the failure."""
+    coord = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    assert "def _exception_debug_message" in coord
+    assert "_exception_debug_message(err)" in coord
+    assert "_exception_debug_message(result)" in coord
+    assert "cache[cache_key] = (now, entry[1])" in coord
+    assert "cache[cache_key] = (now, default)" in coord
+    assert '"%s failed: %s", cache_key, err' not in coord
+    assert 'diag["last_error"] = str(err)' not in coord
+
+
+def test_property_timeout_uses_cached_payload_and_continues_refresh() -> None:
+    """Transient property timeouts must not skip slow trend/stat refresh."""
+    coord = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    refresh = coord.split("async def _async_update_data(", 1)[1].split(
+        "\n    # ------------------------------------------------------------------",
+        1,
+    )[0]
+    assert "property_fetch_fallback_count" in refresh
+    assert "using cached/discovery payload" in refresh
+    assert "payload = {" in refresh
+    assert "extras = await _fetch_device_extras" in refresh
+    assert refresh.index("using cached/discovery payload") < refresh.index(
+        "extras = await _fetch_device_extras"
     )

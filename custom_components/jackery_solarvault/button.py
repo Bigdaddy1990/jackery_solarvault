@@ -1,6 +1,7 @@
 """Button platform for Jackery SolarVault."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
@@ -12,7 +13,7 @@ from . import JackeryConfigEntry
 from .const import DOMAIN, FIELD_REBOOT, PAYLOAD_PROPERTIES
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
+from .util import append_unique_entity, coordinator_entity_signature
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -45,7 +46,14 @@ async def async_setup_entry(
                 _append_unique(entities, JackeryRebootButton(coordinator, dev_id))
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
@@ -55,7 +63,7 @@ async def async_setup_entry(
 
 
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
-    """Restart the SolarVault device via MQTT_PROTOCOL.md reboot command."""
+    """Restart the SolarVault device via PROTOCOL.md §4 reboot command."""
 
     _attr_translation_key = "reboot_device"
     _attr_entity_category = EntityCategory.CONFIG

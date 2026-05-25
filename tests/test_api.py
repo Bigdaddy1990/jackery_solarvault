@@ -1,10 +1,15 @@
 """Unit tests for the Jackery HTTP API client."""
 
+import base64
 from typing import Any
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryApi, JackeryApiError
+from custom_components.jackery_solarvault.client.api import (
+    JackeryApi,
+    JackeryApiError,
+    JackeryAuthError,
+)
 from custom_components.jackery_solarvault.const import (
     APP_REQUEST_META,
     BATTERY_PACK_PATH,
@@ -20,6 +25,14 @@ from custom_components.jackery_solarvault.const import (
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_NAME,
     FIELD_SYSTEM_REGION,
+    MQTT_CREDENTIAL_CLIENT_ID,
+    MQTT_CREDENTIAL_PASSWORD,
+    MQTT_CREDENTIAL_USER_ID,
+    MQTT_CREDENTIAL_USERNAME,
+    MQTT_SESSION_MAC_ID,
+    MQTT_SESSION_MAC_ID_SOURCE,
+    MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_USER_ID,
     SAVE_DYNAMIC_MODE_PATH,
     SAVE_SINGLE_MODE_PATH,
     SYSTEM_NAME_PATH,
@@ -262,3 +275,73 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
         "path": BATTERY_PACK_PATH,
         "params": {FIELD_DEVICE_SN: "sn1"},
     }
+
+
+_FAKE_SEED_B64 = base64.b64encode(bytes(range(32))).decode("ascii")
+
+
+def _bare_api() -> JackeryApi:
+    """Return a JackeryApi instance bypassing the cloud-bound constructor."""
+    api = JackeryApi.__new__(JackeryApi)
+    api._mqtt_user_id = None
+    api._mqtt_seed_b64 = None
+    api._mqtt_mac_id = None
+    api._mqtt_mac_id_source = "generated"
+    api._token = None
+    return api
+
+
+def test_mqtt_session_snapshot_returns_none_until_hydrated() -> None:
+    """The snapshot must stay None until all three mandatory fields are set."""
+    api = _bare_api()
+    assert api.mqtt_session_snapshot() is None
+
+    api.hydrate_mqtt_session(
+        user_id="user-1",
+        seed_b64=_FAKE_SEED_B64,
+        mac_id="2" + "a" * 32,
+        mac_id_source="configured",
+    )
+    snapshot = api.mqtt_session_snapshot()
+    assert snapshot == {
+        MQTT_SESSION_USER_ID: "user-1",
+        MQTT_SESSION_SEED_B64: _FAKE_SEED_B64,
+        MQTT_SESSION_MAC_ID: "2" + "a" * 32,
+        MQTT_SESSION_MAC_ID_SOURCE: "configured",
+    }
+
+
+async def test_get_mqtt_credentials_allow_stale_skips_login_when_hydrated() -> None:
+    """Hydrated MQTT fields must let allow_stale=True build creds without login."""
+    api = _bare_api()
+
+    async def _fail_login() -> str:  # pragma: no cover — must not be called
+        raise AssertionError("async_login must not be called when stale is allowed")
+
+    api.async_login = _fail_login  # type: ignore[assignment]
+
+    api.hydrate_mqtt_session(
+        user_id="user-1",
+        seed_b64=_FAKE_SEED_B64,
+        mac_id="2" + "b" * 32,
+    )
+    creds = await api.async_get_mqtt_credentials(allow_stale=True)
+    assert creds[MQTT_CREDENTIAL_USER_ID] == "user-1"
+    assert creds[MQTT_CREDENTIAL_CLIENT_ID] == "user-1@APP"
+    assert creds[MQTT_CREDENTIAL_USERNAME] == "user-1@" + "2" + "b" * 32
+    # Password is base64 AES output — must be a non-empty ASCII string.
+    assert creds[MQTT_CREDENTIAL_PASSWORD]
+    assert isinstance(creds[MQTT_CREDENTIAL_PASSWORD], str)
+
+
+async def test_get_mqtt_credentials_allow_stale_without_hydration_raises() -> None:
+    """allow_stale=True still requires hydrate or a real login first."""
+    api = _bare_api()
+
+    async def _ensure_token() -> str:
+        raise JackeryAuthError("simulated cloud outage")
+
+    api._ensure_token = _ensure_token  # type: ignore[assignment]
+
+    with pytest.raises(JackeryAuthError):
+        await api.async_get_mqtt_credentials(allow_stale=True)

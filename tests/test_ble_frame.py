@@ -643,6 +643,10 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
         matchers
     )
     assert "bluetooth" in (manifest.get("after_dependencies") or [])
+    assert "dhcp" in (manifest.get("after_dependencies") or [])
+    assert any(
+        matcher.get("macaddress") == "80F1B2*" for matcher in manifest.get("dhcp", [])
+    )
     assert any(
         req.startswith("bleak-retry-connector")
         for req in manifest.get("requirements", [])
@@ -675,26 +679,29 @@ def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
         assert hasattr(JackerySolarVaultCoordinator, attr), attr
 
 
-def test_ble_write_option_is_options_only() -> None:
-    """BLE writes default off and are not shown in the initial login form."""
+def test_ble_write_option_is_dev_mode_only() -> None:
+    """BLE writes are hidden from UI and gated by the developer env switch."""
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     source = (
         root / "custom_components" / "jackery_solarvault" / "config_flow.py"
     ).read_text(encoding="utf-8")
+    coordinator_source = (
+        root / "custom_components" / "jackery_solarvault" / "coordinator.py"
+    ).read_text(encoding="utf-8")
 
-    assert "CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES" in source
     user_schema = source.split("USER_SCHEMA = vol.Schema(", 1)[1].split("\n})", 1)[0]
     assert "CONF_ENABLE_BLE_WRITES" not in user_schema
     options_block = source.split("class JackeryOptionsFlow", 1)[1].split(
         "class JackeryConfigFlow", 1
     )[0]
-    assert "CONF_ENABLE_BLE_WRITES" in options_block
+    assert "CONF_ENABLE_BLE_WRITES" not in options_block
     reconfigure_block = source.split("async def async_step_reconfigure", 1)[1].split(
         "async def async_step_reauth", 1
     )[0]
-    assert "CONF_ENABLE_BLE_WRITES" in reconfigure_block
+    assert "CONF_ENABLE_BLE_WRITES" not in reconfigure_block
+    assert "dev_mode_redactions_disabled" in coordinator_source
 
 
 def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
@@ -772,14 +779,12 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
     asyncio.run(_runner())
 
 
-def test_coordinator_send_ble_command_requires_write_option() -> None:
-    """The public BLE sender is inert until both BLE options are enabled."""
+def test_coordinator_send_ble_command_requires_dev_mode() -> None:
+    """The public BLE sender is inert until BLE transport and dev mode are enabled."""
     import asyncio
+    import os
 
-    from custom_components.jackery_solarvault.const import (
-        CONF_ENABLE_BLE_TRANSPORT,
-        CONF_ENABLE_BLE_WRITES,
-    )
+    from custom_components.jackery_solarvault.const import CONF_ENABLE_BLE_TRANSPORT
     from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
@@ -788,7 +793,6 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
         data: dict[str, object] = {}
         options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: False,
         }
 
     class _Listener:
@@ -807,7 +811,12 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
         )
         assert sent is False
 
-    asyncio.run(_run())
+    old_env = os.environ.pop("JACKERY_DEV_MODE", None)
+    try:
+        asyncio.run(_run())
+    finally:
+        if old_env is not None:
+            os.environ["JACKERY_DEV_MODE"] = old_env
 
 
 def test_ble_observations_include_known_devices_without_frames() -> None:
@@ -858,11 +867,9 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     """Dict service bodies are compact-JSON encoded before GATT write."""
     import asyncio
+    import os
 
-    from custom_components.jackery_solarvault.const import (
-        CONF_ENABLE_BLE_TRANSPORT,
-        CONF_ENABLE_BLE_WRITES,
-    )
+    from custom_components.jackery_solarvault.const import CONF_ENABLE_BLE_TRANSPORT
     from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
@@ -871,7 +878,6 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
         data: dict[str, object] = {}
         options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: True,
         }
 
     captured: dict[str, object] = {}
@@ -922,7 +928,15 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             "mtu_override": None,
         }
 
-    asyncio.run(_run())
+    old_env = os.environ.get("JACKERY_DEV_MODE")
+    os.environ["JACKERY_DEV_MODE"] = "1"
+    try:
+        asyncio.run(_run())
+    finally:
+        if old_env is None:
+            os.environ.pop("JACKERY_DEV_MODE", None)
+        else:
+            os.environ["JACKERY_DEV_MODE"] = old_env
 
 
 def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
@@ -1394,6 +1408,8 @@ def _build_bare_listener() -> object:
     listener._key_resolver = lambda _device_id: None
     listener._serial_resolver = None
     listener._ble_address_resolver = lambda _device_id: None
+    listener._unmapped_serials_logged = set()
+    listener._missing_key_logged = set()
     return listener
 
 
@@ -1614,11 +1630,9 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
 def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     """``async_send_ble_command`` threads the ack knobs through to the listener."""
     import asyncio
+    import os
 
-    from custom_components.jackery_solarvault.const import (
-        CONF_ENABLE_BLE_TRANSPORT,
-        CONF_ENABLE_BLE_WRITES,
-    )
+    from custom_components.jackery_solarvault.const import CONF_ENABLE_BLE_TRANSPORT
     from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
@@ -1627,7 +1641,6 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
         data: dict[str, object] = {}
         options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: True,
         }
 
     captured: dict[str, object] = {}
@@ -1676,7 +1689,15 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
         assert captured["ack_cmds"] == (107, 111)
         assert captured["mtu_override"] == 120
 
-    asyncio.run(_run())
+    old_env = os.environ.get("JACKERY_DEV_MODE")
+    os.environ["JACKERY_DEV_MODE"] = "1"
+    try:
+        asyncio.run(_run())
+    finally:
+        if old_env is None:
+            os.environ.pop("JACKERY_DEV_MODE", None)
+        else:
+            os.environ["JACKERY_DEV_MODE"] = old_env
 
 
 # ---------------------------------------------------------------------------
@@ -2003,6 +2024,42 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
     assert pack["batSoc"] == 53
     assert pack["inPw"] == 0
     assert pack["outPw"] == 200
+
+
+def test_battery_pack_lifetime_ble_guard_accepts_missing_dev_type() -> None:
+    """cmd=120 pack lifetime frames may omit devType but still carry counters."""
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
+
+    assert JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload({
+        "deviceSn": "HQ2C01400955HP3",
+        "outEgy": 5095,
+        "inEgy": 5648,
+    })
+    assert JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload({
+        "deviceSn": "HQ2C01400955HP3",
+        "devType": "1",
+        "outEgy": 5095,
+    })
+
+
+def test_battery_pack_lifetime_ble_guard_rejects_non_pack_variants() -> None:
+    """cmd=120 system/CT variants must stay unrouted."""
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
+
+    assert not JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload({
+        "deviceSn": "HQ2C01400955HP3",
+        "devType": 3,
+        "outEgy": 5095,
+        "inEgy": 5648,
+    })
+    assert not JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload({
+        "deviceSn": "HQ2C01400955HP3",
+        "devType": 1,
+    })
 
 
 def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:

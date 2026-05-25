@@ -299,6 +299,56 @@ def test_entity_statistics_metric_map_targets_existing_entities() -> None:
     )
 
 
+def test_entity_statistics_period_targets_are_period_exact() -> None:
+    """App trend buckets must only fill their matching period entity."""
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_DAY,
+        DATE_TYPE_MONTH,
+        DATE_TYPE_WEEK,
+        DATE_TYPE_YEAR,
+        JackerySolarVaultCoordinator,
+    )
+
+    assert JackerySolarVaultCoordinator._entity_targets_for_app_points(
+        "pv_energy",
+        DATE_TYPE_DAY,
+    ) == (("device_today_pv_energy", DATE_TYPE_DAY, True),)
+    assert JackerySolarVaultCoordinator._entity_targets_for_app_points(
+        "pv_energy",
+        DATE_TYPE_WEEK,
+    ) == (("pv_week_energy", DATE_TYPE_WEEK, True),)
+    assert JackerySolarVaultCoordinator._entity_targets_for_app_points(
+        "pv_energy",
+        DATE_TYPE_MONTH,
+    ) == (("pv_month_energy", DATE_TYPE_MONTH, True),)
+    assert JackerySolarVaultCoordinator._entity_targets_for_app_points(
+        "pv_energy",
+        DATE_TYPE_YEAR,
+    ) == (("pv_year_energy", DATE_TYPE_YEAR, True),)
+
+    assert JackerySolarVaultCoordinator._entity_source_priority(
+        DATE_TYPE_MONTH,
+        DATE_TYPE_MONTH,
+    ) > JackerySolarVaultCoordinator._entity_source_priority(
+        DATE_TYPE_MONTH,
+        DATE_TYPE_WEEK,
+    )
+    assert (
+        JackerySolarVaultCoordinator._entity_source_priority(
+            DATE_TYPE_YEAR,
+            DATE_TYPE_YEAR,
+        )
+        == 1
+    )
+    assert (
+        JackerySolarVaultCoordinator._entity_source_priority(
+            DATE_TYPE_YEAR,
+            DATE_TYPE_MONTH,
+        )
+        == 0
+    )
+
+
 def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None:
     """Implement test ct period stats remain removed from polling and chart imports."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
@@ -489,6 +539,82 @@ def test_external_app_chart_statistics_are_period_scoped() -> None:
     assert 'DATE_TYPE_YEAR: "monthly"' not in source
 
 
+def test_battery_day_signed_curves_create_positive_recorder_buckets() -> None:
+    """Battery day payloads use signed W curves but Recorder buckets stay positive."""
+    from custom_components.jackery_solarvault.const import (
+        APP_REQUEST_META,
+        APP_SECTION_BATTERY_STAT,
+        APP_STAT_TOTAL_CHARGE,
+        APP_STAT_TOTAL_DISCHARGE,
+    )
+    from custom_components.jackery_solarvault.util import day_power_energy_points
+
+    source = {
+        APP_REQUEST_META: {
+            "beginDate": "2026-05-24",
+            "endDate": "2026-05-24",
+            "dateType": "day",
+        },
+        "unit": "W",
+        "x": ["00:00", "00:05", "01:00"],
+        "y1": [-600, None, -300],
+        "y2": [None, 300, 300],
+        APP_STAT_TOTAL_CHARGE: 0.09,
+        APP_STAT_TOTAL_DISCHARGE: 0.06,
+    }
+
+    charge = day_power_energy_points(
+        source,
+        f"{APP_SECTION_BATTERY_STAT}_day",
+        APP_STAT_TOTAL_CHARGE,
+        bucket_minutes=60,
+    )
+    discharge = day_power_energy_points(
+        source,
+        f"{APP_SECTION_BATTERY_STAT}_day",
+        APP_STAT_TOTAL_DISCHARGE,
+        bucket_minutes=60,
+    )
+
+    assert charge
+    assert discharge
+    assert all(point.value >= 0 for point in (*charge, *discharge))
+    assert round(sum(point.value for point in charge), 5) == 0.09
+    assert round(sum(point.value for point in discharge), 5) == 0.06
+
+    combined_source = {
+        APP_REQUEST_META: {
+            "beginDate": "2026-05-24",
+            "endDate": "2026-05-24",
+            "dateType": "day",
+        },
+        "unit": "W",
+        "x": ["00:00", "00:05", "01:00", "01:05"],
+        "y": [600, -300, -600, 300],
+        APP_STAT_TOTAL_CHARGE: 0.09,
+        APP_STAT_TOTAL_DISCHARGE: 0.12,
+    }
+
+    combined_charge = day_power_energy_points(
+        combined_source,
+        f"{APP_SECTION_BATTERY_STAT}_day",
+        APP_STAT_TOTAL_CHARGE,
+        bucket_minutes=60,
+    )
+    combined_discharge = day_power_energy_points(
+        combined_source,
+        f"{APP_SECTION_BATTERY_STAT}_day",
+        APP_STAT_TOTAL_DISCHARGE,
+        bucket_minutes=60,
+    )
+
+    assert combined_charge
+    assert combined_discharge
+    assert all(point.value >= 0 for point in (*combined_charge, *combined_discharge))
+    assert round(sum(point.value for point in combined_charge), 5) == 0.09
+    assert round(sum(point.value for point in combined_discharge), 5) == 0.12
+
+
 def test_app_chart_curves_use_official_recorder_imports() -> None:
     """App chart buckets use official Recorder APIs only.
 
@@ -597,8 +723,72 @@ def test_period_app_bucket_entity_import_fills_only_uncompiled_hours() -> None:
     assert {stat["last_reset"] for stat in statistics} == {start(1)}
 
 
-def test_historical_day_entity_repair_can_replace_compiled_spike_rows() -> None:
-    """Historical day repair rewrites first-run spike rows from app curves."""
+def test_entity_import_fills_compiled_hours_when_entity_row_is_missing() -> None:
+    """A global Recorder run is not proof that this entity has a row."""
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_MONTH,
+        JackerySolarVaultCoordinator,
+    )
+
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_timezone = lambda: UTC
+
+    def start(day: int) -> datetime:
+        return datetime(2026, 5, day, tzinfo=UTC)
+
+    compiled = {
+        int(start(1).timestamp()),
+        int(start(2).timestamp()),
+        int(start(3).timestamp()),
+    }
+    existing = {
+        int(start(1).timestamp()),
+        int(start(3).timestamp()),
+    }
+    statistics = coordinator._entity_statistics_from_contributions(
+        [
+            (start(1), 22.29, DATE_TYPE_MONTH, True),
+            (start(2), 19.02, DATE_TYPE_MONTH, True),
+            (start(3), 18.12, DATE_TYPE_MONTH, True),
+        ],
+        compiled_hour_starts=compiled,
+        existing_hour_starts=existing,
+        sum_offset=100.0,
+        state_offset=10.0,
+    )
+
+    assert [(stat["state"], stat["sum"]) for stat in statistics] == [
+        (29.02, 119.02),
+    ]
+    assert [int(stat["start"].timestamp()) for stat in statistics] == [
+        int(start(2).timestamp()),
+    ]
+
+
+def test_entity_import_keeps_ha_wins_when_existing_row_lookup_is_unavailable() -> None:
+    """Missing per-entity lookup must fall back to the conservative HA-wins rule."""
+    from custom_components.jackery_solarvault.coordinator import (
+        DATE_TYPE_MONTH,
+        JackerySolarVaultCoordinator,
+    )
+
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_timezone = lambda: UTC
+    start = datetime(2026, 5, 1, tzinfo=UTC)
+
+    statistics = coordinator._entity_statistics_from_contributions(
+        [(start, 22.29, DATE_TYPE_MONTH, True)],
+        compiled_hour_starts={int(start.timestamp())},
+        existing_hour_starts=None,
+        sum_offset=100.0,
+        state_offset=10.0,
+    )
+
+    assert statistics == []
+
+
+def test_current_day_entity_import_can_replace_compiled_spike_rows() -> None:
+    """Current-day import rewrites completed current-day spike rows."""
     from custom_components.jackery_solarvault.coordinator import (
         DATE_TYPE_DAY,
         JackerySolarVaultCoordinator,
@@ -967,8 +1157,8 @@ def test_statistics_backfill_state_is_removed() -> None:
     assert "def statistics_import_diagnostics" in coordinator_source
 
 
-def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
-    """Bounded HTTP backfill runs before current buckets for sum continuity."""
+def test_statistics_import_uses_current_payload_without_http_backfill() -> None:
+    """Current app payloads import without historical HTTP day repair."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     import_source = coordinator_source.split(
         "async def _async_import_current_app_chart_statistics_job", 1
@@ -988,43 +1178,58 @@ def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
     assert "_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION" not in coordinator_source
     assert "_ENTITY_STATISTICS_REPAIR_VERSION" not in coordinator_source
     current_import = import_source.index(
-        "successful_devices = await self._async_import_app_chart_statistics(snapshot)"
+        "successful_devices = await self._async_import_day_chart_statistics(snapshot)"
+    )
+    period_import = import_source.index(
+        "_async_import_app_chart_statistics(\n            snapshot\n        )"
     )
     current_entity_import = import_source.index(
-        "_async_import_current_app_chart_entity_statistics(snapshot)"
+        "_async_import_current_app_chart_entity_statistics("
     )
-    http_backfill = import_source.index("_async_http_backfill_recent_day_statistics(")
     assert "_async_repair_missing_app_chart_statistics(" not in import_source
     assert "_statistics_repair_from_date(" not in import_source
     assert "_statistics_rolling_backfill_from_date(" not in import_source
+    assert "_async_http_backfill_recent_day_statistics(" not in import_source
+    assert "_async_fetch_historical_day_chart_sources" not in coordinator_source
+    assert "_async_import_historical_day_chart_statistics_for_device" not in (
+        coordinator_source
+    )
+    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS" not in coordinator_source
+    assert "_STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS" not in coordinator_source
+    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC" not in coordinator_source
+    assert "_STATISTICS_HTTP_BACKFILL_RETRY_SEC" not in coordinator_source
     current_payload_source = coordinator_source.split(
         "def _current_app_chart_entity_source_batches", 1
     )[1].split("\n    async def _async_import_current_app_chart_entity_statistics", 1)[
         0
     ]
-    assert "for date_type in (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH):" in (
-        current_payload_source
-    )
-    assert "DATE_TYPE_YEAR" not in current_payload_source
-    assert http_backfill < current_import
-    assert current_import < current_entity_import
+    assert "DATE_TYPE_DAY" in current_payload_source
+    assert "DATE_TYPE_WEEK" in current_payload_source
+    assert "DATE_TYPE_MONTH" in current_payload_source
+    assert "DATE_TYPE_YEAR" in current_payload_source
+    assert current_import < period_import
+    assert period_import < current_entity_import
+    assert "replace_period_hours=startup_sync" in import_source
+    assert '"last_current_period_replace_existing_hours": startup_sync' in import_source
+    current_update = import_source.split(
+        "self._statistics_import_diagnostics.update({", 1
+    )[1].split("\n        })", 1)[0]
+    assert "last_http_backfill_external_rows" not in current_update
+    assert "last_http_backfill_entity_imported_rows" not in current_update
+    assert "last_http_backfill_entity_failed_rows" not in current_update
 
 
-def test_day_entity_repair_can_replace_recorder_spikes() -> None:
-    """Daily ``sensor.*`` rows may replace Recorder spike rows."""
+def test_current_day_entity_import_can_replace_completed_buckets() -> None:
+    """Completed current-day ``sensor.*`` buckets may be refreshed."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     targets_fn = coordinator_source.split("def _entity_targets_for_app_points", 1)[
         1
     ].split("\n    def _completed_entity_app_points", 1)[0]
-    month_branch = targets_fn.split("if date_type == DATE_TYPE_MONTH:", 1)[1].split(
-        "return tuple(targets)", 1
-    )[0]
 
-    assert "if date_type == DATE_TYPE_DAY:" in targets_fn
-    assert "periods.get(DATE_TYPE_DAY)" in targets_fn
-    assert "day_key" not in month_branch
-    assert "periods.get(DATE_TYPE_MONTH)" in month_branch
-    assert "periods.get(DATE_TYPE_YEAR)" in month_branch
+    assert "key = periods.get(date_type)" in targets_fn
+    assert "periods.get(DATE_TYPE_MONTH)" not in targets_fn
+    assert "periods.get(DATE_TYPE_YEAR)" not in targets_fn
+    assert "day_key" not in targets_fn
 
     importer = coordinator_source.split(
         "async def _async_import_app_chart_entity_statistics_for_device", 1
@@ -1044,6 +1249,10 @@ def test_day_entity_repair_can_replace_recorder_spikes() -> None:
     )[0]
     assert "replace_existing_hours=True" in day_call
     assert "include_current_day_completed=True" in day_call
+    period_call = current_import.split("if period_batches:", 1)[1].split(
+        "if imported_rows or failed_rows:", 1
+    )[0]
+    assert "replace_existing_hours=replace_period_hours" in period_call
 
     assert "_DAY_ENTITY_STATISTICS_REPAIR_WINDOW_DAYS" not in coordinator_source
 
@@ -1076,34 +1285,34 @@ def test_day_chart_sources_prefer_device_minute_curves_for_pv_and_battery() -> N
     assert "timeout_sec=system_trend_timeout_sec" in fetch_system
 
 
-def test_historical_statistics_fetch_path_is_bounded_http_backfill() -> None:
-    """Historical day backfill uses explicit HTTP app-stat requests."""
+def test_historical_statistics_fetch_path_is_removed() -> None:
+    """Historical day repair stays removed; current periods remain explicit."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "async def _async_fetch_historical_app_chart_source" not in (
         coordinator_source
     )
-    assert "async def _async_fetch_historical_day_chart_sources" in (coordinator_source)
-    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 7" in coordinator_source
-    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = 6 * 60 * 60" in (
+    assert "async def _async_fetch_historical_day_chart_sources" not in (
         coordinator_source
     )
-    assert "app_period_request_kwargs(DATE_TYPE_DAY, today=target_day)" in (
+    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS" not in coordinator_source
+    assert "_STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS" not in coordinator_source
+    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC" not in coordinator_source
+    assert "_STATISTICS_HTTP_BACKFILL_RETRY_SEC" not in coordinator_source
+    assert "app_period_request_kwargs(date_type, today=self._local_today())" in (
         coordinator_source
     )
-    assert "Skip historical app chart fetch" not in coordinator_source
-    assert "period_start > today" not in coordinator_source
+    assert "apply_year_month_backfill(bundle, month_history)" in coordinator_source
 
 
 def test_week_month_year_statistic_toggles_filter_imports() -> None:
     """W/M/Y config-flow toggles gate the matching statistic imports.
 
-    When the user disables, say, year statistics in the options/reconfigure
-    flow, the coordinator must:
+    When the user disables, say, year statistics in the options flow, the
+    coordinator must:
 
-    * Skip the YEAR branch when iterating ``APP_CHART_STAT_PERIODS`` in
-      ``_async_import_app_chart_statistics``.
-    * Skip the YEAR ``date_type`` filter in
+    * Skip the YEAR entity-history import from current payloads.
+    * Skip the YEAR current-payload entity source in
       ``_current_app_chart_entity_source_batches``.
 
     DAY-hourly external statistics carry the Energy-Dashboard's hour-by-hour
@@ -1143,16 +1352,14 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
     ]
     assert "enabled_date_types = self._enabled_app_chart_date_types()" in current_source
 
-    # Config-flow schemas expose the three toggles in both the options-flow
-    # and reconfigure entry points.
+    # Config-flow schemas expose the three toggles in the statistics options
+    # page. Reconfigure is credentials-only by HA convention.
     config_flow_source = (COMPONENT_PATH / "config_flow.py").read_text(encoding="utf-8")
     for key in (
         "CONF_ENABLE_WEEK_STATISTICS",
         "CONF_ENABLE_MONTH_STATISTICS",
         "CONF_ENABLE_YEAR_STATISTICS",
     ):
-        # Both schemas (options-flow init + reconfigure) must reference each
-        # constant — at least two occurrences per key.
         assert config_flow_source.count(key) >= 2, key
 
     # Translations carry the new labels in every locale so HA renders them.
@@ -1162,12 +1369,10 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
         "enable_month_statistics",
         "enable_year_statistics",
     ):
-        assert key in base["options"]["step"]["init"]["data"], (
+        assert key in base["options"]["step"]["statistics"]["data"], (
             f"{key} missing in strings.json options step"
         )
-        assert key in base["config"]["step"]["reconfigure"]["data"], (
-            f"{key} missing in strings.json reconfigure step"
-        )
+        assert key not in base["config"]["step"]["reconfigure"]["data"], key
 
     # Runtime: the helper honours the entry options. DAY stays on always.
     from custom_components.jackery_solarvault.coordinator import (
@@ -1215,8 +1420,8 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
     }
 
 
-def test_day_external_history_backfill_uses_http_day_curves() -> None:
-    """Day external statistics may be repaired from historical HTTP curves."""
+def test_day_external_statistics_use_current_day_curves() -> None:
+    """Day external statistics use current app day curves."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "def _iter_calendar_days" not in coordinator_source
@@ -1233,17 +1438,16 @@ def test_day_external_history_backfill_uses_http_day_curves() -> None:
     assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in current_day_source
     assert "APP_DAY_CHART_BUCKET_LABEL" in current_day_source
     assert "_day_chart_points_for_metric(" in current_day_source
+    assert "async def _async_import_historical_day_chart_statistics_for_device" not in (
+        coordinator_source
+    )
+    assert "async def _async_http_backfill_recent_day_statistics" not in (
+        coordinator_source
+    )
 
-    backfill_source = coordinator_source.split(
-        "async def _async_import_historical_day_chart_statistics_for_device", 1
-    )[1].split("\n    async def _async_http_backfill_recent_day_statistics", 1)[0]
-    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in backfill_source
-    assert "_day_chart_points_for_metric(" in backfill_source
-    assert "_async_add_app_chart_statistics(" in backfill_source
 
-
-def test_historical_entity_statistics_repair_uses_http_day_curves() -> None:
-    """Historical day HTTP buckets can replace Recorder spike rows."""
+def test_historical_entity_statistics_repair_is_removed() -> None:
+    """Entity statistics import uses current app payloads only."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "async def _async_repair_missing_app_chart_statistics" not in (
@@ -1255,15 +1459,21 @@ def test_historical_entity_statistics_repair_uses_http_day_curves() -> None:
     assert "replace_existing_hours=replace_existing_day_hours" not in (
         coordinator_source
     )
-    backfill_source = coordinator_source.split(
-        "async def _async_http_backfill_recent_day_statistics", 1
+    assert "async def _async_http_backfill_recent_day_statistics" not in (
+        coordinator_source
+    )
+    current_import = coordinator_source.split(
+        "async def _async_import_current_app_chart_entity_statistics", 1
     )[1].split("\n    async def _async_update_data_quality_issue", 1)[0]
-    assert "source_batches=[(DATE_TYPE_DAY, section_sources)]" in backfill_source
-    assert "replace_existing_hours=True" in backfill_source
+    day_call = current_import.split("if day_batches:", 1)[1].split(
+        "if period_batches:", 1
+    )[0]
+    assert "replace_existing_hours=True" in day_call
+    assert "include_current_day_completed=True" in day_call
 
 
-def test_entity_statistics_import_handles_day_week_month_not_year() -> None:
-    """Entity-stats import fills current day/week/month; year remains external."""
+def test_entity_statistics_import_handles_day_week_month_year() -> None:
+    """Entity-stats import fills current day/week/month/year buckets."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     importer = coordinator_source.split(
@@ -1278,10 +1488,11 @@ def test_entity_statistics_import_handles_day_week_month_not_year() -> None:
     targets_fn = coordinator_source.split("def _entity_targets_for_app_points", 1)[
         1
     ].split("\n    def _completed_entity_app_points", 1)[0]
-    assert "if date_type == DATE_TYPE_DAY:" in targets_fn
-    assert "periods.get(DATE_TYPE_DAY)" in targets_fn
-    assert "periods.get(DATE_TYPE_WEEK)" in targets_fn
-    assert "periods.get(DATE_TYPE_MONTH)" in targets_fn
+    assert "key = periods.get(date_type)" in targets_fn
+    assert "periods.get(DATE_TYPE_DAY)" not in targets_fn
+    assert "periods.get(DATE_TYPE_WEEK)" not in targets_fn
+    assert "periods.get(DATE_TYPE_MONTH)" not in targets_fn
+    assert "periods.get(DATE_TYPE_YEAR)" not in targets_fn
 
     completed_fn = coordinator_source.split("def _completed_entity_app_points", 1)[
         1
@@ -1321,8 +1532,8 @@ def test_statistics_repair_seed_path_is_removed() -> None:
     assert "_STATISTICS_BACKFILL_LAST_REPAIR" not in src
 
 
-def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None:
-    """Automatic backfill is HTTP-only and does not restore old repair state."""
+def test_statistics_import_has_no_historical_day_repair_state() -> None:
+    """Automatic import does not restore old historical repair state."""
     src = COORDINATOR_PATH.read_text(encoding="utf-8")
     for removed in (
         "_STATISTICS_ROLLING_BACKFILL_WINDOW_DAYS",
@@ -1332,6 +1543,12 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
         "async def async_repair_statistics",
         "_STATISTICS_BACKFILL_LAST_MANUAL_FROM",
         "_STATISTICS_BACKFILL_LAST_SOURCE_COUNTS",
+        "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
+        "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC",
+        "self._last_statistics_http_backfill_monotonic",
+        "async def _async_http_backfill_recent_day_statistics",
+        "async def _async_fetch_historical_day_chart_sources",
+        "async def _async_import_historical_day_chart_statistics_for_device",
     ):
         assert removed not in src
 
@@ -1343,7 +1560,7 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
     assert "_statistics_repair_from_date(device_id, today)" not in import_job
     assert "_statistics_rolling_backfill_from_date(" not in import_job
     assert "_async_repair_missing_app_chart_statistics(" not in import_job
-    assert "_async_http_backfill_recent_day_statistics(" in import_job
+    assert "_async_http_backfill_recent_day_statistics(" not in import_job
 
 
 def test_statistics_repair_source_matrix_is_removed() -> None:

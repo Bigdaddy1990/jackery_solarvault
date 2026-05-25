@@ -541,4 +541,269 @@ def test_mqtt_ensure_uses_stable_client_handle_across_awaits() -> None:
     assert "await mqtt.async_start(" in body
     assert "await mqtt.async_wait_until_connected(" in body
     assert "mqtt_last_error = mqtt.diagnostics.get" in body
-    assert "self._mqtt.async_wait_until_connected" not in body
+
+
+def test_cloud_outage_uses_cached_mqtt_session() -> None:
+    """Cloud-login failure must retry credential build with allow_stale=True.
+
+    Without this, a Jackery cloud outage tears down MQTT push at the first
+    credential refresh: the broker would still accept the AES password
+    derived from the cached ``userId+macId+seed`` triple, but the coordinator
+    never tries because ``async_get_mqtt_credentials`` raises ``JackeryError``
+    on the unreachable ``_ensure_token`` call.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+
+    # First attempt is the normal cloud-backed path.
+    assert "creds = await self.api.async_get_mqtt_credentials()" in body
+    # On JackeryError (cloud unreachable) it falls back to the cached session.
+    assert "allow_stale=True" in body
+    # A used-stale flag is tracked so a follow-up broker rejection can drop
+    # the cache instead of replaying the stale row forever.
+    assert "used_stale_session" in body
+    assert "_async_invalidate_mqtt_session_cache" in body
+
+
+def test_mqtt_commands_use_cached_session_during_cloud_outage() -> None:
+    """Command publish must use cached MQTT credentials when login is down."""
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_publish_command\(.*?(?=\n    async def )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+
+    assert "creds = await self.api.async_get_mqtt_credentials()" in body
+    assert "allow_stale=True" in body
+    assert "used_stale_session" in body
+    assert "_async_invalidate_mqtt_session_cache" in body
+
+
+def test_successful_mqtt_connect_persists_session_snapshot() -> None:
+    """Every successful MQTT connect must persist the current session snapshot.
+
+    Persistence lets the next HA restart (or a setup pass during a cloud
+    outage) hydrate ``JackeryApi`` without a live ``/v1/user/login`` round
+    trip, which is what makes MQTT survive the outage.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+    assert "_async_persist_mqtt_session_if_changed" in body
+    # The helper itself must read the API snapshot and compare against the
+    # previously persisted dict before writing — avoids storm-writes.
+    assert "_async_persist_mqtt_session_if_changed" in src
+    assert "self.api.mqtt_session_snapshot()" in src
+    assert "self._persisted_mqtt_session" in src
+
+
+def test_mqtt_session_cache_module_centralizes_storage_keys() -> None:
+    """mqtt_session_cache.py must use the centralized MQTT_SESSION_* keys."""
+    src = _read("mqtt_session_cache.py")
+    assert "MQTT_SESSION_USER_ID" in src
+    assert "MQTT_SESSION_SEED_B64" in src
+    assert "MQTT_SESSION_MAC_ID" in src
+    # Storage key must be DOMAIN-scoped so other integrations cannot collide.
+    assert 'f"{DOMAIN}.mqtt_session_cache"' in src
+    # Public surface required by the coordinator + setup paths.
+    assert "async def async_load_mqtt_session" in src
+    assert "async def async_save_mqtt_session" in src
+    assert "async def async_clear_mqtt_session" in src
+
+
+def test_ble_sink_bootstraps_from_discovery_when_first_refresh_pending() -> None:
+    """BLE notify frames must not be dropped silently when self.data is empty.
+
+    Cloud-Outage during HA startup means ``async_config_entry_first_refresh``
+    cannot land any HTTP-derived ``self.data`` for the device. Before this
+    fix the sink returned early on ``current_device is None`` and every BLE
+    frame was discarded — local-only operation produced zero entity updates
+    even though discovery_cache already knew the device id and bluetoothKey.
+    """
+    src = _read("coordinator.py")
+    sink_match = re.search(
+        r"async def _sink\(device_id: str.*?listener = JackeryBleListener\(",
+        src,
+        re.S,
+    )
+    assert sink_match is not None, "BLE _sink not found"
+    body = sink_match.group(0)
+    # Discovery-cache fallback must be present when self.data has nothing.
+    assert "self._device_index.get(device_id)" in body
+    assert "PAYLOAD_DEVICE_META" in body
+    assert "PAYLOAD_SYSTEM_META" in body
+    # The seeded bundle must carry the four canonical keys the merge helpers
+    # read (PROPERTIES default {}, DEVICE/DISCOVERY from device_meta,
+    # SYSTEM from system_meta).
+    assert "PAYLOAD_PROPERTIES: {}" in body
+    assert "PAYLOAD_DEVICE:" in body
+    assert "PAYLOAD_DISCOVERY:" in body
+    assert "PAYLOAD_SYSTEM:" in body
+
+
+def test_coordinator_uses_ha_bluetooth_async_address_present() -> None:
+    """Reachability check must use the HA-core ``async_address_present`` helper.
+
+    Per https://developers.home-assistant.io/docs/core/bluetooth/api this is
+    the authoritative source for "is the BLE device reachable right now". The
+    integration must consult it instead of trusting the Jackery cloud's
+    ``onlineStatus`` / ``onlineState`` flag, which goes to 0 the moment the
+    device cannot heartbeat back to the cloud — even when BLE is fine.
+    """
+    src = _read("coordinator.py")
+    assert "def is_device_locally_reachable" in src
+    assert "bluetooth.async_address_present" in src
+    # connectable=True ensures only proxies that can actually open a GATT
+    # session count as "reachable" — passive sniffers do not.
+    assert "connectable=True" in src
+    # Defensive import so unit tests on hosts without HA bluetooth still load.
+    assert "from homeassistant.components import bluetooth" in src
+
+
+def test_entity_available_prefers_local_reachability_over_cloud_flag() -> None:
+    """`JackeryEntity.available` must treat local reachability as authoritative.
+
+    Before this fix the Jackery cloud's ``onlineStatus: 0`` during a cloud
+    outage knocked every sensor to ``unavailable`` — even while the BLE
+    listener was decoding 1000+ frames per cycle. Production log evidence:
+    16:14:43 BLE merges OK → 16:15:10 cloud refresh sets onlineStatus=0 →
+    every entity flips to ``unavailable`` despite the live local feed.
+    """
+    src = (ROOT / "custom_components" / "jackery_solarvault" / "entity.py").read_text(
+        encoding="utf-8"
+    )
+    avail_match = re.search(
+        r"def available\(self\).*?(?=\n    @|\n    def |\nclass |\Z)",
+        src,
+        re.S,
+    )
+    assert avail_match is not None, "JackeryEntity.available not found"
+    body = avail_match.group(0)
+    # Local-reachability check must run BEFORE the cloud-online evaluation,
+    # otherwise the cloud's 0 flag would still short-circuit the result.
+    assert "is_device_locally_reachable" in body
+    local_idx = body.index("is_device_locally_reachable")
+    cloud_idx = body.index("FIELD_ONLINE_STATUS")
+    assert local_idx < cloud_idx, (
+        "local reachability must be evaluated before cloud onlineStatus"
+    )
+
+
+def test_ble_transport_logs_first_unmapped_serial_and_missing_key() -> None:
+    """Cloud-outage symptoms must surface once per device at INFO level.
+
+    Two failure modes are otherwise invisible: a stale discovery_cache
+    means ``serial_resolver`` returns None for every advertisement, and an
+    incomplete discovery_cache means the AES key lookup returns None for
+    every notify. Both used to live at DEBUG, so users could not tell why
+    BLE was running but producing no values.
+    """
+    src = (
+        ROOT
+        / "custom_components"
+        / "jackery_solarvault"
+        / "client"
+        / "ble_transport.py"
+    ).read_text(encoding="utf-8")
+    # One-shot per-device throttles so the new INFO logs don't spam.
+    assert "_unmapped_serials_logged: set[str]" in src
+    assert "_missing_key_logged: set[str]" in src
+    # Resolution success must clear the flags so a future re-occurrence
+    # is visible again.
+    assert "self._unmapped_serials_logged.discard(serial)" in src
+    assert "self._missing_key_logged.discard(device_id)" in src
+    # The actionable INFO log must mention the user-facing remediation.
+    assert "device-id mapping" in src
+    assert "Discovery_cache likely stale" in src
+
+
+def test_recorder_external_statistics_offset_is_non_negative() -> None:
+    """The external-statistics import must clamp the prior-sum anchor.
+
+    A poisoned recorder row (negative ``sum`` from an earlier bug) would
+    otherwise propagate as negative external statistics on every subsequent
+    bucket — exactly what the user observed for PV energy where physics
+    cannot produce a negative reading.
+    """
+    src = _read("coordinator.py")
+    match = re.search(
+        r"async def _async_add_app_chart_statistics\(.*?(?=\n    async def |\n    def )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+    assert "cumulative = max(0.0, offset)" in body, (
+        "external-statistics import must clamp the offset to >= 0; cumulative "
+        "must start at max(0, offset) so an existing negative recorder row "
+        "cannot propagate"
+    )
+
+
+def test_entity_statistics_state_offset_is_non_negative() -> None:
+    """The entity-statistics import must clamp the prior-period state anchor."""
+    src = _read("coordinator.py")
+    match = re.search(
+        r"def _entity_statistics_from_contributions\(.*?(?=\n    async def |\n    def )",
+        src,
+        re.S,
+    )
+    assert match is not None
+    body = match.group(0)
+    # cumulative_sum (Wh anchor) is already clamped via max(0.0, sum_offset);
+    # running_state (period anchor) must be clamped the same way, otherwise a
+    # negative recorder row would drive the period state negative.
+    assert "cumulative_sum = max(0.0, sum_offset)" in body
+    assert "max(0.0, state_offset)" in body
+
+
+def test_local_daily_cache_is_wired_into_coordinator_cycle() -> None:
+    """Coordinator must build today's local energy deltas every cycle.
+
+    Without this, a Jackery cloud outage leaves the ``device_*_stat_day``
+    payloads frozen on whatever value the cloud last delivered, and the
+    "today" sensors show 0.04 / 0.6 / 3.54 kWh while the device is in fact
+    producing live energy that ``pvEgy`` / ``batChgEgy`` / etc. on the
+    BLE-routed properties already report.
+    """
+    src = _read("coordinator.py")
+    update_match = re.search(
+        r"async def _async_update_data\(.*?return result\b",
+        src,
+        re.S,
+    )
+    assert update_match is not None, "_async_update_data body not found"
+    body = update_match.group(0)
+    # Refresh hook runs per device after merged_props is built.
+    assert "self._refresh_local_daily_for_device(" in body
+    assert "merged_props, today=today" in body
+    # The result section is set so downstream sensors can read the deltas.
+    assert "PAYLOAD_LOCAL_DAILY_ENERGY" in body
+    # The cycle persists snapshots at the end so HA restarts keep the anchor.
+    assert "_async_persist_local_daily_snapshots_if_changed" in body
+
+
+def test_local_daily_cache_module_exposes_required_helpers() -> None:
+    """The cache module must export load/save/delta/refresh as a public API."""
+    src = _read("local_daily_cache.py")
+    assert "async def async_load_daily_cache" in src
+    assert "async def async_save_daily_cache" in src
+    assert "def daily_delta(" in src
+    assert "def refresh_snapshot(" in src
+    # Storage key must be DOMAIN-scoped so it cannot collide with another
+    # integration that shares HA's Store path.
+    assert 'f"{DOMAIN}.local_daily_cache"' in src

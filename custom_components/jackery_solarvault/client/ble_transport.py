@@ -28,7 +28,7 @@ scope here. Once Phase 3a has shown the listener decodes real frames
 correctly, the same chunking/encrypt path from :mod:`.ble` will be
 plumbed into :meth:`async_write_frames`.
 
-Crypto assumptions follow implementation notes §14 and the reverse-engineered
+Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 — that is why diagnostics retain the last raw frame behind redaction.
 """
@@ -45,7 +45,6 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..util import first_nonblank_int
 from . import ble
 
 if TYPE_CHECKING:
@@ -81,14 +80,6 @@ _STOP_TIMEOUT_SEC: float = 5.0
 #: with a ``DevicePropertyChange`` notify that the sink merges into
 #: ``coordinator.data`` via the existing cmd=107 path.
 _KEEPALIVE_INTERVAL_SEC: float = 15.0
-
-
-def _coerce_ble_int(value: Any, field_name: str) -> int:
-    """Parse an integer BLE transport option without bool/non-finite leakage."""
-    parsed = first_nonblank_int(value)
-    if parsed is None:
-        raise ValueError(f"{field_name} must be an integer")
-    return parsed
 
 
 # ---------------------------------------------------------------------------
@@ -232,45 +223,6 @@ class JackeryBleListener:
     def address_for_device_id(self, device_id: str) -> str | None:
         """Return the cached BLE MAC for a device id, or None."""
         return self._device_addresses.get(device_id)
-
-    async def async_ensure_connected(
-        self,
-        device_id: str,
-        *,
-        timeout_sec: float,
-    ) -> bool:
-        """Wait until a BLE client is available for ``device_id``.
-
-        The listener reconnects in the background after disconnects. A
-        user-triggered service call may land during that reconnect window;
-        waiting here keeps the service action from failing immediately while
-        preserving the fast MQTT fallback path for normal setters.
-        """
-        if device_id in self._clients:
-            return True
-        address = self._device_addresses.get(device_id) or self._ble_address_resolver(
-            device_id
-        )
-        if address is None:
-            return False
-        self._device_addresses.setdefault(device_id, address)
-
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + max(0.0, timeout_sec)
-        while not self._stop_event.is_set():
-            if device_id in self._clients:
-                return True
-            task = self._connections.get(device_id)
-            if task is None or task.done():
-                self._connections[device_id] = self._hass.async_create_background_task(
-                    self._async_run_connection(device_id, address),
-                    name=f"jackery_ble_{device_id}",
-                )
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                break
-            await asyncio.sleep(min(0.2, remaining))
-        return device_id in self._clients
 
     # ------------------------------------------------------------------
     # Phase 3b: write path — send a command frame to the device
@@ -418,7 +370,7 @@ class JackeryBleListener:
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
-            mtu = _coerce_ble_int(mtu_override, "mtu_override")
+            mtu = int(mtu_override)
         else:
             mtu = self.mtu_for_device(device_id)
         try:
@@ -502,11 +454,7 @@ class JackeryBleListener:
         """Create and register a pending-ACK record for ``device_id``."""
         loop = asyncio.get_running_loop()
         pending = _PendingAck(
-            expected_cmds=(
-                frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
-                if ack_cmds
-                else None
-            ),
+            expected_cmds=(frozenset(int(c) for c in ack_cmds) if ack_cmds else None),
             future=loop.create_future(),
         )
         self._pending_acks.setdefault(device_id, []).append(pending)
@@ -800,7 +748,6 @@ class JackeryBleListener:
                     await client.start_notify(
                         ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
                     )
-                    stats.last_error = None
                     # Cache the negotiated MTU so ``async_send_command``
                     # can size per-frame bodies correctly. Different
                     # bleak backends expose this via ``mtu_size`` (int)
@@ -927,7 +874,6 @@ class JackeryBleListener:
         stats.last_frame = observation
         if parsed is not None:
             stats.frames_decoded += 1
-            stats.last_error = None
             _LOGGER.debug(
                 "Jackery BLE %s decoded: cmd=%d body=%d bytes",
                 device_id,

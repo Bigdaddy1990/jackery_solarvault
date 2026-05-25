@@ -45,7 +45,7 @@ logical message is split into ``CHUNK_CNT`` frames, each carrying
 ``CHUNK_LEN`` bytes of the payload; the receiver reassembles by
 ``FRAME_IDX``.
 
-implementation notes §14 documents the AES key source: per-device ``bluetoothKey``
+PROTOCOL.md §14 documents the AES key source: per-device ``bluetoothKey``
 from the HTTP ``/v1/device/system/list`` response. The base64-decoded
 length picks the cipher mode — observed in the wild: a SolarVault 3 Pro
 Max returned a 16-byte key (AES-128). The crypto helpers below accept
@@ -85,7 +85,7 @@ _HEX16_WIDTH: int = 4
 
 #: Key lengths (in bytes) accepted by the BLE crypto helpers.
 #:
-#: implementation notes §14 originally documented a fixed 32-byte AES-256 key, but the
+#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
 #: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
 #: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
 #: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
@@ -145,10 +145,7 @@ def parse_hex16(text: str) -> int:
         raise ValueError(
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         )
-    try:
-        return int(text, 16)
-    except ValueError as err:
-        raise ValueError(f"parse_hex16: expected hex chars, got {text!r}") from err
+    return int(text, 16)
 
 
 def hex_encode(data: bytes) -> str:
@@ -425,7 +422,9 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         # log will surface unexpected values for analysis.
         pass
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
-        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
+        raise ValueError(
+            f"unexpected payload marker {plaintext[12:14].hex()!r}"
+        )
     frame_index = int.from_bytes(plaintext[4:6], "big")
     chunk_count = int.from_bytes(plaintext[6:8], "big")
     flags = int.from_bytes(plaintext[8:10], "big")
@@ -439,9 +438,12 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             f"frame truncated: body_length={body_length} but plaintext is "
             f"{len(plaintext)} bytes"
         )
-    body = plaintext[_BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length]
+    body = plaintext[
+        _BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length
+    ]
     trailer = plaintext[
-        _BINARY_FRAME_HEADER_LEN + body_length : _BINARY_FRAME_HEADER_LEN
+        _BINARY_FRAME_HEADER_LEN
+        + body_length : _BINARY_FRAME_HEADER_LEN
         + body_length
         + _BINARY_FRAME_TRAILER_LEN
     ]

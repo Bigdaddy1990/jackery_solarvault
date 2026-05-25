@@ -15,10 +15,28 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import FIELD_ETH_PORT, FIELD_ONLINE_STATUS, FIELD_SW_EPS_STATE
+from .const import (
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_DEVICE_NAME,
+    FIELD_ETH_PORT,
+    FIELD_ONLINE_STATUS,
+    FIELD_SCAN_NAME,
+    FIELD_SW_EPS_STATE,
+    FIELD_SWITCH_STATE,
+    FIELD_SYS_SWITCH,
+    FIELD_VERSION,
+    PAYLOAD_SMART_PLUGS,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, safe_bool
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_bool,
+    smart_plug_serial,
+    sorted_smart_plugs,
+)
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
@@ -35,7 +53,7 @@ class JackeryBinaryDescription(BinarySensorEntityDescription):
 
 
 # Getter receives (properties, device_meta). Field constants mirror the app/API
-# payload names documented in APP_POLLING_MQTT.md.
+# payload names documented in PROTOCOL.md §2.
 BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
     JackeryBinaryDescription(
         key="online",
@@ -79,12 +97,34 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[BinarySensorEntity]:
         entities: list[BinarySensorEntity] = []
-        for dev_id, _payload in (coordinator.data or {}).items():
+        for dev_id, payload in (coordinator.data or {}).items():
             for desc in BINARY_DESCRIPTIONS:
                 _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
+            for index, plug in enumerate(
+                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)), start=1
+            ):
+                plug_sn = smart_plug_serial(plug)
+                if plug_sn is None:
+                    continue
+                _append_unique(
+                    entities,
+                    JackerySmartPlugStateBinarySensor(
+                        coordinator,
+                        dev_id,
+                        plug_index=index,
+                        plug_sn=plug_sn,
+                    ),
+                )
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
@@ -118,3 +158,66 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
         )
+
+
+class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
+    """Current on/off state for one smart-plug subdevice."""
+
+    _attr_translation_key = "smart_plug_switch_state"
+    _attr_device_class = BinarySensorDeviceClass.POWER
+    _attr_icon = "mdi:power-socket-de"
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        plug_index: int,
+        plug_sn: str,
+    ) -> None:
+        """Initialise the entity from the coordinator, sorted index and serial."""
+        super().__init__(
+            coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
+        )
+        self._plug_index = plug_index
+        self._plug_sn = plug_sn
+        # Build the per-plug device_info once at construction. Allocating it
+        # on every state read is wasted work — HA reads the registry metadata
+        # at entity-add time and merges later updates via the device registry.
+        self._attr_device_info = self._build_smart_plug_device_info(
+            plug_index, self._plug
+        )
+
+    @property
+    def _plug(self) -> dict[str, Any]:
+        # Look the plug up by its captured serial so cloud-side re-ordering of
+        # the plug array cannot reassign this entity to a different device.
+        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
+            if smart_plug_serial(plug) == self._plug_sn:
+                return plug
+        return {}
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the smart plug reports an active output."""
+        raw = self._plug.get(FIELD_SWITCH_STATE)
+        if raw is None:
+            raw = self._plug.get(FIELD_SYS_SWITCH)
+        return safe_bool(raw)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the smart-plug state."""
+        attrs: dict[str, Any] = {"plug_index": self._plug_index}
+        for key in (
+            FIELD_DEVICE_NAME,
+            FIELD_SCAN_NAME,
+            FIELD_COMM_STATE,
+            FIELD_COMM_MODE,
+            FIELD_SWITCH_STATE,
+            FIELD_SYS_SWITCH,
+            FIELD_VERSION,
+        ):
+            if key in self._plug:
+                attrs[key] = self._plug.get(key)
+        return attrs

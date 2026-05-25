@@ -27,10 +27,6 @@
           "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "enable_ble_transport": "Activar transporte BLE",
           "enable_ble_writes": "Activar escrituras BLE experimentales",
-          "enable_week_statistics": "Importar estad\u00edsticas semanales",
-          "enable_month_statistics": "Importar estad\u00edsticas mensuales",
-          "enable_year_statistics": "Importar estad\u00edsticas anuales",
-          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energ\u00eda del hogar",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "password": "Contrase\u00f1a",
           "username": "Correo electr\u00f3nico"
@@ -40,10 +36,6 @@
           "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
-          "enable_week_statistics": "Importa la carga \u00fatil del per\u00edodo semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_month_statistics": "Importa la carga \u00fatil del per\u00edodo mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga \u00fatil del per\u00edodo anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends no est\u00e1 disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagn\u00f3sticos de origen.",
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery."
         },
         "description": "Actualiza la contrase\u00f1a y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID \u00fanico de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
@@ -737,12 +729,6 @@
     "mqtt_missing_device_sn": {
       "message": "No se puede enviar el comando MQTT de Jackery para {device_id}: falta deviceSn"
     },
-    "mqtt_missing_subdevice_sn": {
-      "message": "No se puede enviar el comando MQTT de subdispositivo para {device_id}: falta el deviceSn del subdispositivo"
-    },
-    "query_third_party_mqtt_config_failed": {
-      "message": "No se pudo consultar la configuracion MQTT de terceros para el dispositivo {device_id}: {error}"
-    },
     "refresh_weather_plan_failed": {
       "message": "No se pudo actualizar el plan meteorol\u00f3gico para el dispositivo {device_id}: {error}"
     },
@@ -751,9 +737,6 @@
     },
     "send_ble_command_failed": {
       "message": "No se pudo enviar el comando BLE para el dispositivo {device_id}: {error}"
-    },
-    "set_third_party_mqtt_config_failed": {
-      "message": "No se pudo configurar MQTT de terceros para el dispositivo {device_id}: {error}"
     }
   },
   "issues": {
@@ -761,7 +744,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery devolvi\u00f3 estad\u00edsticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera m\u00e9trica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuraci\u00f3n de payload jackery_solarvault_payload_debug.jsonl y los diagn\u00f3sticos para comparar valores brutos, series de gr\u00e1ficos analizadas y secciones de origen registradas por la integraci\u00f3n.\n\nConfirma para forzar una actualizaci\u00f3n desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integraci\u00f3n con el volcado de diagn\u00f3stico.",
+            "description": "Jackery devolvi\u00f3 estad\u00edsticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera m\u00e9trica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuraci\u00f3n de payload jackery_solarvault_payload_debug.jsonl y los diagn\u00f3sticos para comparar valores brutos, series de gr\u00e1ficos analizadas y secciones de origen documentadas en docs/PROTOCOL.md (§2 endpoints HTTP, §8 prioridad de fuentes de datos).\n\nConfirma para forzar una actualizaci\u00f3n desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integraci\u00f3n con el volcado de diagn\u00f3stico.",
             "title": "Forzar actualizaci\u00f3n de la nube de Jackery"
           }
         }
@@ -778,10 +761,6 @@
           "enable_ble_transport": "Activar transporte BLE",
           "enable_ble_writes": "Activar escrituras BLE experimentales",
           "enable_unredacted_diagnostics": "Activar diagn\u00f3stico de desarrollo sin redactar",
-          "enable_week_statistics": "Importar estad\u00edsticas semanales",
-          "enable_month_statistics": "Importar estad\u00edsticas mensuales",
-          "enable_year_statistics": "Importar estad\u00edsticas anuales",
-          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energ\u00eda del hogar",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter"
         },
         "data_description": {
@@ -790,10 +769,6 @@
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
           "enable_unredacted_diagnostics": "Desactiva la redacci\u00f3n en la exportaci\u00f3n de diagn\u00f3stico y el JSONL de depuraci\u00f3n de payload para pruebas locales. Expone credenciales, n\u00fameros de serie, IDs de dispositivo, temas MQTT y valores bluetoothKey. Desact\u00edvalo antes de compartir archivos.",
-          "enable_week_statistics": "Importa la carga \u00fatil del per\u00edodo semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_month_statistics": "Importa la carga \u00fatil del per\u00edodo mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga \u00fatil del per\u00edodo anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends no est\u00e1 disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagn\u00f3sticos de origen.",
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery."
         },
         "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usan la potencia neta del Smart Meter m\u00e1s la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
@@ -840,16 +815,6 @@
       },
       "name": "Cambiar nombre del sistema SolarVault"
     },
-    "query_third_party_mqtt_config": {
-      "description": "Consulta la configuracion experimental del puente MQTT de terceros mediante el canal de comandos MQTT de Jackery existente.",
-      "fields": {
-        "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID de dispositivo"
-        }
-      },
-      "name": "Consultar configuracion MQTT de terceros"
-    },
     "send_ble_command": {
       "description": "Env\u00eda un frame binario BLE experimental al dispositivo seleccionado. Requiere transporte BLE, escrituras BLE y una conexi\u00f3n BLE activa.",
       "fields": {
@@ -879,40 +844,6 @@
         }
       },
       "name": "Enviar comando BLE"
-    },
-    "set_third_party_mqtt_config": {
-      "description": "Configura el puente MQTT de terceros experimental mediante el canal de comandos MQTT de Jackery existente.",
-      "fields": {
-        "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID de dispositivo"
-        },
-        "enable": {
-          "description": "Activar o desactivar el puente.",
-          "name": "Activar"
-        },
-        "ip": {
-          "description": "Host o direccion IP del broker.",
-          "name": "Host del broker"
-        },
-        "password": {
-          "description": "Contrasena del broker.",
-          "name": "Contrasena"
-        },
-        "port": {
-          "description": "Puerto TCP del broker.",
-          "name": "Puerto"
-        },
-        "token": {
-          "description": "Token opcional del broker.",
-          "name": "Token"
-        },
-        "username": {
-          "description": "Usuario del broker.",
-          "name": "Usuario"
-        }
-      },
-      "name": "Configurar MQTT de terceros"
     }
   },
   "title": "Jackery SolarVault"

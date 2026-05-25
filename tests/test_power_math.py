@@ -258,6 +258,38 @@ def test_day_power_energy_points_never_imports_scalar_total_without_curve() -> N
     )
 
 
+def test_day_power_energy_points_distributes_grid_total_over_explicit_zero_curve() -> (
+    None
+):
+    """Grid-side day totals may arrive with an explicit but zeroed direction curve."""
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-05-24",
+            util.APP_REQUEST_END_DATE: "2026-05-24",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["00:00", "00:05", "01:00", "01:05"],
+        util.APP_CHART_SERIES_Y1: [0, 0, 0, 0],
+        util.APP_STAT_TOTAL_IN_GRID_ENERGY: "0.02",
+    }
+
+    points = util.day_power_energy_points(
+        source,
+        f"{util.APP_SECTION_HOME_STAT}_{util.DATE_TYPE_DAY}",
+        util.APP_STAT_TOTAL_IN_GRID_ENERGY,
+        bucket_minutes=60,
+        today=util.date(2026, 5, 24),
+        now=util.datetime(2026, 5, 24, 2, 0),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.datetime(2026, 5, 24, 0, 0), 0.01),
+        util.TrendStatisticPoint(util.datetime(2026, 5, 24, 1, 0), 0.01),
+    ]
+    assert round(sum(point.value for point in points), 5) == 0.02
+
+
 def test_day_power_energy_points_scales_total_across_minute_curve() -> None:
     """Minute payloads distribute the scalar day total over real hour buckets."""
     source = {
@@ -284,6 +316,75 @@ def test_day_power_energy_points_scales_total_across_minute_curve() -> None:
     assert [(point.start_date.hour, point.value) for point in points] == [
         (3, 1.0),
         (5, 2.0),
+    ]
+
+
+def test_day_power_energy_points_uses_signed_battery_charge_curve() -> None:
+    """Battery charge day curves use signed W samples; magnitude is energy."""
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-05-24",
+            util.APP_REQUEST_END_DATE: "2026-05-24",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["00:25", "01:30"],
+        util.APP_CHART_SERIES_Y1: [-600, -300],
+        util.APP_STAT_TOTAL_CHARGE: "0.10",
+    }
+
+    points = util.day_power_energy_points(
+        source,
+        f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}",
+        util.APP_STAT_TOTAL_CHARGE,
+        bucket_minutes=60,
+        today=util.date(2026, 5, 24),
+        now=util.datetime(2026, 5, 24, 2, 0),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.datetime(2026, 5, 24, 0, 0), 0.06667),
+        util.TrendStatisticPoint(util.datetime(2026, 5, 24, 1, 0), 0.03333),
+    ]
+    assert round(sum(point.value for point in points), 5) == 0.1
+
+
+def test_day_power_energy_points_uses_signed_y1_battery_combo_curve() -> None:
+    """Battery day y1 can be the signed charge/discharge curve while y2 is SOC."""
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-05-25",
+            util.APP_REQUEST_END_DATE: "2026-05-25",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["02:00", "02:05", "07:00", "07:05"],
+        util.APP_CHART_SERIES_Y1: [-600, -300, 1200, 600],
+        util.APP_CHART_SERIES_Y2: [41, 41, 25, 25],
+        util.APP_STAT_TOTAL_CHARGE: "0.30",
+        util.APP_STAT_TOTAL_DISCHARGE: "0.15",
+    }
+
+    charge = util.day_power_energy_points(
+        source,
+        f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}",
+        util.APP_STAT_TOTAL_CHARGE,
+        bucket_minutes=60,
+        today=util.date(2026, 5, 25),
+        now=util.datetime(2026, 5, 25, 8, 0),
+    )
+    discharge = util.day_power_energy_points(
+        source,
+        f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}",
+        util.APP_STAT_TOTAL_DISCHARGE,
+        bucket_minutes=60,
+        today=util.date(2026, 5, 25),
+        now=util.datetime(2026, 5, 25, 8, 0),
+    )
+
+    assert charge == [util.TrendStatisticPoint(util.datetime(2026, 5, 25, 7, 0), 0.3)]
+    assert discharge == [
+        util.TrendStatisticPoint(util.datetime(2026, 5, 25, 2, 0), 0.15)
     ]
 
 

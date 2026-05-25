@@ -27,10 +27,6 @@
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
-          "enable_week_statistics": "Import week statistics",
-          "enable_month_statistics": "Import month statistics",
-          "enable_year_statistics": "Import year statistics",
-          "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "password": "Password",
           "username": "Email"
@@ -40,10 +36,6 @@
           "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
-          "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
         },
         "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
@@ -737,12 +729,6 @@
     "mqtt_missing_device_sn": {
       "message": "Cannot send Jackery MQTT command for {device_id}: missing deviceSn"
     },
-    "mqtt_missing_subdevice_sn": {
-      "message": "Cannot send Jackery MQTT subdevice command for {device_id}: missing subdevice deviceSn"
-    },
-    "query_third_party_mqtt_config_failed": {
-      "message": "Could not query third-party MQTT config for device {device_id}: {error}"
-    },
     "refresh_weather_plan_failed": {
       "message": "Could not refresh weather plan for device {device_id}: {error}"
     },
@@ -751,9 +737,6 @@
     },
     "send_ble_command_failed": {
       "message": "Could not send BLE command for device {device_id}: {error}"
-    },
-    "set_third_party_mqtt_config_failed": {
-      "message": "Could not set third-party MQTT config for device {device_id}: {error}"
     }
   },
   "issues": {
@@ -761,7 +744,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and source sections recorded by the integration.\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (§2 HTTP endpoints, §8 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
             "title": "Force a Jackery cloud refresh"
           }
         }
@@ -778,10 +761,6 @@
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
-          "enable_week_statistics": "Import week statistics",
-          "enable_month_statistics": "Import month statistics",
-          "enable_year_statistics": "Import year statistics",
-          "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors"
         },
         "data_description": {
@@ -790,10 +769,6 @@
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
-          "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
@@ -840,16 +815,6 @@
       },
       "name": "Rename SolarVault system"
     },
-    "query_third_party_mqtt_config": {
-      "description": "Query the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query third-party MQTT config"
-    },
     "send_ble_command": {
       "description": "Send one experimental binary BLE command frame to the selected device. Requires BLE transport, BLE writes and an active BLE connection.",
       "fields": {
@@ -879,40 +844,6 @@
         }
       },
       "name": "Send BLE command"
-    },
-    "set_third_party_mqtt_config": {
-      "description": "Set the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        },
-        "enable": {
-          "description": "Enable or disable the bridge.",
-          "name": "Enable"
-        },
-        "ip": {
-          "description": "Broker host or IP address.",
-          "name": "Broker host"
-        },
-        "password": {
-          "description": "Broker password.",
-          "name": "Password"
-        },
-        "port": {
-          "description": "Broker TCP port.",
-          "name": "Port"
-        },
-        "token": {
-          "description": "Optional broker token.",
-          "name": "Token"
-        },
-        "username": {
-          "description": "Broker username.",
-          "name": "Username"
-        }
-      },
-      "name": "Set third-party MQTT config"
     }
   },
   "title": "Jackery SolarVault"

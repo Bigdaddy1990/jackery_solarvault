@@ -12,7 +12,7 @@ import pytest
 import voluptuous as vol
 
 from custom_components.jackery_solarvault import services
-from custom_components.jackery_solarvault.api import JackeryAuthError
+from custom_components.jackery_solarvault.client.api import JackeryAuthError
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     SERVICE_FIELD_ACK_TIMEOUT,

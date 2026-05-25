@@ -183,16 +183,17 @@ def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> N
 
 
 def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None:
-    """Reconfigure/options submissions must not reset omitted toggles to defaults."""
+    """Options pages preserve omitted values; reconfigure stays credentials-only."""
     src = _read("config_flow.py")
 
     assert "def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:" in src
     assert "config_entry_bool_option(entry, key, default)" in src
     assert "def _flow_options(" in src
+    assert "def _all_current_options(" in src
+    assert "def _merged_options(" in src
     assert "current.get(key, default)" in src
-    assert "data=_flow_options(user_input, current_options)" in src
-    assert "options=_flow_options(" in src
-    assert "user_input, _current_option_values(entry)" in src
+    assert "merged = _all_current_options(entry)" in src
+    assert "_merged_options(self.config_entry, user_input)" in src
 
     reconfigure = re.search(
         r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
@@ -201,7 +202,10 @@ def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None
     )
     assert reconfigure is not None, "async_step_reconfigure not found"
     reconfigure_body = reconfigure.group(0)
-    assert "current_options = _current_option_values(entry)" in reconfigure_body
+    assert "options=" not in reconfigure_body
+    assert "_current_option_values(entry)" not in reconfigure_body
+    assert "CONF_ENABLE_WEEK_STATISTICS" not in reconfigure_body
+    assert "CONF_LOCAL_MQTT_ENABLE" not in reconfigure_body
     assert "entry.options or {}" not in reconfigure_body
 
     options_flow = re.search(
@@ -212,4 +216,8 @@ def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None
     assert options_flow is not None, "JackeryOptionsFlow not found"
     options_body = options_flow.group(0)
     assert "current_options = _current_option_values(self.config_entry)" in options_body
+    assert "async_show_menu(" in options_body
+    assert "async_step_features" in options_body
+    assert "async_step_statistics" in options_body
+    assert "async_step_local_mqtt" in options_body
     assert "clean =" not in options_body

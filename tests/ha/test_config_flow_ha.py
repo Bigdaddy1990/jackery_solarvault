@@ -49,10 +49,10 @@ async def test_user_flow_happy_path(
 
 async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
     """A login rejection must surface as an invalid_auth form error."""
-    from custom_components.jackery_solarvault.api import JackeryAuthError
+    from custom_components.jackery_solarvault.client.api import JackeryAuthError
 
     with patch(
-        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
         side_effect=JackeryAuthError("login rejected"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -69,10 +69,10 @@ async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
     """A network error must surface as a cannot_connect form error."""
-    from custom_components.jackery_solarvault.api import JackeryError
+    from custom_components.jackery_solarvault.client.api import JackeryError
 
     with patch(
-        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
         side_effect=JackeryError("network down"),
     ):
         result = await hass.config_entries.flow.async_init(

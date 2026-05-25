@@ -5,6 +5,7 @@ from collections.abc import Iterable
 import contextlib
 from datetime import timedelta
 import logging
+import re
 from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
@@ -14,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .client.api import JackeryApi, JackeryAuthError, JackeryError
+from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -198,9 +199,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         )
         if isinstance(refresh_result, BaseException):
             raise refresh_result
+        if isinstance(mqtt_result, ConfigEntryAuthFailed):
+            # Broker explicitly rejected MQTT credentials. HTTP login may have
+            # succeeded, but the user must update credentials regardless —
+            # surface this so HA opens the reauth UI.
+            raise mqtt_result
         if isinstance(mqtt_result, BaseException):
-            # MQTT failure must not block setup — push is an optional channel
-            # on top of polling. Log and continue.
+            # Other MQTT failures (network, TLS handshake, broker outage) must
+            # not block setup — push is an optional channel on top of polling.
             _LOGGER.warning(
                 "Jackery MQTT push could not start during setup: %s", mqtt_result
             )
@@ -211,6 +217,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # removed incorrectly.
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        coordinator.async_start_statistics_imports()
+        # Optional BLE listener (Phase 3a). Failures are absorbed inside
+        # the coordinator: BLE is an opt-in diagnostic extra, never a
+        # hard dependency of integration setup.
+        await coordinator.async_start_ble_transport()
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
         with contextlib.suppress(Exception):
@@ -257,6 +268,30 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         registry.async_remove(entity_id)
 
 
+_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
+
+
+def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
+    """Return True when ``uid`` is exactly ``<device_id><key_suffix>``.
+
+    The unique-id contract (docs/PROTOCOL.md §11) says every
+    entity-registry id is ``<device_id>_<key_suffix>`` for the main device or
+    ``<device_id>_battery_pack_<index>_<key_suffix>`` for an add-on battery.
+    A plain ``str.endswith`` therefore over-matches when a current key
+    contains a legacy key as its tail — e.g. legacy ``_today_battery_charge``
+    would otherwise also match the current ``_device_today_battery_charge``
+    unique id and delete a live sensor on every reload (the regression that
+    caused statistics gaps at the user's site).
+
+    This helper anchors the suffix to a valid head so only the legacy id
+    matches.
+    """
+    if not uid.endswith(key_suffix):
+        return False
+    head = uid[: -len(key_suffix)]
+    return _LEGACY_UID_HEAD_RE.fullmatch(head) is not None
+
+
 def _async_remove_entities_with_suffixes(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -268,9 +303,11 @@ def _async_remove_entities_with_suffixes(
     """Remove entity-registry entries whose unique_id ends with any suffix.
 
     Unique IDs for this integration follow ``<device_id>_<key_suffix>`` per
-    docs/UNIQUE_ID_CONTRACT.md, so suffix matching is the right way to drop
+    docs/PROTOCOL.md §11, so suffix matching is the right way to drop
     legacy or option-disabled entities without scanning HA-wide registry
-    entries owned by other integrations.
+    entries owned by other integrations. The match is anchored via
+    :func:`_legacy_suffix_matches` so a legacy suffix cannot accidentally
+    delete a current entity whose key happens to contain the legacy tail.
 
     Synchronous because the entity registry is already in-memory; the helper
     only schedules removals against it. Setup-local cleanup deliberately
@@ -284,7 +321,7 @@ def _async_remove_entities_with_suffixes(
         if ent.domain != domain:
             continue
         uid = ent.unique_id or ""
-        if any(uid.endswith(suffix) for suffix in suffix_tuple):
+        if any(_legacy_suffix_matches(uid, suffix) for suffix in suffix_tuple):
             _LOGGER.info(
                 "Removing %s %s (%s)",
                 log_label,

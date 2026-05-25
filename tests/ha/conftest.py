@@ -43,15 +43,15 @@ def mock_jackery_login() -> Generator[None]:
 
     with (
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+            "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
             new=_fake_login,
         ),
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
+            "custom_components.jackery_solarvault.client.api.JackeryApi.async_get_system_list",
             return_value=[],
         ),
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
+            "custom_components.jackery_solarvault.client.api.JackeryApi.async_list_devices_legacy",
             return_value=[],
         ),
     ):

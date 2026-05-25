@@ -58,7 +58,12 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, safe_int, task_plan_value
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_int,
+    task_plan_value,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -637,7 +642,14 @@ async def async_setup_entry(
                     )
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
