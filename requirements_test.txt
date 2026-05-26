@@ -9,6 +9,6 @@ pytest-asyncio
 pytest-github-actions-annotate-failures
 pytest-homeassistant-custom-component # follows daily HA version
 PyYAML
-ruff==0.15.12
+ruff==0.15.14
 voluptuous
 yarl
