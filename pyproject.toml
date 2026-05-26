@@ -81,7 +81,7 @@ skip-magic-trailing-comma = false
 [tool.ruff.lint]
 preview = true
 select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
-ignore = ["501"]
+ignore = ["E501"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
