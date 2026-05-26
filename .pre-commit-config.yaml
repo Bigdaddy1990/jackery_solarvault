@@ -59,13 +59,13 @@ repos:
           - --unsafe-fixes
           - --exit-non-zero-on-fix
           - --output-format=github
-          types_or:
-           - python
-           - pyi
+           types_or:
+             - python
+             - pyi
       - id: ruff-format
-          types_or:
-           - python
-           - pyi
+           types_or:
+             - python
+             - pyi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
