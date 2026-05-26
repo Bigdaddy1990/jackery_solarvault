@@ -157,17 +157,6 @@ class JackeryApiError(JackeryError):
 # Crypto
 # ---------------------------------------------------------------------------
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
-    """AES-128-ECB encrypt as required by the Jackery cloud login protocol.
-
-    ECB is normally avoided because it leaks block-level structure, but the
-    Jackery Android app uses AES-128-ECB *exclusively* for the small
-    ``rsaForAesKey`` envelope (16-byte AES session key, encrypted under the
-    fixed RSA-1024 public key). This is a *protocol constraint*, not a
-    security choice on our side — see the Jackery Smali analysis in
-    ``docs/`` (``jackery_smali_home_assistant_report_v2``). Changing the
-    primitive would break interop with the cloud. Bulk data after login
-    uses AES-128-CBC via :func:`_aes_cbc_encrypt`.
-    """
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     cipher = Cipher(algorithms.AES(key), modes.ECB())
@@ -190,17 +179,7 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 
 
 def _generate_udid(seed: str) -> str:
-    """Derive a stable per-account UDID matching the Jackery app's algorithm.
-
-    The Jackery Android app builds its MQTT MAC-ID with UUID v3 (name-based,
-    MD5) over the account string, then strips dashes and prepends
-    ``MQTT_MAC_ID_PREFIX``. UUID v3 is *defined by RFC 4122 §4.3 to use MD5*
-    — that is not a security primitive here, it is a deterministic name
-    hash. We replicate it byte-for-byte to stay compatible with sessions
-    the cloud has previously issued for this account (see the Smali analysis
-    in ``docs/jackery_smali_home_assistant_report_v2``).
-    """
-    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()  # noqa: S324 - RFC 4122 §4.3
+    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
 
@@ -208,55 +187,6 @@ def _generate_udid(seed: str) -> str:
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-_DEFAULT_ACCEPT_LANGUAGE: str = "en-US"
-
-# Languages where the conventional region code is unambiguous. Used only as a
-# last-resort completion when Home Assistant exposes a bare language code.
-_LANGUAGE_DEFAULT_REGION: dict[str, str] = {
-    "en": "US",
-    "de": "DE",
-    "fr": "FR",
-    "es": "ES",
-    "it": "IT",
-    "nl": "NL",
-    "pl": "PL",
-    "pt": "PT",
-    "cs": "CZ",
-    "ja": "JP",
-    "ko": "KR",
-    "zh": "CN",
-}
-
-
-def _normalize_accept_language(value: str | None) -> str:
-    """Normalize a HA language string to a BCP-47 ``Accept-Language`` token.
-
-    Home Assistant exposes ``hass.config.language`` in mixed forms (e.g.
-    ``"en"``, ``"de"``, ``"pt-BR"``, ``"zh_TW"``). The Jackery cloud expects a
-    BCP-47 ``language-REGION`` tag (PROTOCOL §2.1). This helper:
-
-    * trims whitespace and unifies separators to ``"-"``
-    * lower-cases the language subtag, upper-cases the region subtag
-    * fills in a conventional region only when HA gave us a bare language
-    * returns ``"en-US"`` for any empty / unrecognisable input (neutral default)
-    """
-    if not value:
-        return _DEFAULT_ACCEPT_LANGUAGE
-    cleaned = value.strip().replace("_", "-")
-    if not cleaned:
-        return _DEFAULT_ACCEPT_LANGUAGE
-    parts = cleaned.split("-", 1)
-    lang = parts[0].lower()
-    if not lang.isalpha() or not (2 <= len(lang) <= 3):
-        return _DEFAULT_ACCEPT_LANGUAGE
-    if len(parts) == 2 and parts[1]:
-        region = parts[1].strip().upper()
-        if region:
-            return f"{lang}-{region}"
-    region_default = _LANGUAGE_DEFAULT_REGION.get(lang)
-    return f"{lang}-{region_default}" if region_default else lang
-
-
 class JackeryApi:
     """Async client for the Jackery SolarVault cloud."""
 
@@ -267,7 +197,6 @@ class JackeryApi:
         password: str,
         mqtt_mac_id: str | None = None,
         region_code: str | None = None,
-        language: str | None = None,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         self._session = session
@@ -281,7 +210,6 @@ class JackeryApi:
         self._mqtt_user_id: str | None = None
         self._mqtt_seed_b64: str | None = None
         self._mqtt_mac_id: str | None = None
-        self._accept_language: str = _normalize_accept_language(language)
 
         # Diagnostics buffers
         self.last_login_response: dict[str, Any] | None = None
@@ -318,16 +246,10 @@ class JackeryApi:
 
     # --- headers ------------------------------------------------------------
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
-        """Headers matching the Android app values documented in PROTOCOL.md §2.
-
-        ``accept-language`` follows the user's Home Assistant language
-        (``hass.config.language``) so the Jackery cloud returns error messages
-        and unit labels in the right locale. A neutral ``en-US`` fallback is
-        used when no HA language is available.
-        """
+        """Headers matching the Android app values documented in PROTOCOL.md §2."""
         h = {
             "accept-encoding": "gzip",
-            "accept-language": self._accept_language,
+            "accept-language": "de-DE",
             "app_version": APP_VERSION,
             "app_version_code": APP_VERSION_CODE,
             "connection": "Keep-Alive",
@@ -425,8 +347,10 @@ class JackeryApi:
                     raise JackeryApiError(
                         f"Login returned invalid JSON: {raw!r}"
                     ) from err
-        except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(f"Login request failed: {err}") from err
+       except (TimeoutError, aiohttp.ClientError) as err:
+            raise JackeryApiError(
+                f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
+            ) from err
 
         self.last_login_response = dict(data)
         await self._emit_payload_debug(
@@ -741,7 +665,8 @@ class JackeryApi:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
-                f"{HTTP_METHOD_GET} {path} request failed: {err}"
+                f"{HTTP_METHOD_GET} {path} request failed: "
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login")
@@ -751,7 +676,8 @@ class JackeryApi:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
-                    f"{HTTP_METHOD_GET} {path} request failed after re-login: {err}"
+                    f"{HTTP_METHOD_GET} {path} request failed after re-login: "
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -1259,7 +1185,8 @@ class JackeryApi:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
-                f"{HTTP_METHOD_PUT} {path} request failed: {err}"
+                f"{HTTP_METHOD_PUT} {path} request failed: "
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -1271,7 +1198,8 @@ class JackeryApi:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
-                    f"{HTTP_METHOD_PUT} {path} request failed after re-login: {err}"
+                    f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -1355,7 +1283,8 @@ class JackeryApi:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
-                f"{HTTP_METHOD_POST} {path} request failed: {err}"
+                f"{HTTP_METHOD_POST} {path} request failed: "
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -1367,7 +1296,8 @@ class JackeryApi:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
-                    f"{HTTP_METHOD_POST} {path} request failed after re-login: {err}"
+                    f"{HTTP_METHOD_POST} {path} request failed after re-login: "
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):

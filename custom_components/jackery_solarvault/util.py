@@ -4,7 +4,6 @@ import calendar
 import contextlib
 from datetime import UTC, date, datetime, timedelta
 import json
-import os
 from pathlib import Path
 import re
 from typing import Any, NamedTuple
@@ -446,6 +445,8 @@ def dev_mode_redactions_disabled() -> bool:
     applies for anything that gets uploaded — flip this off before
     publishing any logs.
     """
+    import os
+
     raw = os.environ.get(_DEV_MODE_ENV, "")
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 

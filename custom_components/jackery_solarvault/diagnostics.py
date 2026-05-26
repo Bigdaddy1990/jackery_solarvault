@@ -82,14 +82,6 @@ async def async_get_config_entry_diagnostics(
                 int(coordinator.configured_update_interval.total_seconds())
             ),
             "coordinator_polling": True,
-            # ``dev_mode`` mirrors the ``JACKERY_DEV_MODE`` env-var (see
-            # util.dev_mode_redactions_disabled). It is exported here so
-            # diagnostics consumers can tell whether the unredacted dev path
-            # was active when the dump was created. Key name is kept as
-            # ``dev_mode`` for backward compatibility with historical
-            # diagnostics JSON; the ``JACKERY_DEV_MODE`` source is also
-            # surfaced through the ``redactions_disabled_source`` warning log
-            # above when redactions are disabled.
             "dev_mode": dev_mode_redactions_disabled(),
             "redactions_disabled": redactions_disabled,
         },

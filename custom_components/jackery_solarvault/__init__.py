@@ -15,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .client import JackeryApi, JackeryAuthError, JackeryError
+from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -152,7 +152,6 @@ async def _async_authenticate(
         password=entry.data[CONF_PASSWORD],
         mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
         region_code=entry.data.get(CONF_REGION_CODE),
-        language=hass.config.language,
     )
     try:
         await api.async_login()

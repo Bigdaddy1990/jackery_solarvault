@@ -101,28 +101,9 @@ BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
     BLE_AES_KEY_LEN_AES256,
 )
 
-
 # Backwards-compatible alias kept until call sites migrate; new code should
-# branch on the actual key length the device returns. Access goes through
-# :pep:`562` ``__getattr__`` so any read emits a ``DeprecationWarning`` while
-# still returning the AES-128 value (the historical wild-type for SolarVault).
-# Listed in ``__all__`` below for discoverability.
-def __getattr__(name: str) -> int:  # noqa: D401 - PEP 562 module hook
-    """Module-level attribute hook for deprecated re-exports."""
-    if name == "BLE_AES_KEY_LEN":
-        import warnings
-
-        warnings.warn(
-            "BLE_AES_KEY_LEN is deprecated; use BLE_AES_KEY_LEN_AES128 "
-            "(or BLE_AES_KEY_LEN_AES256) explicitly instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return BLE_AES_KEY_LEN_AES128
-    raise AttributeError(
-        f"module {__name__!r} has no attribute {name!r}"
-    )
-
+# branch on the actual key length the device returns.
+BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
 
 #: AES-CBC IV length in bytes.
 BLE_AES_IV_LEN: int = 16

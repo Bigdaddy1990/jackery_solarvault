@@ -26,7 +26,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
 
-from .client import JackeryError
+from .api import JackeryError
 from .const import (
     DOMAIN,
     FIELD_ID,

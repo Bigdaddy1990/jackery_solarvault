@@ -23,7 +23,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .client import JackeryAuthError
+from .api import JackeryAuthError
 from .const import (
     DOMAIN,
     FIELD_CURRENCY,
