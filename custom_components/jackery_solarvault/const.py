@@ -146,6 +146,26 @@ DEFAULT_ENABLE_BLE_WRITES: Final = False
 CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
 
+# Third-party MQTT bridge config (PROTOCOL.md §5). Surfaced in the
+# config/options/reconfigure flow so the device can be told to publish
+# telemetry to a local MQTT broker without requiring the user to call
+# the ``set_third_party_mqtt_config`` service by hand. The push is
+# best-effort on entry load: if neither BLE writes nor cloud MQTT are
+# currently available, the integration logs and keeps the settings; the
+# user can retry by invoking the service explicitly.
+CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False
+CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
+DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
+CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
+DEFAULT_THIRD_PARTY_MQTT_PORT: Final = 1883
+CONF_THIRD_PARTY_MQTT_USERNAME: Final = "third_party_mqtt_username"
+DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
+CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
+DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
+CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
+DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
+
 
 # Config-flow step, error and abort identifiers.
 FLOW_STEP_USER: Final = "user"

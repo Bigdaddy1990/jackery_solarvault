@@ -422,9 +422,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         # log will surface unexpected values for analysis.
         pass
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
-        raise ValueError(
-            f"unexpected payload marker {plaintext[12:14].hex()!r}"
-        )
+        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
     frame_index = int.from_bytes(plaintext[4:6], "big")
     chunk_count = int.from_bytes(plaintext[6:8], "big")
     flags = int.from_bytes(plaintext[8:10], "big")
@@ -438,12 +436,9 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             f"frame truncated: body_length={body_length} but plaintext is "
             f"{len(plaintext)} bytes"
         )
-    body = plaintext[
-        _BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length
-    ]
+    body = plaintext[_BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length]
     trailer = plaintext[
-        _BINARY_FRAME_HEADER_LEN
-        + body_length : _BINARY_FRAME_HEADER_LEN
+        _BINARY_FRAME_HEADER_LEN + body_length : _BINARY_FRAME_HEADER_LEN
         + body_length
         + _BINARY_FRAME_TRAILER_LEN
     ]

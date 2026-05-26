@@ -510,6 +510,7 @@ class JackeryMqttPushClient:
 
     def diagnostics_snapshot(self, *, redact_topics: bool = True) -> dict[str, Any]:
         """Return a snapshot of the MQTT client state for diagnostics."""
+
         def topic_value(topic: str | None) -> str | None:
             return self._redact_topic(topic) if redact_topics else topic
 

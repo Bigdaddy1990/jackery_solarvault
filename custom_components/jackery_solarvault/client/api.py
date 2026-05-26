@@ -347,7 +347,7 @@ class JackeryApi:
                     raise JackeryApiError(
                         f"Login returned invalid JSON: {raw!r}"
                     ) from err
-       except (TimeoutError, aiohttp.ClientError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
             ) from err

@@ -33,7 +33,8 @@
   "quality_scale": "custom",
   "requirements": [
     "aiomqtt==2.5.1",
-    "bleak-retry-connector>=3.5.0"
+    "bleak-retry-connector>=3.5.0",
+    "cryptography"
   ],
   "version": "0.1.1"
 }

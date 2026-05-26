@@ -27,8 +27,15 @@
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
+          "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "password": "Password",
+          "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
+          "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
+          "third_party_mqtt_port": "Third-Party MQTT broker port",
+          "third_party_mqtt_username": "Third-Party MQTT username",
+          "third_party_mqtt_password": "Third-Party MQTT password",
+          "third_party_mqtt_token": "Third-Party MQTT token",
           "username": "Email"
         },
         "data_description": {
@@ -36,9 +43,16 @@
           "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+          "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
+          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
+          "third_party_mqtt_password": "Optional MQTT broker password.",
+          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure."
         },
-        "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
+        "description": "Update the password, optional sensor toggles, and the experimental Third-Party MQTT bridge for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
         "title": "Reconfigure Jackery SolarVault"
       },
       "user": {
@@ -761,7 +775,13 @@
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
-          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors"
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
+          "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
+          "third_party_mqtt_port": "Third-Party MQTT broker port",
+          "third_party_mqtt_username": "Third-Party MQTT username",
+          "third_party_mqtt_password": "Third-Party MQTT password",
+          "third_party_mqtt_token": "Third-Party MQTT token"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
@@ -769,9 +789,15 @@
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
+          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
+          "third_party_mqtt_password": "Optional MQTT broker password.",
+          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure."
         },
-        "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
+        "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values. The Third-Party MQTT bridge is experimental and asks the SolarVault to publish telemetry to your local broker as documented in PROTOCOL.md §5.",
         "title": "Jackery options"
       }
     }

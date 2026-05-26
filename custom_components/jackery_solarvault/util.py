@@ -130,6 +130,44 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     return default if parsed is None else parsed
 
 
+def config_entry_str_option(entry: Any, key: str, default: str) -> str:
+    """Return a str option with legacy setup-data fallback.
+
+    Mirrors :func:`config_entry_bool_option`. Used by config-flow code
+    that reads mixed-type options (e.g. the Third-Party MQTT bridge
+    settings from PROTOCOL.md §5) without re-implementing the
+    options-then-data fallback per call site.
+    """
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    if value is None:
+        return default
+    return str(value)
+
+
+def config_entry_int_option(entry: Any, key: str, default: int) -> int:
+    """Return an int option with legacy setup-data fallback.
+
+    Mirrors :func:`config_entry_bool_option`. Strings are coerced via
+    ``int(...)``; invalid values fall back to ``default`` so a corrupted
+    options dict cannot break entry setup.
+    """
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def utc_now() -> datetime:
     """Return the current UTC time as a timezone-aware datetime."""
     return datetime.now(UTC)

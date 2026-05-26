@@ -23,11 +23,23 @@ from .const import (
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_SCAN_INTERVAL_SEC,
+    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+    DEFAULT_THIRD_PARTY_MQTT_IP,
+    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
+    DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
+    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
     PLATFORMS,
@@ -40,7 +52,11 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .services import async_setup_services
-from .util import config_entry_bool_option
+from .util import (
+    config_entry_bool_option,
+    config_entry_int_option,
+    config_entry_str_option,
+)
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -166,6 +182,62 @@ async def _async_authenticate(
     return api
 
 
+async def _async_push_third_party_mqtt_config(
+    coordinator: JackerySolarVaultCoordinator, entry: JackeryConfigEntry
+) -> None:
+    """Push the Third-Party MQTT bridge settings to each main device.
+
+    PROTOCOL.md §5 + §15. Best-effort: both transports may be unavailable
+    (BLE writes off, cloud MQTT not connected yet); failures only log so
+    setup is not blocked. The user can retry via the
+    ``set_third_party_mqtt_config`` service.
+    """
+    if not config_entry_bool_option(
+        entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
+    ):
+        return
+    ip = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP
+    )
+    if not ip:
+        _LOGGER.debug(
+            "Jackery: Third-Party MQTT bridge enabled in options but no IP "
+            "configured; skipping setup-time push"
+        )
+        return
+    port = config_entry_int_option(
+        entry, CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT
+    )
+    username = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
+    )
+    password = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+    )
+    token = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN
+    )
+    for device_id in list((coordinator.data or {}).keys()):
+        try:
+            await coordinator.async_set_third_party_mqtt_config(
+                device_id,
+                enable=True,
+                ip=ip,
+                port=port,
+                username=username,
+                password=password,
+                token=token,
+            )
+        except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+            _LOGGER.warning(
+                "Jackery: third-party MQTT bridge push to %s failed "
+                "(BLE writes or cloud MQTT may be unavailable); the user can "
+                "retry via the set_third_party_mqtt_config service: %s",
+                device_id,
+                err,
+            )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up Jackery SolarVault from a config entry."""
     _async_clean_legacy_entities(hass, entry)
@@ -222,6 +294,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # the coordinator: BLE is an opt-in diagnostic extra, never a
         # hard dependency of integration setup.
         await coordinator.async_start_ble_transport()
+        await _async_push_third_party_mqtt_config(coordinator, entry)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
         with contextlib.suppress(Exception):
