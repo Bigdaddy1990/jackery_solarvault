@@ -23,11 +23,6 @@ repos:
           - --add-import
           - 'from __future__ import annotations'
 
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v4.0.0
-    hooks:
-      - id: add-trailing-comma
-
   - repo: https://github.com/hhatto/autopep8
     rev: v2.3.2
     hooks:
@@ -46,17 +41,6 @@ repos:
       - id: pyupgrade
         args:
           - --py314-plus
-
-  - repo: https://github.com/cdce8p/python-typing-update
-    rev: v0.8.1
-    hooks:
-      - id: python-typing-update
-        stages: [pre-commit]
-        args:
-          - --py314-plus
-          - --keep-updates
-          - --check
-          - --force
 
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
