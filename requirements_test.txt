@@ -2,6 +2,7 @@ annotatedyaml
 bun
 certifi
 coverage
+homeassistant-stubs
 Markdown
 mypy
 pytest
@@ -9,6 +10,7 @@ pytest-asyncio
 pytest-github-actions-annotate-failures
 pytest-homeassistant-custom-component # follows daily HA version
 PyYAML
-ruff==0.15.14
+ruff
 voluptuous
 yarl
+zed
