@@ -1830,7 +1830,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             import base64
 
             key = base64.b64decode(str(raw))
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -2012,7 +2012,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -2110,7 +2110,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -4412,14 +4412,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         def _load_offsets() -> tuple[float, float]:
             with session_scope(session=recorder.get_session()) as session:
                 meta = (
-                    session.query(StatisticsMeta.id)
+                    session
+                    .query(StatisticsMeta.id)
                     .filter(StatisticsMeta.statistic_id == statistic_id)
                     .first()
                 )
                 if meta is None:
                     return 0.0, 0.0
                 row = (
-                    session.query(
+                    session
+                    .query(
                         Statistics.sum,
                         Statistics.state,
                         Statistics.last_reset_ts,
@@ -4478,7 +4480,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             with session_scope(session=recorder.get_session()) as session:
                 return {
                     round(item[0].timestamp()) - 55 * 60
-                    for item in session.query(StatisticsRuns.start)
+                    for item in session
+                    .query(StatisticsRuns.start)
                     .filter(
                         StatisticsRuns.start >= range_start,
                         StatisticsRuns.start < range_end + timedelta(hours=1),
@@ -4843,7 +4846,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except (ImportError, RuntimeError):
+        except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
