@@ -13,6 +13,32 @@ default_install_hook_types:
   - pre-push
 
 repos:
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.16.0
+    hooks:
+      - id: reorder-python-imports
+        exclude: ^pre_commit/resources/
+        args:
+          - --py313-plus
+          - --add-import
+          - 'from __future__ import annotations'
+
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v4.0.0
+    hooks:
+      - id: add-trailing-comma
+
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.2
+    hooks:
+      - id: autopep8
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-pyyaml]
+        exclude: ^testing/resources/
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
@@ -25,7 +51,7 @@ repos:
     rev: v0.8.1
     hooks:
       - id: python-typing-update
-        stages: [manual]
+        stages: [pre-commit]
         args:
           - --py314-plus
           - --keep-updates
@@ -38,26 +64,24 @@ repos:
       - id: autotyping
         stages: [pre-commit]
         types: [python]
-        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
     hooks:
       - id: ruff-check
         args:
-          - --preview
           - --fix
           - --show-fixes
           - --unsafe-fixes
           - --exit-non-zero-on-fix
           - --output-format=github
-        types_or:
-          - python
-          - pyi
+          types_or:
+           - python
+           - pyi
       - id: ruff-format
-        types_or:
-          - python
-          - pyi
+          types_or:
+           - python
+           - pyi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -69,6 +93,7 @@ repos:
         exclude: ^(docs/)
       - id: check-json
       - id: check-toml
+      - id: check-ast
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: mixed-line-ending
@@ -85,6 +110,10 @@ repos:
           - --autofix
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
+      - id: double-quote-string-fixer
+      - id: name-tests-test
+      - id: detect-private-key
+      - id: detect-aws-credentials
       - id: destroyed-symlinks
 
   - repo: local
@@ -95,3 +124,10 @@ repos:
         language: system
         pass_filenames: false
         files: ^docs/.*\.md$
+
+      - id: gate-check
+        name: jackery_solarvault unified gate (read-only)
+        entry: python scripts/gate.py --check --fast
+        language: system
+        pass_filenames: false
+        stages: [manual]
