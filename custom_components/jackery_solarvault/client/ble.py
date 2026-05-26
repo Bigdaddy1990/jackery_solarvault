@@ -53,8 +53,6 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 import os

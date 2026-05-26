@@ -1,0 +1,60 @@
+name: Auto Version Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - custom_components/jackery_solarvault/manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BUN_CONFIG_TELEMETRY_DISABLED: "0"
+  DO_NOT_TRACK: "0"
+
+concurrency:
+  group: auto-version-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag-version:
+    name: Tag manifest version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
+
+      - name: Install Bun tooling
+        run: bun install --frozen-lockfile
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+
+      - name: Extract manifest version
+        id: manifest
+        run: bun run manifest:github-output
+
+      - name: Ensure tag is new or already on this commit
+        id: tag
+        env:
+          TAG: ${{ steps.manifest.outputs.tag }}
+        run: bun run tagging:ensure-tag
+
+      - name: Create and push version tag
+        if: steps.tag.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.manifest.outputs.tag }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: bun run tagging:create-tag

@@ -62,12 +62,13 @@ jobs:
             requirements-test.txt
             pyproject.toml
             package.json
-      - name: Install Ruff
-        run: |
-           bun run install:unit && 
-           python -m pip install ruff
+      - name: Install pinned Ruff
+        run: bun run install:unit && python -m pip install ruff
+      - name: Lint
+        run: bun run lint
       - name: Format check
         run: bun run format:check
+      - name: bun run pre-commit
 
   unit-tests:
     name: Unit / source-only tests
@@ -91,5 +92,26 @@ jobs:
         run: bun run install:unit
       - name: Compile integration and tests
         run: bun run ci
+
+  ha-fixture-tests:
+    name: HA fixture tests
+    runs-on: ubuntu-latest
+    if: ('tests/ha/**') != ''
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-test.txt
+            pyproject.toml
+            package.json
+      - name: Install Home Assistant test dependencies
+        run: bun run install:ha
       - name: Run HA fixture tests
         run: bun run ha:test

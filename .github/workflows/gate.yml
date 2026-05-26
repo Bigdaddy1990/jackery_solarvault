@@ -1,0 +1,95 @@
+name: gate
+
+# Single-command quality gate for jackery_solarvault.
+#
+# This workflow is the canonical CI entry point. Locally you get the same
+# checks with `python scripts/gate.py`. Pre-commit takes care of the
+# per-commit autofixers; this workflow runs the comprehensive verification
+# matrix that gates merges.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Gate profile to run"
+        required: true
+        default: "default"
+        type: choice
+        options:
+          - default
+          - fast
+          - full
+          - fix
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Unified gate (${{ matrix.os }} · Py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install runtime + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
+
+      - name: Install pre-commit + typos
+          # Optional tooling that the gate calls if present.
+        run: |
+          python -m pip install pre-commit
+          python -m pip install typos || true
+
+      - name: Resolve gate profile flags
+        id: profile
+        shell: bash
+        run: |
+          flags=""
+          case "${{ github.event.inputs.profile || 'default' }}" in
+            fast) flags="--fast" ;;
+            full) flags="--full" ;;
+            fix)  flags="--fix"  ;;
+            *)    flags=""       ;;
+          esac
+          echo "flags=$flags" >> "$GITHUB_OUTPUT"
+
+      - name: Run the gate
+        run: |
+          python scripts/gate.py ${{ steps.profile.outputs.flags }}
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.python }}
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 7
