@@ -6,6 +6,8 @@ Languages:
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CodeFactor](https://www.codefactor.io/repository/github/bigdaddy1990/jackery_solarvault/badge)](https://www.codefactor.io/repository/github/bigdaddy1990/jackery_solarvault)
+
 
 Community integration for Jackery SolarVault systems, especially SolarVault 3 Pro Max. It reads live values, energy statistics and configurable settings from the Jackery cloud, and uses MQTT push for fast live updates and control commands.
 
