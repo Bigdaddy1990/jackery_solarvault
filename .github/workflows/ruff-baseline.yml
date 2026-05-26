@@ -59,7 +59,7 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --output-format=github \
             --exit-zero
-          
+
           python -m pre-commit-lite check .
           bun run pre-commit
       - name: Upload coverage reports to Codecov
