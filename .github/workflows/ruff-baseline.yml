@@ -4,10 +4,9 @@ on: { workflow_dispatch: {} }
 permissions: { contents: write }
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-  RUFF_VERSION: ${{ vars.RUFF_VERSION != '' && vars.RUFF_VERSION || '0.15.12' }}
   RUFF_TARGET_VERSION: py314
-  BUN_CONFIG_TELEMETRY_DISABLED: "1"
-  DO_NOT_TRACK: "1"
+  BUN_CONFIG_TELEMETRY_DISABLED: "0"
+  DO_NOT_TRACK: "0"
 jobs:
   baseline:
     if: >-
@@ -21,7 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
+        with:
+          bun-version: "1.2.14"
+      - run: bun install
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -41,7 +42,7 @@ jobs:
           python -m ruff check . \
             --target-version "${RUFF_TARGET_VERSION}" \
             --add-noqa \
-            --output-format=github \
+            --output-format=concise \
             --exit-zero
 
           # Remove stale noqa markers created by older baseline runs.
@@ -49,7 +50,7 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --extend-select RUF100 \
             --fix \
-            --output-format=github \
+            --output-format=concise \
             --exit-zero
 
           # Emit final diagnostics as GitHub annotations without failing the
@@ -58,6 +59,13 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --output-format=github \
             --exit-zero
+          
+          python -m pre-commit-lite check .
+          bun run pre-commit
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Commit baseline changes
         run: |
