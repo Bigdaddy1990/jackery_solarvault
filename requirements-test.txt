@@ -24,6 +24,12 @@ pip>=26.0
 pylint
 pytest
 pytest-asyncio
+pytest-github-actions-annotate-failures
+pytest-homeassistant-custom-component # follows daily HA version
+PyYAML
+ruff==0.15.14
+voluptuous
+yarl
 pytest-cov
 pytest-github-actions-annotate-failures>=0.3.0
 pytest-homeassistant-custom-component
