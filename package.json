@@ -40,7 +40,7 @@
     "ha:smoke": "bun run smoke:prepare-config && bun run smoke:check-config",
     "release:zip": "cd custom_components/jackery_solarvault && zip -r \"${GITHUB_WORKSPACE}/jackery_solarvault.zip\" . -x \"*.pyc\" \"*/__pycache__/*\" \"*.pytest_cache*\" \"*.ruff_cache*\" && cd \"${GITHUB_WORKSPACE}\" && ls -la jackery_solarvault.zip",
     "tagging:ensure-tag": "if git rev-parse --verify --quiet \"refs/tags/${TAG}\" >/dev/null; then tagged_sha=$(git rev-list -n 1 \"${TAG}\"); if [ \"${tagged_sha}\" != \"${GITHUB_SHA}\" ]; then echo \"::error::Tag '${TAG}' already exists at ${tagged_sha}, not ${GITHUB_SHA}\"; exit 1; fi; echo \"exists=true\" >> \"${GITHUB_OUTPUT}\"; echo \"Tag '${TAG}' already exists on this commit; nothing to do.\"; exit 0; fi; echo \"exists=false\" >> \"${GITHUB_OUTPUT}\"",
-    "tagging:create-tag": "git config user.name \"github-actions[bot]\" && git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\" && git tag -a \"${TAG}\" -m \"Release ${VERSION}\" && git push origin \"refs/tags/${TAG}\""
+    "tagging:create-tag": "git config user.name \"github-actions[bot]\" && git config user.email \"41898282+github-actions[bot]@users.noreply.github.com\" && git tag -a \"${TAG}\" -m \"Release ${VERSION}\" && git push origin \"refs/tags/${TAG}\"",
 	"pre-commit": "bun run pre-commit"
   }
 }
