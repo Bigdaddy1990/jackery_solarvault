@@ -1,6 +1,11 @@
-aiomqtt>=2.5.1
-bluetooth
+# Runtime dependencies for jackery_solarvault Home Assistant custom integration.
+#
+# NOTE: Home Assistant loads the actual runtime requirements from
+# custom_components/jackery_solarvault/manifest.json (`requirements` array).
+# This file exists as a convenience mirror for local development environments
+# that install with `pip install -r requirements.txt`. Keep it in sync with
+# the manifest and requirements-test.txt; the manifest remains the source of truth.
+
+aiomqtt==2.5.1
 bleak-retry-connector>=3.5.0
-cryptography>=47.0.0
-plugin-multicast
-upnp
+cryptography>=42.0
