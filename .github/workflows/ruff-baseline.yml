@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
       - run: bun install
       - uses: actions/setup-python@v6
         with:
@@ -31,20 +33,35 @@ jobs:
       - name: Ruff baseline using explicit Python 3.14 target
         run: |
           set -o pipefail
-          
+
+          # First apply safe Ruff fixes before the workflow falls back to
+          # baseline noqa markers for remaining diagnostics.
           bun run autofix
 
           # Only remaining non-fixable diagnostics become baseline noqa markers.
           python -m ruff check . \
-            --fix \
+            --target-version "${RUFF_TARGET_VERSION}" \
             --add-noqa \
+            --output-format=concise \
+            --exit-zero
+
+          # Remove stale noqa markers created by older baseline runs.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
             --extend-select RUF100 \
+            --fix \
+            --output-format=concise \
+            --exit-zero
+
+          # Emit final diagnostics as GitHub annotations without failing the
+          # baseline job after fix/noqa generation has completed.
+          python -m ruff check . \
+            --target-version "${RUFF_TARGET_VERSION}" \
             --output-format=github \
             --exit-zero
           
           python -m pre-commit-lite check .
           bun run pre-commit
-          
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:

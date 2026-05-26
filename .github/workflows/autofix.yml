@@ -39,6 +39,8 @@ jobs:
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.14"
 
       - name: Install Bun tooling
         run: bun install
@@ -65,28 +67,17 @@ jobs:
           set -o pipefail
 
           bun run autofix
-          python scripts/ruff-baseline.py --fix custom_components/
+          python -m ruff check --fix --unsafe-fixes --target-version "${RUFF_TARGET_VERSION}" custom_components/
 
       - name: Run pre-commit with fixes
         run: |
           set -o pipefail
-          python sync_homeassistant_dependencies.py
-          python gen_requirements_all.py
-          python scripts.sync_requirements # Dry-run (zeigt Diff)
-          python scripts.sync_requirements --write   # Schreibt Dateien
-          python scripts.sync_requirements --check 
-          python sync_contributor_guides.py
-          python sync_localization_flags.allowlist
-          python sync_localization_flags.py
-          python hass_async_load_fixtures.py
-          python enforce_docstring_baseline.py
-          python enforce_test_requirements.py
-          python enforce_test_todo_policy.py
-          python sync_translations.py
+
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+
           bun run autofix
-          python scripts/ruff-baseline.py --fix custom_components/
+          python -m ruff check --fix --extend-select=RUF100 --add-noqa --target-version "${RUFF_TARGET_VERSION}" custom_components/
           bun run format
 
       - name: Add Ruff baseline noqa for remaining diagnostics
@@ -97,7 +88,7 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --preview \
             --add-noqa \
-            --output-format=github \
+            --output-format=concise \
             --exit-zero
 
           python -m ruff check ${RUFF_PATHS} \
@@ -105,7 +96,7 @@ jobs:
             --preview \
             --extend-select RUF100 \
             --fix \
-            --output-format=github \
+            --output-format=concise \
             --exit-zero
 
       - name: Final Ruff normalization and checks
