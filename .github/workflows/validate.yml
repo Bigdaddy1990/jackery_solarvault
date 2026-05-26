@@ -64,7 +64,7 @@ jobs:
             package.json
       - name: Install Ruff
         run: |
-           bun run install:unit && 
+           bun run install:unit &&
            python -m pip install ruff
       - name: Format check
         run: bun run format:check
