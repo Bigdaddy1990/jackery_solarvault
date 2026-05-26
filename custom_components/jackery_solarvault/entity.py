@@ -9,11 +9,17 @@ from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
     FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,
+    FIELD_SCAN_NAME,
+    FIELD_SN,
+    FIELD_TYPE_NAME,
+    FIELD_VERSION,
     FIELD_WNAME,
     MANUFACTURER,
     PAYLOAD_ALARM,
@@ -146,6 +152,47 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             model=str(model),
             serial_number=sn,
             sw_version=sw_version,
+        )
+
+    def _build_smart_plug_device_info(
+        self, plug_index: int, plug: dict[str, Any]
+    ) -> DeviceInfo:
+        """Build a static device_info for a smart-plug subdevice.
+
+        Smart-plug subdevices receive a per-plug device row that hangs under
+        the SolarVault via the ``via_device`` link. The metadata is derived
+        from the plug payload captured at entity construction; later metadata
+        updates flow through Home Assistant's device-registry merge, so this
+        method is meant to be called once per entity (typically from
+        ``__init__``) and the result cached on ``_attr_device_info``.
+        """
+        base_name = (
+            self._system.get(FIELD_DEVICE_NAME)
+            or self._discovery.get(FIELD_DEVICE_NAME)
+            or self._properties.get(FIELD_WNAME)
+            or "SolarVault"
+        )
+        sn = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+        display_name = (
+            plug.get(FIELD_DEVICE_NAME)
+            or plug.get(FIELD_SCAN_NAME)
+            or f"Smart Plug {plug_index}"
+        )
+        model = (
+            plug.get(FIELD_MODEL)
+            or plug.get(FIELD_MODEL_NAME)
+            or plug.get(FIELD_TYPE_NAME)
+            or "Smart Plug"
+        )
+        version = plug.get(FIELD_VERSION) or plug.get(FIELD_CURRENT_VERSION)
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._device_id}_smart_plug_{plug_index}")},
+            manufacturer=MANUFACTURER,
+            name=f"{base_name} {display_name}",
+            model=str(model),
+            serial_number=str(sn) if sn else None,
+            sw_version=str(version) if version else None,
+            via_device=(DOMAIN, self._device_id),
         )
 
     @property

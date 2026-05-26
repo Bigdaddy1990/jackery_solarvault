@@ -22,18 +22,34 @@ from . import JackeryConfigEntry
 from .const import (
     DOMAIN,
     FIELD_AUTO_STANDBY,
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_DEVICE_NAME,
     FIELD_FOLLOW_METER,
     FIELD_IS_AUTO_STANDBY,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_OFF_GRID_DOWN,
+    FIELD_SCAN_NAME,
+    FIELD_SOCKET_PRIORITY,
     FIELD_SW_EPS,
+    FIELD_SWITCH_STATE,
+    FIELD_SYS_SWITCH,
+    FIELD_VERSION,
     FIELD_WPS,
     PAYLOAD_PROPERTIES,
+    PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, safe_bool, task_plan_value
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_bool,
+    smart_plug_serial,
+    sorted_smart_plugs,
+    task_plan_value,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -55,7 +71,7 @@ def _standby_is_on(raw: Any) -> bool | None:
         return None
     try:
         return int(raw) == 1
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return safe_bool(raw)
 
 
@@ -136,6 +152,9 @@ async def _set_storm_warning(
 ) -> None:
     """Toggle storm warning on a device."""
     await coord.async_set_storm_warning(dev_id, value)
+
+
+_smart_plug_serial = smart_plug_serial
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +312,172 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             self._raise_action_error(err)
 
 
+class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
+    """Writable switch for one smart-plug subdevice."""
+
+    _attr_translation_key = "smart_plug_switch"
+    _attr_icon = "mdi:power-socket-de"
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        plug_index: int,
+        plug_sn: str,
+    ) -> None:
+        """Initialise the smart-plug switch from its sorted index and serial."""
+        super().__init__(coordinator, device_id, f"smart_plug_{plug_index}_switch")
+        self._plug_index = plug_index
+        self._plug_sn = plug_sn
+        # Build the per-plug device_info once at construction (see PROTOCOL §8
+        # and binary_sensor.py for the rationale).
+        self._attr_device_info = self._build_smart_plug_device_info(
+            plug_index, self._plug
+        )
+
+    @property
+    def _plug(self) -> dict[str, Any]:
+        # Look up by captured serial; cloud-side re-ordering of the plug
+        # array must not switch this entity to a different physical plug.
+        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
+            if smart_plug_serial(plug) == self._plug_sn:
+                return plug
+        return {}
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the smart plug reports an active output."""
+        raw = self._plug.get(FIELD_SWITCH_STATE)
+        if raw is None:
+            raw = self._plug.get(FIELD_SYS_SWITCH)
+        return safe_bool(raw)
+
+    def _raise_action_error(self, error: object) -> None:
+        """Raise a translatable HA action error for this switch."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="entity_action_failed",
+            translation_placeholders={
+                "entity": "smart_plug_switch",
+                "device_id": self._device_id,
+                "error": str(error),
+            },
+        )
+
+    async def _async_set_state(self, value: bool) -> None:
+        """Set the smart-plug state through ControlSubDevice."""
+        plug_sn = _smart_plug_serial(self._plug)
+        if plug_sn is None:
+            self._raise_action_error("missing deviceSn")
+            return
+        try:
+            await self.coordinator.async_set_smart_plug_switch(
+                self._device_id,
+                plug_sn=plug_sn,
+                on=value,
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the smart plug on."""
+        await self._async_set_state(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the smart plug off."""
+        await self._async_set_state(False)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return diagnostic attributes for the smart-plug switch."""
+        attrs: dict[str, Any] = {"plug_index": self._plug_index}
+        for key in (
+            FIELD_DEVICE_NAME,
+            FIELD_SCAN_NAME,
+            FIELD_COMM_STATE,
+            FIELD_COMM_MODE,
+            FIELD_SOCKET_PRIORITY,
+            FIELD_SWITCH_STATE,
+            FIELD_SYS_SWITCH,
+            FIELD_VERSION,
+        ):
+            if key in self._plug:
+                attrs[key] = self._plug.get(key)
+        return attrs
+
+
+class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
+    """Writable priority toggle for one smart-plug subdevice."""
+
+    _attr_translation_key = "smart_plug_priority_enabled"
+    _attr_icon = "mdi:priority-high"
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        plug_index: int,
+        plug_sn: str,
+    ) -> None:
+        """Initialise the smart-plug priority switch from its sorted index/serial."""
+        JackeryEntity.__init__(
+            self,
+            coordinator,
+            device_id,
+            f"smart_plug_{plug_index}_priority_enabled",
+        )
+        self._plug_index = plug_index
+        self._plug_sn = plug_sn
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when smart-plug priority is enabled."""
+        return safe_bool(self._plug.get(FIELD_SOCKET_PRIORITY))
+
+    def _raise_action_error(self, error: object) -> None:
+        """Raise a translatable HA action error for this switch."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="entity_action_failed",
+            translation_placeholders={
+                "entity": "smart_plug_priority_enabled",
+                "device_id": self._device_id,
+                "error": str(error),
+            },
+        )
+
+    async def _async_set_state(self, value: bool) -> None:
+        """Set smart-plug priority through ControlSubDevice."""
+        plug_sn = _smart_plug_serial(self._plug)
+        if plug_sn is None:
+            self._raise_action_error("missing deviceSn")
+            return
+        try:
+            await self.coordinator.async_set_smart_plug_priority(
+                self._device_id,
+                plug_sn=plug_sn,
+                enabled=value,
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)
+
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
@@ -312,7 +497,7 @@ async def async_setup_entry(
             entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
 
-    # APP_POLLING_MQTT.md documents SolarVault advanced controls as app
+    # PROTOCOL.md §2/§4 documents SolarVault advanced controls as app
     # state plus MQTT command paths. Create those entities eagerly for known
     # SolarVault devices; otherwise gate them by the observed property keys.
     gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
@@ -338,9 +523,41 @@ async def async_setup_entry(
                         entities,
                         JackeryDescriptionSwitch(coordinator, dev_id, description),
                     )
+            for index, plug in enumerate(
+                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)), start=1
+            ):
+                plug_sn = smart_plug_serial(plug)
+                if plug_sn is None:
+                    continue
+                _append_unique(
+                    entities,
+                    JackerySmartPlugSwitch(
+                        coordinator,
+                        dev_id,
+                        plug_index=index,
+                        plug_sn=plug_sn,
+                    ),
+                )
+                if FIELD_SOCKET_PRIORITY in plug:
+                    _append_unique(
+                        entities,
+                        JackerySmartPlugPrioritySwitch(
+                            coordinator,
+                            dev_id,
+                            plug_index=index,
+                            plug_sn=plug_sn,
+                        ),
+                    )
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)

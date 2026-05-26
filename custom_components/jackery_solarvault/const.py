@@ -60,9 +60,9 @@ MQTT_AUTH_FAILURE_TOLERANCE: Final = 3
 # falls back to HTTP polling. The probe-reconnect after the pause confirms
 # whether the conflict cleared (app went offline / token settled). HA reauth is
 # left to HTTP auth failures; MQTT-only rejection must not stop the integration.
-MQTT_APP_CONFLICT_PAUSE_SEC: Final = 60
+MQTT_APP_CONFLICT_PAUSE_SEC: Final = 300
 
-# HTTP endpoint constants. Keep this list aligned with APP_POLLING_MQTT.md.
+# HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
 ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
@@ -78,7 +78,7 @@ SAVE_SINGLE_MODE_PATH: Final = (
 )
 SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion
 
-# Device/statistic endpoint group from APP_POLLING_MQTT.md.
+# Device/statistic endpoint group from PROTOCOL.md §2.
 DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
 HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...
 BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...
@@ -116,7 +116,7 @@ RSA_PUBLIC_KEY_B64: Final = (
 )
 REGISTER_APP_ID: Final = "com.hbxn.jackery"
 
-# --- Android app headers documented in APP_POLLING_MQTT.md --------------------
+# --- Android app headers documented in PROTOCOL.md §2 --------------------
 # NB: iOS headers (platform=1) returned empty device lists on a SolarVault-only
 # account. Android headers (platform=2) return data on /v1/device/property.
 APP_VERSION: Final = "v2.0.1"
@@ -138,34 +138,33 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 # Experimental BLE transport (Phase 3a, read-only diagnostic listener).
 # When enabled, the coordinator subscribes to GATT notify on each known
 # SolarVault and surfaces the decoded/raw frames in diagnostics. See
-# local implementation notes §14 + client/ble.py for the wire-format reference.
+# docs/PROTOCOL.md §14 + client/ble.py for the wire-format reference.
 CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
 DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
 CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
 DEFAULT_ENABLE_BLE_WRITES: Final = False
 CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
-# Period-statistic toggles. The user can opt out of the DAY/WEEK/MONTH/YEAR
-# Recorder imports (both ``sensor.*`` entity rows and
-# ``jackery_solarvault:*_<period>_*`` external series). DAY-hourly external
-# stays always enabled because it carries the Energy-Dashboard hour-by-hour
-# breakdown and has no HA-vs-Cloud conflict. Defaults are ``True`` to
-# preserve current behaviour.
-CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
-DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
-CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
-DEFAULT_ENABLE_DAY_STATISTICS: Final = True
-CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"
-DEFAULT_ENABLE_WEEK_STATISTICS: Final = True
-CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"
-DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
-CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
-DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
-# Optional fallback for home-energy when sys/home/trends is empty.
-# Default stays False: device_home_stat is not the same metric family as
-# home_trends and must never silently replace it.
-CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = "enable_derived_home_energy_fallback"
-DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = False
+
+# Third-party MQTT bridge config (PROTOCOL.md §5). Surfaced in the
+# config/options/reconfigure flow so the device can be told to publish
+# telemetry to a local MQTT broker without requiring the user to call
+# the ``set_third_party_mqtt_config`` service by hand. The push is
+# best-effort on entry load: if neither BLE writes nor cloud MQTT are
+# currently available, the integration logs and keeps the settings; the
+# user can retry by invoking the service explicitly.
+CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False
+CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
+DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
+CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
+DEFAULT_THIRD_PARTY_MQTT_PORT: Final = 1883
+CONF_THIRD_PARTY_MQTT_USERNAME: Final = "third_party_mqtt_username"
+DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
+CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
+DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
+CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
+DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 
 
 # Config-flow step, error and abort identifiers.
@@ -202,6 +201,7 @@ DEFAULT_STORM_WARNING_MINUTES: Final = 120
 # data path; MQTT push is an optional live enhancement.
 MQTT_LIVE_THRESHOLD_SEC: Final = 60
 ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
+
 REQUEST_TIMEOUT_SEC: Final = 15
 
 HTTP_METHOD_GET: Final = "GET"
@@ -210,11 +210,11 @@ HTTP_METHOD_PUT: Final = "PUT"
 HTTP_HEADER_CONTENT_TYPE: Final = "content-type"
 HTTP_CONTENT_TYPE_FORM: Final = "application/x-www-form-urlencoded"
 HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
-HTTP_RAW_TEXT_LIMIT: Final = 1000
+HTTP_RAW_TEXT_LIMIT: Final = 500
 
 # Shared payload section names. Coordinator, diagnostics and entity platforms use
 # the same normalized payload shape; keep the keys in one place so section names
-# stay aligned with APP_POLLING_MQTT.md.
+# stay aligned with PROTOCOL.md §2.
 PAYLOAD_DEVICE: Final = "device"
 PAYLOAD_PROPERTIES: Final = "properties"
 PAYLOAD_HTTP_PROPERTIES: Final = "http_properties"
@@ -242,7 +242,6 @@ PAYLOAD_METER_HEADS: Final = "meter_heads"
 PAYLOAD_SMART_PLUGS: Final = "smart_plugs"
 PAYLOAD_NOTICE: Final = "notice"
 PAYLOAD_MQTT_LAST: Final = "mqtt_last"
-PAYLOAD_THIRD_PARTY_MQTT_CONFIG: Final = "third_party_mqtt_config"
 PAYLOAD_DATA_QUALITY: Final = "data_quality"
 
 # Internal normalized payload/cache keys. These are not Jackery wire keys, but
@@ -497,7 +496,6 @@ CT_NEGATIVE_PHASE_POWER_FIELDS: Final = (
 )
 CT_ATTRIBUTE_FIELDS: Final = (
     FIELD_SCAN_NAME,
-    FIELD_SN,
     FIELD_TYPE_NAME,
     FIELD_SUB_TYPE,
     FIELD_DEV_TYPE,
@@ -534,7 +532,7 @@ MAIN_PROPERTY_ALIAS_PAIRS: Final = (
 TASK_PLAN_BODY: Final = FIELD_BODY
 TASK_PLAN_TASKS: Final = "tasks"
 
-# MQTT subdevice routing and mirroring keys documented in MQTT_PROTOCOL.md.
+# MQTT subdevice routing and mirroring keys documented in PROTOCOL.md §3.
 CT_METER_KEYS: Final = frozenset({
     FIELD_CT_POWER,
     FIELD_CT_POWER1,
@@ -670,7 +668,7 @@ BATTERY_PACK_HINT_KEYS: Final = frozenset({
 
 # Normalized metadata/series keys used by app-period helpers. Request metadata is
 # attached by api.py so entity diagnostics can show the exact documented
-# begin/end/dateType range from APP_POLLING_MQTT.md.
+# begin/end/dateType range from PROTOCOL.md §2.
 APP_REQUEST_META: Final = "_request"
 APP_REQUEST_DATE_TYPE: Final = "dateType"
 APP_REQUEST_DATE_TYPE_ALT: Final = "date_type"
@@ -711,13 +709,11 @@ EXTERNAL_STAT_BUCKET_MONTH_DAILY: Final = "month_daily"
 EXTERNAL_STAT_BUCKET_YEAR_MONTHLY: Final = "year_monthly"
 APP_DAY_CHART_BUCKET_LABEL: Final = "hourly app day buckets from 5-minute power curves"
 APP_CHART_BUCKET_BY_DATE_TYPE: Final = {
-    DATE_TYPE_DAY: EXTERNAL_STAT_BUCKET_DAY_HOURLY,
     DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY,
     DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY,
     DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY,
 }
 APP_CHART_BUCKET_LABEL_BY_DATE_TYPE: Final = {
-    DATE_TYPE_DAY: "daily app chart buckets for the current day",
     DATE_TYPE_WEEK: "daily app chart buckets for the current week",
     DATE_TYPE_MONTH: "daily app chart buckets for the current month",
     DATE_TYPE_YEAR: "monthly app chart buckets for the current year",
@@ -763,7 +759,7 @@ APP_YEAR_BACKFILL_META: Final = "_year_month_backfill"
 APP_TOTAL_GUARD_META: Final = "_total_lower_bound_guard"
 APP_SAVINGS_CALC_META: Final = "_savings_calculation"
 
-# Section prefixes and chart-series keys documented by APP_POLLING_MQTT.md.
+# Section prefixes and chart-series keys documented by PROTOCOL.md §2.
 APP_SECTION_PV_STAT: Final = "device_pv_stat"
 APP_SECTION_HOME_STAT: Final = "device_home_stat"
 APP_SECTION_BATTERY_STAT: Final = "device_battery_stat"
@@ -957,7 +953,7 @@ REDACT_KEYS: Final = {
     "trailer_hex",
 }
 
-# MQTT client metadata and topic layout from MQTT_PROTOCOL.md.
+# MQTT client metadata and topic layout from PROTOCOL.md §3.
 MQTT_CLIENT_LIBRARY: Final = "aiomqtt"
 MQTT_CLIENT_ID_SUFFIX: Final = "APP"
 MQTT_USERNAME_SEPARATOR: Final = "@"
@@ -988,7 +984,7 @@ MQTT_CONNACK_REASONS: Final = {
     136: "server unavailable",
 }
 
-# Subdevice type markers observed in MQTT_PROTOCOL.md.. devType=1 is a
+# Subdevice type markers observed in PROTOCOL.md §3. devType=1 is a
 # BatteryPackSub query target. All other concrete devType values are excluded
 # from battery-pack auto-detection so future grouped payloads cannot be
 # mistaken for add-on batteries.
@@ -1024,7 +1020,6 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_TASK_PLAN,
     PAYLOAD_NOTICE,
     PAYLOAD_MQTT_LAST,
-    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 
 # Service names and payload fields from services.yaml.
@@ -1078,11 +1073,9 @@ SAVINGS_DETAIL_SENSOR_SUFFIXES: Final = {
 }
 DUPLICATE_BINARY_SENSOR_SUFFIXES: Final = {"_eps_enabled"}
 CT_PERIOD_SENSOR_SUFFIXES: Final = {
-    "_smart_meter_import_day_energy",
     "_smart_meter_import_week_energy",
     "_smart_meter_import_month_energy",
     "_smart_meter_import_year_energy",
-    "_smart_meter_export_day_energy",
     "_smart_meter_export_week_energy",
     "_smart_meter_export_month_energy",
     "_smart_meter_export_year_energy",
@@ -1095,11 +1088,9 @@ CT_PERIOD_SENSOR_SUFFIXES: Final = {
 LEGACY_PV_TODAY_SENSOR_SUFFIX: Final = "_pv_today_energy"
 SYSTEM_PV_TODAY_SENSOR_SUFFIX: Final = "_system_pv_today_energy"
 STALE_PERIOD_SENSOR_SUFFIXES: Final = frozenset({
-    "_grid_import_day_energy",
     "_grid_import_week_energy",
     "_grid_import_month_energy",
     "_grid_import_year_energy",
-    "_grid_export_day_energy",
     "_grid_export_week_energy",
     "_grid_export_month_energy",
     "_grid_export_year_energy",
@@ -1177,7 +1168,7 @@ PLATFORMS: Final = [
 
 # --- MQTT message types and command IDs -------------------------------------
 # The app protocol transports most writes as MQTT messageType/cmd/actionId triples.
-# Keep these names aligned with MQTT_PROTOCOL.md instead of repeating raw strings.
+# Keep these names aligned with PROTOCOL.md §3 instead of repeating raw strings.
 MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE: Final = "DevicePropertyChange"
 MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"
 MQTT_MESSAGE_QUERY_COMBINE_DATA: Final = "QueryCombineData"
@@ -1194,7 +1185,7 @@ MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = "QuerySubDeviceGroupPropert
 MQTT_MESSAGE_CONTROL_SUB_DEVICE: Final = "ControlSubDevice"
 # Third-party MQTT bridge config — actionId 3046/3047 per
 # HomeCmdAction.smali. Officially "server-side blocked for SolarVault" per
-# implementation notes §15; the integration only exposes these via an explicit, opt-in
+# PROTOCOL.md §15; the integration only exposes these via an explicit, opt-in
 # experimental service so users can verify whether the device firmware itself
 # honours the frame when the cloud broker relays it.
 MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"
@@ -1215,7 +1206,7 @@ MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
 
 # --- MQTT action IDs (Jackery cloud command/upload protocol) ----------------
 # These IDs are sent in MQTT command payloads' `actionId` field. Keep them
-# aligned with the MQTT command tables in MQTT_PROTOCOL.md and APP_POLLING_MQTT.md.
+# aligned with the MQTT command tables in PROTOCOL.md §3 and PROTOCOL.md §2.
 
 # Individual action IDs used in outbound commands:
 # 3028 DevicePropertyChange carries BOTH SOC limits (chg + dischg) in one
@@ -1225,7 +1216,7 @@ MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
 # actionId ``SET_CHARGE_DISCHARGE_LINE = 3028`` carries both SOC limits in
 # one DevicePropertyChange frame (body has ``socChgLimit`` and
 # ``socDischgLimit`` together). An earlier doc capture
-# (docs/MQTT_implementation notes PCAPNG) split this into 3022/3028, but 3022 is
+# (docs/MQTT_PROTOCOL.md PCAPNG) split this into 3022/3028, but 3022 is
 # actually ``CONTROL_AC_OFF_GRID_SWITCH`` (EPS) — sending a charge limit
 # under 3022 would hit the EPS action instead.
 ACTION_ID_SOC_LIMITS: Final = 3028  # cmd=107 DevicePropertyChange (chg + dischg)
@@ -1251,7 +1242,7 @@ ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020  # cmd=23 QueryWeatherPlan
 # actionId 3022 = ``CONTROL_AC_OFF_GRID_SWITCH`` (body field ``swEps`` —
 # the EPS output toggle), actionId 3023 = ``CONTROL_STANDBY``
 # (body field ``standby``). Earlier doc captures
-# (docs/MQTT_implementation notes PCAPNG) had these two swapped; the smali is
+# (docs/MQTT_PROTOCOL.md PCAPNG) had these two swapped; the smali is
 # authoritative.
 ACTION_ID_EPS_ENABLED: Final = 3022  # cmd=107 DevicePropertyChange (EPS toggle)
 ACTION_ID_STANDBY: Final = 3023  # cmd=107 DevicePropertyChange (standby mode 1/2)
@@ -1308,14 +1299,14 @@ FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
 
 # Per-device BLE AES key — base64-encoded 32-byte value from the device entry
 # in ``/v1/device/system/list``. Used to encrypt/decrypt the DFED-framed BLE
-# packets (implementation notes §14, ``bb/c`` helper). Already in REDACT_KEYS.
+# packets (PROTOCOL.md §14, ``bb/c`` helper). Already in REDACT_KEYS.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the
 # numeric value as the ``devType`` body field for QuerySubDeviceGroupProperty
 # bodies and to route inbound UploadSubDeviceGroupProperty payloads. Keep this
-# table in sync with local implementation notes §3 and local implementation notes §2.
+# table in sync with docs/PROTOCOL.md §3 and docs/PROTOCOL.md §2.
 SUBDEVICE_DEV_TYPE_BATTERY_PACK: Final = 1
 SUBDEVICE_DEV_TYPE_COMBO: Final = 2
 SUBDEVICE_DEV_TYPE_CT: Final = 3
@@ -1361,5 +1352,5 @@ MQTT_ACTION_IDS_COMBINE: Final = frozenset({
 })
 # Inbound UploadSubDeviceGroupProperty action IDs the integration consumes.
 # 3014=battery pack, 3031=CT, 3032=socket (smart plug), 3033=meter head,
-# 3037=combo. See local implementation notes §2 "MQTT-Polling/Queries".
+# 3037=combo. See docs/PROTOCOL.md §2 "MQTT-Polling/Queries".
 MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3032, 3033, 3037})

@@ -20,8 +20,9 @@ rules:
     status: done
     comment: >-
       30 s DataUpdateCoordinator interval matches the Jackery app polling rate.
-      MQTT push is optional and can short-circuit HTTP refreshes between
-      keep-alive windows. Confirmed against docs/APP_POLLING_MQTT.md.
+      MQTT push is optional and can short-circuit fast HTTP property refreshes
+      between keep-alive windows, while slow stat endpoints stay on their own
+      cadence. Confirmed against docs/PROTOCOL.md §2.
   brands: done
   common-modules: done
   config-flow-test-coverage:
@@ -48,7 +49,7 @@ rules:
   entity-unique-id:
     status: done
     comment: >-
-      Unique ID contract documented in docs/UNIQUE_ID_CONTRACT.md and
+      Unique ID contract documented in docs/PROTOCOL.md §11 and
       enforced by tests/test_code_quality.py.
   has-entity-name: done
   runtime-data: done
@@ -81,8 +82,8 @@ rules:
   test-coverage:
     status: done
     comment: >-
-      184 source-only unit tests (parser, period contract, MQTT
-      protocol, reauth, MQTT stability, battery-pack lifecycle) plus
+      Extensive source-only unit-test portfolio (parser, period contract,
+      MQTT protocol, reauth, MQTT stability, battery-pack lifecycle) plus
       HA-fixture tests in tests/ha/ for config-flow and entry setup
       lifecycle. CI separates the two via the ha-fixture-tests job in
       .github/workflows/validate.yml so the lightweight unit tests

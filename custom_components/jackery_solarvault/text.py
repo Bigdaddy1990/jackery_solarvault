@@ -1,6 +1,7 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
@@ -9,7 +10,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .client.api import JackeryAuthError, JackeryError
+from .api import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
     FIELD_DEVICE_NAME,
@@ -20,7 +21,7 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
+from .util import append_unique_entity, coordinator_entity_signature
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -49,12 +50,19 @@ async def async_setup_entry(
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
-            # The rename endpoint in APP_POLLING_MQTT.md needs the system id.
+            # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
@@ -116,7 +124,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
                 "Re-authentication is required."
             ) from err
         except JackeryError as err:
-            _LOGGER.error("Failed to rename system %s: %s", system_id, err)
+            _LOGGER.debug("Failed to rename system %s: %s", system_id, err)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="rename_system_failed",

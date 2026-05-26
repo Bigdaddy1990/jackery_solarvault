@@ -56,6 +56,7 @@ from .const import (
     APP_TOTAL_GUARD_META,
     APP_UNIT_KWH,
     APP_YEAR_BACKFILL_META,
+    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATA_QUALITY_KEY_LABEL,
@@ -80,6 +81,10 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
+    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    FIELD_CURRENT_VERSION,
+    FIELD_DEV_SN,
+    FIELD_DEVICE_SN,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
@@ -90,9 +95,16 @@ from .const import (
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
     FIELD_SINGLE_PRICE,
+    FIELD_SN,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_CT_METER,
     PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
+    PAYLOAD_METER_HEADS,
+    PAYLOAD_OTA,
     PAYLOAD_PRICE,
+    PAYLOAD_SMART_PLUGS,
     PAYLOAD_STATISTIC,
     REDACT_KEYS,
     REDACTED_VALUE,
@@ -118,9 +130,42 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     return default if parsed is None else parsed
 
 
-def normalize_account(value: str) -> str:
-    """Normalize user-facing account identifiers before auth and unique IDs."""
-    return value.strip()
+def config_entry_str_option(entry: Any, key: str, default: str) -> str:
+    """Return a str option with legacy setup-data fallback.
+
+    Mirrors :func:`config_entry_bool_option`. Used by config-flow code
+    that reads mixed-type options (e.g. the Third-Party MQTT bridge
+    settings from PROTOCOL.md §5) without re-implementing the
+    options-then-data fallback per call site.
+    """
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    if value is None:
+        return default
+    return str(value)
+
+
+def config_entry_int_option(entry: Any, key: str, default: int) -> int:
+    """Return an int option with legacy setup-data fallback.
+
+    Mirrors :func:`config_entry_bool_option`. Strings are coerced via
+    ``int(...)``; invalid values fall back to ``default`` so a corrupted
+    options dict cannot break entry setup.
+    """
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    value = options.get(key)
+    if value is None:
+        value = data.get(key, default)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def utc_now() -> datetime:
@@ -163,6 +208,66 @@ def parse_utc_datetime(value: Any) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def coordinator_entity_signature(
+    coordinator_data: dict[str, Any] | None,
+) -> tuple[Any, ...]:
+    """Return a cheap shape-hash of the coordinator data for entity setup.
+
+    Each platform's ``async_setup_entry`` registers a listener that HA
+    invokes on every coordinator data update — including the hundreds
+    of MQTT pushes per hour we receive from the cloud. Without a gate,
+    every push runs ``_collect_entities``, builds dozens of
+    ``JackeryEntity`` instances per platform, hands them to
+    ``async_add_entities`` and triggers a unique-id-dedup DEBUG log
+    for every previously-added entity.
+
+    This helper captures exactly the inputs that change the resulting
+    entity set: device ids, plug serials, battery-pack count,
+    meter-head count, presence of alarm/OTA/CT-meter sections. When
+    the signature matches the cached value, the listener returns
+    immediately and no entity is constructed.
+
+    Live entity-state updates flow through each entity's OWN
+    ``CoordinatorEntity.async_add_listener`` callback registered via
+    ``async_added_to_hass`` — that path is independent of this gate.
+    Suppressing the rebuild listener only avoids redundant
+    ``async_add_entities`` work; it does NOT freeze any live values
+    (verified in the 2026-05-16 production log audit).
+
+    ``None`` data returns the empty tuple so the listener still fires
+    once at initial setup.
+    """
+    if not coordinator_data:
+        return ()
+    sig: list[Any] = []
+    for dev_id in sorted(coordinator_data):
+        payload = coordinator_data.get(dev_id) or {}
+        plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+        plug_keys = tuple(smart_plug_serial(p) for p in plugs)
+        packs = payload.get(PAYLOAD_BATTERY_PACKS) or []
+        pack_count = (
+            sum(1 for item in packs if isinstance(item, dict))
+            if isinstance(packs, list)
+            else 0
+        )
+        meter_heads = payload.get(PAYLOAD_METER_HEADS) or []
+        meter_count = (
+            sum(1 for item in meter_heads if isinstance(item, dict))
+            if isinstance(meter_heads, list)
+            else 0
+        )
+        sig.append((
+            dev_id,
+            plug_keys,
+            pack_count,
+            meter_count,
+            payload.get(PAYLOAD_ALARM) is not None,
+            bool((payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION)),
+            payload.get(PAYLOAD_CT_METER) is not None,
+        ))
+    return tuple(sig)
+
+
 def append_unique_entity(
     entities: list[Any],
     seen_unique_ids: set[str],
@@ -203,7 +308,7 @@ def validate_app_period_date_type(date_type: str) -> str:
 def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date, date]:
     """Return the documented Jackery app begin/end range for a period.
 
-    APP_POLLING_MQTT.md requires explicit full ranges for period endpoints:
+    PROTOCOL.md §2 requires explicit full ranges for period endpoints:
     day=today..today, week=Monday..Sunday, month=first..last day,
     year=Jan 1..Dec 31. Keeping this in one helper prevents the REST client
     and coordinator diagnostics from drifting apart.
@@ -343,7 +448,7 @@ def safe_float(value: Any) -> float | None:
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -357,27 +462,119 @@ def safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
-def _payload_debug_redacted(value: Any) -> Any:
-    """Return a recursively redacted, JSON-serializable debug payload."""
+_DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
+
+
+def dev_mode_redactions_disabled() -> bool:
+    """Return True when the JACKERY_DEV_MODE env var is truthy.
+
+    Development-only switch: when set the payload_debug logger and the
+    diagnostics export pass values through without applying ``REDACT_KEYS``
+    so users developing locally can see the raw ``bluetoothKey``,
+    ``mqttPassWord`` and friends. Off by default so production diagnostics
+    stay safe to share. PROTOCOL.md §13 ("Privacy / diagnostics") still
+    applies for anything that gets uploaded — flip this off before
+    publishing any logs.
+    """
+    import os
+
+    raw = os.environ.get(_DEV_MODE_ENV, "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
+    """Return True when diagnostics should bypass sensitive-field redaction.
+
+    ``JACKERY_DEV_MODE`` is kept as a developer fallback, but HAOS users cannot
+    reliably set arbitrary Home Assistant Core environment variables. The entry
+    option is therefore the normal runtime switch for short local debugging.
+    """
+    if dev_mode_redactions_disabled():
+        return True
+    if entry is None:
+        return False
+    return config_entry_bool_option(
+        entry,
+        CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+        DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    )
+
+
+def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:
+    """Return a recursively redacted, JSON-serializable debug payload.
+
+    Bypasses the redaction list entirely when diagnostics redaction is disabled
+    so the developer can see the raw bytes flowing through the integration.
+    """
+    if redactions_disabled is None:
+        redactions_disabled = diagnostic_redactions_disabled()
+    if redactions_disabled:
+        return _payload_debug_passthrough(value)
     if isinstance(value, dict):
         return {
             str(key): REDACTED_VALUE
             if str(key) in REDACT_KEYS
-            else _payload_debug_redacted(item)
+            else _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_payload_debug_redacted(item) for item in value]
+        return [
+            _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
+            for item in value
+        ]
     if isinstance(value, tuple):
-        return [_payload_debug_redacted(item) for item in value]
+        return [
+            _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
+            for item in value
+        ]
     return value
+
+
+def _payload_debug_passthrough(value: Any) -> Any:
+    """Recursively normalise ``value`` to JSON-serializable types only.
+
+    Mirrors the shape transforms in :func:`_payload_debug_redacted` (lists,
+    tuple-to-list) but skips redaction. Used in dev mode.
+    """
+    if isinstance(value, dict):
+        return {
+            str(key): _payload_debug_passthrough(item) for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_payload_debug_passthrough(item) for item in value]
+    if isinstance(value, tuple):
+        return [_payload_debug_passthrough(item) for item in value]
+    return value
+
+
+def redacted_json_safe_payload(value: Any) -> Any:
+    """Return a JSON-safe payload with sensitive Jackery fields redacted.
+
+    This is stricter than diagnostics export redaction: HA entity attributes
+    can be written to the state machine and recorder, so they stay redacted
+    even when the developer-only unredacted diagnostics option is enabled.
+    """
+    return _payload_debug_redacted(value, redactions_disabled=False)
+
+
+def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
+    """Return ``REDACT_KEYS`` or an empty set depending on dev-mode switches.
+
+    Imported by ``diagnostics.py`` so both redaction surfaces (JSONL log
+    and HA diagnostics download) honour the same toggle. Cast to
+    ``frozenset[str]`` for type consistency with the module-level
+    ``REDACT_KEYS``.
+    """
+    if diagnostic_redactions_disabled(entry):
+        return frozenset()
+    return frozenset(REDACT_KEYS)
 
 
 def chart_series_debug(source: Any) -> dict[str, Any]:
@@ -429,7 +626,11 @@ def chart_series_debug(source: Any) -> dict[str, Any]:
     return result
 
 
-def append_payload_debug_line(path: str | Path, event: dict[str, Any]) -> None:
+def append_payload_debug_line(
+    path: str | Path,
+    event: dict[str, Any],
+    redactions_disabled: bool | None = None,
+) -> None:
     """Append one redacted JSONL diagnostic event and rotate at a small limit."""
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
@@ -439,7 +640,7 @@ def append_payload_debug_line(path: str | Path, event: dict[str, Any]) -> None:
             backup.unlink()
         with contextlib.suppress(OSError):
             debug_path.replace(backup)
-    redacted = _payload_debug_redacted(event)
+    redacted = _payload_debug_redacted(event, redactions_disabled=redactions_disabled)
     with debug_path.open("a", encoding="utf-8") as file:
         file.write(
             json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
@@ -467,13 +668,40 @@ def safe_bool(value: Any) -> bool | None:
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
-def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
-    """Return a config-entry boolean option with safe legacy value parsing."""
-    return config_entry_bool_option(entry, key, default)
+def smart_plug_serial(plug: Any) -> str | None:
+    """Return the deviceSn for a smart-plug subdevice payload, or None.
+
+    Smart plugs arrive in an unordered list. The serial is the only stable
+    cross-payload identifier; sorting plugs by this value gives every plug a
+    deterministic position that survives cloud-side re-ordering, so the
+    positional ``smart_plug_<N>_*`` unique-ID suffix stays stable without
+    placing a serial in the unique ID itself (PROTOCOL.md §0 rule 7).
+    """
+    if not isinstance(plug, dict):
+        return None
+    raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+    if raw is None:
+        return None
+    serial = str(raw).strip()
+    return serial or None
+
+
+def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
+    """Return plug entries sorted by serial, dropping entries without one."""
+    if not isinstance(plugs, list):
+        return []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in plugs:
+        sn = smart_plug_serial(entry)
+        if sn is None:
+            continue
+        entries.append((sn, entry))
+    entries.sort(key=lambda item: item[0])
+    return [entry for _, entry in entries]
 
 
 def jackery_online_state(value: Any) -> bool | None:
@@ -493,7 +721,7 @@ def jackery_online_state(value: Any) -> bool | None:
 class TrendStatisticPoint(NamedTuple):
     """One app chart bucket converted to a dated statistic point."""
 
-    start_date: date
+    start_date: date | datetime
     value: float
 
 
@@ -624,7 +852,7 @@ def app_data_quality_warnings(
 ) -> list[AppDataQualityWarning]:
     """Return non-mutating warnings for contradictory app statistics.
 
-    DATA_SOURCE_PRIORITY.md forbids repairing one period with another. This
+    PROTOCOL.md §8 forbids repairing one period with another. This
     helper therefore only detects contradictions that are mathematically valid
     for the current calendar range, then exposes them for diagnostics/repairs.
     Entity values keep their documented source unchanged.
@@ -830,10 +1058,29 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
         )
         if isinstance(date_type, str):
             return date_type
-    for suffix in (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR):
+    for suffix in (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR):
         if section.endswith(f"_{suffix}"):
             return suffix
     return None
+
+
+def _is_day_period_payload(source: dict[str, Any], section: str) -> bool:
+    """Return True for app ``dateType=day`` payloads.
+
+    Day responses carry power curves in W plus documented scalar totals.
+    Only unsuffixed base trend sections may rely on request metadata here;
+    explicit week/month/year section names keep their section contract even
+    if a malformed payload reports the wrong dateType.
+    """
+    if section.endswith(f"_{DATE_TYPE_DAY}"):
+        return True
+    if section.endswith((
+        f"_{DATE_TYPE_WEEK}",
+        f"_{DATE_TYPE_MONTH}",
+        f"_{DATE_TYPE_YEAR}",
+    )):
+        return False
+    return _trend_date_type(section, source) == DATE_TYPE_DAY
 
 
 def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
@@ -850,8 +1097,8 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
 def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     """Return previous/current-month parts for a candidate Jackery compact year value.
 
-    See ``DATA_SOURCE_PRIORITY.md`` ("Device year compact bucket expansion") and
-    ``REPAIR_ROADMAP.md`` ("Device year compact bucket expansion"): for device
+    See ``PROTOCOL.md §8`` ("Device year compact bucket expansion") and
+    ``PROTOCOL.md §1 "Repair roadmap"`` ("Device year compact bucket expansion"): for device
     ``dateType=year`` payloads Jackery can encode two adjacent monthly buckets
     into one current-month slot, e.g. ``13.26`` means previous month ``13`` and
     current month ``26`` (yearly total ``39``). This parser only extracts the
@@ -860,7 +1107,7 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     period total field.
 
     Not used for week/month payloads or system trend endpoints — those always
-    keep normal decimal semantics per ``DATA_SOURCE_PRIORITY.md``.
+    keep normal decimal semantics per ``PROTOCOL.md §8``.
     """
     if value is None:
         return None
@@ -897,8 +1144,8 @@ def expanded_year_series_values(
 ) -> list[float] | None:
     """Return chart values with Jackery device-year compact buckets expanded.
 
-    Reference: ``DATA_SOURCE_PRIORITY.md`` ("Device year compact bucket
-    expansion") and ``REPAIR_ROADMAP.md`` ("Device year compact bucket
+    Reference: ``PROTOCOL.md §8`` ("Device year compact bucket
+    expansion") and ``PROTOCOL.md §1 "Repair roadmap"`` ("Device year compact bucket
     expansion"). Documented example: a May-slot value of ``13.26`` means
     April=``13`` and May=``26``, total ``39``. Raw series
     ``[0,0,0,0,13.26,0,...]`` must be published as effective buckets
@@ -932,7 +1179,7 @@ def expanded_year_series_values(
     2. Else if ``sum(expanded) ≈ direct_total`` -> the compact encoding is
        in effect; return expanded.
     3. Else (neither matches, or no direct total at all) -> return raw.
-       This honours ``STRICT_WORK_INSTRUCTIONS.md`` rule 7 ("Never hide,
+       This honours ``PROTOCOL.md §1`` rule 7 ("Never hide,
        synthesize, extrapolate, or repair energy values silently"): when the
        payload itself is internally inconsistent we publish what was sent
        and let ``data_quality`` diagnostics surface the contradiction.
@@ -958,7 +1205,7 @@ def expanded_year_series_values(
     raw_sum = round(sum(raw_values), 2)
 
     # ``stat_key`` is the documented period-total field on the same payload
-    # (see APP_POLLING_MQTT.md HTTP table). ``safe_float`` handles both
+    # (see PROTOCOL.md §2 HTTP table). ``safe_float`` handles both
     # numeric and locale-formatted strings.
     direct_total = safe_float(source.get(stat_key))
     if direct_total is not None:
@@ -991,7 +1238,7 @@ def expanded_year_series_values(
             return expanded
         # Path 3a: payload is internally inconsistent (neither raw nor
         # expanded sum match the documented total). Per
-        # STRICT_WORK_INSTRUCTIONS.md rule 7 we do not invent a corrected
+        # PROTOCOL.md §1 rule 7 we do not invent a corrected
         # value; the raw series is published and data_quality picks up the
         # discrepancy via app_data_quality_warnings().
         return raw_values
@@ -999,7 +1246,7 @@ def expanded_year_series_values(
     # Path 3b: no direct total to anchor against. The conservative default
     # is to publish raw — fabricating energy in adjacent months without a
     # source-of-truth anchor would silently inflate HA's long-term
-    # statistics, which DATA_SOURCE_PRIORITY.md ("Non-negotiable rules")
+    # statistics, which PROTOCOL.md §8 ("Non-negotiable rules")
     # forbids. The compact-expansion is only safe when payload-internal
     # cross-validation succeeds.
     return raw_values
@@ -1545,20 +1792,55 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
+def guard_statistic_totals_from_year(
+    payload: dict[str, Any],
+    *,
+    previous_statistic: dict[str, Any] | None = None,
+) -> None:
     """Guard app total KPIs with corrected current-year period values.
 
     The Jackery ``systemStatistic`` endpoint can suffer the same month-only bug
     as the app year charts. Generation and carbon remain lower-bound guarded by
-    the corrected PV year total. ``totalRevenue`` itself stays the raw app KPI
-    because Jackery often reports PV revenue there. A separate
+    the corrected PV year total and the previously published totalGeneration
+    value, so a transient app/cloud regression cannot drive HA's
+    TOTAL_INCREASING PV source backwards. ``totalRevenue`` itself stays the raw
+    app KPI because Jackery often reports PV revenue there. A separate
     ``_savings_calculation`` payload exposes the real local savings calculated
     from grid-side AC output after conversion losses, bounded by house
     consumption and reduced by CT export if a CT period payload exists.
     """
     statistic = payload.get(PAYLOAD_STATISTIC)
+    if not isinstance(statistic, dict):
+        return
+
+    previous_generation = (
+        safe_float(previous_statistic.get(APP_STAT_TOTAL_GENERATION))
+        if isinstance(previous_statistic, dict)
+        else None
+    )
+    raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
     pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
-    if not isinstance(statistic, dict) or not isinstance(pv_year, dict):
+    if not isinstance(pv_year, dict):
+        if previous_generation is None or (
+            raw_generation is not None
+            and previous_generation
+            <= raw_generation
+            + _tolerance_for_values(raw_generation, previous_generation)
+        ):
+            return
+        out = dict(statistic)
+        out[APP_STAT_TOTAL_GENERATION] = round(previous_generation, 2)
+        out[APP_TOTAL_GUARD_META] = {
+            "method": "previous_total_lower_bound",
+            "corrected": {
+                APP_STAT_TOTAL_GENERATION: {
+                    "raw_total": raw_generation,
+                    "corrected_total": round(previous_generation, 2),
+                    "previous_total": previous_generation,
+                }
+            },
+        }
+        payload[PAYLOAD_STATISTIC] = out
         return
 
     year_generation = effective_period_total_value(
@@ -1581,16 +1863,21 @@ def guard_statistic_totals_from_year(payload: dict[str, Any]) -> None:
         "source_section": _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
     }
 
-    raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    if year_generation is not None and (
+    generation_candidates = [
+        value for value in (year_generation, previous_generation) if value is not None
+    ]
+    corrected_generation = max(generation_candidates) if generation_candidates else None
+    if corrected_generation is not None and (
         raw_generation is None
-        or year_generation
-        > raw_generation + _tolerance_for_values(raw_generation, year_generation)
+        or corrected_generation
+        > raw_generation + _tolerance_for_values(raw_generation, corrected_generation)
     ):
-        out[APP_STAT_TOTAL_GENERATION] = round(year_generation, 2)
+        out[APP_STAT_TOTAL_GENERATION] = round(corrected_generation, 2)
         meta.setdefault("corrected", {})[APP_STAT_TOTAL_GENERATION] = {
             "raw_total": raw_generation,
-            "corrected_total": round(year_generation, 2),
+            "corrected_total": round(corrected_generation, 2),
+            "current_year_total": year_generation,
+            "previous_total": previous_generation,
         }
 
     raw_revenue = safe_float(statistic.get(APP_STAT_TOTAL_REVENUE))
@@ -1658,7 +1945,7 @@ def trend_series_points(
 ) -> list[TrendStatisticPoint]:
     """Return app chart buckets as dated statistic points.
 
-    APP_POLLING_MQTT.md defines explicit full-period app requests. This helper
+    PROTOCOL.md §2 defines explicit full-period app requests. This helper
     converts the returned chart arrays into dated buckets: week/month -> daily
     buckets, year -> monthly buckets. Future buckets from full-period app
     requests are skipped so HA is not filled with future zero values.
@@ -1708,6 +1995,170 @@ def trend_series_points(
         if bucket_start > today:
             continue
         points.append(TrendStatisticPoint(bucket_start, round(value, 5)))
+    return points
+
+
+def _parse_day_chart_minute(value: Any) -> int | None:
+    """Parse an app day-chart label into minutes after local midnight."""
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", value)
+    if match is None:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    if hour == 24 and minute == 0:
+        return None
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return hour * 60 + minute
+
+
+def _day_power_sample_minute(
+    labels: list[Any] | None,
+    index: int,
+) -> int | None:
+    """Return a local day minute for one power-curve sample."""
+    if labels is not None and index < len(labels):
+        minute = _parse_day_chart_minute(labels[index])
+        if minute is not None:
+            return minute
+    minute = index * 5
+    return minute if 0 <= minute < 24 * 60 else None
+
+
+def day_power_energy_points(
+    source: dict[str, Any],
+    section: str,
+    stat_key: str,
+    *,
+    bucket_minutes: int = 60,
+    today: date | None = None,
+    now: datetime | None = None,
+) -> list[TrendStatisticPoint]:
+    """Convert an app day chart curve into kWh statistic buckets.
+
+    ``dateType=day`` payloads are shaped differently from week/month/year:
+    chart arrays are usually 5-minute power samples in W, while scalar fields
+    are the documented daily kWh totals. Some app/device payloads already
+    return 5-minute energy samples in kWh. This helper preserves both shapes,
+    fills missing buckets with ``0`` up to the latest observed sample, and
+    scales the bucket sum to the documented scalar total when available.
+    """
+    if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
+        return []
+    series_key = day_power_series_key(source, section, stat_key)
+    if not series_key:
+        return []
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit not in {"w", APP_UNIT_KWH}:
+        return []
+    series = source.get(series_key)
+    if not isinstance(series, list) or not series:
+        return []
+
+    request = source.get(APP_REQUEST_META)
+    begin = None
+    end = None
+    if isinstance(request, dict):
+        begin = _parse_iso_date(
+            request.get(APP_REQUEST_BEGIN_DATE)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+        )
+        end = _parse_iso_date(
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+        )
+    if begin is None:
+        return []
+    if end is not None and begin > end:
+        return []
+    if today is None:
+        today = date.today()
+    if begin > today:
+        return []
+    if now is None:
+        now = datetime.now()
+
+    labels = source.get(APP_CHART_LABELS)
+    parsed_labels = labels if isinstance(labels, list) else None
+    current_day_limit_minute = 24 * 60 - 1
+    if begin == now.date():
+        current_day_limit_minute = now.hour * 60 + now.minute
+
+    buckets: dict[int, float] = {}
+    max_bucket_minute: int | None = None
+    for index, raw in enumerate(series):
+        minute = _day_power_sample_minute(parsed_labels, index)
+        if minute is None or minute > current_day_limit_minute:
+            continue
+        sample_value = safe_float(raw)
+        if sample_value is None:
+            continue
+        bucket_minute = (minute // bucket_minutes) * bucket_minutes
+        max_bucket_minute = (
+            bucket_minute
+            if max_bucket_minute is None
+            else max(max_bucket_minute, bucket_minute)
+        )
+        sample_kwh = (
+            max(sample_value, 0.0)
+            if unit == APP_UNIT_KWH
+            else max(sample_value, 0.0) * 5 / 60 / 1000
+        )
+        buckets[bucket_minute] = buckets.get(bucket_minute, 0.0) + sample_kwh
+
+    if max_bucket_minute is None:
+        return []
+    for minute in range(0, max_bucket_minute + 1, bucket_minutes):
+        buckets.setdefault(minute, 0.0)
+
+    raw_total = sum(buckets.values())
+    scalar_total = effective_period_total_value(source, section, stat_key)
+    if scalar_total is not None:
+        if scalar_total < 0:
+            return []
+        if raw_total > 0:
+            scale = scalar_total / raw_total
+            buckets = {minute: value * scale for minute, value in buckets.items()}
+        elif scalar_total > 0:
+            return []
+
+    bucket_items = sorted(buckets.items())
+    rounded_values = [round(max(value, 0.0), 5) for _minute, value in bucket_items]
+    if scalar_total is not None and raw_total > 0 and rounded_values:
+        diff = round(scalar_total - sum(rounded_values), 5)
+        if diff:
+            target_index = next(
+                (
+                    index
+                    for index in range(len(rounded_values) - 1, -1, -1)
+                    if rounded_values[index] > 0
+                ),
+                len(rounded_values) - 1,
+            )
+            rounded_values[target_index] = round(
+                max(rounded_values[target_index] + diff, 0.0),
+                5,
+            )
+
+    points: list[TrendStatisticPoint] = []
+    for (minute, _value), bucket_value in zip(
+        bucket_items,
+        rounded_values,
+        strict=False,
+    ):
+        points.append(
+            TrendStatisticPoint(
+                datetime(
+                    begin.year,
+                    begin.month,
+                    begin.day,
+                    minute // 60,
+                    minute % 60,
+                ),
+                bucket_value,
+            )
+        )
     return points
 
 
@@ -1902,25 +2353,8 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def trend_series_key(section: str, stat_key: str) -> str | None:
-    """Return the chart series key for app week/month/year trend payloads.
-
-    Jackery's period endpoints expose the app values as chart arrays:
-    - PV/home period payloads use ``y``
-    - battery charge uses ``y1``
-    - battery discharge uses ``y2``
-
-    All week/month/year sensors must use this same chart-series key selection.
-    Device dateType=year payloads additionally expand compact monthly buckets
-    (for example raw May value 13.26 -> April 13, May 26) before totals or
-    external statistics are published.
-    """
-    if not section.endswith((
-        f"_{DATE_TYPE_WEEK}",
-        f"_{DATE_TYPE_MONTH}",
-        f"_{DATE_TYPE_YEAR}",
-    )):
-        return None
+def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
+    """Return the app chart-series key for one section/stat pair."""
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
     if section.startswith(APP_SECTION_PV_STAT):
@@ -1957,18 +2391,59 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
     return None
 
 
+def trend_series_key(section: str, stat_key: str) -> str | None:
+    """Return the chart series key for app week/month/year trend payloads.
+
+    Jackery's period endpoints expose the app values as chart arrays:
+    - PV/home period payloads use ``y``
+    - battery charge uses ``y1``
+    - battery discharge uses ``y2``
+
+    All week/month/year sensors must use this same chart-series key selection.
+    Device dateType=year payloads additionally expand compact monthly buckets
+    (for example raw May value 13.26 -> April 13, May 26) before totals or
+    external statistics are published.
+    """
+    if not section.endswith((
+        f"_{DATE_TYPE_WEEK}",
+        f"_{DATE_TYPE_MONTH}",
+        f"_{DATE_TYPE_YEAR}",
+    )):
+        return None
+    return _chart_series_key_for_stat(section, stat_key)
+
+
+def day_power_series_key(
+    source: dict[str, Any],
+    section: str,
+    stat_key: str,
+) -> str | None:
+    """Return the power-curve series key for an app ``dateType=day`` payload."""
+    if not _is_day_period_payload(source, section):
+        return None
+    return _chart_series_key_for_stat(section, stat_key)
+
+
 def trend_series_total(
     source: dict[str, Any],
     section: str,
     stat_key: str,
 ) -> float | None:
-    """Return the app chart-series total for a week/month/year payload.
+    """Return the app period total for a chart/stat payload.
 
     Week, month and year follow the documented app chart series. Device
     dateType=year series are expanded from Jackery compact buckets before
     summing. ``None`` entries are skipped; zero buckets still count as valid
     datapoints so a real zero-period returns ``0.0``.
+
+    Day payloads are different: their arrays are 5-minute power curves in W,
+    while the scalar fields (``totalSolarEnergy``, ``pv1Egy``, ... ) are the
+    documented day totals. Never sum day curves as energy.
     """
+    if _is_day_period_payload(source, section):
+        total = effective_period_total_value(source, section, stat_key)
+        return round(total, 2) if total is not None else None
+
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -2018,12 +2493,19 @@ def trend_series_has_value(
     section: str,
     stat_key: str,
 ) -> bool:
-    """Return True when an app chart payload contains a usable series.
+    """Return True when an app period payload can produce a usable value.
 
-    Server totals alone are not enough for app period charts. A valid zero
-    period must have an explicit chart array containing numeric zero values;
-    an empty array means the cloud did not provide a usable series.
+    For week/month/year, server totals alone are not enough for app period
+    charts. A valid zero period must have an explicit chart array containing
+    numeric zero values; an empty array means the cloud did not provide a
+    usable series.
+
+    For day payloads, the chart arrays are power curves in W and the scalar
+    stat field is the supported energy value.
     """
+    if _is_day_period_payload(source, section):
+        return safe_float(source.get(stat_key)) is not None
+
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return False
@@ -2053,7 +2535,7 @@ def trend_series_has_value(
 
 
 def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
-    """Read a value from the task-plan shapes documented in MQTT_PROTOCOL.md.
+    """Read a value from the task-plan shapes documented in PROTOCOL.md §3-§5.
 
     App/MQTT task-plan responses can expose values directly, inside ``body``
     or as items in ``tasks``. Platforms should use this helper instead of

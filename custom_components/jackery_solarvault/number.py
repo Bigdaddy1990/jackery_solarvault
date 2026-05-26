@@ -23,7 +23,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .client.api import JackeryAuthError, JackeryError
+from .api import JackeryAuthError
 from .const import (
     DOMAIN,
     FIELD_CURRENCY,
@@ -51,7 +51,12 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, safe_float, safe_int
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_float,
+    safe_int,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -139,29 +144,6 @@ async def _set_single_price(
 ) -> None:
     """Set the single-tariff electricity price on a device."""
     await coord.async_set_single_price(dev_id, value)
-
-
-async def _set_max_power_experimental(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
-) -> bool:
-    """Direct API call for experimental max-power setter."""
-    try:
-        ok = await coord.api.async_set_max_power(dev_id, value)
-    except JackeryError as err:
-        _LOGGER.error(
-            "Max-power write failed for device %s (value=%s): %s",
-            dev_id,
-            value,
-            err,
-        )
-        raise
-    if not ok:
-        _LOGGER.warning(
-            "Server returned data=false for max-power=%sW on device %s",
-            value,
-            dev_id,
-        )
-    return ok
 
 
 # ---------------------------------------------------------------------------
@@ -395,8 +377,8 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             await self.entity_description.setter(
                 self.coordinator, self._device_id, wire_value
             )
-        except JackeryAuthError:
-            raise
+        except JackeryAuthError as err:
+            raise ConfigEntryAuthFailed from err
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
@@ -475,7 +457,14 @@ async def async_setup_entry(
                     _append(entities, JackeryNumber(coordinator, dev_id, description))
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     def _add_new_entities() -> None:
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
