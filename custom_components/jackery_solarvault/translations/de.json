@@ -25,26 +25,26 @@
         "data": {
           "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen",
           "create_savings_detail_sensors": "Berechnungsdetails zur Ersparnis erstellen",
+          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
           "enable_ble_transport": "BLE-Transport aktivieren",
           "enable_ble_writes": "Experimentelle BLE-Schreibzugriffe aktivieren",
-          "enable_week_statistics": "Wochenstatistiken importieren",
-          "enable_month_statistics": "Monatsstatistiken importieren",
-          "enable_year_statistics": "Jahresstatistiken importieren",
           "enable_derived_home_energy_fallback": "Abgeleiteten Home-Energie-Fallback erlauben",
-          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
+          "enable_month_statistics": "Monatsstatistiken importieren",
+          "enable_week_statistics": "Wochenstatistiken importieren",
+          "enable_year_statistics": "Jahresstatistiken importieren",
           "password": "Passwort",
           "username": "E-Mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_ble_writes": "Erlaubt experimentelle lokale BLE-Befehlsschreibzugriffe, wenn der BLE-Transport verbunden ist. Standardmaessig deaktiviert; nur fuer direkte SolarVault-Steuertests nutzen.",
-          "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
-          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
-          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
           "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verf\u00fcgbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
-          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
+          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
+          "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
+          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert."
         },
         "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum urspr\u00fcnglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. F\u00fcr einen Kontowechsel zuerst den Eintrag entfernen.",
         "title": "Jackery SolarVault neu konfigurieren"
@@ -53,16 +53,16 @@
         "data": {
           "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen",
           "create_savings_detail_sensors": "Berechnungsdetails zur Ersparnis erstellen",
-          "enable_ble_transport": "BLE-Transport aktivieren",
           "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
+          "enable_ble_transport": "BLE-Transport aktivieren",
           "password": "Passwort",
           "username": "E-Mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
-          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
-          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
+          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
         },
         "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Ger\u00e4t, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zus\u00e4tzlich zu den App-Werten einen vorzeichenbehafteten Nettowert f\u00fcr Dashboards brauchst.\n\nJackery erlaubt \u00fcblicherweise nur eine aktive Sitzung pro Konto. Halte die Jackery-App vom SolarVault-Account abgemeldet, solange Home Assistant Live-MQTT-Updates empfangen soll. Wenn die App kurz ge\u00f6ffnet wird, pausiert Home Assistant MQTT-Reconnects kurzzeitig, pollt weiter per HTTP und nimmt Live-Updates danach automatisch wieder auf.",
         "title": "Jackery SolarVault"
@@ -253,42 +253,6 @@
       "battery_pack_update_status": {
         "name": "Zusatzbatterie Update-Status"
       },
-      "meter_head_charging_energy": {
-        "name": "Meter-Head Ladeenergie"
-      },
-      "meter_head_communication_state": {
-        "name": "Meter-Head Kommunikationsstatus"
-      },
-      "meter_head_discharging_energy": {
-        "name": "Meter-Head Entladeenergie"
-      },
-      "meter_head_input_power": {
-        "name": "Meter-Head Eingangsleistung"
-      },
-      "meter_head_output_power": {
-        "name": "Meter-Head Ausgangsleistung"
-      },
-      "smart_plug_communication_state": {
-        "name": "Smart-Plug Kommunikationsstatus"
-      },
-      "smart_plug_firmware_version": {
-        "name": "Smart-Plug Firmware-Version"
-      },
-      "smart_plug_input_power": {
-        "name": "Smart-Plug Eingangsleistung"
-      },
-      "smart_plug_output_power": {
-        "name": "Smart-Plug Ausgangsleistung"
-      },
-      "smart_plug_priority": {
-        "name": "Smart-Plug Prioritaet"
-      },
-      "smart_plug_today_energy": {
-        "name": "Smart-Plug Tagesenergie"
-      },
-      "smart_plug_total_energy": {
-        "name": "Smart-Plug Gesamtenergie"
-      },
       "battery_soc": {
         "name": "Batteriestand gesamt"
       },
@@ -300,6 +264,9 @@
       },
       "battery_state": {
         "name": "Batteriezustand"
+      },
+      "ble_transport": {
+        "name": "BLE-Transport"
       },
       "cell_temperature": {
         "name": "Hauptbatterie Zelltemperatur"
@@ -496,6 +463,21 @@
       "max_system_output_power": {
         "name": "Max. Systemausgangsleistung"
       },
+      "meter_head_charging_energy": {
+        "name": "Meter-Head Ladeenergie"
+      },
+      "meter_head_communication_state": {
+        "name": "Meter-Head Kommunikationsstatus"
+      },
+      "meter_head_discharging_energy": {
+        "name": "Meter-Head Entladeenergie"
+      },
+      "meter_head_input_power": {
+        "name": "Meter-Head Eingangsleistung"
+      },
+      "meter_head_output_power": {
+        "name": "Meter-Head Ausgangsleistung"
+      },
       "off_grid_shutdown_state": {
         "name": "Inselbetrieb Auto-aus Status"
       },
@@ -534,9 +516,6 @@
       },
       "pv_year_energy": {
         "name": "PV Jahresenergie"
-      },
-      "ble_transport": {
-        "name": "BLE-Transport"
       },
       "raw_properties": {
         "name": "Rohdaten"
@@ -613,6 +592,27 @@
       "smart_meter_power": {
         "name": "Smart-Meter Netzleistung saldiert"
       },
+      "smart_plug_communication_state": {
+        "name": "Smart-Plug Kommunikationsstatus"
+      },
+      "smart_plug_firmware_version": {
+        "name": "Smart-Plug Firmware-Version"
+      },
+      "smart_plug_input_power": {
+        "name": "Smart-Plug Eingangsleistung"
+      },
+      "smart_plug_output_power": {
+        "name": "Smart-Plug Ausgangsleistung"
+      },
+      "smart_plug_priority": {
+        "name": "Smart-Plug Prioritaet"
+      },
+      "smart_plug_today_energy": {
+        "name": "Smart-Plug Tagesenergie"
+      },
+      "smart_plug_total_energy": {
+        "name": "Smart-Plug Gesamtenergie"
+      },
       "soc_charge_limit": {
         "name": "Ladelimit"
       },
@@ -687,17 +687,17 @@
       "off_grid_shutdown": {
         "name": "Auto-aus (Inselbetrieb)"
       },
-      "standby": {
-        "name": "Standby"
-      },
-      "storm_warning": {
-        "name": "Unwetterwarnung"
-      },
       "smart_plug_priority_enabled": {
         "name": "Smart-Plug Prioritaet"
       },
       "smart_plug_switch": {
         "name": "Smart-Plug"
+      },
+      "standby": {
+        "name": "Standby"
+      },
+      "storm_warning": {
+        "name": "Unwetterwarnung"
       }
     },
     "text": {
@@ -775,26 +775,26 @@
         "data": {
           "create_calculated_power_sensors": "Berechnete Netto-Leistungssensoren erstellen",
           "create_savings_detail_sensors": "Berechnungsdetails zur Ersparnis erstellen",
+          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
           "enable_ble_transport": "BLE-Transport aktivieren",
           "enable_ble_writes": "Experimentelle BLE-Schreibzugriffe aktivieren",
+          "enable_derived_home_energy_fallback": "Abgeleiteten Home-Energie-Fallback erlauben",
+          "enable_month_statistics": "Monatsstatistiken importieren",
           "enable_unredacted_diagnostics": "Unredigierte Entwicklerdiagnose aktivieren",
           "enable_week_statistics": "Wochenstatistiken importieren",
-          "enable_month_statistics": "Monatsstatistiken importieren",
-          "enable_year_statistics": "Jahresstatistiken importieren",
-          "enable_derived_home_energy_fallback": "Abgeleiteten Home-Energie-Fallback erlauben",
-          "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen"
+          "enable_year_statistics": "Jahresstatistiken importieren"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_ble_writes": "Erlaubt experimentelle lokale BLE-Befehlsschreibzugriffe, wenn der BLE-Transport verbunden ist. Standardmaessig deaktiviert; nur fuer direkte SolarVault-Steuertests nutzen.",
+          "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verf\u00fcgbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
+          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
           "enable_unredacted_diagnostics": "Deaktiviert die Redaktion im Diagnose-Export und Payload-Debug-JSONL fuer lokale Fehlersuche. Es legt Zugangsdaten, Seriennummern, Geraete-IDs, MQTT-Topics und bluetoothKey-Werte offen. Vor dem Teilen von Dateien wieder ausschalten.",
           "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
-          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
-          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
-          "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verf\u00fcgbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
-          "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind."
+          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert."
         },
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",
         "title": "Jackery Optionen"
@@ -815,6 +815,16 @@
         }
       },
       "name": "Unwetterwarnung l\u00f6schen"
+    },
+    "query_third_party_mqtt_config": {
+      "description": "Fragt die experimentelle Drittanbieter-MQTT-Bridge-Konfiguration ueber den bestehenden Jackery-MQTT-Befehlskanal ab.",
+      "fields": {
+        "device_id": {
+          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
+          "name": "Geraete-ID"
+        }
+      },
+      "name": "Drittanbieter-MQTT-Konfiguration abfragen"
     },
     "refresh_weather_plan": {
       "description": "Fragt den aktuellen Wetter- und Unwetterplan vom Ger\u00e4t ab. Die Antwort erscheint in den Attributen des Diagnose-Sensors Unwetterplan.",
@@ -840,19 +850,13 @@
       },
       "name": "SolarVault-System umbenennen"
     },
-    "query_third_party_mqtt_config": {
-      "description": "Fragt die experimentelle Drittanbieter-MQTT-Bridge-Konfiguration ueber den bestehenden Jackery-MQTT-Befehlskanal ab.",
-      "fields": {
-        "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
-        }
-      },
-      "name": "Drittanbieter-MQTT-Konfiguration abfragen"
-    },
     "send_ble_command": {
       "description": "Sendet einen experimentellen binaeren BLE-Befehlsframe an das ausgewaehlte Geraet. Benoetigt BLE-Transport, BLE-Schreibzugriffe und eine aktive BLE-Verbindung.",
       "fields": {
+        "ack_timeout": {
+          "description": "Wartezeit in Sekunden auf eine Notify-Antwort des Geraets nach dem Write. Wird ignoriert, wenn \"Auf ACK warten\" aus ist.",
+          "name": "ACK-Timeout"
+        },
         "body": {
           "description": "JSON-Objekt, das verschluesselt und geschrieben wird. Das body-level cmd-Feld eintragen, wenn der Zielbefehl der Firmware es erwartet.",
           "name": "Body"
@@ -872,10 +876,6 @@
         "wait_for_ack": {
           "description": "Auf eine vom Geraet zurueckgesendete, dekodierbare Notify-Antwort warten, bevor der Write als erfolgreich gilt. Fuer Setter empfohlen, damit ein stiller Firmware-Drop den Aufruf fehlschlagen laesst statt verloren zu gehen.",
           "name": "Auf ACK warten"
-        },
-        "ack_timeout": {
-          "description": "Wartezeit in Sekunden auf eine Notify-Antwort des Geraets nach dem Write. Wird ignoriert, wenn \"Auf ACK warten\" aus ist.",
-          "name": "ACK-Timeout"
         }
       },
       "name": "BLE-Befehl senden"

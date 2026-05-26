@@ -25,26 +25,26 @@
         "data": {
           "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
           "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
+          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
           "enable_ble_transport": "Activer le transport BLE",
           "enable_ble_writes": "Activer les \u00e9critures BLE exp\u00e9rimentales",
-          "enable_week_statistics": "Importer les statistiques hebdomadaires",
-          "enable_month_statistics": "Importer les statistiques mensuelles",
-          "enable_year_statistics": "Importer les statistiques annuelles",
           "enable_derived_home_energy_fallback": "Autoriser le fallback d'\u00e9nergie domicile d\u00e9riv\u00e9",
-          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
+          "enable_month_statistics": "Importer les statistiques mensuelles",
+          "enable_week_statistics": "Importer les statistiques hebdomadaires",
+          "enable_year_statistics": "Importer les statistiques annuelles",
           "password": "Mot de passe",
           "username": "Adresse e-mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
           "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
+          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
           "enable_ble_writes": "Autorise les ecritures locales experimentales de commandes BLE lorsque le transport BLE est connecte. Desactive par defaut; a utiliser uniquement pour tester le controle direct du SolarVault.",
-          "enable_week_statistics": "Importe la charge utile de la p\u00e9riode hebdomadaire dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
           "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, d\u00e9rive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs d\u00e9riv\u00e9es sont marqu\u00e9es dans les attributs et diagnostics de source.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery."
+          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
+          "enable_week_statistics": "Importe la charge utile de la p\u00e9riode hebdomadaire dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
+          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment."
         },
         "description": "Mettez \u00e0 jour le mot de passe et les interrupteurs de capteurs facultatifs du compte Jackery {username}. L'adresse e-mail doit correspondre au compte configur\u00e9 \u00e0 l'origine afin que l'ID unique de l'entr\u00e9e reste stable. Pour changer de compte, supprimez d'abord l'entr\u00e9e.",
         "title": "Reconfigurer Jackery SolarVault"
@@ -53,16 +53,16 @@
         "data": {
           "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
           "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
-          "enable_ble_transport": "Activer le transport BLE",
           "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
+          "enable_ble_transport": "Activer le transport BLE",
           "password": "Mot de passe",
           "username": "Adresse e-mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
           "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
-          "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery."
+          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
+          "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut."
         },
         "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la r\u00e9gion et les identifiants MQTT sont d\u00e9couverts automatiquement \u00e0 partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas expos\u00e9s.\n\nLes capteurs facultatifs de puissance nette calcul\u00e9e sont des d\u00e9rivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette sign\u00e9e suppl\u00e9mentaire pour les tableaux de bord.\n\nJackery autorise g\u00e9n\u00e9ralement une seule session active par compte. Gardez l'application Jackery d\u00e9connect\u00e9e du compte SolarVault lorsque Home Assistant doit recevoir les mises \u00e0 jour MQTT en direct. Si l'application est ouverte bri\u00e8vement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises \u00e0 jour en direct.",
         "title": "Jackery SolarVault"
@@ -239,10 +239,10 @@
         "name": "Version du firmware du pack batterie"
       },
       "battery_pack_lifetime_charge_energy": {
-        "name": "Énergie totale chargée du pack batterie"
+        "name": "\u00c9nergie totale charg\u00e9e du pack batterie"
       },
       "battery_pack_lifetime_discharge_energy": {
-        "name": "Énergie totale déchargée du pack batterie"
+        "name": "\u00c9nergie totale d\u00e9charg\u00e9e du pack batterie"
       },
       "battery_pack_serial_number": {
         "name": "Num\u00e9ro de s\u00e9rie du pack batterie"
@@ -252,42 +252,6 @@
       },
       "battery_pack_update_status": {
         "name": "\u00c9tat de mise \u00e0 jour du pack batterie"
-      },
-      "meter_head_charging_energy": {
-        "name": "Energie de charge du compteur"
-      },
-      "meter_head_communication_state": {
-        "name": "Etat de communication du compteur"
-      },
-      "meter_head_discharging_energy": {
-        "name": "Energie de decharge du compteur"
-      },
-      "meter_head_input_power": {
-        "name": "Puissance d'entree du compteur"
-      },
-      "meter_head_output_power": {
-        "name": "Puissance de sortie du compteur"
-      },
-      "smart_plug_communication_state": {
-        "name": "Etat de communication de la prise connectee"
-      },
-      "smart_plug_firmware_version": {
-        "name": "Version du firmware de la prise connectee"
-      },
-      "smart_plug_input_power": {
-        "name": "Puissance d'entree de la prise connectee"
-      },
-      "smart_plug_output_power": {
-        "name": "Puissance de sortie de la prise connectee"
-      },
-      "smart_plug_priority": {
-        "name": "Priorite de la prise connectee"
-      },
-      "smart_plug_today_energy": {
-        "name": "Energie journaliere de la prise connectee"
-      },
-      "smart_plug_total_energy": {
-        "name": "Energie totale de la prise connectee"
       },
       "battery_soc": {
         "name": "Niveau total de batterie"
@@ -300,6 +264,9 @@
       },
       "battery_state": {
         "name": "\u00c9tat de la batterie"
+      },
+      "ble_transport": {
+        "name": "Transport BLE"
       },
       "cell_temperature": {
         "name": "Temp\u00e9rature des cellules de la batterie principale"
@@ -496,6 +463,21 @@
       "max_system_output_power": {
         "name": "Puissance de sortie maximale du syst\u00e8me"
       },
+      "meter_head_charging_energy": {
+        "name": "Energie de charge du compteur"
+      },
+      "meter_head_communication_state": {
+        "name": "Etat de communication du compteur"
+      },
+      "meter_head_discharging_energy": {
+        "name": "Energie de decharge du compteur"
+      },
+      "meter_head_input_power": {
+        "name": "Puissance d'entree du compteur"
+      },
+      "meter_head_output_power": {
+        "name": "Puissance de sortie du compteur"
+      },
       "off_grid_shutdown_state": {
         "name": "\u00c9tat d'arr\u00eat hors r\u00e9seau"
       },
@@ -534,9 +516,6 @@
       },
       "pv_year_energy": {
         "name": "\u00c9nergie PV annuelle"
-      },
-      "ble_transport": {
-        "name": "Transport BLE"
       },
       "raw_properties": {
         "name": "Propri\u00e9t\u00e9s brutes"
@@ -613,6 +592,27 @@
       "smart_meter_power": {
         "name": "Puissance nette du Smart Meter"
       },
+      "smart_plug_communication_state": {
+        "name": "Etat de communication de la prise connectee"
+      },
+      "smart_plug_firmware_version": {
+        "name": "Version du firmware de la prise connectee"
+      },
+      "smart_plug_input_power": {
+        "name": "Puissance d'entree de la prise connectee"
+      },
+      "smart_plug_output_power": {
+        "name": "Puissance de sortie de la prise connectee"
+      },
+      "smart_plug_priority": {
+        "name": "Priorite de la prise connectee"
+      },
+      "smart_plug_today_energy": {
+        "name": "Energie journaliere de la prise connectee"
+      },
+      "smart_plug_total_energy": {
+        "name": "Energie totale de la prise connectee"
+      },
       "soc_charge_limit": {
         "name": "Limite de charge"
       },
@@ -687,17 +687,17 @@
       "off_grid_shutdown": {
         "name": "Arr\u00eat auto (mode hors r\u00e9seau)"
       },
-      "standby": {
-        "name": "Veille"
-      },
-      "storm_warning": {
-        "name": "Alerte temp\u00eate"
-      },
       "smart_plug_priority_enabled": {
         "name": "Priorite prise connectee"
       },
       "smart_plug_switch": {
         "name": "Prise connectee"
+      },
+      "standby": {
+        "name": "Veille"
+      },
+      "storm_warning": {
+        "name": "Alerte temp\u00eate"
       }
     },
     "text": {
@@ -775,26 +775,26 @@
         "data": {
           "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
           "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
+          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
           "enable_ble_transport": "Activer le transport BLE",
           "enable_ble_writes": "Activer les \u00e9critures BLE exp\u00e9rimentales",
+          "enable_derived_home_energy_fallback": "Autoriser le fallback d'\u00e9nergie domicile d\u00e9riv\u00e9",
+          "enable_month_statistics": "Importer les statistiques mensuelles",
           "enable_unredacted_diagnostics": "Activer les diagnostics d\u00e9veloppeur non masqu\u00e9s",
           "enable_week_statistics": "Importer les statistiques hebdomadaires",
-          "enable_month_statistics": "Importer les statistiques mensuelles",
-          "enable_year_statistics": "Importer les statistiques annuelles",
-          "enable_derived_home_energy_fallback": "Autoriser le fallback d'\u00e9nergie domicile d\u00e9riv\u00e9",
-          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s"
+          "enable_year_statistics": "Importer les statistiques annuelles"
         },
         "data_description": {
           "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
           "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
+          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
           "enable_ble_writes": "Autorise les ecritures locales experimentales de commandes BLE lorsque le transport BLE est connecte. Desactive par defaut; a utiliser uniquement pour tester le controle direct du SolarVault.",
+          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, d\u00e9rive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs d\u00e9riv\u00e9es sont marqu\u00e9es dans les attributs et diagnostics de source.",
+          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
           "enable_unredacted_diagnostics": "D\u00e9sactive le masquage dans l'export de diagnostics et le JSONL de debug des payloads pour le d\u00e9pannage local. Cela expose les identifiants, num\u00e9ros de s\u00e9rie, IDs d'appareil, topics MQTT et valeurs bluetoothKey. D\u00e9sactivez cette option avant de partager des fichiers.",
           "enable_week_statistics": "Importe la charge utile de la p\u00e9riode hebdomadaire dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, d\u00e9rive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs d\u00e9riv\u00e9es sont marqu\u00e9es dans les attributs et diagnostics de source.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery."
+          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment."
         },
         "description": "Les capteurs calcul\u00e9s sont des d\u00e9rivations locales facultatives. Les capteurs Smart Meter calculent des valeurs nettes, des valeurs de flux brut par phase et la consommation domestique \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, ils utilisent la puissance nette du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. Ce ne sont pas des valeurs brutes suppl\u00e9mentaires de l'application Jackery.",
         "title": "Options Jackery"
@@ -815,6 +815,16 @@
         }
       },
       "name": "Supprimer l'alerte temp\u00eate"
+    },
+    "query_third_party_mqtt_config": {
+      "description": "Interroge la configuration experimentale du pont MQTT tiers via le canal de commande MQTT Jackery existant.",
+      "fields": {
+        "device_id": {
+          "description": "Selectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numerique de l'appareil Jackery.",
+          "name": "ID de l'appareil"
+        }
+      },
+      "name": "Interroger la configuration MQTT tierce"
     },
     "refresh_weather_plan": {
       "description": "Interroge le plan m\u00e9t\u00e9o et temp\u00eate actuel de l'appareil. La r\u00e9ponse est expos\u00e9e dans les attributs du capteur de diagnostic Plan m\u00e9t\u00e9o.",
@@ -840,19 +850,13 @@
       },
       "name": "Renommer le syst\u00e8me SolarVault"
     },
-    "query_third_party_mqtt_config": {
-      "description": "Interroge la configuration experimentale du pont MQTT tiers via le canal de commande MQTT Jackery existant.",
-      "fields": {
-        "device_id": {
-          "description": "Selectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numerique de l'appareil Jackery.",
-          "name": "ID de l'appareil"
-        }
-      },
-      "name": "Interroger la configuration MQTT tierce"
-    },
     "send_ble_command": {
       "description": "Envoie une trame de commande BLE binaire experimentale a l'appareil selectionne. Necessite le transport BLE, les ecritures BLE et une connexion BLE active.",
       "fields": {
+        "ack_timeout": {
+          "description": "Duree d'attente en secondes pour une notification de l'appareil apres l'ecriture. Ignore lorsque \"Attendre l'ACK\" est desactive.",
+          "name": "Delai d'attente de l'ACK"
+        },
         "body": {
           "description": "Objet JSON a chiffrer et ecrire. Incluez le champ cmd dans le body lorsque la commande firmware cible l'attend.",
           "name": "Body"
@@ -872,10 +876,6 @@
         "wait_for_ack": {
           "description": "Attendre que l'appareil renvoie une trame de notification decodee avant de considerer l'ecriture comme reussie. Recommande pour les setters, afin qu'un abandon silencieux du firmware fasse echouer l'appel au lieu d'etre perdu.",
           "name": "Attendre l'ACK"
-        },
-        "ack_timeout": {
-          "description": "Duree d'attente en secondes pour une notification de l'appareil apres l'ecriture. Ignore lorsque \"Attendre l'ACK\" est desactive.",
-          "name": "Delai d'attente de l'ACK"
         }
       },
       "name": "Envoyer une commande BLE"
