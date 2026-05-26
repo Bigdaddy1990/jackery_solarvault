@@ -18,7 +18,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_CONTROL_SOCKET_PRIORITY,
@@ -285,7 +285,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from .mqtt_push import JackeryMqttPushClient
+    from .client.mqtt_push import JackeryMqttPushClient
 
 from .util import (
     app_data_quality_warnings,
@@ -296,6 +296,7 @@ from .util import (
     apply_year_month_backfill,
     chart_series_debug,
     day_power_energy_points,
+    dev_mode_redactions_disabled,
     diagnostic_redactions_disabled,
     external_trend_statistic_id,
     format_data_quality_warning,
@@ -313,6 +314,18 @@ _PAYLOAD_DEBUG_LOGGER = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
 
 _STATISTICS_BACKFILL_STORE_VERSION = 1
 _STATISTICS_BACKFILL_STORE_KEY = "statistics_backfill"
+
+# Recorder writes ``StatisticsRuns`` rows at minute 55 of each hour as a marker
+# that the *following* hour bucket has been fully compiled. There is no stable
+# public read API for these markers; we therefore read the internal table only
+# from the HA-wins entity-statistics repair path. Both constants below capture
+# the same protocol assumption so they stay in lockstep if the Recorder ever
+# changes its cadence.
+#
+# See PROTOCOL §8 ("Datenquellen-Priorität und Reparaturlogik") and
+# CLAUS §H1 / §M5 for the rationale.
+_STATISTICS_RUNS_COMPILE_MINUTE = 55
+_STATISTICS_RUNS_MINUTE_OFFSET_SECS = _STATISTICS_RUNS_COMPILE_MINUTE * 60
 
 
 def _load_mqtt_push_client() -> type[Any]:
@@ -1029,10 +1042,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
 
-    # Legacy alias kept so external callers/diagnostics that reference the
-    # old name keep working. New code calls ``_should_skip_fast_property_fetch``.
-    _should_skip_refresh_for_live_mqtt = _should_skip_fast_property_fetch
-
     async def async_shutdown(self) -> None:
         """Stop MQTT + BLE clients on integration unload."""
         for task in (
@@ -1350,8 +1359,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # sniffed BLE frames outside the integration. JACKERY_DEV_MODE=1
         # *also* disables redaction in the JSONL log and diagnostics
         # export; both surfaces are off by default.
-        from .util import dev_mode_redactions_disabled
-
         if dev_mode_redactions_disabled():
             import base64 as _base64
 
@@ -1424,8 +1431,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     async def _async_ensure_mqtt(
         self, *, force: bool = False, wait_connected: bool = False
     ) -> None:
-        """Ensure MQTT is connected with credentials from current login session."""
-        if self._mqtt is None:
+        """Ensure MQTT is connected with credentials from current login session.
+
+        ``self._mqtt`` can be set to ``None`` by :meth:`async_shutdown` while
+        this coroutine awaits the credential fetch or the broker handshake.
+        We therefore pin the client into a local reference once and use it
+        for every subsequent attribute access; this prevents the
+        ``'NoneType' object has no attribute 'async_wait_until_connected'``
+        race that was observed in the 2026-05-25 traces.
+        """
+        mqtt = self._mqtt
+        if mqtt is None:
             return
 
         # Fast path: current client is already configured for the current
@@ -1435,10 +1451,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         current_fp = self.api.mqtt_fingerprint
         if (
             not force
-            and self._mqtt.is_started
+            and mqtt.is_started
             and self._mqtt_fingerprint is not None
             and self._mqtt_fingerprint == current_fp
-            and self._mqtt.is_connected
+            and mqtt.is_connected
         ):
             if (
                 self._mqtt_app_conflict_pause_cycles
@@ -1469,13 +1485,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # token/seed frequently.
         if (
             not force
-            and self._mqtt.is_started
+            and mqtt.is_started
             and (
                 (
                     self._mqtt_fingerprint is not None
                     and self._mqtt_fingerprint != current_fp
                 )
-                or not self._mqtt.is_connected
+                or not mqtt.is_connected
             )
             and (now - self._last_mqtt_connect_attempt) < MQTT_RECONNECT_THROTTLE_SEC
         ):
@@ -1511,7 +1527,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER.info("Jackery MQTT: credential session changed, reconnecting")
 
         self._last_mqtt_connect_attempt = time.monotonic()
-        await self._mqtt.async_start(
+        await mqtt.async_start(
             client_id=creds[MQTT_CREDENTIAL_CLIENT_ID],
             username=creds[MQTT_CREDENTIAL_USERNAME],
             password=creds[MQTT_CREDENTIAL_PASSWORD],
@@ -1519,13 +1535,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         if wait_connected:
             try:
-                await self._mqtt.async_wait_until_connected(timeout_sec=15.0)
+                await mqtt.async_wait_until_connected(timeout_sec=15.0)
             except RuntimeError as err:
-                mqtt_last_error = self._mqtt.diagnostics.get("last_error")
+                mqtt_last_error = mqtt.diagnostics.get("last_error")
                 if self._is_mqtt_auth_failure(err) or self._is_mqtt_auth_failure(
                     mqtt_last_error
                 ):
-                    streak = self._mqtt.consecutive_auth_failures
+                    streak = mqtt.consecutive_auth_failures
                     # Likely a token/session race with the official Jackery app.
                     # MQTT pauses and the coordinator continues on HTTP. A
                     # genuine password/token problem will be detected by the
@@ -4454,7 +4470,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self,
         starts: list[datetime],
     ) -> set[int]:
-        """Return HA statistic hours that Recorder has already compiled."""
+        """Return HA statistic hours that Recorder has already compiled.
+
+        Used *only* by the HA-wins entity-statistics repair path: callers must
+        treat an empty result as "do not import" rather than "import freely".
+        The lookup reads the internal ``StatisticsRuns`` table because no
+        stable public read API for the per-hour compile markers exists yet
+        (tracked in CLAUS §H1). All recorder access is guarded by defensive
+        ``try/except`` blocks and falls back to an empty set on any error so
+        that downstream imports stay conservative.
+        """
         if not starts:
             return set()
         try:
@@ -4475,17 +4500,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         range_end = max(starts) + timedelta(hours=1)
 
         def _load_compiled_hours() -> set[int]:
-            with session_scope(session=recorder.get_session()) as session:
-                return {
-                    round(item[0].timestamp()) - 55 * 60
-                    for item in session.query(StatisticsRuns.start)
-                    .filter(
-                        StatisticsRuns.start >= range_start,
-                        StatisticsRuns.start < range_end + timedelta(hours=1),
-                    )
-                    .all()
-                    if item[0] is not None and item[0].minute == 55
-                }
+            # Wrapped in its own try/except so any SQLAlchemy / schema-drift
+            # surprise inside the session is contained and the caller still
+            # receives a clean empty set (= no HA-wins import this round).
+            try:
+                with session_scope(session=recorder.get_session()) as session:
+                    return {
+                        round(item[0].timestamp())
+                        - _STATISTICS_RUNS_MINUTE_OFFSET_SECS
+                        for item in session.query(StatisticsRuns.start)
+                        .filter(
+                            StatisticsRuns.start >= range_start,
+                            StatisticsRuns.start < range_end + timedelta(hours=1),
+                        )
+                        .all()
+                        if item[0] is not None
+                        and item[0].minute == _STATISTICS_RUNS_COMPILE_MINUTE
+                    }
+            except Exception as err:  # noqa: BLE001 - defensive: schema drift
+                _LOGGER.debug(
+                    "StatisticsRuns query failed; falling back to empty set: %s",
+                    err,
+                )
+                return set()
 
         try:
             return await recorder.async_add_executor_job(_load_compiled_hours)
