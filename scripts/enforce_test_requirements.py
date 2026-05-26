@@ -9,7 +9,7 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTS_ROOT = REPO_ROOT / "tests"
 REQUIREMENT_FILES = [
-    REPO_ROOT / "requirements_test.txt",
+    REPO_ROOT / "requirements-test.txt",
     REPO_ROOT / "requirements.txt",
 ]
 STANDARD_LIB = {name.replace(".", "_") for name in sys.stdlib_module_names}

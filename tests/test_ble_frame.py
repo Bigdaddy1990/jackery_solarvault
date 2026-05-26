@@ -13,7 +13,6 @@ import pytest
 
 from custom_components.jackery_solarvault.client.ble import (
     BLE_AES_IV_LEN,
-    BLE_AES_KEY_LEN,
     BLE_AES_KEY_LEN_AES128,
     BLE_AES_KEY_LEN_AES256,
     BLE_AES_KEY_LENGTHS,
@@ -62,9 +61,15 @@ def test_wire_format_constants_match_smali() -> None:
     assert BLE_AES_KEY_LEN_AES128 == 16
     assert BLE_AES_KEY_LEN_AES256 == 32
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
-    # The legacy single-value alias points at AES-128 because that is the
-    # observed wild-type for SolarVault.
-    assert BLE_AES_KEY_LEN == BLE_AES_KEY_LEN_AES128
+
+
+def test_legacy_ble_aes_key_len_alias_emits_deprecation() -> None:
+    """``BLE_AES_KEY_LEN`` still returns AES-128 but warns on access (N5)."""
+    from custom_components.jackery_solarvault.client import ble
+
+    with pytest.warns(DeprecationWarning, match="BLE_AES_KEY_LEN_AES128"):
+        value = ble.BLE_AES_KEY_LEN
+    assert value == BLE_AES_KEY_LEN_AES128
 
 
 def test_gatt_uuids_match_smali_and_live_capture() -> None:
