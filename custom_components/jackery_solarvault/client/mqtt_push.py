@@ -43,12 +43,12 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """
         Filter out common aiomqtt passive socket-reset log messages.
-        
+
         Parameters:
-        	record (logging.LogRecord): The log record to evaluate.
-        
+            record (logging.LogRecord): The log record to evaluate.
+
         Returns:
-        	bool: `True` if the record should be logged, `False` if the record is a suppressed passive socket-reset message.
+            bool: `True` if the record should be logged, `False` if suppressed.
         """
         message = record.getMessage()
         if "failed to receive on socket" not in message:
