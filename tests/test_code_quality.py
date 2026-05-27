@@ -3610,7 +3610,7 @@ def test_pre_commit_script_runs_on_all_files() -> None:
         "pre-commit script must include '--all-files' to check the full tree"
     )
     assert 'bun run pre-commit' in pre_commit_cmd, (
-        "pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)"
+        'pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)'
     )
 
 
