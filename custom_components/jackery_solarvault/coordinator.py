@@ -5580,7 +5580,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 state[_STATISTICS_BACKFILL_LAST_ERROR] = (
                     f"{failed} app chart backfill fetch/import step(s) failed"
                 )
-                _LOGGER.debug(
+                _LOGGER.warning(
                     'Jackery statistics backfill for %s repaired %d bucket(s), %d step(s) failed',
                     device_id,
                     repaired,
