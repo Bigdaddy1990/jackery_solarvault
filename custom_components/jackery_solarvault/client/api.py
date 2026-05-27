@@ -354,7 +354,7 @@ class JackeryApi:
 
         self.last_login_response = dict(data)
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 method=HTTP_METHOD_POST,
                 path=LOGIN_PATH,
                 body={'form_fields': sorted(form_body)},
@@ -692,7 +692,7 @@ class JackeryApi:
                 f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 method=HTTP_METHOD_GET,
                 path=path,
                 params=params,
@@ -1214,7 +1214,7 @@ class JackeryApi:
                 f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 method=HTTP_METHOD_PUT,
                 path=path,
                 body=payload,
@@ -1314,7 +1314,7 @@ class JackeryApi:
                 f"data={data.get(FIELD_DATA)!r}"
             )
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 method=HTTP_METHOD_POST,
                 path=path,
                 body=body,

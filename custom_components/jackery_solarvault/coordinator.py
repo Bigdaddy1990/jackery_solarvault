@@ -432,7 +432,7 @@ def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
         response_data = (
             response.get('data')
             if isinstance(response.get('data'), dict)
-            else response.get('data')
+            else None
         )
     else:
         response_data = None
@@ -983,9 +983,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _defer_background_auth_failure(self, err: ConfigEntryAuthFailed) -> None:
         """Route background auth failures through the next coordinator refresh."""
         message = str(err)
-        if 'MQTT broker rejected credentials' in message or self._is_mqtt_auth_failure(
-            message
-        ):
+        if self._is_mqtt_auth_failure(message):
             streak = self._mqtt.consecutive_auth_failures if self._mqtt else None
             self._pause_mqtt_after_auth_failure(message, streak=streak)
             return
@@ -4267,7 +4265,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
         except Exception as err:
-            _LOGGER.debug('Jackery recorder-statistics import failed: %s', err)
+            _LOGGER.warning('Jackery recorder-statistics import failed: %s', err)
         finally:
             if asyncio.current_task() is self._statistics_import_task:
                 self._statistics_import_task = None
