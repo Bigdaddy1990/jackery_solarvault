@@ -17,10 +17,13 @@ LEGACY_EXCEPT_PATTERN = re.compile(
 
 def _iter_python_files(root: Path) -> list[Path]:
     """
-    Gather all Python (.py) files under the given path recursively.
+    Return a sorted list of all Python (.py) files under `root`, searched recursively.
+    
+    Parameters:
+        root (Path): Directory or path to search for `.py` files.
     
     Returns:
-        list[Path]: Sorted list of file paths for every `.py` file found under `root`.
+        list[Path]: Sorted list of `Path` objects for every `.py` file found under `root`.
     """
     return sorted(path for path in root.rglob("*.py") if path.is_file())
 

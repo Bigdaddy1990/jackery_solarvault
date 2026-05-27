@@ -30,12 +30,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """
-    Set up and register reboot Button entities for devices in the config entry.
+    Set up reboot Button entities for devices in the config entry.
     
-    Creates a JackeryRebootButton for each coordinator-managed device that either reports support for advanced features or exposes the reboot property, avoids registering duplicate entities, and registers a coordinator listener to add new entities only when the coordinator-derived device signature changes.
+    Create a JackeryRebootButton for each coordinator-managed device that either reports support for advanced features or exposes the reboot property, avoid registering duplicate entities, and only add entities when the coordinator-derived device signature changes. Registers a coordinator listener to update discovery when the signature changes.
     
     Parameters:
-        hass (HomeAssistant): Home Assistant instance.
         entry (JackeryConfigEntry): Config entry whose runtime_data contains the integration coordinator.
         async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity instances with Home Assistant.
     """
@@ -44,11 +43,11 @@ async def async_setup_entry(
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
         """
-        Append the entity to the provided list if its unique ID has not been seen and record it to prevent duplicate button entities.
+        Append a ButtonEntity to the list if its unique identifier has not been recorded, and record it to prevent duplicate button entities.
         
         Parameters:
             entities (list[ButtonEntity]): Target list to append the entity to when it is unique.
-            entity (ButtonEntity): Button entity to append if not already recorded.
+            entity (ButtonEntity): Button entity to append if its unique identifier has not been seen.
         """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER

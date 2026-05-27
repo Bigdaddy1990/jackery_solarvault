@@ -40,20 +40,20 @@ _KEY_VALUES: Final = "values"
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """
-    Get the Home Assistant Store configured for the local midnight snapshot cache.
+    Provide the Home Assistant Store configured for the module's local midnight snapshot cache.
     
     Returns:
-        Store[dict[str, Any]]: Store instance configured with this module's storage key and version.
+        The `Store` configured with this module's storage key and version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
 def _isoformat_day(today: date) -> str:
     """
-    Return the ISO day string for the given date.
+    Get the ISO-formatted day string for the specified date.
     
     Returns:
-        str: The date formatted as `YYYY-MM-DD`.
+        str: ISO date in `YYYY-MM-DD` format.
     """
     return today.isoformat()
 
@@ -166,18 +166,16 @@ def daily_delta(
     today: date,
 ) -> int | None:
     """
-    Compute the energy delivered since midnight for a metric using a stored midnight anchor.
-    
-    Returns the difference in watt-hours between `current_lifetime_wh` and the snapshot anchor for `metric_key`, or `None` if the snapshot or values are missing/invalid, the snapshot day does not match `today`, `current_lifetime_wh` is `None` or non-numeric, the metric anchor is missing or non-numeric, or the current counter is less than the anchor (indicating a reset/overflow).
+    Compute today's energy delta for a metric using a stored midnight anchor.
     
     Parameters:
-        snapshot (dict | None): Stored snapshot containing a `day` ISO string and a `values` mapping of metric keys to anchored Wh values.
-        metric_key (str): Metric key to read from the snapshot's `values`.
-        current_lifetime_wh (int | float | None): Current lifetime energy counter value for the metric; `None` disables delta calculation.
-        today (date): Local date used to validate the snapshot's `day`.
+        snapshot (dict | None): Stored snapshot with keys `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
+        metric_key (str): Metric key to read from `snapshot["values"]`.
+        current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
+        today (date): Local date used to validate that `snapshot["day"]` matches the current day.
     
     Returns:
-        int | None: The computed delta in watt-hours, or `None` when computation is disabled or invalid as described above.
+        int | None: The computed delta in watt‑hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None
@@ -260,14 +258,10 @@ def refresh_snapshot(
 
 def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
     """
-    Determine whether a snapshot is for a different day than the given `today`.
-    
-    Parameters:
-        snapshot (dict[str, Any] | None): Persisted per-device snapshot that may contain an ISO day under the `"day"` key.
-        today (date): The current date to compare against the snapshot's stored day.
+    Determine if the provided snapshot represents a different day than the given date.
     
     Returns:
-        `True` if `snapshot` is not a dict or its stored day is not equal to `today`'s ISO date, `False` otherwise.
+        `True` if the snapshot is missing or its stored `"day"` value does not equal `today.isoformat()`, `False` otherwise.
     """
     if not isinstance(snapshot, dict):
         return True
@@ -276,10 +270,13 @@ def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
 
 def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
     """
-    Get the snapshot's stored day as an ISO date string (YYYY-MM-DD).
+    Return the stored ISO day string from a snapshot.
+    
+    Parameters:
+        snapshot (dict | None): Snapshot object expected to contain a string value under the key `_KEY_DAY`.
     
     Returns:
-        `str` containing the ISO day if present and a string, `None` otherwise.
+        str | None: The ISO day string (`YYYY-MM-DD`) if present and a string, otherwise `None`.
     """
     if not isinstance(snapshot, dict):
         return None

@@ -42,13 +42,15 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """
-        Filter out common aiomqtt passive socket-reset log messages.
-
+        Suppress expected aiomqtt passive socket-reset log messages.
+        
+        Evaluates a LogRecord and filters out known benign "failed to receive on socket" messages that include common socket-reset markers.
+        
         Parameters:
             record (logging.LogRecord): The log record to evaluate.
-
+        
         Returns:
-            bool: `True` if the record should be logged, `False` if suppressed.
+            bool: `True` if the record should be logged, `False` otherwise.
         """
         message = record.getMessage()
         if "failed to receive on socket" not in message:
@@ -120,12 +122,12 @@ class JackeryMqttPushClient:
         user_id: str,
     ) -> None:
         """
-        Start or restart the MQTT push client session using the provided credentials.
+        Start or restart the MQTT push client session with the given credentials and user scope.
         
-        If the provided credentials produce the same fingerprint as the running session and the client is already connected, this returns immediately. Otherwise it stops any existing session, prepares the user-scoped subscription topics, builds an SSLContext, records the credential fingerprint and connection attempt, and starts the session runner as a background task. After starting the runner, waits up to 12 seconds for the client to report connected; a timeout is suppressed (no exception).
+        If the provided credentials match the currently running session and the client is already connected, the call returns immediately. Otherwise the method stops any existing session, prepares user-scoped subscription topics, builds an SSLContext, records the credential fingerprint and connection attempt, and starts the session runner as a background task. After starting the runner, it waits up to 12 seconds for the client to report connected; a timeout is suppressed.
         
         Parameters:
-            client_id (str): MQTT client identifier for the session.
+            client_id (str): MQTT client identifier used for the session.
             username (str): MQTT username for authentication.
             password (str): MQTT password for authentication.
             user_id (str): User identifier used to construct the subscription topic namespace.
@@ -196,8 +198,6 @@ class JackeryMqttPushClient:
     async def async_stop(self) -> None:
         """
         Stop the MQTT runner and disconnect the client.
-        
-        Acquires the internal lock, stops any active background session task, and clears internal connection state before returning.
         """
         async with self._lock:
             await self._async_stop_locked()
@@ -259,12 +259,11 @@ class JackeryMqttPushClient:
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
         """
-        Block until the MQTT client is marked connected or raise a RuntimeError if it does not become connected.
+        Wait until the MQTT client becomes connected or raise a RuntimeError on timeout or connection failure.
         
-        Waits up to `timeout_sec` seconds for the internal connected event. If the wait times out, sets `self._last_error` to
-        "publish timeout waiting for MQTT connect" when there is no prior error and then raises `RuntimeError("MQTT not connected yet")`.
-        If a prior error exists or the event completes but the client is not marked connected, raises `RuntimeError` including
-        the current `self._last_error`.
+        If the internal connected event is not set within timeout_sec, sets self._last_error to
+        "publish timeout waiting for MQTT connect" when there is no prior error and raises RuntimeError("MQTT not connected yet").
+        If the event is set but the client is not marked connected, raises RuntimeError including the current self._last_error.
         
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
@@ -310,9 +309,9 @@ class JackeryMqttPushClient:
         ssl_context: ssl.SSLContext,
     ) -> None:
         """
-        Manage an MQTT client session: connect, subscribe to configured topics, process incoming messages, and update connection state.
+        Manage a single MQTT session: connect to the broker, subscribe to configured topics, process incoming messages, and maintain connection state.
         
-        On successful connection, sets internal connection flags and timestamps, subscribes to topics in self._topics, and forwards incoming messages to the internal message handler. If configured, schedules the connect callback once connected and schedules the disconnect callback when a previously established session ends. On errors, updates internal error state and sets or clears the connected event to reflect whether the termination was a connect failure.
+        On successful connection this sets internal connection flags and timestamps, subscribes to topics in self._topics, forwards each incoming message to the internal message handler, and schedules the configured connect callback once. On termination, updates disconnect timestamps and schedules the configured disconnect callback only if the session had been previously established. On connection or runtime errors, records a descriptive last-error string and sets or clears the internal connected event to indicate whether the termination represents a connect failure.
         """
         connected = False
         try:
@@ -380,9 +379,9 @@ class JackeryMqttPushClient:
 
     def _handle_connect_failure(self, rc: int) -> None:
         """
-        Record an MQTT CONNACK failure, update connection state and authentication-failure tracking, and notify any waiters.
+        Record an MQTT CONNACK failure and update connection and authentication-failure state.
         
-        Sets `_connected` to False, stores a human-readable `_last_error` of the form `connect rc=<rc> (<reason>)`, sets `_connected_event`, increments or resets `_consecutive_auth_failures` depending on whether `rc` indicates an authentication failure, updates `_last_connect_failure_signature`, and emits a log message indicating a new or repeated failure.
+        Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc> (<reason>)`, sets `_connected_event` to unblock waiters, and updates authentication-failure tracking and the `_last_connect_failure_signature`. If the failure repeats, emits a debug log; if the repeated failure is an authentication failure that reaches the configured tolerance, emits a warning.
         
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
@@ -425,12 +424,15 @@ class JackeryMqttPushClient:
 
     def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
         """
-        Record a disconnect or connection-failure error and emit a corresponding debug log.
+        Record a disconnect or connection-failure error and update the client's last-error state.
         
-        If the current `_last_error` already indicates a connect failure, this method does nothing.
+        If the current `_last_error` already represents a connect failure, this method is a no-op.
+        Sets `_last_error` to either `"disconnect: <error>"` when `was_connected` is True, or
+        `"connect failed: <error>"` when `was_connected` is False, and emits a debug log entry.
+        
         Parameters:
-        	error (str): The error message to record.
-        	was_connected (bool): If True, record the error as a disconnect; if False, record it as a connect failure.
+            error (str): The error message to record.
+            was_connected (bool): If True, record the error as a disconnect; if False, record it as a connect failure.
         """
         if self._is_connect_failure_error(self._last_error):
             return
@@ -444,13 +446,15 @@ class JackeryMqttPushClient:
     @staticmethod
     def _extract_mqtt_code(err: MqttCodeError) -> int:
         """
-        Extract the integer MQTT return code from a `MqttCodeError`.
+        Return the integer MQTT return code contained in a MqttCodeError.
+        
+        Extracts an integer code from `err.rc` or `err.rc.value`. If neither yields an integer, returns `0`.
         
         Parameters:
-            err (MqttCodeError): Error that may expose a numeric return code via `err.rc` or `err.rc.value`.
+            err (MqttCodeError): Exception instance that may expose a numeric return code.
         
         Returns:
-            int: Extracted integer return code, or 0 if no integer code is present.
+            int: The extracted MQTT return code, or `0` if no integer code is present.
         """
         rc = getattr(err, "rc", None)
         if isinstance(rc, int):
@@ -463,7 +467,7 @@ class JackeryMqttPushClient:
     @staticmethod
     def _is_connect_auth_failure_rc(rc: int) -> bool:
         """
-        Determine whether an MQTT CONNACK return code represents an authentication failure.
+        Determine whether an MQTT CONNACK return code indicates an authentication failure.
         
         Parameters:
             rc (int): CONNACK return code to evaluate.
@@ -531,14 +535,16 @@ class JackeryMqttPushClient:
         payload: bytes | bytearray | str,
     ) -> None:
         """
-        Parse and validate an incoming MQTT message, update diagnostics, and dispatch it to the configured async message callback.
+        Process an incoming MQTT message: validate and normalize its JSON payload, update diagnostics, and dispatch it to the configured async message callback.
         
         Parameters:
         	topic (str): MQTT topic the message was received on.
         	payload (bytes | bytearray | str): Raw message payload; bytes/bytearray are decoded as UTF-8, str is used as-is.
         
         Behavior:
-        	Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or parse failure, or when the JSON value is not an object, increments `_messages_dropped` and sets `_last_message_error`. If the parsed object does not contain a dict at `FIELD_BODY` but does contain a dict at `FIELD_DATA`, copies `FIELD_DATA` into `FIELD_BODY`. On successful validation increments `_messages_seen`, records `_last_message_at` (UTC ISO), clears `_last_message_error`, and schedules the configured message callback with `(topic, data)`.
+        	- Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or parse failure, or when the JSON value is not an object, increments `_messages_dropped` and sets `_last_message_error`.
+        	- If the parsed object lacks a dict at `FIELD_BODY` but contains a dict at `FIELD_DATA`, copies `FIELD_DATA` into `FIELD_BODY`.
+        	- On successful validation increments `_messages_seen`, records `_last_message_at` as a UTC ISO timestamp, clears `_last_message_error`, and schedules the configured async message callback with `(topic, data)`.
         """
         try:
             if isinstance(payload, str):
@@ -590,15 +596,13 @@ class JackeryMqttPushClient:
     @staticmethod
     def _redact_topic(topic: str | None) -> str | None:
         """
-        Redact the user identifier segment from an MQTT topic that uses the configured topic prefix.
-        
-        Replaces the third slash-separated segment with `REDACTED_VALUE` when the first two segments joined by `/` equal `MQTT_TOPIC_PREFIX`.
+        Redacts the user identifier segment from an MQTT topic when the topic uses the configured prefix.
         
         Parameters:
         	topic (str | None): MQTT topic to redact, or `None`.
         
         Returns:
-        	None if `topic` is `None`; otherwise the possibly-redacted topic string.
+        	None if `topic` is `None`; otherwise the topic with the third slash-separated segment replaced by `REDACTED_VALUE` when the first two segments equal `MQTT_TOPIC_PREFIX`, or the original topic string if no redaction applies.
         """
         if topic is None:
             return None
@@ -636,13 +640,13 @@ class JackeryMqttPushClient:
         """
         def topic_value(topic: str | None) -> str | None:
             """
-            Produce the topic with the user-specific segment redacted when redaction is enabled.
+            Return a topic with its user-specific segment redacted when topic redaction is enabled.
             
             Parameters:
                 topic (str | None): MQTT topic to process; may be None.
             
             Returns:
-                str | None: The redacted topic when redaction is enabled, the original topic when redaction is disabled, or `None` if `topic` is `None`.
+                str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled, the original `topic` when redaction is disabled, or `None` if `topic` is `None`.
             """
             return self._redact_topic(topic) if redact_topics else topic
 
@@ -686,9 +690,9 @@ class JackeryMqttPushClient:
 
     def _seconds_since_last_message(self) -> float | None:
         """
-        Return the non-negative number of seconds elapsed since the last received message.
+        Compute the non-negative number of seconds elapsed since the last received message.
         
-        Parses the ISO-8601 timestamp stored in `self._last_message_at` and computes the difference between now and that timestamp. If `_last_message_at` is `None` or cannot be parsed, returns `None`.
+        Parses the ISO-8601 timestamp stored in `self._last_message_at` and returns the difference between now and that timestamp. If `_last_message_at` is `None` or cannot be parsed as an ISO timestamp, returns `None`.
         
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
@@ -715,21 +719,21 @@ class JackeryMqttPushClient:
     @property
     def consecutive_auth_failures(self) -> int:
         """
-        Number of consecutive MQTT authentication failures.
+        Report how many consecutive MQTT connect attempts failed due to authentication.
         
         Returns:
-            int: Count of consecutive authentication failures observed for connect attempts.
+            int: Count of consecutive authentication failure occurrences.
         """
         return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
         """
-        Return whether the MQTT connection has been silent longer than MQTT_SILENT_THRESHOLD_SEC.
+        Determine whether the MQTT connection has been silent longer than the configured threshold.
         
-        Uses the time of the most recent received message when available; otherwise falls back to the last connect time. If the client is not connected or no usable timestamp is available, returns False.
+        If a most-recent message timestamp is available, use it; otherwise fall back to the last successful connect time. If the client is not connected or no usable timestamp exists, this returns `False`.
         
         Returns:
-            `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
+            `True` if the elapsed time since the selected timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
         """
         if not self._connected:
             return False
@@ -748,19 +752,19 @@ class JackeryMqttPushClient:
     @property
     def is_started(self) -> bool:
         """
-        Whether the MQTT push client's background runner task exists.
+        Report whether the MQTT push client's background runner task has been started.
         
         Returns:
-            `True` if the client has an active runner task, `False` otherwise.
+            True if a background runner task exists, False otherwise.
         """
         return self._runner_task is not None
 
     @property
     def is_connected(self) -> bool:
         """
-        Report whether the MQTT client currently has an active connection.
+        Return whether the MQTT client currently has an active connection.
         
         Returns:
-            True if the client is connected to the MQTT broker, False otherwise.
+            `true` if the client is connected to the MQTT broker, `false` otherwise.
         """
         return self._connected

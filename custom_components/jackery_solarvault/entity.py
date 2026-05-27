@@ -130,12 +130,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """
-        Builds DeviceInfo for the parent SolarVault device.
+        Constructs the DeviceInfo for the parent SolarVault device.
         
-        Determines the device display name from, in order: system.device_name, discovery.device_name, properties.wname, and falls back to "Jackery {device_id}". Determines the model from discovery.dev_model, device_meta.model_name, and falls back to "SolarVault". Includes the serial number (from device metadata or discovery) and the software version (from OTA data) when available.
+        The returned DeviceInfo includes identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version. The display name is chosen from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". The model is chosen from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Serial number and software version are included when present in device metadata/discovery and OTA data, respectively.
         
         Returns:
-            DeviceInfo: DeviceInfo containing identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version.
+            DeviceInfo: DeviceInfo populated for the parent SolarVault device.
         """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
@@ -165,14 +165,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         self, plug_index: int, plug: dict[str, Any]
     ) -> DeviceInfo:
         """
-        Build DeviceInfo for a smart-plug subdevice associated with the parent SolarVault.
+        Construct DeviceInfo for a smart-plug subdevice attached to the parent SolarVault.
         
         Parameters:
-            plug_index (int): 1-based index of the smart plug used for the subdevice identifier and fallback name.
-            plug (dict[str, Any]): Payload dictionary for the smart plug containing serial, model, version, and naming fields.
+            plug_index (int): 1-based index used to form the subdevice identifier and fallback display name.
+            plug (dict[str, Any]): Smart-plug payload containing fields such as serial numbers, model/type names, scan name, device name, and version.
         
         Returns:
-            DeviceInfo: Device registry metadata for the smart-plug, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
+            DeviceInfo: Device registry metadata for the smart-plug including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
         """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
@@ -212,12 +212,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def available(self) -> bool:
         """
-        Determine if the entity is currently available.
+        Determine whether the entity is available.
         
-        Availability is derived from the parent coordinator and, when present, the device's online status fields (device metadata then system state); a parsed explicit online state takes precedence. If no explicit state is available, availability falls back to whether the device ID exists in the coordinator data.
+        First verifies the parent coordinator's availability. If present, uses the device metadata `online_status` or the system `online_state` (parsed with `jackery_online_state`) to determine availability; if no explicit state is available, falls back to whether the device ID exists in the coordinator data.
         
         Returns:
-            `true` if the entity is available, `false` otherwise.
+            True if the entity is available, False otherwise.
         """
         if not super().available:
             return False

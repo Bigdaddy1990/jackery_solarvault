@@ -217,7 +217,7 @@ class JackeryBleListener:
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """
-        Return the cached BLE MAC address for the specified device id.
+        Get the cached BLE MAC address for the given device id.
         
         Returns:
             The MAC address string for the device, or `None` if no cached address exists.
@@ -692,9 +692,9 @@ class JackeryBleListener:
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:
         """
-        Maintain a persistent GATT session for the given device, subscribing to notifications and reconnecting on link loss.
+        Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
         
-        This coroutine opens a Bleak client to the provided address, publishes the live client for writers, registers a notify callback, and starts a keep-alive task; on disconnect it tears down the session, updates diagnostics, and retries until the listener is stopped or the task is cancelled.
+        This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
         
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
@@ -913,13 +913,9 @@ class JackeryBleListener:
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
         """
-        Handle a received BLE notification: decrypt and parse the payload, record diagnostics, resolve any pending ACK waiters, and forward a BleFrameObservation to the configured async sink.
+        Process a BLE notification: decode into a BleFrameObservation, update per-device statistics, resolve any pending ACK waiters for a successfully parsed frame, and forward the observation to the configured async sink.
         
-        If a per-device AES key is available the function attempts to decrypt the raw payload and, on failure, performs a single base64-decoded fallback attempt. An observation carrying the original bytes, base64 encoding, parsed frame (or `None`) and a human-readable `decode_error` is always created and sent to the sink. The function updates per-device statistics and resolves pending ACK futures when a frame is successfully parsed; exceptions raised by the sink are caught and logged.
-        
-        Parameters:
-            device_id (str): Integration device identifier for the source peripheral.
-            raw (bytes): Raw notify payload received from the BLE characteristic (wire-format bytes).
+        If a per-device AES key is available the method attempts to decrypt the raw payload and, on decryption failure, performs a single fallback try after base64-decoding the payload. A BleFrameObservation (containing the original bytes, base64 encoding, the parsed frame when decoding succeeds, or a human-readable decode error) is always created and forwarded to the sink. When a frame is parsed successfully this method resolves matching pending ACK futures and increments decode-related counters; when parsing fails it increments the decode-failure counter.
         """
         stats = self.stats_for(device_id)
         stats.frames_received += 1

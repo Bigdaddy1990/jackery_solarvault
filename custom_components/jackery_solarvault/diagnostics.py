@@ -31,7 +31,9 @@ def _redacted_payload_map(
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
     """
-    Create a labeled map of redacted payloads by replacing original mapping keys with stable generated labels.
+    Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
+    
+    Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
     
     Parameters:
         payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
@@ -39,7 +41,7 @@ def _redacted_payload_map(
         redact_keys (frozenset[str]): Field names to redact from each payload.
     
     Returns:
-        dict[str, Any]: Mapping of generated labels to redacted payloads. Non-dict payloads are wrapped as {"value": payload} before redaction.
+        dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(

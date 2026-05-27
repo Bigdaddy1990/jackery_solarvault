@@ -129,10 +129,10 @@ async def async_save_mqtt_session(
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the cached MQTT session for ``entry_id``.
-
-    Called after the broker explicitly rejects cached credentials so the next
-    setup pass forces a fresh login instead of replaying stale values.
+    """
+    Remove the cached MQTT session row for the given config entry.
+    
+    Performs no action if the storage layout or the entry's row does not exist.
     """
     store = _store(hass)
     data = await store.async_load()

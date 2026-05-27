@@ -90,13 +90,10 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
 
 def _normalize_account(value: str) -> str:
     """
-    Normalize an account identifier by removing leading and trailing whitespace.
-    
-    Parameters:
-        value (str): Account identifier to normalize.
+    Normalize an account identifier by stripping leading and trailing whitespace.
     
     Returns:
-        str: Normalized account identifier.
+        The account identifier with leading and trailing whitespace removed.
     """
     return value.strip()
 
@@ -273,9 +270,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """
-        Handle the initial user-driven configuration step for the integration.
+        Handle the initial user-driven configuration step and authenticate the provided Jackery account.
         
-        Validates and normalizes the supplied username, prevents creating a duplicate entry for the same account, attempts to authenticate with the Jackery service using the provided credentials, and on success creates the configuration entry with the supplied credentials and merged initial options. On validation or authentication failure it returns the form with appropriate error messages.
+        Validates and normalizes the submitted username, prevents creating a duplicate entry for the same account, attempts to authenticate with the Jackery service using the provided credentials, and on success creates the configuration entry with the supplied credentials and merged initial options. On validation or authentication failure, returns the form populated with appropriate error messages.
         
         Parameters:
             user_input (dict[str, Any] | None): Form input submitted by the user. Expected keys include `CONF_USERNAME` and `CONF_PASSWORD`, and may include optional integration option fields.
@@ -330,9 +327,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """
-        Reconfigure an existing config entry by validating the provided account and credentials and updating the entry's stored username, password, and options.
+        Reconfigure an existing config entry by validating provided account credentials and updating stored username, password, and options.
         
-        Validates that the provided username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. Shows the reconfigure form with current option defaults when input is missing or invalid, and aborts if the reconfigure target is missing or the provided account does not match the entry.
+        Validates that the submitted username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. If input is missing or invalid, presents the reconfigure form prefilled with current option defaults. Aborts if the reconfigure target is missing or the provided account does not match the entry.
         
         Returns:
             A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.

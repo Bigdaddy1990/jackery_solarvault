@@ -173,15 +173,13 @@ _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 
 def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     """
-    Extract the parent numeric Jackery device identifier by removing any recognized subdevice suffix.
-    
-    If the identifier contains a trailing underscore suffix (e.g., "12345_child"), returns the leading numeric portion; otherwise returns the original input unchanged.
+    Return the parent numeric Jackery device identifier by removing a recognized subdevice suffix.
     
     Parameters:
-        device_id (str): Device identifier potentially containing a subdevice suffix.
+        device_id (str): Device identifier that may include a trailing `_suffix` (e.g., "12345_child").
     
     Returns:
-        str: Parent numeric device identifier when a suffix is present, otherwise the original input.
+        str: The leading numeric device identifier if a suffix is present (e.g., "12345"), otherwise the original input.
     """
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
@@ -189,12 +187,13 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
 
 def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
     """
-    Resolve an HA device-registry id or compound Jackery id to the parent Jackery numeric device id.
+    Resolve a Home Assistant device-registry id or Jackery compound id to the parent Jackery numeric device id.
     
-    If `raw` is an HA device-registry id for a registered device, this function follows any `via_device` chain to the parent device and returns that parent's Jackery identifier with any documented subdevice suffix removed. If no registry match is found, returns `raw` with any documented subdevice suffix removed.
+    Parameters:
+    	raw (str): A device-registry id or a Jackery device identifier that may include a documented subdevice suffix.
     
     Returns:
-        str: The parent Jackery numeric device id with subdevice suffix removed.
+    	parent_id (str): The parent Jackery numeric device id with any documented subdevice suffix removed.
     """
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
@@ -219,7 +218,7 @@ def _coordinator_for_device(
     Locate the coordinator that manages the specified Jackery device id.
     
     Returns:
-        JackerySolarVaultCoordinator for the matching device id, `None` if no coordinator is found.
+        The coordinator that manages the device, or `None` if no matching coordinator is loaded.
     """
     for coordinator in _loaded_coordinators(hass):
         if device_id in (coordinator.data or {}):
@@ -254,15 +253,15 @@ def _service_validation_error(
     error: object,
 ) -> ServiceValidationError:
     """
-    Create a ServiceValidationError using the integration DOMAIN and populate translation placeholders for the device id and error.
+    Constructs a ServiceValidationError with the integration DOMAIN and populated translation placeholders for a device and an error.
     
     Parameters:
-    	translation_key (str): Translation key to use for the error message.
-    	device_id (str): Device identifier placed into the `device_id` translation placeholder.
-    	error (object): Error value converted to string and placed into the `error` translation placeholder.
+        translation_key (str): Translation key to identify the localized error message.
+        device_id (str): Value inserted into the `device_id` translation placeholder.
+        error (object): Value converted to string and inserted into the `error` translation placeholder.
     
     Returns:
-    	ServiceValidationError: A validation error with `translation_domain` set to DOMAIN, `translation_key` set to the provided key, and `translation_placeholders` containing `device_id` and `error`.
+        ServiceValidationError: Error with `translation_domain` set to DOMAIN, `translation_key` set to `translation_key`, and `translation_placeholders` containing `device_id` and `error`.
     """
     return ServiceValidationError(
         translation_domain=DOMAIN,
@@ -276,19 +275,19 @@ def _service_validation_error(
 
 def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
     """
-    Parse a BLE command `body` value from a service call into a mapping.
+    Parse a BLE command `body` value from a service call into a dict.
     
-    Accepts either a mapping (returned as a shallow copy) or a JSON-encoded object string; used to produce the body payload for a BLE command.
+    Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.
     
     Parameters:
-        raw_body (Any): Mapping or JSON string encoding an object to be used as the BLE body.
-        device_id (str): Jackery device identifier used in validation error placeholders.
+        raw_body (Any): Mapping or JSON string encoding an object to use as the BLE body.
+        device_id (str): Jackery device identifier included in validation error placeholders.
     
     Returns:
         dict[str, Any]: Parsed body mapping to send with the BLE command.
     
     Raises:
-        ServiceValidationError: If `raw_body` is not a mapping or a JSON object string, or if JSON parsing fails.
+        ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object string, or if JSON parsing fails.
     """
     if isinstance(raw_body, dict):
         return dict(raw_body)
@@ -420,9 +419,8 @@ async def _async_handle_set_third_party_mqtt_config(
     """
     Send a third-party MQTT configuration to the coordinator that owns the resolved Jackery device.
     
-    Resolves the provided device identifier to a Jackery parent id, locates the owning coordinator, and forwards the requested MQTT configuration (enable, ip, port, username, password, token) to that coordinator. If no coordinator owns the resolved device id or the coordinator call fails, raises a ServiceValidationError with translation placeholders `device_id` and `error`.
-    
     Parameters:
+        hass (HomeAssistant): Home Assistant instance.
         call (ServiceCall): Service call whose `data` must include:
             - SERVICE_FIELD_DEVICE_ID: device identifier string to resolve.
             - SERVICE_FIELD_ENABLE: boolean to enable or disable third-party MQTT.
@@ -513,10 +511,18 @@ async def _async_handle_send_ble_command(
     """
     Send a BLE command frame to a Jackery device.
     
-    The ServiceCall data must include SERVICE_FIELD_DEVICE_ID (target device identifier), SERVICE_FIELD_CMD (numeric command identifier), and SERVICE_FIELD_BODY (a mapping or a JSON object string). Optional keys: SERVICE_FIELD_FLAGS (int, default 0), SERVICE_FIELD_WAIT_FOR_ACK (bool, default False), and SERVICE_FIELD_ACK_TIMEOUT (float seconds, default 5.0).
+    Parameters:
+        hass (HomeAssistant): Home Assistant core instance.
+        call (ServiceCall): Service call containing the following data fields:
+            - SERVICE_FIELD_DEVICE_ID: target device identifier (string). May be a registry device id or a Jackery device id; the handler resolves to the parent Jackery numeric id.
+            - SERVICE_FIELD_CMD: numeric command identifier.
+            - SERVICE_FIELD_BODY: either a mapping (dict) or a JSON-encoded object string that decodes to a mapping.
+            - SERVICE_FIELD_FLAGS (optional): integer flags (default 0).
+            - SERVICE_FIELD_WAIT_FOR_ACK (optional): boolean indicating whether to wait for an acknowledgement (default False).
+            - SERVICE_FIELD_ACK_TIMEOUT (optional): float acknowledgement timeout in seconds (default 5.0).
     
     Raises:
-        ServiceValidationError: with translation key "send_ble_command_failed" when the device cannot be resolved to a coordinator, the body is invalid, a send operation raises an error, or the BLE write was not performed.
+        ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -557,16 +563,16 @@ async def _async_handle_send_device_schedule(
     """
     Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery device.
     
-    Resolves the provided device identifier to its owning Jackery device, parses and validates the schedule `body` (accepting a mapping or a JSON object string), and forwards the request to the coordinator to send the schedule frame.
+    Resolves the provided device identifier to the owning Jackery device, parses the schedule `body` (accepts a mapping or a JSON object string), and forwards the action to the coordinator to send the schedule frame.
     
     Parameters:
-        call (ServiceCall): Service call data containing:
+        call (ServiceCall): Service call whose `data` must include:
             - `device_id` (str): device identifier or Home Assistant device registry id to resolve.
             - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018).
             - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string.
     
     Raises:
-        ServiceValidationError: if the device cannot be resolved to a coordinator, if the `body` is invalid, or if sending the schedule fails.
+        ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -600,15 +606,9 @@ async def _async_handle_send_device_schedule(
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """
-    Register domain-scoped Home Assistant service handlers for the integration.
+    Register the integration's domain-scoped Home Assistant services and their handlers.
     
-    Registers one service handler per supported action (rename system, refresh weather plan,
-    delete storm alert, set/query third-party MQTT config, send BLE command, send device schedule).
-    Each service is registered only if not already present and dispatches incoming ServiceCall objects
-    to the integration's internal async handlers which perform validation and coordinator routing.
-    
-    Parameters:
-        hass (HomeAssistant): Home Assistant core instance used to register services.
+    Registers the following services (if not already present) and wires each to the integration's internal async handler: rename system, refresh weather plan, delete storm alert, set/query third-party MQTT config, send BLE command, and send device schedule. Each service is registered with this module's corresponding voluptuous schema and forwards validated ServiceCall objects to the integration handlers.
     """
     if not hass.services.has_service(DOMAIN, SERVICE_RENAME_SYSTEM):
 
@@ -650,10 +650,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_set_third_party_mqtt(call: ServiceCall) -> None:
             """
-            Forward the incoming Home Assistant service call to the integration handler that sets a device's third‑party MQTT configuration.
+            Dispatches the Home Assistant service call to the integration handler that applies a device's third-party MQTT configuration.
             
-            Parameters:
-                call (ServiceCall): Service call data validated by `SET_THIRD_PARTY_MQTT_SCHEMA`.
+            The `call` data must conform to `SET_THIRD_PARTY_MQTT_SCHEMA`.
             """
             await _async_handle_set_third_party_mqtt_config(hass, call)
 
@@ -668,10 +667,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_query_third_party_mqtt(call: ServiceCall) -> None:
             """
-            Forward the "query third-party MQTT config" service call to the integration handler.
-            
-            Parameters:
-                call (ServiceCall): Service call containing service data; must include the device identifier under `SERVICE_FIELD_DEVICE_ID`.
+            Forward a "query third-party MQTT config" service call to the integration's async handler.
             """
             await _async_handle_query_third_party_mqtt_config(hass, call)
 
@@ -686,10 +682,16 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_send_ble_command(call: ServiceCall) -> None:
             """
-            Dispatches an incoming send-BLE-command service call to the integration's internal handler.
+            Forward a Home Assistant send-BLE-command service call to the integration's internal handler.
             
             Parameters:
-                call: The Home Assistant ServiceCall containing the BLE command fields.
+                call (ServiceCall): Service call whose data must include the send-BLE-command fields:
+                    - `device_id`: target device identifier (string)
+                    - `cmd`: command id (int)
+                    - `body`: command payload (dict or JSON string)
+                    - `flags` (optional): flags for the command (int)
+                    - `wait_for_ack` (optional): whether to wait for an acknowledgement (bool)
+                    - `ack_timeout` (optional): acknowledgement timeout in seconds (float)
             """
             await _async_handle_send_ble_command(hass, call)
 
@@ -704,10 +706,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_send_device_schedule(call: ServiceCall) -> None:
             """
-            Forward the "send device schedule" ServiceCall to the integration's internal handler.
+            Dispatches a service call to send a device schedule frame through the integration.
             
             Parameters:
-                call (ServiceCall): Service call containing `device_id`, `action_id`, and `body` for the schedule frame to send.
+                call (ServiceCall): Service call data containing `device_id` (target device identifier), `action_id` (action code for the schedule), and `body` (schedule payload as a dict or JSON string).
             """
             await _async_handle_send_device_schedule(hass, call)
 

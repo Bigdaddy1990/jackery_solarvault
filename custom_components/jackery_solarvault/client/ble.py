@@ -141,16 +141,16 @@ def hex16(value: int) -> str:
 
 def parse_hex16(text: str) -> int:
     """
-    Parse a 4-character hexadecimal string into its integer value.
+    Convert a 4-character hexadecimal string to its integer value.
     
     Parameters:
-        text (str): Hex string exactly 4 characters long (uppercase or lowercase).
+        text (str): Hex string exactly 4 characters long (case-insensitive).
     
     Returns:
         int: Integer value represented by `text`.
     
     Raises:
-        ValueError: If `text` is not exactly 4 characters long or is not valid hexadecimal.
+        ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
     """
     if len(text) != _HEX16_WIDTH:
         raise ValueError(

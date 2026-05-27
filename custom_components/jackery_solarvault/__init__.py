@@ -153,10 +153,10 @@ async def _async_authenticate(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
     """
-    Create a JackeryApi client from the config entry and perform the initial authentication.
+    Authenticate to the Jackery cloud using credentials from the config entry and return an authenticated API client.
     
     Returns:
-        JackeryApi: Authenticated API client ready for use.
+        JackeryApi: An authenticated API client ready for use.
     
     Raises:
         ConfigEntryAuthFailed: If the provided credentials are rejected (triggers re-auth flow).
@@ -190,10 +190,10 @@ def _local_mqtt_client(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """
-    Get the per-entry local MQTT client stored in hass.data for the given config entry.
+    Return the per-entry local MQTT client stored in hass.data for the given config entry.
     
     Returns:
-        JackeryLocalMqttClient or None: The stored `JackeryLocalMqttClient` instance for the entry, or `None` if no client is stored or the stored value is not a `JackeryLocalMqttClient`.
+        JackeryLocalMqttClient instance for the entry, or None if no client is stored or the stored value is not a JackeryLocalMqttClient.
     """
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
@@ -208,7 +208,13 @@ async def _async_start_local_mqtt(
     """
     Start a per-entry local MQTT client when the config entry enables and provides a host.
     
-    If the third-party MQTT option is disabled or the configured host is empty, this function returns without side effects. When started, the client is stored at hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY] and an unload callback is registered that stops the client and removes that runtime reference only if it still points to the same client instance. Exceptions raised while stopping the client are suppressed. Failures to start or run the local MQTT client do not block the overall integration setup.
+    If the third-party MQTT option is disabled or the configured host is empty, no action is taken. When started, the client is stored at hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY] and an unload callback is registered that stops the client and removes that runtime reference only if it still points to the same client instance. Exceptions raised while stopping the client are suppressed. Failures to start or run the local MQTT client do not block overall integration setup.
+    """
+    
+    """
+    Stop the stored local MQTT client and remove its runtime reference if it matches the stored instance.
+    
+    Stops the client while suppressing any exceptions raised during shutdown. If the runtime storage for the current config entry still holds the same client instance, the runtime key is removed; otherwise no modification is made.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -239,9 +245,9 @@ async def _async_start_local_mqtt(
 
     async def _async_stop_local_mqtt() -> None:
         """
-        Stop the stored local MQTT client and remove its runtime reference if it matches the stored instance.
+        Stop the stored per-entry local MQTT client and remove its hass.data reference if it matches the stored instance.
         
-        Stops the client while suppressing any exceptions raised during shutdown. If the runtime storage for the current config entry still holds the same client instance, the function removes that runtime key from hass.data.
+        Exceptions raised while stopping the client are suppressed.
         """
         with contextlib.suppress(Exception):
             await client.async_stop()
@@ -348,12 +354,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
 def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     """
-    Remove stale Energy helper sensors that were created without a unit.
+    Remove stale Energy helper entities that were created without a unit of measurement.
     
-    Scans the entity registry for entities whose entity_id starts with STALE_ENERGY_HELPER_PREFIX
-    and ends with STALE_NET_POWER_SUFFIX. If the current state has no `unit_of_measurement`
-    (or it is empty) and the entity_id contains any token from STALE_HELPER_VENDOR_TOKENS,
-    the entity is removed and an informational log entry is written.
+    Scans the entity registry for entities whose entity_id starts with the configured
+    STALE_ENERGY_HELPER_PREFIX and ends with STALE_NET_POWER_SUFFIX. If an entity's
+    current state has no `unit_of_measurement` (missing or empty) and its entity_id
+    contains any token from STALE_HELPER_VENDOR_TOKENS, the entity is removed from
+    the registry and an informational log entry is emitted.
     """
     registry = er.async_get(hass)
     to_remove: list[str] = []
@@ -411,14 +418,14 @@ def _async_remove_entities_with_suffixes(
     log_label: str,
 ) -> None:
     """
-    Remove entity-registry entries for a config entry in the given domain whose legacy unique IDs match any of the supplied legacy suffixes.
+    Remove entity-registry entries for the given config entry and domain whose legacy unique IDs end with any of the provided legacy suffixes.
     
-    Matching is anchored to the legacy unique-id shape to avoid accidental matches against current unique IDs. If `suffixes` is empty, no action is taken.
+    Matching only applies when the unique ID conforms to the legacy unique-id shape to avoid accidental removal of current entities. If `suffixes` is empty, the function performs no action.
     
     Parameters:
         domain (str): Entity domain to restrict removals (e.g., "sensor", "binary_sensor").
-        suffixes (Iterable[str]): Legacy suffix strings to match against entity unique IDs; entries are removed if their unique ID matches any suffix.
-        log_label (str): Human-readable label used in removal log messages.
+        suffixes (Iterable[str]): Iterable of legacy unique-id suffix strings; an entity is removed if its unique ID matches any suffix.
+        log_label (str): Human-readable label included in removal log messages.
     """
     suffix_tuple = tuple(suffixes)
     if not suffix_tuple:

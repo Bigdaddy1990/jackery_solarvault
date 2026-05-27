@@ -114,9 +114,9 @@ class JackeryLocalMqttClient:
 
     async def async_start(self) -> None:
         """
-        Start the background MQTT session and initiate a connection attempt.
+        Start the background MQTT session runner and trigger an initial connection attempt.
         
-        If a session task is already running, this is a no-op. Schedules the session runner task and waits up to 10 seconds for the initial connection outcome so diagnostics reflect the attempt.
+        If a runner is already active, this call is a no-op. Schedules the session task as a Home Assistant background task, resets connection state, increments the internal connect attempt counter, and waits up to 10 seconds for the initial connection result so diagnostics reflect the attempt.
         """
         async with self._lock:
             if self._runner_task is not None and not self._runner_task.done():
@@ -166,9 +166,9 @@ class JackeryLocalMqttClient:
 
     async def _async_run_session(self) -> None:
         """
-        Run a single MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
+        Run one MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
         
-        On successful connect, update connection state and timestamps; dispatch each received message to the client's message handler; record subscription and connection errors for diagnostics; and always set the internal connected event to avoid start waiters deadlocking.
+        On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
         """
         connected = False
         try:
@@ -228,10 +228,10 @@ class JackeryLocalMqttClient:
 
     def _handle_connect_failure(self, rc: int) -> None:
         """
-        Record that the broker rejected the connection and update diagnostic state.
+        Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
         
         Parameters:
-            rc (int): MQTT CONNACK return code indicating the broker's rejection reason.
+            rc (int): MQTT CONNACK return code provided by the broker indicating the reason for refusal.
         """
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
@@ -246,11 +246,11 @@ class JackeryLocalMqttClient:
 
     def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
         """
-        Record a disconnect or connection-setup failure and update the client's last-error state.
+        Record a connection setup failure or a disconnect and update the client's last-error state.
         
         Parameters:
             error (str): Human-readable error message to record.
-            was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened during connection setup.
+            was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened while attempting to connect.
         """
         if was_connected:
             self._last_error = f"disconnect: {error}"
@@ -288,9 +288,9 @@ class JackeryLocalMqttClient:
         payload: bytes | bytearray | str,
     ) -> None:
         """
-        Handle an incoming MQTT message: update diagnostics, attempt to decode a UTF-8 JSON object payload, and dispatch the result to the configured sink.
+        Process a received MQTT message: record diagnostics, decode the payload, and forward a parsed JSON object (if any) to the configured sink.
         
-        If the payload decodes to a JSON object (`dict`), that object is delivered as `data`. If the payload is binary, not valid UTF-8, invalid JSON, or JSON that is not an object (e.g., list or scalar), the message is counted as dropped and `data` is `None`. First-seen topic names are recorded up to LOCAL_MQTT_MAX_TOPIC_NAMES to aid diagnostics.
+        If the payload is UTF-8 text and parses as a JSON object, that dict is delivered to the sink as `data`. If the payload is binary or cannot be decoded as UTF-8, the message is counted as dropped and `data` is `None`. If UTF-8 text parses as JSON but the result is not an object (e.g., a list or scalar), the message is counted as dropped and `data` is `None`. If JSON parsing fails (invalid JSON), `data` remains `None` but the dropped counter is not incremented. First-seen topic names are recorded up to LOCAL_MQTT_MAX_TOPIC_NAMES for diagnostics.
         
         Parameters:
             topic (str): MQTT topic name of the message.
@@ -350,10 +350,12 @@ class JackeryLocalMqttClient:
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
             """
-            Log any non-cancellation exception raised by a completed asyncio Task.
+            Log any non-cancellation exception from a completed asyncio Task.
+            
+            Retrieves the task result to surface exceptions raised by the task; ignores CancelledError. Logs other exceptions at error level with context identifying the handler label.
             
             Parameters:
-                done (asyncio.Task[None]): The completed task whose exception, if any, will be retrieved and logged; CancelledError is ignored.
+                done (asyncio.Task[None]): Completed task whose exception, if raised, will be logged.
             """
             try:
                 done.result()
@@ -430,19 +432,19 @@ class JackeryLocalMqttClient:
     @property
     def is_started(self) -> bool:
         """
-        Indicates whether the background MQTT session runner task has been started.
+        Report whether the background MQTT session runner task has been started.
         
         Returns:
-            `true` if the runner task exists, `false` otherwise.
+            True if the runner task exists, False otherwise.
         """
         return self._runner_task is not None
 
     @staticmethod
     def _utc_now_iso() -> str:
         """
-        Get the current UTC time as an ISO 8601 string including the timezone offset.
+        Return the current UTC time as an ISO 8601 string including the timezone offset.
         
         Returns:
-            iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. '2026-05-27T12:34:56+00:00').
+            iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """
         return datetime.now(UTC).isoformat()

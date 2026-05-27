@@ -266,13 +266,13 @@ class JackeryApi:
     # --- headers ------------------------------------------------------------
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
         """
-        Constructs HTTP headers that mimic the Android client for API requests.
+        Builds HTTP headers emulating the Android client for API requests.
         
         Parameters:
-            with_token (bool): If True and an authentication token is present on the client, include the auth header.
+        	with_token (bool): If True and the client has an authentication token, include the auth token header.
         
         Returns:
-            dict[str, str]: Mapping of HTTP header names to values to use for the request.
+        	headers (dict[str, str]): Mapping of HTTP header names to values. Includes the auth token header when `with_token` is True and a token is present.
         """
         h = {
             "accept-encoding": "gzip",
@@ -294,7 +294,18 @@ class JackeryApi:
     # --- auth ---------------------------------------------------------------
     @staticmethod
     def _normalize_mqtt_mac_id(value: str) -> str:
-        """Normalize and validate the app-style macId token."""
+        """
+        Normalize and validate an app-style MQTT MAC identifier.
+        
+        Parameters:
+            value (str): The input MAC identifier string to normalize.
+        
+        Returns:
+            str: The normalized MAC identifier (lowercase, stripped).
+        
+        Raises:
+            JackeryAuthError: If the normalized value does not match 33 lowercase hexadecimal characters.
+        """
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
@@ -501,10 +512,13 @@ class JackeryApi:
     @staticmethod
     def _extract_code(data: dict[str, Any] | Any) -> int | None:
         """
-        Retrieve the backend `code` value from a parsed response and parse it as an integer.
+        Extracts the backend numeric `code` value from a parsed API response.
+        
+        Parameters:
+            data (dict | Any): Parsed JSON response (expected dict) or any other value.
         
         Returns:
-            int: The parsed `code` when present as an integer or a numeric string, `None` otherwise.
+            int | None: The `code` parsed as an integer when present as an integer or a numeric string, `None` otherwise.
         """
         if not isinstance(data, dict):
             return None
@@ -897,7 +911,7 @@ class JackeryApi:
         """
         Retrieve the price history configuration for the specified system.
         
-        Stores the raw parsed API response in `self.last_price_history_config_response`.
+        Stores the raw parsed API response in self.last_price_history_config_response.
         
         Returns:
             dict: The response `data` payload as a dict; empty dict if the payload is missing or not a dict.
@@ -911,12 +925,9 @@ class JackeryApi:
     # --- Additional app-statistic endpoints from PROTOCOL.md §2 ----------
     async def async_get_device_statistic(self, device_id: str | int) -> dict:
         """
-        Retrieve current-day energy flow statistics for a device.
+        Retrieve current-day energy flow statistics for the specified device.
         
-        The returned dictionary contains metric keys (strings) whose values are numeric measurements formatted as strings in kilowatt-hours (kWh). Expected keys include:
-        pvEgy, inEpsEgy, ongridOtBatEgy, pvOtBatEgy, inOngridEgy,
-        outOngridEgy, batOtGridEgy, outEpsEgy, batDisChgEgy,
-        acOtBatEgy, batOtAcEgy, batChgEgy
+        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. Keys present may vary by device and backend response.
         
         Returns:
             dict: Mapping of statistic keys to their values as strings in kWh.
@@ -1086,10 +1097,10 @@ class JackeryApi:
         end_date: str | None = None,
     ) -> dict[str, Any]:
         """
-        Retrieve EPS (off-grid) energy input/output statistics for a device over a specified period.
+        Retrieve EPS (off-grid) energy input/output statistics for a device for a specified period.
         
         Returns:
-            dict: Payload containing aggregated totals (for example, `totalInEpsEnergy`, `totalOutEpsEnergy`), chart series arrays such as `x`, `y`, `y1`, and `y2`, and may include an `APP_REQUEST_META` entry with the request parameters used.
+            dict: Payload containing aggregated totals (e.g., `totalInEpsEnergy`, `totalOutEpsEnergy`), chart series arrays (`x`, `y`, `y1`, `y2`), and, when present, an `APP_REQUEST_META` dict with the request parameters used.
         """
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
@@ -1273,7 +1284,15 @@ class JackeryApi:
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict:
-        """GET /v1/device/stat/sys/battery/trends — battery charge/discharge history."""
+        """
+        Retrieve battery charge and discharge trends for the given system.
+        
+        If the returned payload is non-empty, attaches request metadata under `APP_REQUEST_META`
+        containing the request's `dateType`, `beginDate`, and `endDate`.
+        
+        Returns:
+            dict: Normalized payload dictionary extracted from the API response (may be empty).
+        """
         begin_date, end_date = app_period_date_bounds(
             date_type, begin_date=begin_date, end_date=end_date
         )
@@ -1345,10 +1364,10 @@ class JackeryApi:
 
     async def async_get_location(self, device_id: str | int) -> dict:
         """
-        Retrieve GPS coordinates previously set by the user for the given device.
+        Retrieve the GPS coordinates previously set for the specified device.
         
         Returns:
-            dict: The API payload's `data` object as a dict containing location fields (e.g., latitude/longitude); returns an empty dict if the payload is missing or not a dict.
+            dict: The API payload's `data` object containing location fields (e.g., `latitude`, `longitude`); an empty dict if `data` is missing or not a dict.
         """
         data = await self._get_json(
             LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -1359,16 +1378,16 @@ class JackeryApi:
     # --- HTTP write endpoints documented in PROTOCOL.md §2 --------------
     async def _put_json(self, path: str, payload: dict) -> dict:
         """
-        Send a JSON PUT to the API path, ensuring a valid auth token and retrying once after re-login if the token has expired.
+        Send a JSON PUT to the given API path, ensuring a valid auth token and retrying once after re-login if the token has expired.
         
-        If the response body cannot be parsed as JSON, the returned dict will contain `FIELD_RAW_TEXT` with truncated raw text.
+        If the response body cannot be parsed as JSON, the returned dict contains `FIELD_RAW_TEXT` with truncated raw text.
         
         Returns:
-            dict: The parsed response JSON, or a dict containing `FIELD_RAW_TEXT` when JSON parsing failed.
+            dict: Parsed response JSON, or a dict containing `FIELD_RAW_TEXT` when JSON parsing failed.
         
         Raises:
-            JackeryAuthError: When the response indicates an authorization/authentication failure.
-            JackeryApiError: On network/request failures, non-200 HTTP status, or non-OK backend `code`.
+            JackeryAuthError: When the response indicates an authorization or authentication failure.
+            JackeryApiError: On network/request failures, non-200 HTTP status, or backend `code` that is neither `CODE_OK` nor `None`.
         """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
@@ -1444,17 +1463,17 @@ class JackeryApi:
         self, system_id: str | int, system_name: str
     ) -> bool:
         """
-        Rename the system identified by system_id to the provided system_name.
+        Rename the specified system to the given name.
         
         Parameters:
             system_id (str | int): Identifier of the system to rename.
             system_name (str): New name for the system; must be a non-empty string.
         
         Returns:
-            bool: `True` if the server acknowledged the rename, `False` otherwise.
+            bool: `true` if the server acknowledged the rename, `false` otherwise.
         
         Raises:
-            JackeryApiError: If `system_name` is empty or if the API request fails.
+            JackeryApiError: If `system_name` is empty after trimming or if the API request fails.
         """
         if not system_name or not system_name.strip():
             raise JackeryApiError("system_name must be a non-empty string")
@@ -1593,11 +1612,10 @@ class JackeryApi:
         currency: str,
     ) -> bool:
         """
-        Set a system's fixed electricity price for dynamic pricing mode.
+        Set the system's fixed electricity price for dynamic pricing mode.
         
         Parameters:
-            system_id (str | int): Identifier of the target system.
-            single_price (float | str): Price value (or string) that must be greater than or equal to 0; formatted to at most four decimal places before sending.
+            single_price (float | str): Price value that must be greater than or equal to 0; will be formatted to at most four decimal places before sending.
             currency (str): Non-empty currency code or label.
         
         Returns:
@@ -1636,12 +1654,12 @@ class JackeryApi:
         Enable or update dynamic pricing mode for a system.
         
         Parameters:
-            system_id: Identifier of the target system.
-            platform_company_id: Platform company identifier required by the API.
-            system_region: Region code for the system; must be a non-empty string.
+            system_id (str | int): Identifier of the target system.
+            platform_company_id (int): Platform company identifier required by the API.
+            system_region (str): Region code for the system; must be a non-empty string.
         
         Returns:
-            `true` if the server accepted the change, `false` otherwise.
+            True if the server accepted the change, False otherwise.
         
         Raises:
             JackeryApiError: If `system_region` is empty.

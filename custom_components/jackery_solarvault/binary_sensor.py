@@ -96,11 +96,11 @@ async def async_setup_entry(
         entities: list[BinarySensorEntity], entity: BinarySensorEntity
     ) -> None:
         """
-        Append the given binary sensor entity to the entities list if its unique identifier has not already been seen.
+        Add the entity to the provided list and record its unique ID if that ID has not already been seen.
         
         Parameters:
-            entities (list[BinarySensorEntity]): Mutable list to which the entity will be added when not duplicated.
-            entity (BinarySensorEntity): Binary sensor entity to append; its unique id will be recorded to prevent duplicate registration.
+            entities (list[BinarySensorEntity]): List to append the entity to when its unique ID is new.
+            entity (BinarySensorEntity): Binary sensor entity whose unique ID will be checked and recorded.
         """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="binary_sensor", logger=_LOGGER
@@ -110,10 +110,10 @@ async def async_setup_entry(
         """
         Collect binary sensor entities for every device in the coordinator payload.
         
-        For each device this creates one JackeryBinarySensor per entry in BINARY_DESCRIPTIONS and one JackerySmartPlugStateBinarySensor for each smart plug that has a serial number, preserving plug index and serial for stable binding across payload reorders.
+        For each device, create one JackeryBinarySensor per description in BINARY_DESCRIPTIONS and one JackerySmartPlugStateBinarySensor for each smart plug that has a serial number. Smart-plug entities capture a 1-based plug index and the plug serial to maintain stable binding across payload reorders.
         
         Returns:
-            list[BinarySensorEntity]: List of constructed binary sensor entities ready to be added.
+            list[BinarySensorEntity]: Constructed binary sensor entities ready to be added.
         """
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -182,7 +182,7 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         Determine whether the binary sensor is currently active.
         
         Returns:
-            `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
+            bool | None: `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
         """
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
@@ -246,7 +246,9 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """
-        Return whether the smart plug's power output is active.
+        Determine whether the smart plug's power output is active.
+        
+        Checks the plug payload for switch state fields and coerces the value to a boolean.
         
         Returns:
             `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
@@ -259,10 +261,12 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """
-        Provide diagnostic attributes for the smart plug, including its 1-based plug index and any available metadata fields.
+        Return diagnostic attributes for the smart plug, always including its 1-based `plug_index`.
+        
+        Includes any of the following fields from the matched plug payload when present: `FIELD_DEVICE_NAME`, `FIELD_SCAN_NAME`, `FIELD_COMM_STATE`, `FIELD_COMM_MODE`, `FIELD_SWITCH_STATE`, `FIELD_SYS_SWITCH`, `FIELD_VERSION`.
         
         Returns:
-            dict[str, Any]: Mapping of attribute names to values. Always contains `plug_index`; when present in the plug payload includes any of `FIELD_DEVICE_NAME`, `FIELD_SCAN_NAME`, `FIELD_COMM_STATE`, `FIELD_COMM_MODE`, `FIELD_SWITCH_STATE`, `FIELD_SYS_SWITCH`, `FIELD_VERSION`.
+            dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
         """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
