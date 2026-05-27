@@ -1,1 +1,1 @@
-COORDINATOR_CONTENT
+"""Coordinator for Jackery SolarVault integration."""
