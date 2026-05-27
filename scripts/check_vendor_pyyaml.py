@@ -17,7 +17,7 @@ import sys
 from typing import Any
 
 from packaging.version import InvalidVersion, Version
-from pip._vendor import requests
+import requests
 
 ANNOTATEDYAML_INIT = Path("annotatedyaml/_vendor/yaml/__init__.py")
 ANNOTATEDYAML_MODULE = Path("annotatedyaml/_vendor/yaml.py")
