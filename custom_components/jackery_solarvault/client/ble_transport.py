@@ -177,20 +177,15 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """Build the listener.
-
-        :param key_resolver: returns the 16-or-32-byte AES key for a device
-            id, or None when the integration has not seen the device's
-            HTTP entry yet. Read from the coordinator via
-            ``coordinator.device_bluetooth_key``.
-        :param ble_address_resolver: returns the BLE MAC for a Jackery
-            device id, or None. The listener feeds its own MAC cache back
-            via :meth:`address_for_device_id`.
-        :param serial_resolver: maps a BLE-broadcast serial (typically the
-            HTTP serial without its leading model-letter) back to the
-            Jackery device id. Provided by
-            ``coordinator.device_id_for_ble_serial``. When omitted the
-            listener can only log unmapped advertisements.
+        """
+        Construct a Jackery BLE listener that observes notifications and forwards parsed frames to a sink.
+        
+        Parameters:
+            hass (HomeAssistant): Home Assistant instance used for bluetooth callbacks and background tasks.
+            sink (FrameSink): Async callable invoked with (device_id, BleFrameObservation) for each observed frame.
+            key_resolver (Callable[[str], bytes | None]): Returns the 16- or 32-byte AES key for a given device_id, or None if unavailable.
+            ble_address_resolver (Callable[[str], str | None]): Returns the BLE MAC for a given device_id, or None; the listener also caches discovered addresses and exposes them via address_for_device_id.
+            serial_resolver (Callable[[str], str | None] | None): Maps a BLE-broadcast serial string to a Jackery device_id; when omitted incoming advertisements with unmapped serials are logged but not associated.
         """
         self._hass = hass
         self._sink = sink
@@ -222,7 +217,7 @@ class JackeryBleListener:
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """
-        Retrieve the cached BLE MAC address for the given device id.
+        Return the cached BLE MAC address for the specified device id.
         
         Returns:
             The MAC address string for the device, or `None` if no cached address exists.
@@ -572,9 +567,9 @@ class JackeryBleListener:
 
     async def async_stop(self) -> None:
         """
-        Stop the BLE listener and clean up resources.
+        Stop the BLE listener and release its resources.
         
-        Sets the internal stop event, unregisters Home Assistant bluetooth callbacks, cancels running connection tasks and awaits their termination up to _STOP_TIMEOUT_SEC (tasks that do not exit within the timeout are left to the event loop), clears connection state, cancels any pending ACK futures to prevent awaiting writers from hanging, and logs listener shutdown.
+        Signals the listener to stop, unregisters Bluetooth advertisement callbacks, cancels active connection runner tasks and waits up to _STOP_TIMEOUT_SEC for them to exit, clears connection state, and cancels any pending ACK futures so callers waiting for acknowledgements do not hang. Logs the listener shutdown.
         """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
@@ -699,7 +694,7 @@ class JackeryBleListener:
         """
         Maintain a persistent GATT session for the given device, subscribing to notifications and reconnecting on link loss.
         
-        On a successful connection the live Bleak client is published for writers, a notify callback is registered and a keep-alive task is started; on disconnect the session is torn down, statistics are updated, and the method waits and retries until the listener is stopped or the task is cancelled.
+        This coroutine opens a Bleak client to the provided address, publishes the live client for writers, registers a notify callback, and starts a keep-alive task; on disconnect it tears down the session, updates diagnostics, and retries until the listener is stopped or the task is cancelled.
         
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
@@ -897,9 +892,12 @@ class JackeryBleListener:
 
     def _on_disconnect(self, device_id: str) -> None:
         """
-        Record a peripheral disconnect for the given device and emit an info-level log.
+        Handle a peripheral disconnect for the given device.
         
-        Updates the device's stats `last_disconnect_at` timestamp to the current time and logs an informational message indicating the peripheral disconnected. Intended to be invoked by the BLE client's disconnect callback.
+        Updates the device's `BleListenerStats.last_disconnect_at` to the current time and emits an info-level log indicating the device disconnected.
+        
+        Parameters:
+            device_id (str): Identifier of the device whose disconnect is being recorded.
         """
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
@@ -915,9 +913,9 @@ class JackeryBleListener:
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
         """
-        Decrypt and parse a received BLE notify frame and forward a unified observation to the configured sink.
+        Handle a received BLE notification: decrypt and parse the payload, record diagnostics, resolve any pending ACK waiters, and forward a BleFrameObservation to the configured async sink.
         
-        Attempts to decrypt `raw` using the per-device AES `bluetoothKey` resolved from the coordinator; if decryption fails the function will try a single base64-decoded fallback and records a human-readable `decode_error` when no valid frame can be produced. Regardless of decode success, a BleFrameObservation containing the original bytes, base64 representation, parsed frame (or `None`) and any decode error is created and sent to the instance's async sink. The function also updates per-device stats, resolves any pending ACK waiters when a frame is successfully parsed, and logs diagnostic messages.
+        If a per-device AES key is available the function attempts to decrypt the raw payload and, on failure, performs a single base64-decoded fallback attempt. An observation carrying the original bytes, base64 encoding, parsed frame (or `None`) and a human-readable `decode_error` is always created and sent to the sink. The function updates per-device statistics and resolves pending ACK futures when a frame is successfully parsed; exceptions raised by the sink are caught and logged.
         
         Parameters:
             device_id (str): Integration device identifier for the source peripheral.

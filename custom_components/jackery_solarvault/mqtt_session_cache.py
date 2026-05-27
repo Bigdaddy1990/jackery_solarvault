@@ -49,10 +49,10 @@ async def async_load_mqtt_session(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
     """
-    Retrieve cached MQTT session credentials for a config entry from persistent storage.
+    Load cached MQTT session credentials for the given config entry from persistent storage.
     
     Returns:
-        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present and non-empty.
+        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` if present.
         None: If storage is missing or malformed, or any required field is missing or empty.
     """
     data = await _store(hass).async_load()

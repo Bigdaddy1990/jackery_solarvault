@@ -130,12 +130,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """
-        Builds the DeviceInfo for this entity's parent device.
+        Builds DeviceInfo for the parent SolarVault device.
         
-        Selects the device display name from system.device_name, discovery.device_name, properties.wname, or falls back to "Jackery {device_id}". Selects the model from discovery.dev_model, device_meta.model_name, or falls back to "SolarVault". If present, includes the device serial number (from device metadata or discovery) and the software version (from OTA data).
+        Determines the device display name from, in order: system.device_name, discovery.device_name, properties.wname, and falls back to "Jackery {device_id}". Determines the model from discovery.dev_model, device_meta.model_name, and falls back to "SolarVault". Includes the serial number (from device metadata or discovery) and the software version (from OTA data) when available.
         
         Returns:
-            DeviceInfo: DeviceInfo with identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version.
+            DeviceInfo: DeviceInfo containing identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version.
         """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
@@ -165,16 +165,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         self, plug_index: int, plug: dict[str, Any]
     ) -> DeviceInfo:
         """
-        Construct a DeviceInfo record for a smart-plug subdevice linked to the parent SolarVault device.
-        
-        This record is intended to be static (typically created once during entity initialization and cached) and links the plug to the parent device via `via_device`.
+        Build DeviceInfo for a smart-plug subdevice associated with the parent SolarVault.
         
         Parameters:
-            plug_index (int): 1-based index of the smart plug used to build a unique identifier and fallback display name.
-            plug (dict[str, Any]): Payload dictionary for the smart plug providing serial, model, version, and naming fields.
+            plug_index (int): 1-based index of the smart plug used for the subdevice identifier and fallback name.
+            plug (dict[str, Any]): Payload dictionary for the smart plug containing serial, model, version, and naming fields.
         
         Returns:
-            DeviceInfo: Device registry metadata for the smart-plug subdevice, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
+            DeviceInfo: Device registry metadata for the smart-plug, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
         """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)

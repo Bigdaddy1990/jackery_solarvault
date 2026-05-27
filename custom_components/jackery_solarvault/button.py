@@ -44,11 +44,11 @@ async def async_setup_entry(
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
         """
-        Append a button entity to a collection if its unique ID has not been seen and record it to prevent duplicates.
+        Append the entity to the provided list if its unique ID has not been seen and record it to prevent duplicate button entities.
         
         Parameters:
-            entities (list[ButtonEntity]): The list to which the entity will be appended if unique.
-            entity (ButtonEntity): The button entity to append.
+            entities (list[ButtonEntity]): Target list to append the entity to when it is unique.
+            entity (ButtonEntity): Button entity to append if not already recorded.
         """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
@@ -58,10 +58,10 @@ async def async_setup_entry(
         """
         Collect reboot button entities for devices managed by the coordinator.
         
-        Creates a JackeryRebootButton for each device that either supports advanced features or exposes the reboot property and omits duplicates.
+        Create a JackeryRebootButton for each device that either supports advanced features or exposes the reboot property; duplicate entities are omitted.
         
         Returns:
-            list[ButtonEntity]: A list of unique reboot button entities for devices that support advanced features or provide the reboot property.
+            list[ButtonEntity]: Unique `ButtonEntity` instances representing reboot actions for matching devices.
         """
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -74,9 +74,9 @@ async def async_setup_entry(
 
     def _add_new_entities() -> None:
         """
-        Detect changes in the coordinator's device signature and register any newly discovered button entities.
+        Register newly discovered reboot button entities when the coordinator's device signature changes.
         
-        If the computed signature differs from the last seen signature, update the cached signature, collect entities via `_collect_entities()`, and call `async_add_entities` with any discovered entities.
+        If the coordinator-derived signature differs from the last cached signature, update the cache, collect new entities, and add them via `async_add_entities`.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

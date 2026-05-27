@@ -266,13 +266,13 @@ class JackeryApi:
     # --- headers ------------------------------------------------------------
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
         """
-        Build HTTP headers used for API requests that mimic the Android app.
+        Constructs HTTP headers that mimic the Android client for API requests.
         
         Parameters:
-            with_token (bool): If True and a token is available on the client, include the authentication token header.
+            with_token (bool): If True and an authentication token is present on the client, include the auth header.
         
         Returns:
-            headers (dict[str, str]): Mapping of header names to values to use for the request.
+            dict[str, str]: Mapping of HTTP header names to values to use for the request.
         """
         h = {
             "accept-encoding": "gzip",
@@ -305,7 +305,19 @@ class JackeryApi:
         return mac_id
 
     def _resolve_login_mac_id(self) -> str:
-        """Resolve the macId used in login and MQTT username derivation."""
+        """
+        Resolve and return the MAC identifier used for login and MQTT username derivation.
+        
+        If a configured MQTT MAC ID is present and valid, that value is returned and
+        `self._mqtt_mac_id_source` is set to `"configured"`. If the configured value is
+        invalid, a deterministic MAC ID derived from the account is returned and
+        `self._mqtt_mac_id_source` is set to `"generated_fallback_invalid_config"`.
+        If no configured value is provided, a deterministic MAC ID derived from the
+        account is returned and `self._mqtt_mac_id_source` is set to `"generated"`.
+        
+        Returns:
+            str: The resolved MAC ID string.
+        """
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -415,19 +427,18 @@ class JackeryApi:
 
     async def async_get_mqtt_credentials(self) -> dict[str, str]:
         """
-        Derive MQTT client credentials from the active login session.
+        Build MQTT client credentials using the current authenticated session.
         
         Returns:
             dict[str, str]: Mapping with keys:
                 - `clientId`: MQTT client identifier.
                 - `username`: MQTT username.
-                - `password`: MQTT password.
+                - `password`: MQTT password (base64-encoded).
                 - `userId`: MQTT user id from the login response.
         
         Raises:
-            JackeryAuthError: If the client is not logged in or the login response is missing
-                required MQTT fields, if `mqttPassWord` is not valid base64, or if the
-                decoded seed does not have the expected 32-byte length.
+            JackeryAuthError: If the client is not logged in or required MQTT fields are missing,
+                if `mqttPassWord` is not valid base64, or if the decoded seed is not 32 bytes.
         """
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
@@ -490,12 +501,10 @@ class JackeryApi:
     @staticmethod
     def _extract_code(data: dict[str, Any] | Any) -> int | None:
         """
-        Extracts the API response `code` field and returns it as an integer when possible.
-        
-        If `data` is a dict and contains a `code` value that is already an int or a numeric string (after trimming), that integer is returned. Any other shapes, missing or empty values, or non-numeric strings result in `None`.
+        Retrieve the backend `code` value from a parsed response and parse it as an integer.
         
         Returns:
-            int | None: The parsed integer `code` if present and convertible, `None` otherwise.
+            int: The parsed `code` when present as an integer or a numeric string, `None` otherwise.
         """
         if not isinstance(data, dict):
             return None
@@ -891,7 +900,7 @@ class JackeryApi:
         Stores the raw parsed API response in `self.last_price_history_config_response`.
         
         Returns:
-            dict: The response `data` payload as a dict; returns an empty dict if the payload is missing or not a dict.
+            dict: The response `data` payload as a dict; empty dict if the payload is missing or not a dict.
         """
         data = await self._get_json(
             PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -1077,7 +1086,7 @@ class JackeryApi:
         end_date: str | None = None,
     ) -> dict[str, Any]:
         """
-        Return EPS (off-grid) energy input/output statistics for a device for a specified period.
+        Retrieve EPS (off-grid) energy input/output statistics for a device over a specified period.
         
         Returns:
             dict: Payload containing aggregated totals (for example, `totalInEpsEnergy`, `totalOutEpsEnergy`), chart series arrays such as `x`, `y`, `y1`, and `y2`, and may include an `APP_REQUEST_META` entry with the request parameters used.
@@ -1157,9 +1166,9 @@ class JackeryApi:
         end_date: str | None = None,
     ) -> dict[str, Any]:
         """
-        Retrieve socket-chart statistics for a device over a specified period.
+        Retrieve socket-chart statistics for a device for a given period.
         
-        If the returned payload is non-empty, it will include `APP_REQUEST_META` containing the request parameters (`dateType`, `beginDate`, `endDate`) used to produce the chart (excluding `deviceId`/`systemId`).
+        If the returned payload is non-empty, the payload will include `APP_REQUEST_META` with the request parameters (`dateType`, `beginDate`, `endDate`) used to produce the chart (excluding `deviceId`/`systemId`).
         
         Returns:
             dict: The normalized `data` payload for the device socket chart.
@@ -1174,9 +1183,9 @@ class JackeryApi:
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
         """
-        Return a normalized list of battery pack dictionaries for the given device serial number.
+        Get a normalized list of battery pack dictionaries for the given device serial number.
         
-        Handles multiple backend response shapes and normalizes them into a list of pack objects. The raw parsed API response is stored in self.last_battery_pack_responses[device_sn].
+        The raw parsed API response is saved to self.last_battery_pack_responses[device_sn]. Handles multiple backend response shapes and returns an empty list when no pack data is found.
         
         Parameters:
             device_sn (str): Device serial number to query.
@@ -1284,7 +1293,14 @@ class JackeryApi:
         return payload
 
     async def async_get_ota_info(self, device_sn: str) -> dict:
-        """GET /v1/device/ota/list — firmware version + available updates."""
+        """
+        Retrieve OTA information for the device identified by `device_sn`.
+        
+        Normalizes multiple backend response shapes and selects the matching OTA item when available.
+        
+        Returns:
+            dict: OTA information object for the device, or an empty dict if no suitable item is found.
+        """
         data = await self._get_json(
             OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
         )
@@ -1428,7 +1444,7 @@ class JackeryApi:
         self, system_id: str | int, system_name: str
     ) -> bool:
         """
-        Rename the system identified by `system_id` to `system_name`.
+        Rename the system identified by system_id to the provided system_name.
         
         Parameters:
             system_id (str | int): Identifier of the system to rename.
@@ -1438,7 +1454,7 @@ class JackeryApi:
             bool: `True` if the server acknowledged the rename, `False` otherwise.
         
         Raises:
-            JackeryApiError: If `system_name` is empty or the API request fails.
+            JackeryApiError: If `system_name` is empty or if the API request fails.
         """
         if not system_name or not system_name.strip():
             raise JackeryApiError("system_name must be a non-empty string")
@@ -1547,7 +1563,9 @@ class JackeryApi:
 
     async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
         """
-        Set the device's maximum allowed power via the experimental max-power endpoint.
+        Set the device's maximum allowed power using the experimental max-power endpoint.
+        
+        Validates that `max_power` is an integer greater than or equal to 0 before sending the request.
         
         Parameters:
             device_id (str | int): Device identifier (serial or numeric id) used by the backend.
@@ -1575,15 +1593,15 @@ class JackeryApi:
         currency: str,
     ) -> bool:
         """
-        Set a system's single (fixed) electricity price for dynamic pricing mode.
+        Set a system's fixed electricity price for dynamic pricing mode.
         
         Parameters:
             system_id (str | int): Identifier of the target system.
-            single_price (float | str): Price value or string; must be greater than or equal to 0. The value is formatted to at most four decimal places before sending.
+            single_price (float | str): Price value (or string) that must be greater than or equal to 0; formatted to at most four decimal places before sending.
             currency (str): Non-empty currency code or label.
         
         Returns:
-            True if the server indicates the change was accepted, False otherwise.
+            `true` if the backend indicates the change was accepted, `false` otherwise.
         
         Raises:
             JackeryApiError: If `single_price` is negative or `currency` is empty.
@@ -1619,7 +1637,7 @@ class JackeryApi:
         
         Parameters:
             system_id: Identifier of the target system.
-            platform_company_id: Numeric platform company identifier required by the API.
+            platform_company_id: Platform company identifier required by the API.
             system_region: Region code for the system; must be a non-empty string.
         
         Returns:

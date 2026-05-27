@@ -143,10 +143,10 @@ async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """
-    Set the single-tariff electricity price for a device.
+    Set the device's single-tariff electricity price.
     
     Parameters:
-        value (float): Price expressed in the device's configured currency/unit.
+        value (float): Price expressed in the device's current currency/unit (matches the entity's unit of measurement).
     """
     await coord.async_set_single_price(dev_id, value)
 
@@ -344,17 +344,24 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Return the entity's unit of measurement."""
+        """
+        Get the entity's unit of measurement, using the dynamic unit computed from the current payload when available.
+        
+        Returns:
+            unit (str | None): The unit of measurement string, or `None` if no unit is configured.
+        """
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
 
     def _allowed_values(self) -> tuple[float, ...]:
         """
-        Get the discrete native values that this number entity allows.
+        Return the discrete native values allowed for this number entity.
+        
+        If the description's `allowed_values` is None, returns an empty tuple. If it is a callable, returns the tuple produced by calling it with the current payload; otherwise returns the tuple value directly.
         
         Returns:
-            tuple[float, ...]: Allowed native float values; an empty tuple if no discrete allowed-values constraint is defined.
+            tuple[float, ...]: Allowed native float values, or an empty tuple when no discrete constraint is defined.
         """
         allowed = self.entity_description.allowed_values
         if allowed is None:
@@ -365,12 +372,16 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """
-        Write a native numeric value to the device after validating and transforming it.
+        Write the provided native numeric value to the device, applying description-driven validation and transformation.
         
-        Validates the value against the description's min/max and discrete allowed values (if configured). If a setter is provided, the value is converted with the description's `value_transform` and forwarded to the setter. Authentication failures from the setter are converted into `ConfigEntryAuthFailed`. If a `HomeAssistantError` raised by the setter already contains a `translation_key`, it is re-raised; otherwise the error is either raised as a translated action error or ignored depending on `raise_on_setter_error`. Always requests a coordinator refresh after attempting the setter.
+        Validates the value against the entity description's configured min/max and discrete allowed values (if present). If a setter is configured, transforms the native value with the description's `value_transform` and calls the setter. Authentication failures from the setter are converted to `ConfigEntryAuthFailed`. A `HomeAssistantError` from the setter that already contains a `translation_key` is re-raised; other setter errors are either raised as a translated action error when `raise_on_setter_error` is True or ignored. Always requests a coordinator refresh after attempting the write.
         
         Parameters:
-            value (float): The native value to write to the device.
+            value (float): The native numeric value to write.
+        
+        Raises:
+            ConfigEntryAuthFailed: If the setter reports an authentication failure.
+            HomeAssistantError: For invalid range or allowed-value violations, or when `raise_on_setter_error` is True and the setter fails.
         """
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
@@ -467,12 +478,12 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[NumberEntity]:
         """
-        Build a list of NumberEntity objects for devices whose payloads meet gating conditions.
+        Collect number entities for devices whose payloads satisfy their gating predicates.
         
-        Iterates coordinator data and, for each device, instantiates number entities from the description registry when the associated gating predicate allows it.
+        Scans the coordinator data and instantiates a JackeryNumber for each description whose gating predicate is absent or evaluates to True for the device payload.
         
         Returns:
-            entities (list[NumberEntity]): Instantiated number entities ready to be added to Home Assistant.
+            list[NumberEntity]: Instantiated number entities ready to be added to Home Assistant.
         """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -486,9 +497,9 @@ async def async_setup_entry(
 
     def _add_new_entities() -> None:
         """
-        Rebuilds and adds number entities when the coordinator data signature changes.
+        Rebuilds and adds number entities when the coordinator's entity signature changes.
         
-        Checks the current coordinator entity signature against the last-seen signature; if it differs, collects entity instances and calls the platform's `async_add_entities` to add any new entities.
+        If the computed signature differs from the last-seen signature, collects entity instances and calls the platform's async_add_entities callback to add any new entities; otherwise does nothing.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

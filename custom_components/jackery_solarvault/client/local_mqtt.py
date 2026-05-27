@@ -143,9 +143,9 @@ class JackeryLocalMqttClient:
 
     async def async_stop(self) -> None:
         """
-        Stop the background MQTT session task and clear internal connection state.
+        Stop the background MQTT session task and reset internal connection state.
         
-        This cancels the running session task (if any), waits for its completion, clears the stored client reference, marks the client as not connected, and resets the connection event. Cancellation and finalization errors raised by the task are suppressed.
+        If a background session task exists it will be cancelled and awaited; cancellation, MQTT, and other finalization errors are suppressed. The client's connection state and stored client reference are cleared.
         """
         async with self._lock:
             task = self._runner_task
@@ -166,9 +166,9 @@ class JackeryLocalMqttClient:
 
     async def _async_run_session(self) -> None:
         """
-        Maintain a single MQTT broker session: connect to the configured host/port, subscribe to the topic filter, and consume incoming messages until the session ends.
+        Run a single MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
         
-        Updates the client's connection state and timestamps on successful connect/disconnect, dispatches each received message to the client's message handler, records subscribe failures and connection errors for diagnostics, and ensures the internal connected event is set so start waiters do not deadlock.
+        On successful connect, update connection state and timestamps; dispatch each received message to the client's message handler; record subscription and connection errors for diagnostics; and always set the internal connected event to avoid start waiters deadlocking.
         """
         connected = False
         try:
@@ -228,10 +228,10 @@ class JackeryLocalMqttClient:
 
     def _handle_connect_failure(self, rc: int) -> None:
         """
-        Handle an MQTT CONNACK rejection by recording connection state and a diagnostic error message.
+        Record that the broker rejected the connection and update diagnostic state.
         
         Parameters:
-            rc (int): CONNACK return code from the broker indicating the reason for connection rejection.
+            rc (int): MQTT CONNACK return code indicating the broker's rejection reason.
         """
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
@@ -288,9 +288,9 @@ class JackeryLocalMqttClient:
         payload: bytes | bytearray | str,
     ) -> None:
         """
-        Process a received MQTT message: record diagnostics, decode JSON object payloads, and forward the result to the optional sink.
+        Handle an incoming MQTT message: update diagnostics, attempt to decode a UTF-8 JSON object payload, and dispatch the result to the configured sink.
         
-        Tracks first-seen topic names (capped by LOCAL_MQTT_MAX_TOPIC_NAMES) and updates counters and last-seen metadata. Interprets the payload as UTF-8 text when possible and attempts to parse JSON; if the parsed JSON is an object (`dict`), that object is delivered as `data`. If the payload is binary, invalid UTF-8, invalid JSON, or JSON that is not an object (list/scalar), the message is counted as dropped and `data` is `None`. If a sink callback is configured, schedules the sink with the arguments `(topic, data, raw_payload_bytes)`.
+        If the payload decodes to a JSON object (`dict`), that object is delivered as `data`. If the payload is binary, not valid UTF-8, invalid JSON, or JSON that is not an object (e.g., list or scalar), the message is counted as dropped and `data` is `None`. First-seen topic names are recorded up to LOCAL_MQTT_MAX_TOPIC_NAMES to aid diagnostics.
         
         Parameters:
             topic (str): MQTT topic name of the message.
@@ -353,7 +353,7 @@ class JackeryLocalMqttClient:
             Log any non-cancellation exception raised by a completed asyncio Task.
             
             Parameters:
-                done (asyncio.Task[None]): Completed task whose exception will be retrieved and logged; a CancelledError is ignored.
+                done (asyncio.Task[None]): The completed task whose exception, if any, will be retrieved and logged; CancelledError is ignored.
             """
             try:
                 done.result()
@@ -430,19 +430,19 @@ class JackeryLocalMqttClient:
     @property
     def is_started(self) -> bool:
         """
-        Indicates whether a background session task has ever been started.
+        Indicates whether the background MQTT session runner task has been started.
         
         Returns:
-            `true` if a runner task has been created at least once, `false` otherwise.
+            `true` if the runner task exists, `false` otherwise.
         """
         return self._runner_task is not None
 
     @staticmethod
     def _utc_now_iso() -> str:
         """
-        Return the current UTC time as an ISO 8601 string including the timezone offset.
+        Get the current UTC time as an ISO 8601 string including the timezone offset.
         
         Returns:
-            ISO 8601 formatted UTC timestamp including timezone offset (e.g. '2026-05-27T12:34:56+00:00').
+            iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. '2026-05-27T12:34:56+00:00').
         """
         return datetime.now(UTC).isoformat()

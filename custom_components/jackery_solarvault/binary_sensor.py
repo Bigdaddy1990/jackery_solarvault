@@ -85,9 +85,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """
-    Set up coordinator-backed binary_sensor entities for a config entry and register a rebuild listener.
+    Set up coordinator-backed binary sensor entities for a Jackery config entry and register a listener to rebuild entities when coordinator data changes.
     
-    Discovers per-device binary sensors and per-plug smart-plug binary sensors from the coordinator data, de-duplicates entities across rebuilds, and calls the provided `async_add_entities` callback to register any newly discovered entities when the coordinator's entity signature changes.
+    Discovers per-device binary sensors and per-plug smart-plug binary sensors from the coordinator data, de-duplicates entities across rebuilds, and calls the provided `async_add_entities` callback to register newly discovered entities when the coordinator's entity signature changes.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
@@ -108,12 +108,12 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[BinarySensorEntity]:
         """
-        Collect binary sensor entities for all devices in the coordinator payload.
+        Collect binary sensor entities for every device in the coordinator payload.
         
-        Creates one JackeryBinarySensor per description in BINARY_DESCRIPTIONS for each device and one JackerySmartPlugStateBinarySensor for each smart plug that has a serial number.
+        For each device this creates one JackeryBinarySensor per entry in BINARY_DESCRIPTIONS and one JackerySmartPlugStateBinarySensor for each smart plug that has a serial number, preserving plug index and serial for stable binding across payload reorders.
         
         Returns:
-            entities (list[BinarySensorEntity]): Constructed binary sensor entities ready to be added.
+            list[BinarySensorEntity]: List of constructed binary sensor entities ready to be added.
         """
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -179,12 +179,10 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """
-        Indicates whether the binary sensor is currently on.
-        
-        State is derived from the coordinator-provided properties and device metadata for this entity.
+        Determine whether the binary sensor is currently active.
         
         Returns:
-            `True` if the sensor is on, `False` if the sensor is off, or `None` if the state is unknown.
+            `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
         """
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
@@ -248,10 +246,10 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """
-        Indicates whether this smart plug's output is active.
+        Return whether the smart plug's power output is active.
         
         Returns:
-            True if the plug reports an active output, False if it reports inactive, or None if the state is unavailable.
+            `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
         """
         raw = self._plug.get(FIELD_SWITCH_STATE)
         if raw is None:

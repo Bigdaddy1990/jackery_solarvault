@@ -63,7 +63,7 @@ async def async_setup_entry(
         """
         Collect text entities for devices that expose a system identifier.
         
-        Creates a JackerySystemNameText for each entry in the coordinator data whose system object contains `FIELD_ID` or `FIELD_SYSTEM_ID`.
+        Creates JackerySystemNameText entities for coordinator data entries whose system object contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
         
         Returns:
             list[TextEntity]: Created text entities for renaming device systems.
@@ -116,7 +116,9 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     @property
     def native_value(self) -> str | None:
         """
-        Return the current editable system name for the device.
+        Get the current editable system name for the device.
+        
+        Prefers the stored system name; if absent, returns the device product name.
         
         Returns:
             The system's editable label if present, otherwise the device's product name, or None if neither is available.
@@ -127,19 +129,19 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
     async def async_set_value(self, value: str) -> None:
         """
-        Set the system's editable name on the remote device and update local state.
+        Rename the remote system and update local state so the change is reflected in the UI.
         
-        Validates the target system identifier and the provided text, sends the rename request
-        to the remote API, applies an optimistic local update so the new name appears
-        immediately, and requests a coordinator refresh so dependent entities pick up the change.
+        Validates the target system identifier and the provided text (leading/trailing whitespace is trimmed),
+        sends the rename request to the Jackery API, applies an optimistic local update, and requests a
+        coordinator refresh so dependent entities pick up the change.
         
         Parameters:
-            value (str): The new system name to set; leading and trailing whitespace will be trimmed.
+        	value (str): New system name; leading and trailing whitespace will be removed.
         
         Raises:
-            ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
-            HomeAssistantError: If the system identifier is missing, the trimmed name is empty,
-                or the remote API reports a failure (includes translation keys for UI messages).
+        	ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
+        	HomeAssistantError: If the system identifier is missing, the trimmed name is empty,
+        		or the remote API reports a failure (includes translation keys for UI messages).
         """
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)

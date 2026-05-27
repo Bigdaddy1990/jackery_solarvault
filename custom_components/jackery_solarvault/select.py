@@ -110,14 +110,14 @@ def _storm_minutes_value(
     task_plan: dict[str, object],
 ) -> int | None:
     """
-    Return the storm-warning lead time in minutes extracted from device payload sections.
+    Extract the storm-warning lead time in minutes from device payload sections.
     
-    Searches `properties`, then `weather_plan`, then `task_plan`, and finally list entries in `weather_plan[FIELD_STORM]` for `FIELD_WPC` or `FIELD_MINS_INTERVAL`, converts the found value to an integer, and returns it only if it is greater than or equal to STORM_MINUTES_MIN_VALID.
+    Searches for `FIELD_WPC` or `FIELD_MINS_INTERVAL` in `properties`, then `weather_plan`, then `task_plan`, and finally within dict entries of `weather_plan[FIELD_STORM]`. Converts the first found raw value to an integer and returns it only if it is greater than or equal to `STORM_MINUTES_MIN_VALID`.
     
     Parameters:
-        properties: Device `properties` payload section to inspect.
-        weather_plan: Device `weather_plan` payload section to inspect.
-        task_plan: Device `task_plan` payload section to inspect.
+        properties (dict[str, object]): Device `properties` payload section to inspect.
+        weather_plan (dict[str, object]): Device `weather_plan` payload section to inspect.
+        task_plan (dict[str, object]): Device `task_plan` payload section to inspect.
     
     Returns:
         int | None: Extracted lead time in minutes when available and valid, `None` otherwise.
@@ -162,9 +162,9 @@ def _storm_minutes_fallback(
     task_plan: dict[str, object],
 ) -> int | None:
     """
-    Determine a fallback storm-warning minutes value when only storm enablement is indicated.
+    Return a fallback storm-warning minutes value when only a storm-enabled indicator is present.
     
-    If a raw "storm enabled" indicator exists in `properties`, `weather_plan`, or `task_plan` and can be parsed as an integer, or if `weather_plan[FIELD_STORM]` is a list, returns the sentinel `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
+    Checks for a raw "storm enabled" marker (`FIELD_WPS`) in `properties`, then `weather_plan`, then `task_plan`; if such a marker exists and parses as an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
     
     Returns:
         int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
@@ -678,12 +678,12 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[SelectEntity]:
         """
-        Create JackerySelect entities for coordinator devices that pass the module's gating logic.
+        Create JackerySelect entities for coordinator devices that satisfy the module gating rules.
         
-        Only descriptions for which `_gate(description.key, payload, supports_advanced)` is true are instantiated, and duplicate unique IDs are avoided.
+        Only descriptions whose key passes `_gate(description.key, payload, supports_advanced)` for a device are instantiated. Duplicate unique IDs are filtered so each created entity has a unique identifier.
         
         Returns:
-            list[SelectEntity]: Created JackerySelect instances for eligible devices.
+            list[SelectEntity]: The list of created JackerySelect instances for eligible devices.
         """
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():

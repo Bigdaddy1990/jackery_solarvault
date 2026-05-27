@@ -50,10 +50,10 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 def _isoformat_day(today: date) -> str:
     """
-    Format a date as an ISO day string (YYYY-MM-DD).
+    Return the ISO day string for the given date.
     
     Returns:
-        iso_day (str): The date formatted as `YYYY-MM-DD`.
+        str: The date formatted as `YYYY-MM-DD`.
     """
     return today.isoformat()
 
@@ -166,16 +166,18 @@ def daily_delta(
     today: date,
 ) -> int | None:
     """
-    Compute today's energy delta for a metric from a stored midnight anchor.
+    Compute the energy delivered since midnight for a metric using a stored midnight anchor.
+    
+    Returns the difference in watt-hours between `current_lifetime_wh` and the snapshot anchor for `metric_key`, or `None` if the snapshot or values are missing/invalid, the snapshot day does not match `today`, `current_lifetime_wh` is `None` or non-numeric, the metric anchor is missing or non-numeric, or the current counter is less than the anchor (indicating a reset/overflow).
     
     Parameters:
-        snapshot (dict | None): Stored snapshot containing `day` (ISO YYYY-MM-DD) and `values` mapping metric keys to anchored Wh integers.
-        metric_key (str): Metric key to look up in the snapshot's `values`.
+        snapshot (dict | None): Stored snapshot containing a `day` ISO string and a `values` mapping of metric keys to anchored Wh values.
+        metric_key (str): Metric key to read from the snapshot's `values`.
         current_lifetime_wh (int | float | None): Current lifetime energy counter value for the metric; `None` disables delta calculation.
         today (date): Local date used to validate the snapshot's `day`.
     
     Returns:
-        int | None: The difference in watt-hours between `current_lifetime_wh` and the stored midnight anchor for `metric_key`, or `None` if the snapshot is missing/invalid, the snapshot day does not match `today`, the metric is absent or non-numeric, `current_lifetime_wh` is `None` or non-numeric, or the counter decreased (reset/overflow).
+        int | None: The computed delta in watt-hours, or `None` when computation is disabled or invalid as described above.
     """
     if current_lifetime_wh is None:
         return None
@@ -210,17 +212,17 @@ def refresh_snapshot(
     current_values: dict[str, int | float | None],
 ) -> dict[str, Any]:
     """
-    Return an updated per-device midnight snapshot anchored to today's metrics.
+    Produce a snapshot for today containing integer anchors for available lifetime metrics.
     
-    If `snapshot` is missing or its stored day differs from `today`, the function anchors every available metric from `current_values`. If the snapshot is for the same day, it preserves existing anchors and only adds metrics that do not already have an anchor. Metric entries with value `None` or values that cannot be converted to `int` are ignored.
+    If `snapshot` is missing or its recorded day differs from `today`, create a new snapshot by anchoring every metric in `current_values` whose value is not `None` and can be converted to `int`. If the snapshot is already for `today`, preserve existing integer anchors and add metrics from `current_values` only when an anchor does not already exist and the value is convertible to `int`. Entries with `None` or non-convertible values are omitted.
     
     Parameters:
         snapshot (dict[str, Any] | None): Existing per-device snapshot; may be `None`.
-        today (date): Current date used to determine the snapshot day.
+        today (date): Current date used as the snapshot day.
         current_values (dict[str, int | float | None]): Current lifetime metric readings; `None` or non-numeric values are ignored.
     
     Returns:
-        dict[str, Any]: Snapshot dictionary with keys `"day"` (ISO `YYYY-MM-DD`) and `"values"` (mapping metric keys to integer Wh anchors).
+        dict[str, Any]: Snapshot with keys `"day"` (ISO `YYYY-MM-DD`) and `"values"` (mapping metric keys to integer Wh anchors).
     """
     today_iso = _isoformat_day(today)
     if not isinstance(snapshot, dict) or snapshot.get(_KEY_DAY) != today_iso:

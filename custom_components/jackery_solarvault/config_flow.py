@@ -90,20 +90,20 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
 
 def _normalize_account(value: str) -> str:
     """
-    Trim leading and trailing whitespace from an account identifier.
+    Normalize an account identifier by removing leading and trailing whitespace.
     
     Parameters:
-        value (str): Account identifier provided by the user.
+        value (str): Account identifier to normalize.
     
     Returns:
-        str: The account identifier with leading and trailing whitespace removed.
+        str: Normalized account identifier.
     """
     return value.strip()
 
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
     """
-    Return the resolved current option values for a configuration entry.
+    Resolve the current option values for a configuration entry.
     
     For each known option key (grouped by boolean, string, and integer types), the value is taken from the entry's stored options, falling back to any legacy setup-data value for that key and then to the type-specific default.
     
@@ -180,15 +180,15 @@ class JackeryOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """
-        Handle the options flow initial step: create an options entry when values are submitted or show the options form when not.
+        Present the options form for the integration or create an options entry from submitted values.
         
-        When `user_input` is provided, merges the submitted values with the current stored options and creates an options entry. When `user_input` is None, presents a form containing BLE, sensor-creation, diagnostics, and third-party MQTT settings with defaults populated from the current entry options.
+        When `user_input` is provided, merge the submitted values with the current stored options and create an options entry. When `user_input` is None, show the options form populated with defaults from the current entry options (BLE, sensor-creation, diagnostics, and third-party MQTT settings).
         
         Parameters:
-            user_input (dict[str, Any] | None): Submitted form values from the init step, or None to render the form.
+            user_input (dict[str, Any] | None): Submitted form values, or None to render the form.
         
         Returns:
-            ConfigFlowResult: Result of creating the options entry or a form to display to the user.
+            ConfigFlowResult: The created options entry result, or a form result to display to the user.
         """
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
@@ -330,12 +330,12 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """
-        Handle user-initiated reconfiguration of an existing config entry.
+        Reconfigure an existing config entry by validating the provided account and credentials and updating the entry's stored username, password, and options.
         
-        Validates the provided username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates the entry's username, password, and options. Shows the reconfigure form when input is missing or invalid, and aborts if the reconfigure target is missing or the provided account does not match the entry.
+        Validates that the provided username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. Shows the reconfigure form with current option defaults when input is missing or invalid, and aborts if the reconfigure target is missing or the provided account does not match the entry.
         
         Returns:
-            ConfigFlowResult directing the next step of the flow: showing the reconfigure form with any errors, aborting with a specific reason, or updating and reloading the entry on successful reconfiguration.
+            A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.
         """
         try:
             entry = self._get_reconfigure_entry()
