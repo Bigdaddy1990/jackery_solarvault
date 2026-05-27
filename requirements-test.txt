@@ -14,7 +14,7 @@ annotatedyaml
 certifi
 coverage
 coverage[toml]
-homeassistant-stubs>=2026.5.1
+homeassistant-stubs>=2026.5.4
 hypothesis
 jinja2
 mypy
