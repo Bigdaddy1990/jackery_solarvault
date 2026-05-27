@@ -430,9 +430,7 @@ def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
     )
     if response is not None:
         response_data = (
-            response.get('data')
-            if isinstance(response.get('data'), dict)
-            else None
+            response.get('data') if isinstance(response.get('data'), dict) else None
         )
     else:
         response_data = None
