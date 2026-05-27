@@ -72,7 +72,14 @@ jobs:
         id: profile
         shell: bash
         run: |
-          flags=""
+          profile="${{ github.event.inputs.profile || 'default' }}"
+          case "$profile" in
+            default|fast|full|fix) ;;
+            *) echo "Invalid profile: $profile" >&2; exit 1 ;;
+          esac
+           flags=""
+
+          case "$profile" in
           case "${{ github.event.inputs.profile || 'default' }}" in
             fast) flags="--fast" ;;
             full) flags="--full" ;;
