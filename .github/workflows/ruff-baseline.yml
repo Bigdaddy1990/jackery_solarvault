@@ -20,8 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.14"
       - run: bun install
       - uses: actions/setup-python@v6
         with:
@@ -59,11 +57,11 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --output-format=github \
             --exit-zero
-
+          
           python -m pre-commit-lite check .
           bun run pre-commit
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
