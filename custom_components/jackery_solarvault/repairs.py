@@ -45,7 +45,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await self._async_force_refresh()
             return self.async_create_entry(data={})
         return self.async_show_form(
-            step_id='confirm',
+            step_id="confirm",
             data_schema=vol.Schema({}),
             description_placeholders=self._description_placeholders,
         )
@@ -59,7 +59,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
-            _LOGGER.debug('Force refresh from repair flow failed: %s', err)
+            _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
         if not self._entry_id:
@@ -67,7 +67,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return None
-        coordinator = getattr(entry, 'runtime_data', None)
+        coordinator = getattr(entry, "runtime_data", None)
         if isinstance(coordinator, JackerySolarVaultCoordinator):
             return coordinator
         return None
@@ -81,11 +81,11 @@ async def async_create_fix_flow(
     """Return the matching repair flow for an issue raised by this integration."""
     if issue_id.endswith(f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"):
         issue_data = data or {}
-        entry_id = issue_data.get('entry_id')
+        entry_id = issue_data.get("entry_id")
         description_placeholders = {
-            'count': str(issue_data.get('count', 'unknown')),
-            'metric': str(issue_data.get('metric', 'unknown')),
-            'examples': str(issue_data.get('examples', 'unknown')),
+            "count": str(issue_data.get("count", "unknown")),
+            "metric": str(issue_data.get("metric", "unknown")),
+            "examples": str(issue_data.get("examples", "unknown")),
         }
         return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
     raise data_entry_flow.UnknownFlow(
