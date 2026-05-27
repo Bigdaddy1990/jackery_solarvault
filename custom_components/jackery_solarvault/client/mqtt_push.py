@@ -536,7 +536,7 @@ class JackeryMqttPushClient:
             'consecutive_auth_failures': self._consecutive_auth_failures,
             'last_connect_failure_signature': self._last_connect_failure_signature,
             'tls_insecure': False,
-            'tls_x509_strict_disabled': hasattr(ssl, 'VERIFY_X509_STRICT'),
+            'tls_x509_strict_disabled': False,
             'tls_custom_ca_loaded': self._tls_custom_ca_loaded,
             'tls_certificate_source': self._tls_certificate_source,
             'library': MQTT_CLIENT_LIBRARY,
