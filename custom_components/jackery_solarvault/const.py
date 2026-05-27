@@ -318,6 +318,15 @@ FIELD_ID: Final = "id"
 FIELD_VERSION: Final = "version"
 FIELD_MESSAGE_TYPE: Final = "messageType"
 FIELD_TIMESTAMP: Final = "timestamp"
+# AccSocketBody short-keys per docs/html/jackery_smali_home_assistant_report.html
+# §"AccSocketBody". ``op`` is already an alias for ``outPw`` (coordinator
+# merge), ``switch`` is exposed through switch/binary_sensor entities, and
+# the remaining two are documented but not observed in this installer's
+# current payload stream — they are exposed as diagnostic sensors so users
+# whose firmware does emit them see the data, without requiring a code
+# change later.
+FIELD_SOCKET_SWITCH_CYCLE: Final = "sc"
+FIELD_SOCKET_LAST_UPDATE_TS: Final = "ts"
 FIELD_CMD: Final = "cmd"
 FIELD_UPDATES: Final = "updates"
 FIELD_SYSTEM_ID: Final = "systemId"
@@ -858,6 +867,18 @@ APP_STAT_TOTAL_CHARGE: Final = "totalCharge"
 APP_STAT_TOTAL_DISCHARGE: Final = "totalDischarge"
 APP_STAT_TOTAL_CT_INPUT_ENERGY: Final = "totalInCtEnergy"
 APP_STAT_TOTAL_CT_OUTPUT_ENERGY: Final = "totalOutCtEnergy"
+# EpsStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — EPS /
+# off-grid in/out totals for a single dateType payload.
+APP_STAT_TOTAL_IN_EPS_ENERGY: Final = "totalInEpsEnergy"
+APP_STAT_TOTAL_OUT_EPS_ENERGY: Final = "totalOutEpsEnergy"
+# TodayEnergyApi$Bean per PROTOCOL.md §2.4 — flat today KPI bean:
+# ``de`` = feed-in (Einspeisung), ``dg`` = grid import (Bezug),
+# ``dh`` = home load (Hausverbrauch), ``ds`` = battery energy
+# (Batterie-Energie). All four are doubles in kWh.
+APP_STAT_TODAY_FEED_IN_ENERGY: Final = "de"
+APP_STAT_TODAY_GRID_IMPORT_ENERGY: Final = "dg"
+APP_STAT_TODAY_HOME_LOAD_ENERGY: Final = "dh"
+APP_STAT_TODAY_BATTERY_ENERGY: Final = "ds"
 APP_STAT_TOTAL_TREND_CHARGE_ENERGY: Final = "totalChgEgy"
 APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: Final = "totalDisChgEgy"
 APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"

@@ -122,20 +122,28 @@ from .const import (
     APP_SAVINGS_CALC_META,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
+    APP_SECTION_EPS_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
+    APP_SECTION_TODAY_ENERGY,
     APP_STAT_PV1_ENERGY,
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_TODAY_BATTERY_ENERGY,
+    APP_STAT_TODAY_FEED_IN_ENERGY,
+    APP_STAT_TODAY_GRID_IMPORT_ENERGY,
+    APP_STAT_TODAY_HOME_LOAD_ENERGY,
     APP_STAT_TODAY_LOAD,
     APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_DISCHARGE,
     APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_EPS_ENERGY,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_EPS_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
@@ -263,7 +271,9 @@ from .const import (
     FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SOCKET_LAST_UPDATE_TS,
     FIELD_SOCKET_PRIORITY,
+    FIELD_SOCKET_SWITCH_CYCLE,
     FIELD_STACK_IN_PW,
     FIELD_STACK_OUT_PW,
     FIELD_STANDBY_PW,
@@ -1767,6 +1777,166 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-down",
     ),
+    # ------------------------------------------------------------------
+    # EPS / off-grid period totals (PROTOCOL.md §2.4 + EpsStatApi$Bean).
+    # Polled by the coordinator under APP_SECTION_EPS_STAT per dateType
+    # since #14. The fields stay ``unknown`` on hardware that never
+    # operates off-grid: that is correct HA behaviour. This installer's
+    # SolarVault may not exercise EPS often, but the contract is in the
+    # Smali docs (jackery_smali_home_assistant_report.html "Statistik-
+    # Endpunkte") and we must mirror it so users with EPS-active setups
+    # do not have to file feature requests later.
+    # ------------------------------------------------------------------
+    JackeryStatSensorDescription(
+        key="eps_input_day_energy",
+        translation_key="eps_input_day_energy",
+        stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_input_week_energy",
+        translation_key="eps_input_week_energy",
+        stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_input_month_energy",
+        translation_key="eps_input_month_energy",
+        stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_input_year_energy",
+        translation_key="eps_input_year_energy",
+        stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_output_day_energy",
+        translation_key="eps_output_day_energy",
+        stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_output_week_energy",
+        translation_key="eps_output_week_energy",
+        stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_output_month_energy",
+        translation_key="eps_output_month_energy",
+        stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="eps_output_year_energy",
+        translation_key="eps_output_year_energy",
+        stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
+        section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    # ------------------------------------------------------------------
+    # Today KPIs (PROTOCOL.md §2.4 + TodayEnergyApi$Bean). Flat bean
+    # under coordinator.data[<dev>][APP_SECTION_TODAY_ENERGY]:
+    # ``de`` feed-in, ``dg`` grid import, ``dh`` home load, ``ds``
+    # battery energy — all kWh doubles. Polled per #14.
+    # ------------------------------------------------------------------
+    JackeryStatSensorDescription(
+        key="today_feed_in_energy",
+        translation_key="today_feed_in_energy",
+        stat_key=APP_STAT_TODAY_FEED_IN_ENERGY,
+        section=APP_SECTION_TODAY_ENERGY,
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="today_grid_import_energy",
+        translation_key="today_grid_import_energy",
+        stat_key=APP_STAT_TODAY_GRID_IMPORT_ENERGY,
+        section=APP_SECTION_TODAY_ENERGY,
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="today_home_load_energy",
+        translation_key="today_home_load_energy",
+        stat_key=APP_STAT_TODAY_HOME_LOAD_ENERGY,
+        section=APP_SECTION_TODAY_ENERGY,
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:home-lightning-bolt",
+    ),
+    JackeryStatSensorDescription(
+        key="today_battery_energy",
+        translation_key="today_battery_energy",
+        stat_key=APP_STAT_TODAY_BATTERY_ENERGY,
+        section=APP_SECTION_TODAY_ENERGY,
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:battery-charging",
+    ),
     # Removed smart meter panel energy sensors (charging/discharging)
     # Single-tariff power price from powerPriceConfig
     # Source: /v1/device/stat/price field FIELD_SINGLE_PRICE
@@ -2112,6 +2282,57 @@ SMART_PLUG_SENSOR_DESCRIPTIONS: tuple[JackerySmartPlugSensorDescription, ...] = 
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:power-plug-battery",
     ),
+    # Diagnostic identifiers. Default-disabled so they do not crowd the
+    # device card; users can enable them when troubleshooting routing or
+    # network reachability.
+    JackerySmartPlugSensorDescription(
+        key="communication_mode",
+        translation_key="smart_plug_communication_mode",
+        field=FIELD_COMM_MODE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:transit-connection-variant",
+    ),
+    JackerySmartPlugSensorDescription(
+        key="ip_address",
+        translation_key="smart_plug_ip_address",
+        field=FIELD_IP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:ip-network",
+    ),
+    JackerySmartPlugSensorDescription(
+        key="mac_address",
+        translation_key="smart_plug_mac_address",
+        field=FIELD_MAC,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:lan",
+    ),
+    # AccSocketBody short-keys ``sc`` / ``ts`` from the Smali doc table
+    # (docs/html/jackery_smali_home_assistant_report.html). Not observed
+    # in this installer's payload stream, but the Smali contract names
+    # them so we expose them as default-disabled diagnostic sensors —
+    # firmware versions that do emit them surface here without any
+    # code change.
+    JackerySmartPlugSensorDescription(
+        key="switch_cycle",
+        translation_key="smart_plug_switch_cycle",
+        field=FIELD_SOCKET_SWITCH_CYCLE,
+        transform=safe_int,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:counter",
+    ),
+    JackerySmartPlugSensorDescription(
+        key="last_update_ts",
+        translation_key="smart_plug_last_update_ts",
+        field=FIELD_SOCKET_LAST_UPDATE_TS,
+        transform=safe_int,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:clock-outline",
+    ),
 )
 
 SMART_PLUG_STATISTIC_FIELDS: tuple[str, ...] = (
@@ -2172,6 +2393,31 @@ METER_HEAD_SENSOR_DESCRIPTIONS: tuple[JackeryMeterHeadSensorDescription, ...] = 
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:transmission-tower-export",
+    ),
+    # Diagnostic identifiers for meter-head subdevices (default-disabled).
+    JackeryMeterHeadSensorDescription(
+        key="communication_mode",
+        translation_key="meter_head_communication_mode",
+        field=FIELD_COMM_MODE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:transit-connection-variant",
+    ),
+    JackeryMeterHeadSensorDescription(
+        key="ip_address",
+        translation_key="meter_head_ip_address",
+        field=FIELD_IP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:ip-network",
+    ),
+    JackeryMeterHeadSensorDescription(
+        key="mac_address",
+        translation_key="meter_head_mac_address",
+        field=FIELD_MAC,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:lan",
     ),
 )
 
@@ -2277,9 +2523,17 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
     # AccCTBody electrical measurements (PROTOCOL.md §3 +
     # docs/html/jackery_entity_field_candidates_v2.html). Per-phase
     # voltage / current / power-factor / apparent / reactive plus their
-    # totals. Active power is already covered above. Diagnostic-category
-    # entries default-disable themselves so the smart-meter device card
-    # stays focused on voltage / current / frequency by default.
+    # totals. Active power is already covered above.
+    #
+    # ALL of these are ``entity_registry_enabled_default=False``: the
+    # SolarVault firmware only emits ``volt``/``curr``/``freq``/``fact``/
+    # ``ap``/``rep`` when an external AccCT-class accessory is bound
+    # (Shelly Pro EM-50 / 3EM / 3EM63 etc.). Installations with only the
+    # built-in Jackery CT report ``aPhasePw``/``bPhasePw``/``cPhasePw``
+    # (already mapped via the active-power entries above) but no
+    # AccCTBody fields. Default-disabled keeps the smart-meter device
+    # card free of ``unknown`` entities for the common case; users with
+    # an external AccCT-class meter enable them in one click.
     # ------------------------------------------------------------------
     JackerySmartMeterSensorDescription(
         key="voltage",
@@ -2288,6 +2542,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_registry_enabled_default=False,
         icon="mdi:sine-wave",
     ),
     JackerySmartMeterSensorDescription(
@@ -2297,6 +2552,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_registry_enabled_default=False,
         icon="mdi:sine-wave",
     ),
     JackerySmartMeterSensorDescription(
@@ -2306,6 +2562,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_registry_enabled_default=False,
         icon="mdi:sine-wave",
     ),
     JackerySmartMeterSensorDescription(
@@ -2315,6 +2572,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_registry_enabled_default=False,
         icon="mdi:sine-wave",
     ),
     JackerySmartMeterSensorDescription(
@@ -2324,6 +2582,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_registry_enabled_default=False,
         icon="mdi:current-ac",
     ),
     JackerySmartMeterSensorDescription(
@@ -2333,6 +2592,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_registry_enabled_default=False,
         icon="mdi:current-ac",
     ),
     JackerySmartMeterSensorDescription(
@@ -2342,6 +2602,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_registry_enabled_default=False,
         icon="mdi:current-ac",
     ),
     JackerySmartMeterSensorDescription(
@@ -2351,6 +2612,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.FREQUENCY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        entity_registry_enabled_default=False,
         icon="mdi:sine-wave",
     ),
     JackerySmartMeterSensorDescription(
@@ -2360,6 +2622,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.POWER_FACTOR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:angle-acute",
     ),
     JackerySmartMeterSensorDescription(
@@ -2369,6 +2632,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.POWER_FACTOR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:angle-acute",
     ),
     JackerySmartMeterSensorDescription(
@@ -2378,6 +2642,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.POWER_FACTOR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:angle-acute",
     ),
     JackerySmartMeterSensorDescription(
@@ -2387,6 +2652,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         device_class=SensorDeviceClass.POWER_FACTOR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:angle-acute",
     ),
     JackerySmartMeterSensorDescription(
@@ -2397,6 +2663,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2407,6 +2674,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2417,6 +2685,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2427,6 +2696,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2437,6 +2707,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-triangle-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2447,6 +2718,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-triangle-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2457,6 +2729,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-triangle-outline",
     ),
     JackerySmartMeterSensorDescription(
@@ -2467,7 +2740,34 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         icon="mdi:flash-triangle-outline",
+    ),
+    # Diagnostic identifiers for the CT/Smart-Meter subdevice
+    # (default-disabled).
+    JackerySmartMeterSensorDescription(
+        key="communication_mode",
+        translation_key="smart_meter_communication_mode",
+        field=FIELD_COMM_MODE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:transit-connection-variant",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="ip_address",
+        translation_key="smart_meter_ip_address",
+        field=FIELD_IP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:ip-network",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="mac_address",
+        translation_key="smart_meter_mac_address",
+        field=FIELD_MAC,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:lan",
     ),
 )
 

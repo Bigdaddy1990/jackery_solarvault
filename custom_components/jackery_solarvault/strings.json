@@ -226,6 +226,42 @@
       "battery_discharge_year_energy": {
         "name": "Battery discharge yearly energy"
       },
+      "eps_input_day_energy": {
+        "name": "EPS input today energy"
+      },
+      "eps_input_month_energy": {
+        "name": "EPS input monthly energy"
+      },
+      "eps_input_week_energy": {
+        "name": "EPS input weekly energy"
+      },
+      "eps_input_year_energy": {
+        "name": "EPS input yearly energy"
+      },
+      "eps_output_day_energy": {
+        "name": "EPS output today energy"
+      },
+      "eps_output_month_energy": {
+        "name": "EPS output monthly energy"
+      },
+      "eps_output_week_energy": {
+        "name": "EPS output weekly energy"
+      },
+      "eps_output_year_energy": {
+        "name": "EPS output yearly energy"
+      },
+      "today_battery_energy": {
+        "name": "Today battery energy"
+      },
+      "today_feed_in_energy": {
+        "name": "Today feed-in energy"
+      },
+      "today_grid_import_energy": {
+        "name": "Today grid import energy"
+      },
+      "today_home_load_energy": {
+        "name": "Today home load energy"
+      },
       "battery_net_power": {
         "name": "Main battery net power"
       },
@@ -262,6 +298,9 @@
       "meter_head_charging_energy": {
         "name": "Meter head charging energy"
       },
+      "meter_head_communication_mode": {
+        "name": "Meter head communication mode"
+      },
       "meter_head_communication_state": {
         "name": "Meter head communication state"
       },
@@ -271,8 +310,26 @@
       "meter_head_input_power": {
         "name": "Meter head input power"
       },
+      "meter_head_ip_address": {
+        "name": "Meter head IP address"
+      },
+      "meter_head_mac_address": {
+        "name": "Meter head MAC address"
+      },
       "meter_head_output_power": {
         "name": "Meter head output power"
+      },
+      "smart_meter_communication_mode": {
+        "name": "Smart meter communication mode"
+      },
+      "smart_meter_ip_address": {
+        "name": "Smart meter IP address"
+      },
+      "smart_meter_mac_address": {
+        "name": "Smart meter MAC address"
+      },
+      "smart_plug_communication_mode": {
+        "name": "Smart plug communication mode"
       },
       "smart_plug_communication_state": {
         "name": "Smart plug communication state"
@@ -283,11 +340,23 @@
       "smart_plug_input_power": {
         "name": "Smart plug input power"
       },
+      "smart_plug_ip_address": {
+        "name": "Smart plug IP address"
+      },
+      "smart_plug_last_update_ts": {
+        "name": "Smart plug last-update timestamp"
+      },
+      "smart_plug_mac_address": {
+        "name": "Smart plug MAC address"
+      },
       "smart_plug_output_power": {
         "name": "Smart plug output power"
       },
       "smart_plug_priority": {
         "name": "Smart plug priority"
+      },
+      "smart_plug_switch_cycle": {
+        "name": "Smart plug switch cycle"
       },
       "smart_plug_today_energy": {
         "name": "Smart plug daily energy"
