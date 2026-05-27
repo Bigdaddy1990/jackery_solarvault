@@ -471,6 +471,6 @@ jobs:
           print(f"coverage gate passed: {coverage_percent}% >= {coverage_min}%")
           PY
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
