@@ -31,7 +31,7 @@
     "manifest:version": "python scripts/manifest_version.py",
     "manifest:github-output": "python scripts/manifest_version.py --github-output",
     "release:verify-tag": "python scripts/manifest_version.py --verify-tag --tag ${GITHUB_REF_NAME}",
-    "install:ruff-baseline": "python -m pip install --upgrade pip && bun run install:unit && python -m pip install ruff",
+    "install:ruff-baseline": "python -m pip install --upgrade pip && bun run install:unit && python -m pip install \"ruff"",
     "smoke:show-env": "bun --version && python --version && pip --version",
     "smoke:upgrade-pip": "python -m pip install --upgrade pip",
     "smoke:install-ha": "echo \"Installing Home Assistant ${HA_SPEC}\" && python -m pip install --no-cache-dir \"homeassistant${HA_SPEC}\" && python -m pip install --no-cache-dir \"colorlog==6.10.1\" && python -m pip install --no-cache-dir -e .",
