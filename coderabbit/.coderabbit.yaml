@@ -6,6 +6,7 @@ slop_detection: true
 review_status: true
 commit_status: true
 fail_commit_status: true
+reviews.auto_review.auto_pause_after_reviewed_commits: true
 reviews:
   profile: "chill"
   request_changes_workflow: true
