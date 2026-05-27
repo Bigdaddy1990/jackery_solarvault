@@ -138,7 +138,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         model = (
             self._discovery.get(FIELD_DEV_MODEL)
             or self._device_meta.get(FIELD_MODEL_NAME)
-            or "SolarVault"
+            or 'SolarVault'
         )
         sw_version = self._ota.get(FIELD_CURRENT_VERSION) or None
         sn = self._device_meta.get(FIELD_DEVICE_SN) or self._discovery.get(
@@ -170,7 +170,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
             or self._properties.get(FIELD_WNAME)
-            or "SolarVault"
+            or 'SolarVault'
         )
         sn = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
         display_name = (
@@ -182,7 +182,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             plug.get(FIELD_MODEL)
             or plug.get(FIELD_MODEL_NAME)
             or plug.get(FIELD_TYPE_NAME)
-            or "Smart Plug"
+            or 'Smart Plug'
         )
         version = plug.get(FIELD_VERSION) or plug.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
