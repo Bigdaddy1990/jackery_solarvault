@@ -407,46 +407,42 @@ class JackeryMqttPushClient:
         """Return True when disconnect should not hide a failed connect."""
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
-    def _build_ssl_context_blocking(self) -> ssl.SSLContext:
-        """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
-        ctx = ssl.create_default_context()
-        source_parts = ["system_default"]
-        self._tls_custom_ca_loaded = False
-        ca_path = Path(
-            self._hass.config.path(
-                "custom_components", "jackery_solarvault", "jackery_ca.crt"
-            )
+def _build_ssl_context_blocking(self) -> ssl.SSLContext:
+    """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
+    # Strenger Default-Context für Server-Auth
+    ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+    source_parts = ["system_default"]
+    self._tls_custom_ca_loaded = False
+
+    ca_path = Path(
+        self._hass.config.path(
+            "custom_components", "jackery_solarvault", "jackery_ca.crt"
         )
-        if ca_path.is_file():
-            try:
-                ctx.load_verify_locations(cafile=str(ca_path))
-            except (OSError, ssl.SSLError) as err:
-                _LOGGER.warning(
-                    "Jackery MQTT CA file %s could not be loaded: %s", ca_path, err
-                )
-            else:
-                self._tls_custom_ca_loaded = True
-                source_parts.append(f"jackery_ca:{ca_path}")
-        else:
-            _LOGGER.warning("Jackery MQTT CA file missing at %s", ca_path)
-        ctx.check_hostname = True
-        ctx.verify_mode = ssl.CERT_REQUIRED
-        # OpenSSL 3.x / Python 3.10+ ssl.create_default_context() enables
-        # VERIFY_X509_STRICT by default. This enforces the presence of the
-        # Authority Key Identifier (AKID) extension in every certificate in
-        # the chain. Jackery's broker certificate does not include this
-        # extension, causing CERTIFICATE_VERIFY_FAILED on affected Python
-        # versions. Disabling only this strict flag preserves full chain
-        # verification, hostname checking, and signature validation.
-        if hasattr(ssl, "VERIFY_X509_STRICT"):
-            ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-            source_parts.append("no_x509_strict")
-            _LOGGER.debug(
-                "Jackery MQTT TLS: VERIFY_X509_STRICT cleared "
-                "(broker cert missing AKID; chain/hostname/signature still verified)"
+    )
+    if ca_path.is_file():
+        try:
+            ctx.load_verify_locations(cafile=str(ca_path))
+        except (OSError, ssl.SSLError) as err:
+            _LOGGER.warning(
+                "Jackery MQTT CA file %s could not be loaded: %s", ca_path, err
             )
-        self._tls_certificate_source = "+".join(source_parts)
-        return ctx
+        else:
+            self._tls_custom_ca_loaded = True
+            source_parts.append(f"jackery_ca:{ca_path}")
+    else:
+        _LOGGER.warning("Jackery MQTT CA file missing at %s", ca_path)
+
+    # Hostname- und Zertifikatsprüfung bleiben voll aktiv
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+
+    # Optional: moderne Protokollversion erzwingen
+    if hasattr(ssl, "TLSVersion"):
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+
+    # WICHTIG: VERIFY_X509_STRICT NICHT mehr abschalten
+    self._tls_certificate_source = "+".join(source_parts)
+    return ctx
 
     def _handle_message(
         self,
@@ -536,7 +532,7 @@ class JackeryMqttPushClient:
             "consecutive_auth_failures": self._consecutive_auth_failures,
             "last_connect_failure_signature": self._last_connect_failure_signature,
             "tls_insecure": False,
-            "tls_x509_strict_disabled": hasattr(ssl, "VERIFY_X509_STRICT"),
+            "tls_x509_strict_disabled": False,  # wir fassen verify_flags nicht an
             "tls_custom_ca_loaded": self._tls_custom_ca_loaded,
             "tls_certificate_source": self._tls_certificate_source,
             "library": MQTT_CLIENT_LIBRARY,

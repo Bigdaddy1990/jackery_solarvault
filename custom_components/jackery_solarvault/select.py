@@ -52,6 +52,7 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
     PRICE_MODE_TO_OPTION,
     STORM_MINUTES_DEFAULT,
+    STORM_MINUTES_MIN_VALID,
     TEMP_UNIT_TO_OPTION,
     WORK_MODE_READ_ALIASES,
     WORK_MODE_TO_OPTION,
@@ -137,7 +138,10 @@ def _storm_minutes_value(
     value = safe_int(raw)
     if value is None:
         return None
-    return value if value > 0 else None
+    # ``wpc``/``minsInterval`` below STORM_MINUTES_MIN_VALID are firmware
+    # sentinels for "not set" — drop them so the select does not invent an
+    # untranslated ``min_<value>`` option (e.g. ``min_1``).
+    return value if value >= STORM_MINUTES_MIN_VALID else None
 
 
 def _storm_minutes_fallback(

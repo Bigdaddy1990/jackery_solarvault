@@ -45,7 +45,13 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 90
-
+# Adaptive polling: when MQTT delivered an inbound message within the
+# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
+# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
+# cloud_polling because HTTP polling is the startup, fallback and keep-alive
+# data path; MQTT push is an optional live enhancement.
+MQTT_LIVE_THRESHOLD_SEC: Final = 60
+ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
 # the official Jackery app can rotate broker sessions while HTTP credentials
@@ -60,7 +66,34 @@ MQTT_AUTH_FAILURE_TOLERANCE: Final = 3
 # falls back to HTTP polling. The probe-reconnect after the pause confirms
 # whether the conflict cleared (app went offline / token settled). HA reauth is
 # left to HTTP auth failures; MQTT-only rejection must not stop the integration.
-MQTT_APP_CONFLICT_PAUSE_SEC: Final = 300
+MQTT_APP_CONFLICT_PAUSE_SEC: Final = 60
+
+# Persisted MQTT-session-cache dict keys. Used by mqtt_session_cache.py to
+# read/write the JSON row that survives reloads and pins down the macId the
+# device was last authenticated with — required so reconnects do not flip the
+# clientId between cycles.
+MQTT_SESSION_MAC_ID: Final = "mac_id"
+MQTT_SESSION_MAC_ID_SOURCE: Final = "mac_id_source"
+MQTT_SESSION_SEED_B64: Final = "seed_b64"
+MQTT_SESSION_USER_ID: Final = "user_id"
+
+# Third-party MQTT bridge config (PROTOCOL.md §5). Surfaced in the
+# options/reconfigure flow so the device can be told to publish telemetry to
+# a local MQTT broker. The bridge is DISABLED by default and all credential
+# fields default to empty — actual values must come from user input via the
+# config flow, never from hard-coded constants (PII / security).
+CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False
+CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
+DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
+CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
+DEFAULT_THIRD_PARTY_MQTT_PORT: Final = 1883
+CONF_THIRD_PARTY_MQTT_USERNAME: Final = "third_party_mqtt_username"
+DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
+CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
+DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
+CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
+DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 
 # HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
@@ -142,30 +175,62 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
 DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
 CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
+# Default off and gated by JACKERY_DEV_MODE=1 per FehlerLOG 2026-05-25
+# ("BLE-Schreibbefehle waren als normale UI-Option erreichbar"). The UI
+# toggle was removed; this flag is consumed only by services/code paths
+# that already check the dev-mode env var.
 DEFAULT_ENABLE_BLE_WRITES: Final = False
 CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
+# Default off — diagnostics with full credentials, serial numbers, MQTT
+# topics and bluetoothKey are off by default for security. User must opt
+# in explicitly for local troubleshooting.
 DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
 
-# Third-party MQTT bridge config (PROTOCOL.md §5). Surfaced in the
-# config/options/reconfigure flow so the device can be told to publish
-# telemetry to a local MQTT broker without requiring the user to call
-# the ``set_third_party_mqtt_config`` service by hand. The push is
-# best-effort on entry load: if neither BLE writes nor cloud MQTT are
-# currently available, the integration logs and keeps the settings; the
-# user can retry by invoking the service explicitly.
-CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
-DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False
-CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
-DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
-CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
-DEFAULT_THIRD_PARTY_MQTT_PORT: Final = 1883
-CONF_THIRD_PARTY_MQTT_USERNAME: Final = "third_party_mqtt_username"
-DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
-CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
-DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
-CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
-DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
+#: Magic prefix that every plaintext frame starts with.
+BLE_FRAME_MAGIC: str = "DFED"
+#: Protocol version following the magic. Constant in the app's
+#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
+BLE_FRAME_VERSION: str = "0001"
+#: Payload-type marker between the header block and the chunk length.
+BLE_FRAME_PAYLOAD_MARKER: str = "0001"
+#: Length in hex characters of every fixed-width 16-bit field.
+_HEX16_WIDTH: int = 4
+#: Key lengths (in bytes) accepted by the BLE crypto helpers.
+#:
+#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
+#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
+#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
+#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
+#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
+#: AES-128 or AES-256 from the key length implicitly. Both are listed here
+#: so callers can pick the right one without hard-coding either.
+BLE_AES_KEY_LEN_AES128: int = 16
+BLE_AES_KEY_LEN_AES256: int = 32
+#: Tuple of accepted key lengths, used for input validation.
+BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
+    BLE_AES_KEY_LEN_AES128,
+    BLE_AES_KEY_LEN_AES256,
+)
+# Backwards-compatible alias kept until call sites migrate; new code should
+# branch on the actual key length the device returns.
+BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
+#: AES-CBC IV length in bytes.
+BLE_AES_IV_LEN: int = 16
+#: GATT service UUID advertised by the SolarVault BLE radio.
+BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
+#: Write-without-response characteristic (app -> device).
+BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
+#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
+BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
+#: Bluetooth SIG company identifier under which the SolarVault advertises
+#: its serial number in the manufacturer-data field.
+BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
 
+# Optional fallback for home-energy when sys/home/trends is empty.
+# Default stays False: device_home_stat is not the same metric family as
+# home_trends and must never silently replace it.
+CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = "enable_derived_home_energy_fallback"
+DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = False
 
 # Config-flow step, error and abort identifiers.
 FLOW_STEP_USER: Final = "user"
@@ -193,15 +258,6 @@ DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
 SLOW_METRICS_INTERVAL_SEC: Final = 300  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
-
-# Adaptive polling: when MQTT delivered an inbound message within the
-# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
-# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
-# cloud_polling because HTTP polling is the startup, fallback and keep-alive
-# data path; MQTT push is an optional live enhancement.
-MQTT_LIVE_THRESHOLD_SEC: Final = 60
-ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
-
 REQUEST_TIMEOUT_SEC: Final = 15
 
 HTTP_METHOD_GET: Final = "GET"
@@ -210,7 +266,7 @@ HTTP_METHOD_PUT: Final = "PUT"
 HTTP_HEADER_CONTENT_TYPE: Final = "content-type"
 HTTP_CONTENT_TYPE_FORM: Final = "application/x-www-form-urlencoded"
 HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
-HTTP_RAW_TEXT_LIMIT: Final = 500
+HTTP_RAW_TEXT_LIMIT: Final = 1000
 
 # Shared payload section names. Coordinator, diagnostics and entity platforms use
 # the same normalized payload shape; keep the keys in one place so section names
@@ -689,11 +745,13 @@ APP_CHART_SERIES_Y6: Final = "y6"
 APP_HOME_GRID_SERIES_KEYS: Final = (APP_CHART_SERIES_Y1, APP_CHART_SERIES_Y2)
 
 # Date-type values used by the documented app period endpoints.
+DATE_TYPE_HOUR: Final = "hour"
 DATE_TYPE_DAY: Final = "day"
 DATE_TYPE_WEEK: Final = "week"
 DATE_TYPE_MONTH: Final = "month"
 DATE_TYPE_YEAR: Final = "year"
 APP_PERIOD_DATE_TYPES: Final = (
+    DATE_TYPE_HOUR,
     DATE_TYPE_DAY,
     DATE_TYPE_WEEK,
     DATE_TYPE_MONTH,
@@ -709,11 +767,13 @@ EXTERNAL_STAT_BUCKET_MONTH_DAILY: Final = "month_daily"
 EXTERNAL_STAT_BUCKET_YEAR_MONTHLY: Final = "year_monthly"
 APP_DAY_CHART_BUCKET_LABEL: Final = "hourly app day buckets from 5-minute power curves"
 APP_CHART_BUCKET_BY_DATE_TYPE: Final = {
+    DATE_TYPE_DAY: EXTERNAL_STAT_BUCKET_DAY_HOURLY,
     DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY,
     DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY,
     DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY,
 }
 APP_CHART_BUCKET_LABEL_BY_DATE_TYPE: Final = {
+    DATE_TYPE_DAY: "daily app chart buckets for the current day",
     DATE_TYPE_WEEK: "daily app chart buckets for the current week",
     DATE_TYPE_MONTH: "daily app chart buckets for the current month",
     DATE_TYPE_YEAR: "monthly app chart buckets for the current year",
@@ -868,6 +928,12 @@ AUTO_OFF_HOURS: Final = (2, 8, 12, 24)
 STORM_MINUTES_DEFAULT: Final = tuple(
     [hour * 60 for hour in range(1, 25)] + [2880, 4320]
 )
+# Storm-warning lead-times below this value are treated as firmware sentinels,
+# not real user settings. The Jackery app dropdown starts at 60 minutes
+# (STORM_MINUTES_DEFAULT minimum), so values like ``wpc=1`` / ``minsInterval=1``
+# coming from an uninitialized weather plan must be dropped — otherwise the HA
+# select adds an extra ``min_1`` option that has no translation entry.
+STORM_MINUTES_MIN_VALID: Final = 60
 PRICE_MODE_TO_OPTION: Final = {1: "dynamic", 2: "single"}
 
 # Diagnostics redaction keys. Keep this set broad because app/MQTT payloads can
@@ -1073,9 +1139,11 @@ SAVINGS_DETAIL_SENSOR_SUFFIXES: Final = {
 }
 DUPLICATE_BINARY_SENSOR_SUFFIXES: Final = {"_eps_enabled"}
 CT_PERIOD_SENSOR_SUFFIXES: Final = {
+    "_smart_meter_import_day_energy",
     "_smart_meter_import_week_energy",
     "_smart_meter_import_month_energy",
     "_smart_meter_import_year_energy",
+    "_smart_meter_export_day_energy",
     "_smart_meter_export_week_energy",
     "_smart_meter_export_month_energy",
     "_smart_meter_export_year_energy",
@@ -1088,9 +1156,11 @@ CT_PERIOD_SENSOR_SUFFIXES: Final = {
 LEGACY_PV_TODAY_SENSOR_SUFFIX: Final = "_pv_today_energy"
 SYSTEM_PV_TODAY_SENSOR_SUFFIX: Final = "_system_pv_today_energy"
 STALE_PERIOD_SENSOR_SUFFIXES: Final = frozenset({
+    "_grid_import_day_energy",
     "_grid_import_week_energy",
     "_grid_import_month_energy",
     "_grid_import_year_energy",
+    "_grid_export_day_energy",
     "_grid_export_week_energy",
     "_grid_export_month_energy",
     "_grid_export_year_energy",

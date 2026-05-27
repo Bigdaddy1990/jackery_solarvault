@@ -547,6 +547,18 @@ class JackeryBleListener:
             len(device_ids),
             ble.BLE_SERVICE_UUID,
         )
+        # Surface the exact matcher tuple so the user can cross-check it
+        # against ``bluetooth.async_scanner_devices_by_address`` /
+        # ``bluetooth.async_discovered_service_info`` output in the
+        # logbook. Without this line a silent listener (zero further
+        # callbacks) is indistinguishable from a misconfigured matcher.
+        _LOGGER.info(
+            "Jackery BLE: matcher registered (service_uuid=%s, "
+            "manufacturer_id=%#x) for %d device(s); awaiting advertisements",
+            ble.BLE_SERVICE_UUID,
+            ble.BLE_MANUFACTURER_ID,
+            len(device_ids),
+        )
 
     async def async_stop(self) -> None:
         """Shut the listener down. Safe to call from coordinator unload.
@@ -698,13 +710,35 @@ class JackeryBleListener:
                     self._hass, address, connectable=True
                 )
                 if ble_device is None:
-                    _LOGGER.debug(
-                        "Jackery BLE %s: address %s not connectable right now, "
-                        "waiting for next advertisement",
+                    # PROTOCOL.md §4: the SolarVault peripheral typically
+                    # stops advertising once a central is connected. After
+                    # a drop, the HA bluetooth manager may therefore not
+                    # hold a fresh ``BLEDevice`` for the cached MAC for a
+                    # while — yet a new advertisement is what would
+                    # otherwise be needed to spawn a new connection task.
+                    # Returning here would kill the runner and require an
+                    # external trigger (new advertisement) to reconnect,
+                    # which can take minutes or never happen. Instead we
+                    # wait one ``_RECONNECT_BACKOFF_SEC`` window and look
+                    # the address up again. ``async_ble_device_from_address``
+                    # is cheap and idempotent; the matcher callback in
+                    # parallel still works, and ``_stop_event`` aborts the
+                    # wait cleanly on integration unload.
+                    _LOGGER.info(
+                        "Jackery BLE %s: address %s not connectable right "
+                        "now; retrying in %ss",
                         device_id,
                         address,
+                        _RECONNECT_BACKOFF_SEC,
                     )
-                    return
+                    try:
+                        await asyncio.wait_for(
+                            self._stop_event.wait(),
+                            timeout=_RECONNECT_BACKOFF_SEC,
+                        )
+                        return  # stop_event fired during the wait
+                    except TimeoutError:
+                        continue
                 stats.connect_attempts += 1
                 try:
                     client = await establish_connection(
@@ -719,13 +753,28 @@ class JackeryBleListener:
                 except BLEAK_RETRY_EXCEPTIONS as err:
                     stats.connect_failures += 1
                     stats.last_error = f"connect: {err}"
-                    _LOGGER.debug(
-                        "Jackery BLE %s connect failed: %s; will retry on next "
-                        "advertisement",
+                    # PROTOCOL.md §4: the peripheral may stop advertising
+                    # while paired with another central, so a one-shot
+                    # ``return`` here would leave the runner dead until a
+                    # fresh advertisement arrived. Back off and try again;
+                    # ``establish_connection`` already retries internally
+                    # ``max_attempts=3`` times, so the outer retry only
+                    # kicks in on hard failures (radio gone, peripheral
+                    # power-cycled).
+                    _LOGGER.info(
+                        "Jackery BLE %s connect failed: %s; retrying in %ss",
                         device_id,
                         err,
+                        _RECONNECT_BACKOFF_SEC,
                     )
-                    return
+                    try:
+                        await asyncio.wait_for(
+                            self._stop_event.wait(),
+                            timeout=_RECONNECT_BACKOFF_SEC,
+                        )
+                        return  # stop_event fired during the wait
+                    except TimeoutError:
+                        continue
 
                 stats.last_connect_at = datetime.now()
                 # Publish the live client so async_send_command can use
@@ -794,7 +843,12 @@ class JackeryBleListener:
 
                 if self._stop_event.is_set():
                     return
-                _LOGGER.debug(
+                # PROTOCOL.md §4: BLE peripherals routinely drop idle
+                # sessions; the surrounding ``while not self._stop_event``
+                # loop reconnects after this backoff. Logged at INFO so
+                # the user sees the reconnect cadence in default logs
+                # (previously DEBUG, which made the silence invisible).
+                _LOGGER.info(
                     "Jackery BLE %s: lost link, backoff %ss before retry",
                     device_id,
                     _RECONNECT_BACKOFF_SEC,
@@ -821,11 +875,29 @@ class JackeryBleListener:
             _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
         finally:
             self._connections.pop(device_id, None)
+            # PROTOCOL.md §4: the runner is the only thing keeping the
+            # device's GATT session alive. Any exit path (stop event,
+            # cancel, unhandled exception) means no further notifies will
+            # arrive until a new advertisement spawns a new task via
+            # ``_on_advertisement``. Log at INFO so a silent integration
+            # has a discoverable cause in the default log level — without
+            # this line the user reproduces the "BLE doesn't reconnect"
+            # symptom with no trace of the runner ever having existed.
+            _LOGGER.info(
+                "Jackery BLE %s: connection runner exited "
+                "(stop_event=%s); awaiting next advertisement to respawn",
+                device_id,
+                self._stop_event.is_set(),
+            )
 
     def _on_disconnect(self, device_id: str) -> None:
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
-        _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)
+        # Promoted from DEBUG to INFO: peripheral disconnects are the
+        # primary symptom of BLE silence and must be visible in default
+        # HA logs so the user can correlate them with the keep-alive /
+        # reconnect-backoff timing in PROTOCOL.md §4.
+        _LOGGER.info("Jackery BLE %s: peripheral disconnected", device_id)
 
     # ------------------------------------------------------------------
     # Notification handler

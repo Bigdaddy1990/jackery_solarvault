@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from . import JackeryConfigEntry
+from . import JackeryConfigEntry, _local_mqtt_client
 from .const import REDACT_KEYS as _STATIC_REDACT_KEYS
 from .coordinator import JackerySolarVaultCoordinator
 from .util import (
@@ -136,6 +136,7 @@ async def async_get_config_entry_diagnostics(
             ),
             redact_keys,
         ),
+        "local_mqtt": _local_mqtt_diagnostics(hass, entry, redactions_disabled),
         "ble_transport": _redacted_payload_map(
             coordinator.ble_observations(), "ble_device", redact_keys
         ),
@@ -151,3 +152,15 @@ async def async_get_config_entry_diagnostics(
         "devices": devices,
         "raw_api": raw,
     }
+
+
+def _local_mqtt_diagnostics(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    redactions_disabled: bool,
+) -> dict[str, Any]:
+    """Return the local-MQTT diagnostics block (disabled when no client)."""
+    client = _local_mqtt_client(hass, entry)
+    if client is None:
+        return {"enabled": False}
+    return client.diagnostics_snapshot(redact=not redactions_disabled)

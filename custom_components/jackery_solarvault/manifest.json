@@ -2,8 +2,11 @@
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
   "after_dependencies": [
+    "bluetooth",
+    "dhcp",
+    "mqtt",
     "recorder",
-    "bluetooth"
+    "zeroconf"
   ],
   "bluetooth": [
     {
@@ -17,6 +20,16 @@
   ],
   "config_flow": true,
   "dependencies": [],
+  "dhcp": [
+    {
+      "hostname": "solarvault*",
+      "macaddress": "80F1B2*"
+    },
+    {
+      "hostname": "jackery*",
+      "macaddress": "80F1B2*"
+    }
+  ],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_polling",

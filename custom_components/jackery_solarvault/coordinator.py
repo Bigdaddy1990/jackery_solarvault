@@ -56,6 +56,7 @@ from .const import (
     APP_PERIOD_DATE_TYPES,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
+    APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
@@ -645,6 +646,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # import runs after platforms are set up so setup is not blocked by
         # historical week/month/year recovery.
         self._last_stat_import_monotonic: float = float("-inf")
+        # Throttle the once-per-cycle slow-poll INFO summary log so it fires
+        # at most once per ``SLOW_METRICS_INTERVAL_SEC`` window, regardless of
+        # how often the fast 30 s coordinator cycle runs. The actual network
+        # fetches stay gated by their TTL caches in ``_get_with_ttl_for``.
+        self._last_slow_poll_log_monotonic: float = float("-inf")
         # Persistent statistics repair state. It lets the integration notice a
         # successful cloud recovery after a HA/cloud outage and explicitly
         # reload month/year chart buckets that may have crossed an app period
@@ -5656,6 +5662,55 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         started = time.monotonic()
 
+        # Once per slow-metrics window: log which HTTP statistics families
+        # are about to be (re)fetched. Network calls themselves are still
+        # TTL-gated by ``_get_with_ttl_for`` — this log just announces the
+        # cadence boundary so operators can confirm cloud trends are being
+        # pulled. We log per family (not per endpoint) to keep noise low.
+        device_count = len(self._device_index)
+        system_ids: set[str] = set()
+        for _idx in self._device_index.values():
+            _sys_id = _idx.get(FIELD_SYSTEM_ID)
+            if _sys_id:
+                system_ids.add(str(_sys_id))
+        system_count = len(system_ids)
+        if (
+            started - self._last_slow_poll_log_monotonic
+            >= self._slow_metrics_interval_sec
+        ):
+            self._last_slow_poll_log_monotonic = started
+            _LOGGER.info(
+                "Jackery: fetching system trends (pv/home/battery) stats for "
+                "%d device(s) / %d system(s)",
+                device_count,
+                system_count,
+            )
+            _LOGGER.info(
+                "Jackery: fetching system statistic stats for %d device(s) / "
+                "%d system(s)",
+                device_count,
+                system_count,
+            )
+            _LOGGER.info(
+                "Jackery: fetching device period (pv/battery/onGrid/ct) stats "
+                "for %d device(s) / %d system(s)",
+                device_count,
+                system_count,
+            )
+            _LOGGER.info(
+                "Jackery: fetching device statistic stats for %d device(s) / "
+                "%d system(s)",
+                device_count,
+                system_count,
+            )
+            if not skip_fast_property_fetch:
+                _LOGGER.info(
+                    "Jackery: fetching device property stats for %d device(s)"
+                    " / %d system(s)",
+                    device_count,
+                    system_count,
+                )
+
         # Per-system calls honour their own refresh intervals. Inside a
         # single update cycle we call each endpoint at most once; across
         # cycles the cache only refreshes when its TTL expired.
@@ -5697,6 +5752,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_WEEK),
                 self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_MONTH),
                 self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_YEAR),
+                self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_DAY),
+                self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_WEEK),
+                self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_MONTH),
+                self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_YEAR),
             )
             for cache in self._slow_cache.values():
                 for cache_key in cache_keys_to_clear:
@@ -6056,6 +6115,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     APP_SECTION_BATTERY_STAT, date_type
                 )
                 home_key = self._app_period_section(APP_SECTION_HOME_STAT, date_type)
+                ct_key = self._app_period_section(APP_SECTION_CT_STAT, date_type)
                 if sys_id:
                     task_names.append(pv_key)
                     tasks.append(
@@ -6091,6 +6151,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         home_key,
                         self._slow_metrics_interval_sec,
                         lambda q=kwargs: self.api.async_get_device_home_stat(
+                            dev_id,
+                            **q,
+                        ),
+                        {},
+                    )
+                )
+                # /v1/device/stat/ct — CT/smart-meter period statistics
+                # (CtStatApi). Device-scoped, per dateType. Cached on the
+                # slow-metrics TTL so per-cycle fast refreshes are free.
+                task_names.append(ct_key)
+                tasks.append(
+                    _get_with_ttl_for(
+                        per_dev,
+                        ct_key,
+                        self._slow_metrics_interval_sec,
+                        lambda q=kwargs: self.api.async_get_device_ct_stat(
                             dev_id,
                             **q,
                         ),
@@ -6389,6 +6465,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     APP_SECTION_PV_STAT,
                     APP_SECTION_BATTERY_STAT,
                     APP_SECTION_HOME_STAT,
+                    APP_SECTION_CT_STAT,
                 )
                 for date_type in APP_PERIOD_DATE_TYPES
             }

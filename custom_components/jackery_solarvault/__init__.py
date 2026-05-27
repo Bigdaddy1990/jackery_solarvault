@@ -16,6 +16,7 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client.local_mqtt import JackeryLocalMqttClient
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -27,7 +28,6 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
@@ -35,10 +35,8 @@ from .const import (
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
@@ -182,28 +180,36 @@ async def _async_authenticate(
     return api
 
 
-async def _async_push_third_party_mqtt_config(
-    coordinator: JackerySolarVaultCoordinator, entry: JackeryConfigEntry
-) -> None:
-    """Push the Third-Party MQTT bridge settings to each main device.
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
-    PROTOCOL.md §5 + §15. Best-effort: both transports may be unavailable
-    (BLE writes off, cloud MQTT not connected yet); failures only log so
-    setup is not blocked. The user can retry via the
-    ``set_third_party_mqtt_config`` service.
+
+def _local_mqtt_client(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> JackeryLocalMqttClient | None:
+    """Return the stashed local-MQTT client for this entry, if any."""
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not isinstance(bucket, dict):
+        return None
+    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
+    return client if isinstance(client, JackeryLocalMqttClient) else None
+
+
+async def _async_start_local_mqtt(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> None:
+    """Start the optional local MQTT listener (PROTOCOL.md §5).
+
+    Disabled when the bridge toggle is off or the host is empty. Failures
+    here never block setup — local MQTT is an additive channel on top of
+    HTTP polling + cloud MQTT push, and the bridge depends on the device
+    accepting the third-party broker config.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
     ):
         return
-    ip = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP
-    )
-    if not ip:
-        _LOGGER.debug(
-            "Jackery: Third-Party MQTT bridge enabled in options but no IP "
-            "configured; skipping setup-time push"
-        )
+    host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
+    if not host:
         return
     port = config_entry_int_option(
         entry, CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT
@@ -214,28 +220,26 @@ async def _async_push_third_party_mqtt_config(
     password = config_entry_str_option(
         entry, CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
     )
-    token = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN
+    client = JackeryLocalMqttClient(
+        hass,
+        host=host,
+        port=port,
+        username=username or None,
+        password=password or None,
+        client_id=f"ha-jackery-{entry.entry_id[:8]}",
     )
-    for device_id in list((coordinator.data or {}).keys()):
-        try:
-            await coordinator.async_set_third_party_mqtt_config(
-                device_id,
-                enable=True,
-                ip=ip,
-                port=port,
-                username=username,
-                password=password,
-                token=token,
-            )
-        except (JackeryError, LookupError, RuntimeError, ValueError) as err:
-            _LOGGER.warning(
-                "Jackery: third-party MQTT bridge push to %s failed "
-                "(BLE writes or cloud MQTT may be unavailable); the user can "
-                "retry via the set_third_party_mqtt_config service: %s",
-                device_id,
-                err,
-            )
+    bucket = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
+    bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
+
+    async def _async_stop_local_mqtt() -> None:
+        with contextlib.suppress(Exception):
+            await client.async_stop()
+        stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+        if isinstance(stashed, dict) and stashed.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
+            stashed.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
+
+    entry.async_on_unload(_async_stop_local_mqtt)
+    await client.async_start()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
@@ -261,11 +265,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # asyncio.gather(return_exceptions=True) widens the result element
         # type to ``T | BaseException``; the cast surfaces that contract for
         # mypy without changing runtime behaviour.
-        refresh_result, mqtt_result = cast(
-            tuple[None | BaseException, None | BaseException],
+        refresh_result, mqtt_result, local_mqtt_result = cast(
+            tuple[
+                None | BaseException,
+                None | BaseException,
+                None | BaseException,
+            ],
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
+                _async_start_local_mqtt(hass, entry),
                 return_exceptions=True,
             ),
         )
@@ -282,6 +291,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             _LOGGER.warning(
                 "Jackery MQTT push could not start during setup: %s", mqtt_result
             )
+        if isinstance(local_mqtt_result, BaseException):
+            # Local broker outage / wrong credentials must not block setup.
+            _LOGGER.warning(
+                "Jackery local MQTT listener could not start during setup: %s",
+                local_mqtt_result,
+            )
 
         entry.runtime_data = coordinator
         # Do not prune optional runtime sensors here: app/MQTT/Combine backed
@@ -294,7 +309,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # the coordinator: BLE is an opt-in diagnostic extra, never a
         # hard dependency of integration setup.
         await coordinator.async_start_ble_transport()
-        await _async_push_third_party_mqtt_config(coordinator, entry)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
         with contextlib.suppress(Exception):
