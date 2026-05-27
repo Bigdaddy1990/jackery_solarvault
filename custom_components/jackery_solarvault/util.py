@@ -64,9 +64,6 @@ from .const import (
     DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
-    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
-    DATA_QUALITY_KEY_REFERENCE_REQUEST,
-    DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
     DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
@@ -118,6 +115,7 @@ _DAY_CHART_MINUTE_RE = re.compile(r'\s*(\d{1,2}):(\d{2})\s*')
 _DEV_MODE_ENV: str = 'JACKERY_DEV_MODE'
 _DEV_MODE_CACHED: bool | None = None
 
+
 def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a bool option with legacy setup-data fallback."""
     options = getattr(entry, 'options', {}) or {}
@@ -152,7 +150,7 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -208,10 +206,18 @@ def coordinator_entity_signature(
         plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
         plug_keys = tuple(smart_plug_serial(p) for p in plugs)
         packs = payload.get(PAYLOAD_BATTERY_PACKS) or []
-        pack_count = sum(1 for item in packs if isinstance(item, dict)) if isinstance(packs, list) else 0
+        pack_count = (
+            sum(1 for item in packs if isinstance(item, dict))
+            if isinstance(packs, list)
+            else 0
+        )
         meter_heads = payload.get(PAYLOAD_METER_HEADS) or []
-        meter_count = sum(1 for item in meter_heads if isinstance(item, dict)) if isinstance(meter_heads, list) else 0
-        
+        meter_count = (
+            sum(1 for item in meter_heads if isinstance(item, dict))
+            if isinstance(meter_heads, list)
+            else 0
+        )
+
         sig.append((
             dev_id,
             plug_keys,
@@ -374,7 +380,7 @@ def safe_float(value: Any) -> float | None:
             return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -384,10 +390,10 @@ def safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
 
@@ -419,23 +425,33 @@ def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None)
         redactions_disabled = diagnostic_redactions_disabled()
     if redactions_disabled:
         return _payload_debug_passthrough(value)
-    
+
     if isinstance(value, dict):
         return {
-            str(key): REDACTED_VALUE if str(key) in REDACT_KEYS else _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
+            str(key): REDACTED_VALUE
+            if str(key) in REDACT_KEYS
+            else _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
             for key, item in value.items()
         }
     if isinstance(value, list):
-        return [_payload_debug_redacted(item, redactions_disabled=redactions_disabled) for item in value]
+        return [
+            _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
+            for item in value
+        ]
     if isinstance(value, tuple):
-        return [_payload_debug_redacted(item, redactions_disabled=redactions_disabled) for item in value]
+        return [
+            _payload_debug_redacted(item, redactions_disabled=redactions_disabled)
+            for item in value
+        ]
     return value
 
 
 def _payload_debug_passthrough(value: Any) -> Any:
     """Recursively normalise ``value`` to JSON-serializable types only."""
     if isinstance(value, dict):
-        return {str(key): _payload_debug_passthrough(item) for key, item in value.items()}
+        return {
+            str(key): _payload_debug_passthrough(item) for key, item in value.items()
+        }
     if isinstance(value, list):
         return [_payload_debug_passthrough(item) for item in value]
     if isinstance(value, tuple):
@@ -536,7 +552,7 @@ def safe_bool(value: Any) -> bool | None:
             return False
     try:
         return int(value) != 0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -581,12 +597,14 @@ def jackery_online_state(value: Any) -> bool | None:
 # ---------------------------------------------------------------------------
 class TrendStatisticPoint(NamedTuple):
     """One app chart bucket converted to a dated statistic point."""
+
     start_date: date | datetime
     value: float
 
 
 class AppDataQualityWarning(NamedTuple):
     """One non-mutating warning about contradictory app statistics."""
+
     level: str
     reason: str
     metric_key: str
@@ -618,7 +636,9 @@ class AppDataQualityWarning(NamedTuple):
         if self.reference_request is not None:
             payload[DATA_QUALITY_KEY_REFERENCE_REQUEST] = dict(self.reference_request)
         if self.source_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = self.source_chart_series_key
+            payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
+                self.source_chart_series_key
+            )
         if self.total_method is not None:
             payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
         return payload
@@ -648,8 +668,12 @@ def _format_request_range(request: Any) -> str | None:
     """Return a compact dateType/range summary for diagnostics messages."""
     if not isinstance(request, dict):
         return None
-    date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(APP_REQUEST_DATE_TYPE_ALT)
-    begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+    date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
+        APP_REQUEST_DATE_TYPE_ALT
+    )
+    begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
+        APP_REQUEST_BEGIN_DATE_ALT
+    )
     end = request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
     if not date_type and not begin and not end:
         return None
@@ -660,18 +684,24 @@ def _format_request_range(request: Any) -> str | None:
 
 def format_data_quality_warning(warning: dict[str, Any]) -> str:
     """Return a compact, deterministic repair/diagnostic warning example."""
-    metric = warning.get(DATA_QUALITY_KEY_LABEL) or warning.get(DATA_QUALITY_KEY_METRIC_KEY) or 'unknown'
+    metric = (
+        warning.get(DATA_QUALITY_KEY_LABEL)
+        or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
+        or 'unknown'
+    )
     source_section = warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or 'unknown'
     source_value = warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)
     reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or 'unknown'
     reference_value = warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE)
     source_text = 'unknown' if source_value is None else str(source_value)
     reference_text = 'unknown' if reference_value is None else str(reference_value)
-    
+
     text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
-    reference_request = _format_request_range(warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST))
-    
+    reference_request = _format_request_range(
+        warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST)
+    )
+
     if source_request or reference_request:
         text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"
     return text
@@ -693,7 +723,9 @@ def app_data_quality_warnings(
         and week_begin.month == today.month
         and week_end.month == today.month
     )
-    week_inside_current_year = (week_begin.year == today.year and week_end.year == today.year)
+    week_inside_current_year = (
+        week_begin.year == today.year and week_end.year == today.year
+    )
 
     warnings: list[AppDataQualityWarning] = []
 
@@ -743,9 +775,15 @@ def app_data_quality_warnings(
                 reference_value=round(reference_value, 5),
                 source_request=_request_for_section(source_section),
                 reference_request=_request_for_section(reference_section),
-                source_chart_series_key=_chart_series_key_for_section(source_section, stat_key),
-                reference_chart_series_key=_chart_series_key_for_section(reference_section, stat_key),
-                total_method='chart_series_sum' if source_section != PAYLOAD_STATISTIC else None,
+                source_chart_series_key=_chart_series_key_for_section(
+                    source_section, stat_key
+                ),
+                reference_chart_series_key=_chart_series_key_for_section(
+                    reference_section, stat_key
+                ),
+                total_method='chart_series_sum'
+                if source_section != PAYLOAD_STATISTIC
+                else None,
             )
         )
 
@@ -753,7 +791,7 @@ def app_data_quality_warnings(
         week = _period_total(prefix, DATE_TYPE_WEEK, stat_key)
         month = _period_total(prefix, DATE_TYPE_MONTH, stat_key)
         year = _period_total(prefix, DATE_TYPE_YEAR, stat_key)
-        
+
         if year is not None and month is not None and year + tolerance < month:
             _add_warning(
                 reason=DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
@@ -765,7 +803,12 @@ def app_data_quality_warnings(
                 reference_section=_section(prefix, DATE_TYPE_MONTH),
                 reference_value=month,
             )
-        if week_inside_current_year and year is not None and week is not None and year + tolerance < week:
+        if (
+            week_inside_current_year
+            and year is not None
+            and week is not None
+            and year + tolerance < week
+        ):
             _add_warning(
                 reason=DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
                 metric_key=metric_key,
@@ -776,7 +819,12 @@ def app_data_quality_warnings(
                 reference_section=_section(prefix, DATE_TYPE_WEEK),
                 reference_value=week,
             )
-        if week_inside_current_month and month is not None and week is not None and month + tolerance < week:
+        if (
+            week_inside_current_month
+            and month is not None
+            and week is not None
+            and month + tolerance < week
+        ):
             _add_warning(
                 reason=DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
                 metric_key=metric_key,
@@ -791,8 +839,14 @@ def app_data_quality_warnings(
     statistic = payload.get(PAYLOAD_STATISTIC)
     if isinstance(statistic, dict):
         lifetime_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-        year_generation = _period_total(APP_SECTION_PV_STAT, DATE_TYPE_YEAR, APP_STAT_TOTAL_SOLAR_ENERGY)
-        if lifetime_generation is not None and year_generation is not None and lifetime_generation + tolerance < year_generation:
+        year_generation = _period_total(
+            APP_SECTION_PV_STAT, DATE_TYPE_YEAR, APP_STAT_TOTAL_SOLAR_ENERGY
+        )
+        if (
+            lifetime_generation is not None
+            and year_generation is not None
+            and lifetime_generation + tolerance < year_generation
+        ):
             _add_warning(
                 reason=DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
                 metric_key='pv_energy',
@@ -842,7 +896,9 @@ def _parse_iso_date(value: Any) -> date | None:
 def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
-        date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(APP_REQUEST_DATE_TYPE_ALT)
+        date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
+            APP_REQUEST_DATE_TYPE_ALT
+        )
         if isinstance(date_type, str):
             return date_type
     for suffix in (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR):
@@ -855,7 +911,11 @@ def _is_day_period_payload(source: dict[str, Any], section: str) -> bool:
     """Return True for app ``dateType=day`` payloads."""
     if section.endswith(f"_{DATE_TYPE_DAY}"):
         return True
-    if section.endswith((f"_{DATE_TYPE_WEEK}", f"_{DATE_TYPE_MONTH}", f"_{DATE_TYPE_YEAR}")):
+    if section.endswith((
+        f"_{DATE_TYPE_WEEK}",
+        f"_{DATE_TYPE_MONTH}",
+        f"_{DATE_TYPE_YEAR}",
+    )):
         return False
     return _trend_date_type(section, source) == DATE_TYPE_DAY
 
@@ -877,23 +937,23 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     text = str(value).strip().replace(',', '.')
     if not text:
         return None
-    
+
     sign = -1.0 if text.startswith('-') else 1.0
     unsigned = text[1:] if text.startswith('-') else text
     if '.' not in unsigned:
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
-        
+
     whole_text, fraction_text = unsigned.split('.', 1)
     if not whole_text:
         whole_text = '0'
     if not whole_text.isdigit() or not fraction_text.isdigit():
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
-        
+
     whole = sign * float(int(whole_text))
     fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
-    
+
     if fraction == 0.0:
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
@@ -916,7 +976,7 @@ def expanded_year_series_values(
     raw_values = [round(safe_float(item) or 0.0, 5) for item in series]
     raw_sum = round(sum(raw_values), 2)
     direct_total = safe_float(source.get(stat_key))
-    
+
     if direct_total is not None:
         tolerance = max(0.05, abs(direct_total) * 0.005)
         if abs(raw_sum - direct_total) <= tolerance:
@@ -933,7 +993,7 @@ def expanded_year_series_values(
             expanded[target] += previous_value
         if current_value:
             expanded[index] += current_value
-            
+
     expanded = [round(value, 5) for value in expanded]
 
     if direct_total is not None:
@@ -960,8 +1020,10 @@ def effective_trend_series_values(
         return None
     if is_device_year_period_section(source, section):
         return expanded_year_series_values(source, section, stat_key)
-        
-    return [0.0 if (val := safe_float(raw)) is None else round(val, 5) for raw in series]
+
+    return [
+        0.0 if (val := safe_float(raw)) is None else round(val, 5) for raw in series
+    ]
 
 
 def effective_period_total_value(
@@ -1225,7 +1287,9 @@ def _calculated_savings_from_year(
             'pv_year_kwh': _round_stat_value(year_generation),
             'device_grid_side_input_year_kwh': _round_stat_value(device_input),
             'device_grid_side_output_year_kwh': _round_stat_value(device_output),
-            'device_grid_side_net_output_year_kwh': _round_stat_value(net_device_output),
+            'device_grid_side_net_output_year_kwh': _round_stat_value(
+                net_device_output
+            ),
             'savings_basis_ac_year_kwh': _round_stat_value(delivered_ac),
             'home_consumption_year_kwh': _round_stat_value(home_consumption),
             'ct_public_export_year_kwh': _round_stat_value(public_export),
@@ -1233,9 +1297,15 @@ def _calculated_savings_from_year(
             'battery_discharge_year_kwh': _round_stat_value(battery_discharge),
             'battery_charge_discharge_gap_kwh': _round_stat_value(battery_gap),
             'conversion_loss_year_kwh': _round_stat_value(conversion_loss_energy),
-            'conversion_loss_year_kwh_signed': _round_stat_value(conversion_loss_energy_signed),
-            'pv_residual_after_self_consumption_year_kwh': _round_stat_value(pv_residual_after_self_consumption_energy),
-            'pv_not_savings_ac_energy_kwh': _round_stat_value(pv_residual_after_self_consumption_energy),
+            'conversion_loss_year_kwh_signed': _round_stat_value(
+                conversion_loss_energy_signed
+            ),
+            'pv_residual_after_self_consumption_year_kwh': _round_stat_value(
+                pv_residual_after_self_consumption_energy
+            ),
+            'pv_not_savings_ac_energy_kwh': _round_stat_value(
+                pv_residual_after_self_consumption_energy
+            ),
         },
     }
 
@@ -1260,9 +1330,12 @@ def _savings_publish_decision(
     has_prior_lifetime_generation = (
         raw_generation is not None
         and year_generation is not None
-        and raw_generation > year_generation + _tolerance_for_values(raw_generation, year_generation)
+        and raw_generation
+        > year_generation + _tolerance_for_values(raw_generation, year_generation)
     )
-    if not has_prior_lifetime_generation and _matches_pv_revenue_shape(raw_revenue, pv_revenue_candidates):
+    if not has_prior_lifetime_generation and _matches_pv_revenue_shape(
+        raw_revenue, pv_revenue_candidates
+    ):
         return True, 'cloud_total_matches_pv_revenue_not_savings'
 
     return False, 'cloud_total_higher_than_current_year_savings'
@@ -1286,15 +1359,19 @@ def _backfill_pv_revenue(
         found_months.append(month)
     if not found_months:
         return
-        
+
     monthly_total = round(sum(revenue_values), 2)
     raw_total = _pv_revenue_value(year_source)
-    if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(raw_total, monthly_total):
+    if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
+        raw_total, monthly_total
+    ):
         return
 
     out['totalSolarRevenue'] = monthly_total
     out['pvProfit'] = round(monthly_total * 10_000_000, 1)
-    out[APP_CHART_SERIES_Y6] = [round(value * 10_000_000, 1) for value in revenue_values]
+    out[APP_CHART_SERIES_Y6] = [
+        round(value * 10_000_000, 1) for value in revenue_values
+    ]
     meta.setdefault('corrected', {})['totalSolarRevenue'] = {
         'raw_total': raw_total,
         'corrected_total': monthly_total,
@@ -1351,7 +1428,9 @@ def backfill_year_payload_from_months(
             if isinstance(raw_values, list)
             else safe_float(year_source.get(stat_key))
         )
-        if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(raw_total, monthly_total):
+        if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
+            raw_total, monthly_total
+        ):
             continue
 
         out[series_key] = monthly_values
@@ -1364,7 +1443,7 @@ def backfill_year_payload_from_months(
             out['outOngridEgy'] = monthly_total
         elif stat_key == APP_STAT_TOTAL_DISCHARGE:
             out['batOtGridEgy'] = monthly_total
-            
+
         meta.setdefault('corrected', {})[stat_key] = {
             'raw_total': raw_total,
             'corrected_total': monthly_total,
@@ -1387,12 +1466,27 @@ def apply_year_month_backfill(
 ) -> None:
     """Apply same-endpoint month backfill to known year statistic sections."""
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
-        (APP_SECTION_PV_STAT, (APP_STAT_TOTAL_SOLAR_ENERGY, APP_STAT_PV1_ENERGY, APP_STAT_PV2_ENERGY, APP_STAT_PV3_ENERGY, APP_STAT_PV4_ENERGY)),
-        (APP_SECTION_HOME_STAT, (APP_STAT_TOTAL_IN_GRID_ENERGY, APP_STAT_TOTAL_OUT_GRID_ENERGY)),
+        (
+            APP_SECTION_PV_STAT,
+            (
+                APP_STAT_TOTAL_SOLAR_ENERGY,
+                APP_STAT_PV1_ENERGY,
+                APP_STAT_PV2_ENERGY,
+                APP_STAT_PV3_ENERGY,
+                APP_STAT_PV4_ENERGY,
+            ),
+        ),
+        (
+            APP_SECTION_HOME_STAT,
+            (APP_STAT_TOTAL_IN_GRID_ENERGY, APP_STAT_TOTAL_OUT_GRID_ENERGY),
+        ),
         (APP_SECTION_BATTERY_STAT, (APP_STAT_TOTAL_CHARGE, APP_STAT_TOTAL_DISCHARGE)),
         (APP_SECTION_HOME_TRENDS, (APP_STAT_TOTAL_HOME_ENERGY,)),
         (APP_SECTION_PV_TRENDS, (APP_STAT_TOTAL_SOLAR_ENERGY,)),
-        (APP_SECTION_BATTERY_TRENDS, (APP_STAT_TOTAL_TREND_CHARGE_ENERGY, APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY)),
+        (
+            APP_SECTION_BATTERY_TRENDS,
+            (APP_STAT_TOTAL_TREND_CHARGE_ENERGY, APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY),
+        ),
     )
 
     for section_prefix, stat_keys in section_metrics:
@@ -1419,12 +1513,21 @@ def guard_statistic_totals_from_year(
     if not isinstance(statistic, dict):
         return
 
-    previous_generation = safe_float(previous_statistic.get(APP_STAT_TOTAL_GENERATION)) if isinstance(previous_statistic, dict) else None
+    previous_generation = (
+        safe_float(previous_statistic.get(APP_STAT_TOTAL_GENERATION))
+        if isinstance(previous_statistic, dict)
+        else None
+    )
     raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
     pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
-    
+
     if not isinstance(pv_year, dict):
-        if previous_generation is None or (raw_generation is not None and previous_generation <= raw_generation + _tolerance_for_values(raw_generation, previous_generation)):
+        if previous_generation is None or (
+            raw_generation is not None
+            and previous_generation
+            <= raw_generation
+            + _tolerance_for_values(raw_generation, previous_generation)
+        ):
             return
         out = dict(statistic)
         out[APP_STAT_TOTAL_GENERATION] = round(previous_generation, 2)
@@ -1441,10 +1544,16 @@ def guard_statistic_totals_from_year(
         payload[PAYLOAD_STATISTIC] = out
         return
 
-    year_generation = effective_period_total_value(pv_year, _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR), APP_STAT_TOTAL_SOLAR_ENERGY)
+    year_generation = effective_period_total_value(
+        pv_year,
+        _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+        APP_STAT_TOTAL_SOLAR_ENERGY,
+    )
     year_revenue = _pv_revenue_value(pv_year)
-    savings = _calculated_savings_from_year(payload, year_generation=year_generation, year_revenue=year_revenue)
-    
+    savings = _calculated_savings_from_year(
+        payload, year_generation=year_generation, year_revenue=year_revenue
+    )
+
     if year_generation is None and year_revenue is None and savings is None:
         return
 
@@ -1454,10 +1563,16 @@ def guard_statistic_totals_from_year(
         'source_section': _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
     }
 
-    generation_candidates = [val for val in (year_generation, previous_generation) if val is not None]
+    generation_candidates = [
+        val for val in (year_generation, previous_generation) if val is not None
+    ]
     corrected_generation = max(generation_candidates) if generation_candidates else None
-    
-    if corrected_generation is not None and (raw_generation is None or corrected_generation > raw_generation + _tolerance_for_values(raw_generation, corrected_generation)):
+
+    if corrected_generation is not None and (
+        raw_generation is None
+        or corrected_generation
+        > raw_generation + _tolerance_for_values(raw_generation, corrected_generation)
+    ):
         out[APP_STAT_TOTAL_GENERATION] = round(corrected_generation, 2)
         meta.setdefault('corrected', {})[APP_STAT_TOTAL_GENERATION] = {
             'raw_total': raw_generation,
@@ -1470,7 +1585,12 @@ def guard_statistic_totals_from_year(
     if savings is not None:
         calculated_revenue = safe_float(savings.get('calculated_total'))
         if calculated_revenue is not None:
-            candidates = _pv_revenue_candidates(pv_year, year_revenue=year_revenue, raw_generation=raw_generation, price=safe_float(savings.get('price')))
+            candidates = _pv_revenue_candidates(
+                pv_year,
+                year_revenue=year_revenue,
+                raw_generation=raw_generation,
+                price=safe_float(savings.get('price')),
+            )
             publish_calculated, reason = _savings_publish_decision(
                 raw_revenue=raw_revenue,
                 calculated_revenue=calculated_revenue,
@@ -1484,15 +1604,22 @@ def guard_statistic_totals_from_year(
                 'decision': reason,
                 'would_replace_cloud_total': publish_calculated,
                 'published_value': raw_revenue,
-                'published_value_source': 'cloud_total'
+                'published_value_source': 'cloud_total',
             })
             out[APP_SAVINGS_CALC_META] = savings
 
     raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
-    if year_generation is not None and raw_generation is not None and raw_generation > 0 and raw_carbon is not None:
+    if (
+        year_generation is not None
+        and raw_generation is not None
+        and raw_generation > 0
+        and raw_carbon is not None
+    ):
         factor = raw_carbon / raw_generation
         corrected_carbon = round(year_generation * factor, 2)
-        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(raw_carbon, corrected_carbon):
+        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(
+            raw_carbon, corrected_carbon
+        ):
             out[APP_STAT_TOTAL_CARBON] = corrected_carbon
             meta.setdefault('corrected', {})[APP_STAT_TOTAL_CARBON] = {
                 'raw_total': raw_carbon,
@@ -1502,7 +1629,7 @@ def guard_statistic_totals_from_year(
 
     if 'corrected' in meta:
         out[APP_TOTAL_GUARD_META] = meta
-    
+
     if 'corrected' in meta or APP_SAVINGS_CALC_META in out:
         payload[PAYLOAD_STATISTIC] = out
 
@@ -1534,9 +1661,14 @@ def trend_series_points(
     begin = None
     end = None
     if isinstance(request, dict):
-        begin = _parse_iso_date(request.get(APP_REQUEST_BEGIN_DATE) or request.get(APP_REQUEST_BEGIN_DATE_ALT))
-        end = _parse_iso_date(request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT))
-        
+        begin = _parse_iso_date(
+            request.get(APP_REQUEST_BEGIN_DATE)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+        )
+        end = _parse_iso_date(
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+        )
+
     date_type = _trend_date_type(section, source)
     if begin is None:
         return []
@@ -1556,7 +1688,7 @@ def trend_series_points(
             bucket_start = begin + timedelta(days=index)
         else:
             continue
-            
+
         if (end is not None and bucket_start > end) or bucket_start > today:
             continue
         points.append(TrendStatisticPoint(bucket_start, round(value, 5)))
@@ -1617,9 +1749,14 @@ def day_power_energy_points(
     begin = None
     end = None
     if isinstance(request, dict):
-        begin = _parse_iso_date(request.get(APP_REQUEST_BEGIN_DATE) or request.get(APP_REQUEST_BEGIN_DATE_ALT))
-        end = _parse_iso_date(request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT))
-        
+        begin = _parse_iso_date(
+            request.get(APP_REQUEST_BEGIN_DATE)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+        )
+        end = _parse_iso_date(
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+        )
+
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
@@ -1631,7 +1768,9 @@ def day_power_energy_points(
 
     labels = source.get(APP_CHART_LABELS)
     parsed_labels = labels if isinstance(labels, list) else None
-    current_day_limit_minute = now.hour * 60 + now.minute if begin == now.date() else 24 * 60 - 1
+    current_day_limit_minute = (
+        now.hour * 60 + now.minute if begin == now.date() else 24 * 60 - 1
+    )
 
     buckets: dict[int, float] = {}
     max_bucket_minute: int | None = None
@@ -1642,15 +1781,23 @@ def day_power_energy_points(
         sample_value = safe_float(raw)
         if sample_value is None:
             continue
-            
+
         bucket_minute = (minute // bucket_minutes) * bucket_minutes
-        max_bucket_minute = bucket_minute if max_bucket_minute is None else max(max_bucket_minute, bucket_minute)
-        sample_kwh = max(sample_value, 0.0) if unit == APP_UNIT_KWH else max(sample_value, 0.0) * 5 / 60 / 1000
+        max_bucket_minute = (
+            bucket_minute
+            if max_bucket_minute is None
+            else max(max_bucket_minute, bucket_minute)
+        )
+        sample_kwh = (
+            max(sample_value, 0.0)
+            if unit == APP_UNIT_KWH
+            else max(sample_value, 0.0) * 5 / 60 / 1000
+        )
         buckets[bucket_minute] = buckets.get(bucket_minute, 0.0) + sample_kwh
 
     if max_bucket_minute is None:
         return []
-        
+
     for minute in range(0, max_bucket_minute + 1, bucket_minutes):
         buckets.setdefault(minute, 0.0)
 
@@ -1667,19 +1814,30 @@ def day_power_energy_points(
 
     bucket_items = sorted(buckets.items())
     rounded_values = [round(max(value, 0.0), 5) for _minute, value in bucket_items]
-    
+
     if scalar_total is not None and raw_total > 0 and rounded_values:
         diff = round(scalar_total - sum(rounded_values), 5)
         if diff:
-            target_index = next((idx for idx in range(len(rounded_values) - 1, -1, -1) if rounded_values[idx] > 0), len(rounded_values) - 1)
-            rounded_values[target_index] = round(max(rounded_values[target_index] + diff, 0.0), 5)
+            target_index = next(
+                (
+                    idx
+                    for idx in range(len(rounded_values) - 1, -1, -1)
+                    if rounded_values[idx] > 0
+                ),
+                len(rounded_values) - 1,
+            )
+            rounded_values[target_index] = round(
+                max(rounded_values[target_index] + diff, 0.0), 5
+            )
 
     return [
         TrendStatisticPoint(
             datetime(begin.year, begin.month, begin.day, minute // 60, minute % 60),
-            bucket_value
+            bucket_value,
         )
-        for (minute, _value), bucket_value in zip(bucket_items, rounded_values, strict=False)
+        for (minute, _value), bucket_value in zip(
+            bucket_items, rounded_values, strict=False
+        )
     ]
 
 
@@ -1726,7 +1884,9 @@ def signed_phase_power_values(ct: dict[str, Any]) -> list[float] | None:
 
 def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     """Return app-reported CT grid power; positive=import, negative=export."""
-    total = directional_power_value(ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],))
+    total = directional_power_value(
+        ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],)
+    )
     if total is not None:
         return total
     phases = signed_phase_power_values(ct)
@@ -1740,15 +1900,15 @@ def calculated_smart_meter_power(
     """Calculate derived CT powers from signed phase values."""
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
-    
+
     if calculation == 'net_import':
         return None if net is None else max(net, 0.0)
     if calculation == 'net_export':
         return None if net is None else max(-net, 0.0)
-        
+
     if phases is None:
         return None
-        
+
     if calculation == 'gross_import':
         return sum(max(value, 0.0) for value in phases)
     if calculation == 'gross_export':
@@ -1760,6 +1920,7 @@ def calculated_smart_meter_power(
 
 class HomeConsumptionPower(NamedTuple):
     """Calculated home-load value plus diagnostic components."""
+
     value: float
     smart_meter_net_power: float | None
     jackery_input_power: float
@@ -1779,17 +1940,23 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
 
 def jackery_reported_home_load_power(props: dict[str, Any]) -> float | None:
     """Return Jackery's reported live home/other-load power if available."""
-    return first_power_value(props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW)
+    return first_power_value(
+        props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW
+    )
 
 
 def jackery_grid_side_input_power(props: dict[str, Any]) -> float | None:
     """AC power drawn by Jackery from the grid/home side."""
-    return first_power_value(props, FIELD_IN_ONGRID_PW, FIELD_GRID_IN_PW, FIELD_IN_GRID_SIDE_PW)
+    return first_power_value(
+        props, FIELD_IN_ONGRID_PW, FIELD_GRID_IN_PW, FIELD_IN_GRID_SIDE_PW
+    )
 
 
 def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
     """AC power supplied by Jackery to the grid/home side."""
-    return first_power_value(props, FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW)
+    return first_power_value(
+        props, FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW
+    )
 
 
 def jackery_corrected_home_consumption_power(
@@ -1831,7 +1998,7 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
     """Return the app chart-series key for one section/stat pair."""
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
-        
+
     if section.startswith(APP_SECTION_PV_STAT):
         mapping = {
             APP_STAT_TOTAL_SOLAR_ENERGY: APP_CHART_SERIES_Y,
@@ -1841,29 +2008,41 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
             APP_STAT_PV4_ENERGY: APP_CHART_SERIES_Y4,
         }
         return mapping.get(stat_key)
-        
+
     if section.startswith(APP_SECTION_HOME_STAT):
-        if stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY: return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY: return APP_CHART_SERIES_Y2
-        
+        if stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
+            return APP_CHART_SERIES_Y1
+        if stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
+            return APP_CHART_SERIES_Y2
+
     if section.startswith(APP_SECTION_CT_STAT):
-        if stat_key == APP_STAT_TOTAL_CT_INPUT_ENERGY: return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_CT_OUTPUT_ENERGY: return APP_CHART_SERIES_Y2
-        
+        if stat_key == APP_STAT_TOTAL_CT_INPUT_ENERGY:
+            return APP_CHART_SERIES_Y1
+        if stat_key == APP_STAT_TOTAL_CT_OUTPUT_ENERGY:
+            return APP_CHART_SERIES_Y2
+
     if section.startswith(APP_SECTION_BATTERY_TRENDS):
-        if stat_key == APP_STAT_TOTAL_TREND_CHARGE_ENERGY: return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: return APP_CHART_SERIES_Y2
-        
+        if stat_key == APP_STAT_TOTAL_TREND_CHARGE_ENERGY:
+            return APP_CHART_SERIES_Y1
+        if stat_key == APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY:
+            return APP_CHART_SERIES_Y2
+
     if section.startswith(APP_SECTION_BATTERY_STAT):
-        if stat_key == APP_STAT_TOTAL_CHARGE: return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_DISCHARGE: return APP_CHART_SERIES_Y2
-        
+        if stat_key == APP_STAT_TOTAL_CHARGE:
+            return APP_CHART_SERIES_Y1
+        if stat_key == APP_STAT_TOTAL_DISCHARGE:
+            return APP_CHART_SERIES_Y2
+
     return None
 
 
 def trend_series_key(section: str, stat_key: str) -> str | None:
     """Return the chart series key for app week/month/year trend payloads."""
-    if not section.endswith((f"_{DATE_TYPE_WEEK}", f"_{DATE_TYPE_MONTH}", f"_{DATE_TYPE_YEAR}")):
+    if not section.endswith((
+        f"_{DATE_TYPE_WEEK}",
+        f"_{DATE_TYPE_MONTH}",
+        f"_{DATE_TYPE_YEAR}",
+    )):
         return None
     return _chart_series_key_for_stat(section, stat_key)
 
@@ -1892,15 +2071,19 @@ def trend_series_total(
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
-        
+
     unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return None
-        
+
     series = source.get(series_key)
     if not isinstance(series, list):
         server_total = effective_period_total_value(source, section, stat_key)
-        if section.startswith(APP_SECTION_HOME_STAT) and server_total == 0.0 and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS):
+        if (
+            section.startswith(APP_SECTION_HOME_STAT)
+            and server_total == 0.0
+            and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
+        ):
             return 0.0
         if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
             return round(server_total, 2)
@@ -1908,13 +2091,13 @@ def trend_series_total(
 
     values = effective_trend_series_values(source, section, stat_key) or []
     valid_values = [v for v in values if v is not None]
-    
+
     if not valid_values:
         server_total = effective_period_total_value(source, section, stat_key)
         if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
             return round(server_total, 2)
         return None
-        
+
     return round(sum(valid_values), 2)
 
 
@@ -1930,22 +2113,31 @@ def trend_series_has_value(
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return False
-        
+
     unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return False
-        
+
     series = source.get(series_key)
     if not isinstance(series, list):
         server_total = effective_period_total_value(source, section, stat_key)
-        if section.startswith(APP_SECTION_HOME_STAT) and server_total == 0.0 and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS):
+        if (
+            section.startswith(APP_SECTION_HOME_STAT)
+            and server_total == 0.0
+            and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
+        ):
             return True
-        return bool(section.startswith(APP_SECTION_CT_STAT) and server_total is not None)
-        
+        return bool(
+            section.startswith(APP_SECTION_CT_STAT) and server_total is not None
+        )
+
     if any(safe_float(item) is not None for item in series):
         return True
-        
-    return bool(section.startswith(APP_SECTION_CT_STAT) and safe_float(source.get(stat_key)) is not None)
+
+    return bool(
+        section.startswith(APP_SECTION_CT_STAT)
+        and safe_float(source.get(stat_key)) is not None
+    )
 
 
 def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
@@ -1953,13 +2145,13 @@ def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:
             return task_plan.get(key)
-            
+
     body = task_plan.get(TASK_PLAN_BODY)
     if isinstance(body, dict):
         for key in keys:
             if key in body and body.get(key) is not None:
                 return body.get(key)
-                
+
     tasks = task_plan.get(TASK_PLAN_TASKS)
     if isinstance(tasks, list):
         for item in tasks:
@@ -1979,4 +2171,3 @@ def trend_payload_has_value(
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None
-
