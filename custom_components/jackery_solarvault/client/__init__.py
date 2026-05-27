@@ -15,28 +15,27 @@ else:
     JackeryMqttPushClient: Any
 
 __all__ = [
-    "JackeryApi",
-    "JackeryApiError",
-    "JackeryAuthError",
-    "JackeryError",
-    "JackeryMqttPushClient",
+    'JackeryApi',
+    'JackeryApiError',
+    'JackeryAuthError',
+    'JackeryError',
+    'JackeryMqttPushClient',
 ]
 
 
 def __getattr__(name: str) -> Any:
-    """
-    Lazily import and return the `JackeryMqttPushClient` class when accessed as a module attribute.
-    
+    """Lazily import and return the `JackeryMqttPushClient` class when accessed as a module attribute.
+
     Parameters:
         name (str): Name of the requested module attribute.
-    
+
     Returns:
         type: The `JackeryMqttPushClient` class.
-    
+
     Raises:
         AttributeError: If `name` is not `"JackeryMqttPushClient"`.
     """
-    if name == "JackeryMqttPushClient":
+    if name == 'JackeryMqttPushClient':
         from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 
         return _JackeryMqttPushClient

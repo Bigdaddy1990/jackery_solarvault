@@ -29,32 +29,29 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Set up Jackery SolarVault button entities for a config entry.
-    
+    """Set up Jackery SolarVault button entities for a config entry.
+
     Creates and registers reboot button entities for devices in the coordinator's data while avoiding duplicates by unique ID. Monitors a signature of the coordinator data and adds new entities when that signature changes; registers a listener so updates stop when the config entry is unloaded.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
-        """
-        Append the given button entity to `entities` if its unique ID has not been seen.
-        
+        """Append the given button entity to `entities` if its unique ID has not been seen.
+
         Parameters:
             entities (list[ButtonEntity]): Target list to receive the entity when added.
             entity (ButtonEntity): Button entity to append; skipped if its unique ID is already tracked.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
+            entities, seen_unique_ids, entity, platform='button', logger=_LOGGER
         )
 
     def _collect_entities() -> list[ButtonEntity]:
-        """
-        Collect reboot button entities for devices managed by the coordinator.
-        
+        """Collect reboot button entities for devices managed by the coordinator.
+
         Creates a JackeryRebootButton for each device in coordinator.data where the device either reports support for advanced features or exposes the reboot field in its properties. Each entity is added at most once.
-        
+
         Returns:
             list[ButtonEntity]: ButtonEntity instances corresponding to devices that expose or support the reboot action.
         """
@@ -84,48 +81,45 @@ async def async_setup_entry(
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
     """Restart the SolarVault device via PROTOCOL.md §4 reboot command."""
 
-    _attr_translation_key = "reboot_device"
+    _attr_translation_key = 'reboot_device'
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:restart"
+    _attr_icon = 'mdi:restart'
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
-        """
-        Initialize the reboot button entity for a specific SolarVault device.
-        
+        """Initialize the reboot button entity for a specific SolarVault device.
+
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator that manages device state and actions.
             device_id (str): Unique identifier of the target device.
         """
-        super().__init__(coordinator, device_id, "reboot_device")
+        super().__init__(coordinator, device_id, 'reboot_device')
 
     def _raise_action_error(self, error: object) -> None:
-        """
-        Raise a Home Assistant error with translation metadata for a failed entity action.
-        
+        """Raise a Home Assistant error with translation metadata for a failed entity action.
+
         Includes translation_domain, translation_key "entity_action_failed", and placeholders:
         - "entity": the entity key ("reboot_device")
         - "device_id": the target device identifier
         - "error": stringified representation of the original error
-        
+
         Parameters:
             error (object): The original exception or error information to include in the translated message.
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
+            translation_key='entity_action_failed',
             translation_placeholders={
-                "entity": "reboot_device",
-                "device_id": self._device_id,
-                "error": str(error),
+                'entity': 'reboot_device',
+                'device_id': self._device_id,
+                'error': str(error),
             },
         )
 
     async def async_press(self) -> None:
-        """
-        Initiates a reboot of the associated device and requests a coordinator refresh.
-        
+        """Initiates a reboot of the associated device and requests a coordinator refresh.
+
         Attempts to reboot the device via the coordinator and then requests an immediate data refresh.
         If authentication has failed for the config entry, the original ConfigEntryAuthFailed is re-raised.
         If a HomeAssistantError with a translation_key is raised by the coordinator, it is re-raised unchanged.
@@ -138,7 +132,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, "translation_key", None):
+            if getattr(err, 'translation_key', None):
                 raise
             self._raise_action_error(err)
         except Exception as err:

@@ -35,32 +35,31 @@ def mock_jackery_login() -> Generator[None]:
     """
 
     async def _fake_login(api) -> str:
-        """
-        Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
-        
+        """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
+
         Parameters:
             api: The Jackery API client instance whose internal authentication and MQTT-related attributes will be populated for testing.
-        
+
         Returns:
             str: The authentication token assigned to the API instance.
         """
-        api._token = "test-token"
-        api._mqtt_user_id = "test-user"
-        api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+        api._token = 'test-token'
+        api._mqtt_user_id = 'test-user'
+        api._mqtt_seed_b64 = 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
         api._mqtt_mac_id = api._resolve_login_mac_id()
         return api._token
 
     with (
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+            'custom_components.jackery_solarvault.api.JackeryApi.async_login',
             new=_fake_login,
         ),
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
+            'custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list',
             return_value=[],
         ),
         patch(
-            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
+            'custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy',
             return_value=[],
         ),
     ):
