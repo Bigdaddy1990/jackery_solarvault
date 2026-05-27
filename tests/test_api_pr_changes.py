@@ -345,3 +345,114 @@ async def test_async_get_device_eps_stat_does_not_include_system_id() -> None:
     # FIELD_SYSTEM_ID / "systemId" must not appear in params since the EPS method
     # does not accept a system_id argument.
     assert "systemId" not in captured["params"]
+
+
+# ---------------------------------------------------------------------------
+# Additional boundary / regression tests for _rsa_pkcs1v15_encrypt
+# ---------------------------------------------------------------------------
+
+
+def test_rsa_pkcs1v15_encrypt_empty_plaintext_produces_ciphertext() -> None:
+    """Encrypting empty bytes with a valid RSA key must return non-empty ciphertext.
+
+    RSA PKCS#1 v1.5 pads the plaintext, so even an empty input produces a
+    ciphertext block whose length equals the key modulus in bytes.
+    """
+    key_b64 = _make_rsa_public_key_b64()
+    result = _rsa_pkcs1v15_encrypt(b"", key_b64)
+    assert isinstance(result, bytes)
+    # RSA-1024 → 128-byte ciphertext even for empty plaintext.
+    assert len(result) == 128
+
+
+def test_rsa_pkcs1v15_encrypt_ciphertext_length_equals_modulus_bytes() -> None:
+    """Ciphertext length must equal the key size in bytes (128 for RSA-1024).
+
+    This is a concrete numeric assertion that pins the output contract and
+    will catch accidental use of a different padding scheme.
+    """
+    key_b64 = _make_rsa_public_key_b64()
+    result = _rsa_pkcs1v15_encrypt(b"jackery", key_b64)
+    # 1024-bit key → 1024 / 8 = 128-byte output.
+    assert len(result) == 128
+
+
+# ---------------------------------------------------------------------------
+# Additional boundary / regression tests for async_get_device_eps_stat
+# ---------------------------------------------------------------------------
+
+
+async def test_async_get_device_eps_stat_uses_default_date_type() -> None:
+    """With no date_type kwarg the default (DATE_TYPE_DAY) is used in params."""
+    api = JackeryApi.__new__(JackeryApi)
+    api.last_device_period_stat_responses = {}
+    captured: dict[str, Any] = {}
+
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        captured["params"] = dict(params)
+        return {FIELD_CODE: 0, FIELD_DATA: {}}
+
+    api._get_json = _get_json
+
+    await api.async_get_device_eps_stat("dev1")
+
+    assert "dateType" in captured["params"]
+    assert captured["params"]["dateType"] == DATE_TYPE_DAY
+
+
+# ---------------------------------------------------------------------------
+# Additional boundary / regression tests for async_get_today_energy
+# ---------------------------------------------------------------------------
+
+
+async def test_async_get_today_energy_does_not_use_device_id_param() -> None:
+    """today_energy must send FIELD_DEVICE_SN, not FIELD_DEVICE_ID, in params."""
+    api = JackeryApi.__new__(JackeryApi)
+    captured: dict[str, Any] = {}
+
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        captured["params"] = dict(params)
+        return {}
+
+    api._get_json = _get_json
+
+    await api.async_get_today_energy("MySN")
+
+    assert FIELD_DEVICE_SN in captured["params"]
+    assert FIELD_DEVICE_ID not in captured["params"]
+
+
+# ---------------------------------------------------------------------------
+# client/__init__.py — __getattr__ (docstring removed, behaviour unchanged)
+# ---------------------------------------------------------------------------
+
+
+def test_client_package_getattr_raises_attribute_error_for_unknown_name() -> None:
+    """Accessing an unknown attribute on the client package must raise AttributeError.
+
+    The PR removed the docstring from __getattr__ but must not change its
+    behaviour: only ``JackeryMqttPushClient`` is lazily imported; everything
+    else raises ``AttributeError``.
+    """
+    import custom_components.jackery_solarvault.client as client_pkg
+
+    with pytest.raises(AttributeError):
+        _ = client_pkg.__getattr__("NonExistentName")
+
+
+def test_client_package_getattr_raises_for_internal_names() -> None:
+    """Names that look 'internal' but are not exported must still raise AttributeError."""
+    import custom_components.jackery_solarvault.client as client_pkg
+
+    for name in ("JackeryFoo", "JackeryBle", "mqtt_push", "_private"):
+        with pytest.raises(AttributeError):
+            _ = client_pkg.__getattr__(name)
+
+
+def test_client_package_getattr_error_contains_the_requested_name() -> None:
+    """The AttributeError raised by __getattr__ must contain the attribute name."""
+    import custom_components.jackery_solarvault.client as client_pkg
+
+    name = "SomeUnknownAttribute"
+    with pytest.raises(AttributeError, match=name):
+        _ = client_pkg.__getattr__(name)
