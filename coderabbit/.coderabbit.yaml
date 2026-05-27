@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: true
+enable_prompt_for_ai_agents: true
+slop_detection: true
+review_status: true
+commit_status: true
+fail_commit_status: true
+reviews:
+  profile: "chill"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: true
+  review_status: true
+  review_details: true
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    #auto_pause_after_reviewed_commits: 10
+    drafts: true
+    request_changes_workflow: true
+    ignore_title_keywords:
+      - "WIP"
+      - "[skip review]"
+    labels:
+      - "!do-not-review"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "renovate[bot]"
+      - "release-bot"
+    description_keyword: ""
+  tools:
+    github-checks:
+      enabled: true
+      timeout_ms: 190000
+    actionlint:
+      enabled: true
+    flake8:
+      enabled: true
+    htmlhint:
+      enabled: true
+    languagetool:
+      enabled: true
+      enabled_rules: 
+      disabled_rules: 
+      enabled_categories: 
+      disabled_categories: 
+      level: "default"
+     opengrep:
+      enabled: true
+     pylint:
+      enabled: true
+     ruff:
+      enabled: true
+     shellcheck:
+      enabled: true
+     smartyLint:
+      enabled: true
+     yamllint:
+      enabled: true
+pre_merge_checks:
+    docstrings:
+      mode: "error"
+      threshold: 85
+    title:
+      mode: "warning"
+      requirements: "Start with an imperative verb; keep under 50 characters."
+    description:
+      mode: "error"
+    issue_assessment:
+      mode: "warning"
+    custom_checks:
+      - name: "Undocumented Breaking Changes"
+        mode: "warning"
+        instructions: "Pass/fail criteria: All breaking changes to public APIs, CLI flags, environment variables, configuration keys, database schemas, or HTTP/GraphQL endpoints must be documented in the Breaking Change section of the PR description and in CHANGELOG.md. Exclude purely internal or private changes (e.g., code not exported from package entry points or explicitly marked as internal)."
+chat:
+  auto_reply: true
+
