@@ -111,15 +111,15 @@ from .const import (
 )
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
-_DAY_CHART_MINUTE_RE = re.compile(r'\s*(\d{1,2}):(\d{2})\s*')
-_DEV_MODE_ENV: str = 'JACKERY_DEV_MODE'
+_DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
+_DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
 _DEV_MODE_CACHED: bool | None = None
 
 
 def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a bool option with legacy setup-data fallback."""
-    options = getattr(entry, 'options', {}) or {}
-    data = getattr(entry, 'data', {}) or {}
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
     value = options.get(key)
     if value is None:
         value = data.get(key, default)
@@ -129,8 +129,8 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
 
 def config_entry_str_option(entry: Any, key: str, default: str) -> str:
     """Return a str option with legacy setup-data fallback."""
-    options = getattr(entry, 'options', {}) or {}
-    data = getattr(entry, 'data', {}) or {}
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
     value = options.get(key)
     if value is None:
         value = data.get(key, default)
@@ -141,8 +141,8 @@ def config_entry_str_option(entry: Any, key: str, default: str) -> str:
 
 def config_entry_int_option(entry: Any, key: str, default: int) -> int:
     """Return an int option with legacy setup-data fallback."""
-    options = getattr(entry, 'options', {}) or {}
-    data = getattr(entry, 'data', {}) or {}
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
     value = options.get(key)
     if value is None:
         value = data.get(key, default)
@@ -174,13 +174,13 @@ def parse_utc_datetime(value: Any) -> datetime:
     elif isinstance(value, str):
         normalized = value.strip()
         if not normalized:
-            raise ValueError('timestamp must not be empty')
+            raise ValueError("timestamp must not be empty")
         with contextlib.suppress(ValueError, OSError, OverflowError):
             timestamp = float(normalized)
             if abs(timestamp) >= 100_000_000_000:
                 timestamp /= 1000
             return datetime.fromtimestamp(timestamp, UTC)
-        if normalized.endswith('Z'):
+        if normalized.endswith("Z"):
             normalized = f"{normalized[:-1]}+00:00"
         try:
             parsed = datetime.fromisoformat(normalized)
@@ -239,9 +239,9 @@ def append_unique_entity(
     logger: Any,
 ) -> bool:
     """Append an entity once per unique_id during platform setup."""
-    uid = getattr(entity, 'unique_id', None)
+    uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
-        logger.debug('Skip duplicate %s unique_id=%s', platform, uid)
+        logger.debug("Skip duplicate %s unique_id=%s", platform, uid)
         return False
     if uid:
         seen_unique_ids.add(uid)
@@ -310,7 +310,7 @@ def app_period_date_bounds(
     )
     if begin > end:
         raise ValueError(
-            'Jackery app period beginDate must be before or equal to endDate: '
+            "Jackery app period beginDate must be before or equal to endDate: "
             f"{begin.isoformat()} > {end.isoformat()}"
         )
     return begin.isoformat(), end.isoformat()
@@ -370,10 +370,10 @@ def safe_float(value: Any) -> float | None:
         candidate = value.strip()
         if not candidate:
             return None
-        if ',' in candidate and '.' not in candidate:
-            if candidate.count(',') != 1:
+        if "," in candidate and "." not in candidate:
+            if candidate.count(",") != 1:
                 return None
-            candidate = candidate.replace(',', '.')
+            candidate = candidate.replace(",", ".")
         try:
             return float(candidate)
         except ValueError:
@@ -401,8 +401,8 @@ def dev_mode_redactions_disabled() -> bool:
     """Return True when the JACKERY_DEV_MODE env var is truthy. Cached for I/O performance."""
     global _DEV_MODE_CACHED
     if _DEV_MODE_CACHED is None:
-        raw = os.environ.get(_DEV_MODE_ENV, '')
-        _DEV_MODE_CACHED = raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+        raw = os.environ.get(_DEV_MODE_ENV, "")
+        _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
     return _DEV_MODE_CACHED
 
 
@@ -494,23 +494,23 @@ def chart_series_debug(source: Any) -> dict[str, Any]:
         for index, raw in enumerate(series):
             parsed = safe_float(raw)
             parsed_items.append({
-                'index': index,
-                'raw': raw,
-                'raw_type': type(raw).__name__,
-                'parsed_float': parsed,
+                "index": index,
+                "raw": raw,
+                "raw_type": type(raw).__name__,
+                "parsed_float": parsed,
             })
             if parsed is not None:
                 total += parsed
                 found = True
         result[key] = {
-            'raw_count': len(series),
-            'parsed_sum': round(total, 5) if found else None,
-            'items': parsed_items,
+            "raw_count": len(series),
+            "parsed_sum": round(total, 5) if found else None,
+            "items": parsed_items,
         }
     if isinstance(source.get(APP_CHART_LABELS), list):
-        result['labels'] = source.get(APP_CHART_LABELS)
+        result["labels"] = source.get(APP_CHART_LABELS)
     if isinstance(source.get(APP_REQUEST_META), dict):
-        result['request'] = source.get(APP_REQUEST_META)
+        result["request"] = source.get(APP_REQUEST_META)
     return result
 
 
@@ -529,11 +529,11 @@ def append_payload_debug_line(
         with contextlib.suppress(OSError):
             debug_path.replace(backup)
     redacted = _payload_debug_redacted(event, redactions_disabled=redactions_disabled)
-    with debug_path.open('a', encoding='utf-8') as file:
+    with debug_path.open("a", encoding="utf-8") as file:
         file.write(
             json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
         )
-        file.write('\n')
+        file.write("\n")
 
 
 def safe_bool(value: Any) -> bool | None:
@@ -546,9 +546,9 @@ def safe_bool(value: Any) -> bool | None:
         return int(value) != 0
     if isinstance(value, str):
         val = value.strip().lower()
-        if val in {'1', 'true', 'on', 'yes'}:
+        if val in {"1", "true", "on", "yes"}:
             return True
-        if val in {'0', 'false', 'off', 'no'}:
+        if val in {"0", "false", "off", "no"}:
             return False
     try:
         return int(value) != 0
@@ -585,9 +585,9 @@ def jackery_online_state(value: Any) -> bool | None:
     """Return a parsed Jackery online/offline marker, or None when unknown."""
     if isinstance(value, str):
         normalized = value.strip().lower()
-        if normalized in {'online', 'connected', 'available'}:
+        if normalized in {"online", "connected", "available"}:
             return True
-        if normalized in {'offline', 'disconnected', 'unavailable'}:
+        if normalized in {"offline", "disconnected", "unavailable"}:
             return False
     return safe_bool(value)
 
@@ -653,12 +653,12 @@ def normalized_data_quality_warnings(
         if not isinstance(warning, dict):
             continue
         key = (
-            str(warning.get(DATA_QUALITY_KEY_REASON) or ''),
-            str(warning.get(DATA_QUALITY_KEY_METRIC_KEY) or ''),
-            str(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or ''),
-            str(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE) or ''),
-            str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or ''),
-            str(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE) or ''),
+            str(warning.get(DATA_QUALITY_KEY_REASON) or ""),
+            str(warning.get(DATA_QUALITY_KEY_METRIC_KEY) or ""),
+            str(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or ""),
+            str(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE) or ""),
+            str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or ""),
+            str(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE) or ""),
         )
         deduped.setdefault(key, dict(warning))
     return [deduped[key] for key in sorted(deduped)]
@@ -687,14 +687,14 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     metric = (
         warning.get(DATA_QUALITY_KEY_LABEL)
         or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
-        or 'unknown'
+        or "unknown"
     )
-    source_section = warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or 'unknown'
+    source_section = warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or "unknown"
     source_value = warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)
-    reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or 'unknown'
+    reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or "unknown"
     reference_value = warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE)
-    source_text = 'unknown' if source_value is None else str(source_value)
-    reference_text = 'unknown' if reference_value is None else str(reference_value)
+    source_text = "unknown" if source_value is None else str(source_value)
+    reference_text = "unknown" if reference_value is None else str(reference_value)
 
     text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
@@ -781,7 +781,7 @@ def app_data_quality_warnings(
                 reference_chart_series_key=_chart_series_key_for_section(
                     reference_section, stat_key
                 ),
-                total_method='chart_series_sum'
+                total_method="chart_series_sum"
                 if source_section != PAYLOAD_STATISTIC
                 else None,
             )
@@ -849,8 +849,8 @@ def app_data_quality_warnings(
         ):
             _add_warning(
                 reason=DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
-                metric_key='pv_energy',
-                label='PV energy',
+                metric_key="pv_energy",
+                label="PV energy",
                 stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
                 source_section=PAYLOAD_STATISTIC,
                 source_value=lifetime_generation,
@@ -863,10 +863,10 @@ def app_data_quality_warnings(
 
 def statistic_id_part(value: Any) -> str:
     """Return a Home-Assistant-safe external statistic id component."""
-    text = str(value or '').strip().lower()
-    text = re.sub(r'[^a-z0-9_]+', '_', text)
-    text = re.sub(r'_+', '_', text).strip('_')
-    return text or 'unknown'
+    text = str(value or "").strip().lower()
+    text = re.sub(r"[^a-z0-9_]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "unknown"
 
 
 def external_trend_statistic_id(
@@ -934,19 +934,19 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     """Return previous/current-month parts for a candidate Jackery compact year value."""
     if value is None or isinstance(value, bool):
         return None
-    text = str(value).strip().replace(',', '.')
+    text = str(value).strip().replace(",", ".")
     if not text:
         return None
 
-    sign = -1.0 if text.startswith('-') else 1.0
-    unsigned = text[1:] if text.startswith('-') else text
-    if '.' not in unsigned:
+    sign = -1.0 if text.startswith("-") else 1.0
+    unsigned = text[1:] if text.startswith("-") else text
+    if "." not in unsigned:
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
 
-    whole_text, fraction_text = unsigned.split('.', 1)
+    whole_text, fraction_text = unsigned.split(".", 1)
     if not whole_text:
-        whole_text = '0'
+        whole_text = "0"
     if not whole_text.isdigit() or not fraction_text.isdigit():
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
@@ -1068,7 +1068,7 @@ def year_payload_appears_current_month_only(
     """Return True when a year payload looks like the app's month-only bug."""
     if current_month <= 1:
         return False
-    unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return False
     for stat_key in stat_keys:
@@ -1093,10 +1093,10 @@ def _month_value(
 
 
 def _pv_revenue_value(source: dict[str, Any]) -> float | None:
-    revenue = safe_float(source.get('totalSolarRevenue'))
+    revenue = safe_float(source.get("totalSolarRevenue"))
     if revenue is not None:
         return revenue
-    profit = safe_float(source.get('pvProfit'))
+    profit = safe_float(source.get("pvProfit"))
     if profit is None:
         return None
     return round(profit / 10_000_000, 5)
@@ -1135,7 +1135,7 @@ def _configured_or_derived_price(
     if year_generation is not None and year_generation > 0 and year_revenue is not None:
         derived = year_revenue / year_generation
         if 0 <= derived <= 10:
-            return round(derived, 5), 'pv_year_revenue_per_kwh'
+            return round(derived, 5), "pv_year_revenue_per_kwh"
     return None, None
 
 
@@ -1154,11 +1154,11 @@ def _pv_revenue_candidates(
 
     backfill = pv_year.get(APP_YEAR_BACKFILL_META)
     if isinstance(backfill, dict):
-        corrected = backfill.get('corrected')
+        corrected = backfill.get("corrected")
         if isinstance(corrected, dict):
-            revenue_meta = corrected.get('totalSolarRevenue')
+            revenue_meta = corrected.get("totalSolarRevenue")
             if isinstance(revenue_meta, dict):
-                for key in ('raw_total', 'corrected_total'):
+                for key in ("raw_total", "corrected_total"):
                     value = safe_float(revenue_meta.get(key))
                     if value is not None:
                         candidates.append(round(value, 2))
@@ -1225,10 +1225,10 @@ def _calculated_savings_from_year(
         return None
 
     delivered_ac = max(0.0, device_output)
-    method_prefix = 'device_grid_side_output'
+    method_prefix = "device_grid_side_output"
     if device_input is not None:
         delivered_ac = max(0.0, delivered_ac - max(0.0, device_input))
-        method_prefix = 'device_grid_side_net_output'
+        method_prefix = "device_grid_side_net_output"
     net_device_output = delivered_ac
     if public_export is not None:
         delivered_ac = max(0.0, delivered_ac - max(0.0, public_export))
@@ -1278,32 +1278,32 @@ def _calculated_savings_from_year(
 
     calculated_total = round(savings_energy * price, 2)
     return {
-        'method': method,
-        'calculated_total': calculated_total,
-        'energy_kwh': round(savings_energy, 2),
-        'price': round(price, 5),
-        'price_source': price_source,
-        'source_energy': {
-            'pv_year_kwh': _round_stat_value(year_generation),
-            'device_grid_side_input_year_kwh': _round_stat_value(device_input),
-            'device_grid_side_output_year_kwh': _round_stat_value(device_output),
-            'device_grid_side_net_output_year_kwh': _round_stat_value(
+        "method": method,
+        "calculated_total": calculated_total,
+        "energy_kwh": round(savings_energy, 2),
+        "price": round(price, 5),
+        "price_source": price_source,
+        "source_energy": {
+            "pv_year_kwh": _round_stat_value(year_generation),
+            "device_grid_side_input_year_kwh": _round_stat_value(device_input),
+            "device_grid_side_output_year_kwh": _round_stat_value(device_output),
+            "device_grid_side_net_output_year_kwh": _round_stat_value(
                 net_device_output
             ),
-            'savings_basis_ac_year_kwh': _round_stat_value(delivered_ac),
-            'home_consumption_year_kwh': _round_stat_value(home_consumption),
-            'ct_public_export_year_kwh': _round_stat_value(public_export),
-            'battery_charge_year_kwh': _round_stat_value(battery_charge),
-            'battery_discharge_year_kwh': _round_stat_value(battery_discharge),
-            'battery_charge_discharge_gap_kwh': _round_stat_value(battery_gap),
-            'conversion_loss_year_kwh': _round_stat_value(conversion_loss_energy),
-            'conversion_loss_year_kwh_signed': _round_stat_value(
+            "savings_basis_ac_year_kwh": _round_stat_value(delivered_ac),
+            "home_consumption_year_kwh": _round_stat_value(home_consumption),
+            "ct_public_export_year_kwh": _round_stat_value(public_export),
+            "battery_charge_year_kwh": _round_stat_value(battery_charge),
+            "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
+            "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
+            "conversion_loss_year_kwh": _round_stat_value(conversion_loss_energy),
+            "conversion_loss_year_kwh_signed": _round_stat_value(
                 conversion_loss_energy_signed
             ),
-            'pv_residual_after_self_consumption_year_kwh': _round_stat_value(
+            "pv_residual_after_self_consumption_year_kwh": _round_stat_value(
                 pv_residual_after_self_consumption_energy
             ),
-            'pv_not_savings_ac_energy_kwh': _round_stat_value(
+            "pv_not_savings_ac_energy_kwh": _round_stat_value(
                 pv_residual_after_self_consumption_energy
             ),
         },
@@ -1319,13 +1319,13 @@ def _savings_publish_decision(
     pv_revenue_candidates: list[float],
 ) -> tuple[bool, str]:
     if raw_revenue is None:
-        return True, 'missing_cloud_total_revenue'
+        return True, "missing_cloud_total_revenue"
 
     tolerance = _tolerance_for_values(raw_revenue, calculated_revenue)
     if abs(raw_revenue - calculated_revenue) <= tolerance:
-        return True, 'cloud_total_matches_calculated_savings'
+        return True, "cloud_total_matches_calculated_savings"
     if calculated_revenue > raw_revenue + tolerance:
-        return True, 'cloud_total_below_current_year_savings'
+        return True, "cloud_total_below_current_year_savings"
 
     has_prior_lifetime_generation = (
         raw_generation is not None
@@ -1336,9 +1336,9 @@ def _savings_publish_decision(
     if not has_prior_lifetime_generation and _matches_pv_revenue_shape(
         raw_revenue, pv_revenue_candidates
     ):
-        return True, 'cloud_total_matches_pv_revenue_not_savings'
+        return True, "cloud_total_matches_pv_revenue_not_savings"
 
-    return False, 'cloud_total_higher_than_current_year_savings'
+    return False, "cloud_total_higher_than_current_year_savings"
 
 
 def _backfill_pv_revenue(
@@ -1367,15 +1367,15 @@ def _backfill_pv_revenue(
     ):
         return
 
-    out['totalSolarRevenue'] = monthly_total
-    out['pvProfit'] = round(monthly_total * 10_000_000, 1)
+    out["totalSolarRevenue"] = monthly_total
+    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
     out[APP_CHART_SERIES_Y6] = [
         round(value * 10_000_000, 1) for value in revenue_values
     ]
-    meta.setdefault('corrected', {})['totalSolarRevenue'] = {
-        'raw_total': raw_total,
-        'corrected_total': monthly_total,
-        'months': found_months,
+    meta.setdefault("corrected", {})["totalSolarRevenue"] = {
+        "raw_total": raw_total,
+        "corrected_total": monthly_total,
+        "months": found_months,
     }
 
 
@@ -1391,16 +1391,16 @@ def backfill_year_payload_from_months(
 
     year_section = _period_section(section_prefix, DATE_TYPE_YEAR)
     month_section = _period_section(section_prefix, DATE_TYPE_MONTH)
-    unit = str(year_source.get(APP_STAT_UNIT) or '').strip().lower()
+    unit = str(year_source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return year_source
 
     out = dict(year_source)
     out.setdefault(APP_CHART_LABELS, [str(month) for month in range(1, 13)])
     meta: dict[str, Any] = {
-        'method': 'same_endpoint_month_sum',
-        'source_period': DATE_TYPE_MONTH,
-        'target_period': DATE_TYPE_YEAR,
+        "method": "same_endpoint_month_sum",
+        "source_period": DATE_TYPE_MONTH,
+        "target_period": DATE_TYPE_YEAR,
     }
 
     for stat_key in stat_keys:
@@ -1436,25 +1436,25 @@ def backfill_year_payload_from_months(
         out[series_key] = monthly_values
         out[stat_key] = monthly_total
         if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
-            out['pvEgy'] = monthly_total
+            out["pvEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
-            out['inOngridEgy'] = monthly_total
+            out["inOngridEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
-            out['outOngridEgy'] = monthly_total
+            out["outOngridEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_DISCHARGE:
-            out['batOtGridEgy'] = monthly_total
+            out["batOtGridEgy"] = monthly_total
 
-        meta.setdefault('corrected', {})[stat_key] = {
-            'raw_total': raw_total,
-            'corrected_total': monthly_total,
-            'series_key': series_key,
-            'months': found_months,
+        meta.setdefault("corrected", {})[stat_key] = {
+            "raw_total": raw_total,
+            "corrected_total": monthly_total,
+            "series_key": series_key,
+            "months": found_months,
         }
 
     if section_prefix in {APP_SECTION_PV_STAT, APP_SECTION_PV_TRENDS}:
         _backfill_pv_revenue(out, year_source, month_sources, meta)
 
-    if 'corrected' not in meta:
+    if "corrected" not in meta:
         return year_source
     out[APP_YEAR_BACKFILL_META] = meta
     return out
@@ -1532,12 +1532,12 @@ def guard_statistic_totals_from_year(
         out = dict(statistic)
         out[APP_STAT_TOTAL_GENERATION] = round(previous_generation, 2)
         out[APP_TOTAL_GUARD_META] = {
-            'method': 'previous_total_lower_bound',
-            'corrected': {
+            "method": "previous_total_lower_bound",
+            "corrected": {
                 APP_STAT_TOTAL_GENERATION: {
-                    'raw_total': raw_generation,
-                    'corrected_total': round(previous_generation, 2),
-                    'previous_total': previous_generation,
+                    "raw_total": raw_generation,
+                    "corrected_total": round(previous_generation, 2),
+                    "previous_total": previous_generation,
                 }
             },
         }
@@ -1559,8 +1559,8 @@ def guard_statistic_totals_from_year(
 
     out = dict(statistic)
     meta: dict[str, Any] = {
-        'method': 'current_year_lower_bound',
-        'source_section': _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+        "method": "current_year_lower_bound",
+        "source_section": _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
     }
 
     generation_candidates = [
@@ -1574,22 +1574,22 @@ def guard_statistic_totals_from_year(
         > raw_generation + _tolerance_for_values(raw_generation, corrected_generation)
     ):
         out[APP_STAT_TOTAL_GENERATION] = round(corrected_generation, 2)
-        meta.setdefault('corrected', {})[APP_STAT_TOTAL_GENERATION] = {
-            'raw_total': raw_generation,
-            'corrected_total': round(corrected_generation, 2),
-            'current_year_total': year_generation,
-            'previous_total': previous_generation,
+        meta.setdefault("corrected", {})[APP_STAT_TOTAL_GENERATION] = {
+            "raw_total": raw_generation,
+            "corrected_total": round(corrected_generation, 2),
+            "current_year_total": year_generation,
+            "previous_total": previous_generation,
         }
 
     raw_revenue = safe_float(statistic.get(APP_STAT_TOTAL_REVENUE))
     if savings is not None:
-        calculated_revenue = safe_float(savings.get('calculated_total'))
+        calculated_revenue = safe_float(savings.get("calculated_total"))
         if calculated_revenue is not None:
             candidates = _pv_revenue_candidates(
                 pv_year,
                 year_revenue=year_revenue,
                 raw_generation=raw_generation,
-                price=safe_float(savings.get('price')),
+                price=safe_float(savings.get("price")),
             )
             publish_calculated, reason = _savings_publish_decision(
                 raw_revenue=raw_revenue,
@@ -1599,12 +1599,12 @@ def guard_statistic_totals_from_year(
                 pv_revenue_candidates=candidates,
             )
             savings.update({
-                'raw_cloud_total': raw_revenue,
-                'pv_revenue_candidates': candidates,
-                'decision': reason,
-                'would_replace_cloud_total': publish_calculated,
-                'published_value': raw_revenue,
-                'published_value_source': 'cloud_total',
+                "raw_cloud_total": raw_revenue,
+                "pv_revenue_candidates": candidates,
+                "decision": reason,
+                "would_replace_cloud_total": publish_calculated,
+                "published_value": raw_revenue,
+                "published_value_source": "cloud_total",
             })
             out[APP_SAVINGS_CALC_META] = savings
 
@@ -1621,22 +1621,22 @@ def guard_statistic_totals_from_year(
             raw_carbon, corrected_carbon
         ):
             out[APP_STAT_TOTAL_CARBON] = corrected_carbon
-            meta.setdefault('corrected', {})[APP_STAT_TOTAL_CARBON] = {
-                'raw_total': raw_carbon,
-                'corrected_total': corrected_carbon,
-                'kg_per_kwh': round(factor, 5),
+            meta.setdefault("corrected", {})[APP_STAT_TOTAL_CARBON] = {
+                "raw_total": raw_carbon,
+                "corrected_total": corrected_carbon,
+                "kg_per_kwh": round(factor, 5),
             }
 
-    if 'corrected' in meta:
+    if "corrected" in meta:
         out[APP_TOTAL_GUARD_META] = meta
 
-    if 'corrected' in meta or APP_SAVINGS_CALC_META in out:
+    if "corrected" in meta or APP_SAVINGS_CALC_META in out:
         payload[PAYLOAD_STATISTIC] = out
 
 
 def compact_json(value: Any) -> str:
     """Return compact JSON for diagnostic attributes."""
-    return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def trend_series_points(
@@ -1650,7 +1650,7 @@ def trend_series_points(
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
-    unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return []
     series = effective_trend_series_values(source, section, stat_key)
@@ -1738,8 +1738,8 @@ def day_power_energy_points(
     series_key = day_power_series_key(source, section, stat_key)
     if not series_key:
         return []
-    unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
-    if unit and unit not in {'w', APP_UNIT_KWH}:
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit not in {"w", APP_UNIT_KWH}:
         return []
     series = source.get(series_key)
     if not isinstance(series, list) or not series:
@@ -1901,19 +1901,19 @@ def calculated_smart_meter_power(
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
-    if calculation == 'net_import':
+    if calculation == "net_import":
         return None if net is None else max(net, 0.0)
-    if calculation == 'net_export':
+    if calculation == "net_export":
         return None if net is None else max(-net, 0.0)
 
     if phases is None:
         return None
 
-    if calculation == 'gross_import':
+    if calculation == "gross_import":
         return sum(max(value, 0.0) for value in phases)
-    if calculation == 'gross_export':
+    if calculation == "gross_export":
         return sum(max(-value, 0.0) for value in phases)
-    if calculation == 'gross_flow':
+    if calculation == "gross_flow":
         return sum(abs(value) for value in phases)
     return None
 
@@ -1987,7 +1987,7 @@ def jackery_corrected_home_consumption_power(
         smart_meter_net_power=meter_net,
         jackery_input_power=jackery_input,
         jackery_output_power=jackery_output,
-        source='smart_meter_net_minus_input_plus_output',
+        source="smart_meter_net_minus_input_plus_output",
     )
 
 
@@ -2072,7 +2072,7 @@ def trend_series_total(
     if not series_key:
         return None
 
-    unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return None
 
@@ -2114,7 +2114,7 @@ def trend_series_has_value(
     if not series_key:
         return False
 
-    unit = str(source.get(APP_STAT_UNIT) or '').strip().lower()
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit != APP_UNIT_KWH:
         return False
 

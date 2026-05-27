@@ -179,9 +179,9 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 
 
 def _generate_udid(seed: str) -> str:
-    md5_digest = hashlib.md5(seed.encode('utf-8')).digest()
+    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
-    return MQTT_MAC_ID_PREFIX + str(u).replace('-', '')
+    return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
 
 
 # ---------------------------------------------------------------------------
@@ -202,9 +202,9 @@ class JackeryApi:
         self._session = session
         self._account = account
         self._password = password
-        self._region_code = (region_code or '').strip().upper() or None
+        self._region_code = (region_code or "").strip().upper() or None
         self._mqtt_mac_id_configured = mqtt_mac_id
-        self._mqtt_mac_id_source = 'generated'
+        self._mqtt_mac_id_source = "generated"
         self._token: str | None = None
         self._lock = asyncio.Lock()
         self._mqtt_user_id: str | None = None
@@ -234,12 +234,12 @@ class JackeryApi:
         if self._region_code:
             return
         for item in systems:
-            country = str(item.get(FIELD_COUNTRY_CODE) or '').strip().upper()
+            country = str(item.get(FIELD_COUNTRY_CODE) or "").strip().upper()
             if not country:
                 continue
             self._region_code = country
             _LOGGER.debug(
-                'Jackery: inferred regionCode=%s from /v1/device/system/list',
+                "Jackery: inferred regionCode=%s from /v1/device/system/list",
                 country,
             )
             return
@@ -248,17 +248,17 @@ class JackeryApi:
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
         """Headers matching the Android app values documented in PROTOCOL.md §2."""
         h = {
-            'accept-encoding': 'gzip',
-            'accept-language': 'de-DE',
-            'app_version': APP_VERSION,
-            'app_version_code': APP_VERSION_CODE,
-            'connection': 'Keep-Alive',
-            'host': 'iot.jackeryapp.com',
+            "accept-encoding": "gzip",
+            "accept-language": "de-DE",
+            "app_version": APP_VERSION,
+            "app_version_code": APP_VERSION_CODE,
+            "connection": "Keep-Alive",
+            "host": "iot.jackeryapp.com",
             FIELD_MODEL: DEVICE_MODEL_HEADER,
-            'network': 'wifi',
-            'platform': PLATFORM_HEADER,
-            'sys_version': SYS_VERSION,
-            'user-agent': USER_AGENT,
+            "network": "wifi",
+            "platform": PLATFORM_HEADER,
+            "sys_version": SYS_VERSION,
+            "user-agent": USER_AGENT,
         }
         if with_token and self._token:
             h[FIELD_TOKEN] = self._token
@@ -270,10 +270,10 @@ class JackeryApi:
         """Normalize and validate the app-style macId token."""
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
-        if not re.fullmatch(r'[0-9a-f]{33}', mac_id):
+        if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
             raise JackeryAuthError(
-                'Invalid mqtt_mac_id format. Expected 33 lowercase hex chars '
-                '(example: 271c55f5731fa3d9ba1fe131e088946e0).'
+                "Invalid mqtt_mac_id format. Expected 33 lowercase hex chars "
+                "(example: 271c55f5731fa3d9ba1fe131e088946e0)."
             )
         return mac_id
 
@@ -285,16 +285,16 @@ class JackeryApi:
                 mac_id = self._normalize_mqtt_mac_id(configured)
             except JackeryAuthError as err:
                 _LOGGER.warning(
-                    'Ignoring invalid configured mqtt_mac_id (%s); '
-                    'falling back to generated value',
+                    "Ignoring invalid configured mqtt_mac_id (%s); "
+                    "falling back to generated value",
                     err,
                 )
-                self._mqtt_mac_id_source = 'generated_fallback_invalid_config'
+                self._mqtt_mac_id_source = "generated_fallback_invalid_config"
             else:
-                self._mqtt_mac_id_source = 'configured'
+                self._mqtt_mac_id_source = "configured"
                 return mac_id
         # Fallback for headless environments without Android ID access.
-        self._mqtt_mac_id_source = 'generated'
+        self._mqtt_mac_id_source = "generated"
         return _generate_udid(self._account)
 
     async def async_login(self) -> str:
@@ -310,13 +310,13 @@ class JackeryApi:
         if self._region_code:
             login_bean[FIELD_REGION_CODE] = self._region_code
 
-        plaintext = json.dumps(login_bean, ensure_ascii=False).encode('utf-8')
+        plaintext = json.dumps(login_bean, ensure_ascii=False).encode("utf-8")
         aes_blob = base64.b64encode(_aes_ecb_encrypt(plaintext, AES_KEY)).decode(
-            'ascii'
+            "ascii"
         )
         rsa_blob = base64.b64encode(
             _rsa_pkcs1v15_encrypt(AES_KEY, RSA_PUBLIC_KEY_B64)
-        ).decode('ascii')
+        ).decode("ascii")
 
         url = f"{BASE_URL}{LOGIN_PATH}"
 
@@ -324,7 +324,7 @@ class JackeryApi:
         # query string. This matches the captured traffic byte-for-byte.
         headers = self._headers()
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
-        form_body = {'aesEncryptData': aes_blob, 'rsaForAesKey': rsa_blob}
+        form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
         try:
             async with self._session.post(
@@ -357,7 +357,7 @@ class JackeryApi:
             lambda: self._http_payload_debug(
                 method=HTTP_METHOD_POST,
                 path=LOGIN_PATH,
-                body={'form_fields': sorted(form_body)},
+                body={"form_fields": sorted(form_body)},
                 status=200,
                 response=dict(data),
             )
@@ -368,13 +368,13 @@ class JackeryApi:
                 f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
             )
 
-        token = data.get(FIELD_TOKEN) or ''
+        token = data.get(FIELD_TOKEN) or ""
         if not token:
-            raise JackeryAuthError('Login succeeded but no token returned')
+            raise JackeryAuthError("Login succeeded but no token returned")
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
-        self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or '') or None
+        self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id
         return token
@@ -393,14 +393,14 @@ class JackeryApi:
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
             raise JackeryAuthError(
-                'Login response missing MQTT fields (userId/mqttPassWord/macId)'
+                "Login response missing MQTT fields (userId/mqttPassWord/macId)"
             )
 
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
         except (binascii.Error, ValueError) as err:
             raise JackeryAuthError(
-                'Invalid mqttPassWord base64 in login response'
+                "Invalid mqttPassWord base64 in login response"
             ) from err
         if len(seed) != 32:
             raise JackeryAuthError(
@@ -412,11 +412,11 @@ class JackeryApi:
         )
         username = f"{self._mqtt_user_id}{MQTT_USERNAME_SEPARATOR}{self._mqtt_mac_id}"
         encrypted = _aes_cbc_encrypt(
-            username.encode('utf-8'),
+            username.encode("utf-8"),
             key=seed,
             iv=seed[:16],
         )
-        password = base64.b64encode(encrypted).decode('ascii')
+        password = base64.b64encode(encrypted).decode("ascii")
         return {
             MQTT_CREDENTIAL_CLIENT_ID: client_id,
             MQTT_CREDENTIAL_USERNAME: username,
@@ -445,7 +445,7 @@ class JackeryApi:
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError('Login succeeded without returning a token')
+            raise JackeryAuthError("Login succeeded without returning a token")
         return self._token
 
     @staticmethod
@@ -477,8 +477,8 @@ class JackeryApi:
         code = self._extract_code(data)
         if code == CODE_TOKEN_EXPIRED:
             return True
-        msg = str(data.get(FIELD_MSG) or '').lower()
-        return 'token expires' in msg or 'token expired' in msg
+        msg = str(data.get(FIELD_MSG) or "").lower()
+        return "token expires" in msg or "token expired" in msg
 
     @staticmethod
     def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
@@ -487,33 +487,33 @@ class JackeryApi:
             return False
         parts = [
             data.get(FIELD_MSG),
-            data.get('message'),
-            data.get('error'),
+            data.get("message"),
+            data.get("error"),
             data.get(FIELD_RAW_TEXT),
         ]
-        text = ' '.join(str(part) for part in parts if part not in (None, '')).lower()
+        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
         if not text:
             return False
         return any(
             marker in text
             for marker in (
-                'unauthorized',
-                'unauthorised',
-                'not authorized',
-                'not authorised',
-                'forbidden',
-                'invalid token',
-                'token invalid',
-                'token expires',
-                'token expired',
-                'login',
-                'log in',
-                'please login',
-                'please log in',
-                'auth',
-                'authentication',
-                'authorization',
-                'credential',
+                "unauthorized",
+                "unauthorised",
+                "not authorized",
+                "not authorised",
+                "forbidden",
+                "invalid token",
+                "token invalid",
+                "token expires",
+                "token expired",
+                "login",
+                "log in",
+                "please login",
+                "please log in",
+                "auth",
+                "authentication",
+                "authorization",
+                "credential",
             )
         )
 
@@ -536,7 +536,7 @@ class JackeryApi:
     def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
         """Build a compact auth-failure message without exposing secrets."""
         code = data.get(FIELD_CODE)
-        msg = data.get(FIELD_MSG) or data.get('message') or data.get('error')
+        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
@@ -561,7 +561,7 @@ class JackeryApi:
             if inspect.isawaitable(result):
                 await result
         except Exception as err:
-            _LOGGER.debug('Jackery payload debug logging failed: %s', err)
+            _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
     def _http_payload_debug(
@@ -576,18 +576,18 @@ class JackeryApi:
         """Build a redacted-later HTTP payload debug event."""
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
-            'kind': 'http',
-            'method': method,
-            'path': path,
-            'params': params or {},
-            'request_body': body or {},
-            'status': status,
-            'response': response or {},
-            'response_data_type': type(payload).__name__,
+            "kind": "http",
+            "method": method,
+            "path": path,
+            "params": params or {},
+            "request_body": body or {},
+            "status": status,
+            "response": response or {},
+            "response_data_type": type(payload).__name__,
         }
         series_debug = chart_series_debug(payload)
         if series_debug:
-            event['chart_series_debug'] = series_debug
+            event["chart_series_debug"] = series_debug
         return event
 
     @staticmethod
@@ -604,7 +604,7 @@ class JackeryApi:
         if payload is None:
             return {}
         _LOGGER.warning(
-            'Jackery %s returned unexpected data shape for dict payload: %s',
+            "Jackery %s returned unexpected data shape for dict payload: %s",
             path,
             type(payload).__name__,
         )
@@ -619,7 +619,7 @@ class JackeryApi:
         if payload is None:
             return []
         _LOGGER.warning(
-            'Jackery %s returned unexpected data shape for list payload: %s',
+            "Jackery %s returned unexpected data shape for list payload: %s",
             path,
             type(payload).__name__,
         )
@@ -633,7 +633,7 @@ class JackeryApi:
         """Return the OTA item matching the requested device serial."""
         requested_sn = str(device_sn)
         for item in items:
-            if str(item.get(FIELD_DEVICE_SN) or '') == requested_sn:
+            if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
                 return item
         return items[0] if items else {}
 
@@ -669,7 +669,7 @@ class JackeryApi:
                 f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
-            _LOGGER.info('Jackery token expired — re-login')
+            _LOGGER.info("Jackery token expired — re-login")
             self._token = None
             await self._ensure_token()
             try:
@@ -1039,7 +1039,7 @@ class JackeryApi:
                 return [raw]
         if raw is not None:
             _LOGGER.warning(
-                'Jackery %s returned unexpected data shape for battery packs: %s',
+                "Jackery %s returned unexpected data shape for battery packs: %s",
                 BATTERY_PACK_PATH,
                 type(raw).__name__,
             )
@@ -1190,7 +1190,7 @@ class JackeryApi:
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                'Jackery token expired — re-login for %s %s', HTTP_METHOD_PUT, path
+                "Jackery token expired — re-login for %s %s", HTTP_METHOD_PUT, path
             )
             self._token = None
             await self._ensure_token()
@@ -1233,7 +1233,7 @@ class JackeryApi:
         Response payload is a boolean: `data: true`.
         """
         if not system_name or not system_name.strip():
-            raise JackeryApiError('system_name must be a non-empty string')
+            raise JackeryApiError("system_name must be a non-empty string")
         data = await self._put_json(
             SYSTEM_NAME_PATH,
             {FIELD_SYSTEM_NAME: system_name.strip(), FIELD_ID: str(system_id)},
@@ -1288,7 +1288,7 @@ class JackeryApi:
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                'Jackery token expired — re-login for %s %s', HTTP_METHOD_POST, path
+                "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
             )
             self._token = None
             await self._ensure_token()
@@ -1335,7 +1335,7 @@ class JackeryApi:
         additional fields we haven't identified yet.
         """
         if not isinstance(max_power, int) or max_power < 0:
-            raise JackeryApiError('max_power must be a non-negative integer')
+            raise JackeryApiError("max_power must be a non-negative integer")
         data = await self._post_form(
             MAX_POWER_SAVE_PATH,
             {FIELD_MAX_POWER: max_power, FIELD_DEVICE_ID: str(device_id)},
@@ -1352,12 +1352,12 @@ class JackeryApi:
         """POST /v1/device/dynamic/saveSingleMode."""
         price = float(single_price)
         if price < 0:
-            raise JackeryApiError('single_price must be >= 0')
-        cur = str(currency or '').strip()
+            raise JackeryApiError("single_price must be >= 0")
+        cur = str(currency or "").strip()
         if not cur:
-            raise JackeryApiError('currency must be a non-empty string')
+            raise JackeryApiError("currency must be a non-empty string")
         # Keep stable decimal formatting for backend parsing.
-        price_text = f"{price:.4f}".rstrip('0').rstrip('.')
+        price_text = f"{price:.4f}".rstrip("0").rstrip(".")
         data = await self._post_form(
             SAVE_SINGLE_MODE_PATH,
             {
@@ -1377,9 +1377,9 @@ class JackeryApi:
         system_region: str,
     ) -> bool:
         """POST /v1/device/dynamic/saveDynamicMode."""
-        region = str(system_region or '').strip()
+        region = str(system_region or "").strip()
         if not region:
-            raise JackeryApiError('system_region must be a non-empty string')
+            raise JackeryApiError("system_region must be a non-empty string")
         data = await self._post_form(
             SAVE_DYNAMIC_MODE_PATH,
             {
