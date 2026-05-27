@@ -8,7 +8,7 @@
 # Add missing depenices is ok, comment and log in devfiles why.
 
 aiofiles
-aiohttp>=3.13.3
+aiohttp>=3.13.5
 aiomqtt
 annotatedyaml>=1.0.2
 certifi
