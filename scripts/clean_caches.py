@@ -5,13 +5,13 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_DIR_NAMES = {
-    '.mypy_cache',
-    '.pytest_cache',
-    '.ruff_cache',
-    '__pycache__',
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
 }
 CACHE_FILES = {
-    '.coverage',
+    ".coverage",
 }
 
 
@@ -30,11 +30,18 @@ def _remove_file(path: Path) -> bool:
 
 
 def main() -> int:
-    """Remove known local cache directories and files."""
+    """
+    Scan the repository tree under ROOT and remove files and directories matching known local cache names.
+    
+    The function traverses ROOT, removes directories whose names are in CACHE_DIR_NAMES and files whose names are in CACHE_FILES, counts successful removals, and prints a summary. If an entry could not be removed but still exists after an attempt, its path (relative to ROOT) is printed as a skipped item.
+    
+    Returns:
+        exit_code (int): Always returns 0.
+    """
     removed = 0
     skipped: list[str] = []
 
-    for path in sorted(ROOT.rglob('*')):
+    for path in sorted(ROOT.rglob("*")):
         if path.is_dir() and path.name in CACHE_DIR_NAMES:
             if _remove_dir(path):
                 removed += 1
@@ -48,11 +55,11 @@ def main() -> int:
 
     print(f"removed {removed} cache item(s)")
     if skipped:
-        print('skipped locked cache item(s):')
+        print("skipped locked cache item(s):")
         for item in skipped:
             print(f"- {item}")
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())

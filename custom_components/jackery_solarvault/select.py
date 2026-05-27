@@ -86,13 +86,29 @@ def _raise_select_action_error(
     translation_key: str,
     **placeholders: object,
 ) -> NoReturn:
-    """Raise a translatable HA action error for a select entity."""
+    """
+    Raise a HomeAssistantError with translation metadata for a JackerySelect entity.
+    
+    The raised error uses DOMAIN as `translation_domain`, the provided `translation_key`,
+    and a `translation_placeholders` mapping that always includes:
+    - `"entity"`: the entity description key,
+    - `"device_id"`: the entity's device id,
+    and any additional placeholder kwargs converted to strings.
+    
+    Parameters:
+        entity (JackerySelect): The select entity related to the action.
+        translation_key (str): Translation key identifying the error message.
+        **placeholders: object: Additional translation placeholders; values will be cast to strings.
+    
+    Raises:
+        HomeAssistantError: Always raised with the assembled translation metadata.
+    """
     raise HomeAssistantError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
         translation_placeholders={
-            'entity': entity.entity_description.key,
-            'device_id': entity._device_id,
+            "entity": entity.entity_description.key,
+            "device_id": entity._device_id,
             **{key: str(value) for key, value in placeholders.items()},
         },
     )
@@ -176,28 +192,51 @@ def _storm_minutes_label(minutes: int) -> str:
 
 
 def _price_source_label(source: dict[str, object]) -> str:
+    """
+    Builds a human-readable label for a price provider source.
+    
+    Parameters:
+        source (dict[str, object]): Provider data; expected keys include
+            `FIELD_COMPANY_NAME`, `FIELD_NAME`, `FIELD_CID`, `FIELD_PLATFORM_COMPANY_ID`,
+            `FIELD_COUNTRY`, and `FIELD_SYSTEM_REGION`. The function uses these fields
+            (in that precedence order for the name) to compose the label.
+    
+    Returns:
+        str: Label containing the provider name, the country/region in parentheses
+        when available, and `#<company_id>` appended when `FIELD_PLATFORM_COMPANY_ID`
+        is present and non-empty.
+    """
     name = str(
         source.get(FIELD_COMPANY_NAME)
         or source.get(FIELD_NAME)
         or source.get(FIELD_CID)
         or source.get(FIELD_PLATFORM_COMPANY_ID)
-        or 'Provider'
+        or "Provider"
     ).strip()
     country = str(
-        source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or ''
+        source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or ""
     ).strip()
     company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
     label = f"{name} ({country})" if country else name
-    if company_id not in (None, ''):
+    if company_id not in (None, ""):
         return f"{label} #{company_id}"
     return label
 
 
 def _price_source_regions(source: dict[str, object]) -> list[str]:
+    """
+    Extracts a list of region parts from a price source's country or system region field.
+    
+    Parameters:
+        source (dict[str, object]): A price source dictionary that may contain `FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`.
+    
+    Returns:
+        list[str]: A list of trimmed, non-empty region parts split on commas from the first available of `FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`. Returns an empty list if neither field is present or is empty.
+    """
     raw = source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION)
-    if raw in (None, ''):
+    if raw in (None, ""):
         return []
-    return [part.strip() for part in str(raw).split(',') if part.strip()]
+    return [part.strip() for part in str(raw).split(",") if part.strip()]
 
 
 def _price_source_matches_current(
@@ -205,14 +244,37 @@ def _price_source_matches_current(
     company_id: object,
     region: object,
 ) -> bool:
+    """
+    Determine whether a price source corresponds to the given company id and (optionally) region.
+    
+    Parameters:
+        source (dict[str, object]): Provider source payload containing at least a platform company id and optional region fields.
+        company_id (object): Expected platform company id; compared to the source's platform company id using string equality.
+        region (object): Optional region filter; when None or empty, only the company id is considered. Otherwise the string form of this value must be present in the source's derived regions.
+    
+    Returns:
+        True if the source's platform company id equals `company_id` (string comparison) and `region` is empty or included in the source's regions, False otherwise.
+    """
     if str(source.get(FIELD_PLATFORM_COMPANY_ID)) != str(company_id):
         return False
-    if region in (None, ''):
+    if region in (None, ""):
         return True
     return str(region) in _price_source_regions(source)
 
 
 def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, object]]:
+    """
+    Extract valid electricity price provider entries from a payload.
+    
+    Parameters:
+        payload (dict[str, object]): The device/coordinator payload that may contain a
+            list of provider entries under the `PAYLOAD_PRICE_SOURCES` key.
+    
+    Returns:
+        list[dict[str, object]]: A list of source dictionaries from `PAYLOAD_PRICE_SOURCES`
+        where each entry is a dict and contains a non-empty `FIELD_PLATFORM_COMPANY_ID`
+        and a non-empty country/region value (`FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`).
+    """
     raw = payload.get(PAYLOAD_PRICE_SOURCES)
     if not isinstance(raw, list):
         return []
@@ -221,15 +283,21 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
         if isinstance(item, dict):
             company_id = item.get(FIELD_PLATFORM_COMPANY_ID)
             country = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
-            if company_id not in (None, '') and country:
+            if company_id not in (None, "") and country:
                 out.append(item)
     return out
 
 
 def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
+    """
+    Determine whether dynamic electricity pricing is available for the given select entity.
+    
+    Returns:
+        bool: `True` if dynamic pricing can be selected (the entity's price includes a non-empty provider id and a region, or the payload contains one or more valid price sources), `False` otherwise.
+    """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id not in (None, '') and bool(region):
+    if company_id not in (None, "") and bool(region):
         return True
     return bool(_price_sources_from_payload(entity._payload))
 
@@ -320,28 +388,47 @@ class JackerySelect(JackeryEntity, SelectEntity):
         return self.entity_description.current_fn(self)
 
     async def async_select_option(self, option: str) -> None:
-        """Forward the chosen option to the coordinator."""
+        """
+        Send the chosen select option to the device coordinator and request a data refresh.
+        
+        Parameters:
+            option (str): The option value to select.
+        
+        Raises:
+            ConfigEntryAuthFailed: If authentication with the config entry has failed.
+            HomeAssistantError: If the selection cannot be applied; preserved translation keys are re-raised unchanged, otherwise an actionable translation-keyed `HomeAssistantError` is raised.
+        """
         try:
             await self.entity_description.select_fn(self, option)
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
-            _raise_select_action_error(self, 'entity_action_failed', error=err)
+            _raise_select_action_error(self, "entity_action_failed", error=err)
         except Exception as err:
-            _raise_select_action_error(self, 'entity_action_failed', error=err)
+            _raise_select_action_error(self, "entity_action_failed", error=err)
 
     def _warn_unknown_once(self, value: Any) -> None:
-        """Log an unmapped raw value once per instance / value combination."""
+        """
+        Record and log an unmapped raw value once for this entity instance.
+        
+        If the entity description does not request unknown-value warnings or this value
+        was already logged for this instance, this function does nothing. Otherwise it
+        adds the value to the instance's warned set and emits a warning containing the
+        description's warning kind and the raw value.
+        
+        Parameters:
+            value (Any): The raw, unmapped value to record and report.
+        """
         kind = self.entity_description.warn_unknown_kind
         if kind is None or value in self._state.warned_unknown_values:
             return
         self._state.warned_unknown_values.add(value)
         _LOGGER.warning(
-            'Jackery %s value %s is not mapped to a translated option; '
-            'reporting as unknown',
+            "Jackery %s value %s is not mapped to a translated option; "
+            "reporting as unknown",
             kind,
             value,
         )
@@ -372,9 +459,19 @@ def _work_mode_current(entity: JackerySelect) -> str | None:
 
 
 async def _work_mode_select(entity: JackerySelect, option: str) -> None:
+    """
+    Set the device's work mode based on a select option.
+    
+    Parameters:
+        entity (JackerySelect): The select entity representing the device.
+        option (str): The chosen select option label to map to a work mode.
+    
+    Raises:
+        HomeAssistantError: If `option` is not a valid work-mode option (translation key `invalid_select_option`).
+    """
     mode = _OPTION_TO_WORK_MODE.get(option)
     if mode is None:
-        _raise_select_action_error(entity, 'invalid_select_option', option=option)
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_work_model(entity._device_id, mode)
 
 
@@ -386,8 +483,18 @@ def _temp_unit_current(entity: JackerySelect) -> str | None:
 
 
 async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
+    """
+    Set the device's temperature unit based on the selected option.
+    
+    Parameters:
+        entity (JackerySelect): The select entity representing the device.
+        option (str): One of the option keys defined in the entity's option map (mapped via `_OPTION_TO_TEMP_UNIT`).
+    
+    Raises:
+        HomeAssistantError: If `option` is not a valid selection (translation key `invalid_select_option`).
+    """
     if option not in _OPTION_TO_TEMP_UNIT:
-        _raise_select_action_error(entity, 'invalid_select_option', option=option)
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
         entity._device_id, _OPTION_TO_TEMP_UNIT[option]
     )
@@ -415,8 +522,21 @@ def _island_auto_off_current(entity: JackerySelect) -> str | None:
 
 
 async def _island_auto_off_select(entity: JackerySelect, option: str) -> None:
+    """
+    Set the device's off-grid auto-off interval according to the chosen option.
+    
+    Parameters:
+        entity (JackerySelect): The select entity representing the device.
+        option (str): The selected option key; must be one of the module's auto-off option keys.
+    
+    Raises:
+        HomeAssistantError: If `option` is not a valid auto-off option (`translation_key` = "invalid_select_option").
+    
+    Description:
+        Converts the validated option into hours, then requests the coordinator to set the device's off-grid time in minutes (hours * 60).
+    """
     if option not in _AUTO_OFF_OPTION_TO_HOURS:
-        _raise_select_action_error(entity, 'invalid_select_option', option=option)
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     hours = _AUTO_OFF_OPTION_TO_HOURS[option]
     await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)
 
@@ -448,9 +568,21 @@ def _storm_minutes_current(entity: JackerySelect) -> str | None:
 
 
 async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
-    match = re.fullmatch(r'min_(\d+)', option)
+    """
+    Set the storm-warning lead time from a select option of the form `min_<minutes>`.
+    
+    Parses `option`, which must match the pattern `min_<digits>`, converts the captured digits to an integer, and requests the coordinator to set that many storm-warning minutes for the entity's device.
+    
+    Parameters:
+        entity (JackerySelect): The select entity instance.
+        option (str): The chosen option string; must be `min_<minutes>` where `<minutes>` is a non-negative integer.
+    
+    Raises:
+        HomeAssistantError: If `option` does not match the required `min_<minutes>` pattern (translation key `invalid_select_option`).
+    """
+    match = re.fullmatch(r"min_(\d+)", option)
     if not match:
-        _raise_select_action_error(entity, 'invalid_select_option', option=option)
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     minutes = int(match.group(1))
     await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
 
@@ -467,9 +599,21 @@ def _price_mode_current(entity: JackerySelect) -> str | None:
 
 
 async def _price_mode_select(entity: JackerySelect, option: str) -> None:
+    """
+    Handle a user selection to change the device's electricity price mode.
+    
+    Validates the chosen `option` and instructs the coordinator to set either dynamic or single-price mode. Raises a translatable selection error when the option is invalid or when dynamic pricing is unavailable for the device.
+    
+    Parameters:
+        option (str): The selected price-mode option label.
+    
+    Raises:
+        HomeAssistantError: with translation_key `"invalid_select_option"` if `option` is not a valid choice.
+        HomeAssistantError: with translation_key `"dynamic_tariff_unavailable"` if the user selected dynamic pricing but dynamic pricing is not available for the device.
+    """
     mode = _OPTION_TO_PRICE_MODE.get(option)
     if mode is None:
-        _raise_select_action_error(entity, 'invalid_select_option', option=option)
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
     if mode == 1:
         if (
             not _price_mode_dynamic_available(entity)
@@ -477,7 +621,7 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
         ):
             _raise_select_action_error(
                 entity,
-                'dynamic_tariff_unavailable',
+                "dynamic_tariff_unavailable",
                 option=option,
             )
         await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
@@ -497,9 +641,17 @@ def _price_provider_options(entity: JackerySelect) -> list[str]:
 
 
 def _price_provider_current(entity: JackerySelect) -> str | None:
+    """
+    Determine the human-readable label for the entity's currently selected electricity price provider.
+    
+    If the entity has no platform company id, returns `None`. If the current provider matches an entry in the payload, returns that entry's label; otherwise returns a fallback label constructed from the entity's stored company id, region, and company name.
+    
+    Returns:
+        str | None: The provider label, or `None` when no company id is set.
+    """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id in (None, ''):
+    if company_id in (None, ""):
         return None
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_matches_current(source, company_id, region):
@@ -512,11 +664,19 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
 
 
 async def _price_provider_select(entity: JackerySelect, option: str) -> None:
+    """
+    Select the electricity price provider that corresponds to the given option label and apply it to the device.
+    
+    Calls the coordinator to set the price source when `option` matches a provider label derived from the entity payload. If no matching provider is found, raises a translated `invalid_select_option` HomeAssistantError.
+    
+    Parameters:
+        option (str): The provider label chosen from the entity's available options.
+    """
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_label(source) == option:
             await entity.coordinator.async_set_price_source(entity._device_id, source)
             return
-    _raise_select_action_error(entity, 'invalid_select_option', option=option)
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 # ---------------------------------------------------------------------------
@@ -525,51 +685,51 @@ async def _price_provider_select(entity: JackerySelect, option: str) -> None:
 
 SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
     JackerySelectDescription(
-        key='work_mode_select',
-        translation_key='work_mode_select',
-        icon='mdi:tune-variant',
+        key="work_mode_select",
+        translation_key="work_mode_select",
+        icon="mdi:tune-variant",
         options=list(_OPTION_TO_WORK_MODE.keys()),
         current_fn=_work_mode_current,
         select_fn=_work_mode_select,
-        warn_unknown_kind='work mode',
+        warn_unknown_kind="work mode",
     ),
     JackerySelectDescription(
-        key='temp_unit_select',
-        translation_key='temp_unit_select',
-        icon='mdi:thermometer',
+        key="temp_unit_select",
+        translation_key="temp_unit_select",
+        icon="mdi:thermometer",
         options=list(_OPTION_TO_TEMP_UNIT.keys()),
         current_fn=_temp_unit_current,
         select_fn=_temp_unit_select,
     ),
     JackerySelectDescription(
-        key='auto_off_island_mode',
-        translation_key='auto_off_island_mode',
-        icon='mdi:timer-cog-outline',
+        key="auto_off_island_mode",
+        translation_key="auto_off_island_mode",
+        icon="mdi:timer-cog-outline",
         options=list(_AUTO_OFF_OPTIONS),
         current_fn=_island_auto_off_current,
         select_fn=_island_auto_off_select,
     ),
     JackerySelectDescription(
-        key='storm_warning_minutes_select',
-        translation_key='storm_warning_minutes_select',
-        icon='mdi:weather-lightning-rainy',
+        key="storm_warning_minutes_select",
+        translation_key="storm_warning_minutes_select",
+        icon="mdi:weather-lightning-rainy",
         options_fn=_storm_minutes_options,
         current_fn=_storm_minutes_current,
         select_fn=_storm_minutes_select,
     ),
     JackerySelectDescription(
-        key='electricity_price_mode',
-        translation_key='electricity_price_mode',
-        icon='mdi:cash-multiple',
+        key="electricity_price_mode",
+        translation_key="electricity_price_mode",
+        icon="mdi:cash-multiple",
         options=[PRICE_MODE_TO_OPTION[1], PRICE_MODE_TO_OPTION[2]],
         current_fn=_price_mode_current,
         select_fn=_price_mode_select,
-        warn_unknown_kind='electricity price mode',
+        warn_unknown_kind="electricity price mode",
     ),
     JackerySelectDescription(
-        key='electricity_price_provider',
-        translation_key='electricity_price_provider',
-        icon='mdi:transmission-tower-import',
+        key="electricity_price_provider",
+        translation_key="electricity_price_provider",
+        icon="mdi:transmission-tower-import",
         options_fn=_price_provider_options,
         current_fn=_price_provider_current,
         select_fn=_price_provider_select,
@@ -592,26 +752,48 @@ async def async_setup_entry(
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[SelectEntity], entity: SelectEntity) -> None:
+        """
+        Append a select entity to the list if its unique ID has not already been added.
+        
+        Parameters:
+            entities (list[SelectEntity]): Mutable list of select entities to potentially append to.
+            entity (SelectEntity): Candidate select entity; will be appended only when its unique ID
+                has not been seen. The function uses the module-level `seen_unique_ids`, the
+                platform name `"select"`, and the module logger to enforce uniqueness.
+        """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='select', logger=_LOGGER
+            entities, seen_unique_ids, entity, platform="select", logger=_LOGGER
         )
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
     def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
+        """
+        Decide whether a selector (by key) should be exposed for a device based on its payload and advanced-support flag.
+        
+        Parameters:
+            key (str): Selector identifier (e.g., "work_mode_select", "temp_unit_select", "auto_off_island_mode",
+                "storm_warning_minutes_select", "electricity_price_mode", "electricity_price_provider").
+            payload (dict[str, Any]): Device payload containing keys like properties, weather_plan, price, and price_sources.
+            supports_advanced (bool): Whether the device reports advanced feature support.
+        
+        Returns:
+            bool: `True` if the selector identified by `key` should be created for the device given the payload and
+            `supports_advanced`, `False` otherwise.
+        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
-        if key == 'work_mode_select':
+        if key == "work_mode_select":
             return supports_advanced or FIELD_WORK_MODEL in props
-        if key == 'temp_unit_select':
+        if key == "temp_unit_select":
             return supports_advanced or FIELD_TEMP_UNIT in props
-        if key == 'auto_off_island_mode':
+        if key == "auto_off_island_mode":
             return (
                 supports_advanced
                 or FIELD_OFF_GRID_TIME in props
                 or FIELD_OFF_GRID_DOWN in props
             )
-        if key == 'storm_warning_minutes_select':
+        if key == "storm_warning_minutes_select":
             return (
                 supports_advanced
                 or FIELD_WPC in props
@@ -619,15 +801,15 @@ async def async_setup_entry(
                 or FIELD_WPC in weather_plan
                 or FIELD_MINS_INTERVAL in weather_plan
             )
-        if key == 'electricity_price_mode':
+        if key == "electricity_price_mode":
             return True
-        if key == 'electricity_price_provider':
+        if key == "electricity_price_provider":
             current_company = (payload.get(PAYLOAD_PRICE) or {}).get(
                 FIELD_PLATFORM_COMPANY_ID
             )
             return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in (
                 None,
-                '',
+                "",
             )
         return False
 

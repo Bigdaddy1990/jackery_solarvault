@@ -41,10 +41,10 @@ reviews:
       enabled: true
     languagetool:
       enabled: true
-      enabled_rules: 
-      disabled_rules: 
-      enabled_categories: 
-      disabled_categories: 
+      enabled_rules:
+      disabled_rules:
+      enabled_categories:
+      disabled_categories:
       level: "default"
      opengrep:
       enabled: true
@@ -75,4 +75,3 @@ pre_merge_checks:
         instructions: "Pass/fail criteria: All breaking changes to public APIs, CLI flags, environment variables, configuration keys, database schemas, or HTTP/GraphQL endpoints must be documented in the Breaking Change section of the PR description and in CHANGELOG.md. Exclude purely internal or private changes (e.g., code not exported from package entry points or explicitly marked as internal)."
 chat:
   auto_reply: true
-
