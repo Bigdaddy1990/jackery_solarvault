@@ -35,13 +35,13 @@ from custom_components.jackery_solarvault.sensor import (
 
 
 def _entity(payload: dict[str, object]) -> JackeryEntity:
-    return JackeryEntity(SimpleNamespace(data={'dev1': payload}), 'dev1', 'test')
+    return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
 
 
 def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     entity = cls.__new__(cls)
     JackeryEntity.__init__(
-        entity, SimpleNamespace(data={'dev1': payload}), 'dev1', 'test'
+        entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"
     )
     return entity
 
@@ -49,51 +49,51 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
 def test_device_info_ignores_blank_metadata_fields() -> None:
     """Main device registry metadata should skip whitespace-only values."""
     entity = _entity({
-        PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: '  '},
+        PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: "  "},
         PAYLOAD_DISCOVERY: {
-            FIELD_DEVICE_NAME: ' Discovery Name ',
-            FIELD_DEV_MODEL: ' ',
-            FIELD_DEVICE_SN: ' SN1 ',
+            FIELD_DEVICE_NAME: " Discovery Name ",
+            FIELD_DEV_MODEL: " ",
+            FIELD_DEVICE_SN: " SN1 ",
         },
-        PAYLOAD_PROPERTIES: {FIELD_WNAME: ' Main Name '},
-        PAYLOAD_DEVICE: {FIELD_MODEL_NAME: ' Pro Model ', FIELD_DEVICE_SN: ' '},
-        PAYLOAD_OTA: {FIELD_CURRENT_VERSION: ' '},
+        PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
+        PAYLOAD_DEVICE: {FIELD_MODEL_NAME: " Pro Model ", FIELD_DEVICE_SN: " "},
+        PAYLOAD_OTA: {FIELD_CURRENT_VERSION: " "},
     })
 
     info = entity.device_info
 
-    assert info['name'] == 'Discovery Name'
-    assert info['model'] == 'Pro Model'
-    assert info['serial_number'] == 'SN1'
-    assert info['sw_version'] is None
+    assert info["name"] == "Discovery Name"
+    assert info["model"] == "Pro Model"
+    assert info["serial_number"] == "SN1"
+    assert info["sw_version"] is None
 
 
 def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
     """Smart-plug device registry metadata should skip blank payload values."""
     entity = _entity({
-        PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: ' '},
-        PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: ' '},
-        PAYLOAD_PROPERTIES: {FIELD_WNAME: ' Main Name '},
+        PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: " "},
+        PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: " "},
+        PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
     })
 
     info = entity._build_smart_plug_device_info(
         2,
         {
-            FIELD_DEVICE_NAME: ' ',
-            FIELD_SCAN_NAME: ' Plug A ',
-            FIELD_MODEL: ' ',
-            FIELD_MODEL_NAME: ' Socket Model ',
-            FIELD_DEVICE_SN: ' ',
-            FIELD_DEV_SN: ' SN2 ',
-            FIELD_VERSION: ' ',
-            FIELD_CURRENT_VERSION: ' 1.2.3 ',
+            FIELD_DEVICE_NAME: " ",
+            FIELD_SCAN_NAME: " Plug A ",
+            FIELD_MODEL: " ",
+            FIELD_MODEL_NAME: " Socket Model ",
+            FIELD_DEVICE_SN: " ",
+            FIELD_DEV_SN: " SN2 ",
+            FIELD_VERSION: " ",
+            FIELD_CURRENT_VERSION: " 1.2.3 ",
         },
     )
 
-    assert info['name'] == 'Main Name Plug A'
-    assert info['model'] == 'Socket Model'
-    assert info['serial_number'] == 'SN2'
-    assert info['sw_version'] == '1.2.3'
+    assert info["name"] == "Main Name Plug A"
+    assert info["model"] == "Socket Model"
+    assert info["serial_number"] == "SN2"
+    assert info["sw_version"] == "1.2.3"
 
 
 def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
@@ -101,17 +101,17 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
     entity = _sensor_entity(
         JackeryBatteryPackSensor,
         {
-            PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: ' '},
-            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: ' '},
-            PAYLOAD_PROPERTIES: {FIELD_WNAME: ' Main Name '},
+            PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: " "},
+            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: " "},
+            PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
             PAYLOAD_BATTERY_PACKS: [
                 {
-                    FIELD_DEVICE_SN: ' ',
-                    FIELD_DEV_SN: ' Pack SN ',
-                    FIELD_MODEL: ' ',
-                    FIELD_MODEL_NAME: ' Battery Model ',
-                    FIELD_VERSION: ' ',
-                    FIELD_CURRENT_VERSION: ' 2.3.4 ',
+                    FIELD_DEVICE_SN: " ",
+                    FIELD_DEV_SN: " Pack SN ",
+                    FIELD_MODEL: " ",
+                    FIELD_MODEL_NAME: " Battery Model ",
+                    FIELD_VERSION: " ",
+                    FIELD_CURRENT_VERSION: " 2.3.4 ",
                 }
             ],
         },
@@ -120,10 +120,10 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info['name'] == 'Main Name Zusatzbatterie 1'
-    assert info['model'] == 'Battery Model'
-    assert info['serial_number'] == 'Pack SN'
-    assert info['sw_version'] == '2.3.4'
+    assert info["name"] == "Main Name Zusatzbatterie 1"
+    assert info["model"] == "Battery Model"
+    assert info["serial_number"] == "Pack SN"
+    assert info["sw_version"] == "2.3.4"
 
 
 def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
@@ -131,18 +131,18 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
     entity = _sensor_entity(
         JackeryMeterHeadSensor,
         {
-            PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: ' '},
-            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: ' Main Name '},
+            PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: " "},
+            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: " Main Name "},
             PAYLOAD_METER_HEADS: [
                 {
-                    FIELD_DEVICE_NAME: ' ',
-                    FIELD_SCAN_NAME: ' Meter A ',
-                    FIELD_DEVICE_SN: ' ',
-                    FIELD_SN: ' Meter SN ',
-                    FIELD_MODEL: ' ',
-                    FIELD_TYPE_NAME: ' Meter Model ',
-                    FIELD_VERSION: ' ',
-                    FIELD_CURRENT_VERSION: ' 3.4.5 ',
+                    FIELD_DEVICE_NAME: " ",
+                    FIELD_SCAN_NAME: " Meter A ",
+                    FIELD_DEVICE_SN: " ",
+                    FIELD_SN: " Meter SN ",
+                    FIELD_MODEL: " ",
+                    FIELD_TYPE_NAME: " Meter Model ",
+                    FIELD_VERSION: " ",
+                    FIELD_CURRENT_VERSION: " 3.4.5 ",
                 }
             ],
         },
@@ -151,10 +151,10 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info['name'] == 'Main Name Meter A'
-    assert info['model'] == 'Meter Model'
-    assert info['serial_number'] == 'Meter SN'
-    assert info['sw_version'] == '3.4.5'
+    assert info["name"] == "Main Name Meter A"
+    assert info["model"] == "Meter Model"
+    assert info["serial_number"] == "Meter SN"
+    assert info["sw_version"] == "3.4.5"
 
 
 def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
@@ -162,18 +162,18 @@ def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
     entity = _sensor_entity(
         JackerySmartMeterSensor,
         {
-            PAYLOAD_PROPERTIES: {FIELD_WNAME: ' Main Name '},
+            PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
             PAYLOAD_CT_METER: {
-                FIELD_SCAN_NAME: ' ',
-                FIELD_DEVICE_SN: ' ',
-                FIELD_SN: ' ',
-                FIELD_MAC: ' Meter MAC ',
+                FIELD_SCAN_NAME: " ",
+                FIELD_DEVICE_SN: " ",
+                FIELD_SN: " ",
+                FIELD_MAC: " Meter MAC ",
             },
         },
     )
 
     info = entity.device_info
 
-    assert info['name'] == 'Main Name Smart Meter'
-    assert info['model'] == 'Smart Meter'
-    assert info['serial_number'] == 'Meter MAC'
+    assert info["name"] == "Main Name Smart Meter"
+    assert info["model"] == "Smart Meter"
+    assert info["serial_number"] == "Meter MAC"
