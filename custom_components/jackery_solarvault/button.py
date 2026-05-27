@@ -35,7 +35,7 @@ async def async_setup_entry(
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='button', logger=_LOGGER
+            entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
         )
 
     def _collect_entities() -> list[ButtonEntity]:
@@ -65,25 +65,25 @@ async def async_setup_entry(
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
     """Restart the SolarVault device via PROTOCOL.md §4 reboot command."""
 
-    _attr_translation_key = 'reboot_device'
+    _attr_translation_key = "reboot_device"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = 'mdi:restart'
+    _attr_icon = "mdi:restart"
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
         """Initialise the entity from the coordinator and description."""
-        super().__init__(coordinator, device_id, 'reboot_device')
+        super().__init__(coordinator, device_id, "reboot_device")
 
     def _raise_action_error(self, error: object) -> None:
         """Raise a translatable HA action error for this button."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'reboot_device',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "reboot_device",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -95,7 +95,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:

@@ -21,10 +21,10 @@ async def test_setup_and_unload_round_trip(
 
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id='user@example.com',
+        unique_id="user@example.com",
         data={
-            CONF_USERNAME: 'user@example.com',
-            CONF_PASSWORD: 'pass',
+            CONF_USERNAME: "user@example.com",
+            CONF_PASSWORD: "pass",
         },
     )
     entry.add_to_hass(hass)
@@ -32,13 +32,13 @@ async def test_setup_and_unload_round_trip(
     # Patch the network/MQTT-touching paths to avoid real I/O
     with (
         patch(
-            'custom_components.jackery_solarvault.coordinator.'
-            'JackerySolarVaultCoordinator._async_update_data',
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_update_data",
             return_value={},
         ),
         patch(
-            'custom_components.jackery_solarvault.coordinator.'
-            'JackerySolarVaultCoordinator._async_ensure_mqtt',
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_ensure_mqtt",
             return_value=None,
         ),
     ):
@@ -63,23 +63,23 @@ async def test_services_register_on_setup(
 
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id='user@example.com',
+        unique_id="user@example.com",
         data={
-            CONF_USERNAME: 'user@example.com',
-            CONF_PASSWORD: 'pass',
+            CONF_USERNAME: "user@example.com",
+            CONF_PASSWORD: "pass",
         },
     )
     entry.add_to_hass(hass)
 
     with (
         patch(
-            'custom_components.jackery_solarvault.coordinator.'
-            'JackerySolarVaultCoordinator._async_update_data',
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_update_data",
             return_value={},
         ),
         patch(
-            'custom_components.jackery_solarvault.coordinator.'
-            'JackerySolarVaultCoordinator._async_ensure_mqtt',
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_ensure_mqtt",
             return_value=None,
         ),
     ):
@@ -87,6 +87,6 @@ async def test_services_register_on_setup(
         await hass.async_block_till_done()
 
     services = hass.services.async_services_for_domain(DOMAIN)
-    assert 'rename_system' in services
-    assert 'refresh_weather_plan' in services
-    assert 'delete_storm_alert' in services
+    assert "rename_system" in services
+    assert "refresh_weather_plan" in services
+    assert "delete_storm_alert" in services

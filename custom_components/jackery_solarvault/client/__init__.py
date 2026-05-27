@@ -15,16 +15,16 @@ else:
     JackeryMqttPushClient: Any
 
 __all__ = [
-    'JackeryApi',
-    'JackeryApiError',
-    'JackeryAuthError',
-    'JackeryError',
-    'JackeryMqttPushClient',
+    "JackeryApi",
+    "JackeryApiError",
+    "JackeryAuthError",
+    "JackeryError",
+    "JackeryMqttPushClient",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    if name == 'JackeryMqttPushClient':
+    if name == "JackeryMqttPushClient":
         from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 
         return _JackeryMqttPushClient

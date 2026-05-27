@@ -156,7 +156,7 @@ class JackeryOptionsFlow(OptionsFlow):
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
-                title='',
+                title="",
                 data=_flow_options(user_input, current_options),
             )
 
@@ -261,7 +261,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug('Cannot connect to Jackery during setup: %s', err)
+                _LOGGER.debug("Cannot connect to Jackery during setup: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
@@ -301,7 +301,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             account = _normalize_account(user_input[CONF_USERNAME])
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
-            elif account.lower() != str(entry.unique_id or '').lower():
+            elif account.lower() != str(entry.unique_id or "").lower():
                 return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
             else:
                 await self.async_set_unique_id(account.lower())
@@ -320,7 +320,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
                 except JackeryError as err:
                     _LOGGER.debug(
-                        'Cannot connect to Jackery during reconfigure: %s', err
+                        "Cannot connect to Jackery during reconfigure: %s", err
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
@@ -339,7 +339,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         current_options = _current_option_values(entry)
         schema = vol.Schema({
             vol.Required(
-                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, '')
+                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
             ): vol.All(str, vol.Length(min=1)),
             vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
             vol.Optional(
@@ -395,7 +395,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id=FLOW_STEP_RECONFIGURE,
             data_schema=schema,
             description_placeholders={
-                'username': str(entry.data.get(CONF_USERNAME, '')),
+                "username": str(entry.data.get(CONF_USERNAME, "")),
             },
             errors=errors,
         )
@@ -430,7 +430,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug('Cannot connect to Jackery during reauth: %s', err)
+                _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_update_reload_and_abort(
@@ -445,7 +445,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
             }),
             description_placeholders={
-                'username': entry.data[CONF_USERNAME],
+                "username": entry.data[CONF_USERNAME],
             },
             errors=errors,
         )
