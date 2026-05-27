@@ -1831,7 +1831,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
             key = base64.b64decode(str(raw))
         except ValueError, binascii.Error:
-            _LOGGER.debug('Jackery: bluetoothKey for %s is not valid base64', device_id)
+            _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
             _LOGGER.debug(
