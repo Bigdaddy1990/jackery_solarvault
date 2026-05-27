@@ -5,11 +5,21 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-TRANSLATION_ROOT = ROOT / 'custom_components' / 'jackery_solarvault'
-LANGUAGES = ('en', 'de', 'es', 'fr')
+TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
+LANGUAGES = ("en", "de", "es", "fr")
 
 
-def _leaf_paths(value: Any, prefix: str = '') -> set[str]:
+def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
+    """
+    Return the set of dotted "leaf" key paths from a nested dictionary structure.
+    
+    Parameters:
+        value (Any): The value to inspect; if it is a dict, its nested keys are traversed, otherwise treated as a leaf.
+        prefix (str): Optional starting prefix for paths; when provided, child keys are joined using '.'.
+    
+    Returns:
+        set[str]: A set of dotted key paths representing all leaf nodes found (the prefix itself is a leaf when `value` is not a dict).
+    """
     if not isinstance(value, dict):
         return {prefix}
 
@@ -21,88 +31,96 @@ def _leaf_paths(value: Any, prefix: str = '') -> set[str]:
 
 
 def test_language_files_cover_all_string_keys() -> None:
-    """Implement test language files cover all string keys."""
-    base = json.loads((TRANSLATION_ROOT / 'strings.json').read_text(encoding='utf-8'))
+    """
+    Ensure each per-language translation file contains exactly the same set of leaf string keys as strings.json.
+    
+    Loads the base key set from `strings.json` and asserts, for every language in LANGUAGES, that `translations/{lang}.json` has an identical set of leaf key paths. The assertion includes the language code on failure for diagnostic context.
+    """
+    base = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
     base_paths = _leaf_paths(base)
 
     for lang in LANGUAGES:
         translated = json.loads(
-            (TRANSLATION_ROOT / 'translations' / f"{lang}.json").read_text(
-                encoding='utf-8'
+            (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
+                encoding="utf-8"
             )
         )
         assert _leaf_paths(translated) == base_paths, lang
 
 
 def test_service_actions_use_translation_files() -> None:
-    """Service action labels belong in translations, not services.yaml."""
-    services_yaml = (TRANSLATION_ROOT / 'services.yaml').read_text(encoding='utf-8')
+    """
+    Verify that service names and descriptions are provided via translation files rather than hardcoded in services.yaml.
+    
+    Asserts that services.yaml does not contain the literals "  name:" or "  description:", that the expected service IDs are present in both strings.json and icons.json, and that each listed service in icons.json contains a "service" key.
+    """
+    services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
     strings = json.loads(
-        (TRANSLATION_ROOT / 'strings.json').read_text(encoding='utf-8')
+        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8")
     )
-    icons = json.loads((TRANSLATION_ROOT / 'icons.json').read_text(encoding='utf-8'))
+    icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
 
-    for hardcoded_key in ('  name:', '  description:'):
+    for hardcoded_key in ("  name:", "  description:"):
         assert hardcoded_key not in services_yaml
 
     expected_services = {
-        'rename_system',
-        'refresh_weather_plan',
-        'delete_storm_alert',
-        'set_third_party_mqtt_config',
-        'query_third_party_mqtt_config',
-        'send_ble_command',
+        "rename_system",
+        "refresh_weather_plan",
+        "delete_storm_alert",
+        "set_third_party_mqtt_config",
+        "query_third_party_mqtt_config",
+        "send_ble_command",
     }
-    assert set(strings['services']) == expected_services
-    assert set(icons['services']) == expected_services
+    assert set(strings["services"]) == expected_services
+    assert set(icons["services"]) == expected_services
     for service_id in expected_services:
-        assert 'service' in icons['services'][service_id]
+        assert "service" in icons["services"][service_id]
 
 
 def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     """Battery power labels must not hide batOutPw vs stackOutPw semantics."""
     expected = {
-        'de': (
-            'Hauptbatterie Entladeleistung',
-            'Batteriesystem Entladeleistung',
+        "de": (
+            "Hauptbatterie Entladeleistung",
+            "Batteriesystem Entladeleistung",
         ),
-        'en': (
-            'Main battery discharge power',
-            'Battery system discharge power',
+        "en": (
+            "Main battery discharge power",
+            "Battery system discharge power",
         ),
-        'es': (
-            'Potencia de descarga de la batería principal',
-            'Potencia de descarga del sistema de baterías',
+        "es": (
+            "Potencia de descarga de la batería principal",
+            "Potencia de descarga del sistema de baterías",
         ),
-        'fr': (
-            'Puissance de décharge de la batterie principale',
-            'Puissance de décharge du système de batteries',
+        "fr": (
+            "Puissance de décharge de la batterie principale",
+            "Puissance de décharge du système de batteries",
         ),
     }
 
     for lang, (main_battery, battery_system) in expected.items():
         translation = json.loads(
-            (TRANSLATION_ROOT / 'translations' / f"{lang}.json").read_text(
-                encoding='utf-8'
+            (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
+                encoding="utf-8"
             )
         )
         assert (
-            translation['entity']['sensor']['battery_discharge_power']['name']
+            translation["entity"]["sensor"]["battery_discharge_power"]["name"]
             == main_battery
         ), lang
         assert (
-            translation['entity']['sensor']['stack_out_power']['name'] == battery_system
+            translation["entity"]["sensor"]["stack_out_power"]["name"] == battery_system
         ), lang
 
 
 def test_repair_issue_translations_are_fixable_or_descriptive() -> None:
     """Repair issues must define exactly one of description or fix_flow."""
-    paths = [TRANSLATION_ROOT / 'strings.json']
+    paths = [TRANSLATION_ROOT / "strings.json"]
     paths.extend(
-        TRANSLATION_ROOT / 'translations' / f"{lang}.json" for lang in LANGUAGES
+        TRANSLATION_ROOT / "translations" / f"{lang}.json" for lang in LANGUAGES
     )
 
     for path in paths:
-        strings = json.loads(path.read_text(encoding='utf-8'))
-        for issue in strings.get('issues', {}).values():
-            assert ('description' in issue) ^ ('fix_flow' in issue), path
+        strings = json.loads(path.read_text(encoding="utf-8"))
+        for issue in strings.get("issues", {}).values():
+            assert ("description" in issue) ^ ("fix_flow" in issue), path

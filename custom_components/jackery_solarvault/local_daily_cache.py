@@ -31,13 +31,18 @@ from .const import DOMAIN
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
-_KEY_ENTRIES: Final = 'entries'
-_KEY_DAY: Final = 'day'
-_KEY_VALUES: Final = 'values'
+_KEY_ENTRIES: Final = "entries"
+_KEY_DAY: Final = "day"
+_KEY_VALUES: Final = "values"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Return the HA Store backing the local-daily cache."""
+    """
+    Get the Home Assistant Store configured for this module's local daily cache.
+    
+    Returns:
+        store (Store[dict[str, Any]]): Home Assistant Store instance for persisting per-device daily snapshots.
+    """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
@@ -243,10 +248,10 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 
 
 __all__ = [
-    'async_load_daily_cache',
-    'async_save_daily_cache',
-    'daily_delta',
-    'is_new_day',
-    'refresh_snapshot',
-    'snapshot_day',
+    "async_load_daily_cache",
+    "async_save_daily_cache",
+    "daily_delta",
+    "is_new_day",
+    "refresh_snapshot",
+    "snapshot_day",
 ]
