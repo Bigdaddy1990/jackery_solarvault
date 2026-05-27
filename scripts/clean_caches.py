@@ -5,13 +5,13 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_DIR_NAMES = {
-    '.mypy_cache',
-    '.pytest_cache',
-    '.ruff_cache',
-    '__pycache__',
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
 }
 CACHE_FILES = {
-    '.coverage',
+    ".coverage",
 }
 
 
@@ -34,7 +34,7 @@ def main() -> int:
     removed = 0
     skipped: list[str] = []
 
-    for path in sorted(ROOT.rglob('*')):
+    for path in sorted(ROOT.rglob("*")):
         if path.is_dir() and path.name in CACHE_DIR_NAMES:
             if _remove_dir(path):
                 removed += 1
@@ -48,11 +48,11 @@ def main() -> int:
 
     print(f"removed {removed} cache item(s)")
     if skipped:
-        print('skipped locked cache item(s):')
+        print("skipped locked cache item(s):")
         for item in skipped:
             print(f"- {item}")
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())
