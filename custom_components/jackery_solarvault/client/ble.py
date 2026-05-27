@@ -365,7 +365,7 @@ def build_binary_frame(
     )
     if len(header) != _BINARY_FRAME_HEADER_LEN:
         raise RuntimeError(
-            f'BLE frame header length {len(header)} != {_BINARY_FRAME_HEADER_LEN}'
+            f"BLE frame header length {len(header)} != {_BINARY_FRAME_HEADER_LEN}"
         )
     return header + body + trailer
 
