@@ -163,54 +163,54 @@ _smart_plug_serial = smart_plug_serial
 
 SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
     JackerySwitchDescription(
-        key='eps_output',
-        translation_key='eps_output',
+        key="eps_output",
+        translation_key="eps_output",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-plug',
+        icon="mdi:power-plug",
         source_keys=(FIELD_SW_EPS,),
         setter=_set_eps,
     ),
     JackerySwitchDescription(
-        key='auto_standby_set',
-        translation_key='auto_standby_set',
+        key="auto_standby_set",
+        translation_key="auto_standby_set",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-sleep',
+        icon="mdi:power-sleep",
         source_keys=(FIELD_IS_AUTO_STANDBY,),
         use_task_plan_fallback=True,
         setter=_set_auto_standby,
     ),
     JackerySwitchDescription(
-        key='standby',
-        translation_key='standby',
+        key="standby",
+        translation_key="standby",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-sleep',
+        icon="mdi:power-sleep",
         source_keys=(FIELD_AUTO_STANDBY,),
         setter=_set_standby,
         is_on_transform=_standby_is_on,
     ),
     JackerySwitchDescription(
-        key='follow_meter',
-        translation_key='follow_meter',
+        key="follow_meter",
+        translation_key="follow_meter",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:gauge',
+        icon="mdi:gauge",
         source_keys=(FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER),
         use_task_plan_fallback=True,
         setter=_set_follow_meter,
     ),
     JackerySwitchDescription(
-        key='off_grid_shutdown',
-        translation_key='off_grid_shutdown',
+        key="off_grid_shutdown",
+        translation_key="off_grid_shutdown",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-off',
+        icon="mdi:power-off",
         source_keys=(FIELD_OFF_GRID_DOWN,),
         use_task_plan_fallback=True,
         setter=_set_off_grid_shutdown,
     ),
     JackerySwitchDescription(
-        key='storm_warning',
-        translation_key='storm_warning',
+        key="storm_warning",
+        translation_key="storm_warning",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:weather-lightning-rainy',
+        icon="mdi:weather-lightning-rainy",
         source_keys=(FIELD_WPS,),
         fallback_section=PAYLOAD_WEATHER_PLAN,
         use_task_plan_fallback=True,
@@ -243,11 +243,11 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """Raise a translatable HA action error for this switch."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': self.entity_description.key,
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": self.entity_description.key,
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -287,7 +287,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -305,7 +305,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -315,8 +315,8 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
 class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     """Writable switch for one smart-plug subdevice."""
 
-    _attr_translation_key = 'smart_plug_switch'
-    _attr_icon = 'mdi:power-socket-de'
+    _attr_translation_key = "smart_plug_switch"
+    _attr_icon = "mdi:power-socket-de"
 
     def __init__(
         self,
@@ -357,11 +357,11 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """Raise a translatable HA action error for this switch."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'smart_plug_switch',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "smart_plug_switch",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -369,7 +369,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """Set the smart-plug state through ControlSubDevice."""
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
-            self._raise_action_error('missing deviceSn')
+            self._raise_action_error("missing deviceSn")
             return
         try:
             await self.coordinator.async_set_smart_plug_switch(
@@ -381,7 +381,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -398,7 +398,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return diagnostic attributes for the smart-plug switch."""
-        attrs: dict[str, Any] = {'plug_index': self._plug_index}
+        attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
             FIELD_SCAN_NAME,
@@ -417,8 +417,8 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
     """Writable priority toggle for one smart-plug subdevice."""
 
-    _attr_translation_key = 'smart_plug_priority_enabled'
-    _attr_icon = 'mdi:priority-high'
+    _attr_translation_key = "smart_plug_priority_enabled"
+    _attr_icon = "mdi:priority-high"
 
     def __init__(
         self,
@@ -447,11 +447,11 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         """Raise a translatable HA action error for this switch."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'smart_plug_priority_enabled',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "smart_plug_priority_enabled",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -459,7 +459,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         """Set smart-plug priority through ControlSubDevice."""
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
-            self._raise_action_error('missing deviceSn')
+            self._raise_action_error("missing deviceSn")
             return
         try:
             await self.coordinator.async_set_smart_plug_priority(
@@ -471,7 +471,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -494,21 +494,21 @@ async def async_setup_entry(
 
     def _append_unique(entities: list[SwitchEntity], entity: SwitchEntity) -> None:
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='switch', logger=_LOGGER
+            entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
 
     # PROTOCOL.md §2/§4 documents SolarVault advanced controls as app
     # state plus MQTT command paths. Create those entities eagerly for known
     # SolarVault devices; otherwise gate them by the observed property keys.
     gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
-        'eps_output': lambda props, _adv: FIELD_SW_EPS in props,
-        'auto_standby_set': lambda props, adv: (
+        "eps_output": lambda props, _adv: FIELD_SW_EPS in props,
+        "auto_standby_set": lambda props, adv: (
             adv or FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props
         ),
-        'standby': lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
-        'follow_meter': lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
-        'off_grid_shutdown': lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
-        'storm_warning': lambda props, adv: adv or FIELD_WPS in props,
+        "standby": lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
+        "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
+        "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
+        "storm_warning": lambda props, adv: adv or FIELD_WPS in props,
     }
 
     def _collect_entities() -> list[SwitchEntity]:
