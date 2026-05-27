@@ -43,21 +43,20 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.14
     hooks:
-      - id: ruff-check
-        args:
-          - --preview
-          - --fix
-          - --show-fixes
-          - --unsafe-fixes
-          - --exit-non-zero-on-fix
-          - --output-format=github
-           types_or:
-             - python
-             - pyi
-      - id: ruff-format
-           types_or:
-             - python
-             - pyi
+       - id: ruff-check
+         args:
+           - --fix
+           - --show-fixes
+           - --unsafe-fixes
+           - --exit-non-zero-on-fix
+           - --output-format=github
+         types_or:
+           - python
+           - pyi
+       - id: ruff-format
+         types_or:
+           - python
+           - pyi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
