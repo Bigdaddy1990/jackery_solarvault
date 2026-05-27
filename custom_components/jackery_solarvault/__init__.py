@@ -95,16 +95,16 @@ def _async_clean_legacy_entities(
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain="sensor",
+        domain='sensor',
         suffixes=REMOVED_SENSOR_SUFFIXES,
-        log_label="removed Jackery sensor",
+        log_label='removed Jackery sensor',
     )
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain="sensor",
+        domain='sensor',
         suffixes=CT_PERIOD_SENSOR_SUFFIXES,
-        log_label="removed CT period sensor",
+        log_label='removed CT period sensor',
     )
     if not config_entry_bool_option(
         entry,
@@ -114,9 +114,9 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain="sensor",
+            domain='sensor',
             suffixes=SMART_METER_DERIVED_SENSOR_SUFFIXES,
-            log_label="disabled calculated smart-meter sensor",
+            log_label='disabled calculated smart-meter sensor',
         )
     if not config_entry_bool_option(
         entry,
@@ -126,9 +126,9 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain="sensor",
+            domain='sensor',
             suffixes=CALCULATED_POWER_SENSOR_SUFFIXES,
-            log_label="disabled calculated power sensor",
+            log_label='disabled calculated power sensor',
         )
     if not config_entry_bool_option(
         entry,
@@ -138,16 +138,16 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain="sensor",
+            domain='sensor',
             suffixes=SAVINGS_DETAIL_SENSOR_SUFFIXES,
-            log_label="disabled savings detail sensor",
+            log_label='disabled savings detail sensor',
         )
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain="binary_sensor",
+        domain='binary_sensor',
         suffixes=DUPLICATE_BINARY_SENSOR_SUFFIXES,
-        log_label="duplicate binary sensor",
+        log_label='duplicate binary sensor',
     )
 
 
@@ -201,8 +201,8 @@ async def _async_push_third_party_mqtt_config(
     )
     if not ip:
         _LOGGER.debug(
-            "Jackery: Third-Party MQTT bridge enabled in options but no IP "
-            "configured; skipping setup-time push"
+            'Jackery: Third-Party MQTT bridge enabled in options but no IP '
+            'configured; skipping setup-time push'
         )
         return
     port = config_entry_int_option(
@@ -230,9 +230,9 @@ async def _async_push_third_party_mqtt_config(
             )
         except (JackeryError, LookupError, RuntimeError, ValueError) as err:
             _LOGGER.warning(
-                "Jackery: third-party MQTT bridge push to %s failed "
-                "(BLE writes or cloud MQTT may be unavailable); the user can "
-                "retry via the set_third_party_mqtt_config service: %s",
+                'Jackery: third-party MQTT bridge push to %s failed '
+                '(BLE writes or cloud MQTT may be unavailable); the user can '
+                'retry via the set_third_party_mqtt_config service: %s',
                 device_id,
                 err,
             )
@@ -247,7 +247,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     coordinator = JackerySolarVaultCoordinator(
         hass, entry, api, timedelta(seconds=interval_sec)
     )
-    _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
+    _LOGGER.info('Jackery: coordinator polling interval set to %ss', interval_sec)
 
     try:
         # Discovery must run first (MQTT subscriptions and the first refresh
@@ -280,7 +280,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             # Other MQTT failures (network, TLS handshake, broker outage) must
             # not block setup — push is an optional channel on top of polling.
             _LOGGER.warning(
-                "Jackery MQTT push could not start during setup: %s", mqtt_result
+                'Jackery MQTT push could not start during setup: %s', mqtt_result
             )
 
         entry.runtime_data = coordinator
@@ -315,15 +315,15 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
-        entity_id = ent.entity_id or ""
+        entity_id = ent.entity_id or ''
         if not entity_id.startswith(STALE_ENERGY_HELPER_PREFIX):
             continue
         if not entity_id.endswith(STALE_NET_POWER_SUFFIX):
             continue
         lowered = entity_id.lower()
         state = hass.states.get(entity_id)
-        unit = None if state is None else state.attributes.get("unit_of_measurement")
-        if unit not in (None, ""):
+        unit = None if state is None else state.attributes.get('unit_of_measurement')
+        if unit not in (None, ''):
             continue
 
         # Only stale helpers that explicitly reference this integration should
@@ -334,14 +334,14 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
 
     for entity_id in to_remove:
         _LOGGER.info(
-            "Removing stale Energy helper without unit: %s "
-            "(please recreate with Jackery battery_net_power)",
+            'Removing stale Energy helper without unit: %s '
+            '(please recreate with Jackery battery_net_power)',
             entity_id,
         )
         registry.async_remove(entity_id)
 
 
-_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
+_LEGACY_UID_HEAD_RE = re.compile(r'\d+(?:_battery_pack_\d+)?')
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
@@ -393,10 +393,10 @@ def _async_remove_entities_with_suffixes(
     for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
         if ent.domain != domain:
             continue
-        uid = ent.unique_id or ""
+        uid = ent.unique_id or ''
         if any(_legacy_suffix_matches(uid, suffix) for suffix in suffix_tuple):
             _LOGGER.info(
-                "Removing %s %s (%s)",
+                'Removing %s %s (%s)',
                 log_label,
                 ent.entity_id,
                 ent.unique_id,
