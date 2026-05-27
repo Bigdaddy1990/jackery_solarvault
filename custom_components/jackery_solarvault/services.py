@@ -19,14 +19,15 @@ The actions follow the same routing contract:
 
 import json
 import logging
-from typing import Any
+import re
+from typing import Any, Final
 
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
 
-from .api import JackeryError
+from .client import JackeryError
 from .const import (
     DOMAIN,
     FIELD_ID,
@@ -145,23 +146,60 @@ def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinat
     return coordinators
 
 
+# Jackery numeric main-device ids are digits only (e.g.
+# ``573702884982521856`` per PROTOCOL.md §12). Subdevice identifiers in the
+# integration follow ``<parent_digits>_<suffix>`` where ``<suffix>`` is
+# ``battery_pack_<n>``, ``smart_meter``, ``smart_plug_<n>``, ``meter_head_<n>``,
+# ``collector_<n>``, etc. This regex captures only the parent digits so the
+# command path always targets the main device's radio — subdevices share that
+# radio and do not accept BLE/MQTT commands of their own (PROTOCOL.md §3.4 +
+# §4 + docs/Markdown/APP_POLLING_MQTT.md §"Subdevice-Polling").
+_JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
+
+
+def _strip_jackery_subdevice_suffix(device_id: str) -> str:
+    """Return the parent Jackery device id by stripping any subdevice suffix.
+
+    Pass-through for inputs that do not start with digits so non-Jackery
+    callers (and legacy main-device ids that already have the parent form)
+    stay backwards-compatible.
+    """
+    match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
+    return match.group(1) if match else device_id
+
+
 def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
-    """Map an HA device-registry id (UUID) to the Jackery device id, if possible.
+    """Map an HA device-registry id (UUID) to the parent Jackery device id.
 
     The device selector in services.yaml hands the handler an HA device-id
     (e.g. ``a1b2c3...``). The integration's device-registry identifiers carry
-    the matching ``(DOMAIN, jackery_device_id)`` tuple, so we can translate
-    back to the cloud-facing id. If the input is already a Jackery numeric
-    id (legacy automations), the lookup misses and we return the raw value
-    unchanged so handlers stay backwards-compatible.
+    the matching ``(DOMAIN, jackery_device_id)`` tuple. Subdevices (battery
+    packs, smart meter, plugs, meter heads, collectors) are registered with
+    a ``via_device`` link pointing at the parent SolarVault — they share the
+    parent's BLE/MQTT radio per PROTOCOL.md §3 and §4. This resolver walks
+    the ``via_device`` chain so a subdevice pick from the UI ends up at the
+    parent's numeric id, then strips any remaining documented subdevice
+    suffix so legacy automations passing the compound id (e.g.
+    ``573702884982521856_battery_pack_1``) also resolve to the parent.
+
+    Falls back to ``raw`` unchanged when the input is neither an HA UUID nor
+    a recognisable Jackery compound id (defensive: keeps handlers usable in
+    test/automation contexts).
     """
-    device = dr.async_get(hass).async_get(raw)
-    if device is None:
-        return raw
-    for domain, identifier in device.identifiers:
-        if domain == DOMAIN:
-            return str(identifier)
-    return raw
+    registry = dr.async_get(hass)
+    device = registry.async_get(raw)
+    if device is not None:
+        seen: set[str] = set()
+        while device.via_device_id and device.via_device_id not in seen:
+            seen.add(device.via_device_id)
+            parent = registry.async_get(device.via_device_id)
+            if parent is None:
+                break
+            device = parent
+        for domain, identifier in device.identifiers:
+            if domain == DOMAIN:
+                return _strip_jackery_subdevice_suffix(str(identifier))
+    return _strip_jackery_subdevice_suffix(raw)
 
 
 def _coordinator_for_device(

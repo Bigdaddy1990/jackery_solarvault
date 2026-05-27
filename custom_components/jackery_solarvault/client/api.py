@@ -47,6 +47,7 @@ from ..const import (
     DATE_TYPE_DAY,
     DEVICE_BATTERY_STAT_PATH,
     DEVICE_CT_STAT_PATH,
+    DEVICE_EPS_STAT_PATH,
     DEVICE_HOME_STAT_PATH,
     DEVICE_LIST_PATH,
     DEVICE_METER_STAT_PATH,
@@ -56,6 +57,7 @@ from ..const import (
     DEVICE_SOCKET_STAT_PATH,
     DEVICE_SOCKET_STATISTIC_PATH,
     DEVICE_STATISTIC_PATH,
+    DEVICE_TODAY_ENERGY_PATH,
     FIELD_ACCOUNT,
     FIELD_BAT_SOC,
     FIELD_BATTERY_PACKS,
@@ -939,6 +941,43 @@ class JackeryApi:
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
+        )
+
+    async def async_get_device_eps_stat(
+        self,
+        device_id: str | int,
+        *,
+        date_type: str = DATE_TYPE_DAY,
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """GET /v1/device/stat/eps — app EPS / off-grid in/out statistics.
+
+        Per ``docs/Markdown/APP_POLLING_MQTT.md`` §HTTP-Pfade and
+        ``docs/html/jackery_http_api_endpoints_v2.html`` (``EpsStatApi``).
+        Returns ``totalInEpsEnergy``/``totalOutEpsEnergy`` plus
+        ``x``/``y``/``y1``/``y2`` chart series for the requested period.
+        """
+        return await self._async_get_device_period_stat(
+            DEVICE_EPS_STAT_PATH,
+            device_id=device_id,
+            date_type=date_type,
+            begin_date=begin_date,
+            end_date=end_date,
+        )
+
+    async def async_get_today_energy(self, device_sn: str) -> dict[str, Any]:
+        """GET /v1/device/stat/today — compact today KPIs.
+
+        Per ``docs/Markdown/APP_POLLING_MQTT.md`` and the Smali
+        ``TodayEnergyApi``. The bean carries ``de`` (feed-in), ``dg``
+        (grid import), ``dh`` (home load) and ``ds`` (battery energy)
+        as doubles. The endpoint is keyed by ``deviceSn``, not
+        ``deviceId``.
+        """
+        return await self._get_json(
+            DEVICE_TODAY_ENERGY_PATH,
+            params={FIELD_DEVICE_SN: str(device_sn)},
         )
 
     async def async_get_device_meter_stat(

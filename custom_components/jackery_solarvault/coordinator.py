@@ -18,7 +18,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_CONTROL_SOCKET_PRIORITY,
@@ -57,10 +57,12 @@ from .const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
     APP_SECTION_CT_STAT,
+    APP_SECTION_EPS_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
     APP_SECTION_PV_TRENDS,
+    APP_SECTION_TODAY_ENERGY,
     APP_STAT_PV1_ENERGY,
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
@@ -5344,6 +5346,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 system_id,
                 **kwargs,
             )
+        if section_prefix == APP_SECTION_EPS_STAT:
+            return await self.api.async_get_device_eps_stat(
+                device_id,
+                **kwargs,
+            )
         return {}
 
     async def _async_repair_missing_app_chart_statistics(
@@ -5756,6 +5763,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_WEEK),
                 self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_MONTH),
                 self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_YEAR),
+                self._app_period_section(APP_SECTION_EPS_STAT, DATE_TYPE_DAY),
+                self._app_period_section(APP_SECTION_EPS_STAT, DATE_TYPE_WEEK),
+                self._app_period_section(APP_SECTION_EPS_STAT, DATE_TYPE_MONTH),
+                self._app_period_section(APP_SECTION_EPS_STAT, DATE_TYPE_YEAR),
+                APP_SECTION_TODAY_ENERGY,
             )
             for cache in self._slow_cache.values():
                 for cache_key in cache_keys_to_clear:
@@ -6116,6 +6128,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
                 home_key = self._app_period_section(APP_SECTION_HOME_STAT, date_type)
                 ct_key = self._app_period_section(APP_SECTION_CT_STAT, date_type)
+                eps_key = self._app_period_section(APP_SECTION_EPS_STAT, date_type)
                 if sys_id:
                     task_names.append(pv_key)
                     tasks.append(
@@ -6173,6 +6186,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         {},
                     )
                 )
+                # /v1/device/stat/eps — EPS / off-grid in/out period
+                # statistics (EpsStatApi). Same shape as ct_stat: device
+                # id + dateType, slow-metrics TTL.
+                task_names.append(eps_key)
+                tasks.append(
+                    _get_with_ttl_for(
+                        per_dev,
+                        eps_key,
+                        self._slow_metrics_interval_sec,
+                        lambda q=kwargs: self.api.async_get_device_eps_stat(
+                            dev_id,
+                            **q,
+                        ),
+                        {},
+                    )
+                )
             if dev_sn:
                 # REST pack/list is slow and often returns null for SolarVault.
                 # Live pack values are refreshed via MQTT subdevice queries.
@@ -6195,6 +6224,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         pack_interval_sec,
                         lambda: self.api.async_get_battery_pack_list(dev_sn),
                         [],
+                    )
+                )
+                # /v1/device/stat/today — compact today KPIs
+                # (TodayEnergyApi: de/dg/dh/ds). Keyed by deviceSn, no
+                # period parameters. Slow-metrics TTL so the fast 30 s
+                # refresh does not hammer the cloud.
+                task_names.append(APP_SECTION_TODAY_ENERGY)
+                tasks.append(
+                    _get_with_ttl_for(
+                        per_dev,
+                        APP_SECTION_TODAY_ENERGY,
+                        self._slow_metrics_interval_sec,
+                        lambda: self.api.async_get_today_energy(dev_sn),
+                        {},
                     )
                 )
             values = await asyncio.gather(*tasks)
@@ -6466,6 +6509,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     APP_SECTION_BATTERY_STAT,
                     APP_SECTION_HOME_STAT,
                     APP_SECTION_CT_STAT,
+                    APP_SECTION_EPS_STAT,
                 )
                 for date_type in APP_PERIOD_DATE_TYPES
             }
@@ -6477,6 +6521,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 PAYLOAD_DISCOVERY: idx.get(PAYLOAD_DEVICE_META) or {},
                 PAYLOAD_DEVICE_STATISTIC: extras.get(PAYLOAD_DEVICE_STATISTIC) or {},
                 **period_payloads,
+                APP_SECTION_TODAY_ENERGY: extras.get(APP_SECTION_TODAY_ENERGY) or {},
                 PAYLOAD_OTA: extras.get(PAYLOAD_OTA) or {},
                 PAYLOAD_LOCATION: extras.get(PAYLOAD_LOCATION) or {},
                 PAYLOAD_BATTERY_PACKS: battery_packs,

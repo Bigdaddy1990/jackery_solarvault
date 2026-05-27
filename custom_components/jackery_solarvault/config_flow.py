@@ -15,7 +15,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,

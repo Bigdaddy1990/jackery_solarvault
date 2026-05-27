@@ -40,7 +40,7 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .util import jackery_online_state
+from .util import jackery_online_state, subdevice_branding
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -173,13 +173,19 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or "SolarVault"
         )
         sn = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+        # Branding lookup against the documented accessory catalog so the
+        # UI shows "Shelly Plus Plug S" instead of the raw "shellyplusplugs"
+        # wire identifier (PROTOCOL §3 + docs/html scanName table).
+        manufacturer_brand, model_label = subdevice_branding(plug.get(FIELD_SCAN_NAME))
         display_name = (
             plug.get(FIELD_DEVICE_NAME)
+            or model_label
             or plug.get(FIELD_SCAN_NAME)
             or f"Smart Plug {plug_index}"
         )
         model = (
-            plug.get(FIELD_MODEL)
+            model_label
+            or plug.get(FIELD_MODEL)
             or plug.get(FIELD_MODEL_NAME)
             or plug.get(FIELD_TYPE_NAME)
             or "Smart Plug"
@@ -187,7 +193,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         version = plug.get(FIELD_VERSION) or plug.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_smart_plug_{plug_index}")},
-            manufacturer=MANUFACTURER,
+            manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),
             serial_number=str(sn) if sn else None,

@@ -108,6 +108,8 @@ from .const import (
     PAYLOAD_STATISTIC,
     REDACT_KEYS,
     REDACTED_VALUE,
+    SUBDEVICE_SCAN_NAME_LABELS,
+    SUBDEVICE_SCAN_NAME_MANUFACTURERS,
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
@@ -166,6 +168,30 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def subdevice_branding(scan_name: Any) -> tuple[str | None, str | None]:
+    """Look up DeviceInfo branding for a subdevice ``scanName``.
+
+    Returns ``(manufacturer, model_label)``. Both are ``None`` when the
+    ``scan_name`` is empty or not in the documented accessory catalog
+    (``SUBDEVICE_SCAN_NAME_*`` in const.py — sourced from
+    ``docs/html/jackery_smali_home_assistant_report.html``). Callers must
+    fall back to a sensible default themselves: this helper deliberately
+    does not invent a "Smart Plug" placeholder so the call site retains
+    full control over the wire-payload fallback chain.
+
+    Used by the smart-plug / meter-head / smart-meter DeviceInfo
+    builders so the HA UI shows the real brand ("Shelly", "HomeWizard",
+    "Homey", "Jackery") and the user-facing label ("Shelly Pro 3EM-63",
+    "Homey Energy Dongle") instead of the raw wire identifier
+    (``shellypro3em63``, ``homey_energy_dongle``).
+    """
+    if not isinstance(scan_name, str) or not scan_name:
+        return None, None
+    manufacturer = SUBDEVICE_SCAN_NAME_MANUFACTURERS.get(scan_name)
+    label = SUBDEVICE_SCAN_NAME_LABELS.get(scan_name)
+    return manufacturer, label
 
 
 def utc_now() -> datetime:

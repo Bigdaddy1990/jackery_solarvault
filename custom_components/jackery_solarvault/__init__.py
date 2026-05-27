@@ -15,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client import JackeryApi, JackeryAuthError, JackeryError
 from .client.local_mqtt import JackeryLocalMqttClient
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,

@@ -87,9 +87,14 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
+    UnitOfApparentPower,
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
     UnitOfEnergy,
+    UnitOfFrequency,
     UnitOfMass,
     UnitOfPower,
+    UnitOfReactivePower,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -165,12 +170,32 @@ from .const import (
     FIELD_CHARGING_ENERGY,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
+    FIELD_CT_APPARENT_POWER,
+    FIELD_CT_APPARENT_POWER1,
+    FIELD_CT_APPARENT_POWER2,
+    FIELD_CT_APPARENT_POWER3,
+    FIELD_CT_CURRENT1,
+    FIELD_CT_CURRENT2,
+    FIELD_CT_CURRENT3,
+    FIELD_CT_FREQUENCY,
     FIELD_CT_POWER,
     FIELD_CT_POWER1,
     FIELD_CT_POWER2,
     FIELD_CT_POWER3,
+    FIELD_CT_POWER_FACTOR,
+    FIELD_CT_POWER_FACTOR1,
+    FIELD_CT_POWER_FACTOR2,
+    FIELD_CT_POWER_FACTOR3,
+    FIELD_CT_REACTIVE_POWER,
+    FIELD_CT_REACTIVE_POWER1,
+    FIELD_CT_REACTIVE_POWER2,
+    FIELD_CT_REACTIVE_POWER3,
     FIELD_CT_STAT,
     FIELD_CT_STATE,
+    FIELD_CT_VOLT,
+    FIELD_CT_VOLT1,
+    FIELD_CT_VOLT2,
+    FIELD_CT_VOLT3,
     FIELD_CURRENT_VERSION,
     FIELD_DEFAULT_PW,
     FIELD_DEV_SN,
@@ -307,6 +332,7 @@ from .util import (
     smart_meter_net_power,
     smart_plug_serial,
     sorted_smart_plugs,
+    subdevice_branding,
     task_plan_value,
     trend_series_has_value,
     trend_series_key,
@@ -2247,6 +2273,202 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         native_unit_of_measurement=UnitOfPower.WATT,
         icon="mdi:meter-electric-outline",
     ),
+    # ------------------------------------------------------------------
+    # AccCTBody electrical measurements (PROTOCOL.md §3 +
+    # docs/html/jackery_entity_field_candidates_v2.html). Per-phase
+    # voltage / current / power-factor / apparent / reactive plus their
+    # totals. Active power is already covered above. Diagnostic-category
+    # entries default-disable themselves so the smart-meter device card
+    # stays focused on voltage / current / frequency by default.
+    # ------------------------------------------------------------------
+    JackerySmartMeterSensorDescription(
+        key="voltage",
+        translation_key="smart_meter_voltage",
+        field=FIELD_CT_VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        icon="mdi:sine-wave",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_1_voltage",
+        translation_key="smart_meter_phase_1_voltage",
+        field=FIELD_CT_VOLT1,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        icon="mdi:sine-wave",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_2_voltage",
+        translation_key="smart_meter_phase_2_voltage",
+        field=FIELD_CT_VOLT2,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        icon="mdi:sine-wave",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_3_voltage",
+        translation_key="smart_meter_phase_3_voltage",
+        field=FIELD_CT_VOLT3,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        icon="mdi:sine-wave",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_1_current",
+        translation_key="smart_meter_phase_1_current",
+        field=FIELD_CT_CURRENT1,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        icon="mdi:current-ac",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_2_current",
+        translation_key="smart_meter_phase_2_current",
+        field=FIELD_CT_CURRENT2,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        icon="mdi:current-ac",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_3_current",
+        translation_key="smart_meter_phase_3_current",
+        field=FIELD_CT_CURRENT3,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        icon="mdi:current-ac",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="frequency",
+        translation_key="smart_meter_frequency",
+        field=FIELD_CT_FREQUENCY,
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        icon="mdi:sine-wave",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="power_factor",
+        translation_key="smart_meter_power_factor",
+        field=FIELD_CT_POWER_FACTOR,
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:angle-acute",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_1_power_factor",
+        translation_key="smart_meter_phase_1_power_factor",
+        field=FIELD_CT_POWER_FACTOR1,
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:angle-acute",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_2_power_factor",
+        translation_key="smart_meter_phase_2_power_factor",
+        field=FIELD_CT_POWER_FACTOR2,
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:angle-acute",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_3_power_factor",
+        translation_key="smart_meter_phase_3_power_factor",
+        field=FIELD_CT_POWER_FACTOR3,
+        device_class=SensorDeviceClass.POWER_FACTOR,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:angle-acute",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="apparent_power",
+        translation_key="smart_meter_apparent_power",
+        field=FIELD_CT_APPARENT_POWER,
+        device_class=SensorDeviceClass.APPARENT_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_1_apparent_power",
+        translation_key="smart_meter_phase_1_apparent_power",
+        field=FIELD_CT_APPARENT_POWER1,
+        device_class=SensorDeviceClass.APPARENT_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_2_apparent_power",
+        translation_key="smart_meter_phase_2_apparent_power",
+        field=FIELD_CT_APPARENT_POWER2,
+        device_class=SensorDeviceClass.APPARENT_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_3_apparent_power",
+        translation_key="smart_meter_phase_3_apparent_power",
+        field=FIELD_CT_APPARENT_POWER3,
+        device_class=SensorDeviceClass.APPARENT_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="reactive_power",
+        translation_key="smart_meter_reactive_power",
+        field=FIELD_CT_REACTIVE_POWER,
+        device_class=SensorDeviceClass.REACTIVE_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-triangle-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_1_reactive_power",
+        translation_key="smart_meter_phase_1_reactive_power",
+        field=FIELD_CT_REACTIVE_POWER1,
+        device_class=SensorDeviceClass.REACTIVE_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-triangle-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_2_reactive_power",
+        translation_key="smart_meter_phase_2_reactive_power",
+        field=FIELD_CT_REACTIVE_POWER2,
+        device_class=SensorDeviceClass.REACTIVE_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-triangle-outline",
+    ),
+    JackerySmartMeterSensorDescription(
+        key="phase_3_reactive_power",
+        translation_key="smart_meter_phase_3_reactive_power",
+        field=FIELD_CT_REACTIVE_POWER3,
+        device_class=SensorDeviceClass.REACTIVE_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfReactivePower.VOLT_AMPERE_REACTIVE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:flash-triangle-outline",
+    ),
 )
 
 
@@ -3419,13 +3641,22 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             or meter_head.get(FIELD_DEV_SN)
             or meter_head.get(FIELD_SN)
         )
+        # Branding lookup against the documented accessory catalog so the
+        # UI shows "EcoTracker P1/R1" / "P1 Meter" / "Homey Energy Dongle"
+        # / "Jackery HTO892A (Meter Head)" instead of the raw scanName
+        # (PROTOCOL §3 + docs/html scanName table, devType=4).
+        manufacturer_brand, model_label = subdevice_branding(
+            meter_head.get(FIELD_SCAN_NAME)
+        )
         display_name = (
             meter_head.get(FIELD_DEVICE_NAME)
+            or model_label
             or meter_head.get(FIELD_SCAN_NAME)
             or f"Meter Head {self._meter_head_index}"
         )
         model = (
-            meter_head.get(FIELD_MODEL)
+            model_label
+            or meter_head.get(FIELD_MODEL)
             or meter_head.get(FIELD_MODEL_NAME)
             or meter_head.get(FIELD_TYPE_NAME)
             or "Meter Head"
@@ -3435,7 +3666,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             identifiers={
                 (DOMAIN, f"{self._device_id}_meter_head_{self._meter_head_index}")
             },
-            manufacturer=MANUFACTURER,
+            manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),
             serial_number=str(sn) if sn else None,
@@ -3643,9 +3874,21 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             or self._properties.get(FIELD_WNAME)
             or "SolarVault"
         )
-        scan_name = str(ct.get(FIELD_SCAN_NAME) or "Smart Meter")
-        manufacturer = "Shelly" if "shelly" in scan_name.lower() else MANUFACTURER
-        model = scan_name if scan_name and scan_name != "Smart Meter" else "Smart Meter"
+        # Branding lookup against the documented accessory catalog
+        # (PROTOCOL §3 + docs/html scanName table, devType=3 = CT). The
+        # old "shelly in name.lower()" substring heuristic missed branded
+        # units like ``ecotracker`` / ``p1meter`` / ``homey_energy_dongle``
+        # and Jackery's own ``HTO906A``/``HTO907A`` CT-type accessories;
+        # the lookup now covers all 14 documented scanNames.
+        raw_scan_name = ct.get(FIELD_SCAN_NAME)
+        manufacturer_brand, model_label = subdevice_branding(raw_scan_name)
+        scan_name = str(raw_scan_name or "Smart Meter")
+        manufacturer = manufacturer_brand or (
+            "Shelly" if "shelly" in scan_name.lower() else MANUFACTURER
+        )
+        model = model_label or (
+            scan_name if scan_name and scan_name != "Smart Meter" else "Smart Meter"
+        )
         sn = ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_SN) or ct.get(FIELD_MAC)
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_smart_meter")},

@@ -119,6 +119,8 @@ DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"  # ?deviceId&systemId&...
 DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"  # ?deviceId&...
 DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...
 DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...
+DEVICE_EPS_STAT_PATH: Final = "/v1/device/stat/eps"  # ?deviceId&...
+DEVICE_TODAY_ENERGY_PATH: Final = "/v1/device/stat/today"  # ?deviceSn=<...>
 DEVICE_METER_STAT_PATH: Final = (
     "/v1/device/stat/meter"  # ?deviceId=<smart-meter subdevice>
 )
@@ -523,6 +525,17 @@ FIELD_CT_POWER_FACTOR: Final = "fact"
 FIELD_CT_POWER_FACTOR1: Final = "fact1"
 FIELD_CT_POWER_FACTOR2: Final = "fact2"
 FIELD_CT_POWER_FACTOR3: Final = "fact3"
+# AccCTBody apparent / reactive power per docs/html jackery_entity_field_candidates_v2:
+# ``ap``/``ap1..3`` = apparent power (VA), ``rep``/``rep1..3`` = reactive
+# power (var). Total + per-phase variants mirror the active-power layout.
+FIELD_CT_APPARENT_POWER: Final = "ap"
+FIELD_CT_APPARENT_POWER1: Final = "ap1"
+FIELD_CT_APPARENT_POWER2: Final = "ap2"
+FIELD_CT_APPARENT_POWER3: Final = "ap3"
+FIELD_CT_REACTIVE_POWER: Final = "rep"
+FIELD_CT_REACTIVE_POWER1: Final = "rep1"
+FIELD_CT_REACTIVE_POWER2: Final = "rep2"
+FIELD_CT_REACTIVE_POWER3: Final = "rep3"
 FIELD_CT_TOTAL_PHASE_POWER: Final = "tPhasePw"
 FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER: Final = "tnPhasePw"
 FIELD_CT_A_PHASE_POWER: Final = "aPhasePw"
@@ -607,10 +620,14 @@ CT_METER_KEYS: Final = frozenset({
     FIELD_CT_POWER_FACTOR1,
     FIELD_CT_POWER_FACTOR2,
     FIELD_CT_POWER_FACTOR3,
-    "ap",
-    "ap1",
-    "ap2",
-    "ap3",
+    FIELD_CT_APPARENT_POWER,
+    FIELD_CT_APPARENT_POWER1,
+    FIELD_CT_APPARENT_POWER2,
+    FIELD_CT_APPARENT_POWER3,
+    FIELD_CT_REACTIVE_POWER,
+    FIELD_CT_REACTIVE_POWER1,
+    FIELD_CT_REACTIVE_POWER2,
+    FIELD_CT_REACTIVE_POWER3,
     FIELD_CT_A_PHASE_POWER,
     FIELD_CT_B_PHASE_POWER,
     FIELD_CT_C_PHASE_POWER,
@@ -827,6 +844,8 @@ APP_SECTION_HOME_TRENDS: Final = "home_trends"
 APP_SECTION_PV_TRENDS: Final = "pv_trends"
 APP_SECTION_BATTERY_TRENDS: Final = "battery_trends"
 APP_SECTION_CT_STAT: Final = "device_ct_stat"
+APP_SECTION_EPS_STAT: Final = "device_eps_stat"
+APP_SECTION_TODAY_ENERGY: Final = "device_today_energy"
 
 APP_STAT_TOTAL_SOLAR_ENERGY: Final = "totalSolarEnergy"
 APP_STAT_PV1_ENERGY: Final = "pv1Egy"
@@ -1403,6 +1422,87 @@ SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
     SUBDEVICE_DEV_TYPE_SMOKE,
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
+})
+
+# Subdevice ``scanName`` catalog from the Jackery app's accessory enum.
+# Source: ``docs/html/jackery_smali_home_assistant_report.html`` section
+# "Subdevice-/Zubehör-Erkennung" — the table the app's
+# ``DeviceJackeryAccessoriesExistApi`` populates from BLE/mDNS scans.
+# Keys are the wire ``scanName`` exactly as the firmware reports them
+# (case-sensitive; HTO codes are uppercase, branded units are lowercase).
+SUBDEVICE_SCAN_NAME_DEV_TYPES: Final[dict[str, int]] = {
+    "shellyproem50": SUBDEVICE_DEV_TYPE_CT,
+    "shellypro3em": SUBDEVICE_DEV_TYPE_CT,
+    "shellypro3em63": SUBDEVICE_DEV_TYPE_CT,
+    "ecotracker": SUBDEVICE_DEV_TYPE_METER_HEAD,
+    "p1meter": SUBDEVICE_DEV_TYPE_METER_HEAD,
+    "homey_energy_dongle": SUBDEVICE_DEV_TYPE_METER_HEAD,
+    "shellyplusplugs": SUBDEVICE_DEV_TYPE_SOCKET,
+    "shellyplugsg3": SUBDEVICE_DEV_TYPE_SOCKET,
+    "HTO892A": SUBDEVICE_DEV_TYPE_METER_HEAD,
+    "HTO904A": SUBDEVICE_DEV_TYPE_SOCKET,
+    "HTO905A": SUBDEVICE_DEV_TYPE_METER_HEAD,
+    "HTO906A": SUBDEVICE_DEV_TYPE_CT,
+    "HTO907A": SUBDEVICE_DEV_TYPE_CT,
+    "HTO910A": SUBDEVICE_DEV_TYPE_METER_HEAD,
+}
+
+# Human-readable labels mirroring the Jackery app's accessory enum. Used
+# for device-info display and diagnostics; keep ordering aligned with
+# SUBDEVICE_SCAN_NAME_DEV_TYPES so future audits can diff both maps.
+SUBDEVICE_SCAN_NAME_LABELS: Final[dict[str, str]] = {
+    "shellyproem50": "Shelly Pro EM-50",
+    "shellypro3em": "Shelly Pro 3EM",
+    "shellypro3em63": "Shelly Pro 3EM-63",
+    "ecotracker": "EcoTracker P1/R1",
+    "p1meter": "P1 Meter",
+    "homey_energy_dongle": "Homey Energy Dongle",
+    "shellyplusplugs": "Shelly Plus Plug S",
+    "shellyplugsg3": "Shelly Plug S Gen3",
+    "HTO892A": "Jackery HTO892A (Meter Head)",
+    "HTO904A": "Jackery HTO904A (Socket)",
+    "HTO905A": "Jackery HTO905A (Meter Head)",
+    "HTO906A": "Jackery HTO906A (CT)",
+    "HTO907A": "Jackery HTO907A (CT)",
+    "HTO910A": "Jackery HTO910A (Meter Head)",
+}
+
+# Manufacturer names per accessory ``scanName``. Used for HA DeviceInfo so
+# the UI shows the real brand instead of the raw wire identifier. Keys
+# must stay aligned with SUBDEVICE_SCAN_NAME_DEV_TYPES; the value is what
+# the corresponding stand-alone HA integration also reports (e.g. the
+# Shelly integration uses "Shelly", HomeWizard uses "HomeWizard").
+SUBDEVICE_SCAN_NAME_MANUFACTURERS: Final[dict[str, str]] = {
+    "shellyproem50": "Shelly",
+    "shellypro3em": "Shelly",
+    "shellypro3em63": "Shelly",
+    "ecotracker": "EcoTracker",
+    "p1meter": "HomeWizard",
+    "homey_energy_dongle": "Homey",
+    "shellyplusplugs": "Shelly",
+    "shellyplugsg3": "Shelly",
+    "HTO892A": "Jackery",
+    "HTO904A": "Jackery",
+    "HTO905A": "Jackery",
+    "HTO906A": "Jackery",
+    "HTO907A": "Jackery",
+    "HTO910A": "Jackery",
+}
+
+# Set of all known accessory ``scanName`` values.
+SUBDEVICE_SCAN_NAMES: Final[frozenset[str]] = frozenset(
+    SUBDEVICE_SCAN_NAME_DEV_TYPES.keys()
+)
+
+# ``DeviceJackeryAccessoriesExistApi$SCANTY`` enum values. The Jackery
+# cloud uses this string to tell the app whether the accessory was
+# discovered via BLE advertisement or via local mDNS. Both paths are
+# documented and both should map to the same accessory catalog above.
+SUBDEVICE_SCAN_TYPE_BLE: Final = "BLE"
+SUBDEVICE_SCAN_TYPE_MDNS: Final = "MDNS"
+SUBDEVICE_SCAN_TYPES: Final[frozenset[str]] = frozenset({
+    SUBDEVICE_SCAN_TYPE_BLE,
+    SUBDEVICE_SCAN_TYPE_MDNS,
 })
 
 # Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
