@@ -51,7 +51,7 @@ updates:
   - package-ecosystem: "uv" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   - package-ecosystem: "bun"
     directory: "/"
