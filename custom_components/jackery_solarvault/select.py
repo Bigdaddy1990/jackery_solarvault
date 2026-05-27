@@ -109,7 +109,19 @@ def _storm_minutes_value(
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
 ) -> int | None:
-    """Extract storm warning lead-time from known payload variants."""
+    """
+    Determine the storm warning lead time (in minutes) from device payload fragments.
+    
+    Searches for a raw lead-time value in `properties`, then `weather_plan`, then `task_plan`, and finally within list entries of `weather_plan[FIELD_STORM]` when present. Converts the found value to an integer and treats values below STORM_MINUTES_MIN_VALID as "not set".
+    
+    Parameters:
+        properties (dict[str, object]): Device `properties` payload section to inspect.
+        weather_plan (dict[str, object]): Device `weather_plan` payload section to inspect.
+        task_plan (dict[str, object]): Device `task_plan` payload section to inspect.
+    
+    Returns:
+        int | None: Extracted lead time in minutes when available and valid, `None` when no usable value is found.
+    """
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
         raw = properties.get(key)
@@ -149,7 +161,14 @@ def _storm_minutes_fallback(
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
 ) -> int | None:
-    """Return a stable dropdown value when only storm enabled/disabled is known."""
+    """
+    Provide a fallback storm-warning minutes value when only storm enablement is known.
+    
+    Checks for a raw "storm enabled" indicator in `properties`, then `weather_plan`, then `task_plan`. If a raw value is present and can be parsed as an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If no usable raw enablement value exists but `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
+    
+    Returns:
+        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` when no fallback can be determined.
+    """
     raw = properties.get(FIELD_WPS)
     if raw is None:
         raw = weather_plan.get(FIELD_WPS)
@@ -591,7 +610,16 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create description-driven select entities."""
+    """
+    Create and register select entities for devices using the module's description registry.
+    
+    Select entities are created per-device when the device payload indicates support for the described selector; duplicate unique IDs are avoided. The function immediately adds any new entities and registers a listener to add entities later when the coordinator's device payload signature changes.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant core instance.
+        entry (JackeryConfigEntry): Config entry whose runtime_data provides the coordinator and device payloads.
+        async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -636,6 +664,12 @@ async def async_setup_entry(
         return False
 
     def _collect_entities() -> list[SelectEntity]:
+        """
+        Builds select entity instances for coordinator devices that meet creation criteria.
+        
+        Returns:
+            list[SelectEntity]: JackerySelect entities for devices in `coordinator.data` that pass the module's gating logic; duplicates are avoided.
+        """
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             supports_advanced = coordinator.device_supports_advanced(dev_id)
@@ -649,6 +683,11 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
+        """
+        Detect changes in the coordinator's device data and register any newly discovered select entities.
+        
+        If the current device signature differs from the last-seen signature, collect entities for the coordinator and pass them to the platform's `async_add_entities` callback, then update the stored signature. If the signature is unchanged, do nothing.
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

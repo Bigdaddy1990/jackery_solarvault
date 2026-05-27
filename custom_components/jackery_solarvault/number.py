@@ -142,7 +142,12 @@ async def _set_default_power(
 async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
-    """Set the single-tariff electricity price on a device."""
+    """
+    Set the single-tariff electricity price for the specified device.
+    
+    Parameters:
+        value (float): Price value expressed in the device's currency/unit.
+    """
     await coord.async_set_single_price(dev_id, value)
 
 
@@ -354,7 +359,14 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return allowed
 
     async def async_set_native_value(self, value: float) -> None:
-        """Forward a numeric write to the device."""
+        """
+        Set the entity to the given native value on the device.
+        
+        Validates the provided value against the entity description's range and allowed discrete values, then (if a setter is configured) transforms and forwards the value to the device. Authentication failures from the setter are converted into ConfigEntryAuthFailed. If the setter raises a HomeAssistantError that already contains a translation key it is re-raised; otherwise the error is either raised as a translated action error or ignored depending on the description's `raise_on_setter_error` flag. The coordinator is requested to refresh after the setter attempt.
+        
+        Parameters:
+            value (float): The native value to write to the device.
+        """
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
         ):
@@ -449,6 +461,14 @@ async def async_setup_entry(
     }
 
     def _collect_entities() -> list[NumberEntity]:
+        """
+        Build a list of NumberEntity objects for devices whose payloads meet gating conditions.
+        
+        Iterates coordinator data and, for each device, instantiates number entities from the description registry when the associated gating predicate allows it.
+        
+        Returns:
+            entities (list[NumberEntity]): Instantiated number entities ready to be added to Home Assistant.
+        """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for description in NUMBER_DESCRIPTIONS:
@@ -460,6 +480,11 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
+        """
+        Rebuilds and adds number entities when the coordinator data signature changes.
+        
+        Checks the current coordinator entity signature against the last-seen signature; if it differs, collects entity instances and calls the platform's `async_add_entities` to add any new entities.
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

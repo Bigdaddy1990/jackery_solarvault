@@ -129,7 +129,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device-registry metadata for this entity."""
+        """
+        Build DeviceInfo metadata for this entity's device for the device registry.
+        
+        Name is chosen from system.device_name, discovery.device_name, properties.wname, or a fallback of "Jackery {device_id}". Model is taken from discovery.dev_model, device_meta.model_name, or "SolarVault". The serial number and software version are populated from device metadata or discovery/ota payloads when available.
+        
+        Returns:
+            DeviceInfo: A DeviceInfo object containing identifiers, manufacturer, name, model, serial_number, and sw_version.
+        """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -157,14 +164,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     def _build_smart_plug_device_info(
         self, plug_index: int, plug: dict[str, Any]
     ) -> DeviceInfo:
-        """Build a static device_info for a smart-plug subdevice.
-
-        Smart-plug subdevices receive a per-plug device row that hangs under
-        the SolarVault via the ``via_device`` link. The metadata is derived
-        from the plug payload captured at entity construction; later metadata
-        updates flow through Home Assistant's device-registry merge, so this
-        method is meant to be called once per entity (typically from
-        ``__init__``) and the result cached on ``_attr_device_info``.
+        """
+        Construct a DeviceInfo record for a smart-plug subdevice linked to the parent SolarVault device.
+        
+        This record is intended to be static (typically created once during entity initialization and cached) and links the plug to the parent device via `via_device`.
+        
+        Parameters:
+            plug_index (int): 1-based index of the smart plug used to build a unique identifier and fallback display name.
+            plug (dict[str, Any]): Payload dictionary for the smart plug providing serial, model, version, and naming fields.
+        
+        Returns:
+            DeviceInfo: Device registry metadata for the smart-plug subdevice, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
         """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
@@ -203,7 +213,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def available(self) -> bool:
-        """Return whether the entity is currently available."""
+        """
+        Determine whether this entity is currently available.
+        
+        Checks the parent coordinator's availability, then evaluates device-specific online status fields (device metadata then system state). If an explicit online state can be parsed, that value is used; otherwise availability falls back to whether the entity's device ID exists in the coordinator data.
+        
+        Returns:
+            `true` if the entity is available, `false` otherwise.
+        """
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)

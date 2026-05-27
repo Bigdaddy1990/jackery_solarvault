@@ -30,16 +30,16 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Redact payloads without exposing device IDs or serials as dict keys.
-
-    Home Assistant's ``async_redact_data`` redacts values by key inside
-    payloads. It does not anonymize mapping keys such as device IDs,
-    system IDs or battery serial numbers, so diagnostics that are safe to
-    share must replace those outer keys with stable local labels.
-
-    The redact set comes from :func:`.util.active_redact_keys` so the entry
-    option and legacy ``JACKERY_DEV_MODE`` env var can disable redaction during
-    local integration development.
+    """
+    Replace mapping outer keys (e.g., device IDs or serials) with stable local labels and return a map of each label to a redacted payload.
+    
+    Parameters:
+        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
+        prefix (str): Prefix used for generated labels (labels are formatted as "<prefix>_<index>" starting at 1).
+        redact_keys (frozenset[str]): Set of field names that must be redacted from each payload.
+    
+    Returns:
+        dict[str, Any]: A dictionary mapping generated labels to redacted payloads. If a payload is not a dict it is wrapped as {"value": payload} before redaction.
     """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(
@@ -57,7 +57,20 @@ def _redacted_payload_map(
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
-    """Get config entry diagnostics."""
+    """
+    Build the diagnostics export for the given config entry.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant core instance.
+        entry (JackeryConfigEntry): The integration's config entry to export diagnostics for.
+    
+    Returns:
+        dict[str, Any]: Diagnostics payload containing:
+            - `entry_data`: redacted copy of the config entry's stored data.
+            - `options`: redacted copy of the config entry's options.
+            - `devices`: mapping of stable local device labels to redacted device payloads.
+            - `raw_api`: raw diagnostics of coordinator/API responses and transport snapshots (redacted according to the entry's redaction settings). Note: if diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and bluetoothKey may be included unredacted.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
@@ -159,7 +172,17 @@ def _local_mqtt_diagnostics(
     entry: JackeryConfigEntry,
     redactions_disabled: bool,
 ) -> dict[str, Any]:
-    """Return the local-MQTT diagnostics block (disabled when no client)."""
+    """
+    Build the diagnostics block for the integration's local MQTT client, or report that local MQTT is disabled.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant core instance.
+        entry (JackeryConfigEntry): Config entry for the integration.
+        redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
+    
+    Returns:
+        dict[str, Any]: `{"enabled": False}` when no local MQTT client is available, otherwise the client's diagnostics snapshot (respecting the requested redaction).
+    """
     client = _local_mqtt_client(hass, entry)
     if client is None:
         return {"enabled": False}

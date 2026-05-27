@@ -47,6 +47,14 @@ async def async_setup_entry(
         )
 
     def _collect_entities() -> list[TextEntity]:
+        """
+        Collect text entities for devices that expose a system identifier.
+        
+        Scans the coordinator's data payloads and creates a JackerySystemNameText entity for each device whose system object contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
+        
+        Returns:
+            list[TextEntity]: A list of text entities to add for renaming device systems.
+        """
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
@@ -58,6 +66,11 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
+        """
+        Add new text entities when the coordinator's data signature has changed.
+        
+        Compares the current signature of coordinator.data with the last seen signature; if different, collects new entities and registers them with async_add_entities.
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -95,7 +108,21 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
-        """Forward a text write to the device."""
+        """
+        Set the system's editable name on the remote device and update local state.
+        
+        Validates the target system identifier and the provided text, sends the rename request
+        to the remote API, applies an optimistic local update so the new name appears
+        immediately, and requests a coordinator refresh so dependent entities pick up the change.
+        
+        Parameters:
+            value (str): The new system name to set; leading and trailing whitespace will be trimmed.
+        
+        Raises:
+            ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
+            HomeAssistantError: If the system identifier is missing, the trimmed name is empty,
+                or the remote API reports a failure (includes translation keys for UI messages).
+        """
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:

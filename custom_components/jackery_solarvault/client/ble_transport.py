@@ -221,7 +221,12 @@ class JackeryBleListener:
         self._mtu: dict[str, int] = {}
 
     def address_for_device_id(self, device_id: str) -> str | None:
-        """Return the cached BLE MAC for a device id, or None."""
+        """
+        Get the cached BLE MAC address for the given device id.
+        
+        Returns:
+            str | None: MAC address associated with the device id, or `None` if no cached address exists.
+        """
         return self._device_addresses.get(device_id)
 
     # ------------------------------------------------------------------
@@ -329,31 +334,26 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """Build, encrypt and write a single command frame to char 0xEE01.
-
-        Returns ``True`` when the GATT write completed (and, if
-        ``wait_for_ack`` is set, the device echoed a decoded frame on the
-        notify channel within ``ack_timeout_sec``). Returns ``False`` when
-        no active client is available for the device — callers (e.g. the
-        coordinator's BLE-first setter helper) use that to fall back to
-        the cloud-MQTT pipeline.
-
-        Raises ``ValueError`` for malformed inputs, ``RuntimeError`` for
-        GATT-layer failures *or* for an ACK timeout when ``wait_for_ack``
-        is enabled. The router catches the RuntimeError and falls back to
-        MQTT; for SolarVault setters the duplicated write is idempotent.
-
-        ``ack_cmds`` filters which notify frames count as the ACK. When
-        omitted, any decoded frame on the same device within the window
-        counts. The device typically echoes the same ``cmd`` back as a
-        ``DevicePropertyChange``, but we have no firmware contract for
-        that mapping yet, so the default stays permissive.
-
-        The trailer field is left as four NUL bytes — see
-        :class:`.ble.BleBinaryFrame` for the open question on its
-        algorithm. If the device firmware rejects the write (no echo on
-        the notify stream within a reasonable window), the trailer
-        likely needs to be a real checksum derived from a Frida capture.
+        """
+        Send a logical command frame to the device over BLE and optionally wait for a matching acknowledgement.
+        
+        Parameters:
+            device_id (str): Target device identifier.
+            cmd (int): Logical command identifier to send.
+            body (bytes): Command payload bytes.
+            flags (int): Frame flags included in the sent binary frame.
+            timeout_sec (float): Per-GATT-write timeout in seconds.
+            wait_for_ack (bool): If True, wait for a matching decoded notify frame before returning.
+            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is True.
+            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted any decoded frame from the same device within the window counts.
+            mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU (used for tests/diagnostics).
+        
+        Returns:
+            bool: `True` if the GATT write completed (and, when requested, a matching ACK was received); `False` if no active BLE client exists for the device.
+        
+        Raises:
+            ValueError: For malformed inputs (e.g., body cannot be chunked for the selected MTU).
+            RuntimeError: For GATT-layer failures or when an ACK wait times out.
         """
         client = self._clients.get(device_id)
         if client is None:
@@ -451,7 +451,18 @@ class JackeryBleListener:
     def _register_pending_ack(
         self, device_id: str, ack_cmds: tuple[int, ...] | None
     ) -> _PendingAck:
-        """Create and register a pending-ACK record for ``device_id``."""
+        """
+        Register a pending ACK wait record for the given device.
+        
+        Parameters:
+            device_id (str): Identifier of the device the ACK is expected from.
+            ack_cmds (tuple[int, ...] | None): Optional sequence of acceptable command IDs that will satisfy the ACK.
+                If `None`, any decoded frame will satisfy the pending ACK.
+        
+        Returns:
+            _PendingAck: A record containing `expected_cmds` (a `frozenset` of the provided command IDs or `None`)
+                and `future`, an `asyncio.Future` that will be resolved with the matching `ble.BleBinaryFrame`.
+        """
         loop = asyncio.get_running_loop()
         pending = _PendingAck(
             expected_cmds=(frozenset(int(c) for c in ack_cmds) if ack_cmds else None),
@@ -518,11 +529,11 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def async_start(self, device_ids: list[str]) -> None:
-        """Begin watching for advertisements and connecting on match.
-
-        Connect tasks are spawned lazily when the first matching
-        advertisement for a device arrives. This avoids blocking
-        integration setup on a BLE radio that is out of range.
+        """
+        Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners on first matching advertisement.
+        
+        Parameters:
+            device_ids (list[str]): Device IDs to monitor for advertisements; a background connection task will be started lazily when an advertisement matching a monitored device is seen.
         """
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
@@ -698,7 +709,14 @@ class JackeryBleListener:
         return device_id
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:
-        """Maintain a GATT session for one device, reconnecting on drop."""
+        """
+        Maintain a persistent GATT session for the given device, subscribing to notifications and reconnecting on link loss.
+        
+        Runs until the listener is stopped or the task is cancelled. On successful connection the live Bleak client is published to the instance so writers may use the session, a notification callback is registered and a keep-alive task is started; on disconnect the session is torn down, stats are updated, and the method backs off and retries. The method re-raises asyncio.CancelledError to allow clean shutdown.
+        
+        Raises:
+            asyncio.CancelledError: if the task is cancelled during shutdown.
+        """
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
         from homeassistant.components import bluetooth
@@ -891,6 +909,11 @@ class JackeryBleListener:
             )
 
     def _on_disconnect(self, device_id: str) -> None:
+        """
+        Record a peripheral disconnect for the given device and emit an info-level log.
+        
+        Updates the device's stats `last_disconnect_at` timestamp to the current time and logs an informational message indicating the peripheral disconnected. Intended to be invoked by the BLE client's disconnect callback.
+        """
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         # Promoted from DEBUG to INFO: peripheral disconnects are the

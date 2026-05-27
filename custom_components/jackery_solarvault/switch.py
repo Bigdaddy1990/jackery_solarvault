@@ -66,7 +66,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _standby_is_on(raw: Any) -> bool | None:
-    """Treat the raw autoStandby integer flag as on=1 / off=0."""
+    """
+    Convert a raw `autoStandby` payload value into an on/off boolean.
+    
+    Parameters:
+        raw (Any): Raw payload value (typically an integer flag or other truthy/falsy representation).
+    
+    Returns:
+        bool | None: `True` if the value represents "on" (e.g., integer `1` or otherwise truthy), `False` if it represents "off" (e.g., integer `0` or otherwise falsy), or `None` if `raw` is `None` or the state cannot be determined.
+    """
     if raw is None:
         return None
     try:
@@ -150,7 +158,14 @@ async def _set_off_grid_shutdown(
 async def _set_storm_warning(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
 ) -> None:
-    """Toggle storm warning on a device."""
+    """
+    Set the storm warning state for the specified device.
+    
+    Parameters:
+        coord (JackerySolarVaultCoordinator): Coordinator used to apply the change.
+        dev_id (str): Unique identifier of the target device.
+        value (bool): `True` to enable storm warning, `False` to disable it.
+    """
     await coord.async_set_storm_warning(dev_id, value)
 
 
@@ -294,7 +309,13 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             self._raise_action_error(err)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the entity off."""
+        """
+        Turn the described switch off for the device.
+        
+        Raises:
+            ConfigEntryAuthFailed: if authentication for the config entry failed (re-raised).
+            HomeAssistantError: re-raised if it contains a `translation_key`; otherwise a localized action `HomeAssistantError` describing the failure is raised for other errors.
+        """
         if self.entity_description.setter is None:
             return
         try:
@@ -326,7 +347,13 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         plug_index: int,
         plug_sn: str,
     ) -> None:
-        """Initialise the smart-plug switch from its sorted index and serial."""
+        """
+        Initialize the smart-plug switch entity for a specific plug.
+        
+        Parameters:
+            plug_index (int): 1-based index of the smart plug within the device's sorted plug list.
+            plug_sn (str): Smart plug serial number used to bind the entity to the physical plug.
+        """
         super().__init__(coordinator, device_id, f"smart_plug_{plug_index}_switch")
         self._plug_index = plug_index
         self._plug_sn = plug_sn
@@ -340,6 +367,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     def _plug(self) -> dict[str, Any]:
         # Look up by captured serial; cloud-side re-ordering of the plug
         # array must not switch this entity to a different physical plug.
+        """
+        Return the smart-plug payload that matches this entity's captured serial.
+        
+        Searches the sorted list of smart-plug payloads for a plug whose serial equals the entity's stored `_plug_sn`.
+        
+        Returns:
+            dict: The payload dictionary for the matching smart plug, or an empty dict if no matching plug is found.
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -347,14 +382,32 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True when the smart plug reports an active output."""
+        """
+        Determine whether the smart plug's output is active.
+        
+        Checks the plug's reported switch state, falling back to the system switch if the primary field is missing.
+        
+        Returns:
+            bool | None: `True` if the plug reports active output, `False` if it reports inactive, `None` if the state is unavailable.
+        """
         raw = self._plug.get(FIELD_SWITCH_STATE)
         if raw is None:
             raw = self._plug.get(FIELD_SYS_SWITCH)
         return safe_bool(raw)
 
     def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable HA action error for this switch."""
+        """
+        Raise a localized HomeAssistantError describing a failed action for this smart-plug switch.
+        
+        Raises a HomeAssistantError with translation_domain=DOMAIN and translation_key="entity_action_failed".
+        The error's translation placeholders include "entity" = "smart_plug_switch", "device_id" = this entity's device id, and "error" = str(error).
+        
+        Parameters:
+            error (object): The underlying error or message to include in the translation placeholders.
+        
+        Raises:
+            HomeAssistantError: Always raised to surface a translated action-failed message to the caller.
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -366,7 +419,16 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         )
 
     async def _async_set_state(self, value: bool) -> None:
-        """Set the smart-plug state through ControlSubDevice."""
+        """
+        Apply the on/off state to the associated smart plug and request a coordinator refresh.
+        
+        Parameters:
+            value (bool): True to turn the smart plug on, False to turn it off.
+        
+        Raises:
+            ConfigEntryAuthFailed: If the coordinator reports an authentication failure (re-raised).
+            HomeAssistantError: If an action-related error occurs; errors with a `translation_key` are re-raised, other errors are converted to a translated action error via the entity's error helper.
+        """
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
@@ -388,16 +450,29 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             self._raise_action_error(err)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the smart plug on."""
+        """
+        Turn this smart-plug entity on.
+        """
         await self._async_set_state(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the smart plug off."""
+        """
+        Turn the smart plug off.
+        """
         await self._async_set_state(False)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the smart-plug switch."""
+        """
+        Provide diagnostic state attributes for the smart-plug switch.
+        
+        Always includes `plug_index`; additionally includes any of the following plug-specific fields
+        if present: `deviceName`, `scanName`, `commState`, `commMode`, `socketPriority`, `switchState`,
+        `sysSwitch`, `version`.
+        
+        Returns:
+            dict[str, Any]: Mapping of extra state attributes for the entity.
+        """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -428,7 +503,15 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         plug_index: int,
         plug_sn: str,
     ) -> None:
-        """Initialise the smart-plug priority switch from its sorted index/serial."""
+        """
+        Create a smart-plug priority switch entity for the given device using the plug's index and serial.
+        
+        Parameters:
+            coordinator (JackerySolarVaultCoordinator): Coordinator owning device data and actions.
+            device_id (str): The parent device identifier.
+            plug_index (int): One-based index of the smart plug within the device's sorted smart-plug list.
+            plug_sn (str): Serial number of the targeted smart plug used to match its payload across updates.
+        """
         JackeryEntity.__init__(
             self,
             coordinator,
@@ -440,11 +523,25 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True when smart-plug priority is enabled."""
+        """
+        Determine whether the smart-plug's priority is enabled.
+        
+        Returns:
+            `true` if the plug's `socketPriority` indicates enabled, `false` if it indicates disabled, `None` if the value is absent.
+        """
         return safe_bool(self._plug.get(FIELD_SOCKET_PRIORITY))
 
     def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable HA action error for this switch."""
+        """
+        Raise a localized Home Assistant error indicating the smart-plug priority action failed.
+        
+        Parameters:
+            error (object): The original error or message to include in the translation placeholders.
+        
+        Raises:
+            HomeAssistantError: Error with translation_key "entity_action_failed" and placeholders
+            for "entity" ("smart_plug_priority_enabled"), "device_id", and "error".
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -456,7 +553,16 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         )
 
     async def _async_set_state(self, value: bool) -> None:
-        """Set smart-plug priority through ControlSubDevice."""
+        """
+        Enable or disable the smart-plug's priority setting.
+        
+        Parameters:
+            value (bool): True to enable priority, False to disable.
+        
+        Raises:
+            ConfigEntryAuthFailed: If the config entry authentication has failed (re-raised).
+            HomeAssistantError: If the action fails for other reasons; raised as a localized action error.
+        """
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
@@ -488,11 +594,22 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create description-driven switch entities."""
+    """
+    Create and register switch entities for devices and smart plugs from coordinator data.
+    
+    Reads the coordinator's payloads to instantiate description-driven switches and per-smart-plug switches (including priority switches when present), avoids duplicate unique IDs, and gates creation of certain description-driven switches by observed properties or device advanced-capability support. Adds discovered entities via the provided callback and registers a listener that re-evaluates entities when the coordinator data signature changes to add new entities only when the signature differs.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[SwitchEntity], entity: SwitchEntity) -> None:
+        """
+        Append `entity` to `entities` if its unique id has not been seen for the switch platform.
+        
+        Parameters:
+            entities (list[SwitchEntity]): Mutable list to which the entity will be appended when unique.
+            entity (SwitchEntity): Entity to add if its unique id has not already been recorded.
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
@@ -512,6 +629,14 @@ async def async_setup_entry(
     }
 
     def _collect_entities() -> list[SwitchEntity]:
+        """
+        Builds the list of switch entities to register for all devices present in the coordinator data.
+        
+        The returned list contains description-driven Jackery switches and per-smart-plug switch entities (including priority switches when applicable). Entities that cannot be mapped to a valid smart-plug serial are omitted.
+        
+        Returns:
+            list[SwitchEntity]: Switch entity instances to add for the current coordinator dataset.
+        """
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -553,6 +678,11 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
+        """
+        Add any newly available switch entities when the coordinator's entity signature changes.
+        
+        Compares the current coordinator entity signature with the previously recorded signature; if different, collects entities and registers them by calling `async_add_entities`. Updates the stored signature to the current value.
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

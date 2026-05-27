@@ -140,7 +140,18 @@ def hex16(value: int) -> str:
 
 
 def parse_hex16(text: str) -> int:
-    """Parse a 4-character hex string back to an int. Inverse of :func:`hex16`."""
+    """
+    Convert a 4-character hexadecimal string to its integer value.
+    
+    Parameters:
+        text (str): Hex string exactly 4 characters long (upper- or lower-case).
+    
+    Returns:
+        int: The integer value represented by `text`.
+    
+    Raises:
+        ValueError: If `text` is not 4 characters long or is not valid hexadecimal.
+    """
     if len(text) != _HEX16_WIDTH:
         raise ValueError(
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
@@ -149,7 +160,12 @@ def parse_hex16(text: str) -> int:
 
 
 def hex_encode(data: bytes) -> str:
-    """Upper-case hex encode a byte string (no separators, no prefix)."""
+    """
+    Encode bytes to an uppercase hexadecimal string without separators or prefix.
+    
+    Returns:
+        Uppercase hex string of `data` with no separators or `0x` prefix.
+    """
     return data.hex().upper()
 
 
