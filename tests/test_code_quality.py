@@ -3599,3 +3599,45 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert '"unrouted_frames_by_cmd"' in coord, (
         'ble_observations() must expose unrouted_frames_by_cmd in diagnostics'
     )
+
+
+def test_pre_commit_script_runs_on_all_files() -> None:
+    """The pre-commit script must pass --all-files so no file is silently skipped."""
+    package = json.loads(pathlib.Path('package.json').read_text(encoding='utf-8'))
+    pre_commit_cmd = package['scripts']['pre-commit']
+
+    assert '--all-files' in pre_commit_cmd, (
+        "pre-commit script must include '--all-files' to check the full tree"
+    )
+    assert 'bun run pre-commit' in pre_commit_cmd, (
+        "pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)"
+    )
+
+
+def test_ruff_baseline_workflow_delegates_pre_commit_via_bun() -> None:
+    """The ruff-baseline workflow must invoke pre-commit through the bun script.
+
+    Using 'bun run pre-commit' ensures the workflow picks up the --all-files
+    flag defined in package.json rather than invoking pre-commit directly.
+    """
+    workflow = pathlib.Path('.github/workflows/ruff-baseline.yml').read_text(
+        encoding='utf-8'
+    )
+
+    assert 'bun run pre-commit' in workflow, (
+        "ruff-baseline.yml must call 'bun run pre-commit' so the --all-files flag is applied"
+    )
+    assert workflow.count('bun run pre-commit') >= 1
+
+
+def test_package_json_pre_commit_script_is_valid_json_with_required_keys() -> None:
+    """package.json must remain valid JSON and expose a pre-commit script entry."""
+    raw = pathlib.Path('package.json').read_text(encoding='utf-8')
+
+    # Must be parseable JSON (regression guard against syntax errors).
+    parsed = json.loads(raw)
+
+    assert 'scripts' in parsed, "package.json must contain a 'scripts' section"
+    assert 'pre-commit' in parsed['scripts'], (
+        "scripts section must define a 'pre-commit' entry"
+    )
