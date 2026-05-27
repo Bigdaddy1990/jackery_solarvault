@@ -12,8 +12,8 @@ aiohttp>=3.13.3
 aiomqtt
 annotatedyaml>=1.0.2
 certifi
-coverage>=7.10.6
-coverage[toml]>=7.5.4
+coverage
+coverage[toml]
 homeassistant-stubs>=2026.5.1
 hypothesis
 jinja2>=3.1.6
@@ -25,7 +25,7 @@ pylint
 pytest
 pytest-asyncio
 pytest-cov
-pytest-github-actions-annotate-failures>=0.3.0
+pytest-github-actions-annotate-failures
 pytest-homeassistant-custom-component
 pyyaml
 ruff==0.15.12
