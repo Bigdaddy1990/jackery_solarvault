@@ -101,13 +101,13 @@ SET_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_PORT): vol.All(
         vol.Coerce(int), vol.Range(min=1, max=65535)
     ),
-    vol.Optional(SERVICE_FIELD_USERNAME, default=''): vol.All(
+    vol.Optional(SERVICE_FIELD_USERNAME, default=""): vol.All(
         cv.string, vol.Length(max=128)
     ),
-    vol.Optional(SERVICE_FIELD_PASSWORD, default=''): vol.All(
+    vol.Optional(SERVICE_FIELD_PASSWORD, default=""): vol.All(
         cv.string, vol.Length(max=128)
     ),
-    vol.Optional(SERVICE_FIELD_TOKEN, default=''): vol.All(
+    vol.Optional(SERVICE_FIELD_TOKEN, default=""): vol.All(
         cv.string, vol.Length(max=512)
     ),
 })
@@ -139,7 +139,7 @@ def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinat
     """Return runtime coordinators for loaded Jackery config entries."""
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
-        coordinator = getattr(loaded_entry, 'runtime_data', None)
+        coordinator = getattr(loaded_entry, "runtime_data", None)
         if isinstance(coordinator, JackerySolarVaultCoordinator):
             coordinators.append(coordinator)
     return coordinators
@@ -182,7 +182,7 @@ def _coordinator_for_system(
         for payload in (coordinator.data or {}).values():
             system: dict[str, Any] = payload.get(PAYLOAD_SYSTEM) or {}
             for key in (FIELD_ID, FIELD_SYSTEM_ID):
-                if str(system.get(key) or '') == system_id:
+                if str(system.get(key) or "") == system_id:
                     return coordinator
     return None
 
@@ -198,8 +198,8 @@ def _service_validation_error(
         translation_domain=DOMAIN,
         translation_key=translation_key,
         translation_placeholders={
-            'device_id': device_id,
-            'error': str(error),
+            "device_id": device_id,
+            "error": str(error),
         },
     )
 
@@ -213,21 +213,21 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
             parsed = json.loads(raw_body.strip())
         except ValueError as err:
             raise _service_validation_error(
-                'send_ble_command_failed',
+                "send_ble_command_failed",
                 device_id=device_id,
                 error=f"body is not valid JSON: {err}",
             ) from err
         if isinstance(parsed, dict):
             return parsed
         raise _service_validation_error(
-            'send_ble_command_failed',
+            "send_ble_command_failed",
             device_id=device_id,
-            error='body JSON must be an object',
+            error="body JSON must be an object",
         )
     raise _service_validation_error(
-        'send_ble_command_failed',
+        "send_ble_command_failed",
         device_id=device_id,
-        error='body must be a mapping or JSON object string',
+        error="body must be a mapping or JSON object string",
     )
 
 
@@ -244,10 +244,10 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
     if coordinator is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='rename_system_failed',
+            translation_key="rename_system_failed",
             translation_placeholders={
-                'system_id': system_id,
-                'error': 'no Jackery entry owns this system id',
+                "system_id": system_id,
+                "error": "no Jackery entry owns this system id",
             },
         )
     try:
@@ -255,10 +255,10 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
     except JackeryError as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='rename_system_failed',
+            translation_key="rename_system_failed",
             translation_placeholders={
-                'system_id': system_id,
-                'error': str(err),
+                "system_id": system_id,
+                "error": str(err),
             },
         ) from err
     await coordinator.async_request_refresh()
@@ -274,10 +274,10 @@ async def _async_handle_refresh_weather_plan(
     if coordinator is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='refresh_weather_plan_failed',
+            translation_key="refresh_weather_plan_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': 'no Jackery entry owns this device id',
+                "device_id": device_id,
+                "error": "no Jackery entry owns this device id",
             },
         )
     try:
@@ -285,10 +285,10 @@ async def _async_handle_refresh_weather_plan(
     except (JackeryError, LookupError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='refresh_weather_plan_failed',
+            translation_key="refresh_weather_plan_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': str(err),
+                "device_id": device_id,
+                "error": str(err),
             },
         ) from err
 
@@ -304,11 +304,11 @@ async def _async_handle_delete_storm_alert(
     if coordinator is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='delete_storm_alert_failed',
+            translation_key="delete_storm_alert_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'alert_id': alert_id,
-                'error': 'no Jackery entry owns this device id',
+                "device_id": device_id,
+                "alert_id": alert_id,
+                "error": "no Jackery entry owns this device id",
             },
         )
     try:
@@ -316,11 +316,11 @@ async def _async_handle_delete_storm_alert(
     except (JackeryError, LookupError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='delete_storm_alert_failed',
+            translation_key="delete_storm_alert_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'alert_id': alert_id,
-                'error': str(err),
+                "device_id": device_id,
+                "alert_id": alert_id,
+                "error": str(err),
             },
         ) from err
 
@@ -335,10 +335,10 @@ async def _async_handle_set_third_party_mqtt_config(
     if coordinator is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='set_third_party_mqtt_config_failed',
+            translation_key="set_third_party_mqtt_config_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': 'no Jackery entry owns this device id',
+                "device_id": device_id,
+                "error": "no Jackery entry owns this device id",
             },
         )
     try:
@@ -347,17 +347,17 @@ async def _async_handle_set_third_party_mqtt_config(
             enable=bool(call.data[SERVICE_FIELD_ENABLE]),
             ip=str(call.data[SERVICE_FIELD_IP]).strip(),
             port=int(call.data[SERVICE_FIELD_PORT]),
-            username=str(call.data.get(SERVICE_FIELD_USERNAME, '')),
-            password=str(call.data.get(SERVICE_FIELD_PASSWORD, '')),
-            token=str(call.data.get(SERVICE_FIELD_TOKEN, '')),
+            username=str(call.data.get(SERVICE_FIELD_USERNAME, "")),
+            password=str(call.data.get(SERVICE_FIELD_PASSWORD, "")),
+            token=str(call.data.get(SERVICE_FIELD_TOKEN, "")),
         )
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='set_third_party_mqtt_config_failed',
+            translation_key="set_third_party_mqtt_config_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': str(err),
+                "device_id": device_id,
+                "error": str(err),
             },
         ) from err
 
@@ -372,10 +372,10 @@ async def _async_handle_query_third_party_mqtt_config(
     if coordinator is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='query_third_party_mqtt_config_failed',
+            translation_key="query_third_party_mqtt_config_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': 'no Jackery entry owns this device id',
+                "device_id": device_id,
+                "error": "no Jackery entry owns this device id",
             },
         )
     try:
@@ -383,10 +383,10 @@ async def _async_handle_query_third_party_mqtt_config(
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key='query_third_party_mqtt_config_failed',
+            translation_key="query_third_party_mqtt_config_failed",
             translation_placeholders={
-                'device_id': device_id,
-                'error': str(err),
+                "device_id": device_id,
+                "error": str(err),
             },
         ) from err
 
@@ -400,9 +400,9 @@ async def _async_handle_send_ble_command(
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
         raise _service_validation_error(
-            'send_ble_command_failed',
+            "send_ble_command_failed",
             device_id=device_id,
-            error='no Jackery entry owns this device id',
+            error="no Jackery entry owns this device id",
         )
     body = _ble_body_from_service(call.data[SERVICE_FIELD_BODY], device_id)
     try:
@@ -416,15 +416,15 @@ async def _async_handle_send_ble_command(
         )
     except (RuntimeError, ValueError) as err:
         raise _service_validation_error(
-            'send_ble_command_failed',
+            "send_ble_command_failed",
             device_id=device_id,
             error=err,
         ) from err
     if not sent:
         raise _service_validation_error(
-            'send_ble_command_failed',
+            "send_ble_command_failed",
             device_id=device_id,
-            error='BLE writes are disabled or no active BLE session exists',
+            error="BLE writes are disabled or no active BLE session exists",
         )
 
 
