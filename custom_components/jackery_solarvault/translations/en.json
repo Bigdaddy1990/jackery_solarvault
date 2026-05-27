@@ -25,32 +25,32 @@
         "data": {
           "create_calculated_power_sensors": "Create calculated net-power sensors",
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
-          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "password": "Password",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
-          "third_party_mqtt_port": "Third-Party MQTT broker port",
-          "third_party_mqtt_username": "Third-Party MQTT username",
           "third_party_mqtt_password": "Third-Party MQTT password",
+          "third_party_mqtt_port": "Third-Party MQTT broker port",
           "third_party_mqtt_token": "Third-Party MQTT token",
+          "third_party_mqtt_username": "Third-Party MQTT username",
           "username": "Email"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
           "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
-          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
-          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
-          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure."
+          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
+          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
         "title": "Reconfigure Jackery SolarVault"
@@ -59,16 +59,16 @@
         "data": {
           "create_calculated_power_sensors": "Create calculated net-power sensors",
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
-          "enable_ble_transport": "Enable BLE transport",
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "enable_ble_transport": "Enable BLE transport",
           "password": "Password",
           "username": "Email"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
           "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
-          "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values."
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
+          "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
         },
         "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. Keep the Jackery app signed out of the SolarVault account while Home Assistant should receive live MQTT updates. If the app is opened briefly, Home Assistant pauses MQTT reconnects for a short time, keeps polling over HTTP, and resumes live updates automatically.",
         "title": "Jackery SolarVault"
@@ -259,42 +259,6 @@
       "battery_pack_update_status": {
         "name": "Battery pack update status"
       },
-      "meter_head_charging_energy": {
-        "name": "Meter head charging energy"
-      },
-      "meter_head_communication_state": {
-        "name": "Meter head communication state"
-      },
-      "meter_head_discharging_energy": {
-        "name": "Meter head discharging energy"
-      },
-      "meter_head_input_power": {
-        "name": "Meter head input power"
-      },
-      "meter_head_output_power": {
-        "name": "Meter head output power"
-      },
-      "smart_plug_communication_state": {
-        "name": "Smart plug communication state"
-      },
-      "smart_plug_firmware_version": {
-        "name": "Smart plug firmware version"
-      },
-      "smart_plug_input_power": {
-        "name": "Smart plug input power"
-      },
-      "smart_plug_output_power": {
-        "name": "Smart plug output power"
-      },
-      "smart_plug_priority": {
-        "name": "Smart plug priority"
-      },
-      "smart_plug_today_energy": {
-        "name": "Smart plug daily energy"
-      },
-      "smart_plug_total_energy": {
-        "name": "Smart plug total energy"
-      },
       "battery_soc": {
         "name": "Total battery level"
       },
@@ -306,6 +270,9 @@
       },
       "battery_state": {
         "name": "Battery state"
+      },
+      "ble_transport": {
+        "name": "BLE transport"
       },
       "cell_temperature": {
         "name": "Main battery cell temperature"
@@ -398,7 +365,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -407,13 +374,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -502,6 +469,21 @@
       "max_system_output_power": {
         "name": "Max system output power"
       },
+      "meter_head_charging_energy": {
+        "name": "Meter head charging energy"
+      },
+      "meter_head_communication_state": {
+        "name": "Meter head communication state"
+      },
+      "meter_head_discharging_energy": {
+        "name": "Meter head discharging energy"
+      },
+      "meter_head_input_power": {
+        "name": "Meter head input power"
+      },
+      "meter_head_output_power": {
+        "name": "Meter head output power"
+      },
       "off_grid_shutdown_state": {
         "name": "Off-grid shutdown state"
       },
@@ -540,9 +522,6 @@
       },
       "pv_year_energy": {
         "name": "Yearly PV energy"
-      },
-      "ble_transport": {
-        "name": "BLE transport"
       },
       "raw_properties": {
         "name": "Raw properties"
@@ -619,6 +598,27 @@
       "smart_meter_power": {
         "name": "Smart meter net power"
       },
+      "smart_plug_communication_state": {
+        "name": "Smart plug communication state"
+      },
+      "smart_plug_firmware_version": {
+        "name": "Smart plug firmware version"
+      },
+      "smart_plug_input_power": {
+        "name": "Smart plug input power"
+      },
+      "smart_plug_output_power": {
+        "name": "Smart plug output power"
+      },
+      "smart_plug_priority": {
+        "name": "Smart plug priority"
+      },
+      "smart_plug_today_energy": {
+        "name": "Smart plug daily energy"
+      },
+      "smart_plug_total_energy": {
+        "name": "Smart plug total energy"
+      },
       "soc_charge_limit": {
         "name": "Charge limit"
       },
@@ -656,7 +656,7 @@
         "name": "Daily on-grid output (Jackery cloud)"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "PV yield total"
@@ -693,17 +693,17 @@
       "off_grid_shutdown": {
         "name": "Auto-off (off-grid mode)"
       },
-      "standby": {
-        "name": "Standby"
-      },
-      "storm_warning": {
-        "name": "Storm warning"
-      },
       "smart_plug_priority_enabled": {
         "name": "Smart plug priority"
       },
       "smart_plug_switch": {
         "name": "Smart plug"
+      },
+      "standby": {
+        "name": "Standby"
+      },
+      "storm_warning": {
+        "name": "Storm warning"
       }
     },
     "text": {
@@ -758,7 +758,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (§2 HTTP endpoints, §8 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (\u00a72 HTTP endpoints, \u00a78 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
             "title": "Force a Jackery cloud refresh"
           }
         }
@@ -772,30 +772,30 @@
         "data": {
           "create_calculated_power_sensors": "Create calculated net-power sensors",
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_ble_writes": "Enable experimental BLE writes",
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
-          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
-          "third_party_mqtt_port": "Third-Party MQTT broker port",
-          "third_party_mqtt_username": "Third-Party MQTT username",
           "third_party_mqtt_password": "Third-Party MQTT password",
-          "third_party_mqtt_token": "Third-Party MQTT token"
+          "third_party_mqtt_port": "Third-Party MQTT broker port",
+          "third_party_mqtt_token": "Third-Party MQTT token",
+          "third_party_mqtt_username": "Third-Party MQTT username"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
           "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_ble_writes": "Allows experimental local BLE command writes when the BLE transport is connected. Disabled by default; use only while testing direct SolarVault control.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
-          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
-          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
-          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure."
+          "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
+          "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
         "title": "Jackery options"
@@ -844,6 +844,10 @@
     "send_ble_command": {
       "description": "Send one experimental binary BLE command frame to the selected device. Requires BLE transport, BLE writes and an active BLE connection.",
       "fields": {
+        "ack_timeout": {
+          "description": "How long to wait, in seconds, for the device to echo a notify frame after the write. Ignored when Wait for ACK is off.",
+          "name": "ACK timeout"
+        },
         "body": {
           "description": "JSON object body to encrypt and write. Include the body-level cmd field when the target firmware command expects it.",
           "name": "Body"
@@ -863,10 +867,6 @@
         "wait_for_ack": {
           "description": "Wait for the device to echo a decoded notify frame before considering the write successful. Recommended for setters so a silent firmware drop fails the call instead of being lost.",
           "name": "Wait for ACK"
-        },
-        "ack_timeout": {
-          "description": "How long to wait, in seconds, for the device to echo a notify frame after the write. Ignored when Wait for ACK is off.",
-          "name": "ACK timeout"
         }
       },
       "name": "Send BLE command"
