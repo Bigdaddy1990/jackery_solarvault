@@ -63,7 +63,7 @@ jobs:
           python -m pre-commit-lite check .
           bun run pre-commit
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
