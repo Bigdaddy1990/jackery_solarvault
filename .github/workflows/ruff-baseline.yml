@@ -20,8 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.14"
       - run: bun install
       - uses: actions/setup-python@v6
         with:
@@ -42,7 +40,7 @@ jobs:
           python -m ruff check . \
             --target-version "${RUFF_TARGET_VERSION}" \
             --add-noqa \
-            --output-format=concise \
+            --output-format=github \
             --exit-zero
 
           # Remove stale noqa markers created by older baseline runs.
@@ -50,7 +48,7 @@ jobs:
             --target-version "${RUFF_TARGET_VERSION}" \
             --extend-select RUF100 \
             --fix \
-            --output-format=concise \
+            --output-format=github \
             --exit-zero
 
           # Emit final diagnostics as GitHub annotations without failing the

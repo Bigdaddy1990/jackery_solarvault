@@ -96,7 +96,7 @@ jobs:
             --preview \
             --extend-select RUF100 \
             --fix \
-            --output-format=concise \
+            --output-format=github \
             --exit-zero
 
       - name: Final Ruff normalization and checks
