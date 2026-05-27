@@ -8,4 +8,4 @@
 
 aiomqtt==2.5.1
 bleak-retry-connector>=3.5.0
-cryptography>=42.0
+cryptography>=48.0.0
