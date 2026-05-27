@@ -110,17 +110,17 @@ def _storm_minutes_value(
     task_plan: dict[str, object],
 ) -> int | None:
     """
-    Determine the storm warning lead time (in minutes) from device payload fragments.
+    Return the storm-warning lead time in minutes extracted from device payload sections.
     
-    Searches for a raw lead-time value in `properties`, then `weather_plan`, then `task_plan`, and finally within list entries of `weather_plan[FIELD_STORM]` when present. Converts the found value to an integer and treats values below STORM_MINUTES_MIN_VALID as "not set".
+    Searches `properties`, then `weather_plan`, then `task_plan`, and finally list entries in `weather_plan[FIELD_STORM]` for `FIELD_WPC` or `FIELD_MINS_INTERVAL`, converts the found value to an integer, and returns it only if it is greater than or equal to STORM_MINUTES_MIN_VALID.
     
     Parameters:
-        properties (dict[str, object]): Device `properties` payload section to inspect.
-        weather_plan (dict[str, object]): Device `weather_plan` payload section to inspect.
-        task_plan (dict[str, object]): Device `task_plan` payload section to inspect.
+        properties: Device `properties` payload section to inspect.
+        weather_plan: Device `weather_plan` payload section to inspect.
+        task_plan: Device `task_plan` payload section to inspect.
     
     Returns:
-        int | None: Extracted lead time in minutes when available and valid, `None` when no usable value is found.
+        int | None: Extracted lead time in minutes when available and valid, `None` otherwise.
     """
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
@@ -162,12 +162,12 @@ def _storm_minutes_fallback(
     task_plan: dict[str, object],
 ) -> int | None:
     """
-    Provide a fallback storm-warning minutes value when only storm enablement is known.
+    Determine a fallback storm-warning minutes value when only storm enablement is indicated.
     
-    Checks for a raw "storm enabled" indicator in `properties`, then `weather_plan`, then `task_plan`. If a raw value is present and can be parsed as an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If no usable raw enablement value exists but `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
+    If a raw "storm enabled" indicator exists in `properties`, `weather_plan`, or `task_plan` and can be parsed as an integer, or if `weather_plan[FIELD_STORM]` is a list, returns the sentinel `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
     
     Returns:
-        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` when no fallback can be determined.
+        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
     """
     raw = properties.get(FIELD_WPS)
     if raw is None:
@@ -631,6 +631,19 @@ async def async_setup_entry(
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
     def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
+        """
+        Determine whether a select entity identified by `key` should be created for a device described by `payload`.
+        
+        Checks device payload fields and the `supports_advanced` flag to decide if the given select type is applicable for the device.
+        
+        Parameters:
+            key (str): Description key identifying the select entity type (e.g., "work_mode_select").
+            payload (dict[str, Any]): Device payload containing properties, price and weather-plan information.
+            supports_advanced (bool): Whether the device advertises advanced feature support; enables selects that otherwise require specific payload fields.
+        
+        Returns:
+            bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
+        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -665,10 +678,12 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[SelectEntity]:
         """
-        Builds select entity instances for coordinator devices that meet creation criteria.
+        Create JackerySelect entities for coordinator devices that pass the module's gating logic.
+        
+        Only descriptions for which `_gate(description.key, payload, supports_advanced)` is true are instantiated, and duplicate unique IDs are avoided.
         
         Returns:
-            list[SelectEntity]: JackerySelect entities for devices in `coordinator.data` that pass the module's gating logic; duplicates are avoided.
+            list[SelectEntity]: Created JackerySelect instances for eligible devices.
         """
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -684,9 +699,9 @@ async def async_setup_entry(
 
     def _add_new_entities() -> None:
         """
-        Detect changes in the coordinator's device data and register any newly discovered select entities.
+        Detect changes in the coordinator's device payloads and register any newly discovered select entities.
         
-        If the current device signature differs from the last-seen signature, collect entities for the coordinator and pass them to the platform's `async_add_entities` callback, then update the stored signature. If the signature is unchanged, do nothing.
+        When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature; if the signature is unchanged, take no action.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

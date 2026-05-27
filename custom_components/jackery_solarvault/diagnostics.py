@@ -31,15 +31,15 @@ def _redacted_payload_map(
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
     """
-    Replace mapping outer keys (e.g., device IDs or serials) with stable local labels and return a map of each label to a redacted payload.
+    Create a labeled map of redacted payloads by replacing original mapping keys with stable generated labels.
     
     Parameters:
         payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
-        prefix (str): Prefix used for generated labels (labels are formatted as "<prefix>_<index>" starting at 1).
-        redact_keys (frozenset[str]): Set of field names that must be redacted from each payload.
+        prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
+        redact_keys (frozenset[str]): Field names to redact from each payload.
     
     Returns:
-        dict[str, Any]: A dictionary mapping generated labels to redacted payloads. If a payload is not a dict it is wrapped as {"value": payload} before redaction.
+        dict[str, Any]: Mapping of generated labels to redacted payloads. Non-dict payloads are wrapped as {"value": payload} before redaction.
     """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(
@@ -58,18 +58,16 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """
-    Build the diagnostics export for the given config entry.
+    Build a diagnostics export for the given config entry.
     
-    Parameters:
-        hass (HomeAssistant): Home Assistant core instance.
-        entry (JackeryConfigEntry): The integration's config entry to export diagnostics for.
+    The returned payload contains redacted copies of the entry's stored data and options, a stable mapping of labeled device payloads, and raw diagnostics from the coordinator, API responses, and transports. If diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and `bluetoothKey` may be included unredacted.
     
     Returns:
-        dict[str, Any]: Diagnostics payload containing:
+        dict[str, Any]: Diagnostics export with keys:
             - `entry_data`: redacted copy of the config entry's stored data.
             - `options`: redacted copy of the config entry's options.
             - `devices`: mapping of stable local device labels to redacted device payloads.
-            - `raw_api`: raw diagnostics of coordinator/API responses and transport snapshots (redacted according to the entry's redaction settings). Note: if diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and bluetoothKey may be included unredacted.
+            - `raw_api`: raw diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill (redacted according to the entry's redaction settings).
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
@@ -173,15 +171,13 @@ def _local_mqtt_diagnostics(
     redactions_disabled: bool,
 ) -> dict[str, Any]:
     """
-    Build the diagnostics block for the integration's local MQTT client, or report that local MQTT is disabled.
+    Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
     
     Parameters:
-        hass (HomeAssistant): Home Assistant core instance.
-        entry (JackeryConfigEntry): Config entry for the integration.
         redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
     
     Returns:
-        dict[str, Any]: `{"enabled": False}` when no local MQTT client is available, otherwise the client's diagnostics snapshot (respecting the requested redaction).
+        dict[str, Any]: `{"enabled": False}` when no local MQTT client is available, otherwise the client's diagnostics snapshot.
     """
     client = _local_mqtt_client(hass, entry)
     if client is None:

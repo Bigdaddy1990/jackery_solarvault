@@ -16,10 +16,28 @@ LEGACY_EXCEPT_PATTERN = re.compile(
 
 
 def _iter_python_files(root: Path) -> list[Path]:
+    """
+    Find all Python (.py) files under the given path, searching recursively.
+    
+    Parameters:
+        root (Path): Directory to search for Python files.
+    
+    Returns:
+        list[Path]: Sorted list of file paths for every `.py` file found under `root`.
+    """
     return sorted(path for path in root.rglob("*.py") if path.is_file())
 
 
 def _find_legacy_handlers(path: Path) -> list[int]:
+    """
+    Finds line numbers in a Python file that use legacy Python 2 multi-exception syntax.
+    
+    Parameters:
+        path (Path): Path to the Python file to scan.
+    
+    Returns:
+        list[int]: 1-based line numbers of lines matching the legacy `except A, B:` pattern.
+    """
     line_numbers: list[int] = []
     for index, line in enumerate(
         path.read_text(encoding="utf-8").splitlines(), start=1
@@ -30,6 +48,19 @@ def _find_legacy_handlers(path: Path) -> list[int]:
 
 
 def _parse_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments specifying files or directories to scan for legacy exception syntax.
+    
+    The parser accepts zero or more positional `paths`. If none are provided, a default of
+    ["custom_components/jackery_solarvault"] is used.
+    
+    Parameters:
+        None
+    
+    Returns:
+        argparse.Namespace: Parsed arguments with a `paths` attribute containing a list of
+        file or directory paths to scan.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "paths",
@@ -41,6 +72,14 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:  # noqa: D103
+    """
+    Scan provided paths for legacy Python 2 multi-exception `except A, B:` syntax and report any occurrences.
+    
+    Parses command-line paths, inspects files and directories for Python files, prints either a no-findings message or a list of offending file locations with guidance, and exits with a status code reflecting the result.
+    
+    Returns:
+        int: `0` if no legacy multi-exception syntax was found, `1` if any occurrences were detected.
+    """
     args = _parse_args()
     findings: list[tuple[Path, int]] = []
 

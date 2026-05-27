@@ -103,12 +103,12 @@ def _normalize_account(value: str) -> str:
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
     """
-    Builds a dictionary of current option values for the given configuration entry.
+    Return the resolved current option values for a configuration entry.
     
-    For each known option key (grouped by boolean, string, and integer types), the returned dictionary contains the current value stored on the entry. If an option is not present on the entry, the function falls back to any legacy setup-data value for that key and then to the type-specific default.
+    For each known option key (grouped by boolean, string, and integer types), the value is taken from the entry's stored options, falling back to any legacy setup-data value for that key and then to the type-specific default.
     
     Parameters:
-        entry (ConfigEntry): The configuration entry to read option and legacy setup-data values from.
+        entry (ConfigEntry): Configuration entry to read option and legacy setup-data values from.
     
     Returns:
         dict[str, Any]: Mapping of option keys to their resolved current values.
@@ -332,10 +332,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         Handle user-initiated reconfiguration of an existing config entry.
         
-        Validates that the normalized account from the form matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates the entry's username, password, and options. The flow will show the reconfigure form when input is missing or invalid, abort if the reconfigure target is missing, and abort if the provided account does not match the entry's unique ID.
+        Validates the provided username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates the entry's username, password, and options. Shows the reconfigure form when input is missing or invalid, and aborts if the reconfigure target is missing or the provided account does not match the entry.
         
         Returns:
-            A ConfigFlowResult directing the next step of the flow: showing the form with any errors, aborting with a specific reason, or updating and reloading the entry on successful reconfiguration.
+            ConfigFlowResult directing the next step of the flow: showing the reconfigure form with any errors, aborting with a specific reason, or updating and reloading the entry on successful reconfiguration.
         """
         try:
             entry = self._get_reconfigure_entry()

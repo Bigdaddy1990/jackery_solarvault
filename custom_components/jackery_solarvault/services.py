@@ -173,15 +173,15 @@ _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 
 def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     """
-    Extract the parent numeric Jackery device identifier by removing any subdevice suffix.
+    Return the parent numeric Jackery device identifier by removing any recognized subdevice suffix.
     
-    If the input does not begin with digits (or does not match the expected Jackery main-device pattern), the original `device_id` is returned unchanged.
+    If `device_id` matches the pattern `^(\d+)(?:_.+)?$`, returns the captured leading digits; otherwise returns `device_id` unchanged.
     
     Parameters:
-        device_id (str): A device identifier that may be a compound value like "12345_suffix".
+        device_id (str): Device identifier potentially containing a subdevice suffix.
     
     Returns:
-        str: The parent numeric device identifier (e.g., "12345") when a suffix is present, otherwise the original `device_id`.
+        str: Parent numeric device identifier when a suffix is present, otherwise the original input.
     """
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
@@ -216,9 +216,10 @@ def _coordinator_for_device(
     hass: HomeAssistant, device_id: str
 ) -> JackerySolarVaultCoordinator | None:
     """
-    Find the coordinator that manages the specified device id.
+    Locate the coordinator that manages the specified Jackery device id.
     
-    @returns JackerySolarVaultCoordinator for the matching device id, or `None` if no coordinator contains that device.
+    Returns:
+        JackerySolarVaultCoordinator for the matching device id, `None` if no coordinator is found.
     """
     for coordinator in _loaded_coordinators(hass):
         if device_id in (coordinator.data or {}):
@@ -230,10 +231,12 @@ def _coordinator_for_system(
     hass: HomeAssistant, system_id: str
 ) -> JackerySolarVaultCoordinator | None:
     """
-    Locate the loaded coordinator that manages the given Jackery system id.
+    Finds the loaded coordinator that manages the specified Jackery system id.
+    
+    Searches each loaded coordinator's payloads for a `system` object whose `id` or `system_id` (converted to string) equals the provided `system_id`.
     
     Returns:
-        The matching JackerySolarVaultCoordinator if a loaded coordinator contains a payload whose system `id` or `system_id` equals `system_id`, `None` if no match is found.
+        The matching JackerySolarVaultCoordinator if found, `None` otherwise.
     """
     for coordinator in _loaded_coordinators(hass):
         for payload in (coordinator.data or {}).values():
@@ -376,10 +379,10 @@ async def _async_handle_delete_storm_alert(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
     """
-    Delete a storm alert for the specified device using the coordinator responsible for that device.
+    Delete a storm alert for the specified Jackery device.
     
     Raises:
-        ServiceValidationError: If no coordinator owns the resolved device id or if the coordinator reports an error while deleting the alert.  
+        ServiceValidationError: If no coordinator owns the resolved device id, or if the coordinator reports an error while deleting the alert. The error includes translation placeholders `device_id`, `alert_id`, and `error`.
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()
@@ -413,12 +416,13 @@ async def _async_handle_set_third_party_mqtt_config(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
     """
-    Send an experimental third-party MQTT configuration to the coordinator for the resolved Jackery device.
+    Send a third-party MQTT configuration to the coordinator that owns the resolved Jackery device.
+    
+    Resolves the provided device identifier to a Jackery parent id, locates the owning coordinator, and forwards the requested MQTT configuration (enable, ip, port, username, password, token) to that coordinator. If no coordinator owns the resolved device id or the coordinator call fails, raises a ServiceValidationError with translation placeholders `device_id` and `error`.
     
     Parameters:
-        hass (HomeAssistant): Home Assistant instance (used to resolve device ownership).
-        call (ServiceCall): Service call containing the following data fields:
-            - SERVICE_FIELD_DEVICE_ID: device identifier string to resolve to a Jackery parent id.
+        call (ServiceCall): Service call whose `data` must include:
+            - SERVICE_FIELD_DEVICE_ID: device identifier string to resolve.
             - SERVICE_FIELD_ENABLE: boolean to enable or disable third-party MQTT.
             - SERVICE_FIELD_IP: IP address or hostname string.
             - SERVICE_FIELD_PORT: integer port number.
@@ -427,7 +431,7 @@ async def _async_handle_set_third_party_mqtt_config(
             - SERVICE_FIELD_TOKEN: optional token string (default "").
     
     Raises:
-        ServiceValidationError: If no loaded coordinator owns the resolved device id, or if applying the configuration fails for reasons such as communication, lookup, runtime, or value errors. The error includes translation placeholders `device_id` and `error`.
+        ServiceValidationError: If no loaded coordinator owns the resolved device id, or if applying the configuration fails. The error includes translation placeholders `device_id` and `error`.
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -559,9 +563,19 @@ async def _async_handle_send_device_schedule(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
     """
-    Send a DownloadDeviceSchedule (TIMER_TASK_ADD/DELETE/UPDATE/READ) frame to a Jackery device.
+    Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery device.
     
-    Accepts the schedule body as a dict or JSON string and an action_id; the function resolves the provided device identifier to the owning Jackery device and forwards the request to be sent. Raises ServiceValidationError when the device cannot be resolved or when validation/send errors occur.
+    Resolves the given device identifier to the owning Jackery device, validates/parses the provided schedule body (accepting a mapping or a JSON object string), and forwards the request to the coordinator's send routine.
+    
+    Parameters:
+        hass: Home Assistant core instance.
+        call: Service call containing:
+            - `device_id` (string): device identifier or HA device registry id to resolve.
+            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018).
+            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string.
+    
+    Raises:
+        ServiceValidationError: if the device cannot be resolved to a coordinator, if the body is invalid, or if sending the schedule fails.
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -640,17 +654,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_set_third_party_mqtt(call: ServiceCall) -> None:
             """
-            Dispatches a Home Assistant service call to the handler that sets third-party MQTT configuration for a Jackery device.
+            Forward a Home Assistant service call to the integration handler that sets a device's third-party MQTT configuration.
             
             Parameters:
-                call (ServiceCall): Service call matching SET_THIRD_PARTY_MQTT_SCHEMA containing at least:
-                    - device_id: the target device identifier (string)
-                    - enable: whether to enable third-party MQTT (bool)
-                    - ip: MQTT broker IP or hostname (string)
-                    - port: MQTT broker port (int)
-                    - username: optional MQTT username (string)
-                    - password: optional MQTT password (string)
-                    - token: optional authentication token (string)
+                call (ServiceCall): Service call data conforming to SET_THIRD_PARTY_MQTT_SCHEMA (must include `device_id`, `enable`, `ip`, and `port`; `username`, `password`, and `token` are optional).
             """
             await _async_handle_set_third_party_mqtt_config(hass, call)
 
@@ -701,12 +708,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
         async def _handle_send_device_schedule(call: ServiceCall) -> None:
             """
-            Handle a "send device schedule" service call for the integration.
-            
-            Processes the provided ServiceCall payload to send a device schedule frame to the targeted device. The call's data is expected to include the device identifier and the schedule payload fields (for example `device_id`, `action_id`, and `body`); validation and coordinator dispatch are performed by the integration's service handler.
+            Dispatches a "send device schedule" service call to the integration's internal handler.
             
             Parameters:
-                call (ServiceCall): The service call containing the schedule request and associated data.
+                call (ServiceCall): Service call containing `device_id`, `action_id`, and `body` for the schedule frame to send.
             """
             await _async_handle_send_device_schedule(hass, call)
 

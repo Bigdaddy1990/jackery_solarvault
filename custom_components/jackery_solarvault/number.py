@@ -143,10 +143,10 @@ async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """
-    Set the single-tariff electricity price for the specified device.
+    Set the single-tariff electricity price for a device.
     
     Parameters:
-        value (float): Price value expressed in the device's currency/unit.
+        value (float): Price expressed in the device's configured currency/unit.
     """
     await coord.async_set_single_price(dev_id, value)
 
@@ -350,7 +350,12 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return self.entity_description.native_unit_of_measurement
 
     def _allowed_values(self) -> tuple[float, ...]:
-        """Return exact values accepted by a discrete Jackery number."""
+        """
+        Get the discrete native values that this number entity allows.
+        
+        Returns:
+            tuple[float, ...]: Allowed native float values; an empty tuple if no discrete allowed-values constraint is defined.
+        """
         allowed = self.entity_description.allowed_values
         if allowed is None:
             return ()
@@ -360,9 +365,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """
-        Set the entity to the given native value on the device.
+        Write a native numeric value to the device after validating and transforming it.
         
-        Validates the provided value against the entity description's range and allowed discrete values, then (if a setter is configured) transforms and forwards the value to the device. Authentication failures from the setter are converted into ConfigEntryAuthFailed. If the setter raises a HomeAssistantError that already contains a translation key it is re-raised; otherwise the error is either raised as a translated action error or ignored depending on the description's `raise_on_setter_error` flag. The coordinator is requested to refresh after the setter attempt.
+        Validates the value against the description's min/max and discrete allowed values (if configured). If a setter is provided, the value is converted with the description's `value_transform` and forwarded to the setter. Authentication failures from the setter are converted into `ConfigEntryAuthFailed`. If a `HomeAssistantError` raised by the setter already contains a `translation_key`, it is re-raised; otherwise the error is either raised as a translated action error or ignored depending on `raise_on_setter_error`. Always requests a coordinator refresh after attempting the setter.
         
         Parameters:
             value (float): The native value to write to the device.

@@ -161,10 +161,10 @@ def parse_hex16(text: str) -> int:
 
 def hex_encode(data: bytes) -> str:
     """
-    Encode bytes to an uppercase hexadecimal string without separators or prefix.
+    Return an uppercase hexadecimal string of the given bytes with no separators or prefix.
     
     Returns:
-        Uppercase hex string of `data` with no separators or `0x` prefix.
+        Hexadecimal string using uppercase letters (A–F) representing `data`, with no separators or `0x` prefix.
     """
     return data.hex().upper()
 

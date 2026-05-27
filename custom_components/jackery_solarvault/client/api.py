@@ -176,7 +176,7 @@ def _aes_cbc_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
 
 def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
     """
-    Encrypts plaintext using RSA PKCS#1 v1.5 with the provided base64-encoded DER public key.
+    Encrypt `data` using RSA PKCS#1 v1.5 with a base64-encoded DER RSA public key.
     
     Parameters:
         data (bytes): Plaintext bytes to encrypt.
@@ -325,7 +325,14 @@ class JackeryApi:
         return _generate_udid(self._account)
 
     async def async_login(self) -> str:
-        """Encrypted login; stores the JWT session token."""
+        """
+        Perform the encrypted login flow and store session and MQTT credentials.
+        
+        This sends the encrypted login form to the backend, validates the response code, and stores the returned JWT token and MQTT-related fields on the client instance.
+        
+        Returns:
+            token (str): The JWT session token returned by the server.
+        """
         mac_id = self._resolve_login_mac_id()
         login_bean = {
             FIELD_ACCOUNT: self._account,
@@ -408,21 +415,18 @@ class JackeryApi:
 
     async def async_get_mqtt_credentials(self) -> dict[str, str]:
         """
-        Produce MQTT client credentials derived from the active login session.
-        
-        Validates and decodes the server-provided MQTT seed, then derives the MQTT
-        client identifier, username, and password according to the app protocol.
+        Derive MQTT client credentials from the active login session.
         
         Returns:
-            credentials (dict[str, str]): Dictionary containing:
+            dict[str, str]: Mapping with keys:
                 - `clientId`: MQTT client identifier.
                 - `username`: MQTT username.
-                - `password`: MQTT password (base64-encoded AES-CBC of the username).
-                - `userId`: underlying MQTT user id from the login response.
+                - `password`: MQTT password.
+                - `userId`: MQTT user id from the login response.
         
         Raises:
-            JackeryAuthError: If required MQTT fields are missing from the login
-                response, if the mqttPassWord value is invalid base64, or if the
+            JackeryAuthError: If the client is not logged in or the login response is missing
+                required MQTT fields, if `mqttPassWord` is not valid base64, or if the
                 decoded seed does not have the expected 32-byte length.
         """
         await self._ensure_token()
@@ -514,12 +518,12 @@ class JackeryApi:
         self, status: int, data: dict[str, Any] | Any
     ) -> bool:
         """
-        Detect whether a parsed response indicates the authentication token has expired.
+        Determine whether the parsed API response signals that the authentication token has expired.
         
-        Only inspects dict-shaped responses; returns `false` for non-dict data.
+        Only dict-shaped responses are inspected; non-dict responses always return False.
         
         Returns:
-            `true` if the response indicates token expiration, `false` otherwise.
+            True if the response indicates token expiration, False otherwise.
         """
         if not isinstance(data, dict):
             return False
@@ -662,14 +666,17 @@ class JackeryApi:
     @staticmethod
     def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
         """
-        Extract the response `FIELD_DATA` value and return it as a list of dict items.
+        Extract the list payload from a parsed API response.
+        
+        If the response's FIELD_DATA is a list, returns only the elements that are dictionary objects.
+        If FIELD_DATA is None, returns an empty list. For any other shape, logs a warning and returns an empty list.
         
         Parameters:
-            data (dict): Parsed JSON response containing `FIELD_DATA`.
+            data (dict): Parsed JSON response expected to contain FIELD_DATA.
             path (str): Request path used in warning messages when the payload shape is unexpected.
         
         Returns:
-            list[dict]: The items from `FIELD_DATA` that are dicts, or an empty list if `FIELD_DATA` is `None` or not a list.
+            list: The items from FIELD_DATA when it is a list (filtered to dict items), or an empty list otherwise.
         """
         payload = data.get(FIELD_DATA)
         if isinstance(payload, list):
@@ -881,7 +888,7 @@ class JackeryApi:
         """
         Retrieve the price history configuration for the specified system.
         
-        Stores the raw parsed response in `self.last_price_history_config_response`.
+        Stores the raw parsed API response in `self.last_price_history_config_response`.
         
         Returns:
             dict: The response `data` payload as a dict; returns an empty dict if the payload is missing or not a dict.
@@ -922,14 +929,14 @@ class JackeryApi:
         system_id: str | int | None = None,
     ) -> dict[str, Any]:
         """
-        Fetch device-period chart data for a specific device and date range.
+        Fetch period-based chart data for a specific device and date range.
         
-        The returned payload is the endpoint's `data` object normalized to a dict. It will include an `APP_REQUEST_META` entry (added when absent) containing the request parameters except for `deviceId` and `systemId` so callers can correlate the payload with the request range.
+        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
         
         Parameters:
             path (str): Endpoint path to query.
             device_id (str | int): Device identifier to request data for.
-            date_type (str): Period granularity (e.g., day/month/year).
+            date_type (str): Period granularity (e.g., day, month, year). `begin_date`/`end_date` are computed if omitted.
             begin_date (str | None): Start date for the period (computed if None).
             end_date (str | None): End date for the period (computed if None).
             system_id (str | int | None): Optional system identifier included in the request.
@@ -1070,10 +1077,10 @@ class JackeryApi:
         end_date: str | None = None,
     ) -> dict[str, Any]:
         """
-        Retrieve EPS (off-grid) in/out statistics for a device over a specified period.
+        Return EPS (off-grid) energy input/output statistics for a device for a specified period.
         
         Returns:
-            dict: Parsed payload containing totals (e.g., `totalInEpsEnergy`, `totalOutEpsEnergy`) and chart series such as `x`, `y`, `y1`, and `y2`.
+            dict: Payload containing aggregated totals (for example, `totalInEpsEnergy`, `totalOutEpsEnergy`), chart series arrays such as `x`, `y`, `y1`, and `y2`, and may include an `APP_REQUEST_META` entry with the request parameters used.
         """
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
@@ -1088,10 +1095,10 @@ class JackeryApi:
         Retrieve today's compact energy KPIs for a device.
         
         Parameters:
-            device_sn (str): Device serial number (sent as the `deviceSn` query parameter).
+            device_sn (str): Device serial number; sent as the `deviceSn` query parameter.
         
         Returns:
-            response (dict): Parsed JSON response containing KPI fields such as `de` (feed-in), `dg` (grid import), `dh` (home load), and `ds` (battery energy).
+            dict: Parsed JSON response containing KPI fields such as `de` (feed-in), `dg` (grid import), `dh` (home load), and `ds` (battery energy).
         """
         return await self._get_json(
             DEVICE_TODAY_ENERGY_PATH,
@@ -1103,13 +1110,13 @@ class JackeryApi:
         device_id: str | int,
     ) -> dict[str, Any]:
         """
-        Retrieve Smart-Meter (CT accessory) panel totals for the specified device.
+        Retrieve the Smart-Meter (CT accessory) panel totals for the given device.
         
         Parameters:
-            device_id (str | int): Smart-Meter / CT accessory deviceId (not the SolarVault main deviceId).
+            device_id: Smart-Meter / CT accessory deviceId (not the SolarVault main deviceId).
         
         Returns:
-            dict: Parsed payload dictionary containing the panel totals returned by the device meter statistics endpoint.
+            A dictionary containing the parsed payload with the meter panel totals from the device meter statistics endpoint.
         """
         data = await self._get_json(
             DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -1150,10 +1157,12 @@ class JackeryApi:
         end_date: str | None = None,
     ) -> dict[str, Any]:
         """
-        Retrieve socket-chart statistics for the given device.
+        Retrieve socket-chart statistics for a device over a specified period.
+        
+        If the returned payload is non-empty, it will include `APP_REQUEST_META` containing the request parameters (`dateType`, `beginDate`, `endDate`) used to produce the chart (excluding `deviceId`/`systemId`).
         
         Returns:
-            dict: The normalized `data` payload for the device socket chart. May include request metadata under `APP_REQUEST_META`.
+            dict: The normalized `data` payload for the device socket chart.
         """
         return await self._async_get_device_period_stat(
             DEVICE_SOCKET_STAT_PATH,
@@ -1165,15 +1174,15 @@ class JackeryApi:
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
         """
-        Retrieve sub-battery pack status for the given device serial number.
+        Return a normalized list of battery pack dictionaries for the given device serial number.
         
-        Handles multiple backend response shapes and normalizes them to a list of pack objects (each a dict). The raw parsed response is stored in `self.last_battery_pack_responses[device_sn]`.
+        Handles multiple backend response shapes and normalizes them into a list of pack objects. The raw parsed API response is stored in self.last_battery_pack_responses[device_sn].
         
         Parameters:
             device_sn (str): Device serial number to query.
         
         Returns:
-            list[dict]: A list of battery pack dictionaries extracted from the response; returns an empty list if no packs are found or the response shape is unrecognized.
+            list[dict]: Battery pack dictionaries extracted from the response; empty list if no packs are found or the response shape is unrecognized.
         """
         data = await self._get_json(
             BATTERY_PACK_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
@@ -1319,7 +1328,12 @@ class JackeryApi:
         return {}
 
     async def async_get_location(self, device_id: str | int) -> dict:
-        """GET /v1/device/location — GPS coordinates set by the user."""
+        """
+        Retrieve GPS coordinates previously set by the user for the given device.
+        
+        Returns:
+            dict: The API payload's `data` object as a dict containing location fields (e.g., latitude/longitude); returns an empty dict if the payload is missing or not a dict.
+        """
         data = await self._get_json(
             LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -1329,12 +1343,12 @@ class JackeryApi:
     # --- HTTP write endpoints documented in PROTOCOL.md §2 --------------
     async def _put_json(self, path: str, payload: dict) -> dict:
         """
-        Send a JSON PUT request to the given API path, ensuring a valid auth token and retrying once after re-login if the token is expired.
+        Send a JSON PUT to the API path, ensuring a valid auth token and retrying once after re-login if the token has expired.
         
-        Ensures a token is available, performs the PUT with a JSON body, and validates the result: re-logins and retries once on token-expired responses, raises on authorization failures, non-200 HTTP status, or non-OK backend `code`, and emits a debug payload for the request/response. If the response body is not valid JSON, the returned dict will contain `FIELD_RAW_TEXT` with truncated raw text.
+        If the response body cannot be parsed as JSON, the returned dict will contain `FIELD_RAW_TEXT` with truncated raw text.
         
         Returns:
-            dict: The parsed response JSON (or a dict containing `FIELD_RAW_TEXT` when JSON parsing failed).
+            dict: The parsed response JSON, or a dict containing `FIELD_RAW_TEXT` when JSON parsing failed.
         
         Raises:
             JackeryAuthError: When the response indicates an authorization/authentication failure.
@@ -1444,14 +1458,14 @@ class JackeryApi:
 
     async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
         """
-        Send a form-urlencoded POST to the Jackery API and return the parsed JSON response, retrying once after automatic re-login if the token is expired.
+        Send a form-urlencoded POST to the Jackery API, retrying once after automatic re-login if the token is expired.
         
         Parameters:
             path (str): API endpoint path appended to the base URL.
             fields (dict[str, Any]): Form fields to send; all values will be converted to strings.
         
         Returns:
-            dict: The parsed JSON response, or a dict containing raw truncated text under `FIELD_RAW_TEXT` if JSON decoding fails.
+            dict: Parsed JSON response from the API, or a dict containing raw truncated text under `FIELD_RAW_TEXT` if JSON decoding fails.
         
         Raises:
             JackeryApiError: On network/timeout failures, non-200 HTTP status, or when the response `code` indicates an error.
@@ -1533,15 +1547,14 @@ class JackeryApi:
 
     async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
         """
-        Set the device's maximum power using the experimental max-power endpoint.
-        
-        Sends a form-urlencoded request with `maxPower` and `deviceId`. This endpoint is experimental and may behave like a recorded history entry rather than an immediate live setter.
+        Set the device's maximum allowed power via the experimental max-power endpoint.
         
         Parameters:
-            max_power (int): Non-negative integer value for the maximum power; a negative or non-integer value raises `JackeryApiError`.
+            device_id (str | int): Device identifier (serial or numeric id) used by the backend.
+            max_power (int): Desired maximum power in watts; must be an integer greater than or equal to 0.
         
         Returns:
-            bool: `true` if the backend acknowledged success (truthy response `FIELD_DATA`), `false` otherwise.
+            bool: `True` if the backend acknowledged success (truthy `FIELD_DATA`), `False` otherwise.
         
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
@@ -1605,12 +1618,12 @@ class JackeryApi:
         Enable or update dynamic pricing mode for a system.
         
         Parameters:
-            system_id (str | int): Identifier of the target system.
-            platform_company_id (int): Numeric platform company identifier required by the API.
-            system_region (str): Region code for the system; must be a non-empty string.
+            system_id: Identifier of the target system.
+            platform_company_id: Numeric platform company identifier required by the API.
+            system_region: Region code for the system; must be a non-empty string.
         
         Returns:
-            bool: `True` if the server accepted the change, `False` otherwise.
+            `true` if the server accepted the change, `false` otherwise.
         
         Raises:
             JackeryApiError: If `system_region` is empty.
@@ -1631,12 +1644,12 @@ class JackeryApi:
     # --- legacy fallback ----------------------------------------------------
     async def async_list_devices_legacy(self) -> list[dict[str, Any]]:
         """
-        Fetch the legacy device bind list used by Explorer-series devices.
+        Fetches the legacy device bind list used by Explorer-series devices.
         
-        This is a best-effort fallback to the /v1/device/bind/list endpoint. Authentication failures are propagated so callers can trigger re-authentication; other API errors are swallowed and result in an empty list.
+        Propagates authentication failures so callers can handle re-authentication; for other API errors returns an empty list.
         
         Returns:
-            list[dict]: A list of device objects parsed from the response, or an empty list if a non-auth JackeryError occurred.
+            list[dict[str, Any]]: Device objects parsed from the response, or an empty list if a non-auth `JackeryError` occurred.
         """
         try:
             data = await self._get_json(DEVICE_LIST_PATH)

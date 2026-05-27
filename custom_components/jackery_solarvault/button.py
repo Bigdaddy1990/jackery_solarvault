@@ -30,31 +30,38 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """
-    Create and register reboot button entities for devices in the given config entry.
+    Set up and register reboot Button entities for devices in the config entry.
     
-    This sets up Button entities that trigger a device reboot when pressed. It only creates a reboot button for a device when the coordinator reports that the device supports advanced features or when the device payload contains the reboot field. Duplicate entities are avoided; on subsequent coordinator updates a signature of coordinator.data is computed and entities are only re-collected and added when that signature changes. A listener is registered to keep entities in sync with coordinator updates.
+    Creates a JackeryRebootButton for each coordinator-managed device that either reports support for advanced features or exposes the reboot property, avoids registering duplicate entities, and registers a coordinator listener to add new entities only when the coordinator-derived device signature changes.
     
     Parameters:
         hass (HomeAssistant): Home Assistant instance.
         entry (JackeryConfigEntry): Config entry whose runtime_data contains the integration coordinator.
-        async_add_entities (AddEntitiesCallback): Callback used to register new ButtonEntity instances with Home Assistant.
+        async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity instances with Home Assistant.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
+        """
+        Append a button entity to a collection if its unique ID has not been seen and record it to prevent duplicates.
+        
+        Parameters:
+            entities (list[ButtonEntity]): The list to which the entity will be appended if unique.
+            entity (ButtonEntity): The button entity to append.
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
         )
 
     def _collect_entities() -> list[ButtonEntity]:
         """
-        Collects reboot button entities for coordinator-managed devices.
+        Collect reboot button entities for devices managed by the coordinator.
         
-        Scans the coordinator data and creates a JackeryRebootButton for each device that either supports advanced features or exposes the reboot property. Duplicate entities are omitted.
+        Creates a JackeryRebootButton for each device that either supports advanced features or exposes the reboot property and omits duplicates.
         
         Returns:
-            list[ButtonEntity]: List of unique reboot button entities for eligible devices.
+            list[ButtonEntity]: A list of unique reboot button entities for devices that support advanced features or provide the reboot property.
         """
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -67,9 +74,9 @@ async def async_setup_entry(
 
     def _add_new_entities() -> None:
         """
-        Add new button entities to Home Assistant when the coordinator's device signature changes.
+        Detect changes in the coordinator's device signature and register any newly discovered button entities.
         
-        Checks a signature derived from `coordinator.data` against the last seen signature; if different, collects entities with `_collect_entities()` and registers them via `async_add_entities`.
+        If the computed signature differs from the last seen signature, update the cached signature, collect entities via `_collect_entities()`, and call `async_add_entities` with any discovered entities.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

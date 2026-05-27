@@ -25,7 +25,18 @@ TARGET = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _is_typeddict_base(base: ast.expr) -> bool:
-    """Return True if the base class expression looks like TypedDict."""
+    """
+    Detects whether an AST expression represents a TypedDict base class.
+    
+    Recognizes unqualified `TypedDict`, attribute-qualified forms (e.g., `typing.TypedDict`),
+    and subscripted forms (e.g., `TypedDict[...]`).
+    
+    Parameters:
+        base (ast.expr): AST node representing a base class expression.
+    
+    Returns:
+        True if the expression represents a `TypedDict` base, False otherwise.
+    """
     if isinstance(base, ast.Name):
         return base.id == "TypedDict"
     if isinstance(base, ast.Attribute):
@@ -36,12 +47,39 @@ def _is_typeddict_base(base: ast.expr) -> bool:
 
 
 def _iter_py_files(path: Path) -> list[Path]:
+    """
+    Collect Python files under the given directory, excluding any located in `__pycache__` directories.
+    
+    Parameters:
+        path (Path): Root directory to search.
+    
+    Returns:
+        list[Path]: List of `.py` file paths found under `path`, excluding files in `__pycache__` path components.
+    """
     return [
         p for p in path.rglob("*.py") if p.is_file() and "__pycache__" not in p.parts
     ]
 
 
 def _audit_file(path: Path) -> list[str]:
+    """
+    Audit a Python file for TypedDict structure issues.
+    
+    Parse the file at `path` and report TypedDict-related problems found in its AST:
+    - classes that inherit from `TypedDict` but contain no annotated fields,
+    - annotated assignments within those classes that lack an annotation.
+    
+    Parameters:
+        path (Path): Path to the Python source file to audit.
+    
+    Returns:
+        list[str]: A list of error messages found in the file (empty if none).
+            - On a syntax error while parsing, returns a single string formatted as
+              "{path}: SyntaxError: {err}".
+            - For TypedDict issues, messages are formatted like
+              "{path}:{lineno} TypedDict '<Name>' has no annotated fields" or
+              "{path}:{lineno} TypedDict '<Name>' field missing annotation".
+    """
     errors: list[str] = []
 
     try:
@@ -75,6 +113,14 @@ def _audit_file(path: Path) -> list[str]:
 
 
 def main() -> int:  # noqa: D103
+    """
+    Run the TypedDict audit for the configured target directory and return a process exit code.
+    
+    Prints detailed error lines and a failure summary when issues are found, or a success message when none are found. If the target path does not exist, prints a message and treats that as a failure.
+    
+    Returns:
+        int: Exit code — `0` when the audit passes, `1` when the target is missing or any errors are detected.
+    """
     if not TARGET.exists():
         print(f"TypedDict audit: target path not found: {TARGET}")
         return 1

@@ -130,12 +130,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         """
-        Build DeviceInfo metadata for this entity's device for the device registry.
+        Builds the DeviceInfo for this entity's parent device.
         
-        Name is chosen from system.device_name, discovery.device_name, properties.wname, or a fallback of "Jackery {device_id}". Model is taken from discovery.dev_model, device_meta.model_name, or "SolarVault". The serial number and software version are populated from device metadata or discovery/ota payloads when available.
+        Selects the device display name from system.device_name, discovery.device_name, properties.wname, or falls back to "Jackery {device_id}". Selects the model from discovery.dev_model, device_meta.model_name, or falls back to "SolarVault". If present, includes the device serial number (from device metadata or discovery) and the software version (from OTA data).
         
         Returns:
-            DeviceInfo: A DeviceInfo object containing identifiers, manufacturer, name, model, serial_number, and sw_version.
+            DeviceInfo: DeviceInfo with identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version.
         """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
@@ -214,9 +214,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def available(self) -> bool:
         """
-        Determine whether this entity is currently available.
+        Determine if the entity is currently available.
         
-        Checks the parent coordinator's availability, then evaluates device-specific online status fields (device metadata then system state). If an explicit online state can be parsed, that value is used; otherwise availability falls back to whether the entity's device ID exists in the coordinator data.
+        Availability is derived from the parent coordinator and, when present, the device's online status fields (device metadata then system state); a parsed explicit online state takes precedence. If no explicit state is available, availability falls back to whether the device ID exists in the coordinator data.
         
         Returns:
             `true` if the entity is available, `false` otherwise.

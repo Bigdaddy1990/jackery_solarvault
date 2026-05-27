@@ -17,10 +17,11 @@ _KEY_DEVICE_INDEX: Final = "device_index"
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """
-    Get the Home Assistant Store configured for persistent discovery metadata.
+    Return a Store configured to persist this integration's discovery cache.
     
+    The returned Store is configured with the module's storage key and version so callers can load and save discovery metadata.
     Returns:
-        Store[dict[str, Any]]: A Store instance used to persist the discovery cache.
+        Store[dict[str, Any]]: Store instance for persisting the discovery cache.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
@@ -29,10 +30,12 @@ async def async_load_discovery_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
     """
-    Retrieve the cached device-index for the given config entry from persistent storage.
+    Retrieve the cached device index for the specified config entry from persistent storage.
+    
+    If the stored payload is missing or does not match the expected nested structure, an empty dict is returned.
     
     Returns:
-        dict[str, dict[str, Any]]: Mapping from device ID (as `str`) to a shallow copy of the stored metadata dict for each device. Returns an empty dict if no valid cache exists or stored data is malformed.
+        Mapping of device ID (as `str`) to a shallow copy of the stored metadata `dict` for each device. Returns an empty dict if no valid cache exists.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):

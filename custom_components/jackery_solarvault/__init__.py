@@ -190,10 +190,10 @@ def _local_mqtt_client(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """
-    Get the stored local MQTT client for the given config entry, if present.
+    Retrieve the per-entry local MQTT client stored in hass.data for the given config entry.
     
     Returns:
-        JackeryLocalMqttClient | None: The stored `JackeryLocalMqttClient` instance for the entry, or `None` if no client is stored or the stored value is not a `JackeryLocalMqttClient`.
+        The stored `JackeryLocalMqttClient` instance for the entry, or `None` if no client is stored or the stored value is not a `JackeryLocalMqttClient`.
     """
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
@@ -206,9 +206,9 @@ async def _async_start_local_mqtt(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """
-    Start an optional local MQTT listener for the given config entry.
+    Start a configured local MQTT listener for the given config entry.
     
-    If the third-party MQTT bridge option is disabled or the configured host is empty, this function returns without action. When started, the listener is created and stored in hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY], and an unload callback is registered to stop the client and remove that reference. Exceptions raised while stopping the client are suppressed. Failures to start or run the local MQTT client do not block overall integration setup.
+    If the third-party MQTT option is disabled or the configured host is empty, this function does nothing. When started, the listener is stored at hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY] and an unload callback is registered that stops the client and removes that runtime reference if it still matches. Exceptions raised while stopping the client are suppressed. Failures to start or run the local MQTT client do not block overall integration setup.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -241,7 +241,7 @@ async def _async_start_local_mqtt(
         """
         Stop the local MQTT client and remove its runtime reference from hass.data if it matches the stored instance.
         
-        Stops the provided local MQTT client while suppressing any exceptions raised during shutdown. If the client instance is still stored under hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY], that reference is removed.
+        Suppresses exceptions raised during client shutdown. If hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY] still refers to the same client instance, that runtime key is removed.
         """
         with contextlib.suppress(Exception):
             await client.async_stop()
@@ -255,9 +255,9 @@ async def _async_start_local_mqtt(
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """
-    Initialize the integration for a Jackery SolarVault config entry.
+    Set up a Jackery SolarVault config entry and start its coordinator and optional transports.
     
-    Performs authentication, constructs and starts the coordinator (including optional cloud and local MQTT listeners and BLE transport), forwards platform setup, registers the entry update/unload handlers, and stores runtime coordinator state on success.
+    Authenticates the account, constructs and starts the integration coordinator (including discovery, initial refresh, cloud MQTT, optional local MQTT listener, and optional BLE transport), forwards platform setup, registers update/unload listeners, and stores the coordinator on the entry's runtime state. If setup fails after the coordinator is created, the coordinator is shut down and the entry's runtime state is cleared before the error is re-raised.
     
     Returns:
         True if setup completed successfully.
@@ -412,15 +412,15 @@ def _async_remove_entities_with_suffixes(
     log_label: str,
 ) -> None:
     """
-    Remove entities owned by the given config entry whose registry unique IDs end with any of the provided suffixes.
+    Remove entity-registry entries for the given config entry in a specific domain whose legacy unique IDs match any of the provided suffixes.
     
-    Matching is anchored using the legacy UID shape so suffixes only match intended legacy keys and do not accidentally match other unique IDs.
+    Matching is anchored to the legacy unique-id shape so suffixes only match intended legacy keys and do not accidentally match other unique IDs.
     
     Parameters:
         hass (HomeAssistant): Home Assistant instance.
         entry (JackeryConfigEntry): Config entry whose entities may be removed.
         domain (str): Entity domain to restrict removals (e.g., "sensor", "binary_sensor").
-        suffixes (Iterable[str]): Suffix strings to match against entity unique IDs.
+        suffixes (Iterable[str]): Suffix strings to match against entity unique IDs; empty iterables are ignored.
         log_label (str): Human-readable label used in removal log messages.
     """
     suffix_tuple = tuple(suffixes)
@@ -455,10 +455,12 @@ async def _async_update_listener(
 
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """
-    Unload the config entry by unloading its platforms, shutting down the coordinator if active, and clearing the entry's runtime data.
+    Unload the config entry and tear down its runtime resources.
+    
+    If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime data so the coordinator cannot be retained by stray references.
     
     Returns:
-        bool: True if platforms were unloaded and teardown completed, False if platform unload aborted.
+        True if platforms were unloaded and runtime teardown completed, False if platform unload was aborted.
     """
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

@@ -222,10 +222,10 @@ class JackeryBleListener:
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """
-        Get the cached BLE MAC address for the given device id.
+        Retrieve the cached BLE MAC address for the given device id.
         
         Returns:
-            str | None: MAC address associated with the device id, or `None` if no cached address exists.
+            The MAC address string for the device, or `None` if no cached address exists.
         """
         return self._device_addresses.get(device_id)
 
@@ -345,15 +345,14 @@ class JackeryBleListener:
             timeout_sec (float): Per-GATT-write timeout in seconds.
             wait_for_ack (bool): If True, wait for a matching decoded notify frame before returning.
             ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is True.
-            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted any decoded frame from the same device within the window counts.
+            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted, any decoded frame from the same device within the window qualifies.
             mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU (used for tests/diagnostics).
         
         Returns:
             bool: `True` if the GATT write completed (and, when requested, a matching ACK was received); `False` if no active BLE client exists for the device.
         
         Raises:
-            ValueError: For malformed inputs (e.g., body cannot be chunked for the selected MTU).
-            RuntimeError: For GATT-layer failures or when an ACK wait times out.
+            RuntimeError: When the payload cannot be chunked for the selected MTU, on GATT-layer failures (including write timeouts), or when an ACK wait times out.
         """
         client = self._clients.get(device_id)
         if client is None:
@@ -530,10 +529,10 @@ class JackeryBleListener:
 
     async def async_start(self, device_ids: list[str]) -> None:
         """
-        Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners on first matching advertisement.
+        Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners when a matching advertisement is observed.
         
         Parameters:
-            device_ids (list[str]): Device IDs to monitor for advertisements; a background connection task will be started lazily when an advertisement matching a monitored device is seen.
+            device_ids (list[str]): Device IDs to monitor; a background connection task will be created lazily for a device the first time an advertisement matching the listener's BLE matcher is seen.
         """
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
@@ -572,12 +571,10 @@ class JackeryBleListener:
         )
 
     async def async_stop(self) -> None:
-        """Shut the listener down. Safe to call from coordinator unload.
-
-        Uses a hard timeout on the gather so a stuck GATT disconnect or
-        radio hang cannot block HA shutdown beyond ``_STOP_TIMEOUT_SEC``.
-        Any task that misses the timeout is left to be reaped by the
-        event-loop during interpreter teardown.
+        """
+        Stop the BLE listener and clean up resources.
+        
+        Sets the internal stop event, unregisters Home Assistant bluetooth callbacks, cancels running connection tasks and awaits their termination up to _STOP_TIMEOUT_SEC (tasks that do not exit within the timeout are left to the event loop), clears connection state, cancels any pending ACK futures to prevent awaiting writers from hanging, and logs listener shutdown.
         """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
@@ -652,23 +649,13 @@ class JackeryBleListener:
         self,
         service_info: BluetoothServiceInfoBleak,
     ) -> str | None:
-        """Match an advertisement to a Jackery device id and cache the MAC.
-
-        Resolution order:
-
-        1. If we already cached a ``device_id → MAC`` mapping for this
-           address, reuse it.
-        2. Decode the ASCII serial from the manufacturer-data block under
-           company id 0x4802 (verified against
-           :data:`.ble.BLE_MANUFACTURER_ID`).
-        3. Hand the serial to the coordinator-supplied
-           ``serial_resolver`` which maps the BLE serial back to the
-           Jackery numeric device id (the BLE serial is typically the
-           HTTP serial without its leading model letter, e.g.
-           ``HR2C04000280HH3`` → ``R2C04000280HH3``).
-        4. On match, cache ``device_id → MAC`` so future advertisements
-           skip steps 2-3 and the coordinator's
-           ``_ble_address_for_device`` lookup returns the right value.
+        """
+        Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE MAC address.
+        
+        If the advertisement corresponds to a device the integration knows about, the function records device_id -> address in the internal cache on first match so future advertisements skip resolution. It returns the mapped device id when found, or `None` if no mapping could be determined.
+         
+        Returns:
+            `device_id` if the advertisement maps to a known device, `None` otherwise.
         """
         address = service_info.address
         # Step 1: address cache hit.
@@ -712,7 +699,7 @@ class JackeryBleListener:
         """
         Maintain a persistent GATT session for the given device, subscribing to notifications and reconnecting on link loss.
         
-        Runs until the listener is stopped or the task is cancelled. On successful connection the live Bleak client is published to the instance so writers may use the session, a notification callback is registered and a keep-alive task is started; on disconnect the session is torn down, stats are updated, and the method backs off and retries. The method re-raises asyncio.CancelledError to allow clean shutdown.
+        On a successful connection the live Bleak client is published for writers, a notify callback is registered and a keep-alive task is started; on disconnect the session is torn down, statistics are updated, and the method waits and retries until the listener is stopped or the task is cancelled.
         
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
@@ -927,13 +914,14 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """Decrypt + parse a 0xEE02 notify frame and forward it to the sink.
-
-        The wire format is the live-captured binary layout documented in
-        :func:`.ble.decrypt_binary_notify` (``iv || ciphertext`` containing
-        a DFED-prefixed binary header + body + 4-byte trailer). Both the
-        raw bytes and the decoded :class:`.ble.BleBinaryFrame` are emitted
-        so the diagnostics surface can still help if decode fails.
+        """
+        Decrypt and parse a received BLE notify frame and forward a unified observation to the configured sink.
+        
+        Attempts to decrypt `raw` using the per-device AES `bluetoothKey` resolved from the coordinator; if decryption fails the function will try a single base64-decoded fallback and records a human-readable `decode_error` when no valid frame can be produced. Regardless of decode success, a BleFrameObservation containing the original bytes, base64 representation, parsed frame (or `None`) and any decode error is created and sent to the instance's async sink. The function also updates per-device stats, resolves any pending ACK waiters when a frame is successfully parsed, and logs diagnostic messages.
+        
+        Parameters:
+            device_id (str): Integration device identifier for the source peripheral.
+            raw (bytes): Raw notify payload received from the BLE characteristic (wire-format bytes).
         """
         stats = self.stats_for(device_id)
         stats.frames_received += 1

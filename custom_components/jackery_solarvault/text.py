@@ -37,11 +37,24 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the platform from a config entry."""
+    """
+    Set up text entities for renaming Jackery system devices from a config entry.
+    
+    Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
+        """
+        Append a TextEntity to the provided list if its unique identifier has not been registered.
+        
+        Modifies the `entities` list by appending `entity` when its unique id is new, and records that id to prevent duplicate entities from being added.
+        
+        Parameters:
+            entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
+            entity (TextEntity): Candidate text entity to append.
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="text", logger=_LOGGER
         )
@@ -50,10 +63,10 @@ async def async_setup_entry(
         """
         Collect text entities for devices that expose a system identifier.
         
-        Scans the coordinator's data payloads and creates a JackerySystemNameText entity for each device whose system object contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
+        Creates a JackerySystemNameText for each entry in the coordinator data whose system object contains `FIELD_ID` or `FIELD_SYSTEM_ID`.
         
         Returns:
-            list[TextEntity]: A list of text entities to add for renaming device systems.
+            list[TextEntity]: Created text entities for renaming device systems.
         """
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -67,9 +80,9 @@ async def async_setup_entry(
 
     def _add_new_entities() -> None:
         """
-        Add new text entities when the coordinator's data signature has changed.
+        Add newly discovered text entities when the coordinator's data changes.
         
-        Compares the current signature of coordinator.data with the last seen signature; if different, collects new entities and registers them with async_add_entities.
+        Checks the current signature of the coordinator data against the last seen signature; if different, collect entities and register them with `async_add_entities`, and update the stored signature.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
@@ -102,7 +115,12 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the entity's current value."""
+        """
+        Return the current editable system name for the device.
+        
+        Returns:
+            The system's editable label if present, otherwise the device's product name, or None if neither is available.
+        """
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
