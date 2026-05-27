@@ -292,8 +292,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
-                _async_start_local_mqtt(hass, entry),
                 return_exceptions=True,
+            await _async_push_third_party_mqtt_config(coordinator, host, port, username, password)
             ),
         )
         if isinstance(refresh_result, BaseException):
