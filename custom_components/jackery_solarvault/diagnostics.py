@@ -50,7 +50,7 @@ def _redacted_payload_map(
         if isinstance(payload, dict):
             redacted[label] = async_redact_data(payload, redact_keys)
         else:
-            redacted[label] = async_redact_data({"value": payload}, redact_keys)
+            redacted[label] = async_redact_data({'value': payload}, redact_keys)
     return redacted
 
 
@@ -63,91 +63,91 @@ async def async_get_config_entry_diagnostics(
     redactions_disabled = diagnostic_redactions_disabled(entry)
     if redactions_disabled:
         source = (
-            "JACKERY_DEV_MODE=1"
+            'JACKERY_DEV_MODE=1'
             if dev_mode_redactions_disabled()
-            else "enable_unredacted_diagnostics option"
+            else 'enable_unredacted_diagnostics option'
         )
         _LOGGER.warning(
-            "Jackery diagnostics export is running with %s - "
-            "credentials, serial numbers and the bluetoothKey are included "
-            "unredacted. Do NOT share this export publicly.",
+            'Jackery diagnostics export is running with %s - '
+            'credentials, serial numbers and the bluetoothKey are included '
+            'unredacted. Do NOT share this export publicly.',
             source,
         )
 
-    devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)
+    devices = _redacted_payload_map(coordinator.data or {}, 'device', redact_keys)
 
     raw = {
-        "coordinator": {
-            "update_interval_seconds": (
+        'coordinator': {
+            'update_interval_seconds': (
                 int(coordinator.configured_update_interval.total_seconds())
             ),
-            "coordinator_polling": True,
-            "dev_mode": dev_mode_redactions_disabled(),
-            "redactions_disabled": redactions_disabled,
+            'coordinator_polling': True,
+            'dev_mode': dev_mode_redactions_disabled(),
+            'redactions_disabled': redactions_disabled,
         },
-        "login_response": async_redact_data(
+        'login_response': async_redact_data(
             coordinator.api.last_login_response or {}, redact_keys
         ),
-        "system_list_response": async_redact_data(
+        'system_list_response': async_redact_data(
             coordinator.api.last_system_list_response or {}, redact_keys
         ),
-        "property_responses": _redacted_payload_map(
-            coordinator.api.last_property_responses, "property_response", redact_keys
+        'property_responses': _redacted_payload_map(
+            coordinator.api.last_property_responses, 'property_response', redact_keys
         ),
-        "alarm_response": async_redact_data(
+        'alarm_response': async_redact_data(
             coordinator.api.last_alarm_response or {}, redact_keys
         ),
-        "statistic_response": async_redact_data(
+        'statistic_response': async_redact_data(
             coordinator.api.last_statistic_response or {}, redact_keys
         ),
-        "price_response": async_redact_data(
+        'price_response': async_redact_data(
             coordinator.api.last_price_response or {}, redact_keys
         ),
-        "price_sources_response": async_redact_data(
+        'price_sources_response': async_redact_data(
             coordinator.api.last_price_sources_response or {}, redact_keys
         ),
-        "price_history_config_response": async_redact_data(
+        'price_history_config_response': async_redact_data(
             coordinator.api.last_price_history_config_response or {}, redact_keys
         ),
-        "device_statistic_responses": _redacted_payload_map(
+        'device_statistic_responses': _redacted_payload_map(
             coordinator.api.last_device_statistic_responses,
-            "device_statistic_response",
+            'device_statistic_response',
             redact_keys,
         ),
-        "device_period_stat_responses": _redacted_payload_map(
+        'device_period_stat_responses': _redacted_payload_map(
             coordinator.api.last_device_period_stat_responses,
-            "device_period_stat_response",
+            'device_period_stat_response',
             redact_keys,
         ),
-        "battery_pack_responses": _redacted_payload_map(
+        'battery_pack_responses': _redacted_payload_map(
             coordinator.api.last_battery_pack_responses,
-            "battery_pack_response",
+            'battery_pack_response',
             redact_keys,
         ),
-        "ota_responses": _redacted_payload_map(
-            coordinator.api.last_ota_responses, "ota_response", redact_keys
+        'ota_responses': _redacted_payload_map(
+            coordinator.api.last_ota_responses, 'ota_response', redact_keys
         ),
-        "location_responses": _redacted_payload_map(
-            coordinator.api.last_location_responses, "location_response", redact_keys
+        'location_responses': _redacted_payload_map(
+            coordinator.api.last_location_responses, 'location_response', redact_keys
         ),
-        "mqtt": async_redact_data(
+        'mqtt': async_redact_data(
             coordinator.mqtt_diagnostics_snapshot(
                 redact_topics=not redactions_disabled
             ),
             redact_keys,
         ),
-        "ble_transport": _redacted_payload_map(
-            coordinator.ble_observations(), "ble_device", redact_keys
+        'ble_transport': _redacted_payload_map(
+            coordinator.ble_observations(), 'ble_device', redact_keys
         ),
-        "statistics_backfill": async_redact_data(
+        'statistics_backfill': async_redact_data(
             coordinator.statistics_backfill_diagnostics,
             redact_keys,
         ),
     }
 
     return {
-        "entry_data": async_redact_data(dict(entry.data), redact_keys),
-        "options": async_redact_data(dict(entry.options), redact_keys),
-        "devices": devices,
-        "raw_api": raw,
+        'entry_data': async_redact_data(dict(entry.data), redact_keys),
+        'options': async_redact_data(dict(entry.options), redact_keys),
+        'devices': devices,
+        'raw_api': raw,
     }
