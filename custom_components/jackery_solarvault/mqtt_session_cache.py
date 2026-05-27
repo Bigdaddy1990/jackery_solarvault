@@ -14,8 +14,6 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from __future__ import annotations
-
 from typing import Any, Final
 
 from homeassistant.core import HomeAssistant
@@ -31,8 +29,8 @@ from .const import (
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
-_KEY_ENTRIES: Final = "entries"
-_KEY_CACHED_AT: Final = "cached_at"
+_KEY_ENTRIES: Final = 'entries'
+_KEY_CACHED_AT: Final = 'cached_at'
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
