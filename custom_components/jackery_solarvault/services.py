@@ -35,6 +35,7 @@ from .const import (
     PAYLOAD_SYSTEM,
     SERVICE_DELETE_STORM_ALERT,
     SERVICE_FIELD_ACK_TIMEOUT,
+    SERVICE_FIELD_ACTION_ID,
     SERVICE_FIELD_ALERT_ID,
     SERVICE_FIELD_BODY,
     SERVICE_FIELD_CMD,
@@ -55,6 +56,7 @@ from .const import (
     SERVICE_REFRESH_WEATHER_PLAN,
     SERVICE_RENAME_SYSTEM,
     SERVICE_SEND_BLE_COMMAND,
+    SERVICE_SEND_DEVICE_SCHEDULE,
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
 )
 from .coordinator import JackerySolarVaultCoordinator
@@ -128,6 +130,13 @@ SEND_BLE_COMMAND_SCHEMA = vol.Schema({
     vol.Optional(SERVICE_FIELD_ACK_TIMEOUT, default=5.0): vol.All(
         vol.Coerce(float), vol.Range(min=0.5, max=60.0)
     ),
+})
+SEND_DEVICE_SCHEDULE_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
+    vol.Required(SERVICE_FIELD_ACTION_ID): vol.All(
+        vol.Coerce(int), vol.In((3015, 3016, 3017, 3018))
+    ),
+    vol.Required(SERVICE_FIELD_BODY): vol.Any(dict, cv.string),
 })
 
 
@@ -466,6 +475,41 @@ async def _async_handle_send_ble_command(
         )
 
 
+async def _async_handle_send_device_schedule(
+    hass: HomeAssistant, call: ServiceCall
+) -> None:
+    """Publish a DownloadDeviceSchedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ).
+
+    Body shape is the Frida-PCAP-captured layout from
+    ``docs/Markdown/MQTT_PROTOCOL.md`` §DownloadDeviceSchedule. The caller
+    constructs the body verbatim (mapping or JSON string); the handler
+    routes through ``coordinator.async_send_device_schedule`` which adds
+    only the wire-invariant ``cmd: 112``.
+    """
+    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    device_id = _resolve_jackery_device_id(hass, raw)
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        raise _service_validation_error(
+            "send_device_schedule_failed",
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    body = _ble_body_from_service(call.data[SERVICE_FIELD_BODY], device_id)
+    try:
+        await coordinator.async_send_device_schedule(
+            device_id,
+            action_id=int(call.data[SERVICE_FIELD_ACTION_ID]),
+            body=body,
+        )
+    except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+        raise _service_validation_error(
+            "send_device_schedule_failed",
+            device_id=device_id,
+            error=err,
+        ) from err
+
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
@@ -549,4 +593,16 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_SEND_BLE_COMMAND,
             _handle_send_ble_command,
             schema=SEND_BLE_COMMAND_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_DEVICE_SCHEDULE):
+
+        async def _handle_send_device_schedule(call: ServiceCall) -> None:
+            await _async_handle_send_device_schedule(hass, call)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SEND_DEVICE_SCHEDULE,
+            _handle_send_device_schedule,
+            schema=SEND_DEVICE_SCHEDULE_SCHEMA,
         )

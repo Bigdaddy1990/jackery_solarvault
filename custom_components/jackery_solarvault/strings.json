@@ -250,6 +250,18 @@
       "eps_output_year_energy": {
         "name": "EPS output yearly energy"
       },
+      "pv_revenue_day": {
+        "name": "PV revenue today"
+      },
+      "pv_revenue_month": {
+        "name": "PV revenue monthly"
+      },
+      "pv_revenue_week": {
+        "name": "PV revenue weekly"
+      },
+      "pv_revenue_year": {
+        "name": "PV revenue yearly"
+      },
       "today_battery_energy": {
         "name": "Today battery energy"
       },
@@ -321,6 +333,9 @@
       },
       "smart_meter_communication_mode": {
         "name": "Smart meter communication mode"
+      },
+      "smart_meter_fun_form": {
+        "name": "Smart meter function form"
       },
       "smart_meter_ip_address": {
         "name": "Smart meter IP address"
@@ -999,6 +1014,24 @@
         }
       },
       "name": "Send BLE command"
+    },
+    "send_device_schedule": {
+      "description": "Experimental: publish a DownloadDeviceSchedule (cmd=112) frame to the selected device. Pick the actionId for ADD (3015), DELETE (3016), UPDATE (3017) or READ (3018) and pass the schedule body verbatim. Body shape is from the Frida-PCAP capture in docs/Markdown/MQTT_PROTOCOL.md.",
+      "fields": {
+        "action_id": {
+          "description": "TIMER_TASK action: 3015=ADD, 3016=DELETE, 3017=UPDATE, 3018=READ.",
+          "name": "Action ID"
+        },
+        "body": {
+          "description": "Schedule body as JSON. Typical fields: actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (7-char Mon-Sun bitmask), tid (task ID). The integration adds cmd=112 automatically.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Send device schedule"
     }
   },
   "title": "Jackery SolarVault"

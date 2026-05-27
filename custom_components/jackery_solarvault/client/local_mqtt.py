@@ -305,6 +305,9 @@ class JackeryLocalMqttClient:
 
     def diagnostics_snapshot(self, *, redact: bool = True) -> dict[str, Any]:
         """Return a JSON-friendly snapshot of the local-MQTT state."""
+        # Explicit annotation so the redacted (all-str) and unredacted (str + int
+        # port) branches do not lock the inferred dict type to ``dict[str, str]``.
+        target: dict[str, Any]
         if redact:
             target = {
                 "host": REDACTED_VALUE,

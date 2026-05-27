@@ -545,6 +545,11 @@ FIELD_CT_REACTIVE_POWER: Final = "rep"
 FIELD_CT_REACTIVE_POWER1: Final = "rep1"
 FIELD_CT_REACTIVE_POWER2: Final = "rep2"
 FIELD_CT_REACTIVE_POWER3: Final = "rep3"
+# CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html:
+# CT function-form / wiring-mode identifier (1-phase vs 3-phase config).
+# Exposed as diagnostic — useful for troubleshooting an unexpected CT layout.
+FIELD_CT_FUN_FORM: Final = "funForm"
+FIELD_CT_SCHE_PHASE: Final = "schePhase"
 FIELD_CT_TOTAL_PHASE_POWER: Final = "tPhasePw"
 FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER: Final = "tnPhasePw"
 FIELD_CT_A_PHASE_POWER: Final = "aPhasePw"
@@ -666,8 +671,8 @@ SUBDEVICE_ONLY_PROPERTY_KEYS: Final = frozenset({
     FIELD_DEVICE_SN,
     FIELD_CMD,
     "messageId",
-    "funForm",
-    "schePhase",
+    FIELD_CT_FUN_FORM,
+    FIELD_CT_SCHE_PHASE,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
     FIELD_IN_PW,
@@ -885,6 +890,12 @@ APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
 APP_STAT_TODAY_LOAD: Final = "todayLoad"
 APP_STAT_TOTAL_GENERATION: Final = "totalGeneration"
 APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
+# PvStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — separate
+# from systemStatistic.totalRevenue (latter is the lifetime KPI).
+# totalSolarRevenue is the periodic Jackery cloud "PV revenue" value tied
+# to that period's PV energy and the configured tariff (singlePrice or
+# dynamic). Currency arrives in PvStatApi$Bean.currency.
+APP_STAT_TOTAL_SOLAR_REVENUE: Final = "totalSolarRevenue"
 APP_STAT_TOTAL_CARBON: Final = "totalCarbon"
 APP_DEVICE_STAT_PV_ENERGY: Final = "pvEgy"
 APP_DEVICE_STAT_BATTERY_CHARGE: Final = "batChgEgy"
@@ -1136,6 +1147,13 @@ SERVICE_DELETE_STORM_ALERT: Final = "delete_storm_alert"
 SERVICE_SET_THIRD_PARTY_MQTT_CONFIG: Final = "set_third_party_mqtt_config"
 SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "query_third_party_mqtt_config"
 SERVICE_SEND_BLE_COMMAND: Final = "send_ble_command"
+# Experimental schedule write — body shape is the Frida-PCAP-captured
+# DownloadDeviceSchedule frame (see docs/Markdown/MQTT_PROTOCOL.md
+# §"DownloadDeviceSchedule"). Body is passed verbatim so users can match
+# observed wire layouts without the integration locking in one
+# interpretation of actionType/taskType/mode.
+SERVICE_SEND_DEVICE_SCHEDULE: Final = "send_device_schedule"
+SERVICE_FIELD_ACTION_ID: Final = "action_id"
 SERVICE_FIELD_SYSTEM_ID: Final = "system_id"
 SERVICE_FIELD_NEW_NAME: Final = "new_name"
 SERVICE_FIELD_DEVICE_ID: Final = "device_id"
@@ -1310,6 +1328,10 @@ MQTT_CMD_CONTROL_SUB_DEVICE: Final = 111
 MQTT_CMD_QUERY_COMBINE_DATA: Final = 120
 MQTT_CMD_CONTROL_COMBINE: Final = 121
 MQTT_CMD_UPLOAD_DEVICE_ALERT: Final = 122
+# DownloadDeviceSchedule cmd value (HomeCmdAction.smali bleMsgType).
+# Frida-PCAP capture in docs/Markdown/MQTT_PROTOCOL.md confirms cmd=112 in the
+# schedule body alongside actionType/taskType/mode/pw/sysSwitch/end/loops/start/tid.
+MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE: Final = 112
 # Third-party MQTT bridge cmd values (HomeCmdAction.smali bleMsgType).
 MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113
 MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
@@ -1398,6 +1420,19 @@ ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG: Final = 3046  # cmd=113 ThirdPartMQTTConf
 ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = (
     3047  # cmd=114 QueryThirdPartMQTTConfig
 )
+
+# Setter-Konstanten aus docs/html/hbxn_commands.html home-family, deren
+# Wiring (Service-Handler oder Switch/Number/Select-Entity) NICHT in
+# diesem Code-Stand vollständig implementiert ist. Aufgenommen als
+# Single-Source-of-Truth für msg_id ↔ name ↔ ble_msg_type ↔ MQTT-Type;
+# tatsächliche Service-Verdrahtung ist offen und braucht
+# empirisch verifizierte Body-Shapes (MQTT-Mitschnitt der App, dann
+# Service-Handler in services.py + ggf. Coordinator-Helper).
+ACTION_ID_SYNC_GRID_STANDARD: Final = 3010  # cmd=105 DevicePropertyChange
+ACTION_ID_TIMER_TASK_ADD: Final = 3015  # cmd=112 DownloadDeviceSchedule
+ACTION_ID_TIMER_TASK_DELETE: Final = 3016  # cmd=112 DownloadDeviceSchedule
+ACTION_ID_TIMER_TASK_UPDATE: Final = 3017  # cmd=112 DownloadDeviceSchedule
+ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
 
 # Third-party MQTT bridge body keys per ``ThirdPartyMqttBody.smali``.
 FIELD_THIRD_PARTY_MQTT_ENABLE: Final = "enable"

@@ -48,6 +48,10 @@ from .const import (
     ACTION_ID_SUBDEVICE_3033,
     ACTION_ID_SUBDEVICE_3037,
     ACTION_ID_TEMP_UNIT,
+    ACTION_ID_TIMER_TASK_ADD,
+    ACTION_ID_TIMER_TASK_DELETE,
+    ACTION_ID_TIMER_TASK_READ,
+    ACTION_ID_TIMER_TASK_UPDATE,
     ACTION_ID_WORK_MODEL,
     ADAPTIVE_KEEPALIVE_INTERVAL_SEC,
     APP_CHART_STAT_METRICS,
@@ -205,6 +209,7 @@ from .const import (
     MQTT_CMD_CONTROL_COMBINE,
     MQTT_CMD_CONTROL_SUB_DEVICE,
     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+    MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE,
     MQTT_CMD_NONE,
     MQTT_CMD_QUERY_COMBINE_DATA,
     MQTT_CMD_QUERY_DEVICE_PROPERTY,
@@ -657,7 +662,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # successful cloud recovery after a HA/cloud outage and explicitly
         # reload month/year chart buckets that may have crossed an app period
         # boundary while polling was unavailable.
-        self._statistics_backfill_store = Store(
+        self._statistics_backfill_store: Store[dict[str, Any]] = Store(
             hass,
             _STATISTICS_BACKFILL_STORE_VERSION,
             f"{DOMAIN}_{entry.entry_id}_{_STATISTICS_BACKFILL_STORE_KEY}",
@@ -3919,6 +3924,59 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             action_id=ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
             cmd=MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
             body_fields={},
+        )
+
+    async def async_send_device_schedule(
+        self,
+        device_id: str,
+        *,
+        action_id: int,
+        body: dict[str, Any],
+    ) -> None:
+        """Publish a DownloadDeviceSchedule frame (cmd=112, actionId 3015-3018).
+
+        Empirical schedule body from Frida-PCAP per
+        ``docs/Markdown/MQTT_PROTOCOL.md`` §DownloadDeviceSchedule:
+        ``{"actionType": int, "taskType": int, "mode": int, "pw": int,
+        "sysSwitch": int, "end": "HH:MM", "loops": "1111111", "start":
+        "HH:MM", "tid": "<task-id>", "cmd": 112}``. The body is forwarded
+        verbatim so callers can match observed wire layouts without the
+        integration locking in one interpretation; only ``cmd`` is
+        injected (and overwrites any caller-supplied value) so the
+        wire-protocol invariant cmd=112 holds.
+
+        ``action_id`` must be one of ACTION_ID_TIMER_TASK_*
+        (3015=add, 3016=delete, 3017=update, 3018=read). The caller is
+        responsible for picking the right one; the actionType inside
+        the body is independent of the action_id selector per the
+        captured frame layout.
+        """
+        if action_id not in (
+            ACTION_ID_TIMER_TASK_ADD,
+            ACTION_ID_TIMER_TASK_DELETE,
+            ACTION_ID_TIMER_TASK_UPDATE,
+            ACTION_ID_TIMER_TASK_READ,
+        ):
+            raise ValueError(
+                "action_id must be one of 3015/3016/3017/3018 "
+                "(TIMER_TASK_ADD/DELETE/UPDATE/READ); got "
+                f"{action_id!r}"
+            )
+        merged_body = dict(body)
+        merged_body[FIELD_CMD] = MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE
+        _LOGGER.warning(
+            "Jackery: publishing experimental DownloadDeviceSchedule "
+            "(actionId=%s) to %s — body keys=%s",
+            action_id,
+            device_id,
+            sorted(merged_body),
+        )
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE,
+            action_id=action_id,
+            cmd=MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE,
+            body_fields=merged_body,
         )
 
     async def async_query_battery_packs(

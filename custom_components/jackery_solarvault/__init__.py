@@ -314,7 +314,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
         if entry.runtime_data is coordinator:
-            entry.runtime_data = None
+            # HA convention: clear runtime_data on setup failure so the next
+            # retry sees a clean slate. The typed alias narrows the attribute
+            # to ``JackerySolarVaultCoordinator``; the None assignment here
+            # is the documented cleanup path and matches HA core integrations.
+            entry.runtime_data = None  # type: ignore[assignment]
         raise
     return True
 
@@ -440,5 +444,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
         return False
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
-    entry.runtime_data = None
+    # HA convention on unload: drop the runtime_data reference so any
+    # stragglers cannot keep the coordinator alive. Same narrowing caveat
+    # as the setup-failure path above.
+    entry.runtime_data = None  # type: ignore[assignment]
     return True

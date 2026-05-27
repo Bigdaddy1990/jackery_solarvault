@@ -147,6 +147,7 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_TOTAL_SOLAR_REVENUE,
     APP_STAT_UNIT,
     APP_TOTAL_GUARD_META,
     APP_UNIT_KWH,
@@ -186,6 +187,7 @@ from .const import (
     FIELD_CT_CURRENT2,
     FIELD_CT_CURRENT3,
     FIELD_CT_FREQUENCY,
+    FIELD_CT_FUN_FORM,
     FIELD_CT_POWER,
     FIELD_CT_POWER1,
     FIELD_CT_POWER2,
@@ -1937,6 +1939,55 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-charging",
     ),
+    # ------------------------------------------------------------------
+    # PV solar revenue (PvStatApi$Bean.totalSolarRevenue per
+    # docs/html/jackery_http_model_fields_v2.html). Periodic cloud-side
+    # revenue value tied to the period's PV energy × tariff. Currency
+    # is dynamic (PvStatApi$Bean.currency per response) — no static
+    # native_unit_of_measurement here, only an icon hint. Distinct from
+    # systemStatistic.totalRevenue (= lifetime KPI, already mapped as
+    # ``total_revenue``).
+    # ------------------------------------------------------------------
+    JackeryStatSensorDescription(
+        key="pv_revenue_day",
+        translation_key="pv_revenue_day",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        icon="mdi:currency-eur",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_week",
+        translation_key="pv_revenue_week",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        icon="mdi:currency-eur",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_month",
+        translation_key="pv_revenue_month",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        icon="mdi:currency-eur",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_year",
+        translation_key="pv_revenue_year",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        icon="mdi:currency-eur",
+    ),
     # Removed smart meter panel energy sensors (charging/discharging)
     # Single-tariff power price from powerPriceConfig
     # Source: /v1/device/stat/price field FIELD_SINGLE_PRICE
@@ -2768,6 +2819,16 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         icon="mdi:lan",
+    ),
+    # CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html —
+    # function-form / wiring-mode identifier. Diagnostic, default-disabled.
+    JackerySmartMeterSensorDescription(
+        key="fun_form",
+        translation_key="smart_meter_fun_form",
+        field=FIELD_CT_FUN_FORM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        icon="mdi:transit-connection-horizontal",
     ),
 )
 

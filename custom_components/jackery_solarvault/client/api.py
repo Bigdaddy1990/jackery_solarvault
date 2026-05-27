@@ -25,7 +25,7 @@ from typing import Any
 import uuid
 
 import aiohttp
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
@@ -175,8 +175,22 @@ def _aes_cbc_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
 
 
 def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
+    """Encrypt ``data`` with the Jackery login RSA public key (PKCS1v15).
+
+    The Jackery cloud-side login protocol expects an RSA public key (see
+    PROTOCOL.md §2.1 + docs/Markdown/MQTT_PROTOCOL.md). ``load_der_public_key``
+    returns a union of every cryptography public-key type, only RSA exposes
+    ``.encrypt`` — narrow via ``isinstance`` so strict type checkers see the
+    correct contract and a non-RSA key (unexpected protocol change or stub)
+    fails fast with a clear error instead of an ``AttributeError`` deep in
+    the cryptography stack.
+    """
     der_bytes = base64.b64decode(public_key_b64)
     public_key = load_der_public_key(der_bytes)
+    if not isinstance(public_key, rsa.RSAPublicKey):
+        raise TypeError(
+            f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
+        )
     return public_key.encrypt(data, asym_padding.PKCS1v15())
 
 
