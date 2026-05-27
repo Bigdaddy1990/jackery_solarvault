@@ -29,8 +29,8 @@ from .const import (
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
-_KEY_ENTRIES: Final = "entries"
-_KEY_CACHED_AT: Final = "cached_at"
+_KEY_ENTRIES: Final = 'entries'
+_KEY_CACHED_AT: Final = 'cached_at'
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
