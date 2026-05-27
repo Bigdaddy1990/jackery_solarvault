@@ -152,7 +152,18 @@ class JackeryOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step init."""
+        """
+        Present and handle the options form for the integration's initial options step.
+        
+        When called with `user_input`, creates an options entry by merging submitted values with the current option values.
+        When called without `user_input`, shows a form pre-filled with the current option values for editing.
+        
+        Parameters:
+            user_input (dict[str, Any] | None): Submitted option values from the form, or `None` to display the form.
+        
+        Returns:
+            ConfigFlowResult: A flow result that either creates the entry with the provided options or displays the options form.
+        """
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
@@ -235,7 +246,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial user-driven config flow step."""
+        """
+        Handle the initial user-driven configuration step by validating credentials, attempting login, and creating the config entry on success.
+        
+        Parameters:
+            user_input (dict[str, Any] | None): Submitted form values matching USER_SCHEMA; when None, the setup form is shown.
+        
+        Returns:
+            ConfigFlowResult: The next flow step to show or the created config entry on successful authentication.
+        """
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -409,7 +428,17 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt the user for a fresh password and re-test against Jackery."""
+        """
+        Handle reauthentication by prompting for a new password and validating it.
+        
+        When called without input, presents a form requesting the account password. When a password is submitted, attempts to authenticate with the Jackery service; on success the entry's stored password is updated and the entry is reloaded, on failure the form is re-displayed with an appropriate error. If the reauthentication entry cannot be located, the flow is aborted.
+        
+        Parameters:
+        	user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when provided.
+        
+        Returns:
+        	ConfigFlowResult: A flow result that either shows the reauthentication form (with errors if authentication failed), aborts if the reauth entry is missing, or updates and reloads the config entry after successful authentication.
+        """
         try:
             entry = self._get_reauth_entry()
         except KeyError, RuntimeError:

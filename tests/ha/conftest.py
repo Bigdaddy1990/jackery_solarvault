@@ -35,6 +35,15 @@ def mock_jackery_login() -> Generator[None]:
     """
 
     async def _fake_login(api) -> str:
+        """
+        Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
+        
+        Parameters:
+            api: The Jackery API client instance whose internal authentication and MQTT-related attributes will be populated for testing.
+        
+        Returns:
+            str: The authentication token assigned to the API instance.
+        """
         api._token = "test-token"
         api._mqtt_user_id = "test-user"
         api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="

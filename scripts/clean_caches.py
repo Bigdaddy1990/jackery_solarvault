@@ -30,7 +30,14 @@ def _remove_file(path: Path) -> bool:
 
 
 def main() -> int:
-    """Remove known local cache directories and files."""
+    """
+    Scan the repository tree under ROOT and remove files and directories matching known local cache names.
+    
+    The function traverses ROOT, removes directories whose names are in CACHE_DIR_NAMES and files whose names are in CACHE_FILES, counts successful removals, and prints a summary. If an entry could not be removed but still exists after an attempt, its path (relative to ROOT) is printed as a skipped item.
+    
+    Returns:
+        exit_code (int): Always returns 0.
+    """
     removed = 0
     skipped: list[str] = []
 

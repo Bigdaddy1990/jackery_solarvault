@@ -27,6 +27,15 @@ INTEGRATION_COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
+    """
+    Read and return the UTF-8 text of a source file from the appropriate component directory.
+    
+    Parameters:
+        name (str): Filename to read; "mqtt_push.py" is read from the client component, all other names are read from the integration component.
+    
+    Returns:
+        str: File contents decoded as UTF-8.
+    """
     base = CLIENT_COMPONENT if name in {"mqtt_push.py"} else INTEGRATION_COMPONENT
     return (base / name).read_text(encoding="utf-8")
 
@@ -53,7 +62,11 @@ def test_mqtt_client_disables_internal_reconnect_loop() -> None:
 
 
 def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
-    """Credential-change detection must not keep another raw password copy."""
+    """
+    Ensure the MQTT client's credential-change detection does not retain raw password data.
+    
+    Verifies the module computes and stores a hashed credential fingerprint (using `hashlib.sha256` and `_credential_fingerprint`) and exposes a `_fingerprint` member, and asserts the source does not contain a stored tuple of raw credentials `(client_id, username, password)`.
+    """
     src = _read("mqtt_push.py")
     assert "import hashlib" in src, src
     assert "self._fingerprint: str | None = None" in src, src
@@ -64,10 +77,10 @@ def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
 
 
 def test_every_connect_resubscribes_all_topics() -> None:
-    """The session runner must iterate over self._topics + subscribe each.
-
-    Without this, a reconnect after a network blip leaves the integration
-    silently unsubscribed: the TCP session is back but no telemetry flows.
+    """
+    Ensure the session runner re-subscribes all configured MQTT topics on each connection.
+    
+    Asserts that `_async_run_session` iterates over `self._topics` and calls `await client.subscribe(...)` so a reconnect does not leave the integration unsubscribed and without telemetry.
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
@@ -102,11 +115,10 @@ def test_every_connect_triggers_snapshot_callback() -> None:
 
 
 def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
-    """Preserve actionable CONNACK reason after broker rejects + closes.
-
-    When the broker rejects a CONNACK and immediately closes the socket,
-    ``last_error`` must keep the actionable CONNACK reason rather than
-    being overwritten with the generic disconnect message.
+    """
+    Ensure the broker CONNACK failure reason is preserved when the broker rejects the connection and closes the socket.
+    
+    Asserts that the disconnect handler does not overwrite an actionable CONNACK reason (the `"connect rc=..."` signature) and that the connect-failure mapper exposes broker CONNACK reasons via `MQTT_CONNACK_REASONS` and formats them as `f"connect rc={rc}"`.
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
@@ -208,7 +220,11 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
 
 
 def test_aiomqtt_passive_reset_log_is_filtered() -> None:
-    """Expected broker socket resets should not surface as HA error log spam."""
+    """
+    Ensure passive broker socket reset messages are filtered from Home Assistant error logs.
+    
+    Asserts that mqtt_push.py defines `_AioMqttPassiveDisconnectFilter`, contains common passive-reset message substrings (e.g. "failed to receive on socket", "Errno 104", "Connection reset by peer", "WinError 10054"), registers the filter with `_AIOMQTT_LOGGER`, and does not register the filter on the general `_LOGGER`.
+    """
     src = _read("mqtt_push.py")
 
     assert "_AioMqttPassiveDisconnectFilter" in src
@@ -222,7 +238,12 @@ def test_aiomqtt_passive_reset_log_is_filtered() -> None:
 
 
 def test_diagnostics_exposes_stale_subscription_signals() -> None:
-    """Diagnostics must surface ``seconds_since_last_message`` + flag."""
+    """
+    Assert that the diagnostics_snapshot method exposes the `seconds_since_last_message` value and the `mqtt_silent_for_too_long` flag.
+    
+    Raises:
+        AssertionError: If the diagnostics_snapshot method is missing or either key/flag is not present.
+    """
     src = _read("mqtt_push.py")
     diag_match = re.search(
         r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",
@@ -351,17 +372,14 @@ def test_coordinator_refresh_does_not_suppress_reauth_failures() -> None:
 
 
 def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
-    """A server-side broker drop must trigger an immediate reconnect.
-
-    With aiomqtt, a passive disconnect (Errno 104 / ConnectionResetError)
-    raises MqttError out of the ``async for`` loop. The session task exits
-    via the ``finally`` block, which fires ``disconnect_callback`` only
-    when the session had actually been connected (rules out CONNACK
-    rejections). The coordinator's ``_async_handle_mqtt_disconnect``
-    then resets the throttle and calls
-    ``_async_ensure_mqtt(force=True, wait_connected=True)`` so a
-    broker-side credential rejection on the reconnect can pause MQTT while
-    HTTP polling continues rather than being silently retried.
+    """
+    Verify that a passive broker socket reset causes the coordinator to immediately attempt reconnect recovery.
+    
+    Asserts that:
+    - The MQTT client API accepts and stores a `disconnect_callback` parameter.
+    - The session runner only invokes the disconnect callback after a real connected session (uses `was_connected` and checks `self._disconnect_callback is not None`) and logs a `"disconnect-recover"` marker.
+    - The coordinator constructs the client with `disconnect_callback=self._async_handle_mqtt_disconnect`.
+    - The coordinator's disconnect handler resets throttling (`self._last_mqtt_connect_attempt = 0.0`), forces a reconnect (`_async_ensure_mqtt(force=True, wait_connected=True)`), and reclassifies/auth-handles failures (`JackeryAuthError`, `ConfigEntryAuthFailed`, `self._defer_background_auth_failure(err)`, and `_pause_mqtt_after_auth_failure`).
     """
     mqtt_src = _read("mqtt_push.py")
     coord_src = _read("coordinator.py")
@@ -409,7 +427,22 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
 
 
 def test_http_property_polling_is_not_skipped_when_mqtt_is_live() -> None:
-    """The documented HTTP property poll remains active every coordinator tick."""
+    """
+    Ensure the coordinator continues HTTP property polling on every tick even when MQTT is live.
+    
+    Verifies the captured `_async_update_data` implementation:
+    - does not use a `finally:` section that would short-circuit polling,
+    - evaluates `skip_fast_property_fetch = self._should_skip_fast_property_fetch()` but does not short-circuit with `return snapshot` or an `if skip_fast_property_fetch:` that skips scheduling,
+    - does not call `_schedule_mqtt_backfill_queries` in that section,
+    - performs `payload = await self.api.async_get_device_property(dev_id)` and calls `_fetch_device_extras` after the device property fetch,
+    - schedules statistics import before scheduling MQTT poll queries,
+    - does not run `_async_import_and_repair_app_chart_statistics` in this path,
+    - updates `self._last_http_refresh_completed_monotonic` when `property_fetch_completed` is true.
+    
+    Also asserts:
+    - `_async_mqtt_poll_queries` calls `_async_query_subdevices_for_missing` before `_async_query_system_info_for_missing`,
+    - `_should_skip_fast_property_fetch` always returns `False` and does not reference `MQTT_LIVE_THRESHOLD_SEC`.
+    """
     src = _read("coordinator.py")
     match = re.search(
         r"async def _async_update_data\(.*?(?=\n    # --)",
@@ -476,7 +509,14 @@ def test_mqtt_partial_updates_do_not_reset_http_poll_timer() -> None:
 
 
 def test_optional_background_jobs_are_not_setup_tracked() -> None:
-    """Long-running optional jobs must not block HA bootstrap/setup tracking."""
+    """
+    Ensure optional long-running background jobs are scheduled without blocking Home Assistant setup tracking.
+    
+    Asserts that the coordinator schedules the following optional jobs using `async_create_background_task` (and not `async_create_task`):
+    - statistics import scheduler
+    - MQTT poll queries scheduler
+    - battery pack OTA enrichment scheduler
+    """
     src = _read("coordinator.py")
 
     schedule_import = re.search(
@@ -526,7 +566,11 @@ def test_mqtt_disconnect_reconnect_skips_ha_shutdown_states() -> None:
 
 
 def test_mqtt_ensure_uses_stable_client_handle_across_awaits() -> None:
-    """Reload/shutdown must not turn reconnect waits into NoneType errors."""
+    """
+    Ensure the coordinator preserves a stable MQTT client reference across awaits to avoid NoneType errors during reload or shutdown.
+    
+    Asserts that the `_async_ensure_mqtt` implementation captures `self._mqtt` into a local `mqtt` variable, checks for replacement (`if self._mqtt is not mqtt:`), awaits lifecycle calls on the local handle (`async_start`, `async_wait_until_connected`), reads diagnostics via `mqtt.diagnostics.get`, and does not call `self._mqtt.async_wait_until_connected` directly.
+    """
     src = _read("coordinator.py")
     match = re.search(
         r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",

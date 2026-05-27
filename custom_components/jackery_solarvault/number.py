@@ -152,7 +152,17 @@ async def _set_single_price(
 
 
 def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
-    """Return the feed-in choices exposed by the SolarVault app."""
+    """
+    Determine the maximum allowed feed-in power for the device based on its coordinator payload.
+    
+    Checks the payload properties and metadata to decide whether the app exposes a low (800 W) or high (2500 W) feed-in option.
+    
+    Parameters:
+        payload (dict[str, Any]): Coordinator payload containing sections like `properties`, `device`, and `discovery`.
+    
+    Returns:
+        float: `800.0` if the device reports a maximum output power of 800 W or lower and no indicators of higher capability are present; `2500.0` otherwise.
+    """
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
@@ -305,7 +315,16 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         self.entity_description = description
 
     def _raise_action_error(self, translation_key: str, **placeholders: object) -> None:
-        """Raise a translatable HA action error for this entity."""
+        """
+        Raise a Home Assistant error that includes translation metadata and entity-specific placeholders.
+        
+        Parameters:
+            translation_key (str): Translation key identifying the error message.
+            **placeholders (object): Additional placeholder values to include in the translation; each value will be stringified.
+        
+        Raises:
+            HomeAssistantError: Error populated with `translation_domain=DOMAIN`, the provided `translation_key`, and `translation_placeholders` containing the entity key (`"entity"`), device id (`"device_id"`), and the provided placeholders (stringified).
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
@@ -354,7 +373,16 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return allowed
 
     async def async_set_native_value(self, value: float) -> None:
-        """Forward a numeric write to the device."""
+        """
+        Set the entity's native numeric value on the device, enforcing configured range and allowed-values constraints.
+        
+        Parameters:
+            value (float): The new native (Home Assistant) value to write to the device.
+        
+        Raises:
+            ConfigEntryAuthFailed: If the underlying setter reports an authentication failure.
+            HomeAssistantError: If the value is outside the configured min/max or not in the allowed-values set (translation keys `invalid_number_range` or `invalid_number_allowed_values`), or if the setter fails and the description requests errors be raised (`entity_action_failed`).
+        """
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
         ):
@@ -414,20 +442,55 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create description-driven number entities."""
+    """
+    Create and add Jackery number entities for devices present in the coordinator.
+    
+    Scans the coordinator payload to instantiate description-driven NumberEntity objects (using NUMBER_DESCRIPTIONS) for each device when their required payload fields are present, adds them via the provided async_add_entities callback while preventing duplicate unique IDs, and registers a listener to add new entities when the coordinator data signature changes.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
+        """
+        Append a NumberEntity to the provided list if its unique ID has not already been seen.
+        
+        Mutates the `entities` list by adding `entity` when its unique identifier is new, and records that identifier to prevent duplicate additions. Uses the integration's "number" platform and module logger for uniqueness tracking and diagnostics.
+        
+        Parameters:
+            entities (list[NumberEntity]): List to which the entity will be appended when unique.
+            entity (NumberEntity): The entity to append.
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
         )
 
     def _has_props(payload: dict[str, Any], *keys: str) -> bool:
+        """
+        Check whether any of the given property keys exist in the payload's properties section.
+        
+        Parameters:
+            payload (dict[str, Any]): The full payload containing sections such as properties.
+            *keys (str): One or more property key names to look for in the payload's properties.
+        
+        Returns:
+            bool: `True` if any of the provided keys are present in the payload's properties section, `False` otherwise.
+        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
     def _has_price_or_system(payload: dict[str, Any]) -> bool:
+        """
+        Determine whether the payload includes single-price data or a system identifier.
+        
+        Parameters:
+            payload (dict[str, Any]): Device payload, expected to contain `PAYLOAD_PRICE`
+                and/or `PAYLOAD_SYSTEM` sections.
+        
+        Returns:
+            `true` if `FIELD_SINGLE_PRICE` or `FIELD_DYNAMIC_OR_SINGLE` is present in the
+            price section, or if `FIELD_ID` or `FIELD_SYSTEM_ID` is present in the system
+            section; `false` otherwise.
+        """
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (
@@ -449,6 +512,12 @@ async def async_setup_entry(
     }
 
     def _collect_entities() -> list[NumberEntity]:
+        """
+        Builds a list of JackeryNumber entities for devices whose payloads satisfy the configured gating predicates.
+        
+        Returns:
+            list[NumberEntity]: NumberEntity instances created for each device and description where the device payload is present and the optional gating predicate permits creation.
+        """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for description in NUMBER_DESCRIPTIONS:

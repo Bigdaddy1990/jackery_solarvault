@@ -10,10 +10,31 @@ INIT = COMPONENT / "__init__.py"
 
 
 def _read_init() -> str:
+    """
+    Read and return the UTF-8 text contents of the integration's __init__.py file.
+    
+    Returns:
+        text (str): The UTF-8 decoded contents of the file referenced by `INIT`.
+    """
     return INIT.read_text(encoding="utf-8")
 
 
 def _function_source(name: str, *, source_path: Path | None = None) -> str:
+    """
+    Return the source-text block for a top-level `async def` function named `name` from the given file.
+    
+    Reads UTF-8 text from `source_path` (or the module-level `INIT` path when not provided) and returns the contiguous source snippet that begins with `async def {name}` up to the next top-level `async def`, `def`, `class`, or end of file.
+    
+    Parameters:
+        name: The target async function name to extract.
+        source_path: Optional path of the file to read; if omitted, uses `INIT`.
+    
+    Returns:
+        The matched source code block as a string.
+    
+    Raises:
+        AssertionError: If a matching `async def {name}` block is not found in the file.
+    """
     path = source_path or INIT
     source = path.read_text(encoding="utf-8")
     match = re.search(

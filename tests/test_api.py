@@ -154,6 +154,18 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
     api = JackeryApi.__new__(JackeryApi)
 
     async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Test stub that prevents performing an HTTP form POST for tariff-related operations.
+        
+        Used in unit tests to ensure input validation stops execution before any network request is made.
+        
+        Parameters:
+            _path (str): The request path that would have been posted to.
+            _payload (dict[str, Any]): The form payload that would have been sent.
+        
+        Raises:
+            AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
+        """
         raise AssertionError("invalid tariff input must stop before HTTP post")
 
     api._post_form = _post_form

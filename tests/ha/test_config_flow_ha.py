@@ -68,7 +68,11 @@ async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
-    """A network error must surface as a cannot_connect form error."""
+    """
+    Show a "cannot_connect" form error when the API raises a network error during the user config flow.
+    
+    Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
+    """
     from custom_components.jackery_solarvault.api import JackeryError
 
     with patch(

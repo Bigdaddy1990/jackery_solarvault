@@ -12,7 +12,19 @@ VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$")
 
 
 def manifest_version() -> str:
-    """Return the non-empty manifest version."""
+    """
+    Retrieve and validate the package version from the manifest.
+    
+    Reads the module-level MANIFEST JSON, extracts and strips the `version` field,
+    and ensures it matches the module's expected semantic-version pattern.
+    
+    Returns:
+        The validated manifest version string.
+    
+    Raises:
+        SystemExit: If the `version` field is missing, not a string, empty after
+        stripping, or does not match the expected release version format.
+    """
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     version = manifest.get("version")
     if not isinstance(version, str) or not version.strip():
@@ -24,7 +36,17 @@ def manifest_version() -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI options."""
+    """
+    Parse command-line arguments for the script.
+    
+    Supports the following flags:
+    - --github-output: when set, write outputs for GitHub Actions.
+    - --verify-tag: when set, verify the provided tag matches the manifest version.
+    - --tag: tag value to compare against (default: empty string).
+    
+    Returns:
+        argparse.Namespace: Parsed arguments with attributes `github_output` (bool), `verify_tag` (bool), and `tag` (str).
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--github-output", action="store_true")
     parser.add_argument("--verify-tag", action="store_true")
@@ -33,7 +55,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Run the manifest version helper."""
+    """
+    Execute the CLI helper that validates the manifest version and emits the version.
+    
+    If tag verification is requested and the provided tag does not match the manifest version, an error annotation is written to stderr and the function exits with a failure code. When GitHub output is requested, the version and v-prefixed tag are appended to the file specified by the GITHUB_OUTPUT environment variable; otherwise the version is printed to stdout.
+    
+    Returns:
+        exit_code (int): `0` on success, `1` if tag verification fails.
+    """
     args = parse_args()
     version = manifest_version()
     tag = args.tag.removeprefix("v")

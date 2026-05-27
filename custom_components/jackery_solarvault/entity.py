@@ -129,7 +129,16 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device-registry metadata for this entity."""
+        """
+        Builds the DeviceInfo record describing the associated SolarVault device.
+        
+        Name is chosen from system, discovery, properties wname, or falls back to "Jackery <device_id>".
+        Model is chosen from discovery dev model, device meta model name, or falls back to "SolarVault".
+        Software version and serial number are pulled from OTA and device/discovery metadata if present.
+        
+        Returns:
+            DeviceInfo: Device registry metadata containing identifiers {(DOMAIN, self._device_id)}, manufacturer, name, model, serial_number (or None), and sw_version (or None).
+        """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -157,14 +166,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     def _build_smart_plug_device_info(
         self, plug_index: int, plug: dict[str, Any]
     ) -> DeviceInfo:
-        """Build a static device_info for a smart-plug subdevice.
-
-        Smart-plug subdevices receive a per-plug device row that hangs under
-        the SolarVault via the ``via_device`` link. The metadata is derived
-        from the plug payload captured at entity construction; later metadata
-        updates flow through Home Assistant's device-registry merge, so this
-        method is meant to be called once per entity (typically from
-        ``__init__``) and the result cached on ``_attr_device_info``.
+        """
+        Build a DeviceInfo record for a smart-plug subdevice linked to the main SolarVault device.
+        
+        The returned DeviceInfo is populated from the provided plug payload and is intended to represent a static subdevice entry that links to the parent device via `via_device`.
+        
+        Parameters:
+            plug_index (int): Index of the smart plug (used in the generated identifier and fallback display name).
+            plug (dict[str, Any]): Payload for the smart plug containing metadata fields like model, serial number, name, and version.
+        
+        Returns:
+            DeviceInfo: A DeviceInfo object describing the smart-plug subdevice, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device pointing to the parent device.
         """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)

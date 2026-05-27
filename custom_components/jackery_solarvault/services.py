@@ -136,7 +136,12 @@ SEND_BLE_COMMAND_SCHEMA = vol.Schema({
 
 
 def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinator]:
-    """Return runtime coordinators for loaded Jackery config entries."""
+    """
+    Get runtime coordinators for all loaded Jackery config entries.
+    
+    Returns:
+        list[JackerySolarVaultCoordinator]: Coordinator instances attached to loaded config entries.
+    """
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -177,7 +182,16 @@ def _coordinator_for_device(
 def _coordinator_for_system(
     hass: HomeAssistant, system_id: str
 ) -> JackerySolarVaultCoordinator | None:
-    """Return the coordinator whose payload owns the given system id."""
+    """
+    Finds the first loaded coordinator that contains a system whose ID equals the provided `system_id`.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant core instance.
+        system_id (str): System identifier to match against each coordinator's stored system `FIELD_ID` or `FIELD_SYSTEM_ID` (string comparison).
+    
+    Returns:
+        JackerySolarVaultCoordinator | None: The matching coordinator if found, otherwise `None`.
+    """
     for coordinator in _loaded_coordinators(hass):
         for payload in (coordinator.data or {}).values():
             system: dict[str, Any] = payload.get(PAYLOAD_SYSTEM) or {}
@@ -193,7 +207,17 @@ def _service_validation_error(
     device_id: str,
     error: object,
 ) -> ServiceValidationError:
-    """Build a translated service validation error with common placeholders."""
+    """
+    Create a ServiceValidationError localized to the integration's DOMAIN with common placeholders.
+    
+    Parameters:
+        translation_key (str): Translation key identifying the error message.
+        device_id (str): Device or system identifier to include in the translation placeholders.
+        error (object): Error detail; will be converted to a string and included in the placeholders.
+    
+    Returns:
+        ServiceValidationError: An error with `translation_domain` set to the integration DOMAIN and `translation_placeholders` containing `device_id` and the stringified `error`.
+    """
     return ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
@@ -205,7 +229,24 @@ def _service_validation_error(
 
 
 def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
-    """Return a dict body from a service object or JSON string."""
+    """
+    Convert a service-provided BLE command body into a dictionary.
+    
+    Accepts either a mapping (returned as a shallow copy) or a JSON string representing an object.
+    If a JSON string is provided it is parsed; if parsing fails or the parsed value is not an object,
+    a ServiceValidationError is raised and includes `device_id` as a placeholder for error messages.
+    
+    Parameters:
+    	raw_body (Any): A dict-like object or a JSON string representing an object.
+    	device_id (str): Identifier included in error placeholders when validation fails.
+    
+    Returns:
+    	dict[str, Any]: A dictionary representing the BLE command body.
+    
+    Raises:
+    	ServiceValidationError: If `raw_body` is neither a mapping nor a valid JSON object string,
+    	or if JSON parsing fails.
+    """
     if isinstance(raw_body, dict):
         return dict(raw_body)
     if isinstance(raw_body, str):
@@ -237,7 +278,12 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
 
 
 async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
-    """Forward a rename to the API client of the matching coordinator."""
+    """
+    Send a system rename request to the coordinator that owns the given system id.
+    
+    Raises:
+        ServiceValidationError: if no coordinator owns the provided `system_id`, or if the API fails; the error includes `system_id` and `error` placeholders.
+    """
     system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()
     new_name = call.data[SERVICE_FIELD_NEW_NAME].strip()
     coordinator = _coordinator_for_system(hass, system_id)
@@ -296,7 +342,15 @@ async def _async_handle_refresh_weather_plan(
 async def _async_handle_delete_storm_alert(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
-    """Delete a storm alert on the matching coordinator."""
+    """
+    Delete a storm alert for the Jackery device identified in the service call.
+    
+    Reads `device_id` and `alert_id` from the service data, resolves the corresponding
+    coordinator, and requests the coordinator to delete the specified storm alert.
+    If no coordinator owns the resolved device id or the coordinator/API call fails,
+    a ServiceValidationError is raised with `translation_key="delete_storm_alert_failed"`
+    and placeholders `device_id`, `alert_id`, and `error`.
+    """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -328,7 +382,21 @@ async def _async_handle_delete_storm_alert(
 async def _async_handle_set_third_party_mqtt_config(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
-    """Publish the experimental SET_THIRD_PARTY_MQTT_CONFIG (3046) frame."""
+    """
+    Configure third-party MQTT settings for a Jackery device.
+    
+    Expects the service call's data to include:
+    - device_id (str): HA device id or Jackery device id; will be resolved to the internal Jackery device id.
+    - enable (bool): whether to enable third-party MQTT.
+    - ip (str): MQTT broker IP or host (string, whitespace will be stripped).
+    - port (int): MQTT broker port (1..65535).
+    - username (str, optional): MQTT username (defaults to empty string).
+    - password (str, optional): MQTT password (defaults to empty string).
+    - token (str, optional): MQTT authentication token (defaults to empty string).
+    
+    Raises:
+        ServiceValidationError: If no coordinator owns the resolved device_id, or if the coordinator/API returns an error; the exception's translation_placeholders include `device_id` and an `error` message.
+    """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -394,7 +462,24 @@ async def _async_handle_query_third_party_mqtt_config(
 async def _async_handle_send_ble_command(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
-    """Write one experimental binary command frame over the active BLE session."""
+    """
+    Send a BLE command frame to the device specified in the service call by forwarding the request to the device's coordinator.
+    
+    Parameters:
+        call (ServiceCall): Service call whose `data` must include:
+            - `device_id` (str): Target device id or Home Assistant device registry id.
+            - `cmd` (int): Numeric command identifier.
+            - `body` (dict | str): Command payload as a mapping or a JSON string representing an object.
+            - `flags` (int, optional): BLE flags (default 0).
+            - `wait_for_ack` (bool, optional): Whether to wait for an ACK (default False).
+            - `ack_timeout` (float, optional): ACK timeout in seconds (default 5.0).
+    
+    Raises:
+        ServiceValidationError: If no coordinator owns the device id, if the `body` is invalid,
+        if parameter coercion/validation fails, or if the command could not be sent (including when
+        BLE writes are disabled or there is no active BLE session). The error will use the
+        `translation_key` "send_ble_command_failed".
+    """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)

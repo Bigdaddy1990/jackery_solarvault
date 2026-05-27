@@ -21,7 +21,21 @@ COMPONENT_PATH = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _eval_static_string(node: ast.AST, constants: dict[str, str]) -> str | None:
-    """Resolve literal strings, const names and simple f-strings from sensor.py."""
+    """
+    Resolve a static string value from an AST node when it can be determined at compile time.
+    
+    Supports:
+    - string literal constants,
+    - names resolved via the provided `constants` mapping,
+    - simple f-strings (ast.JoinedStr) composed only of literal parts and resolvable subexpressions.
+    
+    Parameters:
+        node (ast.AST): The AST node to evaluate.
+        constants (dict[str, str]): Mapping of identifier names to string values used to resolve ast.Name nodes.
+    
+    Returns:
+        str | None: The resolved string when determinable, otherwise `None`.
+    """
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.Name):
@@ -56,6 +70,15 @@ def _const_keyword(call: ast.Call, name: str) -> object | None:
 
 
 def _state_class_keyword(call: ast.Call) -> str | None:
+    """
+    Return the attribute name used for the `state_class` keyword in an AST call expression.
+    
+    Parameters:
+        call (ast.Call): The AST call node to inspect.
+    
+    Returns:
+        str | None: The `attr` string from the `state_class=` keyword when its value is an `ast.Attribute`, or `None` if the keyword is absent or not an attribute.
+    """
     for keyword in call.keywords:
         if keyword.arg == "state_class":
             value = keyword.value
@@ -65,6 +88,15 @@ def _state_class_keyword(call: ast.Call) -> str | None:
 
 
 def _device_class_keyword(call: ast.Call) -> str | None:
+    """
+    Extract the attribute name used for the `device_class` keyword from an AST call node.
+    
+    Parameters:
+        call (ast.Call): The AST call node to inspect for a `device_class=` keyword.
+    
+    Returns:
+        str | None: The attribute name (the `.attr` value) if `device_class` is provided as an `ast.Attribute`, `None` otherwise.
+    """
     for keyword in call.keywords:
         if keyword.arg == "device_class":
             value = keyword.value
@@ -96,6 +128,12 @@ def _string_tuple_pairs_keyword(
 
 
 def _stat_description_calls() -> list[ast.Call]:
+    """
+    Collect all AST Call nodes that instantiate `JackeryStatSensorDescription` in the sensor source.
+    
+    Returns:
+        list[ast.Call]: AST `Call` nodes corresponding to each `JackeryStatSensorDescription(...)` call found when parsing the file at `SENSOR_PATH`.
+    """
     tree = ast.parse(SENSOR_PATH.read_text(encoding="utf-8"))
     return [
         node
@@ -107,6 +145,14 @@ def _stat_description_calls() -> list[ast.Call]:
 
 
 def _savings_detail_description_calls() -> list[ast.Call]:
+    """
+    Collect all AST call nodes for `JackerySavingsDetailSensorDescription` in the sensor source.
+    
+    Parses the file at `SENSOR_PATH` and returns every `ast.Call` node whose function is named `"JackerySavingsDetailSensorDescription"`.
+    
+    Returns:
+        calls (list[ast.Call]): List of matching AST `Call` nodes.
+    """
     tree = ast.parse(SENSOR_PATH.read_text(encoding="utf-8"))
     return [
         node
@@ -118,6 +164,17 @@ def _savings_detail_description_calls() -> list[ast.Call]:
 
 
 def _stat_description_metadata() -> dict[str, dict[str, object]]:
+    """
+    Collect metadata for all `JackeryStatSensorDescription` call sites found in the sensor source.
+    
+    Only call sites whose `key` argument resolves to a string are included. For each description key the returned mapping contains:
+    - `"section"`: the resolved `section` string, or `"statistic"` when not resolvable as a string.
+    - `"stat_key"`: the resolved `stat_key` string, or an empty string when not resolvable as a string.
+    - `"fallback_sources"`: a tuple of `(left, right)` string pairs parsed from the `fallback_sources` keyword (empty tuple when absent or not resolvable).
+    
+    Returns:
+        A dict mapping each description `key` (string) to its metadata dict as described above.
+    """
     metadata: dict[str, dict[str, object]] = {}
     for call in _stat_description_calls():
         key = _const_keyword(call, "key")
@@ -134,6 +191,17 @@ def _stat_description_metadata() -> dict[str, dict[str, object]]:
 
 
 def _const_string_assignments(path: Path) -> dict[str, str]:
+    """
+    Extract top-level string literal assignments from a Python source file.
+    
+    Parameters:
+        path (Path): Path to the Python source file to read.
+    
+    Returns:
+        dict[str, str]: Mapping of top-level variable names to their string literal values.
+        Only plain assignments and annotated assignments where the value is a string literal
+        are included; other statement forms and non-string values are ignored.
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     assignments: dict[str, str] = {}
     for node in tree.body:
@@ -156,7 +224,13 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
 
 
 def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
-    """Implement test app period stat descriptions use total with reset period."""
+    """
+    Verify app-period statistic sensor descriptions use `TOTAL` state class and the expected `reset_period` values.
+    
+    Asserts that the set of stat description keys present in the integration matches the expected app-period keys, and for each key:
+    - the `state_class` is `"TOTAL"`;
+    - the `reset_period` equals the expected period string (`"day"`, `"week"`, `"month"`, or `"year"`).
+    """
     expected: dict[str, str] = {
         "today_load": "day",
         "device_today_pv_energy": "day",
@@ -203,7 +277,11 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
 
 
 def test_documented_stat_paths_match_const_values() -> None:
-    """Implement test documented stat paths match const values."""
+    """
+    Verify top-level statistic path constants in const.py match the expected API endpoint strings.
+    
+    Asserts that each documented constant (e.g., DEVICE_STATISTIC_PATH, PV_TRENDS_PATH) is defined as the exact path string expected by the integration.
+    """
     expected_paths = {
         "DEVICE_STATISTIC_PATH": "/v1/device/stat/deviceStatistic",
         "DEVICE_PV_STAT_PATH": "/v1/device/stat/pv",
@@ -220,7 +298,11 @@ def test_documented_stat_paths_match_const_values() -> None:
 
 
 def test_week_month_year_sensors_keep_same_source_family() -> None:
-    """Implement test week month year sensors keep same source family."""
+    """
+    Assert that week, month, and year energy stat descriptions use the same source-family section naming pattern.
+    
+    This test builds expected source-prefix mappings for several energy families (pv, home, battery_charge, battery_discharge, device_ongrid_input, device_ongrid_output) and verifies that each `<family>_{period}_energy` stat description reports a `section` equal to `<expected_prefix>_{period}` for period in `("week", "month", "year")`.
+    """
     metadata = _stat_description_metadata()
     expected_source_prefix = {
         "pv": "device_pv_stat",
@@ -277,7 +359,13 @@ def test_device_day_sensors_prefer_day_period_sources() -> None:
 
 
 def test_entity_statistics_metric_map_targets_existing_entities() -> None:
-    """Cloud-bucket repair keys must resolve to real stat sensor entities."""
+    """
+    Ensure metric-to-entity mapping targets only documented statistic entities.
+    
+    Asserts that every entity key referenced by _ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD
+    exists in the stat description metadata and that the day mapping for
+    "battery_discharge_energy" equals "device_today_battery_discharge".
+    """
     from custom_components.jackery_solarvault.coordinator import (
         _ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD,
         DATE_TYPE_DAY,
@@ -315,7 +403,11 @@ def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None
 
 
 def test_external_chart_import_uses_raw_app_period_points() -> None:
-    """Implement test external chart import uses raw app period points."""
+    """
+    Verify the coordinator imports raw app-period chart points for external chart import.
+    
+    Asserts the coordinator source contains a call to `trend_series_points(` and a comment indicating only rows before the rewritten range are handled.
+    """
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "trend_series_points(" in source
@@ -345,7 +437,14 @@ def test_device_period_stats_poll_all_app_periods() -> None:
 
 
 def test_period_ranges_are_explicit_full_app_periods() -> None:
-    """Implement test period ranges are explicit full app periods."""
+    """
+    Verify app-period requests and helper functions explicitly compute full app-period date ranges.
+    
+    Checks that:
+    - The coordinator includes a guard/message requiring explicit period ranges and calls app_period_request_kwargs(date_type, today=self._local_today()).
+    - The API exposes app_period_date_bounds for computing period bounds.
+    - The integration util implements week, month, and year boundary calculations (weekday-based week start, calendar.monthrange for month bounds, and replacing month/day to 12/31 for year end).
+    """
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     api_source = API_PATH.read_text(encoding="utf-8")
     util_source = (
@@ -363,7 +462,14 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
 
 
 def test_obsolete_period_entities_are_not_created() -> None:
-    """Implement test obsolete period entities are not created."""
+    """
+    Assert that obsolete period-based entity classes and keys are not created in the sensor source while required internal constant names remain present.
+    
+    Checks that:
+    - The `JackeryPvTrendsTodaySensor` class is not present in the sensor source.
+    - Period-scoped grid import/export keys for week/month/year are not present in `sensor.py` but their corresponding internal constant names (prefixed with `_`) exist in `const.py`.
+    - `_pv_today_energy` and `_system_pv_today_energy` internal constants exist in `const.py`.
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
@@ -385,7 +491,11 @@ def test_obsolete_period_entities_are_not_created() -> None:
 
 
 def test_non_app_diagnostic_sensors_are_not_created() -> None:
-    """Implement test non app diagnostic sensors are not created."""
+    """
+    Verify non-app diagnostic sensor classes are not appended to entity lists while their class definitions and diagnostic suffixes remain present.
+    
+    This test asserts that specific diagnostic sensor class names appear in the sensor source but are not added to entity construction via `_append_unique(<ClassName>`, and that the corresponding legacy diagnostic suffix strings exist in the constants source.
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
@@ -463,7 +573,11 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
 
 
 def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
-    """Implement test former disabled app sensor suffixes remain documented."""
+    """
+    Ensure legacy disabled app sensor suffix strings remain present in the integration's constants.
+    
+    Asserts that a fixed set of former sensor suffix identifiers (kept for documentation/compatibility) are still contained in the `const.py` source.
+    """
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
     for suffix in (
@@ -478,7 +592,11 @@ def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
 
 
 def test_external_app_chart_statistics_are_period_scoped() -> None:
-    """Implement test external app chart statistics are period scoped."""
+    """
+    Verify external app chart statistic bucket constants are period-scoped.
+    
+    Asserts that the module-level constants map each DATE_TYPE to the appropriate EXTERNAL_STAT_BUCKET for day, week, month, and year, and that literal string mappings like `"daily"` or `"monthly"` are not used for month/year.
+    """
     source = CONST_PATH.read_text(encoding="utf-8")
 
     assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in source
@@ -648,7 +766,11 @@ def test_fast_http_property_fetch_is_never_skipped() -> None:
 
 
 def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
-    """Implement test period sensor translations do not use this period wording."""
+    """
+    Assert that the integration's translation files do not contain locale phrases that use "this week", "this month", or "this year" wording.
+    
+    This test reads the component's strings.json and all JSON files in the translations directory and fails if any of the forbidden phrases (English, German, Spanish, and French variants) appear in the source.
+    """
     for path in (
         COMPONENT_PATH / "strings.json",
         *sorted((COMPONENT_PATH / "translations").glob("*.json")),
@@ -731,7 +853,14 @@ def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
 
 
 def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
-    """Implement test stat state class matrix for totals periods and prices."""
+    """
+    Validate that stat sensor descriptions use the expected `state_class` and `reset_period` values for totals, period totals, and price metrics.
+    
+    Builds an expected mapping of stat description keys to their required `(state_class, reset_period)` tuples, locates `JackeryStatSensorDescription` call sites, and asserts:
+    - The set of discovered keys matches the expected matrix.
+    - Each discovered entry's `(state_class, reset_period)` equals the expected tuple.
+    - Any stat description that declares `reset_period` as `day`, `week`, `month`, or `year` uses `state_class == "TOTAL"`.
+    """
     matrix = {
         "today_load": ("TOTAL", "day"),
         "total_generation": ("TOTAL_INCREASING", None),
@@ -770,15 +899,10 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
 
 
 def test_last_reset_is_data_driven_not_wall_clock() -> None:
-    """``last_reset`` must derive from APP_REQUEST_META, not dt_util.now().
-
-    Wall-clock anchoring caused a midnight race: at 00:00:01 local time
-    HA Recorder saw ``last_reset = today 00:00`` together with the
-    cloud's still-stale yesterday total, so the new day's bucket
-    started at yesterday's value and looked like a loss when the real
-    smaller value arrived seconds later. The fix anchors to the
-    begin_date stamped on the source by the API request, advancing
-    only when fresh data has actually arrived.
+    """
+    Ensure an entity's `last_reset` is derived from the API request's `begin_date` metadata rather than the wall-clock period start.
+    
+    This prevents a midnight race where the recorder records a new day's `last_reset` before fresh period totals arrive, which could appear as a sudden drop. The test verifies the sensor implements `_period_begin_from_meta()`, uses `begin_iso = self._period_begin_from_meta()`, and only falls back to the wall-clock `_period_start` when `begin_iso is None`.
     """
     sensor_source = (
         Path(__file__).resolve().parents[1]
@@ -880,11 +1004,10 @@ def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
 
 
 def test_zero_period_totals_create_entities_without_chart_series() -> None:
-    """Monday week payloads can have ``y: null`` but scalar total ``0``.
-
-    A scalar period total, including zero, is still a valid app statistic.
-    Entity creation must not require a non-empty chart series, otherwise
-    week entities disappear on Monday morning.
+    """
+    Ensure zero scalar period totals still create entities even when the associated chart series is empty.
+    
+    Some app-period payloads (for example, Monday week buckets) may have an empty trend series (`y: null`) while the scalar total is `0`. Entity creation must treat a zero total as valid and must not require a non-empty chart series.
     """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     helper = sensor_source.split("def _stat_description_has_value", 1)[1].split(
@@ -913,23 +1036,10 @@ def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
 
 
 def test_total_revenue_uses_total_increasing_without_monetary_class() -> None:
-    """``total_revenue`` must use TOTAL_INCREASING without MONETARY device_class.
-
-    History (CHANGELOG and 2026-05-16 user audit):
-
-    * The CHANGELOG "Three-part fix" / Midnight race condition
-      explicitly sets ``state_class=TOTAL_INCREASING`` so the Recorder
-      treats the midnight cloud transient as a reset rather than as a
-      real loss (no negative spikes in CO2/Einnahmen).
-    * An earlier revert added ``device_class=MONETARY``, which triggers
-      HA's validator restriction "MONETARY only allows TOTAL or None"
-      and forced ``state_class=TOTAL``. That regression reintroduced
-      the midnight drop.
-    * The user pointed out that ``MONETARY`` is not part of the intended
-      entity model. Removing it eliminates the validator conflict and
-      restores TOTAL_INCREASING.
-
-    Lock the docs-compliant combination so it cannot regress again.
+    """
+    Ensure the `total_revenue` stat description uses SensorStateClass.TOTAL_INCREASING and does not include SensorDeviceClass.MONETARY.
+    
+    This test verifies the integration documents `total_revenue` with the `TOTAL_INCREASING` state class and without the `MONETARY` device class to prevent Recorder midnight-reset regressions caused by the validator interaction between `MONETARY` and `state_class`.
     """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     pattern = re.compile(
@@ -968,7 +1078,16 @@ def test_statistics_backfill_state_is_removed() -> None:
 
 
 def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
-    """Bounded HTTP backfill runs before current buckets for sum continuity."""
+    """
+    Verify HTTP backfill runs before importing current app chart statistics so period sums remain continuous.
+    
+    Asserts that:
+    - legacy repair/backfill helpers and related persistent state symbols are absent from the coordinator source;
+    - the HTTP backfill call `_async_http_backfill_recent_day_statistics(` appears earlier in the import job than the app-chart import call `self._async_import_app_chart_statistics(snapshot)`, which itself appears before the entity-level import `_async_import_current_app_chart_entity_statistics(snapshot)`;
+    - the current payload entity source batches iterate only over day/week/month (not year).
+    
+    This test does not return a value.
+    """
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     import_source = coordinator_source.split(
         "async def _async_import_current_app_chart_statistics_job", 1
@@ -1077,7 +1196,13 @@ def test_day_chart_sources_prefer_device_minute_curves_for_pv_and_battery() -> N
 
 
 def test_historical_statistics_fetch_path_is_bounded_http_backfill() -> None:
-    """Historical day backfill uses explicit HTTP app-stat requests."""
+    """
+    Verify the coordinator implements bounded HTTP-based historical day backfill for app-period statistics.
+    
+    Asserts that coordinator source code uses the HTTP day-chart backfill helper and constants (_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
+    _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC), requests day-period app data via app_period_request_kwargs(DATE_TYPE_DAY, today=target_day),
+    and does not contain removed/deprecated fetch helpers or obsolete guards such as "Skip historical app chart fetch" or "period_start > today".
+    """
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "async def _async_fetch_historical_app_chart_source" not in (
@@ -1216,7 +1341,11 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
 
 
 def test_day_external_history_backfill_uses_http_day_curves() -> None:
-    """Day external statistics may be repaired from historical HTTP curves."""
+    """
+    Verify day external history backfill uses HTTP day chart curves and not calendar-day iteration.
+    
+    Checks that the coordinator does not use internal calendar-day iteration or day-specific app_period_request kwargs, and that both the current-day import and the historical backfill use the external day chart bucket and the `_day_chart_points_for_metric` path, with the backfill code invoking `_async_add_app_chart_statistics`.
+    """
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     assert "def _iter_calendar_days" not in coordinator_source

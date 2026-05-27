@@ -19,6 +19,15 @@ COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
+    """
+    Read a UTF-8 text file from the integration component directory.
+    
+    Parameters:
+    	name (str): Relative filename located inside the integration component directory.
+    
+    Returns:
+    	file_text (str): The file contents decoded as UTF-8.
+    """
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
@@ -133,6 +142,15 @@ def test_stale_drop_helper_logic_unit() -> None:
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
     def drop(packs):
+        """
+        Filter packs by their `_last_seen_at` ISO 8601 timestamp, dropping those older than the configured threshold.
+        
+        Parameters:
+            packs (Iterable[dict]): Sequence of pack dictionaries. Each pack may include an `_last_seen_at` value (ISO-formatted string). Packs with a missing, non-string, or unparsable `_last_seen_at` are retained.
+        
+        Returns:
+            tuple[list[dict], int]: A pair (kept_packs, stale_count) where `kept_packs` is the list of packs retained and `stale_count` is the number of packs considered stale and dropped.
+        """
         kept = []
         stale = 0
         for pack in packs:
@@ -181,6 +199,15 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
     }
 
     def drop(packs):
+        """
+        Filter out battery packs whose `_last_seen_at` timestamp is older than the configured threshold.
+        
+        Parameters:
+            packs (list[dict]): Iterable of battery-pack dictionaries to evaluate.
+        
+        Returns:
+            list: The subset of `packs` retained — packs that do not have a string `_last_seen_at`, have an unparsable `_last_seen_at`, or whose parsed `_last_seen_at` is within `threshold_seconds` of `now`.
+        """
         kept = []
         for p in packs:
             last_seen = p.get("_last_seen_at")

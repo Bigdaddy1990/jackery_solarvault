@@ -14,7 +14,12 @@ _KEY_DEVICE_INDEX: Final = "device_index"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Return the HA Store used for cached discovery metadata."""
+    """
+    Provide the Home Assistant Store configured to persist discovery metadata for this integration.
+    
+    Returns:
+        A `Store[dict[str, Any]]` configured with the integration's storage key and schema version for persisting per-entry discovery data.
+    """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 

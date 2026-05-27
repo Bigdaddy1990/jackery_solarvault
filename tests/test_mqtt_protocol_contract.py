@@ -14,16 +14,32 @@ SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
 
 
 def _read(path: Path) -> str:
-    """Read source files as UTF-8 regardless of host locale.
-
-    Windows defaults ``Path.read_text()`` to cp1252, which crashes on the
-    UTF-8 docstrings used throughout the integration sources. Always
-    pin UTF-8 here so tests are platform-agnostic.
+    """
+    Read the text contents of a file, decoded as UTF-8.
+    
+    Parameters:
+        path (Path): Path to the file to read.
+    
+    Returns:
+        str: The file's contents decoded using UTF-8.
     """
     return path.read_text(encoding="utf-8")
 
 
 def _function_source(path: Path, name: str) -> str:
+    """
+    Return the exact source text for a top-level function or async function defined in a Python file.
+    
+    Parameters:
+        path (Path): Path to the Python source file to read.
+        name (str): Name of the function or async function to extract.
+    
+    Returns:
+        str: The source code lines comprising the named function, including its signature and body.
+    
+    Raises:
+        AssertionError: If the named function is not found in the given file.
+    """
     source = _read(path)
     tree = ast.parse(source)
     lines = source.splitlines()
@@ -176,6 +192,17 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
     )
 
     async def _run() -> None:
+        """
+        Exercise the coordinator's third-party MQTT query handling and assert correct bucketing of response payload.
+        
+        Creates a minimal JackerySolarVaultCoordinator instance with required stubs, injects a QueryThirdPartMQTTConfig MQTT message, and verifies the coordinator:
+        - does not merge third-party MQTT fields into the main `properties` map,
+        - stores the full third-party config under `third_party_mqtt_config`,
+        - and that `_sanitize_main_properties` returns an empty dict for the provided body.
+        
+        Raises:
+            AssertionError: If any of the expected storage or sanitization conditions are not met.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"soc": 40}}}
         self._device_index = {"dev": {}}
@@ -183,9 +210,20 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         captured: dict[str, object] = {}
 
         async def _debug_event(_event_or_factory: object) -> None:
+            """Act as a no-op placeholder for emitting or producing debug events.
+            
+            Parameters:
+                _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
+            """
             return None
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
+            """
+            Store a partial update payload into the test capture dictionary.
+            
+            Parameters:
+                new_data (dict[str, object]): Partial update payload to capture under the key "data".
+            """
             captured["data"] = new_data
 
         self._async_payload_debug_event = _debug_event
@@ -252,7 +290,11 @@ def test_smart_plug_subdevice_protocol_is_wired() -> None:
 
 
 def test_smart_plug_statistics_are_read_only_app_paths() -> None:
-    """Smart-plug statistics use app read paths and never add write commands."""
+    """
+    Validate that smart-plug statistics are read-only and wired to the app's read-only REST/API paths.
+    
+    Asserts that the integration defines the smart-plug statistic REST paths and JSON field constants, that the API exposes the endpoints using those constants and underlying `_get_json` / `_async_get_device_period_stat` helpers, and that the coordinator and sensors provide enrichment, stat ID mapping, and sensor descriptions for today/total energy with daily reset behavior.
+    """
     const_source = _read(CONST_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     sensor_source = _read(SENSOR_PATH)
@@ -403,6 +445,11 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
     )
 
     async def _run() -> None:
+        """
+        Run a minimal coordinator test that sends an MQTT action message containing a text-form command and verifies the device property update is applied.
+        
+        This helper constructs a minimal JackerySolarVaultCoordinator instance with stubbed debug and push callbacks, delivers an MQTT "action" payload whose `FIELD_CMD` is a text string (e.g., "{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0") and a body containing a `new` property, and asserts the coordinator merges that `new` value into the device's `PAYLOAD_PROPERTIES` and that a partial update was pushed.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"old": 1}}}
         self._device_index = {"dev": {}}
@@ -410,9 +457,20 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         captured: dict[str, object] = {}
 
         async def _debug_event(_event_or_factory: object) -> None:
+            """Act as a no-op placeholder for emitting or producing debug events.
+            
+            Parameters:
+                _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
+            """
             return None
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
+            """
+            Store a partial update payload into the test capture dictionary.
+            
+            Parameters:
+                new_data (dict[str, object]): Partial update payload to capture under the key "data".
+            """
             captured["data"] = new_data
 
         self._async_payload_debug_event = _debug_event
@@ -438,7 +496,11 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
 
 def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> None:
-    """Subdevice MQTT detection tolerates string actionIds from payloads."""
+    """
+    Verify _is_subdevice_payload accepts numeric action IDs provided as strings and rejects invalid non-numeric values.
+    
+    Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice action IDs, while `True` and `float('nan')` are rejected.
+    """
     from custom_components.jackery_solarvault.const import FIELD_ACTION_ID
     from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
@@ -493,6 +555,14 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
             self.silent = silent
 
         def diagnostics_snapshot(self) -> dict[str, object]:
+            """
+            Collect a minimal diagnostics snapshot for MQTT connectivity.
+            
+            Returns:
+                snapshot (dict[str, object]): Mapping with:
+                    - "connected": `True` if the coordinator is currently connected to MQTT.
+                    - "mqtt_silent_for_too_long": boolean flag taken from `self.silent` indicating whether MQTT has been silent for too long.
+            """
             return {
                 "connected": True,
                 "mqtt_silent_for_too_long": self.silent,
@@ -551,7 +621,11 @@ def test_fault_alarm_report_is_routed_as_alarm_payload() -> None:
 
 
 def test_mqtt_uses_captured_qos_zero() -> None:
-    """Implement test mqtt uses captured qos zero."""
+    """
+    Verify MQTT publish and subscribe usage is configured to QoS 0.
+    
+    Asserts that the mqtt_push module declares a captured QoS of 0, that subscriptions use `qos=0`, and that the coordinator publishes JSON messages with `qos=0` and `retain=False`.
+    """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
@@ -563,7 +637,11 @@ def test_mqtt_uses_captured_qos_zero() -> None:
 
 
 def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
-    """Implement test mqtt payload data field is normalized to body."""
+    """
+    Verify MQTT payloads using the 'data' field are normalized to the 'body' field across the codebase.
+    
+    Asserts that the relevant constants for `data`/`body` and the ControlCombine message/cmd exist in const.py, and that mqtt_push and the coordinator normalize `FIELD_DATA` into `FIELD_BODY` by reading `data.get(FIELD_DATA)` and assigning it to `data[FIELD_BODY]` / `payload[FIELD_DATA]`.
+    """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     const_source = _read(CONST_PATH)

@@ -15,7 +15,14 @@ REQUIRED_HTML = (
 
 
 def main() -> int:
-    """Validate the required root-level HTML docs."""
+    """
+    Check that each filename in REQUIRED_HTML exists as a root-level HTML file under DOCS.
+    
+    If any required files are missing, prints "Missing required docs:" followed by each missing path as "- docs/<name>" and returns 1. If all required files are present, returns 0.
+    
+    Returns:
+        int: Exit code — 0 when all required docs are present, 1 when one or more are missing.
+    """
     parser = ArgumentParser()
     parser.add_argument("--watch", action="store_true")
     parser.parse_args()

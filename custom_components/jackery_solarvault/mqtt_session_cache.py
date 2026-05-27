@@ -34,7 +34,11 @@ _KEY_CACHED_AT: Final = "cached_at"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Return the HA Store backing the MQTT-session cache."""
+    """
+    Get the Home Assistant Store used to persist the MQTT session cache.
+    
+    @returns Store[dict[str, Any]]: A configured Home Assistant `Store` instance using the module's storage key and version for MQTT session cache persistence.
+    """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 

@@ -35,10 +35,29 @@ from custom_components.jackery_solarvault.sensor import (
 
 
 def _entity(payload: dict[str, object]) -> JackeryEntity:
+    """
+    Create a JackeryEntity test instance using the provided payload stored under the "dev1" key.
+    
+    Parameters:
+        payload (dict[str, object]): Device payload to attach to the entity as its data.
+    
+    Returns:
+        JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
+    """
     return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
 
 
 def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
+    """
+    Create and initialize an instance of the given sensor class for tests using the provided device payload.
+    
+    Parameters:
+        cls (type[Any]): Sensor entity class to instantiate.
+        payload (dict[str, object]): Device payload used to initialize the entity's data under the "dev1" key.
+    
+    Returns:
+        Any: An instance of `cls` initialized with the given payload.
+    """
     entity = cls.__new__(cls)
     JackeryEntity.__init__(
         entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"

@@ -37,7 +37,12 @@ _KEY_VALUES: Final = "values"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Return the HA Store backing the local-daily cache."""
+    """
+    Get the Home Assistant Store configured for this module's local daily cache.
+    
+    Returns:
+        store (Store[dict[str, Any]]): Home Assistant Store instance for persisting per-device daily snapshots.
+    """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 

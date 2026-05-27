@@ -20,7 +20,14 @@ _CODE_RE = re.compile(r"`([^`]+)`")
 
 
 def markdown_files() -> list[Path]:
-    """Return source Markdown files that belong to the docs contract."""
+    """
+    List Markdown source files in the docs directory excluding generated output files.
+    
+    Searches DOCS_DIR for files matching "*.md" and returns only regular files that are not located in OUTPUT_DIR.
+    
+    Returns:
+        list[Path]: Sorted list of Path objects pointing to Markdown source files.
+    """
     return sorted(
         path
         for path in DOCS_DIR.glob("*.md")
@@ -46,14 +53,33 @@ def inline_markdown(value: str) -> str:
 
 
 def close_list(parts: list[str], in_list: bool) -> bool:
-    """Close an open unordered list if needed."""
+    """
+    Close an open unordered list in the HTML parts buffer.
+    
+    Parameters:
+        parts (list[str]): Mutable list collecting HTML fragments; may be appended with a closing `</ul>` tag.
+        in_list (bool): Whether an unordered list is currently open.
+    
+    Returns:
+        `False`: Indicates the list is now closed.
+    """
     if in_list:
         parts.append("</ul>")
     return False
 
 
 def render_body(markdown: str) -> str:
-    """Render Markdown to a compact, deterministic HTML fragment."""
+    """
+    Convert a Markdown document into a compact, deterministic HTML fragment.
+    
+    The renderer supports ATX headings (H1–H6), fenced code blocks using ``` (emitted as
+    HTML-escaped `<pre><code>` blocks), unordered lists (`-` or `*`), paragraphs, and a
+    small inline Markdown subset (inline code, bold, emphasis, and links). Output is a
+    stable, minimal HTML fragment with elements separated by newline characters.
+    
+    Returns:
+        html_fragment (str): The rendered HTML fragment.
+    """
     parts: list[str] = []
     paragraph: list[str] = []
     in_list = False
@@ -114,7 +140,16 @@ def render_body(markdown: str) -> str:
 
 
 def title_for(path: Path, markdown: str) -> str:
-    """Return the first H1 or the file stem as the document title."""
+    """
+    Choose the document title from the first H1 in the markdown or, if none is present, the file stem.
+    
+    Parameters:
+        path (Path): Source file path used as a fallback when no H1 is found.
+        markdown (str): Markdown document text to scan for a first-level heading.
+    
+    Returns:
+        title (str): The text of the first H1, HTML-unescaped and stripped of surrounding whitespace, or `path.stem` if no H1 is found.
+    """
     for line in markdown.splitlines():
         match = _TITLE_RE.match(line)
         if match:
@@ -123,7 +158,13 @@ def title_for(path: Path, markdown: str) -> str:
 
 
 def render_page(path: Path) -> str:
-    """Render a source Markdown file as a standalone HTML document."""
+    """
+    Builds a standalone HTML document from a Markdown source file.
+    
+    Reads the Markdown at `path`, derives the document title and body, and returns a complete HTML string suitable for writing to disk or serving.
+    Returns:
+        html (str): Complete HTML document containing an escaped <title> and the rendered body fragment.
+    """
     markdown = path.read_text(encoding="utf-8")
     title = title_for(path, markdown)
     body = render_body(markdown)
@@ -148,7 +189,18 @@ def render_page(path: Path) -> str:
 
 
 def write_index(outputs: Iterable[Path], *, check: bool) -> bool:
-    """Write or verify a generated HTML index."""
+    """
+    Generate an index HTML file listing the given output paths and either write it to the output directory or verify it against the existing file.
+    
+    Each entry uses the output file's name for the link href and the file stem for the link text.
+    
+    Parameters:
+        outputs (Iterable[Path]): Paths to output files to include in the index.
+        check (bool): If `True`, compare the generated content with the existing file and do not modify disk; if `False`, write the file.
+    
+    Returns:
+        `True` if the generated index was written or matched the existing file, `False` if a difference was detected when `check` is `True`.
+    """
     links = "\n".join(
         f'    <li><a href="{html.escape(path.name, quote=True)}">{html.escape(path.stem)}</a></li>'
         for path in sorted(outputs)
@@ -172,7 +224,17 @@ def write_index(outputs: Iterable[Path], *, check: bool) -> bool:
 
 
 def write_or_check(path: Path, content: str, *, check: bool) -> bool:
-    """Write content or report a diff if the file is stale."""
+    """
+    Write `content` to `path`, or when `check` is true, report a unified diff if the existing file differs.
+    
+    Parameters:
+        path (Path): Destination file path.
+        content (str): New file content to write or compare.
+        check (bool): If `True`, do not write; compare existing content and print a unified diff to stderr when different.
+    
+    Returns:
+        bool: `True` if the file was written or the existing content matches `content`; `False` if `check` is `True` and the contents differ.
+    """
     if check:
         old = path.read_text(encoding="utf-8") if path.exists() else ""
         if old != content:
@@ -218,7 +280,15 @@ def watch(interval: float) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """
+    Parse command-line arguments for the docs builder.
+    
+    Returns:
+        argparse.Namespace: Parsed arguments with attributes:
+            check (bool): True to fail when generated HTML is stale.
+            watch (bool): True to rebuild docs after changes.
+            watch_interval (float): Seconds between source scans in watch mode.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--check", action="store_true", help="fail when generated HTML is stale"
@@ -236,7 +306,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Run the docs builder."""
+    """
+    Run the documentation builder according to CLI arguments.
+    
+    Parses command-line arguments and either starts watch mode or performs a single build, returning the chosen mode's exit code.
+    
+    Returns:
+        int: Exit code (0 on success, non-zero on failure).
+    
+    Raises:
+        SystemExit: If both `--watch` and `--check` are provided.
+    """
     args = parse_args()
     if args.watch:
         if args.check:

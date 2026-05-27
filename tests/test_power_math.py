@@ -12,6 +12,13 @@ import types
 
 
 def _load_util_module():
+    """
+    Load and return the local `custom_components.jackery_solarvault.util` module for tests.
+    
+    This function locates the component directory relative to the test file, registers minimal package module entries in `sys.modules` for `custom_components` and `custom_components.jackery_solarvault`, loads and executes the component's `const.py` and `util.py` files, and returns the executed `util` module object. It mutates `sys.modules` as part of preparing the import environment for testing.
+    Returns:
+        module: The loaded `custom_components.jackery_solarvault.util` module object.
+    """
     package_dir = (
         Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
@@ -338,7 +345,14 @@ def test_coordinator_entity_signature_changes_when_stat_curve_becomes_usable() -
 
 
 def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
-    """Implement test smart meter net and gross values from signed phases."""
+    """
+    Verify smart-meter helpers compute signed-phase, net, and gross power values from a CT phase payload.
+    
+    Asserts that:
+    - phase values are converted to signed-phase list with the B-phase sign inverted,
+    - net power equals the sum of signed phases,
+    - calculated smart-meter powers for `net_import`, `net_export`, `gross_import`, `gross_export`, and `gross_flow` match expected numeric results.
+    """
     ct = {
         "aPhasePw": 2.9,
         "bPhasePw": 0,
@@ -946,7 +960,11 @@ def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None
 
 
 def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> None:
-    """Implement test trend series points build year monthly buckets and skip future."""
+    """
+    Verify monthly bucket points are produced for a year-series payload, that compact-encoded year buckets are expanded when anchored by a documented total, and that months after `today` are omitted.
+    
+    The test uses a `kWh` year payload where `y2` contains a compact value (`7.84`) that should expand into April=7.0 and May=84.0 when `totalOutGridEnergy` anchors the interpretation; with `today` set to 2026-05-03 the function must return points for January through May (month-start dates) and skip later months.
+    """
     source = {
         "unit": "kWh",
         # Documented year total anchors compact expansion: 7.84 -> April=7, May=84
@@ -1555,6 +1573,12 @@ def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
 
     class OverflowFloat:
         def __float__(self) -> float:
+            """
+            Indicate that converting this object to a floating-point value is unsupported because it would overflow.
+            
+            Raises:
+                OverflowError: Always raised to signal an overflow on float conversion.
+            """
             raise OverflowError
 
     assert util.safe_float("40,96") == 40.96

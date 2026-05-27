@@ -117,7 +117,17 @@ _DEV_MODE_CACHED: bool | None = None
 
 
 def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
-    """Return a bool option with legacy setup-data fallback."""
+    """
+    Read a boolean configuration option from an entry, falling back to legacy setup data and a provided default.
+    
+    Parameters:
+        entry (Any): An object with optional `options` and `data` mappings (commonly a config entry).
+        key (str): The option key to read.
+        default (bool): The boolean to return when the option is missing or unparseable.
+    
+    Returns:
+        `true` if the resolved option parses as a truthy value, `false` if it parses as a falsy value; returns `default` when the option is missing or cannot be parsed as a boolean.
+    """
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -128,7 +138,17 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
 
 
 def config_entry_str_option(entry: Any, key: str, default: str) -> str:
-    """Return a str option with legacy setup-data fallback."""
+    """
+    Read a string-valued configuration option from an entry, falling back to legacy setup data and the provided default.
+    
+    Parameters:
+        entry (Any): Config-entry-like object with `options` and `data` mappings.
+        key (str): Option key to look up.
+        default (str): Value to return when neither `options` nor `data` provide a non-`None` value.
+    
+    Returns:
+        str: The resolved option coerced to `str`, or `default` if no value is found.
+    """
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -140,7 +160,17 @@ def config_entry_str_option(entry: Any, key: str, default: str) -> str:
 
 
 def config_entry_int_option(entry: Any, key: str, default: int) -> int:
-    """Return an int option with legacy setup-data fallback."""
+    """
+    Read an integer option from a config entry, falling back to legacy entry.data and finally to a default.
+    
+    Parameters:
+        entry (Any): An object exposing optional mapping attributes `options` and `data`.
+        key (str): The option name to read.
+        default (int): The value to return if the option is missing or cannot be interpreted as an integer.
+    
+    Returns:
+        int: The resolved integer value; if the option is missing or cannot be parsed as an integer, returns `default`.
+    """
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -160,7 +190,23 @@ def utc_now() -> datetime:
 
 
 def parse_utc_datetime(value: Any) -> datetime:
-    """Parse a Jackery timestamp and normalize it to timezone-aware UTC."""
+    """
+    Parse a Jackery timestamp and normalize it to UTC.
+    
+    Accepts:
+    - datetime: used as-is,
+    - int/float (excluding bool): treated as a POSIX timestamp in seconds; values with absolute magnitude >= 100_000_000_000 are treated as milliseconds and divided by 1000,
+    - str: trimmed; empty strings are rejected; first attempted as a numeric timestamp (as above), otherwise parsed as ISO 8601 (a trailing "Z" is treated as "+00:00").
+    
+    Parameters:
+        value (Any): The timestamp value to parse.
+    
+    Returns:
+        A timezone-aware UTC datetime.
+    
+    Raises:
+        ValueError: If the input is empty, unsupported, or cannot be parsed as a UTC timestamp.
+    """
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -238,7 +284,19 @@ def append_unique_entity(
     platform: str,
     logger: Any,
 ) -> bool:
-    """Append an entity once per unique_id during platform setup."""
+    """
+    Append an entity to the provided list only if its `unique_id` has not already been recorded, and record the `unique_id` when appended.
+    
+    Parameters:
+        entities (list[Any]): Destination list for the entity.
+        seen_unique_ids (set[str]): Set of unique IDs already seen; updated when a new entity is appended.
+        entity (Any): Entity object; its `unique_id` attribute (if present) is used for deduplication.
+        platform (str): Platform name used in the duplicate debug message.
+        logger (Any): Logger used to emit a debug message when a duplicate is skipped.
+    
+    Returns:
+        bool: `True` if the entity was appended, `False` if skipped due to a duplicate `unique_id`.
+    """
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         logger.debug("Skip duplicate %s unique_id=%s", platform, uid)
@@ -298,7 +356,21 @@ def app_period_date_bounds(
     end_date: str | date | None = None,
     today: date | None = None,
 ) -> tuple[str, str]:
-    """Return validated ISO begin/end strings for a Jackery app request."""
+    """
+    Validate and normalize begin and end date bounds for a Jackery app period request.
+    
+    Parameters:
+        date_type (str): Period type (one of APP_PERIOD_DATE_TYPES) used to compute defaults when a bound is omitted.
+        begin_date (str | date | None): Optional begin bound; may be a date, datetime, or ISO date string. When None, the period's default begin is used.
+        end_date (str | date | None): Optional end bound; may be a date, datetime, or ISO date string. When None, the period's default end is used.
+        today (date | None): Optional "today" date used when computing period defaults; if None, the current date is used.
+    
+    Returns:
+        tuple[str, str]: A pair (begin_iso, end_iso) of ISO-formatted date strings (YYYY-MM-DD).
+    
+    Raises:
+        ValueError: If a provided bound is empty or unparseable, or if the resolved begin date is after the resolved end date.
+    """
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -363,7 +435,14 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
 
 
 def safe_float(value: Any) -> float | None:
-    """Convert a Jackery payload value to float, returning None on error."""
+    """
+    Parse a Jackery payload value into a floating-point number.
+    
+    Accepts numbers or strings (including strings using a single comma as the decimal separator) and returns the numeric value when parseable.
+    
+    Returns:
+        float | None: The parsed float, or `None` when the input is `None` or cannot be parsed as a float.
+    """
     if value is None:
         return None
     if isinstance(value, str):
@@ -398,7 +477,14 @@ def safe_int(value: Any) -> int | None:
 
 
 def dev_mode_redactions_disabled() -> bool:
-    """Return True when the JACKERY_DEV_MODE env var is truthy. Cached for I/O performance."""
+    """
+    Determine whether developer-mode disables payload redactions based on the JACKERY_DEV_MODE environment variable.
+    
+    The environment values "1", "true", "yes", or "on" (case-insensitive) enable developer mode; the computed result is cached for the process lifetime.
+    
+    Returns:
+        `true` if developer-mode redactions are disabled, `false` otherwise.
+    """
     global _DEV_MODE_CACHED
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
@@ -472,7 +558,19 @@ def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
 
 
 def chart_series_debug(source: Any) -> dict[str, Any]:
-    """Return raw/parsed chart-series diagnostics for app payload arrays."""
+    """
+    Produce diagnostics for chart-series arrays found in an app payload.
+    
+    For each chart-series key (Y, Y1..Y6) present as a list, the returned mapping contains:
+    - raw_count: number of items in the series.
+    - parsed_sum: sum of all values that parse as floats, rounded to 5 decimals, or `None` if no parsable values.
+    - items: list of per-index diagnostics with keys `index`, `raw`, `raw_type`, and `parsed_float`.
+    
+    If present, the payload's chart labels are returned under the `labels` key and request metadata under the `request` key.
+    
+    Returns:
+        dict[str, Any]: A diagnostics dictionary keyed by chart-series names and optionally `labels` and `request`.
+    """
     if not isinstance(source, dict):
         return {}
     result: dict[str, Any] = {}
@@ -519,7 +617,14 @@ def append_payload_debug_line(
     event: dict[str, Any],
     redactions_disabled: bool | None = None,
 ) -> None:
-    """Append one redacted JSONL diagnostic event and rotate at a small limit."""
+    """
+    Append a redacted JSON line to a debug file and rotate the file when it exceeds the configured size.
+    
+    Parameters:
+        path (str | Path): Filesystem path of the JSONL debug file to append to; parent directories will be created if needed.
+        event (dict[str, Any]): Diagnostic payload to redact and write as a single JSON line.
+        redactions_disabled (bool | None): If True, do not redact sensitive fields; if False, redact; if None, use the module's default detection.
+    """
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
@@ -537,7 +642,14 @@ def append_payload_debug_line(
 
 
 def safe_bool(value: Any) -> bool | None:
-    """Convert a Jackery payload value to bool, returning None when unknown."""
+    """
+    Parse a value into a boolean according to Jackery payload conventions.
+    
+    Recognizes booleans, numeric truthiness (nonzero), and common string tokens: truthy {"1", "true", "on", "yes"} and falsy {"0", "false", "off", "no"}.
+    
+    Returns:
+        `True` if the value represents truth, `False` if the value represents false, `None` when the value is `None` or cannot be parsed as a boolean.
+    """
     if value is None:
         return None
     if isinstance(value, bool):
@@ -582,7 +694,12 @@ def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
 
 
 def jackery_online_state(value: Any) -> bool | None:
-    """Return a parsed Jackery online/offline marker, or None when unknown."""
+    """
+    Determine whether a Jackery device state value indicates online or offline.
+    
+    Returns:
+        bool | None: `True` if the value indicates online, `False` if it indicates offline, `None` when unknown or unparseable.
+    """
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"online", "connected", "available"}:
@@ -647,7 +764,19 @@ class AppDataQualityWarning(NamedTuple):
 def normalized_data_quality_warnings(
     warnings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Return deterministic, de-duplicated data-quality warnings."""
+    """
+    Normalize and deduplicate data-quality warning mappings into a deterministic list.
+    
+    Parameters:
+        warnings (list[dict[str, Any]]): Iterable of warning mappings. Each warning may include the keys
+            for reason, metric key, source section, source value, reference section, and reference value;
+            these six fields are used to determine duplicates.
+    
+    Returns:
+        list[dict[str, Any]]: Deduplicated warnings, keeping the first occurrence for each unique tuple of
+        (reason, metric_key, source_section, source_value, reference_section, reference_value) and
+        returned in a deterministic, sorted order.
+    """
     deduped: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
     for warning in warnings:
         if not isinstance(warning, dict):
@@ -683,7 +812,24 @@ def _format_request_range(request: Any) -> str | None:
 
 
 def format_data_quality_warning(warning: dict[str, Any]) -> str:
-    """Return a compact, deterministic repair/diagnostic warning example."""
+    """
+    Format a data-quality warning mapping into a compact, deterministic diagnostic string.
+    
+    Parameters:
+        warning (dict[str, Any]): A warning mapping that may contain label or metric key,
+            source and reference section identifiers and values, and optional source/reference
+            request metadata. Expected keys include `DATA_QUALITY_KEY_LABEL` or
+            `DATA_QUALITY_KEY_METRIC_KEY`, `DATA_QUALITY_KEY_SOURCE_SECTION`,
+            `DATA_QUALITY_KEY_SOURCE_VALUE`, `DATA_QUALITY_KEY_REFERENCE_SECTION`,
+            `DATA_QUALITY_KEY_REFERENCE_VALUE`, and optional `DATA_QUALITY_KEY_SOURCE_REQUEST`
+            / `DATA_QUALITY_KEY_REFERENCE_REQUEST`.
+    
+    Returns:
+        str: A single-line summary in the form
+        "`<metric>: <source_section>=<source_value> < <reference_section>=<reference_value>`"
+        optionally followed by request range summaries in square brackets. Missing or
+        None fields are rendered as `"unknown"`.
+    """
     metric = (
         warning.get(DATA_QUALITY_KEY_LABEL)
         or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
@@ -713,7 +859,22 @@ def app_data_quality_warnings(
     today: date | None = None,
     tolerance: float = 0.05,
 ) -> list[AppDataQualityWarning]:
-    """Return non-mutating warnings for contradictory app statistics."""
+    """
+    Detect contradictory statistics across app period sections and produce data-quality warnings.
+    
+    Parameters:
+        payload (dict[str, Any]): Parsed app payload containing period sections (e.g., "{prefix}_week", "{prefix}_month", "{prefix}_year") and optional `statistic` section.
+        today (date | None): Reference date used to compute the current week/month/year boundaries. When `None`, uses the current local date.
+        tolerance (float): Absolute tolerance applied when comparing totals (a value is considered inconsistent when it exceeds the reference by more than this tolerance).
+    
+    Returns:
+        list[AppDataQualityWarning]: A list of warnings describing detected contradictions. Warnings are produced for cases such as:
+            - year total less than month total,
+            - year total less than week total (when the week is inside the current year),
+            - month total less than week total (when the week is inside the current month),
+            - lifetime generation less than current-year generation.
+        Each warning includes rounded source/reference values, optional request metadata for the involved sections, chart-series keys when applicable, and `total_method="chart_series_sum"` for warnings derived from chart-series totals (omitted when the source is the aggregated `statistic` section).
+    """
     if today is None:
         today = date.today()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
@@ -763,6 +924,19 @@ def app_data_quality_warnings(
         reference_section: str,
         reference_value: float,
     ) -> None:
+        """
+        Append a standardized AppDataQualityWarning to the module-level `warnings` list.
+        
+        Parameters:
+        	reason (str): Short code describing why the warning was generated.
+        	metric_key (str): Metric identifier the warning applies to.
+        	label (str): Human-readable label for the metric.
+        	stat_key (str): Statistic key used to derive chart-series keys for diagnostics.
+        	source_section (str): Section name containing the source value.
+        	source_value (float): Numeric source value that triggered the warning.
+        	reference_section (str): Section name used as the reference for comparison.
+        	reference_value (float): Numeric reference value used for comparison.
+        """
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -862,7 +1036,17 @@ def app_data_quality_warnings(
 
 
 def statistic_id_part(value: Any) -> str:
-    """Return a Home-Assistant-safe external statistic id component."""
+    """
+    Normalize a value into a lowercase, HA-safe statistic id fragment.
+    
+    Parameters:
+        value (Any): Value to normalize; typically a string or identifier.
+    
+    Returns:
+        str: A lowercase string containing only letters, digits, and underscores,
+        with consecutive non-alphanumeric characters collapsed to a single underscore,
+        trimmed of leading/trailing underscores. Returns `"unknown"` if the result is empty.
+    """
     text = str(value or "").strip().lower()
     text = re.sub(r"[^a-z0-9_]+", "_", text)
     text = re.sub(r"_+", "_", text).strip("_")
@@ -875,7 +1059,14 @@ def external_trend_statistic_id(
     metric_key: str,
     bucket: str,
 ) -> str:
-    """Build the external statistics id used for app chart imports."""
+    """
+    Construct an external statistic id for trend statistics.
+    
+    The id has the form "domain:device_metric_bucket" where each component is converted to a normalized identifier part.
+    
+    Returns:
+        external_id (str): The constructed external statistic id.
+    """
     return (
         f"{domain}:"
         f"{statistic_id_part(device_id)}_"
@@ -931,7 +1122,17 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
 
 
 def _compact_year_parts(value: Any) -> tuple[float, float] | None:
-    """Return previous/current-month parts for a candidate Jackery compact year value."""
+    """
+    Parse a Jackery "compact year" value into previous-bucket and current-bucket contributions.
+    
+    Accepts numeric values or string-like representations (commas are accepted as decimal separators). Interprets values with a decimal point as "whole.fraction" where the whole part is treated as the previous bucket contribution and the fractional digits represent the current bucket contribution. Values without a decimal point are returned as (0.0, parsed_value). Returns None for None, boolean inputs, or when the value cannot be reliably parsed into the expected compact format.
+    
+    Parameters:
+        value (Any): Numeric or string-like compact year value (e.g., "12.345" or 12345).
+    
+    Returns:
+        tuple[float, float] | None: `(previous, current)` contributions as floats when parsing succeeds, `None` otherwise.
+    """
     if value is None or isinstance(value, bool):
         return None
     text = str(value).strip().replace(",", ".")
@@ -1065,7 +1266,18 @@ def year_payload_appears_current_month_only(
     *,
     current_month: int,
 ) -> bool:
-    """Return True when a year payload looks like the app's month-only bug."""
+    """
+    Detect whether a year-period payload contains non-zero data only for the current month (a common app month-only bug).
+    
+    Parameters:
+        source: The payload dictionary for the section being inspected.
+        section: The section name within the payload whose series should be examined.
+        stat_keys: Tuple of statistic keys to check inside the section.
+        current_month: The current month as an integer (1–12) used to identify month-only data.
+    
+    Returns:
+        `true` if any inspected series has non-zero values only in `current_month`, `false` otherwise.
+    """
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1093,6 +1305,15 @@ def _month_value(
 
 
 def _pv_revenue_value(source: dict[str, Any]) -> float | None:
+    """
+    Extract the PV revenue value from a payload dictionary.
+    
+    Parameters:
+        source (dict[str, Any]): Payload dictionary that may contain `totalSolarRevenue` or `pvProfit`.
+    
+    Returns:
+        float: The total PV revenue in normal currency units, rounded to 5 decimals, if present or derivable; `None` otherwise.
+    """
     revenue = safe_float(source.get("totalSolarRevenue"))
     if revenue is not None:
         return revenue
@@ -1126,6 +1347,17 @@ def _configured_or_derived_price(
     year_generation: float | None,
     year_revenue: float | None,
 ) -> tuple[float | None, str | None]:
+    """
+    Return a configured per-kWh price if present, otherwise derive a price from yearly generation and revenue.
+    
+    Parameters:
+        payload (dict[str, Any]): Payload that may contain a price configuration under the `PAYLOAD_PRICE` key.
+        year_generation (float | None): Total generation for the year in kWh used to derive a price when configured price is absent.
+        year_revenue (float | None): Total revenue for the year in currency units used to derive a price when configured price is absent.
+    
+    Returns:
+        tuple[float | None, str | None]: A pair `(price, source)` where `price` is the per-kWh price (configured value or a derived value rounded to 5 decimals) and `source` is the string indicating the origin of the price (e.g., "`PAYLOAD_PRICE.FIELD_SINGLE_PRICE`" or `"pv_year_revenue_per_kwh"`). Returns `(None, None)` when no valid configured or derivable price is available.
+    """
     price_source = payload.get(PAYLOAD_PRICE)
     if isinstance(price_source, dict):
         configured = safe_float(price_source.get(FIELD_SINGLE_PRICE))
@@ -1146,6 +1378,25 @@ def _pv_revenue_candidates(
     raw_generation: float | None,
     price: float | None,
 ) -> list[float]:
+    """
+    Generate numeric candidate PV revenue totals for comparison and deduplication.
+    
+    Collects possible revenue values from:
+    - the provided `year_revenue`,
+    - the product of `raw_generation` and `price` (when both are provided),
+    - backfilled metadata found at `pv_year[APP_YEAR_BACKFILL_META]["corrected"]["totalSolarRevenue"]` (`raw_total` and `corrected_total`) when present.
+    
+    All candidate values are rounded to 2 decimal places and deduplicated using a tolerance based on the magnitudes of compared values.
+    
+    Parameters:
+        pv_year (dict[str, Any]): Year payload which may contain backfill metadata under `APP_YEAR_BACKFILL_META`.
+        year_revenue (float | None): Reported year revenue from cloud/statistics, or `None`.
+        raw_generation (float | None): Year generation (kWh) used to derive a revenue candidate when combined with `price`.
+        price (float | None): Unit price used to compute `raw_generation * price`, or `None`.
+    
+    Returns:
+        list[float]: Deduplicated list of candidate revenue totals (rounded to 2 decimals).
+    """
     candidates: list[float] = []
     if year_revenue is not None:
         candidates.append(round(year_revenue, 2))
@@ -1190,6 +1441,24 @@ def _calculated_savings_from_year(
     year_generation: float | None,
     year_revenue: float | None,
 ) -> dict[str, Any] | None:
+    """
+    Estimate monetary savings and provide a breakdown of energy components using annual generation/revenue and payload totals.
+    
+    Parameters:
+        payload (dict[str, Any]): App payload containing trend/statistic sections used to derive totals.
+        year_generation (float | None): Annual PV generation in kWh when available.
+        year_revenue (float | None): Annual PV revenue when available.
+    
+    Returns:
+        dict[str, Any]: A mapping with keys:
+            - "method": string describing the calculation method used,
+            - "calculated_total": monetary savings rounded to 2 decimals,
+            - "energy_kwh": savings energy in kWh rounded to 2 decimals,
+            - "price": price used (rounded to 5 decimals),
+            - "price_source": source identifier for the price,
+            - "source_energy": dict of rounded energy diagnostics (pv_year_kwh, device/grid inputs/outputs, home consumption, CT public export, battery charge/discharge, conversion loss, residual PV energy, etc.).
+        None: If required inputs or derived price are unavailable (no device output, no home/CT totals, or no price).
+    """
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -1318,6 +1587,19 @@ def _savings_publish_decision(
     year_generation: float | None,
     pv_revenue_candidates: list[float],
 ) -> tuple[bool, str]:
+    """
+    Decides whether the cloud-reported revenue should be published (kept) or replaced, and provides a short machine-readable reason.
+    
+    Parameters:
+        raw_revenue (float | None): Cloud-provided total revenue, or `None` if missing.
+        calculated_revenue (float): Revenue calculated from local data.
+        raw_generation (float | None): Cloud-provided lifetime generation, or `None` if missing.
+        year_generation (float | None): Current-year generation derived from year payloads, or `None`.
+        pv_revenue_candidates (list[float]): Candidate revenue values derived from PV data for shape comparison.
+    
+    Returns:
+        tuple[publish (bool), reason (str)]: `publish` is `True` when the cloud total should be used (or cloud total is missing and publishing is allowed); `False` when the cloud total appears implausibly high compared with the current-year calculation. `reason` is a short identifier explaining the decision (e.g., `"missing_cloud_total_revenue"`, `"cloud_total_matches_calculated_savings"`, `"cloud_total_below_current_year_savings"`, `"cloud_total_matches_pv_revenue_not_savings"`, `"cloud_total_higher_than_current_year_savings"`).
+    """
     if raw_revenue is None:
         return True, "missing_cloud_total_revenue"
 
@@ -1347,6 +1629,26 @@ def _backfill_pv_revenue(
     month_sources: dict[int, dict[str, Any]],
     meta: dict[str, Any],
 ) -> None:
+    """
+    Backfill yearly PV revenue fields from per-month sources when monthly totals differ from the year value.
+    
+    Computes per-month revenue values using _pv_revenue_value from month_sources, sums them to a monthly total, and if the monthly total is not approximately equal to the existing year total, mutates `out` to set:
+    - "totalSolarRevenue" to the rounded monthly total (kWh-based revenue total),
+    - "pvProfit" to monthly total scaled by 10_000_000 (rounded to 0.1),
+    - APP_CHART_SERIES_Y6 to the per-month series scaled by 10_000_000 (rounded to 0.1).
+    
+    Also records the correction under meta["corrected"]["totalSolarRevenue"] with keys "raw_total", "corrected_total", and "months".
+    
+    Parameters:
+        out (dict[str, Any]): Mutable output dictionary to receive corrected year fields.
+        year_source (dict[str, Any]): Original year payload used to read the existing raw total.
+        month_sources (dict[int, dict[str, Any]]): Mapping of month (1–12) to month payload dicts used to derive per-month revenues.
+        meta (dict[str, Any]): Mutable metadata dict where correction details are recorded.
+    
+    Behavior notes:
+    - If no valid monthly revenues are found, the function returns without modifying `out` or `meta`.
+    - If the monthly total is within tolerance of the existing year total, no modifications are made.
+    """
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -1385,7 +1687,25 @@ def backfill_year_payload_from_months(
     stat_keys: tuple[str, ...],
     month_sources: dict[int, dict[str, Any]],
 ) -> dict[str, Any]:
-    """Return a year payload guarded by explicit monthly app payloads."""
+    """
+    Produce a year-period payload corrected from explicit monthly payloads when monthly totals indicate a different yearly total.
+    
+    If monthly sources provide values for any requested stat_keys and the summed monthly total exceeds the existing yearly total beyond a computed tolerance, returns a shallow-copied year payload with:
+    - the per-month series written to the appropriate chart-series key,
+    - the stat total replaced by the summed monthly total,
+    - legacy short-field mirrors for certain stat keys (e.g., `pvEgy`),
+    - an `APP_YEAR_BACKFILL_META` entry describing corrections and months used.
+    If no corrections are needed or applicable, returns the original `year_source` unchanged.
+    
+    Parameters:
+        year_source (dict[str, Any]): The original year-period payload to inspect and potentially correct.
+        section_prefix (str): Prefix identifying the section (e.g., PV/home/battery) used to derive section names.
+        stat_keys (tuple[str, ...]): Statistic keys to consider for monthly backfill and correction.
+        month_sources (dict[int, dict[str, Any]]): Mapping from month number (1–12) to monthly payload dicts.
+    
+    Returns:
+        dict[str, Any]: Either the original `year_source` (when unchanged) or a modified copy containing corrected series, totals, and backfill metadata.
+    """
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -1508,7 +1828,15 @@ def guard_statistic_totals_from_year(
     *,
     previous_statistic: dict[str, Any] | None = None,
 ) -> None:
-    """Guard app total KPIs with corrected current-year period values."""
+    """
+    Ensure app KPI totals in `payload[PAYLOAD_STATISTIC]` are not lower than plausible current-year or previous-year derived values.
+    
+    Mutates `payload` in-place when corrections are required: it may update total generation, total revenue, and total carbon and attach metadata under `APP_TOTAL_GUARD_META` and/or `APP_SAVINGS_CALC_META`. Corrections are based on the current-year PV section, a provided previous statistic snapshot, and derived savings/revenue calculations; when no correction is needed the payload is left unchanged.
+    
+    Parameters:
+        payload (dict[str, Any]): The full app payload to inspect and possibly modify. Must be a mapping that may contain `PAYLOAD_STATISTIC` and a year section for PV (e.g. `"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}"`).
+        previous_statistic (dict[str, Any] | None): Optional previous statistics mapping used as a lower-bound reference for total generation when current-year data is absent.
+    """
     statistic = payload.get(PAYLOAD_STATISTIC)
     if not isinstance(statistic, dict):
         return
@@ -1635,7 +1963,15 @@ def guard_statistic_totals_from_year(
 
 
 def compact_json(value: Any) -> str:
-    """Return compact JSON for diagnostic attributes."""
+    """
+    Produce a compact JSON representation of a JSON-serializable value.
+    
+    Parameters:
+        value (Any): A value that can be serialized to JSON.
+    
+    Returns:
+        compact_json (str): Compact JSON string representation of `value`.
+    """
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -1646,7 +1982,17 @@ def trend_series_points(
     *,
     today: date | None = None,
 ) -> list[TrendStatisticPoint]:
-    """Return app chart buckets as dated statistic points."""
+    """
+    Convert an app trend/chart series into dated TrendStatisticPoint buckets.
+    
+    Maps series indexes to bucket start dates using the request's begin/end bounds and the section's inferred date type (week, month, year). Skips buckets outside the request range or after `today`, and ignores non-kWh units or missing series.
+    
+    Parameters:
+        today (date | None): Optional override for the current date used to bound points. If omitted, uses the system date.
+    
+    Returns:
+        list[TrendStatisticPoint]: Points containing the bucket start date and the series value rounded to 5 decimals; returns an empty list when the series is missing, the unit is not kWh, or the request begin date cannot be determined.
+    """
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
@@ -1732,7 +2078,33 @@ def day_power_energy_points(
     today: date | None = None,
     now: datetime | None = None,
 ) -> list[TrendStatisticPoint]:
-    """Convert an app day chart curve into kWh statistic buckets."""
+    """
+    Convert a single-day chart series into time-bucketed kWh points.
+    
+    The function reads the day-series values and produces a list of TrendStatisticPoint
+    objects where each point represents the summed energy (kWh) for a bucket
+    of length `bucket_minutes` starting at that bucket's minute-of-day. If the
+    payload provides a server-side period total, bucket values are scaled so their
+    sum matches that total. Invalid or incompatible inputs (missing/empty series,
+    non-day payload, unsupported unit, invalid request bounds, negative server
+    total, etc.) result in an empty list.
+    
+    Parameters:
+        source (dict[str, Any]): The payload containing chart series, labels and
+            request metadata.
+        section (str): The payload section name (used to locate totals/metadata).
+        stat_key (str): The statistic key whose series/total to use.
+        bucket_minutes (int, optional): Bucket size in minutes; must divide 24*60.
+            Defaults to 60.
+        today (date | None, optional): Reference current date for validation.
+            Defaults to date.today() when omitted.
+        now (datetime | None, optional): Reference current datetime used when the
+            requested day is the current day to limit samples; defaults to now.
+    
+    Returns:
+        list[TrendStatisticPoint]: Ordered list of points for each bucket start time
+        (local date/time at bucket boundary) and the bucket energy in kWh.
+    """
     if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
         return []
     series_key = day_power_series_key(source, section, stat_key)
@@ -1897,7 +2269,22 @@ def calculated_smart_meter_power(
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
-    """Calculate derived CT powers from signed phase values."""
+    """
+    Compute a derived smart-meter power metric from CT payload values.
+    
+    Parameters:
+        ct (dict[str, Any]): CT payload containing phase and total power keys.
+        calculation (str): One of:
+            - "net_import": net power imported (non-negative),
+            - "net_export": net power exported (non-negative),
+            - "gross_import": sum of positive phase powers,
+            - "gross_export": sum of exported (negative) phase powers as positive values,
+            - "gross_flow": sum of absolute phase powers.
+        Unrecognized values produce no result.
+    
+    Returns:
+        float | None: The calculated power (same units as the CT values) when computable, or `None` if required inputs are missing or `calculation` is not supported.
+    """
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -1963,7 +2350,22 @@ def jackery_corrected_home_consumption_power(
     ct: dict[str, Any],
     props: dict[str, Any],
 ) -> HomeConsumptionPower | None:
-    """Return live home load and its diagnostic components."""
+    """
+    Determine the current home consumption power and provide diagnostic components.
+    
+    Parameters:
+    	ct (dict[str, Any]): Smart-meter/CT payload used to derive net meter power.
+    	props (dict[str, Any]): Jackery live properties used to read reported home load and grid-side input/output.
+    
+    Returns:
+    	HomeConsumptionPower: Named tuple containing:
+    		- value: non-negative estimated home consumption (kW or W consistent with inputs),
+    		- smart_meter_net_power: net power from the smart meter or None,
+    		- jackery_input_power: jackery reported grid-side input power,
+    		- jackery_output_power: jackery reported grid-side output power,
+    		- source: string identifying the source of the returned value (`FIELD_OTHER_LOAD_PW` when Jackery reports the load, otherwise `"smart_meter_net_minus_input_plus_output"`).
+    	None: When the smart-meter net is unavailable or Jackery input/output are both zero and no reported home load exists.
+    """
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -2063,7 +2465,17 @@ def trend_series_total(
     section: str,
     stat_key: str,
 ) -> float | None:
-    """Return the app period total for a chart/stat payload."""
+    """
+    Compute the period total for a statistic from a chart or stat payload.
+    
+    If the payload represents a day period, the function uses the payload's effective period total. For trend payloads it only accepts kWh units and returns the rounded sum of parsed series values when a chart-series list is present. Special cases:
+    - For home-stat sections: if the server-side total equals 0.0 but any grid-series lists exist, returns 0.0.
+    - For CT-stat sections: if no usable series values exist, falls back to the server-side total when available.
+    
+    Returns:
+        float: The total rounded to 2 decimal places when available.
+        None: When a total cannot be determined.
+    """
     if _is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -2106,7 +2518,17 @@ def trend_series_has_value(
     section: str,
     stat_key: str,
 ) -> bool:
-    """Return True when an app period payload can produce a usable value."""
+    """
+    Determine whether the provided app-period payload contains a usable value for the given section and statistic key.
+    
+    Parameters:
+        source (dict): The payload dictionary to inspect.
+        section (str): The payload section name (e.g., a suffix like `_day`, `_week`, `_month`, `_year`).
+        stat_key (str): The statistic key to test for presence or derivation.
+    
+    Returns:
+        bool: `True` if a usable value is available for the section and stat key, `False` otherwise.
+    """
     if _is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 

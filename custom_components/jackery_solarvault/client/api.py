@@ -179,6 +179,15 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 
 
 def _generate_udid(seed: str) -> str:
+    """
+    Derives a deterministic MQTT MAC identifier from the given seed.
+    
+    Parameters:
+        seed (str): Input seed string used to derive the identifier.
+    
+    Returns:
+        mqtt_mac_id (str): The MQTT MAC id formed by concatenating `MQTT_MAC_ID_PREFIX` with a UUIDv3 generated from the MD5 digest of `seed`, with dashes removed.
+    """
     md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
@@ -198,7 +207,19 @@ class JackeryApi:
         mqtt_mac_id: str | None = None,
         region_code: str | None = None,
     ) -> None:
-        """Initialise the entity from the coordinator and description."""
+        """
+        Initialize the JackeryApi client with a pre-existing aiohttp session and account credentials.
+        
+        Parameters:
+            session (aiohttp.ClientSession): Reused HTTP session for all requests.
+            account (str): Account identifier (used for login and UDID generation when MQTT MAC id is not configured).
+            password (str): Account password used for login.
+            mqtt_mac_id (str | None): Optional configured MQTT MAC id; when omitted a UDID-based MAC id will be generated during login. The provided value is validated later.
+            region_code (str | None): Optional region/country code; stored as an uppercase string or `None` when empty.
+        
+        Description:
+            Stores the provided inputs, initializes token/mqtt-related caches and an asyncio.Lock for serialized login, and creates diagnostic response buffers and an optional payload debug callback slot.
+        """
         self._session = session
         self._account = account
         self._password = password
@@ -230,7 +251,14 @@ class JackeryApi:
         ) = None
 
     def _maybe_learn_region_code(self, systems: list[dict[str, Any]]) -> None:
-        """Learn region code from system metadata when not configured manually."""
+        """
+        Set the client's region code from the first system entry that provides a country code when not already configured.
+        
+        If the client already has a region code configured, this function does nothing. Otherwise it iterates the provided system dictionaries, looks for a non-empty `FIELD_COUNTRY_CODE`, normalizes it to uppercase, assigns it to `self._region_code`, logs the inference at debug level, and stops after the first match.
+        
+        Parameters:
+            systems (list[dict[str, Any]]): List of system metadata dictionaries; expected to contain `FIELD_COUNTRY_CODE`.
+        """
         if self._region_code:
             return
         for item in systems:
@@ -246,7 +274,15 @@ class JackeryApi:
 
     # --- headers ------------------------------------------------------------
     def _headers(self, *, with_token: bool = False) -> dict[str, str]:
-        """Headers matching the Android app values documented in PROTOCOL.md §2."""
+        """
+        Build request headers that mirror the Android app's expected HTTP headers.
+        
+        Parameters:
+            with_token (bool): If True and a token is cached on the client, include the authentication token header.
+        
+        Returns:
+            dict[str, str]: Mapping of header names to header values to be sent with HTTP requests.
+        """
         h = {
             "accept-encoding": "gzip",
             "accept-language": "de-DE",
@@ -267,7 +303,20 @@ class JackeryApi:
     # --- auth ---------------------------------------------------------------
     @staticmethod
     def _normalize_mqtt_mac_id(value: str) -> str:
-        """Normalize and validate the app-style macId token."""
+        """
+        Normalize and validate an app-style MQTT macId token.
+        
+        Strips surrounding whitespace, lowercases the input, and ensures it is exactly 33 lowercase hexadecimal characters (a 1-hex prefix plus a 32-character UUID with no dashes).
+        
+        Parameters:
+            value (str): The macId string to normalize.
+        
+        Returns:
+            str: Normalized macId (33 lowercase hex characters).
+        
+        Raises:
+            JackeryAuthError: If the input does not match the required 33-character lowercase hex format.
+        """
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
@@ -278,7 +327,16 @@ class JackeryApi:
         return mac_id
 
     def _resolve_login_mac_id(self) -> str:
-        """Resolve the macId used in login and MQTT username derivation."""
+        """
+        Resolve the MQTT MAC identifier to use for login and MQTT username derivation.
+        
+        Sets self._mqtt_mac_id_source to indicate whether the returned value came from the configured
+        setting ("configured"), was generated because no configured value was provided ("generated"),
+        or was generated after ignoring an invalid configured value ("generated_fallback_invalid_config").
+        
+        Returns:
+            str: The normalized configured MAC id if valid, otherwise a generated UDID string.
+        """
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -298,7 +356,18 @@ class JackeryApi:
         return _generate_udid(self._account)
 
     async def async_login(self) -> str:
-        """Encrypted login; stores the JWT session token."""
+        """
+        Authenticate with the Jackery API using the app's AES/RSA hybrid login flow and cache session credentials.
+        
+        Performs an encrypted login request, validates the response, caches the returned JWT token and MQTT-related fields (user id, seed, and mac id), and returns the token.
+        
+        Returns:
+            str: JWT session token.
+        
+        Raises:
+            JackeryApiError: On HTTP failures, request/timeout errors, non-200 responses, or invalid JSON payloads.
+            JackeryAuthError: When the server rejects authentication or no token is returned.
+        """
         mac_id = self._resolve_login_mac_id()
         login_bean = {
             FIELD_ACCOUNT: self._account,
@@ -380,15 +449,20 @@ class JackeryApi:
         return token
 
     async def async_get_mqtt_credentials(self) -> dict[str, str]:
-        """Return MQTT credentials for the active REST login session.
-
-        Runtime-verified app algorithm from PROTOCOL.md §3:
-            clientId = f"{userId}@APP"
-            username = f"{userId}@{macId}"
-            seed     = base64_decode(mqttPassWord)   # 32 bytes
-            key      = seed                           # AES-256 key
-            iv       = seed[:16]
-            password = base64(AES-256-CBC-PKCS5(username_utf8, key, iv))
+        """
+        Builds MQTT client credentials from the active REST login session.
+        
+        Validates required login-derived fields, decodes and verifies the MQTT seed, and derives the MQTT client id, username, and MQTT password.
+        
+        Raises:
+            JackeryAuthError: If required MQTT fields are missing, the seed is not valid base64, or the decoded seed length is not 32 bytes.
+        
+        Returns:
+            dict[str, str]: A mapping containing:
+                - clientId: MQTT client identifier.
+                - username: MQTT username.
+                - password: MQTT password (base64-encoded ciphertext).
+                - userId: The MQTT user id from the login response.
         """
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
@@ -440,6 +514,17 @@ class JackeryApi:
         return self._mqtt_mac_id
 
     async def _ensure_token(self) -> str:
+        """
+        Ensure a valid authentication token is available, triggering a login if necessary.
+        
+        If no token is present, acquires the client lock and calls `async_login()` to obtain one. Raises an error when login completes without producing a token.
+        
+        Returns:
+            The active JWT authentication token.
+        
+        Raises:
+            JackeryAuthError: If no token is available after attempting login.
+        """
         if self._token is None:
             async with self._lock:
                 if self._token is None:
@@ -471,7 +556,16 @@ class JackeryApi:
     def _is_token_expired_response(
         self, status: int, data: dict[str, Any] | Any
     ) -> bool:
-        """Detect token-expired responses across backend variants."""
+        """
+        Determine whether a response indicates an expired authentication token.
+        
+        Parameters:
+            status (int): HTTP status code returned by the backend.
+            data (dict | Any): Parsed response payload (typically a dict) or raw value; function treats non-dict values as not indicating token expiry.
+        
+        Returns:
+            bool: `True` if the response payload signals that the authentication token has expired, `False` otherwise.
+        """
         if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
@@ -482,7 +576,15 @@ class JackeryApi:
 
     @staticmethod
     def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
-        """Return True when a backend error payload looks authorization-related."""
+        """
+        Detects whether a response payload contains text suggesting an authentication or authorization failure.
+        
+        Parameters:
+            data (dict | Any): Response body or parsed JSON; typically a dict containing message fields.
+        
+        Returns:
+            bool: `True` if common text fields contain markers indicating authentication/authorization issues (for example: unauthorized, token expired, login, auth), `False` otherwise.
+        """
         if not isinstance(data, dict):
             return False
         parts = [
@@ -534,7 +636,18 @@ class JackeryApi:
 
     @staticmethod
     def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
-        """Build a compact auth-failure message without exposing secrets."""
+        """
+        Create a compact authorization-failure message for logging.
+        
+        Parameters:
+            method (str): HTTP method used for the request (e.g., "GET", "POST").
+            path (str): Request path or endpoint.
+            status (int): HTTP status code from the response.
+            data (dict): Response JSON-like dictionary; `FIELD_CODE` and one of `FIELD_MSG`/`"message"`/`"error"` may be read.
+        
+        Returns:
+            str: Single-line message containing the method, path, HTTP status, response code (if present), and response message (if present).
+        """
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
@@ -545,13 +658,16 @@ class JackeryApi:
         self,
         event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
     ) -> None:
-        """Forward one raw/parsed payload debug event to the coordinator.
-
-        Accepts either a pre-built event dict or a zero-arg callable that
-        returns one. The callable form is forwarded as-is to the
-        coordinator, which itself only invokes it when the dedicated
-        ``payload_debug`` logger is at DEBUG level — saving the
-        ``redacted`` walk on hot paths when DEBUG is disabled.
+        """
+        Emit a payload debug event to the configured debug callback.
+        
+        If `payload_debug_callback` is set, forwards either the provided event dict or the zero-argument
+        callable that produces one to that callback. Exceptions raised by the callback are caught and
+        logged at debug level; this function never raises.
+         
+        Parameters:
+            event_or_factory (dict[str, Any] | Callable[[], dict[str, Any]]):
+                Either a debug event dictionary or a zero-argument callable that returns such a dictionary.
         """
         callback = self.payload_debug_callback
         if callback is None:
@@ -573,7 +689,20 @@ class JackeryApi:
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Build a redacted-later HTTP payload debug event."""
+        """
+        Build a redacted-later debug event describing an HTTP request and its response.
+        
+        Returns a dict containing:
+            kind (str): Fixed value "http".
+            method (str): HTTP method used for the request.
+            path (str): Request path.
+            params (dict): Query parameters (empty dict when None).
+            request_body (dict): Request JSON/body (empty dict when None).
+            status (int|None): HTTP response status code or None.
+            response (dict): Raw parsed response (empty dict when None).
+            response_data_type (str): The Python type name of the response `data` field (e.g., "dict", "list", "NoneType").
+            chart_series_debug (Any, optional): Added when `chart_series_debug(payload)` returns debug metadata for chart-like payloads.
+        """
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -592,11 +721,17 @@ class JackeryApi:
 
     @staticmethod
     def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
-        """Return a dict payload or an empty dict with one diagnostic warning.
-
-        Several Jackery endpoints return `{code,msg,data}` but backend variants
-        sometimes change `data` to null, list or string. Returning those shapes
-        to the coordinator would break payload merging and sensor creation.
+        """
+        Normalize the API response `data` payload to a dictionary suitable for consumers.
+        
+        If `data[FIELD_DATA]` is a dict, that dict is returned. If it is `None` or missing, an empty dict is returned. If it exists but is not a dict, an empty dict is returned and a warning is logged indicating the unexpected shape.
+        
+        Parameters:
+            data (dict[str, Any]): Raw parsed JSON response from the API.
+            path (str): Request path used for diagnostic logging.
+        
+        Returns:
+            dict[str, Any]: The payload dictionary from `data[FIELD_DATA]` or an empty dict.
         """
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
@@ -612,7 +747,14 @@ class JackeryApi:
 
     @staticmethod
     def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
-        """Return a list of dict payload items or an empty list."""
+        """
+        Extract dictionary items from the response `FIELD_DATA` list and return them.
+        
+        If `FIELD_DATA` is a list, returns a new list containing only elements that are dicts. If `FIELD_DATA` is missing or not a list, an empty list is returned and a warning is logged.
+         
+        Returns:
+            List of dict items from `FIELD_DATA`; empty list when `FIELD_DATA` is absent or has an unexpected shape.
+        """
         payload = data.get(FIELD_DATA)
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
@@ -630,7 +772,16 @@ class JackeryApi:
         items: list[dict[str, Any]],
         device_sn: str,
     ) -> dict[str, Any]:
-        """Return the OTA item matching the requested device serial."""
+        """
+        Selects the OTA item whose device serial equals the requested serial.
+        
+        Parameters:
+            items (list[dict]): Candidate OTA item dictionaries to search.
+            device_sn (str): Device serial to match (compared as strings).
+        
+        Returns:
+            dict: The matching OTA item if found; otherwise the first item in `items` if present; or an empty dict when `items` is empty.
+        """
         requested_sn = str(device_sn)
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
@@ -639,6 +790,20 @@ class JackeryApi:
 
     # --- generic GET with auto re-login ------------------------------------
     async def _get_json(self, path: str, params: dict | None = None) -> dict:
+        """
+        Perform an authenticated GET request to the given API path and return the parsed response payload.
+        
+        Parameters:
+            path (str): API path (appended to the base URL) to request.
+            params (dict | None): Query parameters to include in the request.
+        
+        Returns:
+            dict: The parsed JSON response object (or a dict containing raw truncated text under `FIELD_RAW_TEXT` when the response is not valid JSON).
+        
+        Raises:
+            JackeryAuthError: When the response indicates an authentication/authorization failure.
+            JackeryApiError: For HTTP errors, request failures, token-expiry/retry failures, or when the API returns a non-OK application code.
+        """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -994,11 +1159,16 @@ class JackeryApi:
         )
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
-        """GET /v1/device/battery/pack/list — sub-battery pack status.
-
-        App decompile (BatteryPackApi + BatteryPackSub):
-            request: deviceSn
-            fields: batSoc, cellTemp, inPw, outPw, version, isFirmwareUpgrade
+        """
+        Retrieve sub-battery pack status for the given device serial number.
+        
+        Sends a request to the battery pack list endpoint and returns a list of battery-pack objects found in the response. The raw response is cached in `self.last_battery_pack_responses[device_sn]`.
+        
+        Parameters:
+        	device_sn (str): Device serial number to query.
+        
+        Returns:
+        	list[dict[str, Any]]: A list of battery pack dictionaries; an empty list if no packs are present or the response shape is not recognized.
         """
         data = await self._get_json(
             BATTERY_PACK_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
@@ -1153,7 +1323,22 @@ class JackeryApi:
 
     # --- HTTP write endpoints documented in PROTOCOL.md §2 --------------
     async def _put_json(self, path: str, payload: dict) -> dict:
-        """Generic JSON PUT helper with token re-login on expiry."""
+        """
+        Send a JSON PUT request to the API and return the parsed response.
+        
+        Automatically ensures a valid auth token, attempts a re-login once if the server indicates the token expired, and validates the HTTP status and application-level response code.
+        
+        Parameters:
+            path (str): API path to append to the base URL.
+            payload (dict): JSON-serializable body to send.
+        
+        Returns:
+            dict: The parsed JSON response object. If the response cannot be parsed as JSON, returns a dict containing `FIELD_RAW_TEXT` with truncated raw text.
+        
+        Raises:
+            JackeryAuthError: When the response indicates an authentication or authorization failure.
+            JackeryApiError: On HTTP errors, request failures, or when the application-level response code is not OK.
+        """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1227,10 +1412,18 @@ class JackeryApi:
     async def async_set_system_name(
         self, system_id: str | int, system_name: str
     ) -> bool:
-        """PUT /v1/device/system/name — rename a system.
-
-        Captured body: {"systemName": "SolarVault", "id": "<systemId>"}
-        Response payload is a boolean: `data: true`.
+        """
+        Rename a system on the remote API.
+        
+        Parameters:
+            system_id (str | int): Identifier of the system to rename.
+            system_name (str): New name for the system; must be non-empty after stripping.
+        
+        Returns:
+            bool: `True` if the backend reported success (`data` truthy), `False` otherwise.
+        
+        Raises:
+            JackeryApiError: If `system_name` is empty or only whitespace.
         """
         if not system_name or not system_name.strip():
             raise JackeryApiError("system_name must be a non-empty string")
@@ -1249,7 +1442,20 @@ class JackeryApi:
     # can troubleshoot. See const.py for caveats.
 
     async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
-        """Generic form-urlencoded POST with auto re-login on expiry."""
+        """
+        Send a form-urlencoded POST to the API, handling token refresh on expiry.
+        
+        Parameters:
+        	path (str): API path appended to the base URL.
+        	fields (dict[str, Any]): Form fields; values will be converted to strings.
+        
+        Returns:
+        	dict: Parsed JSON response from the server, or a dict containing the raw truncated response text under FIELD_RAW_TEXT when JSON parsing fails.
+        
+        Raises:
+        	JackeryAuthError: When the response indicates an authentication/authorization failure.
+        	JackeryApiError: On network/request failures, non-200 HTTP status, or when the API returns an application error code.
+        """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1325,14 +1531,20 @@ class JackeryApi:
         return data
 
     async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
-        """POST /v1/device/deviceMaxPowerRecord/saveRecord (experimental).
-
-        Captured body: `maxPower=<int>&deviceId=<long>` as form-urlencoded.
-
-        ⚠️  Only failed responses (code=10600) have been observed so far.
-        The endpoint name ("saveRecord") suggests this might be a history
-        log, not the live setter. May require specific value ranges or
-        additional fields we haven't identified yet.
+        """
+        Request the device's maximum allowed power using the experimental saveRecord endpoint.
+        
+        This validates that `max_power` is a non-negative integer and submits a form-encoded request with `deviceId` and `maxPower`; the backend may treat this as a historical record rather than an immediate live setting.
+        
+        Parameters:
+            device_id (str | int): Device identifier to apply the max power to.
+            max_power (int): Maximum power value in watts; must be greater than or equal to 0.
+        
+        Returns:
+            bool: `true` if the response `data` field is truthy, `false` otherwise.
+        
+        Raises:
+            JackeryApiError: If `max_power` validation fails or the API call reports an error.
         """
         if not isinstance(max_power, int) or max_power < 0:
             raise JackeryApiError("max_power must be a non-negative integer")
@@ -1349,7 +1561,20 @@ class JackeryApi:
         single_price: float | str,
         currency: str,
     ) -> bool:
-        """POST /v1/device/dynamic/saveSingleMode."""
+        """
+        Set the system to single-price mode using the provided price and currency.
+        
+        Parameters:
+            system_id (str | int): Identifier of the target system.
+            single_price (float | str): Price per unit; must be greater than or equal to 0. Values are formatted with up to four decimal places (trailing zeros and a trailing decimal point are removed).
+            currency (str): Currency code or symbol; must be a non-empty string.
+        
+        Returns:
+            bool: `True` if the backend indicates the request was accepted, `False` otherwise.
+        
+        Raises:
+            JackeryApiError: If `single_price` is negative or `currency` is empty.
+        """
         price = float(single_price)
         if price < 0:
             raise JackeryApiError("single_price must be >= 0")
@@ -1376,7 +1601,20 @@ class JackeryApi:
         platform_company_id: int,
         system_region: str,
     ) -> bool:
-        """POST /v1/device/dynamic/saveDynamicMode."""
+        """
+        Set the system to dynamic pricing mode on the server.
+        
+        Parameters:
+            system_id (str | int): Identifier of the system to update.
+            platform_company_id (int): Platform company identifier required by the backend.
+            system_region (str): Non-empty region code/name associated with the system.
+        
+        Returns:
+            `True` if the server acknowledged the change, `False` otherwise.
+        
+        Raises:
+            JackeryApiError: If `system_region` is empty or the API request fails.
+        """
         region = str(system_region or "").strip()
         if not region:
             raise JackeryApiError("system_region must be a non-empty string")

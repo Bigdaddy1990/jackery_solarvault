@@ -6,7 +6,12 @@ import sys
 
 
 def main() -> int:
-    """Run mypy for the integration package."""
+    """
+    Run mypy for the integration package using os.devnull as the cache directory.
+    
+    Returns:
+        int: Exit code returned by the mypy subprocess (`0` indicates success, non-zero indicates failure).
+    """
     return subprocess.call([
         sys.executable,
         "-m",

@@ -14,7 +14,14 @@ YAML_FILES = [
 
 
 def validate_yaml(path: Path) -> None:
-    """Load a YAML file and fail if it is empty or invalid."""
+    """
+    Load and validate a YAML file, raising if the file is empty or contains invalid YAML.
+    
+    Raises:
+        ValueError: if the YAML document is empty.
+        OSError: if the file cannot be read.
+        yaml.YAMLError: if the file contains invalid YAML.
+    """
     with path.open(encoding="utf-8") as stream:
         document = yaml.safe_load(stream)
     if document is None:
@@ -22,7 +29,14 @@ def validate_yaml(path: Path) -> None:
 
 
 def main() -> int:
-    """Validate all repository automation YAML files."""
+    """
+    Validate all repository automation YAML files and report any validation failures.
+    
+    Prints validation failure messages to stderr when one or more files fail validation; prints a success message when all files validate.
+    
+    Returns:
+        int: 0 if all files validated successfully, 1 if one or more files failed validation.
+    """
     failures: list[str] = []
     for path in YAML_FILES:
         try:

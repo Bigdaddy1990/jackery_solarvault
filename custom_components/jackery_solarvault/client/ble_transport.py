@@ -227,13 +227,14 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:
-        """Cache the negotiated GATT MTU after ``start_notify`` returns.
-
-        Different bleak backends expose the MTU under different attribute
-        names, and at different points in the connect lifecycle. We try
-        the well-known ones in order and keep the cache empty if none
-        produce a usable integer — the writer then falls back to
-        :data:`ble.DEFAULT_BLE_MTU`.
+        """
+        Cache the negotiated GATT MTU for a device if the connected client exposes it.
+        
+        Checks the connected BLE client's attributes for a usable MTU and stores it in the listener's MTU cache so subsequent writes can size frames appropriately. If no usable MTU is found, the cache is left unchanged and callers will use the module default.
+        
+        Parameters:
+            device_id (str): Identifier of the BLE device.
+            client (Any): Connected BLE client object; may expose negotiated MTU as an attribute.
         """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
@@ -258,22 +259,17 @@ class JackeryBleListener:
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
-        """Periodically write a no-op query frame to keep the GATT session warm.
-
-        The SolarVault peripheral closes idle GATT sessions after
-        roughly 20 s (observed 2026-05-17 production log: BLE
-        disconnects every 6-20 s without traffic). Sending a ``cmd=106``
-        :data:`.const.MQTT_CMD_QUERY_DEVICE_PROPERTY` query at
-        :data:`_KEEPALIVE_INTERVAL_SEC` keeps the session warm and
-        yields a fresh ``DevicePropertyChange`` notify response, which
-        the sink merges into ``coordinator.data`` via the normal
-        ``cmd=107`` path.
-
-        Cancellation contract: the parent connection runner cancels
-        this task in its ``finally`` block on disconnect / shutdown.
-        ``CancelledError`` propagates so the cancel sees a clean exit;
-        write errors are caught and DEBUG-logged so a single missed
-        keep-alive does not abort the loop.
+        """
+        Keep the device's GATT session active by periodically sending a minimal query frame.
+        
+        At each _KEEPALIVE_INTERVAL_SEC interval this task issues a MQTT_CMD_QUERY_DEVICE_PROPERTY
+        query with an empty JSON body (b"{}") to prevent the peripheral from closing an idle GATT
+        session. The write uses wait_for_ack=False so the response is delivered via the normal
+        notify path and handled by the sink.
+        
+        Cancellation: the parent connection runner cancels this task; asyncio.CancelledError
+        is allowed to propagate for a clean shutdown. Write errors are caught and logged at
+        DEBUG level and do not terminate the keep-alive loop.
         """
         # Avoid an import cycle by deferring the ``MQTT_CMD_QUERY_DEVICE_PROPERTY``
         # lookup — ``ble_transport`` is imported during
@@ -327,31 +323,28 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """Build, encrypt and write a single command frame to char 0xEE01.
-
-        Returns ``True`` when the GATT write completed (and, if
-        ``wait_for_ack`` is set, the device echoed a decoded frame on the
-        notify channel within ``ack_timeout_sec``). Returns ``False`` when
-        no active client is available for the device — callers (e.g. the
-        coordinator's BLE-first setter helper) use that to fall back to
-        the cloud-MQTT pipeline.
-
-        Raises ``ValueError`` for malformed inputs, ``RuntimeError`` for
-        GATT-layer failures *or* for an ACK timeout when ``wait_for_ack``
-        is enabled. The router catches the RuntimeError and falls back to
-        MQTT; for SolarVault setters the duplicated write is idempotent.
-
-        ``ack_cmds`` filters which notify frames count as the ACK. When
-        omitted, any decoded frame on the same device within the window
-        counts. The device typically echoes the same ``cmd`` back as a
-        ``DevicePropertyChange``, but we have no firmware contract for
-        that mapping yet, so the default stays permissive.
-
-        The trailer field is left as four NUL bytes — see
-        :class:`.ble.BleBinaryFrame` for the open question on its
-        algorithm. If the device firmware rejects the write (no echo on
-        the notify stream within a reasonable window), the trailer
-        likely needs to be a real checksum derived from a Frida capture.
+        """
+        Send a command to the device over BLE by building, encrypting, chunking for the negotiated MTU, and writing one or more GATT frames.
+        
+        When requested, the call can wait for a decoded notify-frame echo (ACK) from the device before returning.
+        
+        Parameters:
+            device_id (str): Target device identifier.
+            cmd (int): Command identifier to send in the frame.
+            body (bytes): Payload bytes to include in the command; will be split into MTU-sized chunks as needed.
+            flags (int): Frame flags field included in each binary frame.
+            timeout_sec (float): Per-write GATT operation timeout in seconds.
+            wait_for_ack (bool): If true, wait for a matching decoded notify-frame within `ack_timeout_sec` before returning.
+            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is true.
+            ack_cmds (tuple[int, ...] | None): If provided, only decoded frames whose `cmd` is in this tuple satisfy the ACK; if omitted, any decoded frame from the device qualifies.
+            mtu_override (int | None): If provided, use this MTU for chunking instead of the negotiated per-device MTU (used mainly for tests/diagnostics).
+        
+        Returns:
+            bool: `True` if the GATT write completed (and, when `wait_for_ack` is true, a matching ACK was received); `False` if there is no active BLE client for `device_id`.
+        
+        Raises:
+            ValueError: For malformed inputs passed to lower-level helpers (e.g., invalid body/chunking arguments).
+            RuntimeError: For GATT-layer failures (write timeouts or other write errors) or when an ACK was requested but not received within `ack_timeout_sec`.
         """
         client = self._clients.get(device_id)
         if client is None:
@@ -547,12 +540,10 @@ class JackeryBleListener:
         )
 
     async def async_stop(self) -> None:
-        """Shut the listener down. Safe to call from coordinator unload.
-
-        Uses a hard timeout on the gather so a stuck GATT disconnect or
-        radio hang cannot block HA shutdown beyond ``_STOP_TIMEOUT_SEC``.
-        Any task that misses the timeout is left to be reaped by the
-        event-loop during interpreter teardown.
+        """
+        Shut down the BLE listener, cancel active connection tasks, and clear pending state.
+        
+        This signals the listener to stop, unregisters any Bluetooth callbacks, cancels running per-device connection tasks and waits up to the module stop timeout for them to exit, clears the connection registry, and cancels any in-flight pending ACK futures so writers do not hang. Tasks that fail to exit within the timeout are left for the event loop to clean up. Safe to call from coordinator unload.
         """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
@@ -684,7 +675,11 @@ class JackeryBleListener:
         return device_id
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:
-        """Maintain a GATT session for one device, reconnecting on drop."""
+        """
+        Maintain and manage a long-running BLE GATT connection for the specified device.
+        
+        Subscribes to the device's notify characteristic and forwards incoming notifications to the listener, starts a keep‑alive heartbeat to keep the session active, caches the negotiated MTU and exposes the active client for outgoing writes, and updates per-device connection and frame statistics. The routine automatically attempts reconnects with backoff when the link is lost, cleans up client state and background tasks on disconnect or shutdown, and propagates cancellation so caller shutdown logic can observe task cancellation.
+        """
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
         from homeassistant.components import bluetooth
@@ -821,6 +816,12 @@ class JackeryBleListener:
             self._connections.pop(device_id, None)
 
     def _on_disconnect(self, device_id: str) -> None:
+        """
+        Record a device disconnect timestamp and log the disconnection.
+        
+        Parameters:
+            device_id (str): Identifier of the device whose disconnect time is recorded.
+        """
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)
@@ -830,13 +831,10 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """Decrypt + parse a 0xEE02 notify frame and forward it to the sink.
-
-        The wire format is the live-captured binary layout documented in
-        :func:`.ble.decrypt_binary_notify` (``iv || ciphertext`` containing
-        a DFED-prefixed binary header + body + 4-byte trailer). Both the
-        raw bytes and the decoded :class:`.ble.BleBinaryFrame` are emitted
-        so the diagnostics surface can still help if decode fails.
+        """
+        Process an incoming notify payload: attempt to decrypt and parse it, record a BleFrameObservation in per-device stats, resolve any pending ACKs, and forward the observation to the configured sink.
+        
+        If a key is not available the observation is recorded with a decode error. When decryption fails the method will once attempt a base64-decoded fallback before giving up. On successful parse the method increments decoded-frame counters and resolves any registered pending ACKs for the device prior to invoking the sink. Sink exceptions are caught and logged so they do not propagate.
         """
         stats = self.stats_for(device_id)
         stats.frames_received += 1

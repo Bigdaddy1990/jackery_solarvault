@@ -24,6 +24,15 @@ COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
+    """
+    Read a UTF-8 text file from the integration component directory.
+    
+    Parameters:
+        name (str): Relative filename or path under the integration's component directory.
+    
+    Returns:
+        str: The file contents decoded as UTF-8.
+    """
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
@@ -156,7 +165,13 @@ def test_reconfigure_preserves_stored_login_context() -> None:
 
 
 def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> None:
-    """Credential validation must use hidden app login context from entry.data."""
+    """
+    Ensure credential validation reuses hidden login context stored in entry.data.
+    
+    Asserts that CONF_MQTT_MAC_ID and CONF_REGION_CODE are present in the config_flow
+    source and that both async_step_reconfigure and async_step_reauth_confirm obtain
+    mqtt_mac_id and region_code via entry.data.get(...) for validation.
+    """
     src = _read("config_flow.py")
     assert "CONF_MQTT_MAC_ID" in src
     assert "CONF_REGION_CODE" in src

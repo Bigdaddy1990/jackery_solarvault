@@ -85,11 +85,14 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 def _async_clean_legacy_entities(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
-    """Drop entity-registry entries from older releases or disabled options.
-
-    Keep entity-registry cleanup explicit and setup-local. This avoids hidden
-    entry-version side effects while still removing entities that are no
-    longer part of the documented app/HTTP/MQTT data model.
+    """
+    Remove legacy entity-registry entries and stale energy helper entities no longer part of the integration's current data model.
+    
+    This function always removes stale energy helper entities and sensor/binary_sensor entries whose unique IDs match known legacy suffixes. It also conditionally removes groups of derived or calculated sensors when the corresponding `create_*` config options on the entry are disabled.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant instance.
+        entry (JackeryConfigEntry): The config entry for the Jackery SolarVault integration.
     """
     _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
@@ -185,12 +188,10 @@ async def _async_authenticate(
 async def _async_push_third_party_mqtt_config(
     coordinator: JackerySolarVaultCoordinator, entry: JackeryConfigEntry
 ) -> None:
-    """Push the Third-Party MQTT bridge settings to each main device.
-
-    PROTOCOL.md §5 + §15. Best-effort: both transports may be unavailable
-    (BLE writes off, cloud MQTT not connected yet); failures only log so
-    setup is not blocked. The user can retry via the
-    ``set_third_party_mqtt_config`` service.
+    """
+    Push third-party MQTT bridge settings from the config entry to each device managed by the coordinator.
+    
+    If the third-party MQTT option is disabled or no IP is configured, the push is skipped. Attempts are best-effort per device; failures are logged and do not raise, and the user may retry via the `set_third_party_mqtt_config` service.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -239,7 +240,18 @@ async def _async_push_third_party_mqtt_config(
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Set up Jackery SolarVault from a config entry."""
+    """
+    Perform per-entry setup for the Jackery SolarVault integration.
+    
+    This authenticates the account, initializes and configures the integration coordinator, performs device discovery and initial data refresh, starts MQTT/optional BLE transports, forwards platform setup, pushes third-party MQTT settings when configured, and registers an update listener. On failure, the partially initialized coordinator is shut down and the error is propagated.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant core object.
+        entry (JackeryConfigEntry): Configuration entry for this integration.
+    
+    Returns:
+        True if setup completed successfully.
+    """
     _async_clean_legacy_entities(hass, entry)
     api = await _async_authenticate(hass, entry)
 
@@ -311,7 +323,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
 
 def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
-    """Remove known stale Energy helper sensors that were created without a unit."""
+    """
+    Remove stale Energy helper entities that were created without a unit of measurement.
+    
+    Scans the entity registry for entities whose IDs match the integration's stale-energy helper pattern, have no `unit_of_measurement` in their current state, and reference a known vendor token; removes matching entities from the registry and logs an informational message for each removal.
+    """
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
@@ -345,19 +361,17 @@ _LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
-    """Return True when ``uid`` is exactly ``<device_id><key_suffix>``.
-
-    The unique-id contract (docs/PROTOCOL.md §11) says every
-    entity-registry id is ``<device_id>_<key_suffix>`` for the main device or
-    ``<device_id>_battery_pack_<index>_<key_suffix>`` for an add-on battery.
-    A plain ``str.endswith`` therefore over-matches when a current key
-    contains a legacy key as its tail — e.g. legacy ``_today_battery_charge``
-    would otherwise also match the current ``_device_today_battery_charge``
-    unique id and delete a live sensor on every reload (the regression that
-    caused statistics gaps at the user's site).
-
-    This helper anchors the suffix to a valid head so only the legacy id
-    matches.
+    """
+    Determine whether a unique ID exactly matches a legacy "<device_id><key_suffix>" pattern.
+    
+    Checks that `uid` ends with `key_suffix` and that the portion before the suffix is a valid legacy head (either `<device_id>_` or `<device_id>_battery_pack_<index>_`), preventing accidental matches where a current key contains a legacy key as its tail.
+    
+    Parameters:
+        uid (str): The entity unique ID to test.
+        key_suffix (str): The legacy suffix to match.
+    
+    Returns:
+        True if `uid` is exactly `<legacy_head><key_suffix>`, `False` otherwise.
     """
     if not uid.endswith(key_suffix):
         return False

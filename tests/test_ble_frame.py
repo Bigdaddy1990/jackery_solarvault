@@ -531,6 +531,11 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
     )
 
     async def _run() -> None:
+        """
+        Exercise JackeryBleListener.async_send_command with no active clients and assert it returns False.
+        
+        Constructs a minimal JackeryBleListener instance with an empty client registry and a fixed 16-byte key resolver, calls async_send_command for a sample device and command, and asserts the call indicates the command was not sent.
+        """
         listener = JackeryBleListener.__new__(JackeryBleListener)
         listener._stop_event = asyncio.Event()
         listener._clients = {}  # no active client
@@ -571,11 +576,30 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         async def write_gatt_char(
             self, uuid: str, blob: bytes, *, response: bool
         ) -> None:
+            """
+            Record a GATT characteristic write attempt into the shared `captured` mapping.
+            
+            Parameters:
+                uuid (str): The GATT characteristic UUID targeted for the write.
+                blob (bytes): The bytes that would be written to the characteristic; a copy is stored.
+                response (bool): Whether the write requested a response from the device.
+            
+            Side effects:
+                Stores the provided values into the surrounding `captured` dict under keys
+                `"uuid"`, `"blob"`, and `"response"`.
+            """
             captured["uuid"] = uuid
             captured["blob"] = bytes(blob)
             captured["response"] = response
 
     async def _run() -> None:
+        """
+        Set up a minimal JackeryBleListener with a fake client, send a BLE command, and assert the resulting GATT write and decryption match expectations.
+        
+        This coroutine constructs a listener with a single fake client and a fixed AES key, calls its async_send_command with cmd 107, flags 42, and a JSON byte body, then verifies:
+        - the write used the BLE write characteristic UUID and requested no response,
+        - the written blob decrypts to a binary frame with the same cmd, flags, and body.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = JackeryBleListener.__new__(JackeryBleListener)
         listener._stop_event = asyncio.Event()
@@ -625,7 +649,11 @@ def test_build_binary_frame_rejects_oversized_fields() -> None:
 
 
 def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
-    """``manifest.json`` advertises the BLE service for HA bluetooth discovery."""
+    """
+    Assert the integration manifest declares the BLE service matcher, manufacturer, dependency, and requirement.
+    
+    Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
+    """
     import json
     from pathlib import Path
 
@@ -754,6 +782,12 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
         async def _stuck() -> None:
             # Mimic the real runner's backoff wait. Without
             # cancellation propagation this would park 30s.
+            """
+            Simulate a runner task that waits for the listener stop event with a 30-second backoff.
+            
+            This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
+            and is intended for tests that assert prompt cancellation of long-running runner tasks.
+            """
             await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)
 
         task = asyncio.create_task(_stuck())
@@ -793,9 +827,20 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
     class _Listener:
         async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:
+            """
+            Stub method that fails immediately to indicate the BLE listener must not be invoked.
+            
+            Raises:
+                AssertionError: Always raised with the message "BLE listener must not be called".
+            """
             raise AssertionError("BLE listener must not be called")
 
     async def _run() -> None:
+        """
+        Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
+        
+        Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.entry = _Entry()
         self._ble_listener = _Listener()
@@ -829,9 +874,23 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
     class _Listener:
         def all_stats(self) -> dict[str, object]:
+            """
+            Return a snapshot of listener statistics as a mapping of statistic names to values.
+            
+            The returned dictionary contains current monitoring fields (counters, timestamps, and optional diagnostic strings) keyed by their descriptive names; callers may read but should not assume mutability of internal state.
+            
+            Returns:
+                stats (dict[str, object]): A snapshot mapping statistic names to their current values.
+            """
             return {}
 
         def mtu_for_device(self, device_id: str) -> int:
+            """
+            Get the negotiated MTU size for the specified device.
+            
+            Returns:
+                int: MTU size in bytes for the device.
+            """
             assert device_id == "dev1"
             return 517
 
@@ -889,6 +948,22 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:
+            """
+            Send a BLE command to the given device and optionally wait for an acknowledgement.
+            
+            Parameters:
+                device_id (str): Identifier of the target device.
+                cmd (int): Command identifier to send.
+                body (bytes): Raw payload for the command.
+                flags (int): Transport-level flags associated with the frame.
+                wait_for_ack (bool): If True, wait for an acknowledgement matching `ack_cmds` before returning.
+                ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
+                ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
+                mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
+            
+            Returns:
+                bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
+            """
             captured["device_id"] = device_id
             captured["cmd"] = cmd
             captured["body"] = body
@@ -900,6 +975,11 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             return True
 
     async def _run() -> None:
+        """
+        Test coroutine that verifies async_send_ble_command forwards the correct BLE command payload to an attached listener.
+        
+        Creates a minimal Coordinator instance with a stubbed entry and a fake BLE listener, calls `async_send_ble_command` for device "dev1" with `cmd=107`, a compact JSON body, and `flags=42`, and asserts the call reports success and the captured write parameters match the expected device id, command, compacted body bytes, flags, and ack/MTU defaults.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.entry = _Entry()
         self._ble_listener = _Listener()
@@ -926,7 +1006,11 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
 
 
 def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
-    """A successful BLE write is enough for Phase 3b setter routing."""
+    """
+    Verify that when BLE send succeeds, the coordinator does not call the MQTT fallback and forwards the expected BLE send options.
+    
+    Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
+    """
     import asyncio
 
     from custom_components.jackery_solarvault.const import FIELD_SW_EPS
@@ -950,6 +1034,22 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:
+            """
+            Send a BLE command to the specified device and optionally wait for an acknowledgement.
+            
+            Parameters:
+                device_id (str): Identifier of the target device.
+                cmd (int): Numeric command identifier to send.
+                body (dict[str, object]): JSON-serializable payload to include in the command.
+                flags (int): Transport/command flags bitfield.
+                wait_for_ack (bool): If True, wait for an acknowledgement matching `ack_cmds`.
+                ack_timeout_sec (float): Seconds to wait for an acknowledgement before timing out.
+                ack_cmds (tuple[int, ...] | None): Optional tuple of command ids that satisfy the acknowledgement.
+                mtu_override (int | None): Optional MTU value to force for this send; if None, use negotiated/default MTU.
+            
+            Returns:
+                bool: `True` if the command was sent (or acknowledged when requested), `False` otherwise.
+            """
             captured["device_id"] = device_id
             captured["cmd"] = cmd
             captured["body"] = body
@@ -961,6 +1061,14 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             return True
 
         async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:
+            """
+            Sentinel coroutine that fails immediately if the MQTT fallback path is invoked.
+            
+            This async function is intended for tests and will raise an AssertionError to indicate that MQTT publishing was not expected to be called in the current execution path.
+            
+            Raises:
+                AssertionError: Always raised with the message "MQTT fallback must not be called".
+            """
             raise AssertionError("MQTT fallback must not be called")
 
         self.async_send_ble_command = _send_ble
@@ -1001,6 +1109,11 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
     captured: dict[str, object] = {}
 
     async def _run() -> None:
+        """
+        Run the coordinator's BLE-first publish flow with BLE unavailable and assert the MQTT publish is invoked with the expected arguments.
+        
+        This coroutine configures a coordinator instance so BLE sends always fail and replaces the MQTT publish method with a captor, then invokes `_async_publish_command_ble_first` and verifies the captured MQTT parameters match the expected values.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
@@ -1015,6 +1128,17 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
             body_fields: dict[str, object],
             ensure_mqtt: bool = True,
         ) -> None:
+            """
+            Publish a device-specific command message to MQTT with the given action, command, and body fields.
+            
+            Parameters:
+                device_id (str): Unique identifier of the target device.
+                message_type (str): MQTT message topic suffix or type identifier used for routing.
+                action_id (int): Protocol action identifier associated with this message.
+                cmd (int): Numeric command identifier included in the message body.
+                body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
+                ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1060,9 +1184,23 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
     captured: dict[str, object] = {}
 
     async def _run() -> None:
+        """
+        Run a BLE-first publish scenario that forces a BLE ack timeout and captures the MQTT fallback call.
+        
+        This coroutine constructs a Coordinator instance stub, replaces its BLE send method with one that raises a `RuntimeError("BLE ack timeout")`, and replaces its MQTT publish method with a recorder that stores the call arguments into the surrounding `captured` mapping. It then invokes `_async_publish_command_ble_first` for device `"dev1"` with `message_type="DevicePropertyChange"`, `action_id=3022`, `cmd=107`, and `body_fields={FIELD_SW_EPS: 1}` to drive the BLE-fails-then-MQTT flow.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+            """
+            Send a BLE command and wait for its acknowledgement (ACK).
+            
+            Returns:
+                True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
+            
+            Raises:
+                RuntimeError: If waiting for the ACK times out.
+            """
             raise RuntimeError("BLE ack timeout")
 
         async def _publish_mqtt(
@@ -1074,6 +1212,17 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
             body_fields: dict[str, object],
             ensure_mqtt: bool = True,
         ) -> None:
+            """
+            Publish a device-specific command message to MQTT with the given action, command, and body fields.
+            
+            Parameters:
+                device_id (str): Unique identifier of the target device.
+                message_type (str): MQTT message topic suffix or type identifier used for routing.
+                action_id (int): Protocol action identifier associated with this message.
+                cmd (int): Numeric command identifier included in the message body.
+                body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
+                ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1116,9 +1265,23 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
     )
 
     async def _run() -> None:
+        """
+        Exercise the coordinator's BLE-first publish path by invoking _async_publish_command_ble_first on a stubbed coordinator instance.
+        
+        This coroutine constructs a bare coordinator object, replaces its BLE send and MQTT publish callables with stubs that raise RuntimeError("BLE ack timeout") and RuntimeError("MQTT publish timeout") respectively, and then calls _async_publish_command_ble_first for device "dev1" with a DevicePropertyChange message (action_id 3022, cmd 107, and a body containing FIELD_SW_EPS: 1). The call will propagate the RuntimeError raised by the underlying stubbed publish operation.
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+            """
+            Send a BLE command and wait for its acknowledgement (ACK).
+            
+            Returns:
+                True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
+            
+            Raises:
+                RuntimeError: If waiting for the ACK times out.
+            """
             raise RuntimeError("BLE ack timeout")
 
         async def _publish_mqtt(
@@ -1130,6 +1293,20 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
             body_fields: dict[str, object],
             ensure_mqtt: bool = True,
         ) -> None:
+            """
+            Publish a device-specific command message to MQTT.
+            
+            Parameters:
+                device_id (str): Target device identifier.
+                message_type (str): Logical MQTT message type or subtopic used for the publish.
+                action_id (int): Numeric action identifier included in the published payload.
+                cmd (int): Command identifier included in the published payload.
+                body_fields (dict[str, object]): Mapping of additional fields to include in the message body.
+                ensure_mqtt (bool): If True, require MQTT delivery (may trigger fallback or raise on failure).
+            
+            Raises:
+                RuntimeError: If the MQTT publish operation times out (message: "MQTT publish timeout").
+            """
             raise RuntimeError("MQTT publish timeout")
 
         self.async_send_ble_command = _send_ble
@@ -1171,6 +1348,12 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+            """
+            Guard that prevents attempting BLE sends for command 0.
+            
+            Raises:
+                AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
+            """
             raise AssertionError("cmd=0 must not attempt BLE")
 
         async def _publish_mqtt(
@@ -1182,6 +1365,17 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             body_fields: dict[str, object],
             ensure_mqtt: bool = True,
         ) -> None:
+            """
+            Publish a device-specific command message to MQTT with the given action, command, and body fields.
+            
+            Parameters:
+                device_id (str): Unique identifier of the target device.
+                message_type (str): MQTT message topic suffix or type identifier used for routing.
+                action_id (int): Protocol action identifier associated with this message.
+                cmd (int): Numeric command identifier included in the message body.
+                body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
+                ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1414,10 +1608,23 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         async def write_gatt_char(
             self, _uuid: str, blob: bytes, *, response: bool
         ) -> None:
+            """
+            Record a GATT characteristic write payload and response flag into the test capture map.
+            
+            Parameters:
+                _uuid (str): GATT characteristic UUID (ignored by this fake client).
+                blob (bytes): Data that would be written to the characteristic; a copy is stored.
+                response (bool): Whether the write requests a response; stored as provided.
+            """
             captured["blob"] = bytes(blob)
             captured["response"] = response
 
     async def _run() -> None:
+        """
+        Exercise the listener ACK path by sending a command, simulating an echoed notify, and asserting the ACK is received and listener stats are updated.
+        
+        Sends a command (cmd 107) to a bare listener with `wait_for_ack=True`, synthesizes the corresponding encrypted notify echo, and asserts that the send completed successfully, one ACK was received (no timeouts), `last_ack_at` was set, and the pending ACK registry was cleared.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1427,6 +1634,11 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
             # Give async_send_command a tick to register its pending ack
             # and to issue the write, then synthesise the echo frame the
             # device would have pushed back on the notify channel.
+            """
+            Drive a pending ACK flow by synthesizing and delivering an encrypted echo notify to the listener.
+            
+            This coroutine waits a micro-task tick so a concurrently-started async_send_command can register its pending ACK and perform its write, then builds a binary frame with `cmd=107` and a small JSON body, encrypts it using the test `key`, and invokes the listener's notification handler with the resulting blob for device "dev". Side effects: calls `listener._handle_notification` and may resolve any pending ACK futures registered by the listener.
+            """
             await asyncio.sleep(0)
             echo_plain = build_binary_frame(cmd=107, body=b'{"cmd":107,"swEps":1}')
             echo_blob = encrypt_binary_notify(echo_plain, key)
@@ -1454,7 +1666,13 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
 
 
 def test_listener_ack_timeout_raises_runtime_error() -> None:
-    """No notify within ``ack_timeout_sec`` surfaces RuntimeError + bumps stats."""
+    """
+    Verify that sending a command with `wait_for_ack=True` that receives no notify within `ack_timeout_sec`
+    raises a `RuntimeError`, increments the device's `acks_timed_out` stat, and clears pending ack state.
+    
+    After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
+    pending ack registry is empty so late notifications cannot resolve the timed-out future.
+    """
     import asyncio
     import base64
 
@@ -1465,6 +1683,11 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
             return None
 
     async def _run() -> None:
+        """
+        Exercise a bare JackeryBleListener to assert ack timeout behavior and cleanup.
+        
+        Sends a command with `wait_for_ack=True` and a short `ack_timeout_sec`, asserts a `RuntimeError` matching "ack timeout" is raised, verifies the listener's stats record one timed-out ack and zero received acks, and confirms the pending ack registry is cleared.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1505,6 +1728,11 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
             return None
 
     async def _run() -> None:
+        """
+        Exercise the listener ACK handling: send a command that waits for an ACK, deliver a non-matching notify which must not resolve the pending ACK, then deliver a matching notify which must resolve it.
+        
+        Sets up a bare listener with a fake client and a fixed AES key, sends a command with ACK options (wait_for_ack=True, ack_timeout_sec=2.0, ack_cmds=(111,)), and asserts that the pending ACK is preserved after the mismatched notify and that it is fulfilled by the subsequent matching notify. Also asserts that the send completed successfully and listener ACK statistics reflect one received and zero timed out.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1564,6 +1792,11 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
     import asyncio
 
     async def _run() -> None:
+        """
+        Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
+        
+        Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
+        """
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
@@ -1588,9 +1821,25 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         async def write_gatt_char(
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
+            """
+            Simulate a GATT characteristic write that always fails.
+            
+            Parameters:
+                _uuid (str): GATT characteristic UUID to write to.
+                _blob (bytes): Bytes payload to write.
+                response (bool): Whether the write requests a response from the device.
+            
+            Raises:
+                RuntimeError: Always raised with message "simulated GATT failure".
+            """
             raise RuntimeError("simulated GATT failure")
 
     async def _run() -> None:
+        """
+        Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
+        
+        Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _ExplodingClient()}  # type: ignore[attr-defined]
@@ -1645,6 +1894,22 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:
+            """
+            Send a BLE command to the given device and optionally wait for an acknowledgement.
+            
+            Parameters:
+                device_id (str): Identifier of the target device.
+                cmd (int): Command identifier to send.
+                body (bytes): Raw payload for the command.
+                flags (int): Transport-level flags associated with the frame.
+                wait_for_ack (bool): If True, wait for an acknowledgement matching `ack_cmds` before returning.
+                ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
+                ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
+                mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
+            
+            Returns:
+                bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
+            """
             captured["device_id"] = device_id
             captured["cmd"] = cmd
             captured["body"] = body
@@ -1722,7 +1987,11 @@ def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
 
 
 def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
-    """A 200-byte body at MTU=247 is sent as two frames with idx=1/2, cnt=2."""
+    """
+    Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
+    
+    Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
+    """
     import asyncio
     import base64
 
@@ -1742,6 +2011,15 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
             writes.append(bytes(blob))
 
     async def _run() -> None:
+        """
+        Exercise listener chunking behavior by sending a large command body and asserting it is split into two encrypted writes which decrypt to sequential frames that reassemble to the original body.
+        
+        Builds a listener with a fake client and a resolved AES key, sends a 209-byte JSON body with cmd 107, and verifies:
+        - async_send_command reports success,
+        - exactly two GATT write blobs were produced,
+        - each decrypted binary frame has the correct `frame_index`, shared `chunk_count`, and `cmd`,
+        - the concatenation of decrypted `body` fields equals the original payload.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1787,6 +2065,11 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
             writes.append(bytes(blob))
 
     async def _run() -> None:
+        """
+        Verifies that a bare listener splits an oversized body according to an MTU override, sends the expected number of encrypted chunked frames, and that those frames reassemble to the original body.
+        
+        Sets up a bare listener with a fake client and a fixed AES key/MTU, sends a command with mtu_override=70 for a 25-byte body, and asserts that three writes occur, frame indices progress 1..3, each frame reports the same chunk_count (3), and concatenating the decrypted frame bodies equals the original payload.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1820,9 +2103,26 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
         async def write_gatt_char(
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
+            """
+            Fail fast when an invalid MTU write attempt occurs.
+            
+            This stub is not intended to perform BLE writes; it raises an AssertionError to indicate a call was attempted despite an invalid MTU.
+            
+            Raises:
+                AssertionError: with message "invalid MTU must not write to GATT".
+            """
             raise AssertionError("invalid MTU must not write to GATT")
 
     async def _run() -> None:
+        """
+        Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
+        
+        Constructs a bare listener with a fake client and a resolved AES key, then calls
+        `async_send_command` with a non-integer `mtu_override` to assert input validation.
+        
+        Raises:
+            ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1880,7 +2180,11 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
 
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
-    """A recovered BLE session must not keep stale GATT errors in diagnostics."""
+    """
+    Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
+    
+    Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
+    """
     import asyncio
     import base64
 
@@ -1890,6 +2194,11 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     )
 
     async def _run() -> None:
+        """
+        Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
+        
+        This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
@@ -1924,6 +2233,11 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             writes.append(bytes(blob))
 
     async def _run() -> None:
+        """
+        Exercise the listener's chunked-write + ACK flow and assert it resolves a single pending ACK.
+        
+        Sets up a bare listener with a fake client and the captured AES key, sends a 250-byte command which is split into two chunked writes, drives a single encrypted echo notification to resolve the ACK, and asserts the send succeeded, two writes occurred, one ACK was received, no ACKs timed out, and the pending-ack registry is cleared.
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -1932,6 +2246,11 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         async def _drive_ack_after_writes() -> None:
             # Wait until both chunked writes have hit the wire, then push
             # one echo frame — that single notify must complete the ack.
+            """
+            Waits for two chunked writes to be observed, then injects an encrypted echo notification carrying cmd 107 and body '{"ok":1}' to drive ACK completion in the listener.
+            
+            This helper is used by the test to simulate the device-side echo that should resolve a pending ACK after multi-chunk writes.
+            """
             for _ in range(100):
                 if len(writes) >= 2:
                     break

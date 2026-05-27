@@ -57,7 +57,18 @@ def _redacted_payload_map(
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
-    """Get config entry diagnostics."""
+    """
+    Assembles a diagnostics payload for a Jackery config entry with sensitive data redacted and mapping keys anonymized.
+    
+    When redactions are disabled for the entry, logs a warning indicating that credentials, serial numbers, and the bluetoothKey are included unredacted. The returned payload contains a redacted copy of the entry data and options, an anonymized mapping of device payloads, and a `raw_api` section with coordinator metadata and redacted snapshots of API/messaging telemetry. Redaction behavior respects the entry's diagnostic settings and developer-mode overrides.
+    
+    Returns:
+        dict: Diagnostics structure containing:
+            - `entry_data`: redacted copy of the config entry data
+            - `options`: redacted copy of the config entry options
+            - `devices`: anonymized and redacted mapping of device payloads
+            - `raw_api`: detailed redacted snapshots and coordinator metadata
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
