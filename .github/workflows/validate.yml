@@ -69,6 +69,7 @@ jobs:
       - name: Format check
         run: bun run format:check
       - name: bun run pre-commit
+        run: bun run pre-commit:check
 
   unit-tests:
     name: Unit / source-only tests
