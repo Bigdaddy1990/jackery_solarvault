@@ -45,6 +45,6 @@ jobs:
         uses: actions/dependency-review-action@v5.0.0
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

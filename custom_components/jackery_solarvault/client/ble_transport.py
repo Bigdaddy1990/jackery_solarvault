@@ -235,20 +235,20 @@ class JackeryBleListener:
         produce a usable integer — the writer then falls back to
         :data:`ble.DEFAULT_BLE_MTU`.
         """
-        for attr in ("mtu_size", "mtu"):
+        for attr in ('mtu_size', 'mtu'):
             value = getattr(client, attr, None)
             if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:
                 self._mtu[device_id] = value
                 _LOGGER.debug(
-                    "Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)",
+                    'Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)',
                     device_id,
                     value,
                     ble.chunk_size_for_mtu(value),
                 )
                 return
         _LOGGER.debug(
-            "Jackery BLE %s: bleak did not expose mtu_size yet, will assume "
-            "%d on the next write",
+            'Jackery BLE %s: bleak did not expose mtu_size yet, will assume '
+            '%d on the next write',
             device_id,
             ble.DEFAULT_BLE_MTU,
         )
@@ -302,12 +302,12 @@ class JackeryBleListener:
                     await self.async_send_command(
                         device_id,
                         cmd=MQTT_CMD_QUERY_DEVICE_PROPERTY,
-                        body=b"{}",
+                        body=b'{}',
                         wait_for_ack=False,
                     )
                 except (RuntimeError, ValueError) as err:
                     _LOGGER.debug(
-                        "Jackery BLE %s keep-alive write failed: %s",
+                        'Jackery BLE %s keep-alive write failed: %s',
                         device_id,
                         err,
                     )
@@ -356,7 +356,7 @@ class JackeryBleListener:
         client = self._clients.get(device_id)
         if client is None:
             _LOGGER.debug(
-                "Jackery BLE %s: cannot send cmd=%d — no active client",
+                'Jackery BLE %s: cannot send cmd=%d — no active client',
                 device_id,
                 cmd,
             )
@@ -379,7 +379,7 @@ class JackeryBleListener:
             ) from err
         chunk_count = len(chunks)
         _LOGGER.debug(
-            "Jackery BLE %s: writing cmd=%d body=%d bytes across %d frame(s) at mtu=%d",
+            'Jackery BLE %s: writing cmd=%d body=%d bytes across %d frame(s) at mtu=%d',
             device_id,
             cmd,
             len(body),
@@ -529,8 +529,8 @@ class JackeryBleListener:
         self._stop_event.clear()
 
         matcher: BluetoothCallbackMatcher = {
-            "service_uuid": ble.BLE_SERVICE_UUID,
-            "manufacturer_id": ble.BLE_MANUFACTURER_ID,
+            'service_uuid': ble.BLE_SERVICE_UUID,
+            'manufacturer_id': ble.BLE_MANUFACTURER_ID,
         }
         unregister = bluetooth.async_register_callback(
             self._hass,
@@ -540,8 +540,8 @@ class JackeryBleListener:
         )
         self._unregister_callbacks.append(unregister)
         _LOGGER.info(
-            "Jackery BLE listener started for %d device(s); waiting for "
-            "advertisements with service %s",
+            'Jackery BLE listener started for %d device(s); waiting for '
+            'advertisements with service %s',
             len(device_ids),
             ble.BLE_SERVICE_UUID,
         )
@@ -559,7 +559,7 @@ class JackeryBleListener:
             try:
                 unregister()
             except Exception as err:  # pragma: no cover — HA callback contract is sync
-                _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
+                _LOGGER.debug('Jackery BLE: callback unregister failed: %s', err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
         tasks = [task for task in self._connections.values() if not task.done()]
@@ -573,8 +573,8 @@ class JackeryBleListener:
                 )
             except TimeoutError:
                 _LOGGER.warning(
-                    "Jackery BLE: %d connection task(s) did not exit within %ss; "
-                    "leaving them to the event loop",
+                    'Jackery BLE: %d connection task(s) did not exit within %ss; '
+                    'leaving them to the event loop',
                     sum(1 for t in tasks if not t.done()),
                     _STOP_TIMEOUT_SEC,
                 )
@@ -583,13 +583,13 @@ class JackeryBleListener:
         # Use getattr to stay safe against stubbed instances that may have
         # been constructed via ``__new__`` in tests without going through
         # ``__init__``.
-        pending_acks: dict[str, list[_PendingAck]] = getattr(self, "_pending_acks", {})
+        pending_acks: dict[str, list[_PendingAck]] = getattr(self, '_pending_acks', {})
         for bucket in pending_acks.values():
             for pending in bucket:
                 if not pending.future.done():
                     pending.future.cancel()
         pending_acks.clear()
-        _LOGGER.info("Jackery BLE listener stopped")
+        _LOGGER.info('Jackery BLE listener stopped')
 
     # ------------------------------------------------------------------
     # Advertisement -> connect orchestration
@@ -655,7 +655,7 @@ class JackeryBleListener:
         serial: str | None = None
         if isinstance(mfr_data, bytes):
             try:
-                serial = mfr_data.decode("ascii").strip()
+                serial = mfr_data.decode('ascii').strip()
             except UnicodeDecodeError:
                 serial = None
         if serial is None:
@@ -666,8 +666,8 @@ class JackeryBleListener:
             device_id = self._serial_resolver(serial)
         if device_id is None:
             _LOGGER.debug(
-                "Jackery BLE: advertisement for serial %s @ %s — no device "
-                "id mapping yet",
+                'Jackery BLE: advertisement for serial %s @ %s — no device '
+                'id mapping yet',
                 serial,
                 address,
             )
@@ -676,7 +676,7 @@ class JackeryBleListener:
         if device_id not in self._device_addresses:
             self._device_addresses[device_id] = address
             _LOGGER.info(
-                "Jackery BLE: matched serial %s @ %s to device %s",
+                'Jackery BLE: matched serial %s @ %s to device %s',
                 serial,
                 address,
                 device_id,
@@ -697,8 +697,8 @@ class JackeryBleListener:
                 )
                 if ble_device is None:
                     _LOGGER.debug(
-                        "Jackery BLE %s: address %s not connectable right now, "
-                        "waiting for next advertisement",
+                        'Jackery BLE %s: address %s not connectable right now, '
+                        'waiting for next advertisement',
                         device_id,
                         address,
                     )
@@ -706,7 +706,7 @@ class JackeryBleListener:
                 stats.connect_attempts += 1
                 try:
                     client = await establish_connection(
-                        client_class=__import__("bleak").BleakClient,
+                        client_class=__import__('bleak').BleakClient,
                         device=ble_device,
                         name=f"jackery-{device_id}",
                         disconnected_callback=lambda _client: self._on_disconnect(
@@ -718,8 +718,8 @@ class JackeryBleListener:
                     stats.connect_failures += 1
                     stats.last_error = f"connect: {err}"
                     _LOGGER.debug(
-                        "Jackery BLE %s connect failed: %s; will retry on next "
-                        "advertisement",
+                        'Jackery BLE %s connect failed: %s; will retry on next '
+                        'advertisement',
                         device_id,
                         err,
                     )
@@ -730,7 +730,7 @@ class JackeryBleListener:
                 # this session without re-establishing its own connect.
                 self._clients[device_id] = client
                 _LOGGER.info(
-                    "Jackery BLE %s: connected to %s; subscribing to notify %s",
+                    'Jackery BLE %s: connected to %s; subscribing to notify %s',
                     device_id,
                     address,
                     ble.BLE_NOTIFY_CHAR_UUID,
@@ -768,7 +768,7 @@ class JackeryBleListener:
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"
                     _LOGGER.debug(
-                        "Jackery BLE %s notify subscribe failed: %s",
+                        'Jackery BLE %s notify subscribe failed: %s',
                         device_id,
                         err,
                     )
@@ -793,7 +793,7 @@ class JackeryBleListener:
                 if self._stop_event.is_set():
                     return
                 _LOGGER.debug(
-                    "Jackery BLE %s: lost link, backoff %ss before retry",
+                    'Jackery BLE %s: lost link, backoff %ss before retry',
                     device_id,
                     _RECONNECT_BACKOFF_SEC,
                 )
@@ -810,20 +810,20 @@ class JackeryBleListener:
             # already handled it, and another await would race against
             # the event loop tearing down.
             _LOGGER.debug(
-                "Jackery BLE %s: connection runner cancelled (shutdown)",
+                'Jackery BLE %s: connection runner cancelled (shutdown)',
                 device_id,
             )
             raise
         except Exception as err:  # pragma: no cover — defensive
             stats.last_error = f"runner: {err}"
-            _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
+            _LOGGER.exception('Jackery BLE %s: connection runner crashed', device_id)
         finally:
             self._connections.pop(device_id, None)
 
     def _on_disconnect(self, device_id: str) -> None:
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
-        _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)
+        _LOGGER.debug('Jackery BLE %s: peripheral disconnected', device_id)
 
     # ------------------------------------------------------------------
     # Notification handler
@@ -840,15 +840,15 @@ class JackeryBleListener:
         """
         stats = self.stats_for(device_id)
         stats.frames_received += 1
-        b64 = base64.b64encode(raw).decode("ascii")
-        _LOGGER.debug("Jackery BLE %s notify: %d bytes", device_id, len(raw))
+        b64 = base64.b64encode(raw).decode('ascii')
+        _LOGGER.debug('Jackery BLE %s notify: %d bytes', device_id, len(raw))
 
         parsed: ble.BleBinaryFrame | None = None
         decode_error: str | None = None
 
         key = self._key_resolver(device_id)
         if key is None:
-            decode_error = "no bluetoothKey for device"
+            decode_error = 'no bluetoothKey for device'
         else:
             try:
                 parsed = ble.decrypt_binary_notify(raw, key)
@@ -873,7 +873,7 @@ class JackeryBleListener:
         if parsed is not None:
             stats.frames_decoded += 1
             _LOGGER.debug(
-                "Jackery BLE %s decoded: cmd=%d body=%d bytes",
+                'Jackery BLE %s decoded: cmd=%d body=%d bytes',
                 device_id,
                 parsed.cmd,
                 len(parsed.body),
@@ -887,13 +887,13 @@ class JackeryBleListener:
         try:
             await self._sink(device_id, observation)
         except Exception as err:  # pragma: no cover — sink misbehaviour
-            _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
+            _LOGGER.debug('Jackery BLE %s sink raised: %s', device_id, err)
 
 
 __all__ = [
-    "DEFAULT_BLE_CONNECT_TIMEOUT_SEC",
-    "BleFrameObservation",
-    "BleListenerStats",
-    "FrameSink",
-    "JackeryBleListener",
+    'DEFAULT_BLE_CONNECT_TIMEOUT_SEC',
+    'BleFrameObservation',
+    'BleListenerStats',
+    'FrameSink',
+    'JackeryBleListener',
 ]
