@@ -1,0 +1,63 @@
+name: Scheduled full test suite
+
+on:
+  schedule:
+    # Run twice per week during the early-morning UTC window to avoid CI contention
+    - cron: "0 3 * * 2,5"
+  workflow_dispatch:
+    inputs:
+      override_ci_window:
+        description: "Bestätige, dass du das reservierte Testfenster mit dem Team abgestimmt hast."
+        required: true
+        type: boolean
+      run_reason:
+        description: "Kurzbeschreibung oder Link zum Issue/Incident für den manuellen Vollsuite-Lauf."
+        required: true
+        default: maintenance-window
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard-manual-dispatch:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    name: Confirm reserved slot coordination
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate override flag
+        run: |
+          if [ "${{ github.event.inputs.override_ci_window }}" != 'true' ]; then
+            echo "::error ::Manual dispatch requires override_ci_window=true after coordinating with maintainers."
+            exit 1
+          fi
+          echo "ℹ️ Scheduled full-suite run reason: ${{ github.event.inputs.run_reason }}"
+
+  scheduled-pytest:
+    needs: guard-manual-dispatch
+    # GitHub Actions skips a job whose `needs` dependency is skipped, even when
+    # the `if:` condition would allow it. The `always()` wrapper prevents the
+    # implicit skip so that schedule-triggered runs (which skip the guard job
+    # entirely) still reach this job. The explicit result check then keeps
+    # manual-dispatch runs gated on the guard passing.
+    if: always() && (github.event_name != 'workflow_dispatch' || needs.guard-manual-dispatch.result == 'success')
+    name: Weekly pytest quality gate
+    uses: ./.github/workflows/reusable-python-tests.yml
+    with:
+      python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+      home-assistant-spec: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '2026.1.1') }}
+      coverage-min: ${{ vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '5' }}
+      coverage-xml-path: ./coverage/coverage.xml
+      coverage-html-dir: ./coverage/html
+      upload-junit-artifact: true
+      junit-artifact-name: junit-results
+      run-codecov: true
+      upload-coverage-artifact: true
+      coverage-artifact-name: scheduled-coverage-report
+      pytest-extra-args: "-q tests/"
+    secrets: inherit
