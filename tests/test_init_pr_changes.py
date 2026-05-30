@@ -24,12 +24,13 @@ import pytest
 try:
     from custom_components.jackery_solarvault import (
         _LOCAL_MQTT_RUNTIME_KEY,
-        _local_mqtt_client,
         _async_start_local_mqtt,
+        _local_mqtt_client,
     )
     from custom_components.jackery_solarvault.client.local_mqtt import (
         JackeryLocalMqttClient,
     )
+
     _IMPORT_OK = True
 except (SyntaxError, ImportError) as _import_err:
     _IMPORT_OK = False
@@ -41,13 +42,9 @@ except (SyntaxError, ImportError) as _import_err:
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_USERNAME,
-    CONF_THIRD_PARTY_MQTT_PASSWORD,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
-    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DOMAIN,
 )
 
@@ -259,8 +256,8 @@ async def test_async_start_local_mqtt_stores_client_in_hass_data() -> None:
     ):
         await _async_start_local_mqtt(hass, entry)
 
-    client = hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get(
-        _LOCAL_MQTT_RUNTIME_KEY
+    client = (
+        hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get(_LOCAL_MQTT_RUNTIME_KEY)
     )
     assert isinstance(client, JackeryLocalMqttClient)
     assert started  # async_start was called
@@ -277,7 +274,9 @@ async def test_async_start_local_mqtt_registers_unload_callback() -> None:
     assert len(entry._unload_callbacks) == 1
 
 
-async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client() -> None:
+async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client() -> (
+    None
+):
     """The unload callback must stop the client and remove it from hass.data."""
     hass = _FakeHass()
     entry = _make_local_mqtt_entry(enable=True, host="192.168.1.100")
@@ -343,7 +342,6 @@ async def test_async_start_local_mqtt_unload_does_not_remove_different_client() 
     async def _noop_stop() -> None:
         pass
 
-    original_client = None  # the client that was created during setup
     # We can't easily get original_client here, so we verify the new_client stays.
     with patch.object(JackeryLocalMqttClient, "async_stop", new_callable=AsyncMock):
         await callback()
@@ -356,9 +354,7 @@ async def test_async_start_local_mqtt_client_id_uses_entry_id_prefix() -> None:
     """Client ID must be derived from the first 8 chars of the entry ID."""
     hass = _FakeHass()
     entry_id = "ABCDEFGHIJKLMNOP"
-    entry = _make_local_mqtt_entry(
-        enable=True, host="192.168.1.100", entry_id=entry_id
-    )
+    entry = _make_local_mqtt_entry(enable=True, host="192.168.1.100", entry_id=entry_id)
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
         await _async_start_local_mqtt(hass, entry)

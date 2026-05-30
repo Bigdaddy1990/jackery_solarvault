@@ -18,7 +18,6 @@ will be skipped with an informative message.
 """
 
 import asyncio
-import sys
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -26,14 +25,15 @@ import pytest
 
 try:
     from custom_components.jackery_solarvault.client.local_mqtt import (
-        JackeryLocalMqttClient,
         LOCAL_MQTT_DEFAULT_TOPIC,
         LOCAL_MQTT_MAX_TOPIC_NAMES,
+        JackeryLocalMqttClient,
     )
     from custom_components.jackery_solarvault.const import (
         MQTT_CLIENT_LIBRARY,
         REDACTED_VALUE,
     )
+
     _IMPORT_OK = True
 except SyntaxError as _syntax_err:
     _IMPORT_OK = False
@@ -317,8 +317,8 @@ def test_handle_message_does_not_duplicate_topics() -> None:
 def test_handle_message_tracks_multiple_distinct_topics() -> None:
     """Each unique topic is tracked separately."""
     client = _make_client()
-    client._handle_message("a/b", b'{}')
-    client._handle_message("c/d", b'{}')
+    client._handle_message("a/b", b"{}")
+    client._handle_message("c/d", b"{}")
     assert len(client._topics_seen) == 2
 
 
@@ -326,12 +326,12 @@ def test_handle_message_caps_topic_tracking_at_max() -> None:
     """After LOCAL_MQTT_MAX_TOPIC_NAMES topics, new topics set the truncated flag."""
     client = _make_client()
     for i in range(LOCAL_MQTT_MAX_TOPIC_NAMES):
-        client._handle_message(f"topic/{i}", b'{}')
+        client._handle_message(f"topic/{i}", b"{}")
     assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES
     assert not client._topics_seen_truncated
 
     # One more topic beyond the cap.
-    client._handle_message("overflow/topic", b'{}')
+    client._handle_message("overflow/topic", b"{}")
     assert client._topics_seen_truncated
     assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES
 
@@ -382,13 +382,13 @@ def test_handle_message_updates_last_topic_and_last_message_at() -> None:
     client = _make_client()
     assert client._last_topic is None
     assert client._last_message_at is None
-    client._handle_message("jackery/props", b'{}')
+    client._handle_message("jackery/props", b"{}")
     assert client._last_topic == "jackery/props"
     assert client._last_message_at is not None
 
 
 def test_handle_message_string_payload_is_accepted() -> None:
-    """str payloads (not bytes) must be processed without error."""
+    """Str payloads (not bytes) must be processed without error."""
     client = _make_client()
     client._handle_message("test/str", '{"cmd": 107}')
     assert client._messages_received == 1
@@ -421,7 +421,7 @@ def test_diagnostics_snapshot_unredacted_exposes_host_and_port() -> None:
 def test_diagnostics_snapshot_redacted_hides_topic_names() -> None:
     """With redact=True, each entry in topics_seen must be REDACTED."""
     client = _make_client()
-    client._handle_message("jackery/device/123/props", b'{}')
+    client._handle_message("jackery/device/123/props", b"{}")
     snap = client.diagnostics_snapshot(redact=True)
     assert snap["topics_seen"] == [REDACTED_VALUE]
 
@@ -429,7 +429,7 @@ def test_diagnostics_snapshot_redacted_hides_topic_names() -> None:
 def test_diagnostics_snapshot_unredacted_exposes_topic_names() -> None:
     """With redact=False, topic names are included verbatim."""
     client = _make_client()
-    client._handle_message("jackery/device/123/props", b'{}')
+    client._handle_message("jackery/device/123/props", b"{}")
     snap = client.diagnostics_snapshot(redact=False)
     assert "jackery/device/123/props" in snap["topics_seen"]
 
@@ -475,9 +475,9 @@ def test_diagnostics_snapshot_library_key_matches_const() -> None:
 def test_diagnostics_snapshot_counts_are_accurate() -> None:
     """Message and topic counts in the snapshot match internal counters."""
     client = _make_client()
-    client._handle_message("a", b'{}')
-    client._handle_message("b", b'{}')
-    client._handle_message("b", b'not valid json')  # no drop for invalid JSON
+    client._handle_message("a", b"{}")
+    client._handle_message("b", b"{}")
+    client._handle_message("b", b"not valid json")  # no drop for invalid JSON
     snap = client.diagnostics_snapshot()
     assert snap["messages_received"] == 3
     assert snap["topics_seen_count"] == 2
@@ -486,7 +486,7 @@ def test_diagnostics_snapshot_counts_are_accurate() -> None:
 def test_diagnostics_snapshot_redacted_last_topic_is_redacted_value() -> None:
     """After a message, redacted snapshot must show REDACTED for last_topic."""
     client = _make_client()
-    client._handle_message("private/topic/123", b'{}')
+    client._handle_message("private/topic/123", b"{}")
     snap = client.diagnostics_snapshot(redact=True)
     assert snap["last_topic"] == REDACTED_VALUE
 
@@ -593,7 +593,7 @@ def test_diagnostics_snapshot_messages_dropped_count_is_accurate() -> None:
     # A non-dict JSON payload (array) is counted as dropped.
     client._handle_message("topic/a", b"[1, 2, 3]")
     client._handle_message("topic/b", b'{"ok": true}')  # not dropped
-    client._handle_message("topic/c", b'[false]')  # dropped
+    client._handle_message("topic/c", b"[false]")  # dropped
     snap = client.diagnostics_snapshot()
     assert snap["messages_dropped"] == 2
     assert snap["messages_received"] == 3

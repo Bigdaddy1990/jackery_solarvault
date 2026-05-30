@@ -63,7 +63,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:  # noqa: D103
+def main() -> int:
     """Scan provided paths for legacy Python 2 multi-exception `except A, B:` syntax and report any occurrences.
 
     Parses command-line paths, inspects files and directories for Python files, prints either a no-findings message or a list of offending file locations with guidance, and exits with a status code reflecting the result.
