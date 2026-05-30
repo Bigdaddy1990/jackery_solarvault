@@ -13,24 +13,18 @@ default_install_hook_types:
   - pre-push
 
 repos:
-
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
       - id: pyupgrade
         args:
-          - --py314-plus
-
-  - repo: https://github.com/cdce8p/python-typing-update
-    rev: v0.8.1
-    hooks:
-      - id: python-typing-update
-        stages: [manual]
-        args:
-          - --py314-plus
-          - --keep-updates
-          - --check
-          - --force
+          - --py36-plus
+          - --py37-plus
+          - --py38-plus
+          - --py39-plus
+          - --py310-plus
+          - --py311-plus
+          - --py313-plus
 
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
@@ -38,25 +32,26 @@ repos:
       - id: autotyping
         stages: [pre-commit]
         types: [python]
-        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
-
+        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above 
+        
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.15
     hooks:
-       - id: ruff-check
-         args:
-           - --fix
-           - --show-fixes
-           - --unsafe-fixes
-           - --exit-non-zero-on-fix
-           - --output-format=github
-         types_or:
-           - python
-           - pyi
-       - id: ruff-format
-         types_or:
-           - python
-           - pyi
+      - id: ruff-check
+        args:
+          - --fix
+          - --show-fixes
+          - --unsafe-fixes
+          - --extend-select
+          - --exit-non-zero-on-fix
+          - --output-format=github
+           types_or:
+             - python
+             - pyi
+      - id: ruff-format
+           types_or:
+             - python
+             - pyi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -86,23 +81,13 @@ repos:
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
       - id: double-quote-string-fixer
-      - id: name-tests-test
       - id: detect-private-key
       - id: detect-aws-credentials
       - id: destroyed-symlinks
-
-  - repo: local
+      
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
     hooks:
-      - id: docs-html-build
-        name: build docs HTML with bun
-        entry: bun run docs:build
-        language: system
-        pass_filenames: false
-        files: ^docs/.*\.md$
-
-      - id: gate-check
-        name: jackery_solarvault unified gate (read-only)
-        entry: python scripts/gate.py --check --fast
-        language: system
-        pass_filenames: false
-        stages: [manual]
+      - id: mypy
+        additional_dependencies: [types-pyyaml]
+        exclude: ^testing/resources/
