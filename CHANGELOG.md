@@ -9,6 +9,15 @@ After 0.1.0 the changelog is generated automatically by Release Drafter from
 PR titles and labels. Manual entries below 0.1.0 are kept for historical
 context.
 
+## 1.0.0 (2026-05-30)
+
+
+### Bug Fixes
+
+* promote statistics backfill failure summary to WARNING ([daac9d0](https://github.com/Bigdaddy1990/jackery_solarvault/commit/daac9d06b301b051d6e4e9d1d0f88516b4aa34e1))
+* six real runtime bugs found in code review ([8722106](https://github.com/Bigdaddy1990/jackery_solarvault/commit/872210644b5af0882f139f99d33057b500ef78ed))
+* six real runtime bugs found in code review ([fe1fc7a](https://github.com/Bigdaddy1990/jackery_solarvault/commit/fe1fc7a703baf2e6091833164b0cb0a591883392))
+
 ## [Unreleased]
 
 ### Added
