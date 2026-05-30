@@ -1,49 +1,102 @@
-name: Release
+name: Release Automation
 
 on:
   push:
     tags:
-      - "v*"
-
-permissions:
-  contents: write
-
-env:
-  BUN_CONFIG_TELEMETRY_DISABLED: "1"
-  DO_NOT_TRACK: "1"
+      - "v*.*.*"
 
 jobs:
-  release:
+  create-release:
+    name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.14"
-
-      - name: Install Bun tooling
-        run: bun install --frozen-lockfile
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+          python-version: "3.14"
 
-      - name: Verify manifest version matches tag
-        run: bun run release:verify-tag
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
 
-      - name: Build release zip
-        run: bun run release:zip
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          PREVIOUS_TAG_COMMIT=$(git rev-list --tags --skip=1 --max-count=1)
+          PREVIOUS_TAG=$(git describe --abbrev=0 --tags "$PREVIOUS_TAG_COMMIT" 2>/dev/null || echo "")
 
-      - name: Publish release with auto-generated notes
+          if [ -z "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            COMMITS=$(git log "$PREVIOUS_TAG"..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+
+          # Write release body to a dedicated temp file – never overwrite CHANGELOG.md
+          # (the repo CHANGELOG.md is maintained by release-please and must not be
+          # clobbered here).
+          cat > RELEASE_BODY.md << EOF
+          # Release ${{ steps.version.outputs.version }}
+
+          ## Changes
+
+          $COMMITS
+
+          ## Installation
+
+          \`\`\`yaml
+          # Via HACS (recommended)
+          1. Open HACS → Integrations
+          2. Search for "jackery_solarvault"
+          3. Click Download
+
+          # Manual
+          1. Download jackery_solarvault.tar.gz
+          2. Extract to custom_components/
+          3. Restart Home Assistant
+          \`\`\`
+
+          ## Verification
+
+          SHA256: \$(sha256sum dist/jackery_solarvault.tar.gz | cut -d' ' -f1)
+          EOF
+
+          cat RELEASE_BODY.md
+
+      - name: Create package
+        run: |
+          mkdir -p dist
+          cp -r custom_components/jackery_solarvault dist/
+          cd dist
+          tar -czf jackery_solarvault.tar.gz jackery_solarvault/
+          sha256sum jackery_solarvault.tar.gz > jackery_solarvault.tar.gz.sha256
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: RELEASE_BODY.md
           files: |
-            jackery_solarvault.zip
+            dist/jackery_solarvault.tar.gz
+            dist/jackery_solarvault.tar.gz.sha256
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'rc') || contains(steps.version.outputs.version, 'beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update HACS repository
+        if: ${{ !contains(steps.version.outputs.version, 'rc') && !contains(steps.version.outputs.version, 'beta') }}
+        run: |
+          echo "Stable release ${{ steps.version.outputs.version }} created"
+          # HACS will automatically detect the new release
