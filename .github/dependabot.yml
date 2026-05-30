@@ -53,12 +53,3 @@ updates:
     schedule:
       interval: "daily"
 
-  - package-ecosystem: "bun"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    labels:
-      - "dependencies"
-      - "bun"
-    commit-message:
-      prefix: "⬆️ [bun]"
