@@ -10,9 +10,7 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -24,7 +22,6 @@ from custom_components.jackery_solarvault.client.ble import (
     build_binary_frame,
     decrypt_binary_notify,
 )
-
 
 # ---------------------------------------------------------------------------
 # _emit_payload_debug — pre-built dict vs callable factory
@@ -214,7 +211,7 @@ def test_decrypt_binary_notify_version_mismatch_does_not_raise() -> None:
 
 
 def test_decrypt_binary_notify_version_mismatch_returns_correct_cmd() -> None:
-    """cmd field must survive version-byte tampering."""
+    """Cmd field must survive version-byte tampering."""
     key = b"hr2c0hh361336138"
     body = b'{"cmd":121,"swEps":0}'
     blob = _make_tampered_notify(cmd=121, body=body, key=key)
@@ -223,7 +220,7 @@ def test_decrypt_binary_notify_version_mismatch_returns_correct_cmd() -> None:
 
 
 def test_decrypt_binary_notify_version_mismatch_returns_correct_body() -> None:
-    """body must be recovered intact even when version bytes are unexpected."""
+    """Body must be recovered intact even when version bytes are unexpected."""
     key = b"hr2c0hh361336138"
     body = b'{"cmd":107,"batSoc":80}'
     blob = _make_tampered_notify(cmd=107, body=body, key=key)
@@ -232,7 +229,7 @@ def test_decrypt_binary_notify_version_mismatch_returns_correct_body() -> None:
 
 
 def test_decrypt_binary_notify_valid_version_still_succeeds() -> None:
-    """Frames with the standard version b'\\x00\\x64' continue to decode normally."""
+    r"""Frames with the standard version b'\\x00\\x64' continue to decode normally."""
     key = b"hr2c0hh361336138"
     body = b'{"cmd":107,"pvPw":1200}'
     plain = build_binary_frame(cmd=107, body=body)

@@ -19,12 +19,11 @@ from custom_components.jackery_solarvault.client.ble import (
     BLE_FRAME_MAGIC,
     BLE_FRAME_PAYLOAD_MARKER,
     BLE_FRAME_VERSION,
+    BLE_NOTIFY_CHAR_UUID,
     BLE_SERVICE_UUID,
     BLE_WRITE_CHAR_UUID,
-    BLE_NOTIFY_CHAR_UUID,
     build_binary_frame,
 )
-
 
 # ---------------------------------------------------------------------------
 # build_binary_frame — assert replaces RuntimeError for header length
@@ -39,7 +38,7 @@ def test_build_binary_frame_normal_call_does_not_raise() -> None:
 
 
 def test_build_binary_frame_validates_cmd_range_raises_value_error() -> None:
-    """cmd outside 0..0xFFFF must raise ValueError (not AssertionError)."""
+    """Cmd outside 0..0xFFFF must raise ValueError (not AssertionError)."""
     with pytest.raises(ValueError, match="cmd"):
         build_binary_frame(cmd=-1, body=b"")
     with pytest.raises(ValueError, match="cmd"):
@@ -55,7 +54,7 @@ def test_build_binary_frame_cmd_boundary_values_are_accepted() -> None:
 
 
 def test_build_binary_frame_validates_flags_range() -> None:
-    """flags outside 0..0xFFFF must raise ValueError."""
+    """Flags outside 0..0xFFFF must raise ValueError."""
     with pytest.raises(ValueError, match="flags"):
         build_binary_frame(cmd=107, body=b"", flags=-1)
     with pytest.raises(ValueError, match="flags"):
@@ -82,13 +81,13 @@ def test_build_binary_frame_validates_chunk_count_range() -> None:
 
 
 def test_build_binary_frame_validates_body_max_length() -> None:
-    """body longer than 0xFFFF bytes must raise ValueError."""
+    """Body longer than 0xFFFF bytes must raise ValueError."""
     with pytest.raises(ValueError, match="body too long"):
         build_binary_frame(cmd=107, body=b"x" * (0x10001))
 
 
 def test_build_binary_frame_validates_trailer_length() -> None:
-    """trailer must be exactly 4 bytes; any other length raises ValueError."""
+    """Trailer must be exactly 4 bytes; any other length raises ValueError."""
     with pytest.raises(ValueError, match="trailer"):
         build_binary_frame(cmd=107, body=b"", trailer=b"\x00\x00\x00")
     with pytest.raises(ValueError, match="trailer"):
@@ -140,7 +139,9 @@ def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
 
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")  # 16-byte device key
     body = b'{"cmd":107,"swEps":1}'
-    plain = build_binary_frame(cmd=107, body=body, flags=7, frame_index=1, chunk_count=1)
+    plain = build_binary_frame(
+        cmd=107, body=body, flags=7, frame_index=1, chunk_count=1
+    )
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
     parsed = decrypt_binary_notify(blob, key)
     assert parsed.cmd == 107
@@ -199,10 +200,7 @@ def test_aes_encrypt_decrypt_roundtrip_with_aes128_key() -> None:
     The ``from __future__ import annotations`` change must not affect the
     runtime behaviour of aes_encrypt/aes_decrypt.
     """
-    from custom_components.jackery_solarvault.client.ble import (
-        aes_decrypt,
-        aes_encrypt,
-    )
+    from custom_components.jackery_solarvault.client.ble import aes_decrypt, aes_encrypt
 
     key = b"1234567890abcdef"  # 16-byte AES-128 key
     iv = bytes(16)  # zero IV for determinism
@@ -218,10 +216,7 @@ def test_aes_encrypt_decrypt_roundtrip_with_aes256_key() -> None:
 
     Pins that both key-length code paths work after the annotations change.
     """
-    from custom_components.jackery_solarvault.client.ble import (
-        aes_decrypt,
-        aes_encrypt,
-    )
+    from custom_components.jackery_solarvault.client.ble import aes_decrypt, aes_encrypt
 
     key = b"12345678901234567890123456789012"  # 32-byte AES-256 key
     iv = bytes(16)

@@ -109,7 +109,7 @@ def _audit_file(path: Path) -> list[str]:
     return errors
 
 
-def main() -> int:  # noqa: D103
+def main() -> int:
     """Run the TypedDict audit for the configured target directory and return a process exit code.
 
     Prints detailed error lines and a failure summary when issues are found, or a success message when none are found. If the target path does not exist, prints a message and treats that as a failure.

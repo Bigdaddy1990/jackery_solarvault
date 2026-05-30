@@ -7,7 +7,6 @@ Covers:
 - async_get_today_energy: new today-energy KPI endpoint
 """
 
-import base64
 from typing import Any
 
 import pytest
@@ -28,7 +27,6 @@ from custom_components.jackery_solarvault.const import (
     FIELD_DEVICE_SN,
     MQTT_MAC_ID_PREFIX,
 )
-
 
 # ---------------------------------------------------------------------------
 # _rsa_pkcs1v15_encrypt — new isinstance guard

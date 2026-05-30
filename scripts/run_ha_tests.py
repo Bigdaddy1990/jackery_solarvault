@@ -117,7 +117,7 @@ def main() -> int:
     args = list(sys.argv[1:])
     # Defer the pytest import so the stub is in place before any plugin
     # auto-discovery touches ``homeassistant.runner``.
-    import pytest  # noqa: PLC0415 — intentional late import
+    import pytest
 
     return int(pytest.main(args))
 
