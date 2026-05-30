@@ -120,7 +120,7 @@ jobs:
       coverage-threshold: ${{ env.COVERAGE_MIN }}
     env:
       PYTHON_VERSION: ${{ inputs.python-version != '' && inputs.python-version || (vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14') }}
-      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '2026.1.1') }}
+      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '') }}
       COVERAGE_MIN: ${{ inputs.coverage-min != '' && inputs.coverage-min || (vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '85') }}
       CRITICAL_MODULE_COVERAGE_MIN: ${{ inputs.critical-module-coverage-min != '' && inputs.critical-module-coverage-min || (vars.CI_CRITICAL_MODULE_COVERAGE_MIN != '' && vars.CI_CRITICAL_MODULE_COVERAGE_MIN || '90') }}
       COVERAGE_XML: ${{ inputs.coverage-xml-path != '' && inputs.coverage-xml-path || 'coverage.xml' }}
@@ -146,7 +146,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
-            requirements_test.txt
+            requirements-test.txt
             pyproject.toml
 
       - name: Install test dependencies
@@ -158,7 +158,7 @@ jobs:
             pip install -U "homeassistant${{ env.HA_SPEC }}"
           fi
           pip install -r requirements.txt
-          pip install -r requirements_test.txt
+          pip install -r requirements-test.txt
 
       # Quality checks run after deps are fully installed so that a check
       # failure never leaves the environment in a partially-installed state.
@@ -470,7 +470,3 @@ jobs:
 
           print(f"coverage gate passed: {coverage_percent}% >= {coverage_min}%")
           PY
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}

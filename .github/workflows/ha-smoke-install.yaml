@@ -8,24 +8,12 @@ on:
 permissions:
   contents: read
 
-env:
-  BUN_CONFIG_TELEMETRY_DISABLED: "0"
-  DO_NOT_TRACK: "0"
-
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.2.14"
-
-      - name: Install Bun tooling
-        run: bun install 
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -38,18 +26,31 @@ jobs:
             pyproject.toml
 
       - name: Show Python environment
-        run: bun run smoke:show-env
+        run: python --version && pip --version
 
       - name: Upgrade pip
-        run: bun run smoke:upgrade-pip
+        run: python -m pip install --upgrade pip
 
       - name: Install Home Assistant and jackery_solarvault
         env:
           HA_SPEC: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '2026.1.1') }}
-        run: bun run smoke:install-ha
+        run: |
+          python -m pip install --no-cache-dir "homeassistant${HA_SPEC}"
+          # `hass --script check_config` imports colorlog directly on Python 3.14.
+          # Install it eagerly so the smoke gate does not rely on runtime auto-install.
+          python -m pip install --no-cache-dir "colorlog==6.10.1"
+          python -m pip install --no-cache-dir -e .
 
       - name: Prepare Home Assistant config
-        run: bun run smoke:prepare-config
+        run: |
+          mkdir -p smoke-config/custom_components
+          cp -r custom_components/jackery_solarvault smoke-config/custom_components/
+          cat <<'YAML' > smoke-config/configuration.yaml
+          default_config:
+          logger:
+            default: warning
+          YAML
 
       - name: Validate installation with hass --script check_config
-        run: bun run ha:smoke
+        run: |
+          hass --script check_config --config smoke-config
