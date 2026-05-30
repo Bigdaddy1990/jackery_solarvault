@@ -1,6 +1,6 @@
 # pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
-requires = ["setuptools>=82.0.1", "home-assistant-wheels", "wheels-custom-integrations"]
+requires = ["setuptools>=82.0.1", "wheels"]
 build-backend = "setuptools.build_meta"
 
 [project]
