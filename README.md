@@ -23,6 +23,22 @@ This integration is not an official Jackery product and is not affiliated with J
 - Device restart button and cloud services for system name and storm-alert management.
 - Diagnostics for raw redacted data, MQTT status, firmware, system limits and data-quality warnings.
 
+### About hardware coverage and ``unknown`` entities
+
+The integration mirrors the documented Jackery wire-protocol (Smali analysis in
+``docs/html/`` and PROTOCOL.md) rather than only what one specific installation
+emits at runtime. That means entities and sub-device branding are wired for the
+full documented catalog — Shelly Pro EM-50 / 3EM / 3EM63, EcoTracker, P1
+Meter, Homey Energy Dongle, Shelly Plug S / S-Gen3, Jackery HTO892A–HTO910A,
+and per-phase voltage / current / frequency / power-factor / apparent /
+reactive readings from ``AccCTBody``, plus EPS-period totals and the today
+KPI bean. Entities for fields that the user's own SolarVault does not
+currently emit (no external CT accessory bound, no EPS event in the period,
+no smart plug paired, etc.) stay in the ``unknown`` state until the matching
+payload arrives. This is intentional and matches Home Assistant conventions:
+the catalogue is authored from the Smali contract so the integration does not
+need a code change every time a user pairs a new documented accessory.
+
 ## Requirements
 
 - Home Assistant 2025.8.0 or newer.
