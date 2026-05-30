@@ -1641,7 +1641,6 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
 def test_listener_ack_timeout_raises_runtime_error() -> None:
     """Verify that sending a command with `wait_for_ack=True` that receives no notify within `ack_timeout_sec`
     raises a `RuntimeError`, increments the device's `acks_timed_out` stat, and clears pending ack state.
-
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
     """
@@ -1656,7 +1655,6 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     async def _run() -> None:
         """Exercise a bare JackeryBleListener to assert ack timeout behavior and cleanup.
-
         Sends a command with `wait_for_ack=True` and a short `ack_timeout_sec`, asserts a `RuntimeError` matching "ack timeout" is raised, verifies the listener's stats record one timed-out ack and zero received acks, and confirms the pending ack registry is cleared.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -1700,7 +1698,6 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
 
     async def _run() -> None:
         """Exercise the listener ACK handling: send a command that waits for an ACK, deliver a non-matching notify which must not resolve the pending ACK, then deliver a matching notify which must resolve it.
-
         Sets up a bare listener with a fake client and a fixed AES key, sends a command with ACK options (wait_for_ack=True, ack_timeout_sec=2.0, ack_cmds=(111,)), and asserts that the pending ACK is preserved after the mismatched notify and that it is fulfilled by the subsequent matching notify. Also asserts that the send completed successfully and listener ACK statistics reflect one received and zero timed out.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -1763,7 +1760,6 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
 
     async def _run() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
-
         Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
         """
         listener = _build_bare_listener()
@@ -1804,7 +1800,6 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
 
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
-
         Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -1862,7 +1857,6 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             mtu_override: int | None = None,
         ) -> bool:
             """Send a BLE command to the given device and optionally wait for an acknowledgement.
-
             Parameters:
                 device_id (str): Identifier of the target device.
                 cmd (int): Command identifier to send.
@@ -1872,7 +1866,6 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
                 ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
                 mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
-
             Returns:
                 bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
             """
@@ -1954,7 +1947,6 @@ def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
 
 def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
-
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
     """
     import asyncio
@@ -1977,7 +1969,6 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
     async def _run() -> None:
         """Exercise listener chunking behavior by sending a large command body and asserting it is split into two encrypted writes which decrypt to sequential frames that reassemble to the original body.
-
         Builds a listener with a fake client and a resolved AES key, sends a 209-byte JSON body with cmd 107, and verifies:
         - async_send_command reports success,
         - exactly two GATT write blobs were produced,
@@ -2030,7 +2021,6 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
     async def _run() -> None:
         """Verifies that a bare listener splits an oversized body according to an MTU override, sends the expected number of encrypted chunked frames, and that those frames reassemble to the original body.
-
         Sets up a bare listener with a fake client and a fixed AES key/MTU, sends a command with mtu_override=70 for a 25-byte body, and asserts that three writes occur, frame indices progress 1..3, each frame reports the same chunk_count (3), and concatenating the decrypted frame bodies equals the original payload.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -2067,9 +2057,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             """Fail fast when an invalid MTU write attempt occurs.
-
             This stub is not intended to perform BLE writes; it raises an AssertionError to indicate a call was attempted despite an invalid MTU.
-
             Raises:
                 AssertionError: with message "invalid MTU must not write to GATT".
             """
@@ -2077,10 +2065,8 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
     async def _run() -> None:
         """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
-
         Constructs a bare listener with a fake client and a resolved AES key, then calls
         `async_send_command` with a non-integer `mtu_override` to assert input validation.
-
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
         """
@@ -2142,7 +2128,6 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
-
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
     """
     import asyncio
@@ -2155,7 +2140,6 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
 
     async def _run() -> None:
         """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
-
         This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -2193,7 +2177,6 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
     async def _run() -> None:
         """Exercise the listener's chunked-write + ACK flow and assert it resolves a single pending ACK.
-
         Sets up a bare listener with a fake client and the captured AES key, sends a 250-byte command which is split into two chunked writes, drives a single encrypted echo notification to resolve the ACK, and asserts the send succeeded, two writes occurred, one ACK was received, no ACKs timed out, and the pending-ack registry is cleared.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
@@ -2205,7 +2188,6 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             # Wait until both chunked writes have hit the wire, then push
             # one echo frame — that single notify must complete the ack.
             """Waits for two chunked writes to be observed, then injects an encrypted echo notification carrying cmd 107 and body '{"ok":1}' to drive ACK completion in the listener.
-
             This helper is used by the test to simulate the device-side echo that should resolve a pending ACK after multi-chunk writes.
             """
             for _ in range(100):
@@ -2238,7 +2220,6 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
 def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
     """cmd=120 BLE for devType=1 merges inEgy/outEgy into the matching pack.
-
     Pinned 2026-05-17: BLE frame
     ``{cmd:120, deviceSn:"HQ2C01400955HP3", devType:1, subType:0,
        outEgy:5095, inEgy:5648}`` arrives. MQTT ``UploadSubDeviceGroupProperty``
@@ -2283,7 +2264,6 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
 
 def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
     """BLE-only lifetime data creates a minimal pack entry.
-
     The captured SolarVault payloads show HTTP ``pack/list`` returning
     ``data:null`` while cmd=120 BLE still reports the pack ``deviceSn``
     plus ``inEgy``/``outEgy``. Without a minimal entry the lifetime
