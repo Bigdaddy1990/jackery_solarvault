@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INIT = ROOT / 'custom_components' / 'jackery_solarvault' / '__init__.py'
+INIT = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 
 
 def _async_unload_entry() -> ast.AsyncFunctionDef:
@@ -15,11 +15,11 @@ def _async_unload_entry() -> ast.AsyncFunctionDef:
     Returns:
         ast.AsyncFunctionDef: The AST node representing `async_unload_entry`.
     """
-    tree = ast.parse(INIT.read_text(encoding='utf-8'))
+    tree = ast.parse(INIT.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == 'async_unload_entry':
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_unload_entry":
             return node
-    raise AssertionError('async_unload_entry not found')
+    raise AssertionError("async_unload_entry not found")
 
 
 def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
@@ -53,8 +53,8 @@ def test_unload_platforms_before_coordinator_shutdown() -> None:
     """
     function = _async_unload_entry()
 
-    assert _call_line(function, 'async_unload_platforms') < _call_line(
-        function, 'async_shutdown'
+    assert _call_line(function, "async_unload_platforms") < _call_line(
+        function, "async_shutdown"
     )
 
 
@@ -64,7 +64,7 @@ def test_coordinator_shutdown_is_success_gated() -> None:
     Checks the AST of `async_unload_entry` and fails unless an `if not unload_ok: ... return` block appears before the call to `async_shutdown`, ensuring shutdown is gated on unload success.
     """
     function = _async_unload_entry()
-    shutdown_line = _call_line(function, 'async_shutdown')
+    shutdown_line = _call_line(function, "async_shutdown")
 
     failure_blocks = [
         node
@@ -73,8 +73,8 @@ def test_coordinator_shutdown_is_success_gated() -> None:
         and isinstance(node.test, ast.UnaryOp)
         and isinstance(node.test.op, ast.Not)
         and isinstance(node.test.operand, ast.Name)
-        and node.test.operand.id == 'unload_ok'
+        and node.test.operand.id == "unload_ok"
         and node.lineno < shutdown_line
         and any(isinstance(stmt, ast.Return) for stmt in node.body)
     ]
-    assert failure_blocks, 'async_shutdown must be after if not unload_ok return'
+    assert failure_blocks, "async_shutdown must be after if not unload_ok return"
