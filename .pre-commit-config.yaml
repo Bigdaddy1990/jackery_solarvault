@@ -42,16 +42,15 @@ repos:
           - --fix
           - --show-fixes
           - --unsafe-fixes
-          - --extend-select
           - --exit-non-zero-on-fix
           - --output-format=github
-           types_or:
-             - python
-             - pyi
+        types_or:
+          - python
+          - pyi
       - id: ruff-format
-           types_or:
-             - python
-             - pyi
+        types_or:
+          - python
+          - pyi
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -80,14 +79,15 @@ repos:
           - --autofix
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
-      - id: double-quote-string-fixer
       - id: detect-private-key
       - id: detect-aws-credentials
+        args:
+          - --allow-missing-credentials
       - id: destroyed-symlinks
       
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-pyyaml]
+        additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^testing/resources/
