@@ -16,20 +16,30 @@ import pytest
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register pytest-asyncio's ini key for plugin-free source test runs."""
+    """Register the `asyncio_mode` ini option used for running async tests when pytest plugins are not autoloaded.
+
+    Registers the ini option named `asyncio_mode` with a default value of `"strict"`, so source-only test runs (when `pytest-asyncio` is not auto-loaded) still expose the configuration key.
+    """
     parser.addini(
-        "asyncio_mode",
-        "asyncio mode for plugin-free source-only tests",
-        default="strict",
+        'asyncio_mode',
+        'asyncio mode for plugin-free source-only tests',
+        default='strict',
     )
 
 
 def _pytest_asyncio_loaded(config: pytest.Config) -> bool:
-    """Return True when pytest-asyncio is active."""
+    """Detect whether pytest-asyncio is active in the current pytest run.
+
+    Parameters:
+        config (pytest.Config): Pytest `Config` instance whose plugin manager will be inspected.
+
+    Returns:
+        bool: `True` if the pytest-asyncio plugin is present, `False` otherwise.
+    """
     pluginmanager = config.pluginmanager
     return any(
         pluginmanager.hasplugin(name)
-        for name in ("asyncio", "pytest_asyncio", "pytest_asyncio.plugin")
+        for name in ('asyncio', 'pytest_asyncio', 'pytest_asyncio.plugin')
     )
 
 

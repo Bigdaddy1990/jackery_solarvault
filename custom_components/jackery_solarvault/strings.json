@@ -250,18 +250,6 @@
       "eps_output_year_energy": {
         "name": "EPS output yearly energy"
       },
-      "pv_revenue_day": {
-        "name": "PV revenue today"
-      },
-      "pv_revenue_month": {
-        "name": "PV revenue monthly"
-      },
-      "pv_revenue_week": {
-        "name": "PV revenue weekly"
-      },
-      "pv_revenue_year": {
-        "name": "PV revenue yearly"
-      },
       "today_battery_energy": {
         "name": "Today battery energy"
       },

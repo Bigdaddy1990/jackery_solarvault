@@ -383,7 +383,7 @@ class JackeryApi:
                 url,
                 data=form_body,
                 headers=headers,
-                timeout=LOGIN_TIMEOUT_SEC,
+                timeout=aiohttp.ClientTimeout(total=LOGIN_TIMEOUT_SEC),
             ) as resp:
                 if resp.status != 200:
                     raise JackeryApiError(f"Login HTTP {resp.status}")
@@ -738,7 +738,7 @@ class JackeryApi:
                 url,
                 params=params,
                 headers=self._headers(with_token=True),
-                timeout=REQUEST_TIMEOUT_SEC,
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
                 try:
@@ -1376,7 +1376,7 @@ class JackeryApi:
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=REQUEST_TIMEOUT_SEC,
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
                 try:
@@ -1493,7 +1493,7 @@ class JackeryApi:
                 url,
                 data=body,
                 headers=_request_headers(),
-                timeout=REQUEST_TIMEOUT_SEC,
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
                 try:
