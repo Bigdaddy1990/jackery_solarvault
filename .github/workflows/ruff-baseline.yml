@@ -35,9 +35,21 @@ jobs:
           ruff check . --preview || true
           ruff format .
 
-      - uses: peter-evans/create-pull-request@v8
-        with:
-          branch: chore/ruff-baseline
-          title: "chore: ruff baseline (format+fix)"
-          commit-message: "chore: ruff baseline (format+fix)"
-          body: "Automated ruff baseline via GitHub Actions."
+      - name: Commit baseline changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No ruff baseline changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: ruff baseline (format+fix)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+    #- uses: peter-evans/create-pull-request@v8
+     #  with:
+     #    branch: chore/ruff-baseline
+     #    title: "chore: ruff baseline (format+fix)"
+     #    commit-message: "chore: ruff baseline (format+fix)"
+     #    body: "Automated ruff baseline via GitHub Actions."
