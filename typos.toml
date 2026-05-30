@@ -1,8 +1,0 @@
-[extend-words]
-# HA / Projekt-spezifische Begriffe hier rein
-extend-exclude = ["hass",]
-
-[files]
-extend-exclude = [
-  "custom_components/jackery_solarvault/translations/**",
-]
