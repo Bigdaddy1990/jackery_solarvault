@@ -28,7 +28,7 @@ pytest-cov
 pytest-github-actions-annotate-failures>=0.4.0
 pytest-homeassistant-custom-component
 pyyaml
-ruff==0.15.14
+ruff==0.15.15
 types-aiofiles>=25.1.0.20251011
 types-atomicwrites>=1.4.5.1
 types-caldav>=1.3.0.20250516
