@@ -1,10 +1,8 @@
 """Unit tests for ``custom_components.jackery_solarvault.client.ble``.
-
 The wire-format constants and crypto come from reverse-engineered Jackery
 app smali. These tests lock down the bit-level layout, the CRC reference
 vector and the AES round-trip so future refactors cannot silently break
 compatibility with the Jackery firmware.
-
 No real Bluetooth I/O happens here — everything is pure Python so the
 tests run on every supported platform without bleak or BlueZ.
 """
@@ -155,7 +153,6 @@ def test_aes_round_trip_with_deterministic_iv_aes256() -> None:
 
 def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     """AES-128 with the SolarVault-shaped 16-byte key round-trips too.
-
     Pinned input is the actual ``bluetoothKey`` captured 2026-05-16 from
     a SolarVault 3 Pro Max: ``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
     → ``b"hr2c0hh361336138"``. This is the regression that motivated
@@ -202,7 +199,6 @@ def test_random_iv_returns_fresh_16_byte_values() -> None:
 
 def test_build_plaintext_frame_smali_layout() -> None:
     """Verify the exact frame string against the smali format string.
-
     The string must match ``"DFED" + "0001" + 4×hex16(idx,cnt,actionId,bleCmd)
     + "0001" + hex16(len) + chunk_hex`` exactly, byte by byte.
     """
@@ -446,7 +442,6 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
 
 def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     """The live binary decoder reproduces real device JSON bodies.
-
     Pinned inputs are wire-bytes captured 2026-05-16 from a SolarVault 3
     Pro Max via the ESPHome BLE proxy. Decoding them recovers the JSON
     telemetry that the integration would otherwise have to wait for from
@@ -490,7 +485,6 @@ def test_decrypt_binary_notify_rejects_short_frame() -> None:
 
 def test_build_then_decrypt_binary_frame_round_trips() -> None:
     """Encode a frame, encrypt it, then run the live decoder to recover it.
-
     Pins the symmetry between :func:`build_binary_frame` /
     :func:`encrypt_binary_notify` and the read-path
     :func:`decrypt_binary_notify`. The trailer is opaque (see
@@ -519,7 +513,6 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
 
 def test_listener_async_send_command_returns_false_without_client() -> None:
     """``async_send_command`` falls back to ``False`` when no GATT session exists.
-
     This is the contract callers (coordinator setter routing) rely on to
     decide whether to fall back to the cloud-MQTT pipeline when the BLE
     proxy hasn't (re-)connected yet.
@@ -532,7 +525,6 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
 
     async def _run() -> None:
         """Exercise JackeryBleListener.async_send_command with no active clients and assert it returns False.
-
         Constructs a minimal JackeryBleListener instance with an empty client registry and a fixed 16-byte key resolver, calls async_send_command for a sample device and command, and asserts the call indicates the command was not sent.
         """
         listener = JackeryBleListener.__new__(JackeryBleListener)
@@ -552,7 +544,6 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
 
 def test_listener_async_send_command_writes_through_fake_client() -> None:
     """The writer path encrypts the right body and writes to char 0xEE01.
-
     Drives ``async_send_command`` against an in-memory client double that
     captures the ``write_gatt_char`` invocation, then decrypts the captured
     blob with the same key to confirm it round-trips through the live
@@ -576,7 +567,6 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
             self, uuid: str, blob: bytes, *, response: bool
         ) -> None:
             """Record a GATT characteristic write attempt into the shared `captured` mapping.
-
             Parameters:
                 uuid (str): The GATT characteristic UUID targeted for the write.
                 blob (bytes): The bytes that would be written to the characteristic; a copy is stored.
@@ -592,7 +582,6 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
     async def _run() -> None:
         """Set up a minimal JackeryBleListener with a fake client, send a BLE command, and assert the resulting GATT write and decryption match expectations.
-
         This coroutine constructs a listener with a single fake client and a fixed AES key, calls its async_send_command with cmd 107, flags 42, and a JSON byte body, then verifies:
         - the write used the BLE write characteristic UUID and requested no response,
         - the written blob decrypts to a binary frame with the same cmd, flags, and body.
@@ -647,7 +636,6 @@ def test_build_binary_frame_rejects_oversized_fields() -> None:
 
 def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
     """Assert the integration manifest declares the BLE service matcher, manufacturer, dependency, and requirement.
-
     Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
     """
     import json
@@ -754,7 +742,6 @@ def test_ble_transport_module_exports_listener() -> None:
 
 def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
     """``async_stop()`` cancels stuck runners without blocking shutdown.
-
     The runner sits in ``asyncio.wait_for(_stop_event.wait(), 30s)`` while
     backing off after a disconnect. HA's shutdown logs "tasks still
     pending" if cancellation does not take effect quickly. This test
@@ -779,7 +766,6 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
             # Mimic the real runner's backoff wait. Without
             # cancellation propagation this would park 30s.
             """Simulate a runner task that waits for the listener stop event with a 30-second backoff.
-
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
             """
@@ -823,7 +809,6 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
     class _Listener:
         async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:
             """Stub method that fails immediately to indicate the BLE listener must not be invoked.
-
             Raises:
                 AssertionError: Always raised with the message "BLE listener must not be called".
             """
@@ -831,7 +816,6 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
     async def _run() -> None:
         """Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
-
         Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -868,9 +852,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     class _Listener:
         def all_stats(self) -> dict[str, object]:
             """Return a snapshot of listener statistics as a mapping of statistic names to values.
-
             The returned dictionary contains current monitoring fields (counters, timestamps, and optional diagnostic strings) keyed by their descriptive names; callers may read but should not assume mutability of internal state.
-
             Returns:
                 stats (dict[str, object]): A snapshot mapping statistic names to their current values.
             """
@@ -878,7 +860,6 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
         def mtu_for_device(self, device_id: str) -> int:
             """Get the negotiated MTU size for the specified device.
-
             Returns:
                 int: MTU size in bytes for the device.
             """
@@ -940,7 +921,6 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             mtu_override: int | None = None,
         ) -> bool:
             """Send a BLE command to the given device and optionally wait for an acknowledgement.
-
             Parameters:
                 device_id (str): Identifier of the target device.
                 cmd (int): Command identifier to send.
@@ -950,7 +930,6 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
                 ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
                 mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
-
             Returns:
                 bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
             """
@@ -966,7 +945,6 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
 
     async def _run() -> None:
         """Test coroutine that verifies async_send_ble_command forwards the correct BLE command payload to an attached listener.
-
         Creates a minimal Coordinator instance with a stubbed entry and a fake BLE listener, calls `async_send_ble_command` for device "dev1" with `cmd=107`, a compact JSON body, and `flags=42`, and asserts the call reports success and the captured write parameters match the expected device id, command, compacted body bytes, flags, and ack/MTU defaults.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -996,7 +974,6 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
 
 def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
     """Verify that when BLE send succeeds, the coordinator does not call the MQTT fallback and forwards the expected BLE send options.
-
     Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
     """
     import asyncio
@@ -1023,7 +1000,6 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             mtu_override: int | None = None,
         ) -> bool:
             """Send a BLE command to the specified device and optionally wait for an acknowledgement.
-
             Parameters:
                 device_id (str): Identifier of the target device.
                 cmd (int): Numeric command identifier to send.
@@ -1033,7 +1009,6 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement before timing out.
                 ack_cmds (tuple[int, ...] | None): Optional tuple of command ids that satisfy the acknowledgement.
                 mtu_override (int | None): Optional MTU value to force for this send; if None, use negotiated/default MTU.
-
             Returns:
                 bool: `True` if the command was sent (or acknowledged when requested), `False` otherwise.
             """
@@ -1049,9 +1024,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
 
         async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:
             """Sentinel coroutine that fails immediately if the MQTT fallback path is invoked.
-
             This async function is intended for tests and will raise an AssertionError to indicate that MQTT publishing was not expected to be called in the current execution path.
-
             Raises:
                 AssertionError: Always raised with the message "MQTT fallback must not be called".
             """
@@ -1096,7 +1069,6 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
 
     async def _run() -> None:
         """Run the coordinator's BLE-first publish flow with BLE unavailable and assert the MQTT publish is invoked with the expected arguments.
-
         This coroutine configures a coordinator instance so BLE sends always fail and replaces the MQTT publish method with a captor, then invokes `_async_publish_command_ble_first` and verifies the captured MQTT parameters match the expected values.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -1114,7 +1086,6 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
             ensure_mqtt: bool = True,
         ) -> None:
             """Publish a device-specific command message to MQTT with the given action, command, and body fields.
-
             Parameters:
                 device_id (str): Unique identifier of the target device.
                 message_type (str): MQTT message topic suffix or type identifier used for routing.
@@ -1169,17 +1140,14 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
 
     async def _run() -> None:
         """Run a BLE-first publish scenario that forces a BLE ack timeout and captures the MQTT fallback call.
-
         This coroutine constructs a Coordinator instance stub, replaces its BLE send method with one that raises a `RuntimeError("BLE ack timeout")`, and replaces its MQTT publish method with a recorder that stores the call arguments into the surrounding `captured` mapping. It then invokes `_async_publish_command_ble_first` for device `"dev1"` with `message_type="DevicePropertyChange"`, `action_id=3022`, `cmd=107`, and `body_fields={FIELD_SW_EPS: 1}` to drive the BLE-fails-then-MQTT flow.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Send a BLE command and wait for its acknowledgement (ACK).
-
             Returns:
                 True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
-
             Raises:
                 RuntimeError: If waiting for the ACK times out.
             """
@@ -1195,7 +1163,6 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
             ensure_mqtt: bool = True,
         ) -> None:
             """Publish a device-specific command message to MQTT with the given action, command, and body fields.
-
             Parameters:
                 device_id (str): Unique identifier of the target device.
                 message_type (str): MQTT message topic suffix or type identifier used for routing.
@@ -1247,17 +1214,14 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
     async def _run() -> None:
         """Exercise the coordinator's BLE-first publish path by invoking _async_publish_command_ble_first on a stubbed coordinator instance.
-
         This coroutine constructs a bare coordinator object, replaces its BLE send and MQTT publish callables with stubs that raise RuntimeError("BLE ack timeout") and RuntimeError("MQTT publish timeout") respectively, and then calls _async_publish_command_ble_first for device "dev1" with a DevicePropertyChange message (action_id 3022, cmd 107, and a body containing FIELD_SW_EPS: 1). The call will propagate the RuntimeError raised by the underlying stubbed publish operation.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Send a BLE command and wait for its acknowledgement (ACK).
-
             Returns:
                 True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
-
             Raises:
                 RuntimeError: If waiting for the ACK times out.
             """
@@ -1273,7 +1237,6 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
             ensure_mqtt: bool = True,
         ) -> None:
             """Publish a device-specific command message to MQTT.
-
             Parameters:
                 device_id (str): Target device identifier.
                 message_type (str): Logical MQTT message type or subtopic used for the publish.
@@ -1281,7 +1244,6 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
                 cmd (int): Command identifier included in the published payload.
                 body_fields (dict[str, object]): Mapping of additional fields to include in the message body.
                 ensure_mqtt (bool): If True, require MQTT delivery (may trigger fallback or raise on failure).
-
             Raises:
                 RuntimeError: If the MQTT publish operation times out (message: "MQTT publish timeout").
             """
@@ -1327,7 +1289,6 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Guard that prevents attempting BLE sends for command 0.
-
             Raises:
                 AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
             """
@@ -1343,7 +1304,6 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             ensure_mqtt: bool = True,
         ) -> None:
             """Publish a device-specific command message to MQTT with the given action, command, and body fields.
-
             Parameters:
                 device_id (str): Unique identifier of the target device.
                 message_type (str): MQTT message topic suffix or type identifier used for routing.
@@ -1424,7 +1384,6 @@ def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
     """Live HTTP capture puts the AES key at the system level, not per-device.
-
     The 2026-05-16 ``/v1/device/system/list`` capture from a SolarVault 3
     Pro Max had ``data[].bluetoothKey == "aHIyYzBoaDM2MTMzNjEzOA=="`` at
     the system level and ``data[].devices[0].bluetoothKey == null`` for
@@ -1462,7 +1421,6 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
 
 def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
     """A per-device key (newer firmware?) wins over the system-level key.
-
     Future firmware may migrate the key down to the per-device slot. The
     lookup picks the most specific value so the integration stays
     forwards-compatible.
@@ -1494,7 +1452,6 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
 
 def test_serial_resolver_strips_http_prefix_letter() -> None:
     """BLE-broadcast serial maps to its HTTP counterpart even with a model letter.
-
     Live capture 2026-05-16: HTTP returns ``HR2C04000280HH3`` while the
     BLE manufacturer-data field carries ``R2C04000280HH3`` (no leading
     H). The coordinator's ``device_id_for_ble_serial`` must accept the
@@ -1541,7 +1498,6 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
 
 def _build_bare_listener() -> object:
     """Return a JackeryBleListener stub wired for the ACK path only.
-
     Avoids constructing the real class because that pulls in HA fixtures
     (bluetooth callbacks, async_create_background_task) that the static
     test harness can't load on Windows.
