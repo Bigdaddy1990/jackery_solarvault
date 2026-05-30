@@ -30,16 +30,15 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """
-    Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
-    
+    """Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
+
     Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
-    
+
     Parameters:
         payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
         prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
         redact_keys (frozenset[str]): Field names to redact from each payload.
-    
+
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
@@ -59,11 +58,10 @@ def _redacted_payload_map(
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
-    """
-    Build a diagnostics export for the given config entry.
-    
+    """Build a diagnostics export for the given config entry.
+
     The returned payload contains redacted copies of the entry's stored data and options, a stable mapping of labeled device payloads, and raw diagnostics from the coordinator, API responses, and transports. If diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and `bluetoothKey` may be included unredacted.
-    
+
     Returns:
         dict[str, Any]: Diagnostics export with keys:
             - `entry_data`: redacted copy of the config entry's stored data.
@@ -172,12 +170,11 @@ def _local_mqtt_diagnostics(
     entry: JackeryConfigEntry,
     redactions_disabled: bool,
 ) -> dict[str, Any]:
-    """
-    Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
-    
+    """Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
+
     Parameters:
         redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
-    
+
     Returns:
         dict[str, Any]: `{"enabled": False}` when no local MQTT client is available, otherwise the client's diagnostics snapshot.
     """

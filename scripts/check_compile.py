@@ -22,11 +22,10 @@ EXCLUDE_NAMES: frozenset[str] = frozenset({
 
 
 def main() -> int:
-    """
-    Compiles all project Python source files under SOURCE_ROOTS in memory without writing bytecode cache files.
-    
+    """Compiles all project Python source files under SOURCE_ROOTS in memory without writing bytecode cache files.
+
     Files whose basename appears in EXCLUDE_NAMES are skipped. Any SyntaxError or other exception raised by compile is propagated to the caller.
-    
+
     Returns:
         int: Exit code 0 on successful compilation of all included files.
     """

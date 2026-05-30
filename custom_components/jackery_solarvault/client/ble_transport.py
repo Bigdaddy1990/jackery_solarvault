@@ -177,9 +177,8 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """
-        Construct a Jackery BLE listener that observes notifications and forwards parsed frames to a sink.
-        
+        """Construct a Jackery BLE listener that observes notifications and forwards parsed frames to a sink.
+
         Parameters:
             hass (HomeAssistant): Home Assistant instance used for bluetooth callbacks and background tasks.
             sink (FrameSink): Async callable invoked with (device_id, BleFrameObservation) for each observed frame.
@@ -216,9 +215,8 @@ class JackeryBleListener:
         self._mtu: dict[str, int] = {}
 
     def address_for_device_id(self, device_id: str) -> str | None:
-        """
-        Get the cached BLE MAC address for the given device id.
-        
+        """Get the cached BLE MAC address for the given device id.
+
         Returns:
             The MAC address string for the device, or `None` if no cached address exists.
         """
@@ -329,9 +327,8 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """
-        Send a logical command frame to the device over BLE and optionally wait for a matching acknowledgement.
-        
+        """Send a logical command frame to the device over BLE and optionally wait for a matching acknowledgement.
+
         Parameters:
             device_id (str): Target device identifier.
             cmd (int): Logical command identifier to send.
@@ -342,10 +339,10 @@ class JackeryBleListener:
             ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is True.
             ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted, any decoded frame from the same device within the window qualifies.
             mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU (used for tests/diagnostics).
-        
+
         Returns:
             bool: `True` if the GATT write completed (and, when requested, a matching ACK was received); `False` if no active BLE client exists for the device.
-        
+
         Raises:
             RuntimeError: When the payload cannot be chunked for the selected MTU, on GATT-layer failures (including write timeouts), or when an ACK wait times out.
         """
@@ -445,14 +442,13 @@ class JackeryBleListener:
     def _register_pending_ack(
         self, device_id: str, ack_cmds: tuple[int, ...] | None
     ) -> _PendingAck:
-        """
-        Register a pending ACK wait record for the given device.
-        
+        """Register a pending ACK wait record for the given device.
+
         Parameters:
             device_id (str): Identifier of the device the ACK is expected from.
             ack_cmds (tuple[int, ...] | None): Optional sequence of acceptable command IDs that will satisfy the ACK.
                 If `None`, any decoded frame will satisfy the pending ACK.
-        
+
         Returns:
             _PendingAck: A record containing `expected_cmds` (a `frozenset` of the provided command IDs or `None`)
                 and `future`, an `asyncio.Future` that will be resolved with the matching `ble.BleBinaryFrame`.
@@ -523,9 +519,8 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def async_start(self, device_ids: list[str]) -> None:
-        """
-        Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners when a matching advertisement is observed.
-        
+        """Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners when a matching advertisement is observed.
+
         Parameters:
             device_ids (list[str]): Device IDs to monitor; a background connection task will be created lazily for a device the first time an advertisement matching the listener's BLE matcher is seen.
         """
@@ -566,9 +561,8 @@ class JackeryBleListener:
         )
 
     async def async_stop(self) -> None:
-        """
-        Stop the BLE listener and release its resources.
-        
+        """Stop the BLE listener and release its resources.
+
         Signals the listener to stop, unregisters Bluetooth advertisement callbacks, cancels active connection runner tasks and waits up to _STOP_TIMEOUT_SEC for them to exit, clears connection state, and cancels any pending ACK futures so callers waiting for acknowledgements do not hang. Logs the listener shutdown.
         """
         self._stop_event.set()
@@ -644,11 +638,10 @@ class JackeryBleListener:
         self,
         service_info: BluetoothServiceInfoBleak,
     ) -> str | None:
-        """
-        Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE MAC address.
-        
+        """Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE MAC address.
+
         If the advertisement corresponds to a device the integration knows about, the function records device_id -> address in the internal cache on first match so future advertisements skip resolution. It returns the mapped device id when found, or `None` if no mapping could be determined.
-         
+
         Returns:
             `device_id` if the advertisement maps to a known device, `None` otherwise.
         """
@@ -691,11 +684,10 @@ class JackeryBleListener:
         return device_id
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:
-        """
-        Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
-        
+        """Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
+
         This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
-        
+
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
         """
@@ -891,11 +883,10 @@ class JackeryBleListener:
             )
 
     def _on_disconnect(self, device_id: str) -> None:
-        """
-        Handle a peripheral disconnect for the given device.
-        
+        """Handle a peripheral disconnect for the given device.
+
         Updates the device's `BleListenerStats.last_disconnect_at` to the current time and emits an info-level log indicating the device disconnected.
-        
+
         Parameters:
             device_id (str): Identifier of the device whose disconnect is being recorded.
         """
@@ -912,9 +903,8 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """
-        Process a BLE notification: decode into a BleFrameObservation, update per-device statistics, resolve any pending ACK waiters for a successfully parsed frame, and forward the observation to the configured async sink.
-        
+        """Process a BLE notification: decode into a BleFrameObservation, update per-device statistics, resolve any pending ACK waiters for a successfully parsed frame, and forward the observation to the configured async sink.
+
         If a per-device AES key is available the method attempts to decrypt the raw payload and, on decryption failure, performs a single fallback try after base64-decoding the payload. A BleFrameObservation (containing the original bytes, base64 encoding, the parsed frame when decoding succeeds, or a human-readable decode error) is always created and forwarded to the sink. When a frame is parsed successfully this method resolves matching pending ACK futures and increments decode-related counters; when parsing fails it increments the decode-failure counter.
         """
         stats = self.stats_for(device_id)

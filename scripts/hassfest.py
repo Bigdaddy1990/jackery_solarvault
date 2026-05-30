@@ -14,7 +14,10 @@ from pathlib import Path
 import sys
 from typing import Any
 
-QUALITY_SCALE_LEVELS = {"internal", "bronze", "silver", "gold", "platinum"}
+# ``custom`` is the value HA Core's hassfest accepts for integrations
+# distributed outside core (HACS / manual installs). Our shim must
+# mirror that to avoid rejecting valid custom integrations.
+QUALITY_SCALE_LEVELS = {"internal", "bronze", "silver", "gold", "platinum", "custom"}
 REQUIRED_KEYS = {
     "domain",
     "name",

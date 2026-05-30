@@ -129,11 +129,10 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """
-        Constructs the DeviceInfo for the parent SolarVault device.
-        
+        """Constructs the DeviceInfo for the parent SolarVault device.
+
         The returned DeviceInfo includes identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version. The display name is chosen from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". The model is chosen from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Serial number and software version are included when present in device metadata/discovery and OTA data, respectively.
-        
+
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
         """
@@ -164,13 +163,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     def _build_smart_plug_device_info(
         self, plug_index: int, plug: dict[str, Any]
     ) -> DeviceInfo:
-        """
-        Construct DeviceInfo for a smart-plug subdevice attached to the parent SolarVault.
-        
+        """Construct DeviceInfo for a smart-plug subdevice attached to the parent SolarVault.
+
         Parameters:
             plug_index (int): 1-based index used to form the subdevice identifier and fallback display name.
             plug (dict[str, Any]): Smart-plug payload containing fields such as serial numbers, model/type names, scan name, device name, and version.
-        
+
         Returns:
             DeviceInfo: Device registry metadata for the smart-plug including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
         """
@@ -211,11 +209,10 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def available(self) -> bool:
-        """
-        Determine whether the entity is available.
-        
+        """Determine whether the entity is available.
+
         First verifies the parent coordinator's availability. If present, uses the device metadata `online_status` or the system `online_state` (parsed with `jackery_online_state`) to determine availability; if no explicit state is available, falls back to whether the device ID exists in the coordinator data.
-        
+
         Returns:
             True if the entity is available, False otherwise.
         """

@@ -376,9 +376,13 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
             print(f"  OK {path} geschrieben ({len(ALWAYS_TEST)} Eintraege)")
 
     elif args.check and any_changed:
+        # Use ASCII-only punctuation here: Windows consoles default to cp1252
+        # and crash on U+2717 / U+2014 unless stdout is reconfigured. The
+        # gate script captures stdout for diagnostics, so an encode error
+        # would mask the actual drift report.
         print(
-            "\n  ✗ requirements sind nicht synchron — "
-            "bitte `python -m scripts.sync_requirements --write` ausführen"
+            "\n  [DRIFT] requirements sind nicht synchron -- "
+            "bitte `python -m scripts.sync_requirements --write` ausfuehren"
         )
         return 1
 

@@ -70,9 +70,8 @@ class JackeryLocalMqttClient:
         sink: LocalMqttSink | None = None,
         topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
     ) -> None:
-        """
-        Initialize the local MQTT client configuration and internal runtime state without connecting to the broker.
-        
+        """Initialize the local MQTT client configuration and internal runtime state without connecting to the broker.
+
         Parameters:
             hass: Home Assistant instance (passed for creating tasks and logging; not used to open network connections here).
             host (str): MQTT broker hostname or IP address.
@@ -113,9 +112,8 @@ class JackeryLocalMqttClient:
     # ------------------------------------------------------------------
 
     async def async_start(self) -> None:
-        """
-        Start the background MQTT session runner and trigger an initial connection attempt.
-        
+        """Start the background MQTT session runner and trigger an initial connection attempt.
+
         If a runner is already active, this call is a no-op. Schedules the session task as a Home Assistant background task, resets connection state, increments the internal connect attempt counter, and waits up to 10 seconds for the initial connection result so diagnostics reflect the attempt.
         """
         async with self._lock:
@@ -142,9 +140,8 @@ class JackeryLocalMqttClient:
             await asyncio.wait_for(self._connected_event.wait(), timeout=10.0)
 
     async def async_stop(self) -> None:
-        """
-        Stop the background MQTT session task and reset internal connection state.
-        
+        """Stop the background MQTT session task and reset internal connection state.
+
         If a background session task exists it will be cancelled and awaited; cancellation, MQTT, and other finalization errors are suppressed. The client's connection state and stored client reference are cleared.
         """
         async with self._lock:
@@ -165,9 +162,8 @@ class JackeryLocalMqttClient:
     # ------------------------------------------------------------------
 
     async def _async_run_session(self) -> None:
-        """
-        Run one MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
-        
+        """Run one MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
+
         On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
         """
         connected = False
@@ -227,9 +223,8 @@ class JackeryLocalMqttClient:
             self._connected_event.set()
 
     def _handle_connect_failure(self, rc: int) -> None:
-        """
-        Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
-        
+        """Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
+
         Parameters:
             rc (int): MQTT CONNACK return code provided by the broker indicating the reason for refusal.
         """
@@ -245,9 +240,8 @@ class JackeryLocalMqttClient:
         )
 
     def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
-        """
-        Record a connection setup failure or a disconnect and update the client's last-error state.
-        
+        """Record a connection setup failure or a disconnect and update the client's last-error state.
+
         Parameters:
             error (str): Human-readable error message to record.
             was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened while attempting to connect.
@@ -261,12 +255,11 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _extract_mqtt_code(err: MqttCodeError) -> int:
-        """
-        Extract the numeric MQTT return code from a MqttCodeError instance.
-        
+        """Extract the numeric MQTT return code from a MqttCodeError instance.
+
         Parameters:
             err (MqttCodeError): The exception object that may contain an `rc` attribute or an `rc.value` holding the numeric code.
-        
+
         Returns:
             int: The MQTT return code if present, otherwise `0`.
         """
@@ -287,11 +280,10 @@ class JackeryLocalMqttClient:
         topic: str,
         payload: bytes | bytearray | str,
     ) -> None:
-        """
-        Process a received MQTT message: record diagnostics, decode the payload, and forward a parsed JSON object (if any) to the configured sink.
-        
+        """Process a received MQTT message: record diagnostics, decode the payload, and forward a parsed JSON object (if any) to the configured sink.
+
         If the payload is UTF-8 text and parses as a JSON object, that dict is delivered to the sink as `data`. If the payload is binary or cannot be decoded as UTF-8, the message is counted as dropped and `data` is `None`. If UTF-8 text parses as JSON but the result is not an object (e.g., a list or scalar), the message is counted as dropped and `data` is `None`. If JSON parsing fails (invalid JSON), `data` remains `None` but the dropped counter is not incremented. First-seen topic names are recorded up to LOCAL_MQTT_MAX_TOPIC_NAMES for diagnostics.
-        
+
         Parameters:
             topic (str): MQTT topic name of the message.
             payload (bytes | bytearray | str): Raw message payload; may be a string or bytes-like object.
@@ -339,9 +331,8 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        """
-        Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions from it.
-        
+        """Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions from it.
+
         Parameters:
             coro (Awaitable[None]): Coroutine to run as a background task.
             label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
@@ -349,11 +340,10 @@ class JackeryLocalMqttClient:
         task = self._hass.async_create_task(coro, name=f"jackery_local_mqtt_{label}")
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """
-            Log any non-cancellation exception from a completed asyncio Task.
-            
+            """Log any non-cancellation exception from a completed asyncio Task.
+
             Retrieves the task result to surface exceptions raised by the task; ignores CancelledError. Logs other exceptions at error level with context identifying the handler label.
-            
+
             Parameters:
                 done (asyncio.Task[None]): Completed task whose exception, if raised, will be logged.
             """
@@ -371,12 +361,11 @@ class JackeryLocalMqttClient:
     # ------------------------------------------------------------------
 
     def diagnostics_snapshot(self, *, redact: bool = True) -> dict[str, Any]:
-        """
-        Produce a JSON-serializable snapshot of the client's runtime state for diagnostics.
-        
+        """Produce a JSON-serializable snapshot of the client's runtime state for diagnostics.
+
         Parameters:
             redact (bool): If True, redact sensitive fields (host, port, and topic names); if False, include real host, port, and topic names.
-        
+
         Returns:
             dict[str, Any]: A snapshot containing connection/configuration flags, topic diagnostics, message counters, last-seen timestamps/errors, connect attempts, and the MQTT client library identifier.
         """
@@ -421,9 +410,8 @@ class JackeryLocalMqttClient:
 
     @property
     def is_connected(self) -> bool:
-        """
-        Indicates whether the client currently has an active MQTT broker session.
-        
+        """Indicates whether the client currently has an active MQTT broker session.
+
         Returns:
             True if the client has an active MQTT broker session, False otherwise.
         """
@@ -431,9 +419,8 @@ class JackeryLocalMqttClient:
 
     @property
     def is_started(self) -> bool:
-        """
-        Report whether the background MQTT session runner task has been started.
-        
+        """Report whether the background MQTT session runner task has been started.
+
         Returns:
             True if the runner task exists, False otherwise.
         """
@@ -441,9 +428,8 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _utc_now_iso() -> str:
-        """
-        Return the current UTC time as an ISO 8601 string including the timezone offset.
-        
+        """Return the current UTC time as an ISO 8601 string including the timezone offset.
+
         Returns:
             iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """

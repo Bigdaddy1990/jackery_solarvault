@@ -16,12 +16,11 @@ LEGACY_EXCEPT_PATTERN = re.compile(
 
 
 def _iter_python_files(root: Path) -> list[Path]:
-    """
-    Return a sorted list of all Python (.py) files under `root`, searched recursively.
-    
+    """Return a sorted list of all Python (.py) files under `root`, searched recursively.
+
     Parameters:
         root (Path): Directory or path to search for `.py` files.
-    
+
     Returns:
         list[Path]: Sorted list of `Path` objects for every `.py` file found under `root`.
     """
@@ -29,12 +28,11 @@ def _iter_python_files(root: Path) -> list[Path]:
 
 
 def _find_legacy_handlers(path: Path) -> list[int]:
-    """
-    Finds line numbers in a Python file that use legacy Python 2 multi-exception syntax.
-    
+    """Finds line numbers in a Python file that use legacy Python 2 multi-exception syntax.
+
     Parameters:
         path (Path): Path to the Python file to scan.
-    
+
     Returns:
         list[int]: 1-based line numbers of lines matching the legacy `except A, B:` pattern.
     """
@@ -48,11 +46,10 @@ def _find_legacy_handlers(path: Path) -> list[int]:
 
 
 def _parse_args() -> argparse.Namespace:
-    """
-    Builds and parses command-line arguments that specify files or directories to scan for legacy exception syntax.
-    
+    """Builds and parses command-line arguments that specify files or directories to scan for legacy exception syntax.
+
     The returned namespace has a `paths` attribute: a list of file or directory paths to scan. If no positional paths are provided on the command line, `paths` defaults to ["custom_components/jackery_solarvault"].
-    
+
     Returns:
         argparse.Namespace: Parsed arguments with a `paths` attribute (list[str]) containing paths to scan.
     """
@@ -67,11 +64,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:  # noqa: D103
-    """
-    Scan provided paths for legacy Python 2 multi-exception `except A, B:` syntax and report any occurrences.
-    
+    """Scan provided paths for legacy Python 2 multi-exception `except A, B:` syntax and report any occurrences.
+
     Parses command-line paths, inspects files and directories for Python files, prints either a no-findings message or a list of offending file locations with guidance, and exits with a status code reflecting the result.
-    
+
     Returns:
         int: `0` if no legacy multi-exception syntax was found, `1` if any occurrences were detected.
     """

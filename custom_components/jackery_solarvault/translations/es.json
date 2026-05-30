@@ -226,6 +226,54 @@
       "battery_discharge_year_energy": {
         "name": "Energía anual de descarga de batería"
       },
+      "eps_input_day_energy": {
+        "name": "EPS input today energy"
+      },
+      "eps_input_month_energy": {
+        "name": "EPS input monthly energy"
+      },
+      "eps_input_week_energy": {
+        "name": "EPS input weekly energy"
+      },
+      "eps_input_year_energy": {
+        "name": "EPS input yearly energy"
+      },
+      "eps_output_day_energy": {
+        "name": "EPS output today energy"
+      },
+      "eps_output_month_energy": {
+        "name": "EPS output monthly energy"
+      },
+      "eps_output_week_energy": {
+        "name": "EPS output weekly energy"
+      },
+      "eps_output_year_energy": {
+        "name": "EPS output yearly energy"
+      },
+      "pv_revenue_day": {
+        "name": "PV revenue today"
+      },
+      "pv_revenue_month": {
+        "name": "PV revenue monthly"
+      },
+      "pv_revenue_week": {
+        "name": "PV revenue weekly"
+      },
+      "pv_revenue_year": {
+        "name": "PV revenue yearly"
+      },
+      "today_battery_energy": {
+        "name": "Today battery energy"
+      },
+      "today_feed_in_energy": {
+        "name": "Today feed-in energy"
+      },
+      "today_grid_import_energy": {
+        "name": "Today grid import energy"
+      },
+      "today_home_load_energy": {
+        "name": "Today home load energy"
+      },
       "battery_net_power": {
         "name": "Potencia neta de la batería principal"
       },
@@ -262,6 +310,9 @@
       "meter_head_charging_energy": {
         "name": "Energia de carga del medidor"
       },
+      "meter_head_communication_mode": {
+        "name": "Meter head communication mode"
+      },
       "meter_head_communication_state": {
         "name": "Estado de comunicacion del medidor"
       },
@@ -271,8 +322,29 @@
       "meter_head_input_power": {
         "name": "Potencia de entrada del medidor"
       },
+      "meter_head_ip_address": {
+        "name": "Meter head IP address"
+      },
+      "meter_head_mac_address": {
+        "name": "Meter head MAC address"
+      },
       "meter_head_output_power": {
         "name": "Potencia de salida del medidor"
+      },
+      "smart_meter_communication_mode": {
+        "name": "Smart meter communication mode"
+      },
+      "smart_meter_fun_form": {
+        "name": "Smart meter function form"
+      },
+      "smart_meter_ip_address": {
+        "name": "Smart meter IP address"
+      },
+      "smart_meter_mac_address": {
+        "name": "Smart meter MAC address"
+      },
+      "smart_plug_communication_mode": {
+        "name": "Smart plug communication mode"
       },
       "smart_plug_communication_state": {
         "name": "Estado de comunicación del enchufe inteligente"
@@ -283,11 +355,23 @@
       "smart_plug_input_power": {
         "name": "Potencia de entrada del enchufe inteligente"
       },
+      "smart_plug_ip_address": {
+        "name": "Smart plug IP address"
+      },
+      "smart_plug_last_update_ts": {
+        "name": "Smart plug last-update timestamp"
+      },
+      "smart_plug_mac_address": {
+        "name": "Smart plug MAC address"
+      },
       "smart_plug_output_power": {
         "name": "Potencia de salida del enchufe inteligente"
       },
       "smart_plug_priority": {
         "name": "Prioridad del enchufe inteligente"
+      },
+      "smart_plug_switch_cycle": {
+        "name": "Smart plug switch cycle"
       },
       "smart_plug_today_energy": {
         "name": "Energia diaria del enchufe inteligente"
@@ -607,17 +691,77 @@
       "smart_meter_panel_discharging_energy": {
         "name": "Energía de descarga del panel del Smart Meter"
       },
+      "smart_meter_apparent_power": {
+        "name": "Smart meter apparent power"
+      },
+      "smart_meter_frequency": {
+        "name": "Smart meter frequency"
+      },
+      "smart_meter_phase_1_apparent_power": {
+        "name": "Smart meter phase 1 apparent power"
+      },
+      "smart_meter_phase_1_current": {
+        "name": "Smart meter phase 1 current"
+      },
       "smart_meter_phase_1_power": {
         "name": "Potencia fase 1 del Smart Meter"
+      },
+      "smart_meter_phase_1_power_factor": {
+        "name": "Smart meter phase 1 power factor"
+      },
+      "smart_meter_phase_1_reactive_power": {
+        "name": "Smart meter phase 1 reactive power"
+      },
+      "smart_meter_phase_1_voltage": {
+        "name": "Smart meter phase 1 voltage"
+      },
+      "smart_meter_phase_2_apparent_power": {
+        "name": "Smart meter phase 2 apparent power"
+      },
+      "smart_meter_phase_2_current": {
+        "name": "Smart meter phase 2 current"
       },
       "smart_meter_phase_2_power": {
         "name": "Potencia fase 2 del Smart Meter"
       },
+      "smart_meter_phase_2_power_factor": {
+        "name": "Smart meter phase 2 power factor"
+      },
+      "smart_meter_phase_2_reactive_power": {
+        "name": "Smart meter phase 2 reactive power"
+      },
+      "smart_meter_phase_2_voltage": {
+        "name": "Smart meter phase 2 voltage"
+      },
+      "smart_meter_phase_3_apparent_power": {
+        "name": "Smart meter phase 3 apparent power"
+      },
+      "smart_meter_phase_3_current": {
+        "name": "Smart meter phase 3 current"
+      },
       "smart_meter_phase_3_power": {
         "name": "Potencia fase 3 del Smart Meter"
       },
+      "smart_meter_phase_3_power_factor": {
+        "name": "Smart meter phase 3 power factor"
+      },
+      "smart_meter_phase_3_reactive_power": {
+        "name": "Smart meter phase 3 reactive power"
+      },
+      "smart_meter_phase_3_voltage": {
+        "name": "Smart meter phase 3 voltage"
+      },
       "smart_meter_power": {
         "name": "Potencia neta del Smart Meter"
+      },
+      "smart_meter_power_factor": {
+        "name": "Smart meter power factor"
+      },
+      "smart_meter_reactive_power": {
+        "name": "Smart meter reactive power"
+      },
+      "smart_meter_voltage": {
+        "name": "Smart meter voltage"
       },
       "soc_charge_limit": {
         "name": "Límite de carga"
@@ -870,6 +1014,24 @@
         }
       },
       "name": "Enviar comando BLE"
+    },
+    "send_device_schedule": {
+      "description": "Experimental: publish a DownloadDeviceSchedule (cmd=112) frame to the selected device. Pick the actionId for ADD (3015), DELETE (3016), UPDATE (3017) or READ (3018) and pass the schedule body verbatim. Body shape is from the Frida-PCAP capture in docs/Markdown/MQTT_PROTOCOL.md.",
+      "fields": {
+        "action_id": {
+          "description": "TIMER_TASK action: 3015=ADD, 3016=DELETE, 3017=UPDATE, 3018=READ.",
+          "name": "Action ID"
+        },
+        "body": {
+          "description": "Schedule body as JSON. Typical fields: actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (7-char Mon-Sun bitmask), tid (task ID). The integration adds cmd=112 automatically.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Send device schedule"
     }
   },
   "title": "Jackery SolarVault"

@@ -39,9 +39,8 @@ _KEY_VALUES: Final = "values"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """
-    Provide the Home Assistant Store configured for the module's local midnight snapshot cache.
-    
+    """Provide the Home Assistant Store configured for the module's local midnight snapshot cache.
+
     Returns:
         The `Store` configured with this module's storage key and version.
     """
@@ -49,9 +48,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 
 def _isoformat_day(today: date) -> str:
-    """
-    Get the ISO-formatted day string for the specified date.
-    
+    """Get the ISO-formatted day string for the specified date.
+
     Returns:
         str: ISO date in `YYYY-MM-DD` format.
     """
@@ -61,17 +59,16 @@ def _isoformat_day(today: date) -> str:
 async def async_load_daily_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
-    """
-    Load cached midnight snapshots for a config entry.
-    
+    """Load cached midnight snapshots for a config entry.
+
     Returns a mapping keyed by device_id where each value is a snapshot object with the shape
     {"day": "YYYY-MM-DD", "values": {metric: wh}}. Malformed store entries are ignored; an
     empty dict is returned when the store is missing or contains no valid snapshots. Callers
     should compare each snapshot's "day" to the current date before using its values.
-    
+
     Parameters:
         entry_id (str): Config entry identifier whose snapshots to load.
-    
+
     Returns:
         dict[str, dict[str, Any]]: Device-id -> snapshot mapping containing validated
         and normalized snapshot data.
@@ -114,11 +111,10 @@ async def async_save_daily_cache(
     *,
     snapshots: dict[str, dict[str, Any]],
 ) -> None:
-    """
-    Persist per-device midnight snapshot data for a configuration entry.
-    
+    """Persist per-device midnight snapshot data for a configuration entry.
+
     Cleans and writes `snapshots` into the module's persistent store for `entry_id`. The function accepts a mapping of device IDs to payloads of the form `{"day": "YYYY-MM-DD", "values": {metric: number}}`; non-dict payloads, non-string days, non-dict values, non-string metric keys, and values that cannot be converted to `int` are omitted. Existing store data for other entries is preserved; invalid fields in the provided snapshots are dropped rather than raising errors.
-    
+
     Parameters:
         hass: HomeAssistant instance (provided by the caller).
         entry_id: Configuration entry identifier whose snapshots will be stored.
@@ -165,15 +161,14 @@ def daily_delta(
     *,
     today: date,
 ) -> int | None:
-    """
-    Compute today's energy delta for a metric using a stored midnight anchor.
-    
+    """Compute today's energy delta for a metric using a stored midnight anchor.
+
     Parameters:
         snapshot (dict | None): Stored snapshot with keys `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
         metric_key (str): Metric key to read from `snapshot["values"]`.
         current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
         today (date): Local date used to validate that `snapshot["day"]` matches the current day.
-    
+
     Returns:
         int | None: The computed delta in watt‑hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
     """
@@ -209,16 +204,15 @@ def refresh_snapshot(
     today: date,
     current_values: dict[str, int | float | None],
 ) -> dict[str, Any]:
-    """
-    Produce a snapshot for today containing integer anchors for available lifetime metrics.
-    
+    """Produce a snapshot for today containing integer anchors for available lifetime metrics.
+
     If `snapshot` is missing or its recorded day differs from `today`, create a new snapshot by anchoring every metric in `current_values` whose value is not `None` and can be converted to `int`. If the snapshot is already for `today`, preserve existing integer anchors and add metrics from `current_values` only when an anchor does not already exist and the value is convertible to `int`. Entries with `None` or non-convertible values are omitted.
-    
+
     Parameters:
         snapshot (dict[str, Any] | None): Existing per-device snapshot; may be `None`.
         today (date): Current date used as the snapshot day.
         current_values (dict[str, int | float | None]): Current lifetime metric readings; `None` or non-numeric values are ignored.
-    
+
     Returns:
         dict[str, Any]: Snapshot with keys `"day"` (ISO `YYYY-MM-DD`) and `"values"` (mapping metric keys to integer Wh anchors).
     """
@@ -257,9 +251,8 @@ def refresh_snapshot(
 
 
 def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
-    """
-    Determine if the provided snapshot represents a different day than the given date.
-    
+    """Determine if the provided snapshot represents a different day than the given date.
+
     Returns:
         `True` if the snapshot is missing or its stored `"day"` value does not equal `today.isoformat()`, `False` otherwise.
     """
@@ -269,12 +262,11 @@ def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
 
 
 def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
-    """
-    Return the stored ISO day string from a snapshot.
-    
+    """Return the stored ISO day string from a snapshot.
+
     Parameters:
         snapshot (dict | None): Snapshot object expected to contain a string value under the key `_KEY_DAY`.
-    
+
     Returns:
         str | None: The ISO day string (`YYYY-MM-DD`) if present and a string, otherwise `None`.
     """

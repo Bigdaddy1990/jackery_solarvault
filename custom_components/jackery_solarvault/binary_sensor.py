@@ -84,9 +84,8 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Set up coordinator-backed binary sensor entities for a Jackery config entry and register a listener to rebuild entities when coordinator data changes.
-    
+    """Set up coordinator-backed binary sensor entities for a Jackery config entry and register a listener to rebuild entities when coordinator data changes.
+
     Discovers per-device binary sensors and per-plug smart-plug binary sensors from the coordinator data, de-duplicates entities across rebuilds, and calls the provided `async_add_entities` callback to register newly discovered entities when the coordinator's entity signature changes.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
@@ -95,9 +94,8 @@ async def async_setup_entry(
     def _append_unique(
         entities: list[BinarySensorEntity], entity: BinarySensorEntity
     ) -> None:
-        """
-        Add the entity to the provided list and record its unique ID if that ID has not already been seen.
-        
+        """Add the entity to the provided list and record its unique ID if that ID has not already been seen.
+
         Parameters:
             entities (list[BinarySensorEntity]): List to append the entity to when its unique ID is new.
             entity (BinarySensorEntity): Binary sensor entity whose unique ID will be checked and recorded.
@@ -107,11 +105,10 @@ async def async_setup_entry(
         )
 
     def _collect_entities() -> list[BinarySensorEntity]:
-        """
-        Collect binary sensor entities for every device in the coordinator payload.
-        
+        """Collect binary sensor entities for every device in the coordinator payload.
+
         For each device, create one JackeryBinarySensor per description in BINARY_DESCRIPTIONS and one JackerySmartPlugStateBinarySensor for each smart plug that has a serial number. Smart-plug entities capture a 1-based plug index and the plug serial to maintain stable binding across payload reorders.
-        
+
         Returns:
             list[BinarySensorEntity]: Constructed binary sensor entities ready to be added.
         """
@@ -139,9 +136,8 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
-        """
-        Register new binary sensor entities when the coordinator's entity signature changes.
-        
+        """Register new binary sensor entities when the coordinator's entity signature changes.
+
         Compute the coordinator entity signature and, if it differs from the previously recorded signature, collect entities and register them via `async_add_entities`; update the stored signature. No action is taken when the signature is unchanged.
         """
         nonlocal last_signature
@@ -178,9 +174,8 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """
-        Determine whether the binary sensor is currently active.
-        
+        """Determine whether the binary sensor is currently active.
+
         Returns:
             bool | None: `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
         """
@@ -204,15 +199,14 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         plug_index: int,
         plug_sn: str,
     ) -> None:
-        """
-        Create a binary sensor entity representing a specific smart plug's switch state.
-        
+        """Create a binary sensor entity representing a specific smart plug's switch state.
+
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator providing device payloads and updates.
             device_id (str): Identifier of the parent device this plug belongs to.
             plug_index (int): 1-based index of the plug within the device's sorted smart-plug list.
             plug_sn (str): Serial number of the smart plug used to locate the plug in payloads.
-        
+
         Notes:
             Builds and stores the plug's device_info at construction so the device registry can use it when the entity is added.
         """
@@ -232,9 +226,8 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     def _plug(self) -> dict[str, Any]:
         # Look the plug up by its captured serial so cloud-side re-ordering of
         # the plug array cannot reassign this entity to a different device.
-        """
-        Finds the smart-plug payload matching this entity's captured serial to keep the entity bound to the same physical plug if the cloud-side plug list is reordered.
-        
+        """Finds the smart-plug payload matching this entity's captured serial to keep the entity bound to the same physical plug if the cloud-side plug list is reordered.
+
         Returns:
             dict[str, Any]: The matching smart-plug dictionary from the current payload, or an empty dict if no match is found.
         """
@@ -245,11 +238,10 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """
-        Determine whether the smart plug's power output is active.
-        
+        """Determine whether the smart plug's power output is active.
+
         Checks the plug payload for switch state fields and coerces the value to a boolean.
-        
+
         Returns:
             `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
         """
@@ -260,11 +252,10 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """
-        Return diagnostic attributes for the smart plug, always including its 1-based `plug_index`.
-        
+        """Return diagnostic attributes for the smart plug, always including its 1-based `plug_index`.
+
         Includes any of the following fields from the matched plug payload when present: `FIELD_DEVICE_NAME`, `FIELD_SCAN_NAME`, `FIELD_COMM_STATE`, `FIELD_COMM_MODE`, `FIELD_SWITCH_STATE`, `FIELD_SYS_SWITCH`, `FIELD_VERSION`.
-        
+
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
         """

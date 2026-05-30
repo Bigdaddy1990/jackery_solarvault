@@ -36,9 +36,8 @@ _KEY_CACHED_AT: Final = "cached_at"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """
-    Get the Store configured for persisting the MQTT session cache.
-    
+    """Get the Store configured for persisting the MQTT session cache.
+
     Returns:
         A Store[dict[str, Any]] configured with the module's storage key and storage version.
     """
@@ -48,9 +47,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_mqtt_session(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """
-    Load cached MQTT session credentials for the given config entry from persistent storage.
-    
+    """Load cached MQTT session credentials for the given config entry from persistent storage.
+
     Returns:
         dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` if present.
         None: If storage is missing or malformed, or any required field is missing or empty.
@@ -94,11 +92,10 @@ async def async_save_mqtt_session(
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """
-    Persist MQTT session fields for a config entry.
-    
+    """Persist MQTT session fields for a config entry.
+
     Stores the `userId`, base64 `mqttPassWord` seed, and `macId` for `entry_id` in the integration's Home Assistant storage, overwriting any existing row.
-    
+
     Parameters:
         entry_id (str): The config entry identifier to associate the cached session with.
         user_id (str): `userId` returned by the Jackery cloud (used for MQTT clientId/username).
@@ -129,9 +126,8 @@ async def async_save_mqtt_session(
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
-    """
-    Remove the cached MQTT session row for the given config entry.
-    
+    """Remove the cached MQTT session row for the given config entry.
+
     Performs no action if the storage layout or the entry's row does not exist.
     """
     store = _store(hass)

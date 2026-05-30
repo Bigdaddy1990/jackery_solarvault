@@ -142,11 +142,10 @@ async def _set_default_power(
 async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
-    """
-    Set the device's single-tariff electricity price.
-    
+    """Set the device's single-tariff electricity price.
+
     The price value must be expressed in the device's current currency/unit and match the entity's unit of measurement.
-    
+
     Parameters:
         value (float): Price to set, in the device's currency/unit.
     """
@@ -346,9 +345,8 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """
-        The entity's unit of measurement, using a dynamic unit computed from the current payload when available.
-        
+        """The entity's unit of measurement, using a dynamic unit computed from the current payload when available.
+
         Returns:
             The unit of measurement string, or None if no unit is configured.
         """
@@ -357,11 +355,10 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return self.entity_description.native_unit_of_measurement
 
     def _allowed_values(self) -> tuple[float, ...]:
-        """
-        Get the discrete native values allowed for this number entity.
-        
+        """Get the discrete native values allowed for this number entity.
+
         If the description's `allowed_values` is None, returns an empty tuple. If it is a callable, returns the tuple produced by calling it with the current coordinator payload; otherwise returns the configured tuple directly.
-        
+
         Returns:
             tuple[float, ...]: Allowed native float values, or an empty tuple when no discrete constraint is defined.
         """
@@ -373,14 +370,13 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return allowed
 
     async def async_set_native_value(self, value: float) -> None:
-        """
-        Write the given native numeric value to the device, enforcing description-driven validation and invoking the configured setter.
-        
+        """Write the given native numeric value to the device, enforcing description-driven validation and invoking the configured setter.
+
         Validates the value against the description's min/max when `validate_range` is True and against discrete `allowed_values` when present. If a setter is configured, the native value is transformed with the description's `value_transform` and passed to the setter. Setter authentication failures are converted to `ConfigEntryAuthFailed`. If a `HomeAssistantError` raised by the setter already contains a `translation_key` it is re-raised; otherwise, the error is either raised as a translated action error when `raise_on_setter_error` is True or ignored. A coordinator refresh is always requested after the write attempt.
-        
+
         Parameters:
             value (float): The native numeric value to write.
-        
+
         Raises:
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when `raise_on_setter_error` is True and the setter fails.
@@ -479,11 +475,10 @@ async def async_setup_entry(
     }
 
     def _collect_entities() -> list[NumberEntity]:
-        """
-        Collect JackeryNumber entities for devices whose payloads satisfy their gating predicates.
-        
+        """Collect JackeryNumber entities for devices whose payloads satisfy their gating predicates.
+
         Iterates coordinator data and instantiates a JackeryNumber for each entry in NUMBER_DESCRIPTIONS when the description has no predicate or its predicate returns True for the device payload.
-        
+
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home Assistant.
         """
@@ -498,9 +493,8 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
-        """
-        Rebuilds and adds number entities when the coordinator's entity signature changes.
-        
+        """Rebuilds and adds number entities when the coordinator's entity signature changes.
+
         Computes the coordinator's entity signature and, if it differs from the last-seen signature, collects new entity instances and calls the platform's async_add_entities callback to register them; otherwise performs no action.
         """
         nonlocal last_signature

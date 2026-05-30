@@ -37,20 +37,18 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Set up text entities for renaming Jackery system devices from a config entry.
-    
+    """Set up text entities for renaming Jackery system devices from a config entry.
+
     Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """
-        Append a TextEntity to the provided list if its unique identifier has not been registered.
-        
+        """Append a TextEntity to the provided list if its unique identifier has not been registered.
+
         Modifies the `entities` list by appending `entity` when its unique id is new, and records that id to prevent duplicate entities from being added.
-        
+
         Parameters:
             entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
             entity (TextEntity): Candidate text entity to append.
@@ -60,11 +58,10 @@ async def async_setup_entry(
         )
 
     def _collect_entities() -> list[TextEntity]:
-        """
-        Collects text entities for devices that expose a system identifier.
-        
+        """Collects text entities for devices that expose a system identifier.
+
         Creates a JackerySystemNameText for each coordinator data entry whose system contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
-        
+
         Returns:
             list[TextEntity]: TextEntity instances created for devices that support renaming their system.
         """
@@ -79,9 +76,8 @@ async def async_setup_entry(
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
-        """
-        Add newly discovered text entities when the coordinator's data changes.
-        
+        """Add newly discovered text entities when the coordinator's data changes.
+
         Checks the current signature of the coordinator data against the last seen signature; if different, collect entities and register them with `async_add_entities`, and update the stored signature.
         """
         nonlocal last_signature
@@ -115,11 +111,10 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """
-        Return the current editable system name for the device.
-        
+        """Return the current editable system name for the device.
+
         Prefers the stored system name (FIELD_SYSTEM_NAME); falls back to the device product name (FIELD_DEVICE_NAME). Returns None if neither value is available.
-        
+
         Returns:
             The editable system name, the device product name, or None.
         """
@@ -128,14 +123,13 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
-        """
-        Rename the remote system and update local state so the change appears in the UI.
-        
+        """Rename the remote system and update local state so the change appears in the UI.
+
         Trims leading and trailing whitespace from `value`, sends the rename request to the Jackery API, applies an optimistic local update on success, and requests a coordinator refresh so dependent entities reflect the new name.
-        
+
         Parameters:
             value (str): New system name; leading and trailing whitespace will be removed.
-        
+
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is empty, or the remote API reports a failure.

@@ -44,7 +44,9 @@ class Version:
         return f"{self.major}.{self.minor}.{self.patch}"
 
 
-DEFAULT_RULES_PATH = Path("scripts/homeassistant_upgrade_rules.json")
+DEFAULT_RULES_PATH = (
+    Path(__file__).resolve().parent / "homeassistant_upgrade_rules.json"
+)
 DEFAULT_SOURCE_ROOT = Path("custom_components/jackery_solarvault")
 PYPI_HOMEASSISTANT_URL = "https://pypi.org/pypi/homeassistant/json"
 REQUEST_TIMEOUT_SECONDS = 30

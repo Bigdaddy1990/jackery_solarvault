@@ -745,6 +745,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # recently. Skip this one; the next genuinely-new record after
             # the throttle window will carry the difference.
             return
+        # Bound the dedup cache to prevent unbounded memory growth. With
+        # ~10 topics per device the cap is never hit in normal operation;
+        # it only guards against pathological churn (BUGFIXTODO patch).
+        if len(self._payload_debug_last_sig) >= 256:
+            oldest = next(iter(self._payload_debug_last_sig))
+            self._payload_debug_last_sig.pop(oldest, None)
+            self._payload_debug_last_emit_ts.pop(oldest, None)
         self._payload_debug_last_sig[cache_key] = signature
         self._payload_debug_last_emit_ts[cache_key] = now_mono
         event.setdefault("timestamp", dt_util.now().isoformat())
@@ -1280,6 +1287,25 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return
 
             cmd = observation.parsed.cmd
+            # Mirror the MQTT debug-emit pattern (see ``_async_handle_mqtt_message``)
+            # so payload-debug consumers can see BLE traffic too. The lazy
+            # factory keeps the ``chart_series_debug`` walk off the hot path
+            # when the dedicated payload_debug logger is below DEBUG. The
+            # ``topic`` field is synthesised as ``ble://<device>/cmd<n>`` so
+            # the per-channel dedup throttle in
+            # ``_async_payload_debug_event`` distinguishes each device/cmd
+            # pair (otherwise every BLE frame would share one cache slot).
+            await self._async_payload_debug_event(
+                lambda: {
+                    "kind": "ble",
+                    "topic": f"ble://{device_id}/cmd{cmd}",
+                    "device_id": device_id,
+                    "cmd": cmd,
+                    "body_size": len(body),
+                    "payload": payload,
+                    "payload_chart_series_debug": chart_series_debug(payload),
+                }
+            )
             current = self.data or {}
             current_device = current.get(device_id)
             if not isinstance(current_device, dict):
@@ -1843,7 +1869,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             import base64
 
             key = base64.b64decode(str(raw))
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -2025,7 +2051,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -2123,7 +2149,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -2172,7 +2198,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             DOMAIN,
                             f"{device_id}_battery_pack_{pack_index}",
                         )
-                        self._pending_device_removals.append(identifier)
+                        # Idempotent append: repeated refreshes that re-detect
+                        # the same dropped pack must not stack duplicate
+                        # removal entries (BUGFIXTODO patch).
+                        if identifier not in self._pending_device_removals:
+                            self._pending_device_removals.append(identifier)
             touched = True
 
         ct = self._find_dict_with_any_key(source, self._CT_METER_KEYS)
@@ -2459,6 +2489,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             registry.async_remove_device(device.id)
             removed += 1
+        # BUGFIXTODO Bug D: registry removal alone leaks per-device cache
+        # entries. Extract the parent device id from the battery-pack
+        # identifier and drop the matching ``_slow_cache`` /
+        # ``_last_*_query`` rows so the next refresh does not keep
+        # paying memory for a device that no longer exists.
+        removed_device_ids: set[str] = set()
+        for _domain, unique_id in pending:
+            if "_battery_pack_" in unique_id:
+                removed_device_ids.add(unique_id.rsplit("_battery_pack_", 1)[0])
+        for dev_id in removed_device_ids:
+            self._slow_cache.pop(f"dev:{dev_id}", None)
+            self._last_system_info_query.pop(dev_id, None)
+            self._last_weather_plan_query.pop(dev_id, None)
+            self._last_subdevice_query.pop(dev_id, None)
         if removed:
             _LOGGER.info(
                 "Jackery: removed %d stale battery-pack device(s) "
@@ -4478,14 +4522,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         def _load_offsets() -> tuple[float, float]:
             with session_scope(session=recorder.get_session()) as session:
                 meta = (
-                    session.query(StatisticsMeta.id)
+                    session
+                    .query(StatisticsMeta.id)
                     .filter(StatisticsMeta.statistic_id == statistic_id)
                     .first()
                 )
                 if meta is None:
                     return 0.0, 0.0
                 row = (
-                    session.query(
+                    session
+                    .query(
                         Statistics.sum,
                         Statistics.state,
                         Statistics.last_reset_ts,
@@ -4544,7 +4590,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             with session_scope(session=recorder.get_session()) as session:
                 return {
                     round(item[0].timestamp()) - 55 * 60
-                    for item in session.query(StatisticsRuns.start)
+                    for item in session
+                    .query(StatisticsRuns.start)
                     .filter(
                         StatisticsRuns.start >= range_start,
                         StatisticsRuns.start < range_end + timedelta(hours=1),
@@ -4909,7 +4956,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except (ImportError, RuntimeError):
+        except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -5830,6 +5877,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             for cache in self._slow_cache.values():
                 for cache_key in cache_keys_to_clear:
                     cache.pop(cache_key, None)
+            # Stat-import dedup cache spans calendar days; stale
+            # signatures from yesterday would prevent fresh buckets
+            # from being written to the HA recorder after midnight
+            # (BUGFIXTODO patch).
+            self._stat_import_last_sig.clear()
         self._cached_date = today
 
         async def _get_with_ttl_for(
@@ -5878,25 +5930,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         async def _fetch_system(sys_id: str) -> dict[str, Any]:
             if sys_id in system_cache:
                 return system_cache[sys_id]
-            (
-                statistic,
-                alarm,
-                pv_trends,
-                pv_trends_week,
-                pv_trends_month,
-                pv_trends_year,
-                home_trends,
-                home_trends_week,
-                home_trends_month,
-                home_trends_year,
-                battery_trends,
-                battery_trends_week,
-                battery_trends_month,
-                battery_trends_year,
-                price,
-                price_sources,
-                price_history_config,
-            ) = await asyncio.gather(
+            # BUGFIXTODO Bug A: gather without return_exceptions previously
+            # let a single TimeoutError / aiohttp.ClientError / SSL drop
+            # propagate out and abort the whole update cycle, marking every
+            # Jackery entity unavailable. We isolate failures per slot and
+            # map them to the same defaults already wired in the
+            # ``_get_with_ttl(... default)`` calls below.
+            _slow_results = await asyncio.gather(
                 _get_with_ttl(
                     sys_id,
                     PAYLOAD_STATISTIC,
@@ -6058,7 +6098,53 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     self.api.async_get_price_history_config,
                     {},
                 ),
+                return_exceptions=True,
             )
+            # Per-slot defaults match the empty values already passed into
+            # the ``_get_with_ttl`` calls above. ``alarm`` is None and
+            # ``price_sources`` is a list; everything else collapses to {}.
+            _slow_defaults: tuple[Any, ...] = (
+                {},  # statistic
+                None,  # alarm
+                {},  # pv_trends
+                {},  # pv_trends_week
+                {},  # pv_trends_month
+                {},  # pv_trends_year
+                {},  # home_trends
+                {},  # home_trends_week
+                {},  # home_trends_month
+                {},  # home_trends_year
+                {},  # battery_trends
+                {},  # battery_trends_week
+                {},  # battery_trends_month
+                {},  # battery_trends_year
+                {},  # price
+                [],  # price_sources
+                {},  # price_history_config
+            )
+            _slow_safe = tuple(
+                default if isinstance(value, BaseException) else value
+                for value, default in zip(_slow_results, _slow_defaults, strict=True)
+            )
+            (
+                statistic,
+                alarm,
+                pv_trends,
+                pv_trends_week,
+                pv_trends_month,
+                pv_trends_year,
+                home_trends,
+                home_trends_week,
+                home_trends_month,
+                home_trends_year,
+                battery_trends,
+                battery_trends_week,
+                battery_trends_month,
+                battery_trends_year,
+                price,
+                price_sources,
+                price_history_config,
+            ) = _slow_safe
             bundle: dict[str, Any] = {
                 PAYLOAD_STATISTIC: statistic,
                 PAYLOAD_ALARM: alarm,
@@ -6132,11 +6218,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             {},
                         )
 
+                    # BUGFIXTODO Bug C: a single 404 (e.g. the device was
+                    # bought mid-year and earlier months legitimately do
+                    # not exist) used to abort the whole year backfill.
+                    # ``return_exceptions`` lets the ``isinstance(source,
+                    # dict)`` filter below quietly skip BaseException
+                    # entries.
                     sources = await asyncio.gather(
                         *(
                             _fetch_previous_home_month(month, prefix)
                             for month in previous_months
-                        )
+                        ),
+                        return_exceptions=True,
                     )
                     for month, source in zip(previous_months, sources, strict=False):
                         if isinstance(source, dict):
@@ -6298,7 +6391,24 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         {},
                     )
                 )
-            values = await asyncio.gather(*tasks)
+            # BUGFIXTODO Bug B: gather without return_exceptions previously
+            # let one device-metric failure (HTTP 5xx, timeout, payload-
+            # parse error) abort the whole zip, leaving every per-device
+            # entity blank. Map exceptions back to the structural default
+            # expected by downstream consumers.
+            _raw_values = await asyncio.gather(*tasks, return_exceptions=True)
+            _device_extras_defaults: dict[str, Any] = {
+                PAYLOAD_DEVICE_STATISTIC: {},
+                PAYLOAD_LOCATION: {},
+                PAYLOAD_OTA: {},
+                PAYLOAD_BATTERY_PACKS: [],
+            }
+            values = [
+                v
+                if not isinstance(v, BaseException)
+                else _device_extras_defaults.get(name, {})
+                for name, v in zip(task_names, _raw_values, strict=False)
+            ]
             out: dict[str, Any] = dict(zip(task_names, values, strict=False))
             out.setdefault(PAYLOAD_DEVICE_STATISTIC, {})
             out.setdefault(PAYLOAD_LOCATION, {})
@@ -6376,8 +6486,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 if isinstance(current_month_source, dict):
                     months[today.month] = current_month_source
                 previous_months = list(range(1, today.month))
+                # BUGFIXTODO Bug C: same year-backfill robustness as the
+                # home-trends path — a single 404/timeout for one early
+                # month must not abort the entire year.
                 sources = await asyncio.gather(
-                    *(_fetch_device_month(prefix, month) for month in previous_months)
+                    *(_fetch_device_month(prefix, month) for month in previous_months),
+                    return_exceptions=True,
                 )
                 for month, source in zip(previous_months, sources, strict=False):
                     if isinstance(source, dict):

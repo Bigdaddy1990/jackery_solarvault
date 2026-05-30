@@ -78,15 +78,14 @@ class MonitoringResult:
 
 
 def _parse_wheel_profile(value: str) -> WheelProfile:
-    """
-    Parse a CLI wheel profile string into a WheelProfile.
-    
+    """Parse a CLI wheel profile string into a WheelProfile.
+
     Parameters:
         value (str): CLI value in the format "<python_tag>:<platform_fragment>" (both sides may include surrounding whitespace).
-    
+
     Returns:
         WheelProfile: Parsed profile with `python_tag` and `platform_fragment` extracted and stripped.
-    
+
     Raises:
         argparse.ArgumentTypeError: If `value` does not contain ":" or either side is empty after stripping.
     """
@@ -111,15 +110,14 @@ DEFAULT_WHEEL_PROFILES = (
 
 
 def _normalise_wheel_profiles(args: argparse.Namespace) -> list[WheelProfile]:
-    """
-    Determine which wheel profiles should be monitored based on parsed CLI arguments.
-    
+    """Determine which wheel profiles should be monitored based on parsed CLI arguments.
+
     Selects profiles in this precedence order: the repeatable `--wheel-profile` values if present; otherwise the deprecated `--target-python-tag`/`--target-platform-fragment` pair (using `cp313` and `manylinux` as defaults for missing sides) if either is set; otherwise the module `DEFAULT_WHEEL_PROFILES`.
-    
+
     Parameters:
         args (argparse.Namespace): Parsed CLI namespace with attributes `wheel_profile` (list[WheelProfile] | None),
             `target_python_tag` (str | None), and `target_platform_fragment` (str | None).
-    
+
     Returns:
         list[WheelProfile]: The list of resolved wheel profiles to track.
     """
@@ -147,16 +145,15 @@ def _normalise_wheel_profiles(args: argparse.Namespace) -> list[WheelProfile]:
 
 
 def parse_arguments() -> argparse.Namespace:
-    """
-    Parse and validate command-line arguments for the monitoring script.
-    
+    """Parse and validate command-line arguments for the monitoring script.
+
     Recognizes options to control failure behaviour and tracked wheel profiles:
     - --fail-on-outdated: treat a newer stable PyYAML on PyPI as a failure.
     - --fail-severity: minimum OSV severity that triggers a non-zero exit.
     - Deprecated --target-python-tag / --target-platform-fragment: legacy single-profile inputs.
     - --wheel-profile: repeatable `<python_tag>:<platform>` values to track specific wheel compatibility.
     - --metadata-path: optional file path to write a JSON summary for downstream automation.
-    
+
     Returns:
         argparse.Namespace: The parsed CLI arguments.
     """
@@ -219,15 +216,14 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def load_vendor_version() -> Version:
-    """
-    Locate and parse the vendored PyYAML __version__ from the annotatedyaml package.
-    
+    """Locate and parse the vendored PyYAML __version__ from the annotatedyaml package.
+
     Searches for annotatedyaml/_vendor/yaml/__init__.py (falling back to annotatedyaml/_vendor/yaml.py),
     extracts the `__version__` assignment, and returns it as a `packaging.version.Version`.
-    
+
     Returns:
         Version: The parsed vendored PyYAML version.
-    
+
     Raises:
         MonitoringError: If neither vendored module file is present, if a `__version__` assignment
             cannot be found, or if the extracted version string is not a valid version.
@@ -260,12 +256,11 @@ def load_vendor_version() -> Version:
 
 
 def fetch_pypi_metadata() -> dict[str, Any]:
-    """
-    Fetch the PyPI JSON metadata for the PyYAML project.
-    
+    """Fetch the PyPI JSON metadata for the PyYAML project.
+
     Returns:
         data (dict[str, Any]): Decoded JSON object from PyPI containing release metadata (must include a "releases" key).
-    
+
     Raises:
         MonitoringError: If the HTTP request fails or the response is missing the expected "releases" metadata.
     """
@@ -283,12 +278,11 @@ def fetch_pypi_metadata() -> dict[str, Any]:
 def select_latest_release(
     data: dict[str, Any],
 ) -> tuple[Version | None, list[dict[str, Any]]]:
-    """
-    Selects the newest stable (non-prerelease, non-dev) release from PyPI metadata and returns its parsed version and associated file entries.
-    
+    """Selects the newest stable (non-prerelease, non-dev) release from PyPI metadata and returns its parsed version and associated file entries.
+
     Parameters:
         data (dict[str, Any]): Decoded PyPI JSON object expected to contain a "releases" mapping from version strings to lists of file metadata.
-    
+
     Returns:
         tuple[Version | None, list[dict[str, Any]]]: A pair where the first element is the newest stable parsed `Version` (or `None` if none found) and the second element is the list of file entries for that release (empty if none).
     """
@@ -308,12 +302,11 @@ def select_latest_release(
 
 
 def _convert_version(raw: str | None) -> Version | None:
-    """
-    Convert a raw version string into a packaging Version, treating the literal "0" as Version("0") and returning None for absent or unparsable inputs.
-    
+    """Convert a raw version string into a packaging Version, treating the literal "0" as Version("0") and returning None for absent or unparsable inputs.
+
     Parameters:
         raw (str | None): A version string to convert, or None.
-    
+
     Returns:
         Version | None: A `Version` instance for valid inputs (including the literal `"0"`), or `None` if `raw` is `None` or cannot be parsed as a valid version.
     """
@@ -326,18 +319,17 @@ def _convert_version(raw: str | None) -> Version | None:
 
 
 def _range_contains_version(events: list[dict[str, str]], version: Version) -> bool:
-    """
-    Determine whether a given version falls within any affected interval described by an OSV-style sequence of range events.
-    
+    """Determine whether a given version falls within any affected interval described by an OSV-style sequence of range events.
+
     The `events` list is a sequence of dictionaries representing range events with one of the keys: `introduced`, `fixed`, or `last_affected`. Intervals are interpreted as:
     - `introduced` followed by `fixed` => [introduced, fixed)
     - `introduced` followed by `last_affected` => [introduced, last_affected]
     If an `introduced` event has no subsequent `fixed` or `last_affected`, the interval is treated as open-ended (introduced ≤ version).
-    
+
     Parameters:
         events (list[dict[str, str]]): OSV range event objects in chronological order.
         version (Version): The version to check against the described intervals.
-    
+
     Returns:
         bool: `True` if `version` is contained in any described interval, `False` otherwise.
     """
@@ -367,19 +359,18 @@ def _range_contains_version(events: list[dict[str, str]], version: Version) -> b
 
 
 def _format_range(events: list[dict[str, str]]) -> str | None:
-    """
-    Format OSV range events into human-readable interval segments.
-    
+    """Format OSV range events into human-readable interval segments.
+
     Converts a sequence of OSV `affected.ranges` events into interval strings such as
     `[introduced, fixed)` or `[introduced, last_affected]`. Multiple intervals are
     joined with `, `. Returns `None` when no complete interval segments can be
     produced.
-    
+
     Parameters:
         events (list[dict[str, str]]): OSV range event objects containing keys
             like `"introduced"`, `"fixed"`, or `"last_affected"` mapping to version
             strings; events are processed in order.
-    
+
     Returns:
         str | None: A comma-separated string of interval segments (for example
         `"[1.0, 1.2), [2.0, 2.1]"`), or `None` if no segments were produced.
@@ -401,12 +392,11 @@ def _format_range(events: list[dict[str, str]]) -> str | None:
 
 
 def _normalise_severity(raw: str | None) -> str | None:
-    """
-    Normalize a raw severity label into a canonical severity name used by this module.
-    
+    """Normalize a raw severity label into a canonical severity name used by this module.
+
     Parameters:
         raw (str | None): Severity string to normalise (e.g., from OSV or database-specific fields).
-    
+
     Returns:
         str | None: Uppercased canonical severity present in SEVERITY_ORDER (with "MODERATE" mapped to "MEDIUM"), or `None` if the input is empty, None, or not recognised.
     """
@@ -421,12 +411,11 @@ def _normalise_severity(raw: str | None) -> str | None:
 
 
 def _severity_from_cvss(score: float) -> str:
-    """
-    Map a numeric CVSS score to an OSV severity label.
-    
+    """Map a numeric CVSS score to an OSV severity label.
+
     Parameters:
         score (float): CVSS numeric score.
-    
+
     Returns:
         severity (str): One of "CRITICAL", "HIGH", "MEDIUM", or "LOW" according to thresholds:
             - >= 9.0 => "CRITICAL"
@@ -447,15 +436,14 @@ def _severity_from_cvss(score: float) -> str:
 
 
 def _derive_severity(entry: dict[str, Any]) -> str:
-    """
-    Determine the severity level for an OSV vulnerability entry.
-    
+    """Determine the severity level for an OSV vulnerability entry.
+
     Checks `entry["database_specific"]["severity"]` first and returns a normalized value if present.
     If absent or invalid, extracts numeric CVSS scores from `entry["severity"]` (if any), uses the highest numeric score and maps it to a severity category. If no usable severity information is found, returns `"CRITICAL"`.
-    
+
     Parameters:
         entry (dict[str, Any]): An OSV vulnerability entry (decoded JSON) to inspect.
-    
+
     Returns:
         str: Severity name (`CRITICAL`, `HIGH`, `MEDIUM`, or `LOW`).
     """
@@ -487,11 +475,10 @@ def _derive_severity(entry: dict[str, Any]) -> str:
 
 
 def query_osv(vendor_version: Version) -> list[VulnerabilityRecord]:
-    """
-    Find OSV advisories that affect the provided vendored PyYAML version.
-    
+    """Find OSV advisories that affect the provided vendored PyYAML version.
+
     Queries the OSV API for PyYAML and returns VulnerabilityRecord entries for advisories whose affected ranges include the given version.
-    
+
     Returns:
         list[VulnerabilityRecord]: Vulnerabilities from OSV that still affect the vendored version; empty list if none.
     """
@@ -546,14 +533,13 @@ def locate_target_wheel(
     python_tag: str,
     platform_fragment: str,
 ) -> tuple[Version | None, str, str]:
-    """
-    Locate the newest PyPI release that includes a non-yanked wheel whose filename contains the given python tag and platform fragment.
-    
+    """Locate the newest PyPI release that includes a non-yanked wheel whose filename contains the given python tag and platform fragment.
+
     Parameters:
         data (dict[str, Any]): Decoded PyPI JSON metadata for the package (expects a "releases" mapping).
         python_tag (str): Substring expected in the wheel filename identifying the Python ABI/tag (e.g., "cp313").
         platform_fragment (str): Substring expected in the wheel filename identifying the target platform (e.g., "manylinux").
-    
+
     Returns:
         tuple[Version | None, str, str]: A tuple of (version, filename, url):
             - version: the newest stable release Version that has a matching wheel, or `None` if no match was found.
@@ -585,14 +571,13 @@ def locate_target_wheel(
 
 
 def build_summary(result: MonitoringResult) -> str:
-    """
-    Build a Markdown-formatted GitHub Actions step summary describing the monitoring run.
-    
+    """Build a Markdown-formatted GitHub Actions step summary describing the monitoring run.
+
     Parameters:
         result (MonitoringResult): Aggregated monitoring output containing the vendored
             version, latest PyPI release information, discovered wheel matches, and
             any affecting vulnerabilities.
-    
+
     Returns:
         summary (str): A multi-line Markdown string suitable for a GitHub Actions
         step summary that reports the vendored PyYAML version, latest stable PyPI
@@ -649,9 +634,8 @@ def build_summary(result: MonitoringResult) -> str:
 
 
 def build_metadata_document(result: MonitoringResult) -> dict[str, Any]:
-    """
-    Serialize a MonitoringResult into a JSON-serializable mapping.
-    
+    """Serialize a MonitoringResult into a JSON-serializable mapping.
+
     Returns:
         mapping (dict): A JSON-serializable mapping with the following keys:
             - vendor_version (str): Vendored package version as a string.
@@ -703,14 +687,13 @@ def evaluate(
     fail_severity: str,
     wheel_profiles: list[WheelProfile],
 ) -> tuple[MonitoringResult, int]:
-    """
-    Run the monitoring routine that inspects the vendored PyYAML, queries PyPI and OSV, checks wheel availability for configured profiles, and computes an exit code.
-    
+    """Run the monitoring routine that inspects the vendored PyYAML, queries PyPI and OSV, checks wheel availability for configured profiles, and computes an exit code.
+
     Parameters:
         fail_on_outdated (bool): If true, consider the vendored release being older than the latest stable PyPI release a failure (sets the exit code to 1).
         fail_severity (str): Minimum OSV severity name (e.g., "HIGH") that triggers failure when an affecting advisory has equal or greater severity.
         wheel_profiles (list[WheelProfile]): Wheel profiles to probe on PyPI for compatible prebuilt wheels.
-    
+
     Returns:
         tuple[MonitoringResult, int]: A MonitoringResult containing gathered metadata, vulnerabilities, and wheel matches, and an exit code (0 for success, 1 when policy conditions are met that require failure).
     """
@@ -793,11 +776,10 @@ def evaluate(
 
 
 def main() -> int:
-    """
-    Run the monitoring workflow for the vendored PyYAML and return an appropriate process exit code.
-    
+    """Run the monitoring workflow for the vendored PyYAML and return an appropriate process exit code.
+
     Parses command-line arguments, performs the monitoring checks (vendored version extraction, PyPI and OSV queries, and wheel availability scans), emits a GitHub Actions step summary (appending to the file pointed to by GITHUB_STEP_SUMMARY when set, otherwise printing to stdout), and optionally writes a JSON metadata document when a metadata path is provided.
-    
+
     Returns:
         int: Process exit code — `0` on success, `1` when checks fail due to configured thresholds (e.g., vulnerability or outdated failures), `2` when a monitoring error prevents completion.
     """
