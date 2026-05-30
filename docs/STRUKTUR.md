@@ -255,11 +255,10 @@ Die gesamte Formel‑ und Guard‑Logik aus PROTOCOL §7 spiegelt sich in diesen
 - Plattformdateien `sensor.py`, `switch.py`, `number.py`, `select.py`, `text.py`, `binary_sensor.py`, `button.py`
 
 ```
-- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).  
+- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).
 ```
 
 - Tests:
     - `tests/test_entity.py`, `tests/test_battery_pack_stability.py` prüfen, dass `unique_id` stabil bleibt bei Namens‑/Label‑Änderungen und dass Battery‑Packs nicht ihre ID wechseln.
 
 ***
-

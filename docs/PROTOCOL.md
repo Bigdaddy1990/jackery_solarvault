@@ -1,4 +1,4 @@
-Hier ist ein zusammenhängendes `PROTOCOL.md`, inhaltlich vollständig aus allen von dir genannten Quellen zusammengeführt und neu formuliert. 
+Hier ist ein zusammenhängendes `PROTOCOL.md`, inhaltlich vollständig aus allen von dir genannten Quellen zusammengeführt und neu formuliert.
 Dieses Protokoll ist ausdrücklich **bindend** und **darf nicht verändert** werden; jede Arbeit an der Integration hat sich daran zu orientieren.[^1][^2][^3][^4][^5][^6][^7][^8][^9][^10][^11][^12][^13][^14][^15][^16][^17][^18][^19]
 
 ***
@@ -779,11 +779,10 @@ Die gesamte Formel‑ und Guard‑Logik aus PROTOCOL §7 spiegelt sich in diesen
 - Plattformdateien `sensor.py`, `switch.py`, `number.py`, `select.py`, `text.py`, `binary_sensor.py`, `button.py`
 
 ```
-- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).  
+- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).
 ```
 
 - Tests:
     - `tests/test_entity.py`, `tests/test_battery_pack_stability.py` prüfen, dass `unique_id` stabil bleibt bei Namens‑/Label‑Änderungen und dass Battery‑Packs nicht ihre ID wechseln.
 
 ***
-

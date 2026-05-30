@@ -17,19 +17,19 @@ def test_property_device_candidate_parses_cloud_marker_strings() -> None:
     assert JackerySolarVaultCoordinator._is_property_device_candidate({
         FIELD_BIND_KEY: 1,
         FIELD_DEV_TYPE: 3,
-        FIELD_IS_CLOUD: 'false',
+        FIELD_IS_CLOUD: "false",
         FIELD_MODEL_CODE: 3002,
     })
     assert not JackerySolarVaultCoordinator._is_property_device_candidate({
         FIELD_BIND_KEY: 1,
         FIELD_DEV_TYPE: 3,
-        FIELD_IS_CLOUD: 'true',
+        FIELD_IS_CLOUD: "true",
         FIELD_MODEL_CODE: 3002,
     })
     assert not JackerySolarVaultCoordinator._is_property_device_candidate({
         FIELD_BIND_KEY: 1,
-        FIELD_DEV_TYPE: '3',
-        FIELD_IS_CLOUD: 'true',
+        FIELD_DEV_TYPE: "3",
+        FIELD_IS_CLOUD: "true",
         FIELD_MODEL_CODE: 3002,
     })
 
@@ -37,12 +37,12 @@ def test_property_device_candidate_parses_cloud_marker_strings() -> None:
 def test_property_device_candidate_parses_bind_key_false_markers() -> None:
     """String false bindKey markers must filter unsupported accessories."""
     assert not JackerySolarVaultCoordinator._is_property_device_candidate({
-        FIELD_BIND_KEY: 'false',
+        FIELD_BIND_KEY: "false",
         FIELD_DEV_TYPE: 1,
         FIELD_MODEL_CODE: 3002,
     })
     assert JackerySolarVaultCoordinator._is_property_device_candidate({
-        FIELD_BIND_KEY: 'true',
+        FIELD_BIND_KEY: "true",
         FIELD_DEV_TYPE: 1,
         FIELD_MODEL_CODE: 3002,
     })
@@ -53,11 +53,11 @@ def test_property_device_candidate_treats_empty_model_code_as_missing() -> None:
     assert not JackerySolarVaultCoordinator._is_property_device_candidate({
         FIELD_BIND_KEY: 1,
         FIELD_DEV_TYPE: 1,
-        FIELD_MODEL_CODE: '',
+        FIELD_MODEL_CODE: "",
     })
     assert JackerySolarVaultCoordinator._is_property_device_candidate({
         FIELD_BIND_KEY: 1,
         FIELD_DEV_TYPE: 1,
-        FIELD_MODEL_CODE: '',
-        FIELD_DEV_MODEL: 'SolarVault',
+        FIELD_MODEL_CODE: "",
+        FIELD_DEV_MODEL: "SolarVault",
     })
