@@ -3,9 +3,9 @@ aiohttp
 aiomqtt
 annotatedyaml
 certifi
+codecov
 coverage
 coverage[toml]
-codecov
 homeassistant-stubs>=2026.5.4
 hypothesis
 jinja2>=3.1.6

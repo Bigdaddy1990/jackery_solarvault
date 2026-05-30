@@ -209,7 +209,7 @@ async def _async_start_local_mqtt(
     """
     """
     Stop the stored local MQTT client and remove its runtime reference if it matches the stored instance.
-    
+
     Stops the client while suppressing any exceptions raised during shutdown. If the runtime storage for the current config entry still holds the same client instance, the runtime key is removed; otherwise no modification is made.
     """
     if not config_entry_bool_option(

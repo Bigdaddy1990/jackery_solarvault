@@ -32,8 +32,8 @@ repos:
       - id: autotyping
         stages: [pre-commit]
         types: [python]
-        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above 
-        
+        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.15
     hooks:
@@ -84,7 +84,7 @@ repos:
         args:
           - --allow-missing-credentials
       - id: destroyed-symlinks
-      
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
