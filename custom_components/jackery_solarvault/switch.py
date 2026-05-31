@@ -78,7 +78,7 @@ def _standby_is_on(raw: Any) -> bool | None:
         return None
     try:
         return int(raw) == 1
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return safe_bool(raw)
 
 
@@ -687,4 +687,3 @@ async def async_setup_entry(
 
     _add_new_entities()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
-

@@ -1942,7 +1942,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             import base64
 
             key = base64.b64decode(str(raw))
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -2122,7 +2122,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return True
         action_id = payload.get(FIELD_ACTION_ID)
         action_id_int = safe_float(action_id)
-        if action_id_int is not None and int(action_id_int) in MQTT_ACTION_IDS_SUBDEVICE:
+        if (
+            action_id_int is not None
+            and int(action_id_int) in MQTT_ACTION_IDS_SUBDEVICE
+        ):
             return True
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -2220,7 +2223,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -3217,7 +3220,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return int(match.group(1))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def _endpoint_backoff_active(self, key: str, now_monotonic: float) -> bool:
@@ -4028,7 +4031,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
         region = self._source_region_for_device(device_id, source)
         company_id_num = safe_float(company_id)
-        if company_id_num is None or not float(company_id_num).is_integer() or not region:
+        if (
+            company_id_num is None
+            or not float(company_id_num).is_integer()
+            or not region
+        ):
             raise HomeAssistantError(
                 "Cannot set dynamic tariff: selected provider is missing "
                 "platformCompanyId/country."
@@ -5223,7 +5230,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except (ImportError, RuntimeError):
+        except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -6738,55 +6745,55 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return cast(
                         dict[str, Any],
                         await _get_with_ttl_for(
-                        per_dev,
-                        cache_key,
-                        self._price_config_interval_sec,
-                        cast(
-                            Callable[[], Awaitable[dict[str, Any]]],
-                            lambda q=kwargs: self.api.async_get_device_pv_stat(
-                                dev_id,
-                                sys_id,
-                                **q,
+                            per_dev,
+                            cache_key,
+                            self._price_config_interval_sec,
+                            cast(
+                                Callable[[], Awaitable[dict[str, Any]]],
+                                lambda q=kwargs: self.api.async_get_device_pv_stat(
+                                    dev_id,
+                                    sys_id,
+                                    **q,
+                                ),
                             ),
-                        ),
-                        {},
-                        backoff_key=backoff_pv_key,
+                            {},
+                            backoff_key=backoff_pv_key,
                         ),
                     )
                 if prefix == APP_SECTION_BATTERY_STAT:
                     return cast(
                         dict[str, Any],
                         await _get_with_ttl_for(
-                        per_dev,
-                        cache_key,
-                        self._price_config_interval_sec,
-                        cast(
-                            Callable[[], Awaitable[dict[str, Any]]],
-                            lambda q=kwargs: self.api.async_get_device_battery_stat(
-                                dev_id,
-                                **q,
+                            per_dev,
+                            cache_key,
+                            self._price_config_interval_sec,
+                            cast(
+                                Callable[[], Awaitable[dict[str, Any]]],
+                                lambda q=kwargs: self.api.async_get_device_battery_stat(
+                                    dev_id,
+                                    **q,
+                                ),
                             ),
-                        ),
-                        {},
-                        backoff_key=backoff_battery_key,
+                            {},
+                            backoff_key=backoff_battery_key,
                         ),
                     )
                 if prefix == APP_SECTION_HOME_STAT:
                     return cast(
                         dict[str, Any],
                         await _get_with_ttl_for(
-                        per_dev,
-                        cache_key,
-                        self._price_config_interval_sec,
-                        cast(
-                            Callable[[], Awaitable[dict[str, Any]]],
-                            lambda q=kwargs: self.api.async_get_device_home_stat(
-                                dev_id,
-                                **q,
+                            per_dev,
+                            cache_key,
+                            self._price_config_interval_sec,
+                            cast(
+                                Callable[[], Awaitable[dict[str, Any]]],
+                                lambda q=kwargs: self.api.async_get_device_home_stat(
+                                    dev_id,
+                                    **q,
+                                ),
                             ),
-                        ),
-                        {},
-                        backoff_key=backoff_home_key,
+                            {},
+                            backoff_key=backoff_home_key,
                         ),
                     )
                 return {}
@@ -7144,4 +7151,3 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             0, int(self._mqtt_paused_until_monotonic - now_mono)
         )
         return diag
-
