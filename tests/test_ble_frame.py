@@ -50,9 +50,9 @@ from custom_components.jackery_solarvault.client.ble import (
 
 def test_wire_format_constants_match_smali() -> None:
     """Wire-format string literals match HomeControlFormat.smali."""
-    assert BLE_FRAME_MAGIC == 'DFED'
-    assert BLE_FRAME_VERSION == '0001'
-    assert BLE_FRAME_PAYLOAD_MARKER == '0001'
+    assert BLE_FRAME_MAGIC == "DFED"
+    assert BLE_FRAME_VERSION == "0001"
+    assert BLE_FRAME_PAYLOAD_MARKER == "0001"
     assert BLE_AES_IV_LEN == 16
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
@@ -68,9 +68,9 @@ def test_wire_format_constants_match_smali() -> None:
 
 def test_gatt_uuids_match_smali_and_live_capture() -> None:
     """GATT service/char UUIDs match sb/v.smali and the live HA scan capture."""
-    assert BLE_SERVICE_UUID == '0000bdee-0000-1000-8000-00805f9b34fb'
-    assert BLE_WRITE_CHAR_UUID == '0000ee01-0000-1000-8000-00805f9b34fb'
-    assert BLE_NOTIFY_CHAR_UUID == '0000ee02-0000-1000-8000-00805f9b34fb'
+    assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"
+    assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"
+    assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"
     assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data
 
 
@@ -81,11 +81,11 @@ def test_gatt_uuids_match_smali_and_live_capture() -> None:
 
 def test_hex16_upper_case_4_digit_format() -> None:
     """``hex16`` produces a 4-char upper-case hex string (matches ``sb/d.d``)."""
-    assert hex16(0) == '0000'
-    assert hex16(1) == '0001'
-    assert hex16(0xBEE) == '0BEE'  # actionId 3046 = 0x0BEE
-    assert hex16(0x71) == '0071'  # cmd 113 = 0x71
-    assert hex16(0xFFFF) == 'FFFF'
+    assert hex16(0) == "0000"
+    assert hex16(1) == "0001"
+    assert hex16(0xBEE) == "0BEE"  # actionId 3046 = 0x0BEE
+    assert hex16(0x71) == "0071"  # cmd 113 = 0x71
+    assert hex16(0xFFFF) == "FFFF"
 
 
 def test_hex16_rejects_out_of_range() -> None:
@@ -105,15 +105,15 @@ def test_parse_hex16_round_trips() -> None:
 def test_parse_hex16_rejects_wrong_width() -> None:
     """``parse_hex16`` enforces the 4-char width."""
     with pytest.raises(ValueError):
-        parse_hex16('BEE')
+        parse_hex16("BEE")
     with pytest.raises(ValueError):
-        parse_hex16('00BEE')
+        parse_hex16("00BEE")
 
 
 def test_parse_hex16_rejects_non_hex_characters_with_context() -> None:
     """``parse_hex16`` reports malformed 4-char fields with parser context."""
-    with pytest.raises(ValueError, match='parse_hex16: expected hex chars'):
-        parse_hex16('00GG')
+    with pytest.raises(ValueError, match="parse_hex16: expected hex chars"):
+        parse_hex16("00GG")
 
 
 def test_hex_encode_decode_round_trip() -> None:
@@ -130,12 +130,12 @@ def test_hex_encode_decode_round_trip() -> None:
 def test_crc16_modbus_reference_vector() -> None:
     """Standard Modbus CRC-16 of ``"123456789"`` is ``0x4B37``."""
     # https://crccalc.com — CRC-16/MODBUS (poly 0xA001, init 0xFFFF, reflected).
-    assert crc16_modbus(b'123456789') == 0x4B37
+    assert crc16_modbus(b"123456789") == 0x4B37
 
 
 def test_crc16_hex_is_4_chars_upper() -> None:
     """``crc16_hex`` returns the CRC as a 4-char upper-case hex string."""
-    assert crc16_hex(b'123456789') == '4B37'
+    assert crc16_hex(b"123456789") == "4B37"
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def test_aes_round_trip_with_deterministic_iv_aes256() -> None:
     """AES-256 encrypt + decrypt with a fixed IV recovers the plaintext."""
     key = bytes(range(BLE_AES_KEY_LEN_AES256))
     iv = bytes(BLE_AES_IV_LEN)
-    plaintext = b'Hello, Jackery!' * 4
+    plaintext = b"Hello, Jackery!" * 4
     ciphertext = aes_encrypt(plaintext, key, iv)
     assert aes_decrypt(ciphertext, key, iv) == plaintext
 
@@ -156,17 +156,17 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     """AES-128 with the SolarVault-shaped 16-byte key round-trips too.
     Pinned input is the actual ``bluetoothKey`` captured 2026-05-16 from
     a SolarVault 3 Pro Max: ``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-    → ``b"hr2c0hh361336138"``. 
-    
+    → ``b"hr2c0hh361336138"``.
+
     This is the regression that motivated
     accepting both key lengths.
     """
     import base64
 
-    key = base64.b64decode('aHIyYzBoaDM2MTMzNjEzOA==')
+    key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
     assert len(key) == BLE_AES_KEY_LEN_AES128 == 16
     iv = bytes(BLE_AES_IV_LEN)
-    plaintext = b'DFED0001000100010BEE007100010000'
+    plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
     assert aes_decrypt(ciphertext, key, iv) == plaintext
 
@@ -176,14 +176,14 @@ def test_aes_rejects_wrong_key_or_iv_length() -> None:
     # Reject key lengths that are neither AES-128 nor AES-256.
     for bad_key_len in (15, 17, 24, 31, 33, 64):
         with pytest.raises(ValueError):
-            aes_encrypt(b'x', b'\x00' * bad_key_len, b'\x00' * 16)
+            aes_encrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
         with pytest.raises(ValueError):
-            aes_decrypt(b'x', b'\x00' * bad_key_len, b'\x00' * 16)
+            aes_decrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
     # Reject wrong IV lengths.
     with pytest.raises(ValueError):
-        aes_encrypt(b'x', b'\x00' * 32, b'\x00' * 15)
+        aes_encrypt(b"x", b"\x00" * 32, b"\x00" * 15)
     with pytest.raises(ValueError):
-        aes_decrypt(b'x', b'\x00' * 32, b'\x00' * 17)
+        aes_decrypt(b"x", b"\x00" * 32, b"\x00" * 17)
 
 
 def test_random_iv_returns_fresh_16_byte_values() -> None:
@@ -202,7 +202,7 @@ def test_random_iv_returns_fresh_16_byte_values() -> None:
 
 def test_build_plaintext_frame_smali_layout() -> None:
     """Verify the exact frame string against the smali format string.
-    
+
     The string must match ``"DFED" + "0001" + 4×hex16(idx,cnt,actionId,bleCmd)
     + "0001" + hex16(len) + chunk_hex`` exactly, byte by byte.
     """
@@ -215,22 +215,22 @@ def test_build_plaintext_frame_smali_layout() -> None:
     )
     text = build_plaintext_frame(frame)
     expected = (
-        'DFED'  # magic
-        '0001'  # version
-        '0001'  # frame_index
-        '0001'  # chunk_count
-        '0BEE'  # action_id 3046
-        '0071'  # ble_cmd 113
-        '0001'  # payload marker
-        '000C'  # chunk_len 12 bytes
-        '7B22656E61626C65223A317D'  # '{"enable":1}' hex
+        "DFED"  # magic
+        "0001"  # version
+        "0001"  # frame_index
+        "0001"  # chunk_count
+        "0BEE"  # action_id 3046
+        "0071"  # ble_cmd 113
+        "0001"  # payload marker
+        "000C"  # chunk_len 12 bytes
+        "7B22656E61626C65223A317D"  # '{"enable":1}' hex
     )
     assert text == expected
 
 
 def test_parse_plaintext_frame_inverts_builder() -> None:
     """Builder + parser round-trips frame metadata + payload bytes."""
-    for chunk in (b'', b'x', b'hello', bytes(range(64))):
+    for chunk in (b"", b"x", b"hello", bytes(range(64))):
         frame = BleFrame(
             frame_index=3,
             chunk_count=7,
@@ -250,14 +250,14 @@ def test_parse_plaintext_frame_rejects_bad_magic_or_marker() -> None:
             chunk_count=1,
             action_id=1,
             ble_cmd=107,
-            chunk_payload=b'',
+            chunk_payload=b"",
         )
     )
     with pytest.raises(ValueError):
-        parse_plaintext_frame('BEEF' + valid[4:])
+        parse_plaintext_frame("BEEF" + valid[4:])
     with pytest.raises(ValueError):
         # Corrupt the payload marker (position after header fields).
-        broken = valid[:24] + 'BEEF' + valid[28:]
+        broken = valid[:24] + "BEEF" + valid[28:]
         parse_plaintext_frame(broken)
 
 
@@ -269,7 +269,7 @@ def test_parse_plaintext_frame_detects_truncation() -> None:
             chunk_count=1,
             action_id=1,
             ble_cmd=107,
-            chunk_payload=b'deadbeef',
+            chunk_payload=b"deadbeef",
         )
     )
     with pytest.raises(ValueError):
@@ -283,7 +283,7 @@ def test_parse_plaintext_frame_detects_truncation() -> None:
 
 def test_encrypt_decrypt_round_trip_recovers_frame_aes256() -> None:
     """``encrypt_frame`` + ``decrypt_frame`` recovers the original BleFrame."""
-    key = bytes.fromhex('00112233445566778899AABBCCDDEEFF' * 2)
+    key = bytes.fromhex("00112233445566778899AABBCCDDEEFF" * 2)
     frame = BleFrame(
         frame_index=1,
         chunk_count=1,
@@ -304,13 +304,13 @@ def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
     """End-to-end frame round-trip with the captured 16-byte device key."""
     import base64
 
-    key = base64.b64decode('aHIyYzBoaDM2MTMzNjEzOA==')
+    key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
     frame = BleFrame(
         frame_index=1,
         chunk_count=1,
         action_id=3019,  # READ_SYSTEM_INFO
         ble_cmd=120,
-        chunk_payload=b'{}',
+        chunk_payload=b"{}",
     )
     blob = encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN), random16=0xABCD)
     parsed = decrypt_frame(blob, key)
@@ -325,7 +325,7 @@ def test_encrypt_frame_uses_random_iv_when_omitted() -> None:
         chunk_count=1,
         action_id=3019,
         ble_cmd=120,
-        chunk_payload=b'{}',
+        chunk_payload=b"{}",
     )
     blob1 = encrypt_frame(frame, key)
     blob2 = encrypt_frame(frame, key)
@@ -340,7 +340,7 @@ def test_decrypt_rejects_crc_tampering() -> None:
         chunk_count=1,
         action_id=3019,
         ble_cmd=120,
-        chunk_payload=b'{}',
+        chunk_payload=b"{}",
     )
     blob = bytearray(encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN)))
     blob[-1] ^= 0x01
@@ -381,7 +381,7 @@ def test_split_payload_emits_correct_number_of_frames() -> None:
     assert frames[0].frame_index == 1
     assert frames[0].chunk_count == 3
     assert frames[-1].frame_index == 3
-    assert b''.join(f.chunk_payload for f in frames) == payload
+    assert b"".join(f.chunk_payload for f in frames) == payload
     # All but the last chunk are at the MTU-derived max length.
     for f in frames[:-1]:
         assert len(f.chunk_payload) == chunk_size_for_mtu(247)
@@ -390,10 +390,10 @@ def test_split_payload_emits_correct_number_of_frames() -> None:
 
 def test_split_payload_handles_empty_payload() -> None:
     """An empty payload still produces one frame so query messages round-trip."""
-    frames = split_payload_into_frames(b'', action_id=3046, ble_cmd=113, mtu=247)
+    frames = split_payload_into_frames(b"", action_id=3046, ble_cmd=113, mtu=247)
     assert len(frames) == 1
     assert frames[0].chunk_count == 1
-    assert frames[0].chunk_payload == b''
+    assert frames[0].chunk_payload == b""
 
 
 # ---------------------------------------------------------------------------
@@ -401,45 +401,45 @@ def test_split_payload_handles_empty_payload() -> None:
 # ---------------------------------------------------------------------------
 
 
-_LIVE_KEY_B64 = 'aHIyYzBoaDM2MTMzNjEzOA=='  # 16-byte AES-128 key from device
+_LIVE_KEY_B64 = "aHIyYzBoaDM2MTMzNjEzOA=="  # 16-byte AES-128 key from device
 
 _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     # (raw_hex, expected_cmd, expected_body_len, first_body_byte_marker)
     # Captured 2026-05-16 from SolarVault 3 Pro Max via ESPHome BLE proxy.
     (
-        '32373731383339313431373738393000'
-        'e85350bc2bc69eb244252c5745eb0a619f341bfa5a92b34c3be3786db38a4ebf'
-        '2d578615198d49eea423bf07199c66b9118a57c33b027a71be688bd64d36917e'
-        'f39233a369ccd53a9eccbdf712a901961f8fd9b555f08dc75320909403a7c442'
-        'd63745bc549382cabc227ef031ed865645aeda679dbfc027bf1ac1c2dff827b3'
-        '3c9236e7baf89ccf97c910defa78e356d409dad3c9b5d3c1fdaaed8286334869'
-        'ed300b6b056b37b1866b1fea8196d65ce839a5f46f3c42d40f17e233ea7dfbdf'
-        '97b8efca02b6722050998354402ee58c70afcfdc33ee29b220b251828d46a4ab'
-        'f7b862ec34ef1473d2ba21c34564cb241470a85f3eef7a9f409c327fd8ac0e13'
-        '8f17f38446261f24974099a3e72dbe775395b21baede73017a3db60f519ac5a3'
-        'd41ab2aba9b013e754ed4a0d0a666442',
+        "32373731383339313431373738393000"
+        "e85350bc2bc69eb244252c5745eb0a619f341bfa5a92b34c3be3786db38a4ebf"
+        "2d578615198d49eea423bf07199c66b9118a57c33b027a71be688bd64d36917e"
+        "f39233a369ccd53a9eccbdf712a901961f8fd9b555f08dc75320909403a7c442"
+        "d63745bc549382cabc227ef031ed865645aeda679dbfc027bf1ac1c2dff827b3"
+        "3c9236e7baf89ccf97c910defa78e356d409dad3c9b5d3c1fdaaed8286334869"
+        "ed300b6b056b37b1866b1fea8196d65ce839a5f46f3c42d40f17e233ea7dfbdf"
+        "97b8efca02b6722050998354402ee58c70afcfdc33ee29b220b251828d46a4ab"
+        "f7b862ec34ef1473d2ba21c34564cb241470a85f3eef7a9f409c327fd8ac0e13"
+        "8f17f38446261f24974099a3e72dbe775395b21baede73017a3db60f519ac5a3"
+        "d41ab2aba9b013e754ed4a0d0a666442",
         107,  # DevicePropertyChange
         272,
-        '{',
+        "{",
     ),
     (
-        '3134373339363034343131373738390030b643e9f3747cb075dabffa3115ecb0'
-        '261ed615b0a5e0ec7c767ebca1b0b127a744947c40497e2d5f2e1e579d206147'
-        '320499d1e235be30e08251195d8a7d6167dbb5edc976f237ec80d1137ab31f25'
-        'd56acc46040630775e163c84f9b1cf1ae92ebad5f7fc2c68be73daca864a1c6c'
-        '6240f285a4b5782cba46870dcafb5f52c581dcc868b5541ddd221516b9363ae7',
+        "3134373339363034343131373738390030b643e9f3747cb075dabffa3115ecb0"
+        "261ed615b0a5e0ec7c767ebca1b0b127a744947c40497e2d5f2e1e579d206147"
+        "320499d1e235be30e08251195d8a7d6167dbb5edc976f237ec80d1137ab31f25"
+        "d56acc46040630775e163c84f9b1cf1ae92ebad5f7fc2c68be73daca864a1c6c"
+        "6240f285a4b5782cba46870dcafb5f52c581dcc868b5541ddd221516b9363ae7",
         111,  # ControlSubDevice (sub-device incremental property)
         118,
-        '{',
+        "{",
     ),
     (
-        '393936333539323634313737383930006852f3235ffc0dbd0586c39e2237a31a'
-        'c8d0d400d3286e94dca1adeb3de5db4c5f8d251fcfc16549af868bdd29e12c17'
-        'd682bd1c2e0eb6ea0fdd508c18d2c41880a737b5e554ad218db53182ec08ed59'
-        'd0e245afc3cffd959eb463a07a658fc25e83c7e0f45c444345b7d05be3bee98a',
+        "393936333539323634313737383930006852f3235ffc0dbd0586c39e2237a31a"
+        "c8d0d400d3286e94dca1adeb3de5db4c5f8d251fcfc16549af868bdd29e12c17"
+        "d682bd1c2e0eb6ea0fdd508c18d2c41880a737b5e554ad218db53182ec08ed59"
+        "d0e245afc3cffd959eb463a07a658fc25e83c7e0f45c444345b7d05be3bee98a",
         111,
         78,
-        '{',
+        "{",
     ),
 )
 
@@ -447,8 +447,8 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
 def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     """The live binary decoder reproduces real device JSON bodies.
     Pinned inputs are wire-bytes captured 2026-05-16 from a SolarVault 3
-    Pro Max via the ESPHome BLE proxy. 
-    
+    Pro Max via the ESPHome BLE proxy.
+
     Decoding them recovers the JSON telemetry that the integration would otherwise have to wait for from
     the cloud.
     """
@@ -466,13 +466,13 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
         assert frame.frame_index == 1
         assert frame.chunk_count == 1
         assert len(frame.body) == expected_body_len
-        body_text = frame.body.decode('utf-8')
+        body_text = frame.body.decode("utf-8")
         assert body_text.startswith(body_marker)
         # The bodies are always JSON dicts that include the ``cmd`` field
         # mirroring the binary header — the integration's sink strips it.
         payload = _json.loads(body_text)
         assert isinstance(payload, dict)
-        assert payload.get('cmd') == expected_cmd
+        assert payload.get("cmd") == expected_cmd
         # Trailer is always 4 bytes — assumed CRC; opaque for now.
         assert len(frame.trailer) == 4
 
@@ -485,12 +485,12 @@ def test_decrypt_binary_notify_rejects_short_frame() -> None:
 
     key = base64.b64decode(_LIVE_KEY_B64)
     with pytest.raises(ValueError):
-        decrypt_binary_notify(b'too short', key)
+        decrypt_binary_notify(b"too short", key)
 
 
 def test_build_then_decrypt_binary_frame_round_trips() -> None:
     """Encode a frame, encrypt it, then run the live decoder to recover it.
-    
+
     Pins the symmetry between :func:`build_binary_frame` /
     :func:`encrypt_binary_notify` and the read-path
     :func:`decrypt_binary_notify`. The trailer is opaque (see
@@ -514,12 +514,12 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     assert parsed.frame_index == 1
     assert parsed.chunk_count == 1
     assert parsed.body == body
-    assert parsed.trailer == b'\x00\x00\x00\x00'
+    assert parsed.trailer == b"\x00\x00\x00\x00"
 
 
 def test_listener_async_send_command_returns_false_without_client() -> None:
     """``async_send_command`` falls back to ``False`` when no GATT session exists.
-    
+
     This is the contract callers (coordinator setter routing) rely on to
     decide whether to fall back to the cloud-MQTT pipeline when the BLE
     proxy hasn't (re-)connected yet.
@@ -538,9 +538,9 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
         listener._stop_event = asyncio.Event()
         listener._clients = {}  # no active client
         listener._mtu = {}
-        listener._key_resolver = lambda _device_id: b'x' * 16
+        listener._key_resolver = lambda _device_id: b"x" * 16
         sent = await listener.async_send_command(
-            '573702884982521856',
+            "573702884982521856",
             cmd=107,
             body=b'{"swEps":1}',
         )
@@ -551,7 +551,7 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
 
 def test_listener_async_send_command_writes_through_fake_client() -> None:
     """The writer path encrypts the right body and writes to char 0xEE01.
-    
+
     Drives ``async_send_command`` against an in-memory client double that
     captures the ``write_gatt_char`` invocation, then decrypts the captured
     blob with the same key to confirm it round-trips through the live
@@ -584,13 +584,13 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
                 Stores the provided values into the surrounding `captured` dict under keys
                 `"uuid"`, `"blob"`, and `"response"`.
             """
-            captured['uuid'] = uuid
-            captured['blob'] = bytes(blob)
-            captured['response'] = response
+            captured["uuid"] = uuid
+            captured["blob"] = bytes(blob)
+            captured["response"] = response
 
     async def _run() -> None:
         """Set up a minimal JackeryBleListener with a fake client, send a BLE command, and assert the resulting GATT write and decryption match expectations.
-        
+
         This coroutine constructs a listener with a single fake client and a fixed AES key, calls its async_send_command with cmd 107, flags 42, and a JSON byte body, then verifies:
         - the write used the BLE write characteristic UUID and requested no response,
         - the written blob decrypts to a binary frame with the same cmd, flags, and body.
@@ -598,19 +598,19 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = JackeryBleListener.__new__(JackeryBleListener)
         listener._stop_event = asyncio.Event()
-        listener._clients = {'573702884982521856': _FakeClient()}
+        listener._clients = {"573702884982521856": _FakeClient()}
         listener._mtu = {}
         listener._key_resolver = lambda _device_id: key
         ok = await listener.async_send_command(
-            '573702884982521856',
+            "573702884982521856",
             cmd=107,
             body=b'{"swEps":1}',
             flags=42,
         )
         assert ok is True
-        assert captured['uuid'] == BLE_WRITE_CHAR_UUID
-        assert captured['response'] is False
-        parsed = decrypt_binary_notify(captured['blob'], key)  # type: ignore[arg-type]
+        assert captured["uuid"] == BLE_WRITE_CHAR_UUID
+        assert captured["response"] is False
+        parsed = decrypt_binary_notify(captured["blob"], key)  # type: ignore[arg-type]
         assert parsed.cmd == 107
         assert parsed.flags == 42
         assert parsed.body == b'{"swEps":1}'
@@ -625,17 +625,17 @@ def test_build_binary_frame_rejects_oversized_fields() -> None:
     from custom_components.jackery_solarvault.client.ble import build_binary_frame
 
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=107, body=b'x', frame_index=0)
+        build_binary_frame(cmd=107, body=b"x", frame_index=0)
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=107, body=b'x', chunk_count=0x1_0000)
+        build_binary_frame(cmd=107, body=b"x", chunk_count=0x1_0000)
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=107, body=b'x', flags=-1)
+        build_binary_frame(cmd=107, body=b"x", flags=-1)
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=0x1_0000, body=b'x')
+        build_binary_frame(cmd=0x1_0000, body=b"x")
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=107, body=b'x' * 0x1_0001)
+        build_binary_frame(cmd=107, body=b"x" * 0x1_0001)
     with pytest.raises(ValueError):
-        build_binary_frame(cmd=107, body=b'x', trailer=b'\x00\x00\x00')
+        build_binary_frame(cmd=107, body=b"x", trailer=b"\x00\x00\x00")
 
 
 # ---------------------------------------------------------------------------
@@ -652,33 +652,33 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads(
-        (root / 'custom_components' / 'jackery_solarvault' / 'manifest.json').read_text(
-            encoding='utf-8'
+        (root / "custom_components" / "jackery_solarvault" / "manifest.json").read_text(
+            encoding="utf-8"
         )
     )
-    matchers = manifest.get('bluetooth', [])
+    matchers = manifest.get("bluetooth", [])
     assert any(
-        m.get('service_uuid', '').lower() == BLE_SERVICE_UUID for m in matchers
+        m.get("service_uuid", "").lower() == BLE_SERVICE_UUID for m in matchers
     ), matchers
-    assert any(m.get('manufacturer_id') == BLE_MANUFACTURER_ID for m in matchers), (
+    assert any(m.get("manufacturer_id") == BLE_MANUFACTURER_ID for m in matchers), (
         matchers
     )
-    assert 'bluetooth' in (manifest.get('after_dependencies') or [])
+    assert "bluetooth" in (manifest.get("after_dependencies") or [])
     assert any(
-        req.startswith('bleak-retry-connector')
-        for req in manifest.get('requirements', [])
-    ), manifest.get('requirements')
+        req.startswith("bleak-retry-connector")
+        for req in manifest.get("requirements", [])
+    ), manifest.get("requirements")
 
 
 def test_const_exposes_ble_option_and_field() -> None:
     """Config option + bluetoothKey field constants exist in const.py."""
     from custom_components.jackery_solarvault import const
 
-    assert const.CONF_ENABLE_BLE_TRANSPORT == 'enable_ble_transport'
+    assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
     assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
-    assert const.CONF_ENABLE_BLE_WRITES == 'enable_ble_writes'
+    assert const.CONF_ENABLE_BLE_WRITES == "enable_ble_writes"
     assert const.DEFAULT_ENABLE_BLE_WRITES is False
-    assert const.FIELD_BLUETOOTH_KEY == 'bluetoothKey'
+    assert const.FIELD_BLUETOOTH_KEY == "bluetoothKey"
 
 
 def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
@@ -688,10 +688,10 @@ def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
     )
 
     for attr in (
-        'device_bluetooth_key',
-        'async_start_ble_transport',
-        'async_send_ble_command',
-        'ble_observations',
+        "device_bluetooth_key",
+        "async_start_ble_transport",
+        "async_send_ble_command",
+        "ble_observations",
     ):
         assert hasattr(JackerySolarVaultCoordinator, attr), attr
 
@@ -702,20 +702,20 @@ def test_ble_write_option_is_options_only() -> None:
 
     root = Path(__file__).resolve().parents[1]
     source = (
-        root / 'custom_components' / 'jackery_solarvault' / 'config_flow.py'
-    ).read_text(encoding='utf-8')
+        root / "custom_components" / "jackery_solarvault" / "config_flow.py"
+    ).read_text(encoding="utf-8")
 
-    assert 'CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES' in source
-    user_schema = source.split('USER_SCHEMA = vol.Schema(', 1)[1].split('\n})', 1)[0]
-    assert 'CONF_ENABLE_BLE_WRITES' not in user_schema
-    options_block = source.split('class JackeryOptionsFlow', 1)[1].split(
-        'class JackeryConfigFlow', 1
+    assert "CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES" in source
+    user_schema = source.split("USER_SCHEMA = vol.Schema(", 1)[1].split("\n})", 1)[0]
+    assert "CONF_ENABLE_BLE_WRITES" not in user_schema
+    options_block = source.split("class JackeryOptionsFlow", 1)[1].split(
+        "class JackeryConfigFlow", 1
     )[0]
-    assert 'CONF_ENABLE_BLE_WRITES' in options_block
-    reconfigure_block = source.split('async def async_step_reconfigure', 1)[1].split(
-        'async def async_step_reauth', 1
+    assert "CONF_ENABLE_BLE_WRITES" in options_block
+    reconfigure_block = source.split("async def async_step_reconfigure", 1)[1].split(
+        "async def async_step_reauth", 1
     )[0]
-    assert 'CONF_ENABLE_BLE_WRITES' in reconfigure_block
+    assert "CONF_ENABLE_BLE_WRITES" in reconfigure_block
 
 
 def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
@@ -724,15 +724,15 @@ def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
 
     root = Path(__file__).resolve().parents[1]
     coordinator_source = (
-        root / 'custom_components' / 'jackery_solarvault' / 'coordinator.py'
-    ).read_text(encoding='utf-8')
-    ble_block = coordinator_source.split('async def async_start_ble_transport', 1)[
+        root / "custom_components" / "jackery_solarvault" / "coordinator.py"
+    ).read_text(encoding="utf-8")
+    ble_block = coordinator_source.split("async def async_start_ble_transport", 1)[
         1
-    ].split('def _ble_address_for_device', 1)[0]
+    ].split("def _ble_address_for_device", 1)[0]
 
-    assert 'self._config_entry' not in ble_block
+    assert "self._config_entry" not in ble_block
     assert (
-        'self.entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT'
+        "self.entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT"
         in ble_block
     )
 
@@ -742,9 +742,9 @@ def test_ble_transport_module_exports_listener() -> None:
     from custom_components.jackery_solarvault.client import ble_transport
 
     for symbol in (
-        'JackeryBleListener',
-        'BleFrameObservation',
-        'BleListenerStats',
+        "JackeryBleListener",
+        "BleFrameObservation",
+        "BleListenerStats",
     ):
         assert hasattr(ble_transport, symbol), symbol
 
@@ -781,14 +781,14 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
             await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)
 
         task = asyncio.create_task(_stuck())
-        listener._connections['dev'] = task
+        listener._connections["dev"] = task
         # Give the loop a tick so the task actually parks at the wait.
         await asyncio.sleep(0)
         loop = asyncio.get_running_loop()
         before = loop.time()
         await listener.async_stop()
         elapsed = loop.time() - before
-        assert task.done(), 'stuck runner task was not cancelled'
+        assert task.done(), "stuck runner task was not cancelled"
         # Must be far under the 5 s hard stop budget; in practice this
         # finishes in single-digit milliseconds.
         assert elapsed < 1.0, f"async_stop took {elapsed:.3f}s — too slow"
@@ -818,10 +818,11 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
     class _Listener:
         async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:
             """Stub method that fails immediately to indicate the BLE listener must not be invoked.
+
             Raises:
                 AssertionError: Always raised with the message "BLE listener must not be called".
             """
-            raise AssertionError('BLE listener must not be called')
+            raise AssertionError("BLE listener must not be called")
 
     async def _run() -> None:
         """Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
@@ -832,9 +833,9 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
             self,
-            'dev1',
+            "dev1",
             cmd=107,
-            body={'cmd': 107},
+            body={"cmd": 107},
         )
         assert sent is False
 
@@ -862,6 +863,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
         def all_stats(self) -> dict[str, object]:
             """Return a snapshot of listener statistics as a mapping of statistic names to values.
             The returned dictionary contains current monitoring fields (counters, timestamps, and optional diagnostic strings) keyed by their descriptive names; callers may read but should not assume mutability of internal state.
+
             Returns:
                 stats (dict[str, object]): A snapshot mapping statistic names to their current values.
             """
@@ -869,30 +871,31 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
         def mtu_for_device(self, device_id: str) -> int:
             """Get the negotiated MTU size for the specified device.
+
             Returns:
                 int: MTU size in bytes for the device.
             """
-            assert device_id == 'dev1'
+            assert device_id == "dev1"
             return 517
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.entry = _Entry()
-    coordinator._device_index = {'dev1': {}}
+    coordinator._device_index = {"dev1": {}}
     coordinator._ble_listener = None
 
-    idle = JackerySolarVaultCoordinator.ble_observations(coordinator)['dev1']
-    assert idle['enabled'] is True
-    assert idle['write_enabled'] is False
-    assert idle['running'] is False
-    assert idle['frames_decoded'] == 0
-    assert idle['mtu'] is None
+    idle = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
+    assert idle["enabled"] is True
+    assert idle["write_enabled"] is False
+    assert idle["running"] is False
+    assert idle["frames_decoded"] == 0
+    assert idle["mtu"] is None
 
     coordinator._ble_listener = _Listener()
-    running = JackerySolarVaultCoordinator.ble_observations(coordinator)['dev1']
-    assert running['enabled'] is True
-    assert running['running'] is True
-    assert running['frames_decoded'] == 0
-    assert running['mtu'] == 517
+    running = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
+    assert running["enabled"] is True
+    assert running["running"] is True
+    assert running["frames_decoded"] == 0
+    assert running["mtu"] == 517
 
 
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
@@ -939,17 +942,18 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
                 ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
                 mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
+
             Returns:
                 bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
             """
-            captured['device_id'] = device_id
-            captured['cmd'] = cmd
-            captured['body'] = body
-            captured['flags'] = flags
-            captured['wait_for_ack'] = wait_for_ack
-            captured['ack_timeout_sec'] = ack_timeout_sec
-            captured['ack_cmds'] = ack_cmds
-            captured['mtu_override'] = mtu_override
+            captured["device_id"] = device_id
+            captured["cmd"] = cmd
+            captured["body"] = body
+            captured["flags"] = flags
+            captured["wait_for_ack"] = wait_for_ack
+            captured["ack_timeout_sec"] = ack_timeout_sec
+            captured["ack_cmds"] = ack_cmds
+            captured["mtu_override"] = mtu_override
             return True
 
     async def _run() -> None:
@@ -961,21 +965,21 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
             self,
-            'dev1',
+            "dev1",
             cmd=107,
-            body={'cmd': 107, 'swEps': 1},
+            body={"cmd": 107, "swEps": 1},
             flags=42,
         )
         assert sent is True
         assert captured == {
-            'device_id': 'dev1',
-            'cmd': 107,
-            'body': b'{"cmd":107,"swEps":1}',
-            'flags': 42,
-            'wait_for_ack': False,
-            'ack_timeout_sec': 5.0,
-            'ack_cmds': None,
-            'mtu_override': None,
+            "device_id": "dev1",
+            "cmd": 107,
+            "body": b'{"cmd":107,"swEps":1}',
+            "flags": 42,
+            "wait_for_ack": False,
+            "ack_timeout_sec": 5.0,
+            "ack_cmds": None,
+            "mtu_override": None,
         }
 
     asyncio.run(_run())
@@ -1018,33 +1022,35 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement before timing out.
                 ack_cmds (tuple[int, ...] | None): Optional tuple of command ids that satisfy the acknowledgement.
                 mtu_override (int | None): Optional MTU value to force for this send; if None, use negotiated/default MTU.
+
             Returns:
                 bool: `True` if the command was sent (or acknowledged when requested), `False` otherwise.
             """
-            captured['device_id'] = device_id
-            captured['cmd'] = cmd
-            captured['body'] = body
-            captured['flags'] = flags
-            captured['wait_for_ack'] = wait_for_ack
-            captured['ack_timeout_sec'] = ack_timeout_sec
-            captured['ack_cmds'] = ack_cmds
-            captured['mtu_override'] = mtu_override
+            captured["device_id"] = device_id
+            captured["cmd"] = cmd
+            captured["body"] = body
+            captured["flags"] = flags
+            captured["wait_for_ack"] = wait_for_ack
+            captured["ack_timeout_sec"] = ack_timeout_sec
+            captured["ack_cmds"] = ack_cmds
+            captured["mtu_override"] = mtu_override
             return True
 
         async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:
             """Sentinel coroutine that fails immediately if the MQTT fallback path is invoked.
             This async function is intended for tests and will raise an AssertionError to indicate that MQTT publishing was not expected to be called in the current execution path.
+
             Raises:
                 AssertionError: Always raised with the message "MQTT fallback must not be called".
             """
-            raise AssertionError('MQTT fallback must not be called')
+            raise AssertionError("MQTT fallback must not be called")
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
         await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
-            'dev1',
-            message_type='DevicePropertyChange',
+            "dev1",
+            message_type="DevicePropertyChange",
             action_id=3022,
             cmd=107,
             body_fields={FIELD_SW_EPS: 1},
@@ -1052,14 +1058,14 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
         # Router now always asks for an ACK so a silent firmware drop
         # falls back to MQTT instead of being swallowed.
         assert captured == {
-            'device_id': 'dev1',
-            'cmd': 107,
-            'body': {FIELD_SW_EPS: 1, 'cmd': 107},
-            'flags': 0,
-            'wait_for_ack': True,
-            'ack_timeout_sec': 5.0,
-            'ack_cmds': None,
-            'mtu_override': None,
+            "device_id": "dev1",
+            "cmd": 107,
+            "body": {FIELD_SW_EPS: 1, "cmd": 107},
+            "flags": 0,
+            "wait_for_ack": True,
+            "ack_timeout_sec": 5.0,
+            "ack_cmds": None,
+            "mtu_override": None,
         }
 
     asyncio.run(_run())
@@ -1103,31 +1109,31 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
             """
-            captured['device_id'] = device_id
-            captured['message_type'] = message_type
-            captured['action_id'] = action_id
-            captured['cmd'] = cmd
-            captured['body_fields'] = body_fields
-            captured['ensure_mqtt'] = ensure_mqtt
+            captured["device_id"] = device_id
+            captured["message_type"] = message_type
+            captured["action_id"] = action_id
+            captured["cmd"] = cmd
+            captured["body_fields"] = body_fields
+            captured["ensure_mqtt"] = ensure_mqtt
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
         await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
-            'dev1',
-            message_type='DevicePropertyChange',
+            "dev1",
+            message_type="DevicePropertyChange",
             action_id=3022,
             cmd=107,
             body_fields={FIELD_SW_EPS: 1},
             ensure_mqtt=False,
         )
         assert captured == {
-            'device_id': 'dev1',
-            'message_type': 'DevicePropertyChange',
-            'action_id': 3022,
-            'cmd': 107,
-            'body_fields': {FIELD_SW_EPS: 1},
-            'ensure_mqtt': False,
+            "device_id": "dev1",
+            "message_type": "DevicePropertyChange",
+            "action_id": 3022,
+            "cmd": 107,
+            "body_fields": {FIELD_SW_EPS: 1},
+            "ensure_mqtt": False,
         }
 
     asyncio.run(_run())
@@ -1155,12 +1161,14 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Send a BLE command and wait for its acknowledgement (ACK).
+
             Returns:
                 True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
+
             Raises:
                 RuntimeError: If waiting for the ACK times out.
             """
-            raise RuntimeError('BLE ack timeout')
+            raise RuntimeError("BLE ack timeout")
 
         async def _publish_mqtt(
             device_id: str,
@@ -1180,19 +1188,19 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
             """
-            captured['device_id'] = device_id
-            captured['message_type'] = message_type
-            captured['action_id'] = action_id
-            captured['cmd'] = cmd
-            captured['body_fields'] = body_fields
-            captured['ensure_mqtt'] = ensure_mqtt
+            captured["device_id"] = device_id
+            captured["message_type"] = message_type
+            captured["action_id"] = action_id
+            captured["cmd"] = cmd
+            captured["body_fields"] = body_fields
+            captured["ensure_mqtt"] = ensure_mqtt
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
         await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
-            'dev1',
-            message_type='DevicePropertyChange',
+            "dev1",
+            message_type="DevicePropertyChange",
             action_id=3022,
             cmd=107,
             body_fields={FIELD_SW_EPS: 1},
@@ -1200,13 +1208,13 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
 
     with caplog.at_level(
         logging.WARNING,
-        logger='custom_components.jackery_solarvault.coordinator',
+        logger="custom_components.jackery_solarvault.coordinator",
     ):
         asyncio.run(_run())
 
-    assert captured['device_id'] == 'dev1'
-    assert captured['body_fields'] == {FIELD_SW_EPS: 1}
-    assert 'falling back to MQTT' not in caplog.text
+    assert captured["device_id"] == "dev1"
+    assert captured["body_fields"] == {FIELD_SW_EPS: 1}
+    assert "falling back to MQTT" not in caplog.text
 
 
 def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
@@ -1229,12 +1237,14 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Send a BLE command and wait for its acknowledgement (ACK).
+
             Returns:
                 True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
+
             Raises:
                 RuntimeError: If waiting for the ACK times out.
             """
-            raise RuntimeError('BLE ack timeout')
+            raise RuntimeError("BLE ack timeout")
 
         async def _publish_mqtt(
             device_id: str,
@@ -1253,17 +1263,18 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
                 cmd (int): Command identifier included in the published payload.
                 body_fields (dict[str, object]): Mapping of additional fields to include in the message body.
                 ensure_mqtt (bool): If True, require MQTT delivery (may trigger fallback or raise on failure).
+
             Raises:
                 RuntimeError: If the MQTT publish operation times out (message: "MQTT publish timeout").
             """
-            raise RuntimeError('MQTT publish timeout')
+            raise RuntimeError("MQTT publish timeout")
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
         await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
-            'dev1',
-            message_type='DevicePropertyChange',
+            "dev1",
+            message_type="DevicePropertyChange",
             action_id=3022,
             cmd=107,
             body_fields={FIELD_SW_EPS: 1},
@@ -1272,15 +1283,15 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
     with (
         caplog.at_level(
             logging.DEBUG,
-            logger='custom_components.jackery_solarvault.coordinator',
+            logger="custom_components.jackery_solarvault.coordinator",
         ),
-        pytest.raises(RuntimeError, match='MQTT publish timeout'),
+        pytest.raises(RuntimeError, match="MQTT publish timeout"),
     ):
         asyncio.run(_run())
 
-    assert 'MQTT fallback also failed' in caplog.text
-    assert 'BLE=BLE ack timeout' in caplog.text
-    assert 'MQTT=MQTT publish timeout' in caplog.text
+    assert "MQTT fallback also failed" in caplog.text
+    assert "BLE=BLE ack timeout" in caplog.text
+    assert "MQTT=MQTT publish timeout" in caplog.text
 
 
 def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
@@ -1298,10 +1309,11 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:
             """Guard that prevents attempting BLE sends for command 0.
+
             Raises:
                 AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
             """
-            raise AssertionError('cmd=0 must not attempt BLE')
+            raise AssertionError("cmd=0 must not attempt BLE")
 
         async def _publish_mqtt(
             device_id: str,
@@ -1321,30 +1333,30 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
             """
-            captured['device_id'] = device_id
-            captured['message_type'] = message_type
-            captured['action_id'] = action_id
-            captured['cmd'] = cmd
-            captured['body_fields'] = body_fields
-            captured['ensure_mqtt'] = ensure_mqtt
+            captured["device_id"] = device_id
+            captured["message_type"] = message_type
+            captured["action_id"] = action_id
+            captured["cmd"] = cmd
+            captured["body_fields"] = body_fields
+            captured["ensure_mqtt"] = ensure_mqtt
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
         await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
-            'dev1',
-            message_type='SendWeatherAlert',
+            "dev1",
+            message_type="SendWeatherAlert",
             action_id=3040,
             cmd=0,
-            body_fields={'wpc': 30},
+            body_fields={"wpc": 30},
         )
         assert captured == {
-            'device_id': 'dev1',
-            'message_type': 'SendWeatherAlert',
-            'action_id': 3040,
-            'cmd': 0,
-            'body_fields': {'wpc': 30},
-            'ensure_mqtt': True,
+            "device_id": "dev1",
+            "message_type": "SendWeatherAlert",
+            "action_id": 3040,
+            "cmd": 0,
+            "body_fields": {"wpc": 30},
+            "ensure_mqtt": True,
         }
 
     asyncio.run(_run())
@@ -1358,16 +1370,16 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
     )
 
     assert JackerySolarVaultCoordinator._command_body_for_transport(
-        {'swEps': 1},
-        cmd='107.0',  # type: ignore[arg-type]
-    ) == {'swEps': 1, FIELD_CMD: 107}
+        {"swEps": 1},
+        cmd="107.0",  # type: ignore[arg-type]
+    ) == {"swEps": 1, FIELD_CMD: 107}
     assert JackerySolarVaultCoordinator._command_body_for_transport(
-        {'wpc': 30},
+        {"wpc": 30},
         cmd=0,
-    ) == {'wpc': 30}
+    ) == {"wpc": 30}
 
-    for bad_cmd in (True, float('nan'), '107.5'):
-        with pytest.raises(ValueError, match='cmd must be an integer'):
+    for bad_cmd in (True, float("nan"), "107.5"):
+        with pytest.raises(ValueError, match="cmd must be an integer"):
             JackerySolarVaultCoordinator._command_body_for_transport(
                 {},
                 cmd=bad_cmd,  # type: ignore[arg-type]
@@ -1380,15 +1392,15 @@ def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
 
     from custom_components.jackery_solarvault import services
 
-    assert services._ble_body_from_service({'cmd': 107}, 'dev1') == {'cmd': 107}
-    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', 'dev1') == {
-        'cmd': 107,
-        'swEps': 1,
+    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}
+    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {
+        "cmd": 107,
+        "swEps": 1,
     }
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service('[1,2,3]', 'dev1')
+        services._ble_body_from_service("[1,2,3]", "dev1")
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service('{bad json', 'dev1')
+        services._ble_body_from_service("{bad json", "dev1")
 
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
@@ -1413,19 +1425,19 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
     self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     self.data = None
     self._device_index = {
-        '573702884982521856': {
+        "573702884982521856": {
             PAYLOAD_DEVICE_META: {
                 # Key is null at device level — matches the live HTTP shape.
                 FIELD_BLUETOOTH_KEY: None,
             },
             PAYLOAD_SYSTEM_META: {
                 # System-level key — base64-decoded "hr2c0hh361336138".
-                FIELD_BLUETOOTH_KEY: 'aHIyYzBoaDM2MTMzNjEzOA==',
+                FIELD_BLUETOOTH_KEY: "aHIyYzBoaDM2MTMzNjEzOA==",
             },
         }
     }
-    key = JackerySolarVaultCoordinator.device_bluetooth_key(self, '573702884982521856')
-    assert key == b'hr2c0hh361336138'
+    key = JackerySolarVaultCoordinator.device_bluetooth_key(self, "573702884982521856")
+    assert key == b"hr2c0hh361336138"
 
 
 def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
@@ -1448,15 +1460,15 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
     self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     self.data = None
     # Two distinct valid keys so we can tell which one came back.
-    device_key = base64.b64encode(b'D' * 16).decode('ascii')
-    system_key = base64.b64encode(b'S' * 16).decode('ascii')
+    device_key = base64.b64encode(b"D" * 16).decode("ascii")
+    system_key = base64.b64encode(b"S" * 16).decode("ascii")
     self._device_index = {
-        'dev1': {
+        "dev1": {
             PAYLOAD_DEVICE_META: {FIELD_BLUETOOTH_KEY: device_key},
             PAYLOAD_SYSTEM_META: {FIELD_BLUETOOTH_KEY: system_key},
         }
     }
-    assert JackerySolarVaultCoordinator.device_bluetooth_key(self, 'dev1') == b'D' * 16
+    assert JackerySolarVaultCoordinator.device_bluetooth_key(self, "dev1") == b"D" * 16
 
 
 def test_serial_resolver_strips_http_prefix_letter() -> None:
@@ -1479,23 +1491,23 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
     # that the static-test harness can't load on Windows.
     self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     self._device_index = {
-        '573702884982521856': {
-            PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: 'HR2C04000280HH3'},
+        "573702884982521856": {
+            PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "HR2C04000280HH3"},
         }
     }
 
     assert (
-        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, 'R2C04000280HH3')
-        == '573702884982521856'
+        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "R2C04000280HH3")
+        == "573702884982521856"
     )
     # Exact match also works (future firmware may align them).
     assert (
-        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, 'HR2C04000280HH3')
-        == '573702884982521856'
+        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "HR2C04000280HH3")
+        == "573702884982521856"
     )
     # Unknown serial returns None so the listener can fall through quietly.
     assert (
-        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, 'DOESNOTEXIST')
+        JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "DOESNOTEXIST")
         is None
     )
 
@@ -1556,8 +1568,8 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
                 blob (bytes): Data that would be written to the characteristic; a copy is stored.
                 response (bool): Whether the write requests a response; stored as provided.
             """
-            captured['blob'] = bytes(blob)
-            captured['response'] = response
+            captured["blob"] = bytes(blob)
+            captured["response"] = response
 
     async def _run() -> None:
         """Exercise the listener ACK path by sending a command, simulating an echoed notify, and asserting the ACK is received and listener stats are updated.
@@ -1566,7 +1578,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
         async def _drive_ack() -> None:
@@ -1580,10 +1592,10 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
             await asyncio.sleep(0)
             echo_plain = build_binary_frame(cmd=107, body=b'{"cmd":107,"swEps":1}')
             echo_blob = encrypt_binary_notify(echo_plain, key)
-            await listener._handle_notification('dev', echo_blob)
+            await listener._handle_notification("dev", echo_blob)
 
         sender = listener.async_send_command(
-            'dev',
+            "dev",
             cmd=107,
             body=b'{"swEps":1}',
             wait_for_ack=True,
@@ -1591,7 +1603,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         )
         sent, _ = await asyncio.gather(sender, _drive_ack())
         assert sent is True
-        stats = listener.stats_for('dev')
+        stats = listener.stats_for("dev")
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         assert stats.last_ack_at is not None
@@ -1624,18 +1636,18 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
-        with pytest.raises(RuntimeError, match='ack timeout'):
+        with pytest.raises(RuntimeError, match="ack timeout"):
             await listener.async_send_command(
-                'dev',
+                "dev",
                 cmd=107,
                 body=b'{"swEps":1}',
                 wait_for_ack=True,
                 ack_timeout_sec=0.05,
             )
-        stats = listener.stats_for('dev')
+        stats = listener.stats_for("dev")
         assert stats.acks_received == 0
         assert stats.acks_timed_out == 1
         # Pending bucket is cleaned up so a later notify doesn't fire
@@ -1667,7 +1679,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
         async def _drive_wrong_cmd_then_right_cmd() -> None:
@@ -1675,20 +1687,20 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
             # First a frame the caller doesn't want — must NOT complete
             # the pending ack.
             mismatched = encrypt_binary_notify(
-                build_binary_frame(cmd=42, body=b'unrelated'), key
+                build_binary_frame(cmd=42, body=b"unrelated"), key
             )
-            await listener._handle_notification('dev', mismatched)
-            assert listener._pending_acks.get('dev'), (
-                'mismatched cmd must leave the pending ack registered'
+            await listener._handle_notification("dev", mismatched)
+            assert listener._pending_acks.get("dev"), (
+                "mismatched cmd must leave the pending ack registered"
             )
             # Then the expected echo — this fulfils the future.
             matching = encrypt_binary_notify(
                 build_binary_frame(cmd=111, body=b'{"ok":1}'), key
             )
-            await listener._handle_notification('dev', matching)
+            await listener._handle_notification("dev", matching)
 
         sender = listener.async_send_command(
-            'dev',
+            "dev",
             cmd=107,
             body=b'{"swEps":1}',
             wait_for_ack=True,
@@ -1697,7 +1709,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         )
         sent, _ = await asyncio.gather(sender, _drive_wrong_cmd_then_right_cmd())
         assert sent is True
-        stats = listener.stats_for('dev')
+        stats = listener.stats_for("dev")
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
 
@@ -1711,8 +1723,8 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
     async def _run() -> None:
         listener = _build_bare_listener()
 
-        with pytest.raises(ValueError, match='ack_cmds must be an integer'):
-            listener._register_pending_ack('dev', (True,))  # type: ignore[attr-defined]
+        with pytest.raises(ValueError, match="ack_cmds must be an integer"):
+            listener._register_pending_ack("dev", (True,))  # type: ignore[attr-defined]
 
         assert listener._pending_acks == {}  # type: ignore[attr-defined]
 
@@ -1730,8 +1742,8 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
-        ack_a = listener._register_pending_ack('dev1', None)  # type: ignore[attr-defined]
-        ack_b = listener._register_pending_ack('dev2', (107,))  # type: ignore[attr-defined]
+        ack_a = listener._register_pending_ack("dev1", None)  # type: ignore[attr-defined]
+        ack_b = listener._register_pending_ack("dev2", (107,))  # type: ignore[attr-defined]
 
         await listener.async_stop()
 
@@ -1761,7 +1773,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             Raises:
                 RuntimeError: Always raised with message "simulated GATT failure".
             """
-            raise RuntimeError('simulated GATT failure')
+            raise RuntimeError("simulated GATT failure")
 
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
@@ -1769,12 +1781,12 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _ExplodingClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _ExplodingClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
-        with pytest.raises(RuntimeError, match='simulated GATT failure'):
+        with pytest.raises(RuntimeError, match="simulated GATT failure"):
             await listener.async_send_command(
-                'dev',
+                "dev",
                 cmd=107,
                 body=b'{"swEps":1}',
                 wait_for_ack=True,
@@ -1831,17 +1843,18 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
                 ack_timeout_sec (float): Seconds to wait for an acknowledgement when `wait_for_ack` is True.
                 ack_cmds (tuple[int, ...] | None): Tuple of command IDs that are accepted as an acknowledgement; if None, no specific cmd filter is applied.
                 mtu_override (int | None): If provided, use this MTU value to compute chunking instead of the negotiated MTU.
+
             Returns:
                 bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
             """
-            captured['device_id'] = device_id
-            captured['cmd'] = cmd
-            captured['body'] = body
-            captured['flags'] = flags
-            captured['wait_for_ack'] = wait_for_ack
-            captured['ack_timeout_sec'] = ack_timeout_sec
-            captured['ack_cmds'] = ack_cmds
-            captured['mtu_override'] = mtu_override
+            captured["device_id"] = device_id
+            captured["cmd"] = cmd
+            captured["body"] = body
+            captured["flags"] = flags
+            captured["wait_for_ack"] = wait_for_ack
+            captured["ack_timeout_sec"] = ack_timeout_sec
+            captured["ack_cmds"] = ack_cmds
+            captured["mtu_override"] = mtu_override
             return True
 
     async def _run() -> None:
@@ -1850,9 +1863,9 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
             self,
-            'dev1',
+            "dev1",
             cmd=107,
-            body={'cmd': 107, 'swEps': 1},
+            body={"cmd": 107, "swEps": 1},
             flags=0,
             wait_for_ack=True,
             ack_timeout_sec=3.5,
@@ -1860,10 +1873,10 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             mtu_override=120,
         )
         assert sent is True
-        assert captured['wait_for_ack'] is True
-        assert captured['ack_timeout_sec'] == 3.5
-        assert captured['ack_cmds'] == (107, 111)
-        assert captured['mtu_override'] == 120
+        assert captured["wait_for_ack"] is True
+        assert captured["ack_timeout_sec"] == 3.5
+        assert captured["ack_cmds"] == (107, 111)
+        assert captured["mtu_override"] == 120
 
     asyncio.run(_run())
 
@@ -1883,31 +1896,31 @@ def test_split_body_for_mtu_matches_smali_budget() -> None:
 
     # Default MTU (247) → 187 bytes per chunk, matching the Android app.
     assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187
-    body = b'a' * 400
+    body = b"a" * 400
     chunks = split_body_for_mtu(body, DEFAULT_BLE_MTU)
     assert [len(c) for c in chunks] == [187, 187, 26]
-    assert b''.join(chunks) == body
+    assert b"".join(chunks) == body
 
     # Empty body still emits one envelope so the writer can ship a header
     # for cmd=0 queries.
-    assert split_body_for_mtu(b'', DEFAULT_BLE_MTU) == [b'']
+    assert split_body_for_mtu(b"", DEFAULT_BLE_MTU) == [b""]
 
     # Tiny MTU honours the same formula (70 - 60 = 10 bytes/chunk).
-    assert split_body_for_mtu(b'abcdefghij', 70) == [b'abcdefghij']
-    assert split_body_for_mtu(b'abcdefghij' * 3, 70) == [
-        b'abcdefghij',
-        b'abcdefghij',
-        b'abcdefghij',
+    assert split_body_for_mtu(b"abcdefghij", 70) == [b"abcdefghij"]
+    assert split_body_for_mtu(b"abcdefghij" * 3, 70) == [
+        b"abcdefghij",
+        b"abcdefghij",
+        b"abcdefghij",
     ]
-    assert split_body_for_mtu(b'x' * 25, 70) == [b'x' * 10, b'x' * 10, b'x' * 5]
+    assert split_body_for_mtu(b"x" * 25, 70) == [b"x" * 10, b"x" * 10, b"x" * 5]
 
 
 def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
     """``chunk_size_for_mtu`` refuses values below the 60-byte overhead."""
     from custom_components.jackery_solarvault.client.ble import split_body_for_mtu
 
-    with pytest.raises(ValueError, match='below'):
-        split_body_for_mtu(b'x', 23)
+    with pytest.raises(ValueError, match="below"):
+        split_body_for_mtu(b"x", 23)
 
 
 def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
@@ -1942,12 +1955,12 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
-        body = b'{"big":"' + (b'A' * 200) + b'"}'  # > 187 bytes
+        body = b'{"big":"' + (b"A" * 200) + b'"}'  # > 187 bytes
         sent = await listener.async_send_command(
-            'dev',
+            "dev",
             cmd=107,
             body=body,
         )
@@ -1990,14 +2003,14 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
-        listener._mtu = {'dev': 247}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
+        listener._mtu = {"dev": 247}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
-        body = b'x' * 25
+        body = b"x" * 25
         # MTU 70 → 10 bytes / chunk → three frames.
         sent = await listener.async_send_command(
-            'dev',
+            "dev",
             cmd=42,
             body=body,
             mtu_override=70,
@@ -2007,7 +2020,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         parsed = [decrypt_binary_notify(w, key) for w in writes]
         assert [p.frame_index for p in parsed] == [1, 2, 3]
         assert all(p.chunk_count == 3 for p in parsed)
-        assert b''.join(p.body for p in parsed) == body
+        assert b"".join(p.body for p in parsed) == body
 
     asyncio.run(_run())
 
@@ -2023,29 +2036,31 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
         ) -> None:
             """Fail fast when an invalid MTU write attempt occurs.
             This stub is not intended to perform BLE writes; it raises an AssertionError to indicate a call was attempted despite an invalid MTU.
+
             Raises:
                 AssertionError: with message "invalid MTU must not write to GATT".
             """
-            raise AssertionError('invalid MTU must not write to GATT')
+            raise AssertionError("invalid MTU must not write to GATT")
 
     async def _run() -> None:
         """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
         Constructs a bare listener with a fake client and a resolved AES key, then calls
         `async_send_command` with a non-integer `mtu_override` to assert input validation.
+
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
-        with pytest.raises(ValueError, match='mtu_override must be an integer'):
+        with pytest.raises(ValueError, match="mtu_override must be an integer"):
             await listener.async_send_command(
-                'dev',
+                "dev",
                 cmd=42,
-                body=b'x',
-                mtu_override=float('nan'),  # type: ignore[arg-type]
+                body=b"x",
+                mtu_override=float("nan"),  # type: ignore[arg-type]
             )
 
     asyncio.run(_run())
@@ -2056,9 +2071,9 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU
 
     listener = _build_bare_listener()
-    assert listener.mtu_for_device('unknown') == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
-    listener._mtu['known'] = 120  # type: ignore[attr-defined]
-    assert listener.mtu_for_device('known') == 120  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    listener._mtu["known"] = 120  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("known") == 120  # type: ignore[attr-defined]
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -2068,8 +2083,8 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
     class _Client:
         mtu_size = 185
 
-    listener._record_negotiated_mtu('dev', _Client())  # type: ignore[attr-defined]
-    assert listener.mtu_for_device('dev') == 185  # type: ignore[attr-defined]
+    listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]
 
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
@@ -2084,11 +2099,11 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     class _Bad:
         mtu_size = 12  # below the 60-byte overhead
 
-    listener._record_negotiated_mtu('dev', _NoMtu())  # type: ignore[attr-defined]
-    listener._record_negotiated_mtu('dev2', _Bad())  # type: ignore[attr-defined]
+    listener._record_negotiated_mtu("dev", _NoMtu())  # type: ignore[attr-defined]
+    listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]
     # Both fall back to the default — the cache stays untouched.
-    assert listener.mtu_for_device('dev') == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
-    assert listener.mtu_for_device('dev2') == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
 
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
@@ -2110,11 +2125,11 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
-        stats = listener.stats_for('dev')
-        stats.last_error = 'notify: Bluetooth GATT Error error=133'
+        stats = listener.stats_for("dev")
+        stats.last_error = "notify: Bluetooth GATT Error error=133"
 
-        blob = encrypt_binary_notify(build_binary_frame(cmd=120, body=b'{}'), key)
-        await listener._handle_notification('dev', blob)
+        blob = encrypt_binary_notify(build_binary_frame(cmd=120, body=b"{}"), key)
+        await listener._handle_notification("dev", blob)
 
         assert stats.frames_decoded == 1
         assert stats.last_error is None
@@ -2146,7 +2161,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {'dev': _FakeClient()}  # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
 
         async def _drive_ack_after_writes() -> None:
@@ -2162,19 +2177,19 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             echo = encrypt_binary_notify(
                 build_binary_frame(cmd=107, body=b'{"ok":1}'), key
             )
-            await listener._handle_notification('dev', echo)
+            await listener._handle_notification("dev", echo)
 
         sender = listener.async_send_command(
-            'dev',
+            "dev",
             cmd=107,
-            body=b'P' * 250,  # 250 bytes → 2 frames at default MTU
+            body=b"P" * 250,  # 250 bytes → 2 frames at default MTU
             wait_for_ack=True,
             ack_timeout_sec=2.0,
         )
         sent, _ = await asyncio.gather(sender, _drive_ack_after_writes())
         assert sent is True
         assert len(writes) == 2
-        stats = listener.stats_for('dev')
+        stats = listener.stats_for("dev")
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         # No leftover pending ack — one notify cleared the registry.
@@ -2196,35 +2211,35 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
     )
 
     updated = {
-        'battery_packs': [
+        "battery_packs": [
             {
-                'deviceSn': 'HQ2C01400955HP3',
-                'devType': 1,
-                'subType': 0,
-                'batSoc': 53,
-                'inPw': 0,
-                'outPw': 200,
+                "deviceSn": "HQ2C01400955HP3",
+                "devType": 1,
+                "subType": 0,
+                "batSoc": 53,
+                "inPw": 0,
+                "outPw": 200,
             },
         ],
     }
     body = {
-        'deviceSn': 'HQ2C01400955HP3',
-        'devType': 1,
-        'subType': 0,
-        'outEgy': 5095,
-        'inEgy': 5648,
+        "deviceSn": "HQ2C01400955HP3",
+        "devType": 1,
+        "subType": 0,
+        "outEgy": 5095,
+        "inEgy": 5648,
     }
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated, body
     )
     assert touched is True
-    pack = updated['battery_packs'][0]
-    assert pack['inEgy'] == 5648
-    assert pack['outEgy'] == 5095
+    pack = updated["battery_packs"][0]
+    assert pack["inEgy"] == 5648
+    assert pack["outEgy"] == 5095
     # Existing fields preserved.
-    assert pack['batSoc'] == 53
-    assert pack['inPw'] == 0
-    assert pack['outPw'] == 200
+    assert pack["batSoc"] == 53
+    assert pack["inPw"] == 0
+    assert pack["outPw"] == 200
 
 
 def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
@@ -2240,32 +2255,32 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
     )
 
     updated = {
-        'battery_packs': [
+        "battery_packs": [
             {
-                'deviceSn': 'HQ2C01400955HP3',
-                'devType': 1,
+                "deviceSn": "HQ2C01400955HP3",
+                "devType": 1,
             },
         ],
     }
     body = {
-        'deviceSn': 'DIFFERENT_PACK_SN',  # not in the list
-        'devType': 1,
-        'subType': 0,
-        'outEgy': 99,
-        'inEgy': 88,
+        "deviceSn": "DIFFERENT_PACK_SN",  # not in the list
+        "devType": 1,
+        "subType": 0,
+        "outEgy": 99,
+        "inEgy": 88,
     }
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated, body
     )
     assert touched is True
-    assert len(updated['battery_packs']) == 2
-    pack = updated['battery_packs'][1]
-    assert pack['deviceSn'] == 'DIFFERENT_PACK_SN'
-    assert pack['devType'] == 1
-    assert pack['subType'] == 0
-    assert pack['inEgy'] == 88
-    assert pack['outEgy'] == 99
-    assert '_last_seen_at' in pack
+    assert len(updated["battery_packs"]) == 2
+    pack = updated["battery_packs"][1]
+    assert pack["deviceSn"] == "DIFFERENT_PACK_SN"
+    assert pack["devType"] == 1
+    assert pack["subType"] == 0
+    assert pack["inEgy"] == 88
+    assert pack["outEgy"] == 99
+    assert "_last_seen_at" in pack
 
 
 def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None:
@@ -2275,9 +2290,9 @@ def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None
     )
 
     updated = {
-        'battery_packs': [{'deviceSn': 'HQ2C01400955HP3', 'devType': 1}],
+        "battery_packs": [{"deviceSn": "HQ2C01400955HP3", "devType": 1}],
     }
-    body = {'deviceSn': 'HQ2C01400955HP3', 'devType': 1, 'subType': 0}
+    body = {"deviceSn": "HQ2C01400955HP3", "devType": 1, "subType": 0}
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated, body
     )
