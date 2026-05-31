@@ -239,13 +239,13 @@ filterwarnings = [
 [tool.ruff]
 target-version = "py314"
 line-length = 88
-src = ["custom_components", "tests"]
+#src = ["custom_components", "tests"]
 indent-width = 4
 show-fixes = true
 fix = true
 unsafe-fixes = true
 force-exclude = true
-#output-format= "github"
+output-format= "github"
 
 [tool.ruff.analyze]
 detect-string-imports = true
@@ -263,8 +263,8 @@ skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
 preview = true
-select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
-#ignore = ["E501"]
+select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D", "W", "RUF", "NPY", "ASYNC", "N", "ANN"]
+ignore = ["E501"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -376,12 +376,27 @@ dependencies = { file = ["requirements.txt"] }
 [tool.setuptools.dynamic.optional-dependencies]
 tests = { file = ["requirements-test.txt"] }
 
-[tool.pylint.TYPECHECK]
-ignored-classes = ["_CountingAttr"]
-mixin-class-rgx = ".*[Mm]ix[Ii]n"
-
 [tool.pylint.BASIC]
 class-const-naming-style = "any"
 
 [tool.pylint.REPORTS]
 score = true
+
+[tool.pylint.EXCEPTIONS]
+overgeneral-exceptions = [
+  "builtins.BaseException",
+  "builtins.Exception",
+  # "homeassistant.exceptions.HomeAssistantError",  # too many issues
+]
+
+[tool.pylint.TYPING]
+runtime-typing = false
+
+[tool.pylint.CODE_STYLE]
+max-line-length-suggestions = 72
+
+[tool.pylint.TYPECHECK]
+ignored-classes = [
+  "_CountingAttr", # for attrs
+]
+mixin-class-rgx = ".*[Mm]ix[Ii]n"
