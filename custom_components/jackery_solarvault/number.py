@@ -94,7 +94,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     allowed_values: (
         Callable[[dict[str, Any]], tuple[float, ...]] | tuple[float, ...] | None
     ) = None
-    value_transform: Callable[[float], Any] = lambda v: int(round(v))
+    value_transform: Callable[[float], Any] = lambda v: round(v)
     validate_range: bool = False
     raise_on_setter_error: bool = True
 
@@ -393,7 +393,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 max=f"{self.native_max_value:.0f}",
             )
         allowed = self._allowed_values()
-        if allowed and int(round(value)) not in {int(round(v)) for v in allowed}:
+        if allowed and round(value) not in {round(v) for v in allowed}:
             allowed_text = ", ".join(f"{int(v)}" for v in allowed)
             self._raise_action_error(
                 "invalid_number_allowed_values",

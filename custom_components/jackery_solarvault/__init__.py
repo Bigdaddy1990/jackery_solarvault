@@ -301,9 +301,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # mypy without changing runtime behaviour.
         refresh_result, mqtt_result, local_mqtt_result = cast(
             tuple[
-                None | BaseException,
-                None | BaseException,
-                None | BaseException,
+                BaseException | None,
+                BaseException | None,
+                BaseException | None,
             ],
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),

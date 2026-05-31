@@ -300,14 +300,14 @@ def test_local_mqtt_result_warning_logged_via_logger(
     Simulates the code path in async_setup_entry that logs a warning for
     local_mqtt_result being a BaseException.
     """
-    _logger = logging.getLogger("custom_components.jackery_solarvault")
+    logger = logging.getLogger("custom_components.jackery_solarvault")
     err = RuntimeError("local broker unreachable")
 
     # Replicate the async_setup_entry condition inline.
     local_mqtt_result: Any = err
-    with caplog.at_level(logging.WARNING, logger=_logger.name):
+    with caplog.at_level(logging.WARNING, logger=logger.name):
         if isinstance(local_mqtt_result, BaseException):
-            _logger.warning(
+            logger.warning(
                 "Jackery local MQTT listener could not start during setup: %s",
                 local_mqtt_result,
             )
@@ -320,12 +320,12 @@ def test_local_mqtt_result_no_warning_when_none(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """When local_mqtt_result is None, no warning must be emitted."""
-    _logger = logging.getLogger("custom_components.jackery_solarvault")
+    logger = logging.getLogger("custom_components.jackery_solarvault")
     local_mqtt_result: Any = None
 
-    with caplog.at_level(logging.WARNING, logger=_logger.name):
+    with caplog.at_level(logging.WARNING, logger=logger.name):
         if isinstance(local_mqtt_result, BaseException):
-            _logger.warning(
+            logger.warning(
                 "Jackery local MQTT listener could not start during setup: %s",
                 local_mqtt_result,
             )

@@ -6049,10 +6049,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # pulled. We log per family (not per endpoint) to keep noise low.
         device_count = len(self._device_index)
         system_ids: set[str] = set()
-        for _idx in self._device_index.values():
-            _sys_id = _idx.get(FIELD_SYSTEM_ID)
-            if _sys_id:
-                system_ids.add(str(_sys_id))
+        for idx_ in self._device_index.values():
+            sys_id_ = idx_.get(FIELD_SYSTEM_ID)
+            if sys_id_:
+                system_ids.add(str(sys_id_))
         system_count = len(system_ids)
         if (
             started - self._last_slow_poll_log_monotonic
@@ -6218,7 +6218,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # Jackery entity unavailable. We isolate failures per slot and
             # map them to the same defaults already wired in the
             # ``_get_with_ttl(... default)`` calls below.
-            _slow_results = await asyncio.gather(
+            slow_results = await asyncio.gather(
                 _get_with_ttl(
                     sys_id,
                     PAYLOAD_STATISTIC,
@@ -6385,7 +6385,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # Per-slot defaults match the empty values already passed into
             # the ``_get_with_ttl`` calls above. ``alarm`` is None and
             # ``price_sources`` is a list; everything else collapses to {}.
-            _slow_defaults: tuple[Any, ...] = (
+            slow_defaults: tuple[Any, ...] = (
                 {},  # statistic
                 None,  # alarm
                 {},  # pv_trends
@@ -6404,9 +6404,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 [],  # price_sources
                 {},  # price_history_config
             )
-            _slow_safe = tuple(
+            slow_safe = tuple(
                 default if isinstance(value, BaseException) else value
-                for value, default in zip(_slow_results, _slow_defaults, strict=True)
+                for value, default in zip(slow_results, slow_defaults, strict=True)
             )
             (
                 statistic,
@@ -6426,7 +6426,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 price,
                 price_sources,
                 price_history_config,
-            ) = _slow_safe
+            ) = slow_safe
             bundle: dict[str, Any] = {
                 PAYLOAD_STATISTIC: statistic,
                 PAYLOAD_ALARM: alarm,
@@ -6705,8 +6705,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # parse error) abort the whole zip, leaving every per-device
             # entity blank. Map exceptions back to the structural default
             # expected by downstream consumers.
-            _raw_values = await asyncio.gather(*tasks, return_exceptions=True)
-            _device_extras_defaults: dict[str, Any] = {
+            raw_values = await asyncio.gather(*tasks, return_exceptions=True)
+            device_extras_defaults: dict[str, Any] = {
                 PAYLOAD_DEVICE_STATISTIC: {},
                 PAYLOAD_LOCATION: {},
                 PAYLOAD_OTA: {},
@@ -6715,8 +6715,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             values = [
                 v
                 if not isinstance(v, BaseException)
-                else _device_extras_defaults.get(name, {})
-                for name, v in zip(task_names, _raw_values, strict=False)
+                else device_extras_defaults.get(name, {})
+                for name, v in zip(task_names, raw_values, strict=False)
             ]
             out: dict[str, Any] = dict(zip(task_names, values, strict=False))
             out.setdefault(PAYLOAD_DEVICE_STATISTIC, {})
