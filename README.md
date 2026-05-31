@@ -84,6 +84,14 @@ Device ID, system ID, MQTT `macId` and region are derived from cloud and MQTT da
 
 The same options can be changed later from the integration options. Credentials can be updated through Home Assistant's reconfigure or reauth flow without deleting the integration.
 
+For the optional local third-party MQTT listener, the integration is strict by default:
+
+- It starts only when `Enable Third-Party MQTT bridge` is on.
+- A broker host is configured.
+- A non-empty `Third-Party MQTT topic filter` is configured.
+
+An empty topic filter keeps the local listener disabled on purpose. There is no implicit wildcard fallback. Broad wildcards (`#`, `+/#`) are blocked by the integration for CPU safety; use a scoped filter instead.
+
 ## Devices and Entities
 
 ### Main SolarVault Device

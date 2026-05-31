@@ -6,18 +6,18 @@
             "reauth_successful": "La réauthentification a réussi.",
             "reconfigure_account_mismatch": "La nouvelle adresse e-mail ne correspond pas au compte Jackery configuré. Utilisez l'adresse e-mail d'origine ou supprimez d'abord l'entrée.",
             "reconfigure_entry_missing": "L’entrée Jackery à reconfigurer est introuvable.",
-            "reconfigure_successful": "Configuration mise à jour.",
+            "reconfigure_successful": "Configuration mise à jour."
         },
         "error": {
             "account_required": "Le compte ne doit pas être vide.",
             "cannot_connect": "Impossible de se connecter à iot.jackeryapp.com.",
-            "invalid_auth": "Adresse e-mail ou mot de passe invalide.",
+            "invalid_auth": "Adresse e-mail ou mot de passe invalide."
         },
         "step": {
             "reauth_confirm": {
                 "data": {"password": "Mot de passe"},
                 "description": "Le mot de passe enregistré pour {username} ne fonctionne plus. Saisissez le mot de passe actuel pour restaurer la connexion.",
-                "title": "Réauthentifier Jackery",
+                "title": "Réauthentifier Jackery"
             },
             "reconfigure": {
                 "data": {
@@ -35,7 +35,7 @@
                     "third_party_mqtt_password": "Third-Party MQTT password",
                     "third_party_mqtt_token": "Third-Party MQTT token",
                     "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter",
-                    "username": "Adresse e-mail",
+                    "username": "Adresse e-mail"
                 },
                 "data_description": {
                     "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
@@ -50,10 +50,10 @@
                     "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
                     "third_party_mqtt_password": "Optional MQTT broker password.",
                     "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
-                    "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled.",
+                    "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled."
                 },
                 "description": "Mettez à jour le mot de passe et les interrupteurs de capteurs facultatifs du compte Jackery {username}. L'adresse e-mail doit correspondre au compte configuré à l'origine afin que l'ID unique de l'entrée reste stable. Pour changer de compte, supprimez d'abord l'entrée.",
-                "title": "Reconfigurer Jackery SolarVault",
+                "title": "Reconfigurer Jackery SolarVault"
             },
             "user": {
                 "data": {
@@ -62,18 +62,18 @@
                     "enable_ble_transport": "Activer le transport BLE",
                     "create_smart_meter_derived_sensors": "Créer des capteurs Smart Meter calculés",
                     "password": "Mot de passe",
-                    "username": "Adresse e-mail",
+                    "username": "Adresse e-mail"
                 },
                 "data_description": {
                     "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
                     "create_savings_detail_sensors": "Crée des capteurs facultatifs pour le calcul des économies : économies calculées, énergie CA autoconsommée, prix, énergie perdue du système de batteries, énergie perdue de l'onduleur/conversion, résidu PV après autoconsommation et puissance instantanée calculée de perte onduleur/conversion. Désactivés par défaut car ce sont des valeurs intermédiaires de diagnostic.",
                     "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
-                    "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
+                    "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery."
                 },
                 "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nJackery autorise généralement une seule session active par compte. Gardez l'application Jackery déconnectée du compte SolarVault lorsque Home Assistant doit recevoir les mises à jour MQTT en direct. Si l'application est ouverte brièvement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises à jour en direct.",
-                "title": "Jackery SolarVault",
-            },
-        },
+                "title": "Jackery SolarVault"
+            }
+        }
     },
     "entity": {
         "binary_sensor": {
@@ -81,7 +81,7 @@
             "eps_enabled": {"name": "EPS activé"},
             "eth_connected": {"name": "Ethernet connecté"},
             "online": {"name": "En ligne"},
-            "smart_plug_switch_state": {"name": "Etat de la prise connectee"},
+            "smart_plug_switch_state": {"name": "Etat de la prise connectee"}
         },
         "button": {"reboot_device": {"name": "Redémarrer l'appareil"}},
         "number": {
@@ -90,19 +90,19 @@
             "max_output_power_set": {"name": "Puissance de sortie maximale"},
             "single_tariff_price_set": {"name": "Prix du tarif unique"},
             "soc_charge_limit_set": {"name": "Limite de charge"},
-            "soc_discharge_limit_set": {"name": "Limite de décharge"},
+            "soc_discharge_limit_set": {"name": "Limite de décharge"}
         },
         "select": {
             "auto_off_island_mode": {
                 "name": "Arrêt auto (hors réseau)",
-                "state": {"h_12": "12 h", "h_2": "2 h", "h_24": "24 h", "h_8": "8 h"},
+                "state": {"h_12": "12 h", "h_2": "2 h", "h_24": "24 h", "h_8": "8 h"}
             },
             "electricity_price_mode": {
                 "name": "Mode de prix de l'électricité",
                 "state": {
                     "dynamic": "Prix dynamique de l'électricité",
-                    "single": "Tarif fixe",
-                },
+                    "single": "Tarif fixe"
+                }
             },
             "electricity_price_provider": {
                 "name": "Fournisseur de prix de l'électricité"
@@ -135,12 +135,12 @@
                     "min_780": "13 h",
                     "min_840": "14 h",
                     "min_900": "15 h",
-                    "min_960": "16 h",
-                },
+                    "min_960": "16 h"
+                }
             },
             "temp_unit_select": {
                 "name": "Unité de température",
-                "state": {"celsius": "Celsius", "fahrenheit": "Fahrenheit"},
+                "state": {"celsius": "Celsius", "fahrenheit": "Fahrenheit"}
             },
             "work_mode_select": {
                 "name": "Mode d'utilisation de l'énergie",
@@ -148,9 +148,9 @@
                     "ai_smart": "Mode intelligent IA",
                     "custom": "Mode personnalisé",
                     "self_use": "Autoconsommation",
-                    "tariff": "Mode tarif",
-                },
-            },
+                    "tariff": "Mode tarif"
+                }
+            }
         },
         "sensor": {
             "ability_bits": {"name": "Indicateurs de capacité"},
@@ -494,7 +494,7 @@
             "wifi_ip": {"name": "Adresse IP"},
             "wifi_name": {"name": "Nom WiFi"},
             "wifi_signal": {"name": "Signal WiFi"},
-            "work_mode": {"name": "Mode de fonctionnement"},
+            "work_mode": {"name": "Mode de fonctionnement"}
         },
         "switch": {
             "auto_standby_set": {"name": "Arrêt auto (connecté au réseau)"},
@@ -504,9 +504,9 @@
             "standby": {"name": "Veille"},
             "storm_warning": {"name": "Alerte tempête"},
             "smart_plug_priority_enabled": {"name": "Priorite prise connectee"},
-            "smart_plug_switch": {"name": "Prise connectee"},
+            "smart_plug_switch": {"name": "Prise connectee"}
         },
-        "text": {"system_name": {"name": "Nom du système"}},
+        "text": {"system_name": {"name": "Nom du système"}}
     },
     "exceptions": {
         "delete_storm_alert_failed": {
@@ -547,7 +547,7 @@
         },
         "send_ble_command_failed": {
             "message": "Impossible d'envoyer la commande BLE pour l'appareil {device_id} : {error}"
-        },
+        }
     },
     "issues": {
         "app_data_inconsistency": {
@@ -555,11 +555,11 @@
                 "step": {
                     "confirm": {
                         "description": "Jackery a renvoyé des statistiques application/cloud contradictoires. {count} avertissement(s) détecté(s). Première métrique concernée : {metric}. Exemples : {examples}. Les états des entités ne sont pas réparés silencieusement ; activez le logger custom_components.jackery_solarvault.payload_debug=debug, puis utilisez le journal de débogage du payload jackery_solarvault_payload_debug.jsonl et les diagnostics pour comparer les valeurs brutes, les séries de graphique analysées et les sections source documentées dans docs/PROTOCOL.md (§2 endpoints HTTP, §8 priorité des sources de données).\n\nConfirmez pour forcer une actualisation depuis le cloud Jackery. Les incohérences transitoires disparaissent lorsqu'un nouveau payload cohérent arrive. Si l'avertissement revient, ouvrez une issue sur le tracker de l'intégration avec le dump de diagnostic.",
-                        "title": "Forcer une actualisation du cloud Jackery",
+                        "title": "Forcer une actualisation du cloud Jackery"
                     }
                 }
             },
-            "title": "Les statistiques de l'application Jackery sont incohérentes",
+            "title": "Les statistiques de l'application Jackery sont incohérentes"
         }
     },
     "options": {
@@ -578,7 +578,7 @@
                     "third_party_mqtt_username": "Third-Party MQTT username",
                     "third_party_mqtt_password": "Third-Party MQTT password",
                     "third_party_mqtt_token": "Third-Party MQTT token",
-                    "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter",
+                    "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter"
                 },
                 "data_description": {
                     "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
@@ -593,10 +593,10 @@
                     "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
                     "third_party_mqtt_password": "Optional MQTT broker password.",
                     "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
-                    "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled.",
+                    "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled."
                 },
                 "description": "Les capteurs calculés sont des dérivations locales facultatives. Les capteurs Smart Meter calculent des valeurs nettes, des valeurs de flux brut par phase et la consommation domestique à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, ils utilisent la puissance nette du Smart Meter plus l'entrée/sortie côté réseau Jackery. Ce ne sont pas des valeurs brutes supplémentaires de l'application Jackery.",
-                "title": "Options Jackery",
+                "title": "Options Jackery"
             }
         }
     },
@@ -606,87 +606,87 @@
             "fields": {
                 "alert_id": {
                     "description": "Identifiant d'alerte provenant des attributs de diagnostic du plan météo, généralement storm[].alertId.",
-                    "name": "ID d'alerte",
+                    "name": "ID d'alerte"
                 },
                 "device_id": {
                     "description": "Sélectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
-                    "name": "ID de l'appareil",
-                },
+                    "name": "ID de l'appareil"
+                }
             },
-            "name": "Supprimer l'alerte tempête",
+            "name": "Supprimer l'alerte tempête"
         },
         "refresh_weather_plan": {
             "description": "Interroge le plan météo et tempête actuel de l'appareil. La réponse est exposée dans les attributs du capteur de diagnostic Plan météo.",
             "fields": {
                 "device_id": {
                     "description": "Sélectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
-                    "name": "ID de l'appareil",
+                    "name": "ID de l'appareil"
                 }
             },
-            "name": "Actualiser le plan météo et tempête",
+            "name": "Actualiser le plan météo et tempête"
         },
         "rename_system": {
             "description": "Renomme un système Jackery SolarVault via l'API cloud Jackery. Le nom est affiché dans l'application Jackery et les informations d'appareil Home Assistant.",
             "fields": {
                 "new_name": {
                     "description": "Nouveau nom d'affichage, de 1 à 64 caractères.",
-                    "name": "Nouveau nom",
+                    "name": "Nouveau nom"
                 },
                 "system_id": {
                     "description": "ID numérique du système Jackery. Il est visible dans les diagnostics sous raw_api.system_list_response.data[].id.",
-                    "name": "ID du système",
-                },
+                    "name": "ID du système"
+                }
             },
-            "name": "Renommer le système SolarVault",
+            "name": "Renommer le système SolarVault"
         },
         "send_ble_command": {
             "description": "Envoie une trame de commande BLE binaire experimentale a l'appareil selectionne. Necessite le transport BLE, les ecritures BLE et une connexion BLE active.",
             "fields": {
                 "body": {
                     "description": "Objet JSON a chiffrer et ecrire. Incluez le champ cmd dans le body lorsque la commande firmware cible l'attend.",
-                    "name": "Body",
+                    "name": "Body"
                 },
                 "cmd": {
                     "description": "ID de commande de l'en-tete BLE binaire, de 1 a 65535.",
-                    "name": "Commande",
+                    "name": "Commande"
                 },
                 "device_id": {
                     "description": "Selectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numerique de l'appareil Jackery.",
-                    "name": "ID de l'appareil",
+                    "name": "ID de l'appareil"
                 },
                 "flags": {
                     "description": "Flags de l'en-tete BLE binaire, normalement 0 pour les commandes de test sortantes.",
-                    "name": "Flags",
+                    "name": "Flags"
                 },
                 "wait_for_ack": {
                     "description": "Attendre que l'appareil renvoie une trame de notification decodee avant de considerer l'ecriture comme reussie. Recommande pour les setters, afin qu'un abandon silencieux du firmware fasse echouer l'appel au lieu d'etre perdu.",
-                    "name": "Attendre l'ACK",
+                    "name": "Attendre l'ACK"
                 },
                 "ack_timeout": {
                     "description": "Duree d'attente en secondes pour une notification de l'appareil apres l'ecriture. Ignore lorsque \"Attendre l'ACK\" est desactive.",
-                    "name": "Delai d'attente de l'ACK",
-                },
+                    "name": "Delai d'attente de l'ACK"
+                }
             },
-            "name": "Envoyer une commande BLE",
+            "name": "Envoyer une commande BLE"
         },
         "send_device_schedule": {
             "description": "Experimental: publish a DownloadDeviceSchedule (cmd=112) frame to the selected device. Pick the actionId for ADD (3015), DELETE (3016), UPDATE (3017) or READ (3018) and pass the schedule body verbatim. Body shape is from the Frida-PCAP capture in docs/Markdown/MQTT_PROTOCOL.md.",
             "fields": {
                 "action_id": {
                     "description": "TIMER_TASK action: 3015=ADD, 3016=DELETE, 3017=UPDATE, 3018=READ.",
-                    "name": "Action ID",
+                    "name": "Action ID"
                 },
                 "body": {
                     "description": "Schedule body as JSON. Typical fields: actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (7-char Mon-Sun bitmask), tid (task ID). The integration adds cmd=112 automatically.",
-                    "name": "Body",
+                    "name": "Body"
                 },
                 "device_id": {
                     "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-                    "name": "Device ID",
-                },
+                    "name": "Device ID"
+                }
             },
-            "name": "Send device schedule",
-        },
+            "name": "Send device schedule"
+        }
     },
-    "title": "Jackery SolarVault",
+    "title": "Jackery SolarVault"
 }
