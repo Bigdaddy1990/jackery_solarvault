@@ -65,7 +65,8 @@ repos:
           - --fix
           - --show-fixes
           - --unsafe-fixes
-          - --exit-non-zero-on-fix
+          - --target-version py314
+          - --extend-select RUF100
           - --output-format=github
         types_or:
           - python
