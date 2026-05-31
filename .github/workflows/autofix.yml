@@ -67,7 +67,6 @@ jobs:
           ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
           ruff check . --add-noqa || true
-          ruff check . --extend-select RUF100 || true
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
