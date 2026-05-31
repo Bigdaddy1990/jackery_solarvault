@@ -56,7 +56,7 @@ repos:
         stages: [pre-commit]
         types: [python]
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above 
-        
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.15
     hooks:
@@ -65,7 +65,10 @@ repos:
           - --fix
           - --show-fixes
           - --unsafe-fixes
-          - --exit-non-zero-on-fix
+          - --target-version py314
+          - --extend-select RUF100
+          - --add-noqa
+          - --preview
           - --output-format=github
         types_or:
           - python
