@@ -24,11 +24,13 @@ jobs:
           ruff check . --fix all || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
-          ruff check . --add-noqa || true
           ruff check . --extend-select RUF100 || true
-          ruff check . --output-format=github || true
           ruff check . --preview || true
-          ruff format .
+          ruff check . --add-noqa || true
+          ruff check . --output-format=github || true
+          ruff format . || true
+          pre-commit run --all-files || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
 
       - name: Commit baseline changes
         run: |
