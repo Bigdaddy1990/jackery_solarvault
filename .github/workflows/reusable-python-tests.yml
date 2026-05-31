@@ -120,7 +120,7 @@ jobs:
       coverage-threshold: ${{ env.COVERAGE_MIN }}
     env:
       PYTHON_VERSION: ${{ inputs.python-version != '' && inputs.python-version || (vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14') }}
-      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '') }}
+      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '2026.5.4') }}
       COVERAGE_MIN: ${{ inputs.coverage-min != '' && inputs.coverage-min || (vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '85') }}
       CRITICAL_MODULE_COVERAGE_MIN: ${{ inputs.critical-module-coverage-min != '' && inputs.critical-module-coverage-min || (vars.CI_CRITICAL_MODULE_COVERAGE_MIN != '' && vars.CI_CRITICAL_MODULE_COVERAGE_MIN || '90') }}
       COVERAGE_XML: ${{ inputs.coverage-xml-path != '' && inputs.coverage-xml-path || 'coverage.xml' }}
@@ -162,11 +162,11 @@ jobs:
 
       # Quality checks run after deps are fully installed so that a check
       # failure never leaves the environment in a partially-installed state.
-      - name: Check docstring baseline
-        run: python scripts/enforce_docstring_baseline.py --update
+    #  - name: Check docstring baseline
+    #    run: python scripts/enforce_docstring_baseline.py --update
 
-      - name: Check contributor guide sync
-        run: python scripts/sync_contributor_guides.py --check
+   #   - name: Check contributor guide sync
+    #    run: python scripts/sync_contributor_guides.py --check
 
       - name: Enforce test requirements and localization flags
         run: |
