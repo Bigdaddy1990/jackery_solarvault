@@ -8,8 +8,6 @@ Covers:
 - client/__init__ __getattr__: raises AttributeError for unknown names
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pytest

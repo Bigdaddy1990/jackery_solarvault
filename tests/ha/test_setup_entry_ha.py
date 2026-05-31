@@ -2,12 +2,12 @@
 
 from unittest.mock import patch
 
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
 import pytest
 
 from custom_components.jackery_solarvault.const import DOMAIN
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
 
 pytestmark = pytest.mark.asyncio
 

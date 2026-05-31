@@ -10,11 +10,9 @@ This is a new module introduced in this PR. Tests exercise:
 - is_connected / is_started properties
 - _utc_now_iso: produces a non-empty ISO timestamp
 
-NOTE: The local_mqtt module in this PR has a known Python 3 syntax issue:
-``except json.JSONDecodeError, ValueError:`` should be
-``except (json.JSONDecodeError, ValueError):`` — the comma form is Python 2
-syntax. If the SyntaxError is present the import will fail and these tests
-will be skipped with an informative message.
+If import-time errors occur (for example from a broken dependency or syntax
+regression), tests are skipped with an informative message so the failure mode
+is explicit.
 """
 
 import asyncio
@@ -48,7 +46,7 @@ except SyntaxError as _syntax_err:
 
 pytestmark = pytest.mark.skipif(
     not _IMPORT_OK,
-    reason="client/local_mqtt.py has a SyntaxError — fix except clause first",
+    reason="client/local_mqtt.py import failed; fix the module before running tests",
 )
 
 
@@ -368,7 +366,7 @@ def test_handle_message_drops_invalid_json_text() -> None:
     client._handle_message("topic", b"not json at all")
     # Non-JSON text: parsed will be None, so data is None but dropped is NOT
     # incremented for invalid JSON (only for non-object JSON or binary).
-    # Based on the code: `except json.JSONDecodeError, ValueError: parsed = None`
+    # Based on the code: `except (json.JSONDecodeError, ValueError): parsed = None`
     # then `if isinstance(parsed, dict): data = parsed elif parsed is not None:...`
     # invalid JSON → parsed=None → no dropped increment, data=None
     # This is the documented behaviour; dropped is only for non-object JSON.

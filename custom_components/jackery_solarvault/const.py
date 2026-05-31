@@ -95,10 +95,9 @@ DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
 CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
-# Empty by default: local-MQTT must be explicitly scoped by the user. A broad
-# wildcard (for example ``#``) can ingest the full broker traffic and create
-# avoidable CPU pressure on Home Assistant.
-DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = ""
+# Safe narrow default from app traces / user reports. Still configurable.
+# Broad wildcards (for example ``#``) remain blocked separately.
+DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
 
 # HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>

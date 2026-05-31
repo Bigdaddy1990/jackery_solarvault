@@ -8,12 +8,9 @@ Covers the new helper functions introduced in this PR:
 
 These tests use lightweight stubs so HA fixtures are not required.
 
-NOTE: The integration __init__.py imports client/local_mqtt.py which has a
-known Python 3 syntax error (``except json.JSONDecodeError, ValueError:``).
-The tests are skipped when that import fails.
+If __init__.py or a dependency fails to import, these tests are skipped with
+an explicit reason so syntax/dependency regressions are easy to spot.
 """
-
-from __future__ import annotations
 
 import asyncio
 from typing import Any
@@ -51,7 +48,7 @@ from custom_components.jackery_solarvault.const import (
 
 pytestmark = pytest.mark.skipif(
     not _IMPORT_OK,
-    reason="__init__.py imports local_mqtt.py which has a SyntaxError — fix first",
+    reason="__init__.py import failed; fix dependency/syntax issues first",
 )
 
 
@@ -251,6 +248,21 @@ async def test_async_start_local_mqtt_does_nothing_when_topic_filter_is_empty() 
         enable=True,
         host="192.168.1.100",
         topic_filter="",
+    )
+
+    await _async_start_local_mqtt(hass, entry)
+
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
+
+
+async def test_async_start_local_mqtt_blocks_broad_wildcard_filter() -> None:
+    """Broad wildcard topic filters are blocked for CPU safety."""
+    hass = _FakeHass()
+    entry = _make_local_mqtt_entry(
+        enable=True,
+        host="192.168.1.100",
+        topic_filter="#",
     )
 
     await _async_start_local_mqtt(hass, entry)

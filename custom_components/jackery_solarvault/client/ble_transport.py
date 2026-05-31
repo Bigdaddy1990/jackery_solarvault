@@ -33,8 +33,6 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import binascii
@@ -361,7 +359,9 @@ class JackeryBleListener:
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
-            mtu = int(mtu_override)
+            if isinstance(mtu_override, bool) or not isinstance(mtu_override, int):
+                raise ValueError("mtu_override must be an integer")
+            mtu = mtu_override
         else:
             mtu = self.mtu_for_device(device_id)
         try:
@@ -454,8 +454,16 @@ class JackeryBleListener:
                 and `future`, an `asyncio.Future` that will be resolved with the matching `ble.BleBinaryFrame`.
         """
         loop = asyncio.get_running_loop()
+        expected_cmds: frozenset[int] | None = None
+        if ack_cmds:
+            parsed_cmds: set[int] = set()
+            for ack_cmd in ack_cmds:
+                if isinstance(ack_cmd, bool) or not isinstance(ack_cmd, int):
+                    raise ValueError("ack_cmds must be an integer")
+                parsed_cmds.add(ack_cmd)
+            expected_cmds = frozenset(parsed_cmds)
         pending = _PendingAck(
-            expected_cmds=(frozenset(int(c) for c in ack_cmds) if ack_cmds else None),
+            expected_cmds=expected_cmds,
             future=loop.create_future(),
         )
         self._pending_acks.setdefault(device_id, []).append(pending)
@@ -693,6 +701,7 @@ class JackeryBleListener:
         """
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
+
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)
@@ -941,6 +950,7 @@ class JackeryBleListener:
         stats.last_frame = observation
         if parsed is not None:
             stats.frames_decoded += 1
+            stats.last_error = None
             _LOGGER.debug(
                 "Jackery BLE %s decoded: cmd=%d body=%d bytes",
                 device_id,
@@ -953,6 +963,8 @@ class JackeryBleListener:
             self._resolve_pending_acks(device_id, parsed)
         else:
             stats.frames_decode_failed += 1
+            if decode_error is not None:
+                stats.last_error = f"notify: {decode_error}"
         try:
             await self._sink(device_id, observation)
         except Exception as err:  # pragma: no cover — sink misbehaviour

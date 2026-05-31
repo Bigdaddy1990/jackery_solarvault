@@ -22,10 +22,11 @@ import logging
 import re
 from typing import Any, Final
 
+import voluptuous as vol
+
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
-import voluptuous as vol
 
 from .client import JackeryError
 from .const import (
@@ -444,7 +445,7 @@ async def _async_handle_set_third_party_mqtt_config(
             port=int(call.data[SERVICE_FIELD_PORT]),
             username=str(call.data.get(SERVICE_FIELD_USERNAME, "")),
             password=str(call.data.get(SERVICE_FIELD_PASSWORD, "")),
-            token=str(call.data.get(SERVICE_FIELD_TOKEN, "")),
+            token=str(call.data.get(SERVICE_FIELD_TOKEN, "")).strip(),
         )
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise ServiceValidationError(

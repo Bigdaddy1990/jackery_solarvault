@@ -3,11 +3,12 @@
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-import voluptuous as vol
 
 from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
 from .coordinator import JackerySolarVaultCoordinator

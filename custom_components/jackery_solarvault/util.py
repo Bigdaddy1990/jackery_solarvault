@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -183,7 +183,7 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -491,7 +491,7 @@ def safe_float(value: Any) -> float | None:
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -507,10 +507,10 @@ def safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
@@ -740,7 +740,7 @@ def safe_bool(value: Any) -> bool | None:
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -873,7 +873,7 @@ class AppDataQualityWarning(NamedTuple):
 
 
 def normalized_data_quality_warnings(
-    warnings: list[dict[str, Any]],
+    warnings: list[Any],
 ) -> list[dict[str, Any]]:
     """Return deterministic, de-duplicated data-quality warnings."""
     deduped: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
@@ -2108,6 +2108,7 @@ def trend_series_points(
     series = effective_trend_series_values(source, section, stat_key)
     if not isinstance(series, list) or not series:
         return []
+    series_values = cast(list[Any], series)
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -2128,7 +2129,7 @@ def trend_series_points(
         today = date.today()
 
     points: list[TrendStatisticPoint] = []
-    for index, value in enumerate(series):
+    for index, value in enumerate(series_values):
         if value is None:
             continue
         if date_type == DATE_TYPE_YEAR:
@@ -2143,7 +2144,10 @@ def trend_series_points(
 
         if (end is not None and bucket_start > end) or bucket_start > today:
             continue
-        points.append(TrendStatisticPoint(bucket_start, round(value, 5)))
+        value_float = safe_float(value)
+        if value_float is None:
+            continue
+        points.append(TrendStatisticPoint(bucket_start, round(value_float, 5)))
     return points
 
 
@@ -2781,3 +2785,4 @@ def trend_payload_has_value(
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None
+

@@ -14,8 +14,6 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from __future__ import annotations
-
 from typing import Any, Final
 
 from homeassistant.core import HomeAssistant

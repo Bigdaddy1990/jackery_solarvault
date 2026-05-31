@@ -7,8 +7,6 @@ shelling out to the real subprocess. The few cases that do invoke
 project scripts being on disk.
 """
 
-from __future__ import annotations
-
 import importlib.util
 from pathlib import Path
 import sys

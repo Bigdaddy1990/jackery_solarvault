@@ -2910,10 +2910,21 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
         c = self._components()
         if any(value is None for value in c.values()):
             return None
-        produced = (
-            c["pv_power"] + c["battery_discharge_power"] + c["grid_side_input_power"]
-        )
-        consumed = c["battery_charge_power"] + c["grid_side_output_power"]
+        pv_power = safe_float(c.get("pv_power"))
+        battery_discharge_power = safe_float(c.get("battery_discharge_power"))
+        grid_side_input_power = safe_float(c.get("grid_side_input_power"))
+        battery_charge_power = safe_float(c.get("battery_charge_power"))
+        grid_side_output_power = safe_float(c.get("grid_side_output_power"))
+        if (
+            pv_power is None
+            or battery_discharge_power is None
+            or grid_side_input_power is None
+            or battery_charge_power is None
+            or grid_side_output_power is None
+        ):
+            return None
+        produced = pv_power + battery_discharge_power + grid_side_input_power
+        consumed = battery_charge_power + grid_side_output_power
         return round(max(0.0, produced - consumed), 2)
 
     @property
@@ -4570,10 +4581,7 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return diagnostic attributes for the current state."""
-        plan = self._weather_plan
-        if isinstance(plan, dict):
-            return dict(plan)
-        return {}
+        return dict(self._weather_plan)
 
 
 class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
@@ -4606,10 +4614,7 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return diagnostic attributes for the current state."""
-        plan = self._task_plan
-        if isinstance(plan, dict):
-            return dict(plan)
-        return {}
+        return dict(self._task_plan)
 
 
 # ---------------------------------------------------------------------------

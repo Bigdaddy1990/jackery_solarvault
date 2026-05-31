@@ -4,6 +4,8 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -13,7 +15,6 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import voluptuous as vol
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
@@ -337,7 +338,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -468,7 +469,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
 
@@ -511,3 +512,4 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(entry: ConfigEntry) -> JackeryOptionsFlow:
         """Return the options flow handler for this entry."""
         return JackeryOptionsFlow()
+

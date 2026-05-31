@@ -341,7 +341,10 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """Return the highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(self._payload)
-        return float(self.entity_description.native_max_value)
+        max_value = self.entity_description.native_max_value
+        if max_value is None:
+            return 0.0
+        return float(max_value)
 
     @property
     def native_unit_of_measurement(self) -> str | None:

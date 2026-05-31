@@ -53,8 +53,6 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 import os
@@ -155,7 +153,10 @@ def parse_hex16(text: str) -> int:
         raise ValueError(
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         )
-    return int(text, 16)
+    try:
+        return int(text, 16)
+    except ValueError as err:
+        raise ValueError("parse_hex16: expected hex chars") from err
 
 
 def hex_encode(data: bytes) -> str:

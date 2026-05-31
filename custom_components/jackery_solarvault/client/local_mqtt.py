@@ -12,8 +12,6 @@ we do NOT touch the coordinator from here so the cloud parsing pipeline
 stays the single source of truth.
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections.abc import Awaitable, Callable
 import contextlib
@@ -345,7 +343,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 parsed = None
             if isinstance(parsed, dict):
                 data = parsed
@@ -498,3 +496,4 @@ class JackeryLocalMqttClient:
             iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """
         return datetime.now(UTC).isoformat()
+

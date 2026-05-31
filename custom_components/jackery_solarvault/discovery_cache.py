@@ -1,7 +1,5 @@
 """Persistent discovery cache for local offline startup."""
 
-from __future__ import annotations
-
 from typing import Any, Final
 
 from homeassistant.core import HomeAssistant

@@ -625,7 +625,10 @@ class JackeryApi:
         if callback is None:
             return
         try:
-            result = callback(event_or_factory)
+            event = (
+                event_or_factory() if callable(event_or_factory) else event_or_factory
+            )
+            result = callback(event)
             if inspect.isawaitable(result):
                 await result
         except Exception as err:

@@ -27,6 +27,7 @@ from .util import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 
 # Kept as an import alias so tests / external callers can still reference the
 # static redact-key set when needed. Runtime redaction in this module always
@@ -207,6 +208,8 @@ def _local_mqtt_diagnostics(
             reason = "bridge_disabled"
         elif not host:
             reason = "missing_broker_host"
+        elif topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
+            reason = "broad_topic_filter_blocked"
         elif not topic_filter:
             reason = "missing_topic_filter"
         else:

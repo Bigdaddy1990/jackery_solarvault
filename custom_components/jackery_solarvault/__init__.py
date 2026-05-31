@@ -67,6 +67,7 @@ from .util import (
 type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
 
 _LOGGER = logging.getLogger(__name__)
+_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 
 
 # This integration is config-entry-only — there is no YAML configuration
@@ -225,6 +226,13 @@ async def _async_start_local_mqtt(
         DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     ).strip()
     if not topic_filter:
+        return
+    if topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
+        _LOGGER.warning(
+            "Jackery local MQTT listener not started: broad topic filter %r is "
+            "blocked for CPU safety; configure a scoped filter or leave empty",
+            topic_filter,
+        )
         return
     port = config_entry_int_option(
         entry, CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT

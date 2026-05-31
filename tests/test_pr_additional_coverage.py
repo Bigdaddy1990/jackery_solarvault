@@ -15,8 +15,8 @@ Covers gaps not addressed by the existing PR test files:
 9. local_mqtt._handle_message: bytearray non-UTF8 increments dropped counter
 10. local_mqtt diagnostics: topics_seen_count matches len(topics_seen) invariant
 
-NOTE: Where the source module has a known SyntaxError (local_mqtt.py, __init__.py)
-the tests are skipped gracefully.
+If local_mqtt/__init__ import fails, tests skip with an explicit message so
+syntax/dependency regressions are obvious.
 """
 
 import asyncio
@@ -26,7 +26,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
-# Conditional imports — local_mqtt has a known Python-3 SyntaxError
+# Conditional imports for environments where local_mqtt import fails.
 # ---------------------------------------------------------------------------
 
 try:
@@ -51,7 +51,7 @@ except SyntaxError:
 
 _skip_local_mqtt = pytest.mark.skipif(
     not _LOCAL_MQTT_OK,
-    reason="client/local_mqtt.py has a SyntaxError — fix except clause first",
+    reason="client/local_mqtt.py import failed; fix dependency/syntax issues first",
 )
 
 try:
@@ -86,7 +86,7 @@ except SyntaxError, ImportError:
 
 _skip_init = pytest.mark.skipif(
     not _INIT_OK,
-    reason="__init__.py imports local_mqtt.py which has a SyntaxError — fix first",
+    reason="__init__.py import failed; fix dependency/syntax issues first",
 )
 
 from custom_components.jackery_solarvault.client.api import (  # noqa: E402
