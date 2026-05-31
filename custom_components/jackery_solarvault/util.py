@@ -33,6 +33,7 @@ from .const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
     APP_SECTION_CT_STAT,
+    APP_SECTION_EPS_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
@@ -48,7 +49,9 @@ from .const import (
     APP_STAT_TOTAL_DISCHARGE,
     APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_EPS_ENERGY,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_EPS_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
@@ -84,11 +87,14 @@ from .const import (
     DATE_TYPE_YEAR,
     DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
     FIELD_CURRENT_VERSION,
+    FIELD_DEV_ID,
     FIELD_DEV_SN,
+    FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
+    FIELD_ID,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
     FIELD_LOAD_PW,
@@ -746,17 +752,24 @@ def safe_bool(value: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload v
 
 
 def smart_plug_serial(plug: object) -> str | None:
-    """Extract the serial number from a smart-plug subdevice payload.
+    """Extract the stable identity from a smart-plug subdevice payload.
 
     Parameters:
         plug (Any): A subdevice payload, expected to be a dict containing one of the serial fields.
 
     Returns:
-        serial (str | None): The trimmed serial string from `FIELD_DEVICE_SN`, `FIELD_DEV_SN`, or `FIELD_SN`, or `None` if the input is not a dict or no serial is present.
+        serial (str | None): The trimmed value from serial fields, falling back to cloud id fields for Shelly Cloud sockets.
     """
     if not isinstance(plug, dict):
         return None
-    raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+    raw = (
+        plug.get(FIELD_DEVICE_SN)
+        or plug.get(FIELD_DEV_SN)
+        or plug.get(FIELD_SN)
+        or plug.get(FIELD_DEVICE_ID)
+        or plug.get(FIELD_ID)
+        or plug.get(FIELD_DEV_ID)
+    )
     if raw is None:
         return None
     serial = str(raw).strip()
@@ -764,13 +777,13 @@ def smart_plug_serial(plug: object) -> str | None:
 
 
 def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
-    """Return plug entries sorted by their serial numbers.
+    """Return plug entries sorted by stable serial/id values.
 
     Parameters:
         plugs (Any): Iterable expected to be a list of plug payloads; if not a list, an empty list is returned.
 
     Returns:
-        list[dict[str, Any]]: The input entries that contain a serial (as determined by `smart_plug_serial`), sorted ascending by serial. Entries without a serial are omitted.
+        list[dict[str, Any]]: The input entries that contain a stable identity (as determined by `smart_plug_serial`), sorted ascending by that identity. Entries without an identity are omitted.
     """
     if not isinstance(plugs, list):
         return []
@@ -2228,9 +2241,6 @@ def day_power_energy_points(
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if unit and unit not in {"w", APP_UNIT_KWH}:
         return []
-    series = source.get(series_key)
-    if not isinstance(series, list) or not series:
-        return []
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -2258,9 +2268,24 @@ def day_power_energy_points(
     current_day_limit_minute = (
         now.hour * 60 + now.minute if begin == now.date() else 24 * 60 - 1
     )
+    series = source.get(series_key)
+    if not isinstance(series, list) or not series:
+        scalar_total = effective_period_total_value(source, section, stat_key)
+        if scalar_total != 0.0:  # noqa: RUF069  # exact zero means safe zero-fill
+            return []
+        zero_fill_max_bucket_minute = (current_day_limit_minute // bucket_minutes) * (
+            bucket_minutes
+        )
+        return [
+            TrendStatisticPoint(
+                datetime(begin.year, begin.month, begin.day, minute // 60, minute % 60),
+                0.0,
+            )
+            for minute in range(0, zero_fill_max_bucket_minute + 1, bucket_minutes)
+        ]
 
     buckets: dict[int, float] = {}
-    max_bucket_minute: int | None = None
+    last_bucket_minute: int | None = None
     for index, raw in enumerate(series):
         minute = _day_power_sample_minute(parsed_labels, index)
         if minute is None or minute > current_day_limit_minute:
@@ -2270,10 +2295,10 @@ def day_power_energy_points(
             continue
 
         bucket_minute = (minute // bucket_minutes) * bucket_minutes
-        max_bucket_minute = (
+        last_bucket_minute = (
             bucket_minute
-            if max_bucket_minute is None
-            else max(max_bucket_minute, bucket_minute)
+            if last_bucket_minute is None
+            else max(last_bucket_minute, bucket_minute)
         )
         sample_kwh = (
             max(sample_value, 0.0)
@@ -2282,10 +2307,10 @@ def day_power_energy_points(
         )
         buckets[bucket_minute] = buckets.get(bucket_minute, 0.0) + sample_kwh
 
-    if max_bucket_minute is None:
+    if last_bucket_minute is None:
         return []
 
-    for minute in range(0, max_bucket_minute + 1, bucket_minutes):
+    for minute in range(0, last_bucket_minute + 1, bucket_minutes):
         buckets.setdefault(minute, 0.0)
 
     raw_total = sum(buckets.values())
@@ -2467,6 +2492,22 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
     return None
 
 
+def first_nonzero_power_value(source: dict[str, Any], *keys: str) -> float | None:
+    """Return the first non-zero power value, falling back to the first zero."""
+    first_zero: float | None = None
+    for key in keys:
+        if key not in source or source.get(key) is None:
+            continue
+        value = safe_float(source.get(key))
+        if value is None:
+            continue
+        if value != 0:
+            return value
+        if first_zero is None:
+            first_zero = value
+    return first_zero
+
+
 def jackery_reported_home_load_power(props: dict[str, Any]) -> float | None:
     """Get the Jackery-reported live home/other-load power from device properties.
 
@@ -2489,8 +2530,8 @@ def jackery_grid_side_input_power(props: dict[str, Any]) -> float | None:
     Returns:
         float: AC input power in watts, or `None` if no suitable value is present.
     """
-    return first_power_value(
-        props, FIELD_IN_ONGRID_PW, FIELD_GRID_IN_PW, FIELD_IN_GRID_SIDE_PW
+    return first_nonzero_power_value(
+        props, FIELD_GRID_IN_PW, FIELD_IN_ONGRID_PW, FIELD_IN_GRID_SIDE_PW
     )
 
 
@@ -2503,8 +2544,8 @@ def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
     Returns:
         float: Power in watts if a known output field contains a numeric value, `None` otherwise.
     """
-    return first_power_value(
-        props, FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW
+    return first_nonzero_power_value(
+        props, FIELD_GRID_OUT_PW, FIELD_OUT_ONGRID_PW, FIELD_OUT_GRID_SIDE_PW
     )
 
 
@@ -2594,6 +2635,12 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
         if stat_key == APP_STAT_TOTAL_CT_OUTPUT_ENERGY:
             return APP_CHART_SERIES_Y2
 
+    if section.startswith(APP_SECTION_EPS_STAT):
+        if stat_key == APP_STAT_TOTAL_IN_EPS_ENERGY:
+            return APP_CHART_SERIES_Y1
+        if stat_key == APP_STAT_TOTAL_OUT_EPS_ENERGY:
+            return APP_CHART_SERIES_Y2
+
     if section.startswith(APP_SECTION_BATTERY_TRENDS):
         if stat_key == APP_STAT_TOTAL_TREND_CHARGE_ENERGY:
             return APP_CHART_SERIES_Y1
@@ -2678,7 +2725,10 @@ def trend_series_total(
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
-        if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
+        if (
+            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+            and server_total is not None
+        ):
             return round(server_total, 2)
         return None
 
@@ -2687,7 +2737,10 @@ def trend_series_total(
 
     if not valid_values:
         server_total = effective_period_total_value(source, section, stat_key)
-        if section.startswith(APP_SECTION_CT_STAT) and server_total is not None:
+        if (
+            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+            and server_total is not None
+        ):
             return round(server_total, 2)
         return None
 
@@ -2727,14 +2780,15 @@ def trend_series_has_value(
         ):
             return True
         return bool(
-            section.startswith(APP_SECTION_CT_STAT) and server_total is not None
+            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+            and server_total is not None
         )
 
     if any(safe_float(item) is not None for item in series):
         return True
 
     return bool(
-        section.startswith(APP_SECTION_CT_STAT)
+        section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
         and safe_float(source.get(stat_key)) is not None
     )
 

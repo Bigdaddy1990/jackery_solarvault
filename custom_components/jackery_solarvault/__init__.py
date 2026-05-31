@@ -6,7 +6,7 @@ import contextlib
 from datetime import timedelta
 import logging
 import re
-from typing import cast
+from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -17,6 +17,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
 from .client.local_mqtt import JackeryLocalMqttClient
+from .client.mqtt_push import JackeryMqttPushClient
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -210,7 +211,9 @@ def _local_mqtt_client(
 
 
 async def _async_start_local_mqtt(
-    hass: HomeAssistant, entry: JackeryConfigEntry
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
 ) -> None:
     """Start a per-entry local MQTT client when the entry is explicitly scoped.
 
@@ -249,6 +252,17 @@ async def _async_start_local_mqtt(
     password = config_entry_str_option(
         entry, CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
     )
+
+    async def _sink(
+        topic: str,
+        data: dict[str, Any] | None,
+        _raw_bytes: bytes,
+    ) -> None:
+        """Forward parsed LAN MQTT JSON into the coordinator payload router."""
+        if data is None:
+            return
+        await coordinator.async_handle_local_mqtt_message(topic, data)
+
     client = JackeryLocalMqttClient(
         hass,
         host=host,
@@ -256,6 +270,7 @@ async def _async_start_local_mqtt(
         username=username or None,
         password=password or None,
         client_id=f"ha-jackery-{entry.entry_id[:8]}",
+        sink=_sink,
         topic_filter=topic_filter,
     )
     bucket = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
@@ -314,7 +329,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
-                _async_start_local_mqtt(hass, entry),
+                _async_start_local_mqtt(hass, entry, coordinator),
                 return_exceptions=True,
             ),
         )

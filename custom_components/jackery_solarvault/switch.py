@@ -24,20 +24,30 @@ from .const import (
     FIELD_AUTO_STANDBY,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
+    FIELD_CONTROL_ALLOWED,
+    FIELD_DEV_ID,
+    FIELD_DEV_SN,
+    FIELD_DEVICE_ID,
     FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
     FIELD_FOLLOW_METER,
+    FIELD_ID,
     FIELD_IS_AUTO_STANDBY,
+    FIELD_IS_CLOUD,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_OFF_GRID_DOWN,
     FIELD_SCAN_NAME,
+    FIELD_SN,
     FIELD_SOCKET_PRIORITY,
     FIELD_SW_EPS,
     FIELD_SWITCH_STATE,
     FIELD_SYS_SWITCH,
+    FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_VERSION,
     FIELD_WPS,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SMART_PLUGS,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
@@ -166,6 +176,16 @@ async def _set_storm_warning(
     await coord.async_set_storm_warning(dev_id, value)
 
 
+async def _set_third_party_mqtt_enabled(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the app third-party MQTT bridge using the current config fields."""
+    await coord.async_update_third_party_mqtt_config(
+        dev_id,
+        {FIELD_THIRD_PARTY_MQTT_ENABLE: 1 if value else 0},
+    )
+
+
 _smart_plug_serial = smart_plug_serial
 
 
@@ -227,6 +247,15 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         fallback_section=PAYLOAD_WEATHER_PLAN,
         use_task_plan_fallback=True,
         setter=_set_storm_warning,
+    ),
+    JackerySwitchDescription(
+        key="third_party_mqtt_enable",
+        translation_key="third_party_mqtt_enable",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:mqtt",
+        source_keys=(FIELD_THIRD_PARTY_MQTT_ENABLE,),
+        source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+        setter=_set_third_party_mqtt_enabled,
     ),
 )
 
@@ -401,6 +430,22 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             raw = self._plug.get(FIELD_SYS_SWITCH)
         return safe_bool(raw)
 
+    @staticmethod
+    def _cloud_device_id(plug: dict[str, Any]) -> str | None:
+        """Return the Shelly Cloud ``deviceId`` used by the app control API."""
+        raw = plug.get(FIELD_DEVICE_ID) or plug.get(FIELD_ID) or plug.get(FIELD_DEV_ID)
+        if raw in (None, ""):
+            return None
+        return str(raw)
+
+    @staticmethod
+    def _jackery_device_sn(plug: dict[str, Any]) -> str | None:
+        """Return the real Jackery subdevice serial for local/BLE setters."""
+        raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+        if raw in (None, ""):
+            return None
+        return str(raw)
+
     def _raise_action_error(self, error: object) -> None:
         """Raise a localized HomeAssistantError indicating the smart-plug switch action failed.
 
@@ -431,16 +476,36 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             ConfigEntryAuthFailed: Re-raised when the coordinator reports an authentication failure.
             HomeAssistantError: Re-raised if the error contains a `translation_key`; other errors are converted to a translated action error via the entity's `_raise_action_error`.
         """
-        plug_sn = _smart_plug_serial(self._plug)
-        if plug_sn is None:
+        plug = self._plug
+        plug_sn = self._jackery_device_sn(plug)
+        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
+        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+            "shelly"
+        )
+        if is_cloud:
+            shelly_device_id = self._cloud_device_id(plug)
+            if shelly_device_id is None:
+                self._raise_action_error("missing Shelly deviceId")
+                return
+            if safe_bool(plug.get(FIELD_CONTROL_ALLOWED)) is not True:
+                self._raise_action_error("Shelly control is not allowed")
+                return
+        elif plug_sn is None:
             self._raise_action_error("missing deviceSn")
             return
         try:
-            await self.coordinator.async_set_smart_plug_switch(
-                self._device_id,
-                plug_sn=plug_sn,
-                on=value,
-            )
+            if is_cloud:
+                await self.coordinator.async_set_shelly_cloud_switch(
+                    self._device_id,
+                    shelly_device_id=shelly_device_id,
+                    on=value,
+                )
+            else:
+                await self.coordinator.async_set_smart_plug_switch(
+                    self._device_id,
+                    plug_sn=plug_sn,
+                    on=value,
+                )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
@@ -477,6 +542,10 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             FIELD_SCAN_NAME,
             FIELD_COMM_STATE,
             FIELD_COMM_MODE,
+            FIELD_CONTROL_ALLOWED,
+            FIELD_DEVICE_ID,
+            FIELD_ID,
+            FIELD_IS_CLOUD,
             FIELD_SOCKET_PRIORITY,
             FIELD_SWITCH_STATE,
             FIELD_SYS_SWITCH,
@@ -558,7 +627,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
             ConfigEntryAuthFailed: If the config entry authentication fails (re-raised).
             HomeAssistantError: If the plug serial is missing or the update action fails; errors include translation placeholders when available.
         """
-        plug_sn = _smart_plug_serial(self._plug)
+        plug_sn = self._jackery_device_sn(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
             return
@@ -619,6 +688,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
         "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
         "storm_warning": lambda props, adv: adv or FIELD_WPS in props,
+        "third_party_mqtt_enable": lambda _props, adv: adv,
     }
 
     def _collect_entities() -> list[SwitchEntity]:

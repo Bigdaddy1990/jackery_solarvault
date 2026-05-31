@@ -109,6 +109,7 @@ class JackeryMqttPushClient:
         self._consecutive_auth_failures = 0
         self._tls_custom_ca_loaded = False
         self._tls_certificate_source = "not_built"
+        self._tls_x509_strict_disabled = False
 
     async def async_start(
         self,
@@ -486,6 +487,7 @@ class JackeryMqttPushClient:
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
+        self._tls_x509_strict_disabled = False
 
         ca_path = Path(
             self._hass.config.path(
@@ -510,6 +512,16 @@ class JackeryMqttPushClient:
 
         if hasattr(ssl, "TLSVersion"):
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+
+        strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
+        if (
+            isinstance(strict_flag, int)
+            and hasattr(ctx, "verify_flags")
+            and ctx.verify_flags & strict_flag
+        ):
+            ctx.verify_flags &= ~strict_flag
+            self._tls_x509_strict_disabled = True
+            source_parts.append("x509_strict_disabled")
 
         self._tls_certificate_source = "+".join(source_parts)
         return ctx
@@ -656,7 +668,7 @@ class JackeryMqttPushClient:
             "consecutive_auth_failures": self._consecutive_auth_failures,
             "last_connect_failure_signature": self._last_connect_failure_signature,
             "tls_insecure": False,
-            "tls_x509_strict_disabled": False,
+            "tls_x509_strict_disabled": self._tls_x509_strict_disabled,
             "tls_custom_ca_loaded": self._tls_custom_ca_loaded,
             "tls_certificate_source": self._tls_certificate_source,
             "library": MQTT_CLIENT_LIBRARY,

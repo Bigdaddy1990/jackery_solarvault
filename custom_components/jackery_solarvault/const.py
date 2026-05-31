@@ -132,6 +132,9 @@ DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"  # ?deviceId&...
 DEVICE_SOCKET_STATISTIC_PATH: Final = (
     "/v1/device/stat/smartSocketStatistic"  # ?smartSocketId=<socket accessory>
 )
+SHELLY_DEVICES_PATH: Final = "/v1/device/shelly/devices"
+SHELLY_REALTIME_POWER_PATH: Final = "/v1/wss-cloud/device/shelly/device/realtime-power"
+SHELLY_CONTROL_PATH: Final = "/v1/wss-cloud/device/shelly/device/control"
 BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
 OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
 LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>
@@ -289,10 +292,12 @@ PAYLOAD_BATTERY_TRENDS: Final = "battery_trends"
 PAYLOAD_HOME_TRENDS: Final = "home_trends"
 PAYLOAD_ALARM: Final = "alarm"
 PAYLOAD_DEVICE_STATISTIC: Final = "device_statistic"
+PAYLOAD_LIFETIME_COUNTERS: Final = "lifetime_counters"
 PAYLOAD_OTA: Final = "ota"
 PAYLOAD_LOCATION: Final = "location"
 PAYLOAD_WEATHER_PLAN: Final = "weather_plan"
 PAYLOAD_TASK_PLAN: Final = "task_plan"
+PAYLOAD_THIRD_PARTY_MQTT_CONFIG: Final = "third_party_mqtt_config"
 PAYLOAD_PRICE_SOURCES: Final = "price_sources"
 PAYLOAD_BATTERY_PACKS: Final = "battery_packs"
 PAYLOAD_CT_METER: Final = "ct_meter"
@@ -316,12 +321,27 @@ PAYLOAD_PRICE_HISTORY_CONFIG: Final = "price_history_config"
 # Common Jackery app/API field names used by several platforms. Names are kept
 # verbatim because they are wire keys documented or observed in app traffic.
 FIELD_ACTION_ID: Final = "actionId"
+FIELD_ACTION: Final = "action"
+FIELD_ALERT_ID: Final = "alertId"
 FIELD_BODY: Final = "body"
+FIELD_CONTROL_ALLOWED: Final = "controlAllowed"
 FIELD_DATA: Final = "data"
+FIELD_FUNCTION: Final = "function"
 FIELD_ID: Final = "id"
 FIELD_VERSION: Final = "version"
 FIELD_MESSAGE_TYPE: Final = "messageType"
 FIELD_TIMESTAMP: Final = "timestamp"
+FIELD_BIND_ID: Final = "bindId"
+FIELD_DEVICE_CODE: Final = "deviceCode"
+FIELD_HOST: Final = "host"
+FIELD_ICON: Final = "icon"
+FIELD_ICON_PATH: Final = "iconPath"
+FIELD_INTEGRATOR_ENABLED: Final = "integratorEnabled"
+FIELD_POWER_BODY: Final = "powerBody"
+FIELD_SWITCH: Final = "switch"
+SHELLY_CONTROL_FUNCTION_SWITCH: Final = "switch"
+SHELLY_CONTROL_ACTION_ON: Final = "on"
+SHELLY_CONTROL_ACTION_OFF: Final = "off"
 # AccSocketBody short-keys per docs/html/jackery_smali_home_assistant_report.html
 # §"AccSocketBody". ``op`` is already an alias for ``outPw`` (coordinator
 # merge), ``switch`` is exposed through switch/binary_sensor entities, and
@@ -389,6 +409,13 @@ FIELD_WPS: Final = "wps"
 FIELD_WPC: Final = "wpc"
 FIELD_MINS_INTERVAL: Final = "minsInterval"
 FIELD_STORM: Final = "storm"
+FIELD_START_TS: Final = "startTs"
+FIELD_END_TS: Final = "endTs"
+FIELD_STATUS: Final = "status"
+FIELD_MANUAL: Final = "manual"
+FIELD_ACTION_TYPE: Final = "actionType"
+FIELD_TASK_TYPE: Final = "taskType"
+FIELD_TID: Final = "tid"
 FIELD_WORK_MODEL: Final = "workModel"
 FIELD_TEMP_UNIT: Final = "tempUnit"
 FIELD_DYNAMIC_OR_SINGLE: Final = "dynamicOrSingle"
@@ -618,6 +645,13 @@ MAIN_PROPERTY_ALIAS_PAIRS: Final = (
 
 TASK_PLAN_BODY: Final = FIELD_BODY
 TASK_PLAN_TASKS: Final = "tasks"
+TIMER_TASK_ACTION_ADD: Final = 1
+TIMER_TASK_ACTION_DELETE: Final = 2
+TIMER_TASK_ACTION_UPDATE: Final = 3
+TIMER_TASK_ACTION_READ: Final = 4
+TIMER_TASK_TYPE_SMART_PLUG: Final = 1
+TIMER_TASK_TYPE_CUSTOM_MODE: Final = 2
+TIMER_TASK_TYPE_TIME_ELEC: Final = 3
 
 # MQTT subdevice routing and mirroring keys documented in PROTOCOL.md §3.
 CT_METER_KEYS: Final = frozenset({
@@ -747,6 +781,8 @@ BATTERY_PACK_HINT_KEYS: Final = frozenset({
     FIELD_CELL_TEMP,
     FIELD_IN_PW,
     FIELD_OUT_PW,
+    FIELD_IN_EGY,
+    FIELD_OUT_EGY,
     FIELD_RB,
     FIELD_IP,
     FIELD_OP,
@@ -909,6 +945,10 @@ APP_DEVICE_STAT_ONGRID_OUTPUT: Final = "outOngridEgy"
 APP_DEVICE_STAT_BATTERY_TO_GRID: Final = "batOtGridEgy"
 APP_DEVICE_STAT_PV_TO_BATTERY: Final = "pvOtBatEgy"
 APP_DEVICE_STAT_ONGRID_TO_BATTERY: Final = "ongridOtBatEgy"
+APP_DEVICE_STAT_EPS_INPUT: Final = "inEpsEgy"
+APP_DEVICE_STAT_EPS_OUTPUT: Final = "outEpsEgy"
+APP_DEVICE_STAT_AC_TO_BATTERY: Final = "acOtBatEgy"
+APP_DEVICE_STAT_BATTERY_TO_AC: Final = "batOtAcEgy"
 
 APP_CHART_METRIC_KEY_BY_SECTION_PREFIX: Final = {
     APP_SECTION_PV_STAT: {
@@ -925,6 +965,14 @@ APP_CHART_METRIC_KEY_BY_SECTION_PREFIX: Final = {
     APP_SECTION_BATTERY_STAT: {
         APP_STAT_TOTAL_CHARGE: "battery_charge_energy",
         APP_STAT_TOTAL_DISCHARGE: "battery_discharge_energy",
+    },
+    APP_SECTION_CT_STAT: {
+        APP_STAT_TOTAL_CT_INPUT_ENERGY: "ct_input_energy",
+        APP_STAT_TOTAL_CT_OUTPUT_ENERGY: "ct_output_energy",
+    },
+    APP_SECTION_EPS_STAT: {
+        APP_STAT_TOTAL_IN_EPS_ENERGY: "eps_input_energy",
+        APP_STAT_TOTAL_OUT_EPS_ENERGY: "eps_output_energy",
     },
     APP_SECTION_HOME_TRENDS: {
         APP_STAT_TOTAL_HOME_ENERGY: "home_energy",
@@ -960,6 +1008,30 @@ APP_CHART_STAT_METRICS: Final = (
         APP_STAT_TOTAL_DISCHARGE,
         "battery_discharge_energy",
         "Battery discharge energy",
+    ),
+    (
+        APP_SECTION_CT_STAT,
+        APP_STAT_TOTAL_CT_INPUT_ENERGY,
+        "ct_input_energy",
+        "CT grid import energy",
+    ),
+    (
+        APP_SECTION_CT_STAT,
+        APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+        "ct_output_energy",
+        "CT grid export energy",
+    ),
+    (
+        APP_SECTION_EPS_STAT,
+        APP_STAT_TOTAL_IN_EPS_ENERGY,
+        "eps_input_energy",
+        "EPS input energy",
+    ),
+    (
+        APP_SECTION_EPS_STAT,
+        APP_STAT_TOTAL_OUT_EPS_ENERGY,
+        "eps_output_energy",
+        "EPS output energy",
     ),
     (
         APP_SECTION_HOME_TRENDS,
@@ -1139,6 +1211,8 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
     PAYLOAD_TASK_PLAN,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+    PAYLOAD_LIFETIME_COUNTERS,
     PAYLOAD_NOTICE,
     PAYLOAD_MQTT_LAST,
 )
@@ -1147,7 +1221,6 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
 SERVICE_RENAME_SYSTEM: Final = "rename_system"
 SERVICE_REFRESH_WEATHER_PLAN: Final = "refresh_weather_plan"
 SERVICE_DELETE_STORM_ALERT: Final = "delete_storm_alert"
-# Experimental — see coordinator.async_set/async_query_third_party_mqtt_config.
 SERVICE_SET_THIRD_PARTY_MQTT_CONFIG: Final = "set_third_party_mqtt_config"
 SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "query_third_party_mqtt_config"
 SERVICE_SEND_BLE_COMMAND: Final = "send_ble_command"
@@ -1382,7 +1455,7 @@ ACTION_ID_QUERY_WEATHER_PLAN: Final = 3020  # cmd=23 QueryWeatherPlan
 # authoritative.
 ACTION_ID_EPS_ENABLED: Final = 3022  # cmd=107 DevicePropertyChange (EPS toggle)
 ACTION_ID_STANDBY: Final = 3023  # cmd=107 DevicePropertyChange (standby mode 1/2)
-ACTION_ID_CT_PHASE: Final = 3026  # cmd=111 ControlSubDevice (CT phase 1..4)
+ACTION_ID_CT_PHASE: Final = 3026  # cmd=111 ControlSubDevice (CT phase 1..3, 4=combined)
 ACTION_ID_REBOOT_DEVICE: Final = 3030  # cmd=107 DevicePropertyChange
 ACTION_ID_STORM_MINUTES: Final = 3034  # cmd=*** SendWeatherAlert
 ACTION_ID_DELETE_STORM_ALERT: Final = 3035  # cmd=*** CancelWeatherAlert

@@ -52,6 +52,8 @@ LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
 # Guardrail for unexpectedly large broker payloads.
 LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 
+_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
+
 
 # Sink signature kept loose so the wiring layer can pass any async callable
 # that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
@@ -103,6 +105,7 @@ class JackeryLocalMqttClient:
         self._connected = False
         self._messages_received = 0
         self._messages_dropped = 0
+        self._messages_forwarded = 0
         self._topics_seen: list[str] = []
         self._topics_seen_set: set[str] = set()
         self._topics_seen_truncated = False
@@ -114,6 +117,7 @@ class JackeryLocalMqttClient:
         self._connect_attempts = 0
         self._blocked_by_filter_count = 0
         self._payload_too_large_count = 0
+        self._home_assistant_event_count = 0
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -329,6 +333,10 @@ class JackeryLocalMqttClient:
             self._payload_too_large_count += 1
             self._messages_dropped += 1
             return
+        if self._looks_like_home_assistant_event_payload(raw_bytes):
+            self._home_assistant_event_count += 1
+            self._messages_dropped += 1
+            return
         # Hot-path CPU guard: when no sink is configured, parsing JSON and
         # UTF-8 decoding / callback scheduling is unnecessary work.
         if self._sink is None:
@@ -360,6 +368,7 @@ class JackeryLocalMqttClient:
             self._messages_dropped += 1
 
         if self._sink is not None:
+            self._messages_forwarded += 1
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
@@ -369,6 +378,16 @@ class JackeryLocalMqttClient:
         if not self._is_broad_topic_filter():
             return False
         return topic.startswith("homeassistant/")
+
+    @staticmethod
+    def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
+        """Return True for HA event-stream JSON published on a shared topic."""
+        head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
+        return (
+            b'"event_type"' in head
+            and b'"event_data"' in head
+            and (b'"state_changed"' in head or b'"entity_id"' in head)
+        )
 
     def _is_broad_topic_filter(self) -> bool:
         """Return True when the current topic filter is globally broad."""
@@ -468,6 +487,7 @@ class JackeryLocalMqttClient:
             "topics_seen_truncated": self._topics_seen_truncated,
             "messages_received": self._messages_received,
             "messages_dropped": self._messages_dropped,
+            "messages_forwarded": self._messages_forwarded,
             "last_topic": last_topic,
             "last_message_at": self._last_message_at,
             "last_connect_at": self._last_connect_at,
@@ -476,6 +496,7 @@ class JackeryLocalMqttClient:
             "connect_attempts": self._connect_attempts,
             "blocked_by_filter_count": self._blocked_by_filter_count,
             "payload_too_large_count": self._payload_too_large_count,
+            "home_assistant_event_count": self._home_assistant_event_count,
             "library": MQTT_CLIENT_LIBRARY,
         }
 

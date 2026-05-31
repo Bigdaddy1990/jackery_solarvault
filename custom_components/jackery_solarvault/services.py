@@ -91,11 +91,9 @@ DELETE_STORM_ALERT_SCHEMA = vol.Schema({
         cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
     ),
 })
-# Experimental third-party MQTT bridge — see PROTOCOL.md §15. ``username``/
-# ``password`` accept any printable text; the device firmware is expected to
-# AES-256-CBC-encrypt them itself if the cloud relay forbids plaintext, but
-# until that path is verified the integration sends them as-is and lets the
-# user verify reception against their own broker.
+# Third-party MQTT bridge. The service accepts plaintext form values from HA;
+# the coordinator encodes ``userName``/``password``/``token`` with the app's
+# ``bb/e.d`` codec before publishing the command body.
 SET_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
     vol.Required(SERVICE_FIELD_ENABLE): cv.boolean,

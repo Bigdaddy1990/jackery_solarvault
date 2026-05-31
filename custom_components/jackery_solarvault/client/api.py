@@ -59,6 +59,7 @@ from ..const import (
     DEVICE_STATISTIC_PATH,
     DEVICE_TODAY_ENERGY_PATH,
     FIELD_ACCOUNT,
+    FIELD_ACTION,
     FIELD_BAT_SOC,
     FIELD_BATTERY_PACKS,
     FIELD_BODY,
@@ -71,6 +72,7 @@ from ..const import (
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_SN_LIST,
+    FIELD_FUNCTION,
     FIELD_ID,
     FIELD_IN_PW,
     FIELD_IP,
@@ -132,6 +134,9 @@ from ..const import (
     RSA_PUBLIC_KEY_B64,
     SAVE_DYNAMIC_MODE_PATH,
     SAVE_SINGLE_MODE_PATH,
+    SHELLY_CONTROL_PATH,
+    SHELLY_DEVICES_PATH,
+    SHELLY_REALTIME_POWER_PATH,
     SYS_VERSION,
     SYSTEM_LIST_PATH,
     SYSTEM_NAME_PATH,
@@ -1169,6 +1174,51 @@ class JackeryApi:
             begin_date=begin_date,
             end_date=end_date,
         )
+
+    async def async_get_shelly_devices(self) -> list[dict[str, Any]]:
+        """GET device/shelly/devices and return app-linked Shelly accessories."""
+        data = await self._get_json(SHELLY_DEVICES_PATH)
+        raw = data.get(FIELD_DATA)
+        if isinstance(raw, list):
+            return [item for item in raw if isinstance(item, dict)]
+        if isinstance(raw, dict):
+            devices = raw.get("devices")
+            if isinstance(devices, list):
+                return [item for item in devices if isinstance(item, dict)]
+            return [raw]
+        return []
+
+    async def async_get_shelly_realtime_power(
+        self,
+        device_id: str | int,
+    ) -> dict[str, Any]:
+        """GET Shelly realtime-power for one app-linked accessory."""
+        data = await self._get_json(
+            SHELLY_REALTIME_POWER_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
+        )
+        return self._payload_dict(data, SHELLY_REALTIME_POWER_PATH)
+
+    async def async_control_shelly_device(
+        self,
+        device_id: str | int,
+        *,
+        action: str,
+        function: str,
+        control_allowed: bool = True,
+    ) -> bool:
+        """POST Shelly control using app-derived action/function values."""
+        if not control_allowed:
+            raise JackeryApiError("Shelly control is not allowed for this device")
+        data = await self._post_form(
+            SHELLY_CONTROL_PATH,
+            {
+                FIELD_DEVICE_ID: str(device_id),
+                FIELD_ACTION: str(action),
+                FIELD_FUNCTION: str(function),
+            },
+        )
+        return bool(data.get(FIELD_DATA, True))
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
         """Get a normalized list of battery pack dictionaries for the given device serial number.

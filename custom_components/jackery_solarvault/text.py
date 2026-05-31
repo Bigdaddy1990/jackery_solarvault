@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.text import TextEntity
+from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -17,6 +17,10 @@ from .const import (
     FIELD_ID,
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_NAME,
+    FIELD_THIRD_PARTY_MQTT_IP,
+    FIELD_THIRD_PARTY_MQTT_PASSWORD,
+    FIELD_THIRD_PARTY_MQTT_TOKEN,
+    FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_SYSTEM,
 )
 from .coordinator import JackerySolarVaultCoordinator
@@ -30,6 +34,39 @@ from .util import append_unique_entity, coordinator_entity_signature
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
+
+_THIRD_PARTY_MQTT_TEXT_FIELDS: tuple[
+    tuple[str, str, str, TextMode, str | None], ...
+] = (
+    (
+        "third_party_mqtt_ip",
+        "third_party_mqtt_ip",
+        FIELD_THIRD_PARTY_MQTT_IP,
+        TextMode.TEXT,
+        None,
+    ),
+    (
+        "third_party_mqtt_username",
+        "third_party_mqtt_username",
+        FIELD_THIRD_PARTY_MQTT_USERNAME,
+        TextMode.TEXT,
+        None,
+    ),
+    (
+        "third_party_mqtt_password",
+        "third_party_mqtt_password",
+        FIELD_THIRD_PARTY_MQTT_PASSWORD,
+        TextMode.PASSWORD,
+        None,
+    ),
+    (
+        "third_party_mqtt_token",
+        "third_party_mqtt_token",
+        FIELD_THIRD_PARTY_MQTT_TOKEN,
+        TextMode.TEXT,
+        r"^\d{0,9}$",
+    ),
+)
 
 
 async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
@@ -71,6 +108,28 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
+            if coordinator.device_supports_advanced(
+                dev_id
+            ) or coordinator.device_bluetooth_key(dev_id):
+                for (
+                    key_suffix,
+                    translation_key,
+                    field,
+                    mode,
+                    pattern,
+                ) in _THIRD_PARTY_MQTT_TEXT_FIELDS:
+                    _append_unique(
+                        entities,
+                        JackeryThirdPartyMqttText(
+                            coordinator,
+                            dev_id,
+                            key_suffix=key_suffix,
+                            translation_key=translation_key,
+                            field=field,
+                            mode=mode,
+                            pattern=pattern,
+                        ),
+                    )
         return entities
 
     last_signature: tuple[Any, ...] = ()
@@ -189,3 +248,70 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         # Trigger a coordinator refresh so every dependent entity also
         # picks up the new name next cycle
         await self.coordinator.async_request_refresh()
+
+
+class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
+    """Editable ThirdPartMQTTConfig string field."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_min = 0
+    _attr_native_max = 128
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        key_suffix: str,
+        translation_key: str,
+        field: str,
+        mode: TextMode,
+        pattern: str | None,
+    ) -> None:
+        """Initialise the Third-Party MQTT text field."""
+        super().__init__(coordinator, device_id, key_suffix)
+        self._field = field
+        self._attr_translation_key = translation_key
+        self._attr_mode = mode
+        if pattern is not None:
+            self._attr_pattern = pattern
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the current plaintext value used for writes."""
+        value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
+            self._field
+        )
+        if value is None:
+            return None
+        return str(value)
+
+    def _raise_action_error(self, error: object) -> None:
+        """Raise a translatable HA action error for this text entity."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="entity_action_failed",
+            translation_placeholders={
+                "entity": str(self._attr_translation_key),
+                "device_id": self._device_id,
+                "error": str(error),
+            },
+        )
+
+    async def async_set_value(self, value: str) -> None:
+        """Write this ThirdPartMQTTConfig string field."""
+        new_value = str(value or "").strip()
+        try:
+            await self.coordinator.async_update_third_party_mqtt_config(
+                self._device_id,
+                {self._field: new_value},
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)

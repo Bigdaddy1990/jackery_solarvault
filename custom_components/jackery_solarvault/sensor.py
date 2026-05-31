@@ -138,6 +138,8 @@ from .const import (
     APP_STAT_TODAY_LOAD,
     APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
+    APP_STAT_TOTAL_CT_INPUT_ENERGY,
+    APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
     APP_STAT_TOTAL_DISCHARGE,
     APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_HOME_ENERGY,
@@ -490,6 +492,24 @@ def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
     return _getter
 
 
+def _prop_power_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
+    def _getter(props: dict[str, Any]) -> object:
+        first_zero: float | None = None
+        for key in keys:
+            if key not in props or props.get(key) is None:
+                continue
+            value = safe_float(props.get(key))
+            if value is None:
+                continue
+            if value != 0:
+                return value
+            if first_zero is None:
+                first_zero = value
+        return first_zero
+
+    return _getter
+
+
 def _payload_http_prop(key: str) -> Callable[[dict[str, Any]], Any]:
     """Read the latest HTTP property value before MQTT overlay values."""
 
@@ -622,7 +642,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="grid_in_power",
         translation_key="grid_in_power",
-        getter=_prop_any(FIELD_IN_ONGRID_PW, FIELD_GRID_IN_PW, FIELD_IN_GRID_SIDE_PW),
+        getter=_prop_power_any(
+            FIELD_GRID_IN_PW, FIELD_IN_ONGRID_PW, FIELD_IN_GRID_SIDE_PW
+        ),
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -631,8 +653,8 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="grid_out_power",
         translation_key="grid_out_power",
-        getter=_prop_any(
-            FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW
+        getter=_prop_power_any(
+            FIELD_GRID_OUT_PW, FIELD_OUT_ONGRID_PW, FIELD_OUT_GRID_SIDE_PW
         ),
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -1724,8 +1746,107 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
-    # PROTOCOL.md §2 keeps Smart-Meter/CT live values on MQTT `devType=3`.
-    # Obsolete CT period entities are cleaned from the registry by __init__.py.
+    # ------------------------------------------------------------------
+    # CT / Smart-Meter period totals (CtStatApi$Bean).
+    # The endpoint is accessory-scoped (`devType=3` Smart Meter / Shelly Pro
+    # 3EM), so the coordinator resolves the CT accessory id before polling.
+    # ------------------------------------------------------------------
+    JackeryStatSensorDescription(
+        key="ct_input_day_energy",
+        translation_key="ct_input_day_energy",
+        stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_input_week_energy",
+        translation_key="ct_input_week_energy",
+        stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_input_month_energy",
+        translation_key="ct_input_month_energy",
+        stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_input_year_energy",
+        translation_key="ct_input_year_energy",
+        stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-import",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_output_day_energy",
+        translation_key="ct_output_day_energy",
+        stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_output_week_energy",
+        translation_key="ct_output_week_energy",
+        stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_output_month_energy",
+        translation_key="ct_output_month_energy",
+        stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
+    JackeryStatSensorDescription(
+        key="ct_output_year_energy",
+        translation_key="ct_output_year_energy",
+        stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+        section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        icon="mdi:transmission-tower-export",
+    ),
     # Source: /v1/device/stat/sys/battery (dateType=week) field APP_STAT_TOTAL_CHARGE
     JackeryStatSensorDescription(
         key="battery_charge_week_energy",

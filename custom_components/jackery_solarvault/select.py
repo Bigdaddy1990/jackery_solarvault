@@ -30,6 +30,8 @@ from .const import (
     FIELD_CID,
     FIELD_COMPANY_NAME,
     FIELD_COUNTRY,
+    FIELD_DEV_SN,
+    FIELD_DEVICE_SN,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_MINS_INTERVAL,
     FIELD_NAME,
@@ -39,6 +41,7 @@ from .const import (
     FIELD_OFF_GRID_TIME,
     FIELD_PLATFORM_COMPANY_ID,
     FIELD_PRICE_MODE,
+    FIELD_SCHE_PHASE,
     FIELD_SINGLE_PRICE,
     FIELD_STORM,
     FIELD_SYSTEM_REGION,
@@ -46,6 +49,7 @@ from .const import (
     FIELD_WORK_MODEL,
     FIELD_WPC,
     FIELD_WPS,
+    PAYLOAD_CT_METER,
     PAYLOAD_PRICE,
     PAYLOAD_PRICE_SOURCES,
     PAYLOAD_PROPERTIES,
@@ -80,6 +84,14 @@ _AUTO_OFF_OPTIONS = [f"h_{hours}" for hours in AUTO_OFF_HOURS]
 _HOURS_TO_AUTO_OFF_OPTION = {hours: f"h_{hours}" for hours in AUTO_OFF_HOURS}
 _AUTO_OFF_OPTION_TO_HOURS = {f"h_{hours}": hours for hours in AUTO_OFF_HOURS}
 _OPTION_TO_PRICE_MODE = {v: k for k, v in PRICE_MODE_TO_OPTION.items()}
+_CT_PHASE_TO_OPTION = {
+    1: "phase_1",
+    2: "phase_2",
+    3: "phase_3",
+    # App schePhase=4 is not a fourth conductor; it means combined phases.
+    4: "phase_4",
+}
+_OPTION_TO_CT_PHASE = {value: key for key, value in _CT_PHASE_TO_OPTION.items()}
 
 
 def _raise_select_action_error(
@@ -540,6 +552,39 @@ async def _price_provider_select(entity: JackerySelect, option: str) -> None:
     _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
+def _ct_phase_current(entity: JackerySelect) -> str | None:
+    ct = entity._payload.get(PAYLOAD_CT_METER) or {}
+    if not isinstance(ct, dict):
+        return None
+    raw_phase = safe_int(ct.get(FIELD_SCHE_PHASE))
+    if raw_phase is None:
+        return None
+    return _CT_PHASE_TO_OPTION.get(raw_phase)
+
+
+async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
+    phase = _OPTION_TO_CT_PHASE.get(option)
+    if phase is None:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    ct = entity._payload.get(PAYLOAD_CT_METER) or {}
+    if not isinstance(ct, dict):
+        _raise_select_action_error(
+            entity,
+            "entity_action_failed",
+            error="ct meter payload missing",
+        )
+    ct_sn = str(
+        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ct.get("deviceSn") or ""
+    ).strip()
+    if not ct_sn:
+        _raise_select_action_error(
+            entity,
+            "entity_action_failed",
+            error="ct meter serial missing",
+        )
+    await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)
+
+
 # ---------------------------------------------------------------------------
 # Description registry
 # ---------------------------------------------------------------------------
@@ -594,6 +639,14 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         options_fn=_price_provider_options,
         current_fn=_price_provider_current,
         select_fn=_price_provider_select,
+    ),
+    JackerySelectDescription(
+        key="ct_phase_select",
+        translation_key="ct_phase_select",
+        icon="mdi:transmission-tower",
+        options=list(_OPTION_TO_CT_PHASE.keys()),
+        current_fn=_ct_phase_current,
+        select_fn=_ct_phase_select,
     ),
 )
 
@@ -670,6 +723,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                 None,
                 "",
             )
+        if key == "ct_phase_select":
+            return isinstance(payload.get(PAYLOAD_CT_METER), dict)
         return False
 
     def _collect_entities() -> list[SelectEntity]:

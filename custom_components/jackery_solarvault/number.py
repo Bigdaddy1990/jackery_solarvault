@@ -43,11 +43,13 @@ from .const import (
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
     FIELD_SYSTEM_ID,
+    FIELD_THIRD_PARTY_MQTT_PORT,
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
     PAYLOAD_PRICE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
@@ -150,6 +152,16 @@ async def _set_single_price(
         value (float): Price to set, in the device's currency/unit.
     """
     await coord.async_set_single_price(dev_id, value)
+
+
+async def _set_third_party_mqtt_port(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the Third-Party MQTT broker port."""
+    await coord.async_update_third_party_mqtt_config(
+        dev_id,
+        {FIELD_THIRD_PARTY_MQTT_PORT: int(value)},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +299,20 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         dynamic_unit=_single_tariff_dynamic_unit,
         value_transform=lambda v: float(v),
     ),
+    JackeryNumberDescription(
+        key="third_party_mqtt_port",
+        translation_key="third_party_mqtt_port",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:numeric",
+        native_min_value=1,
+        native_max_value=65535,
+        native_step=1,
+        source_keys=(FIELD_THIRD_PARTY_MQTT_PORT,),
+        source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+        setter=_set_third_party_mqtt_port,
+        validate_range=True,
+    ),
 )
 
 
@@ -324,7 +350,13 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     def _section(self) -> dict[str, Any]:
         """Read the configured payload section (properties/price/...)."""
-        return self._payload.get(self.entity_description.source_section) or {}
+        if self.entity_description.source_section == PAYLOAD_THIRD_PARTY_MQTT_CONFIG:
+            section = self.coordinator.third_party_mqtt_config_plaintext(
+                self._device_id
+            )
+        else:
+            section = self._payload.get(self.entity_description.source_section) or {}
+        return section if isinstance(section, dict) else {}
 
     @property
     def native_value(self) -> float | None:
@@ -473,8 +505,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         "max_feed_grid": lambda p: _has_props(
             p, FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW, FIELD_MAX_OUT_PW
         ),
-        "default_power_set": lambda p: _has_props(p, FIELD_MAX_OUT_PW),
+        "default_power_set": lambda p: _has_props(
+            p, FIELD_DEFAULT_PW, FIELD_MAX_OUT_PW
+        ),
         "single_tariff_price_set": _has_price_or_system,
+        "third_party_mqtt_port": lambda _p: True,
     }
 
     def _collect_entities() -> list[NumberEntity]:
