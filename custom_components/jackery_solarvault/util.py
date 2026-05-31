@@ -4,6 +4,7 @@ import calendar
 import contextlib
 from datetime import UTC, date, datetime, timedelta
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -120,7 +121,7 @@ _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
 _DEV_MODE_CACHED: bool | None = None
 
 
-def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
     """Resolve a boolean configuration option, falling back to legacy entry data when options are absent.
 
     Parameters:
@@ -140,7 +141,7 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     return default if parsed is None else parsed
 
 
-def config_entry_str_option(entry: Any, key: str, default: str) -> str:
+def config_entry_str_option(entry: object, key: str, default: str) -> str:
     """Resolve a string configuration option from a config entry, falling back to legacy entry data and a provided default.
 
     Looks up `key` first in `entry.options`, then in `entry.data`, and returns the resolved value coerced to `str`. If the resolved value is `None`, returns `default`.
@@ -163,7 +164,7 @@ def config_entry_str_option(entry: Any, key: str, default: str) -> str:
     return str(value)
 
 
-def config_entry_int_option(entry: Any, key: str, default: int) -> int:
+def config_entry_int_option(entry: object, key: str, default: int) -> int:
     """Retrieve an integer option from a config entry, falling back to legacy setup data when the option is absent.
 
     Parameters:
@@ -187,7 +188,7 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:
         return default
 
 
-def subdevice_branding(scan_name: Any) -> tuple[str | None, str | None]:
+def subdevice_branding(scan_name: object) -> tuple[str | None, str | None]:
     """Return manufacturer and model label for a documented subdevice `scan_name`.
 
     Looks up `scan_name` in the internal accessory catalog and returns a tuple
@@ -215,7 +216,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(value: Any) -> datetime:
+def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401  # arbitrary payload timestamp, coerced at runtime
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
 
     Parameters:
@@ -308,10 +309,10 @@ def coordinator_entity_signature(
 def append_unique_entity(
     entities: list[Any],
     seen_unique_ids: set[str],
-    entity: Any,
+    entity: object,
     *,
     platform: str,
-    logger: Any,
+    logger: logging.Logger,
 ) -> bool:
     """Add the entity to `entities` if its `unique_id` has not been seen; otherwise skip it.
 
@@ -464,7 +465,7 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def safe_float(value: Any) -> float | None:
+def safe_float(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
 
     Parameters:
@@ -495,7 +496,7 @@ def safe_float(value: Any) -> float | None:
         return None
 
 
-def safe_int(value: Any) -> int | None:
+def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
     """Convert a value to an integer when possible.
 
     Returns None for a None input or when the value cannot be converted to an integer.
@@ -529,7 +530,7 @@ def dev_mode_redactions_disabled() -> bool:
     return _DEV_MODE_CACHED
 
 
-def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
+def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
     """Determine whether diagnostic payload redactions are disabled.
 
     Parameters:
@@ -549,7 +550,7 @@ def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
     )
 
 
-def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:
+def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Create a JSON-serializable copy of `value` with sensitive fields redacted.
 
     When `redactions_disabled` is True (or when omitted and diagnostics redactions are disabled), returns a normalized passthrough of `value`. Otherwise, recursively replaces values for keys listed in `REDACT_KEYS` with `REDACTED_VALUE`, preserves overall structure, and converts tuples to lists so the result is JSON-serializable.
@@ -587,7 +588,7 @@ def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None)
     return value
 
 
-def _payload_debug_passthrough(value: Any) -> Any:
+def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Normalize a nested structure into JSON-serializable types.
 
     Converts mapping keys to strings and converts tuples to lists while recursively
@@ -613,7 +614,7 @@ def _payload_debug_passthrough(value: Any) -> Any:
     return value
 
 
-def redacted_json_safe_payload(value: Any) -> Any:
+def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
     The redaction is applied recursively to nested dicts/lists/tuples while preserving the overall structure and types that are JSON-serializable.
@@ -624,7 +625,7 @@ def redacted_json_safe_payload(value: Any) -> Any:
     return _payload_debug_redacted(value, redactions_disabled=False)
 
 
-def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
+def active_redact_keys(entry: object | None = None) -> frozenset[str]:
     """Determine which diagnostic keys should be redacted.
 
     Parameters:
@@ -638,7 +639,7 @@ def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
     return frozenset(REDACT_KEYS)
 
 
-def chart_series_debug(source: Any) -> dict[str, Any]:
+def chart_series_debug(source: object) -> dict[str, Any]:
     """Produce diagnostics for chart-series arrays in an app payload.
 
     Parses each chart-series list found under the keys `APP_CHART_SERIES_Y`, `APP_CHART_SERIES_Y1`…`APP_CHART_SERIES_Y6`
@@ -720,7 +721,7 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:
+def safe_bool(value: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -744,7 +745,7 @@ def safe_bool(value: Any) -> bool | None:
         return None
 
 
-def smart_plug_serial(plug: Any) -> str | None:
+def smart_plug_serial(plug: object) -> str | None:
     """Extract the serial number from a smart-plug subdevice payload.
 
     Parameters:
@@ -762,7 +763,7 @@ def smart_plug_serial(plug: Any) -> str | None:
     return serial or None
 
 
-def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
+def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
     """Return plug entries sorted by their serial numbers.
 
     Parameters:
@@ -783,7 +784,7 @@ def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
     return [entry for _, entry in entries]
 
 
-def jackery_online_state(value: Any) -> bool | None:
+def jackery_online_state(value: object) -> bool | None:
     """Determine whether a Jackery online/offline marker indicates the device is online.
 
     Recognizes common string markers for online and offline states; for other types or unrecognized strings, falls back to generic boolean parsing.
@@ -892,7 +893,7 @@ def normalized_data_quality_warnings(
     return [deduped[key] for key in sorted(deduped)]
 
 
-def _format_request_range(request: Any) -> str | None:
+def _format_request_range(request: object) -> str | None:
     """Return a compact dateType/range summary for diagnostics messages."""
     if not isinstance(request, dict):
         return None
@@ -1146,7 +1147,7 @@ def app_data_quality_warnings(
     return warnings
 
 
-def statistic_id_part(value: Any) -> str:
+def statistic_id_part(value: object) -> str:
     """Return a Home-Assistant-safe external statistic id component."""
     text = str(value or "").strip().lower()
     text = re.sub(r"[^a-z0-9_]+", "_", text)
@@ -1179,7 +1180,7 @@ def external_trend_statistic_id(
     )
 
 
-def _parse_iso_date(value: Any) -> date | None:
+def _parse_iso_date(value: object) -> date | None:
     if not isinstance(value, str):
         return None
     try:
@@ -1248,7 +1249,7 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
     ))
 
 
-def _compact_year_parts(value: Any) -> tuple[float, float] | None:
+def _compact_year_parts(value: object) -> tuple[float, float] | None:
     """Parse a compact year bucket value into previous- and current-month parts.
 
     Accepts numeric or string inputs that encode a whole (previous months) and a fractional
@@ -1281,7 +1282,7 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     whole = sign * float(int(whole_text))
     fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
 
-    if fraction == 0.0:
+    if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
     return whole, fraction
@@ -1429,7 +1430,7 @@ def year_payload_appears_current_month_only(
         source (dict[str, Any]): The payload section containing chart series and metadata.
         section (str): The year-section key to inspect (e.g., `"pv_stat_year"`).
         stat_keys (tuple[str, ...]): Statistic keys to examine within the section.
-        current_month (int): One-based current month index (1–12) used to detect a month-only pattern.
+        current_month (int): One-based current month index (1-12) used to detect a month-only pattern.
 
     Returns:
         bool: `True` if any inspected series has non-zero values only for `current_month`, `False` otherwise.
@@ -1734,12 +1735,12 @@ def _backfill_pv_revenue(
 ) -> None:
     """Backfills yearly PV revenue fields in `out` using monthly revenue values when the monthly-derived total differs from the yearly source.
 
-    Iterates `month_sources` (keys 1–12) to collect per-month PV revenue values, sums them, and — if the derived monthly total exceeds the yearly `year_source` total beyond the computed tolerance — writes corrected values into `out` and records metadata in `meta`.
+    Iterates `month_sources` (keys 1-12) to collect per-month PV revenue values, sums them, and — if the derived monthly total exceeds the yearly `year_source` total beyond the computed tolerance — writes corrected values into `out` and records metadata in `meta`.
 
     Parameters:
         out (dict[str, Any]): Mutable output payload to update with corrected yearly PV revenue fields.
         year_source (dict[str, Any]): Original year-level payload used to read the existing yearly PV revenue.
-        month_sources (dict[int, dict[str, Any]]): Mapping of 1-based month index to month payloads used to derive monthly revenue values; months outside 1–12 are ignored.
+        month_sources (dict[int, dict[str, Any]]): Mapping of 1-based month index to month payloads used to derive monthly revenue values; months outside 1-12 are ignored.
         meta (dict[str, Any]): Mutable metadata dictionary; when a correction is applied, `meta["corrected"]["totalSolarRevenue"]` is set with keys `raw_total`, `corrected_total`, and `months`.
 
     Side effects:
@@ -2072,7 +2073,7 @@ def guard_statistic_totals_from_year(
         payload[PAYLOAD_STATISTIC] = out
 
 
-def compact_json(value: Any) -> str:
+def compact_json(value: object) -> str:
     """Produce a compact JSON string of the given value suitable for diagnostics.
 
     Returns:
@@ -2151,14 +2152,14 @@ def trend_series_points(
     return points
 
 
-def _parse_day_chart_minute(value: Any) -> int | None:
+def _parse_day_chart_minute(value: object) -> int | None:
     """Parse an app day-chart label into minutes after local midnight.
 
     Parameters:
         value (Any): Label expected as an H:MM-style string (hours and minutes).
 
     Returns:
-        int: Minutes after local midnight for a valid label (0–1439).
+        int: Minutes after local midnight for a valid label (0-1439).
         None: If the input is not a valid H:MM label or represents the disallowed `24:00` end marker.
     """
     if not isinstance(value, str):
@@ -2185,7 +2186,7 @@ def _day_power_sample_minute(
         index (int): Zero-based sample index; used as a fallback to compute minute = index * 5.
 
     Returns:
-        minute_of_day (int | None): Minutes after local midnight (0–1439) for the sample, or `None` if the computed minute is outside the day range or no valid label/index mapping exists.
+        minute_of_day (int | None): Minutes after local midnight (0-1439) for the sample, or `None` if the computed minute is outside the day range or no valid label/index mapping exists.
     """
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
@@ -2206,7 +2207,7 @@ def day_power_energy_points(
 ) -> list[TrendStatisticPoint]:
     """Convert a day chart curve into kWh statistic buckets for the requested day.
 
-    Parses a chart-series day curve (watts or kWh sampled at ~5‑minute intervals) and aggregates samples into contiguous buckets of `bucket_minutes`, optionally constraining to `today`/`now` when the request begins today. If the payload includes a scalar period total, bucket values are scaled to match that total; if the scalar total is present but the raw series sums to zero, the function returns an empty list.
+    Parses a chart-series day curve (watts or kWh sampled at ~5-minute intervals) and aggregates samples into contiguous buckets of `bucket_minutes`, optionally constraining to `today`/`now` when the request begins today. If the payload includes a scalar period total, bucket values are scaled to match that total; if the scalar total is present but the raw series sums to zero, the function returns an empty list.
 
     Parameters:
         source (dict[str, Any]): App payload containing chart series, optional labels and request meta.
@@ -2542,7 +2543,7 @@ def jackery_corrected_home_consumption_power(
             source=FIELD_OTHER_LOAD_PW,
         )
 
-    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):
+    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # noqa: RUF069  # parsed device powers (or 0.0 default); exact-zero means absent/zero
         return None
 
     calculated = meter_net - jackery_input + jackery_output
@@ -2673,7 +2674,7 @@ def trend_series_total(
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0
+            and server_total == 0.0  # noqa: RUF069  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
@@ -2721,7 +2722,7 @@ def trend_series_has_value(
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0
+            and server_total == 0.0  # noqa: RUF069  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
@@ -2738,7 +2739,7 @@ def trend_series_has_value(
     )
 
 
-def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
+def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # payload value of unknown type by design
     """Retrieve the first non-None value for any of the given keys from a task-plan payload.
 
     Searches in this order: the top-level of `task_plan`, the `TASK_PLAN_BODY` dictionary (if present), then each dictionary item in the `TASK_PLAN_TASKS` list (if present). Keys are checked in the order provided and the first non-`None` match is returned.

@@ -65,7 +65,7 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _standby_is_on(raw: Any) -> bool | None:
+def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
     Parameters:
@@ -584,7 +584,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,

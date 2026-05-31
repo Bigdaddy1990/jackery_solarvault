@@ -9,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 import ssl
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError
@@ -29,6 +29,9 @@ from ..const import (
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -68,7 +71,7 @@ class JackeryMqttPushClient:
 
     def __init__(
         self,
-        hass: Any,
+        hass: HomeAssistant,
         message_callback: Callable[[str, dict[str, Any]], Awaitable[None]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
         disconnect_callback: Callable[[], Awaitable[None]] | None = None,
@@ -550,7 +553,10 @@ class JackeryMqttPushClient:
         self._schedule_coroutine(self._message_callback(topic, data), "message")
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        task = self._hass.async_create_task(coro, name=f"jackery_mqtt_{label}")
+        async def _runner() -> None:
+            await coro
+
+        task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
             try:

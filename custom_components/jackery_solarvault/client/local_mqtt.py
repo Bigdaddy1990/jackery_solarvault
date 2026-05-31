@@ -18,7 +18,7 @@ import contextlib
 from datetime import UTC, datetime
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError
@@ -30,6 +30,9 @@ from ..const import (
     MQTT_KEEPALIVE_SEC,
     REDACTED_VALUE,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -63,7 +66,7 @@ class JackeryLocalMqttClient:
 
     def __init__(
         self,
-        hass: Any,
+        hass: HomeAssistant,
         *,
         host: str,
         port: int,
@@ -397,7 +400,13 @@ class JackeryLocalMqttClient:
             coro (Awaitable[None]): Coroutine to run as a background task.
             label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
         """
-        task = self._hass.async_create_task(coro, name=f"jackery_local_mqtt_{label}")
+
+        async def _runner() -> None:
+            await coro
+
+        task = self._hass.async_create_task(
+            _runner(), name=f"jackery_local_mqtt_{label}"
+        )
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
             """Log any non-cancellation exception from a completed asyncio Task.

@@ -268,7 +268,7 @@ def _service_validation_error(
     )
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
+def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
     """Parse a BLE command `body` value from a service call into a dict.
 
     Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.

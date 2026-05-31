@@ -96,7 +96,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
-    def _alarm(self) -> Any:
+    def _alarm(self) -> object:
         return self._payload.get(PAYLOAD_ALARM)
 
     @property

@@ -77,8 +77,14 @@ _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up global Jackery SolarVault services."""
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029
+    """Set up global Jackery SolarVault services.
+
+    Declared ``async`` because Home Assistant awaits the integration's
+    ``async_setup`` entry point; the framework contract mandates the
+    coroutine signature even though the body currently performs only
+    synchronous service registration. Hence RUF029 is suppressed here.
+    """
     async_setup_services(hass)
     return True
 

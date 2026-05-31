@@ -168,7 +168,7 @@ def daily_delta(
         today (date): Local date used to validate that `snapshot["day"]` matches the current day.
 
     Returns:
-        int | None: The computed delta in watt‑hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
+        int | None: The computed delta in watt-hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None

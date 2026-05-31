@@ -1,7 +1,7 @@
 {
     "domain": "jackery_solarvault",
     "name": "Jackery SolarVault",
-    "after_dependencies": ["bluetooth", "dhcp", "mqtt", "recorder", "zeroconf"],
+    "after_dependencies": ["bluetooth", "dhcp", "http", "mqtt", "recorder", "zeroconf"],
     "bluetooth": [
         {
             "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb",
@@ -32,5 +32,5 @@
     "quality_scale": "custom",
     "requirements": ["aiomqtt==2.5.1", "bleak-retry-connector>=3.5.0", "cryptography"],
     "version": "0.1.1",
-    "zeroconf": ["_jackery-solarvault._tcp.local."]
+    "zeroconf": ["_http._tcp.local."]
 }

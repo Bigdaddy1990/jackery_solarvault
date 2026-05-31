@@ -46,8 +46,11 @@ from typing import TYPE_CHECKING, Any
 from . import ble
 
 if TYPE_CHECKING:
+    from bleak import BleakClient
+
     from homeassistant.components.bluetooth import (
         BluetoothCallbackMatcher,
+        BluetoothChange,
         BluetoothServiceInfoBleak,
     )
     from homeassistant.core import HomeAssistant
@@ -224,7 +227,7 @@ class JackeryBleListener:
     # Phase 3b: write path — send a command frame to the device
     # ------------------------------------------------------------------
 
-    def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:
+    def _record_negotiated_mtu(self, device_id: str, client: BleakClient) -> None:
         """Cache the negotiated GATT MTU after ``start_notify`` returns.
 
         Different bleak backends expose the MTU under different attribute
@@ -617,7 +620,7 @@ class JackeryBleListener:
     def _on_advertisement(
         self,
         service_info: BluetoothServiceInfoBleak,
-        change: Any,
+        change: BluetoothChange,
     ) -> None:
         """HA bluetooth-callback. Triggers a connect task on first match.
 
@@ -789,7 +792,7 @@ class JackeryBleListener:
                 )
 
                 async def _notify_callback(
-                    _characteristic: Any, data: bytearray
+                    _characteristic: object, data: bytearray
                 ) -> None:
                     await self._handle_notification(device_id, bytes(data))
 
@@ -812,10 +815,14 @@ class JackeryBleListener:
                         self._async_keep_alive_loop(device_id),
                         name=f"jackery_ble_keepalive_{device_id}",
                     )
-                    # Park the connection until the device drops it or we
-                    # are asked to stop. ``client.is_connected`` is polled
-                    # via the disconnect callback above.
-                    while not self._stop_event.is_set() and client.is_connected:
+                    # Park the connection until the device drops it or we are
+                    # asked to stop. We poll ``client.is_connected`` (a bleak
+                    # property with no awaitable) alongside the stop event: the
+                    # disconnect callback only records stats, and bleak backends
+                    # do not all fire it reliably, so the 1s poll is a deliberate
+                    # robustness net that a single ``Event.wait()`` cannot replace
+                    # (hence ASYNC110 is suppressed below).
+                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"

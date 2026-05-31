@@ -66,7 +66,7 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(
+async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this entry point
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.

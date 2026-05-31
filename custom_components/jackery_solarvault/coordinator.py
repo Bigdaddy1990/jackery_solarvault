@@ -4,7 +4,7 @@ import asyncio
 import binascii
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 import importlib
 import json
 import logging
@@ -12,7 +12,7 @@ import math
 import re
 import secrets
 import time
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CoreState, HomeAssistant
@@ -296,7 +296,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from .mqtt_push import JackeryMqttPushClient
+    from .client.mqtt_push import JackeryMqttPushClient
 
 from .util import (
     app_data_quality_warnings,
@@ -442,14 +442,7 @@ def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
     response = (
         event.get("response") if isinstance(event.get("response"), dict) else None
     )
-    if response is not None:
-        response_data = (
-            response.get("data")
-            if isinstance(response.get("data"), dict)
-            else response.get("data")
-        )
-    else:
-        response_data = None
+    response_data = response.get("data") if response is not None else None
     return json.dumps(
         [
             event.get("kind"),
@@ -537,7 +530,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     _BATTERY_PACK_HINT_KEYS = BATTERY_PACK_HINT_KEYS
     _MAIN_PROPERTY_ALIAS_PAIRS = MAIN_PROPERTY_ALIAS_PAIRS
     _BATTERY_PACK_LIVE_KEYS = frozenset({FIELD_BAT_SOC, FIELD_CELL_TEMP})
-    _DEVICE_YEAR_BACKFILL_STAT_KEYS = {
+    _DEVICE_YEAR_BACKFILL_STAT_KEYS: ClassVar[dict[str, tuple[str, ...]]] = {
         APP_SECTION_PV_STAT: (
             APP_STAT_TOTAL_SOLAR_ENERGY,
             APP_STAT_PV1_ENERGY,
@@ -554,7 +547,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             APP_STAT_TOTAL_OUT_GRID_ENERGY,
         ),
     }
-    _SYSTEM_YEAR_BACKFILL_STAT_KEYS = {
+    _SYSTEM_YEAR_BACKFILL_STAT_KEYS: ClassVar[dict[str, tuple[str, ...]]] = {
         APP_SECTION_HOME_TRENDS: (APP_STAT_TOTAL_HOME_ENERGY,),
     }
 
@@ -1299,7 +1292,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             ``_merge_main_properties_for_device(device_id, payload)``
             call (the previous shape) raises ``TypeError`` in the sink's
             ``try/except`` and silently drops every decoded frame
-            (observed 2026-05-16 17:41–17:44 production log).
+            (observed 2026-05-16 17:41-17:44 production log).
 
             Routing per ``cmd`` (from :data:`.const.MQTT_CMD_*`):
 
@@ -1616,8 +1609,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # awaited credentials. Bail out quietly instead of touching a stale
         # handle that might already be stopped.
         if self._mqtt is not mqtt:
-            return
-        if mqtt is None:
             return
 
         self._last_mqtt_connect_attempt = time.monotonic()
@@ -2058,7 +2049,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _find_dict_with_any_key(
-        obj: Any,
+        obj: object,
         keys: set[str] | frozenset[str],
     ) -> dict[str, Any] | None:
         """Find the first nested dict containing any of the requested keys."""
@@ -2079,7 +2070,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return None
 
     @staticmethod
-    def _find_list_for_key(obj: Any, key: str) -> list[dict[str, Any]] | None:
+    def _find_list_for_key(obj: object, key: str) -> list[dict[str, Any]] | None:
         """Find a nested list of dicts under a key such as batteryPacks."""
         if isinstance(obj, dict):
             value = obj.get(key)
@@ -2136,7 +2127,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return any(key in body for key in cls._SUBDEVICE_HINT_KEYS)
 
     @classmethod
-    def _normalize_battery_pack_payload(cls, item: Any) -> dict[str, Any]:
+    def _normalize_battery_pack_payload(cls, item: object) -> dict[str, Any]:
         """Flatten Jackery battery-pack payloads to BatteryPackSub fields.
 
         The Android app parses add-on battery updates from BatteryPackSub. In
@@ -2165,7 +2156,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return normalized
 
     @classmethod
-    def _looks_like_battery_pack(cls, item: Any) -> bool:
+    def _looks_like_battery_pack(cls, item: object) -> bool:
         """Return True for add-on battery pack dicts, not CT/smart meters."""
         if not isinstance(item, dict):
             return False
@@ -2184,7 +2175,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return any(key in item for key in cls._BATTERY_PACK_HINT_KEYS)
 
     @classmethod
-    def _battery_packs_from_source(cls, source: Any) -> list[dict[str, Any]] | None:
+    def _battery_packs_from_source(cls, source: object) -> list[dict[str, Any]] | None:
         """Extract up to five add-on battery pack payloads from known shapes."""
         for key in (
             FIELD_BATTERY_PACKS,
@@ -2333,7 +2324,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,
+        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields.
@@ -2407,7 +2398,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,
+        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -2450,7 +2441,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,
+        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``.
@@ -2846,7 +2837,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,
+        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -3069,7 +3060,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return cls._subdevice_id(candidates[0])
         return None
 
-    def _local_timezone(self) -> Any:
+    def _local_timezone(self) -> tzinfo:
         """Return the Home Assistant local timezone for app-period math."""
         timezone = dt_util.get_time_zone(self.hass.config.time_zone)
         return timezone or dt_util.DEFAULT_TIME_ZONE
@@ -3381,7 +3372,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
 
     @staticmethod
-    def _coerce_transport_cmd(cmd: Any) -> int:
+    def _coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd input, coerced at runtime
         """Coerce transport cmd input to an integer.
 
         Accepts plain ints plus integral numeric strings (e.g. ``"107"``,
@@ -3413,7 +3404,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _command_body_for_transport(
-        body_fields: dict[str, Any], *, cmd: Any
+        body_fields: dict[str, Any], *, cmd: object
     ) -> dict[str, Any]:
         """Build the command body shared by MQTT and BLE command transports."""
         body: dict[str, Any] = dict(body_fields)
@@ -3908,7 +3899,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self.async_set_single_price(device_id, float(single_price))
 
     @staticmethod
-    def _valid_price_sources(sources: Any) -> list[dict[str, Any]]:
+    def _valid_price_sources(sources: object) -> list[dict[str, Any]]:
         if not isinstance(sources, list):
             return []
         valid: list[dict[str, Any]] = []
@@ -5346,7 +5337,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return state
 
     @staticmethod
-    def _parse_statistics_backfill_date(value: Any) -> date | None:
+    def _parse_statistics_backfill_date(value: object) -> date | None:
         """Parse a persisted ISO date for statistics repair decisions."""
         if not isinstance(value, str):
             return None
@@ -6157,10 +6148,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,
+            default: Any,  # noqa: ANN401  # generic TTL cache over arbitrary payloads
             *,
             backoff_key: str | None = None,
-        ) -> Any:
+        ) -> Any:  # noqa: ANN401  # generic TTL cache over arbitrary payloads
             """Generic TTL cache helper operating on any dict."""
             now = time.monotonic()
             entry = cache.get(cache_key)
@@ -6197,8 +6188,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,
-        ) -> Any:
+            default: Any,  # noqa: ANN401  # generic TTL cache over arbitrary payloads
+        ) -> Any:  # noqa: ANN401  # generic TTL cache over arbitrary payloads
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -6487,7 +6478,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:
+                    ) -> Any:  # noqa: ANN401  # forwards arbitrary cached payload
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         return await _get_with_ttl(
                             sys_id,

@@ -504,7 +504,7 @@ class JackeryApi:
         return self._token
 
     @staticmethod
-    def _extract_code(data: dict[str, Any] | Any) -> int | None:
+    def _extract_code(data: object) -> int | None:
         """Extracts the backend numeric `code` value from a parsed API response.
 
         Parameters:
@@ -530,9 +530,7 @@ class JackeryApi:
                 return None
         return None
 
-    def _is_token_expired_response(
-        self, status: int, data: dict[str, Any] | Any
-    ) -> bool:
+    def _is_token_expired_response(self, status: int, data: object) -> bool:
         """Determine whether the parsed API response signals that the authentication token has expired.
 
         Only dict-shaped responses are inspected; non-dict responses always return False.
@@ -549,7 +547,7 @@ class JackeryApi:
         return "token expires" in msg or "token expired" in msg
 
     @staticmethod
-    def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
+    def _response_has_auth_failure_text(data: object) -> bool:
         """Return True when a backend error payload looks authorization-related."""
         if not isinstance(data, dict):
             return False
@@ -585,9 +583,7 @@ class JackeryApi:
             )
         )
 
-    def _is_auth_failure_response(
-        self, status: int, data: dict[str, Any] | Any
-    ) -> bool:
+    def _is_auth_failure_response(self, status: int, data: object) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in (401, 403):
             return True
@@ -826,7 +822,7 @@ class JackeryApi:
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:
+    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}

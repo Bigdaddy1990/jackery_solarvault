@@ -354,7 +354,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
         except Exception as err:
             _raise_select_action_error(self, "entity_action_failed", error=err)
 
-    def _warn_unknown_once(self, value: Any) -> None:
+    def _warn_unknown_once(self, value: object) -> None:
         """Log an unmapped raw value once per instance / value combination."""
         kind = self.entity_description.warn_unknown_kind
         if kind is None or value in self._state.warned_unknown_values:
@@ -603,7 +603,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,

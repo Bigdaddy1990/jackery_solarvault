@@ -72,7 +72,7 @@ must never affect ``unique_id``.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo
 import logging
 from typing import Any, Literal
 
@@ -363,7 +363,7 @@ SAVINGS_PRICE_PRECISION = 5
 # ---------------------------------------------------------------------------
 # Value extraction helpers
 # ---------------------------------------------------------------------------
-def _path(props: dict[str, Any], *keys: str) -> Any:
+def _path(props: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # returns arbitrary nested payload value
     """Walk a nested path; return None on missing intermediate keys."""
     node: Any = props
     for k in keys:
@@ -383,7 +383,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
         Callable[[Any], float | None]: A function that accepts any value, returns the quotient rounded to 2 decimals when the value can be converted to float, or `None` when conversion fails.
     """
 
-    def _f(value: Any) -> float | None:
+    def _f(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
         try:
             return round(float(value) / divisor, 2)
         except TypeError, ValueError:
@@ -392,7 +392,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     return _f
 
 
-def _signed_diff(merged_value: Any, http_value: Any) -> int | None:
+def _signed_diff(merged_value: object, http_value: object) -> int | None:
     """Return ``merged - http`` as int when both inputs parse, else None.
 
     Used to surface MQTT-vs-HTTP drift in net-power sensor attributes so
@@ -406,11 +406,11 @@ def _signed_diff(merged_value: Any, http_value: Any) -> int | None:
     return merged_int - http_int
 
 
-def _identity(value: Any) -> Any:
+def _identity[T](value: T) -> T:
     return value
 
 
-def _temp_unit_label(value: Any) -> str | None:
+def _temp_unit_label(value: object) -> str | None:
     unit = safe_int(value)
     if unit is None:
         return None
@@ -481,7 +481,7 @@ def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
 
 
 def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
-    def _getter(props: dict[str, Any]) -> Any:
+    def _getter(props: dict[str, Any]) -> object:
         for key in keys:
             if key in props and props.get(key) is not None:
                 return props.get(key)
@@ -493,7 +493,7 @@ def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
 def _payload_http_prop(key: str) -> Callable[[dict[str, Any]], Any]:
     """Read the latest HTTP property value before MQTT overlay values."""
 
-    def _getter(payload: dict[str, Any]) -> Any:
+    def _getter(payload: dict[str, Any]) -> object:
         http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
         if isinstance(http_props, dict) and http_props:
             return http_props.get(key)
@@ -512,7 +512,7 @@ def _nested(*keys: str) -> Callable[[dict[str, Any]], Any]:
 def _pv_channel_power(channel_key: str) -> Callable[[dict[str, Any]], Any]:
     """Read per-channel PV power and default to 0W when channel exists."""
 
-    def _getter(props: dict[str, Any]) -> Any:
+    def _getter(props: dict[str, Any]) -> object:
         channel = props.get(channel_key)
         if not isinstance(channel, dict):
             return None
@@ -1012,7 +1012,7 @@ StatResetPeriod = Literal["day", "week", "month", "year"]
 
 
 def _period_start(
-    reset_period: StatResetPeriod, timezone: Any | None = None
+    reset_period: StatResetPeriod, timezone: tzinfo | None = None
 ) -> datetime:
     """Return the timezone-aware start datetime for the current statistic period.
 
@@ -2835,7 +2835,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         return savings if isinstance(savings, dict) else {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Return the selected calculated value."""
         raw: Any = self._calculation
         for key in self.entity_description.path:
@@ -2953,7 +2953,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -3224,7 +3224,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Return the entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
@@ -3338,7 +3338,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             tzinfo=self._local_timezone(),
         )
 
-    def _local_timezone(self) -> Any:
+    def _local_timezone(self) -> tzinfo:
         """Get the Home Assistant local timezone for period sensors.
 
         Returns:
@@ -3435,7 +3435,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
-    def _non_negative_period_raw(self, raw: Any) -> Any:
+    def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401  # passes through dynamic state value
         """Clamp negative energy period totals to zero when applicable.
 
         If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
@@ -3729,7 +3729,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -3796,7 +3796,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             return {}
         return pack if isinstance(pack, dict) else {}
 
-    def _value_from_pack(self, pack: dict[str, Any]) -> Any:
+    def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Extracts the described battery-pack field from a battery-pack payload and applies the entity transform.
 
         Looks up the field named by the entity description in the provided pack dict. If the primary key is missing, checks a small set of known alias and alternate keys (including current firmware version, device serial candidates, and firmware-upgrade flag) before giving up.
@@ -3886,7 +3886,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Get the entity's last cached native value.
 
         Returns:
@@ -4010,7 +4010,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Get the smart plug entity's current sensor value from its plug payload.
 
         Reads the configured field from the plug data, falls back to known alias fields when the primary key is missing, and applies the entity description's transform.
@@ -4128,7 +4128,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return meter_head if isinstance(meter_head, dict) else {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Provide the current value for this meter-head sensor.
 
         Returns:
@@ -4263,7 +4263,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Calculate derived smart-meter powers from signed phase values."""
         return calculated_smart_meter_power(ct, calculation)
 
-    def _value_from_ct(self, ct: dict[str, Any]) -> Any:
+    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Calculate the current value from a CT payload."""
         raw = None
 
@@ -4297,12 +4297,12 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         return round(value, 2) if isinstance(value, float) else value
 
     def _attrs_from_ct(self, ct: dict[str, Any]) -> dict[str, Any]:
-        """Build diagnostic attributes from a CT (smart‑meter) payload.
+        """Build diagnostic attributes from a CT (smart-meter) payload.
 
         Returns a dictionary of diagnostic attributes derived from the provided CT payload. Possible keys:
         - "calculation": calculation mode when the entity description specifies a derived calculation.
         - "source": origin of the reported value (e.g., "total_fields", "phase_fields", "total_field", "phase_sum", "raw_field").
-        - "phase_a_signed_power", "phase_b_signed_power", "phase_c_signed_power": signed per‑phase powers (positive = grid import, negative = grid export) when available.
+        - "phase_a_signed_power", "phase_b_signed_power", "phase_c_signed_power": signed per-phase powers (positive = grid import, negative = grid export) when available.
         - "signed_phase_convention": string describing the sign convention for signed phase powers.
         - Any keys from CT_ATTRIBUTE_FIELDS that are present in the CT payload are copied through.
         - For the "power" entity: "phase_sum_power" and/or "total_field_power" when those computed directional sums are available.
@@ -4398,7 +4398,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -5008,7 +5008,7 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
         self._source_key = source_key
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
         """Return the entity's current value."""
         return self._system.get(self._source_key)
 
