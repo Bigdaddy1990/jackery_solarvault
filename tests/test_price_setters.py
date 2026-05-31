@@ -1,5 +1,6 @@
 """Unit tests for coordinator price writer behavior."""
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -16,7 +17,6 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from homeassistant.exceptions import HomeAssistantError
 
 
 class _RejectingPriceApi:

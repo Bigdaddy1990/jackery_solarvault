@@ -1379,8 +1379,9 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    from custom_components.jackery_solarvault import services
     from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.jackery_solarvault import services
 
     assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}
     assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {

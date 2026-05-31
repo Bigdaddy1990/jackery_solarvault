@@ -693,7 +693,6 @@ class JackeryBleListener:
         """
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
-
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)

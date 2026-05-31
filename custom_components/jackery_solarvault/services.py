@@ -22,11 +22,10 @@ import logging
 import re
 from typing import Any, Final
 
-import voluptuous as vol
-
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
+import voluptuous as vol
 
 from .client import JackeryError
 from .const import (

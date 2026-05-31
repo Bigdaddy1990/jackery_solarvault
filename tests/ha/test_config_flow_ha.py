@@ -2,6 +2,10 @@
 
 from unittest.mock import patch
 
+from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -9,10 +13,6 @@ from custom_components.jackery_solarvault.const import (
     DOMAIN,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
 )
-from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 
 pytestmark = pytest.mark.asyncio
 
