@@ -245,7 +245,7 @@ show-fixes = true
 fix = true
 unsafe-fixes = true
 force-exclude = true
-#output-format= "github"
+output-format= "github"
 
 [tool.ruff.analyze]
 detect-string-imports = true
@@ -264,7 +264,7 @@ skip-magic-trailing-comma = false
 [tool.ruff.lint]
 preview = true
 select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D"]
-#ignore = ["E501"]
+ignore = ["E501"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -284,7 +284,7 @@ property-decorators = ["propcache.api.cached_property"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
-known-first-party = ["homeassistant", "custom_components", "pytest_"]
+known-first-party = ["custom_components", "pytest_"]
 combine-as-imports = true
 split-on-trailing-comma = false
 
