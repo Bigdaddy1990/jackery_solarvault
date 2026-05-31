@@ -55,15 +55,15 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 
-def _make_hass() -> Any:
+def _make_hass() -> Any:  # noqa: ANN401
     """Return a minimal hass stub sufficient for JackeryLocalMqttClient."""
 
     class _Hass:
-        _tasks: list[asyncio.Task[Any]] = []
+        _tasks: list[asyncio.Task[Any]] = []  # noqa: RUF012
 
         def async_create_background_task(
             self,
-            coro: Any,
+            coro: Any,  # noqa: ANN401
             name: str = "",
         ) -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
@@ -72,7 +72,7 @@ def _make_hass() -> Any:
 
         def async_create_task(
             self,
-            coro: Any,
+            coro: Any,  # noqa: ANN401
             name: str = "",
         ) -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
@@ -89,7 +89,7 @@ def _make_client(
     username: str | None = None,
     password: str | None = None,
     client_id: str = "ha-jackery-test0001",
-    sink: Any = None,
+    sink: Any = None,  # noqa: ANN401
     topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
 ) -> JackeryLocalMqttClient:
     """Return a configured JackeryLocalMqttClient with a minimal hass stub."""
@@ -174,7 +174,7 @@ def test_construction_custom_topic_filter_is_stored() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _make_mqtt_code_error(rc: Any) -> Any:
+def _make_mqtt_code_error(rc: Any) -> Any:  # noqa: ANN401
     """Return a MqttCodeError-shaped stub with the given rc attribute."""
     from aiomqtt.exceptions import MqttCodeError
 
@@ -338,7 +338,7 @@ def test_handle_message_caps_topic_tracking_at_max() -> None:
 def test_handle_message_drops_non_dict_json() -> None:
     """JSON arrays/scalars must increment messages_dropped; data stays None."""
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         return None
 
     client = _make_client(sink=_sink, topic_filter="topic")
@@ -351,7 +351,7 @@ def test_handle_message_drops_non_dict_json() -> None:
 def test_handle_message_drops_non_utf8_binary() -> None:
     """Non-decodable binary payload increments messages_dropped."""
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         return None
 
     client = _make_client(sink=_sink, topic_filter="topic")
@@ -377,7 +377,7 @@ def test_handle_message_parses_valid_json_dict() -> None:
     """A valid JSON object payload must be forwarded as data; not dropped."""
     sink_calls: list[tuple[str, Any, bytes]] = []
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         sink_calls.append((topic, data, raw))
 
     client = _make_client(sink=_sink)

@@ -106,7 +106,7 @@ from custom_components.jackery_solarvault.const import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_hass() -> Any:
+def _make_hass() -> Any:  # noqa: ANN401
     """Minimal hass stub for JackeryLocalMqttClient and _async_start_local_mqtt."""
 
     class _Hass:
@@ -115,13 +115,15 @@ def _make_hass() -> Any:
             self._tasks: list[asyncio.Task[Any]] = []
 
         def async_create_background_task(
-            self, coro: Any, name: str = ""
+            self,
+            coro: Any,
+            name: str = "",  # noqa: ANN401
         ) -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
             self._tasks.append(task)
             return task
 
-        def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:
+        def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:  # noqa: ANN401
             task = asyncio.get_event_loop().create_task(coro)
             self._tasks.append(task)
             return task
@@ -136,7 +138,7 @@ def _make_client(
     username: str | None = None,
     password: str | None = None,
     client_id: str = "ha-jackery-test0001",
-    sink: Any = None,
+    sink: Any = None,  # noqa: ANN401
     topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
 ) -> JackeryLocalMqttClient:
     hass = _make_hass()
@@ -165,7 +167,7 @@ class _FakeEntry:
         self.data: dict[str, Any] = {}
         self._unload_callbacks: list[Any] = []
 
-    def async_on_unload(self, callback: Any) -> None:
+    def async_on_unload(self, callback: Any) -> None:  # noqa: ANN401
         self._unload_callbacks.append(callback)
 
 
@@ -211,7 +213,7 @@ def test_handle_message_bytearray_utf8_json_dict_is_accepted() -> None:
 def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
     """A bytearray payload that is not valid UTF-8 must increment messages_dropped."""
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         return None
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
@@ -226,7 +228,7 @@ def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
 def test_handle_message_bytearray_json_array_increments_dropped() -> None:
     """A bytearray that decodes to a JSON array must increment messages_dropped."""
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         return None
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
@@ -249,7 +251,7 @@ def test_handle_message_bytearray_raw_bytes_forwarded_to_sink() -> None:
     """raw_bytes forwarded to sink must be bytes, even when payload was bytearray."""
     received: list[bytes] = []
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         received.append(raw)
 
     client = _make_client(sink=_sink)
@@ -270,7 +272,7 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def _callback(event: Any) -> None:
+    def _callback(event: Any) -> None:  # noqa: ANN401
         received.append(event)
 
     api.payload_debug_callback = _callback
@@ -285,12 +287,12 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def _callback(event: Any) -> None:
+    def _callback(event: Any) -> None:  # noqa: ANN401
         received.append(event)
 
     api.payload_debug_callback = _callback
 
-    def factory():
+    def factory():  # noqa: ANN202
         return {"kind": "http", "path": "/lazy"}
 
     await api._emit_payload_debug(factory)
@@ -311,7 +313,7 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
     """Exceptions raised by the callback must be caught, not propagated."""
     api = JackeryApi.__new__(JackeryApi)
 
-    def _exploding_callback(event: Any) -> None:
+    def _exploding_callback(event: Any) -> None:  # noqa: ANN401
         raise RuntimeError("callback exploded")
 
     api.payload_debug_callback = _exploding_callback
@@ -324,7 +326,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
     api = JackeryApi.__new__(JackeryApi)
     results: list[str] = []
 
-    async def _async_callback(event: Any) -> None:
+    async def _async_callback(event: Any) -> None:  # noqa: ANN401, RUF029
         results.append("done")
 
     api.payload_debug_callback = _async_callback
@@ -419,7 +421,7 @@ async def test_async_get_device_eps_stat_without_dates_uses_defaults() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["path"] = path
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: {"totalInEpsEnergy": "2.0"}}
@@ -443,7 +445,7 @@ async def test_async_get_device_eps_stat_with_month_date_type() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
@@ -491,7 +493,7 @@ def test_diagnostics_snapshot_topics_seen_count_matches_len() -> None:
 def test_diagnostics_snapshot_messages_dropped_in_snapshot() -> None:
     """messages_dropped in snapshot must reflect actual dropped count."""
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # noqa: RUF029
         return None
 
     client = _make_client(sink=_sink, topic_filter="t")
@@ -663,7 +665,7 @@ async def test_async_get_today_energy_with_special_chars_in_sn() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["params"] = dict(params)
         return {}
 
@@ -677,7 +679,7 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["path"] = path
         return {}
 

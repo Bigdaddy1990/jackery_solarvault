@@ -290,7 +290,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     """MQTT command errors are surfaced through the service translation key."""
 
     class _FailingCoordinator:
-        data = {"dev1": {}}
+        data = {"dev1": {}}  # noqa: RUF012
 
         async def async_query_weather_plan(self, device_id: str) -> None:
             """Request a weather plan update for the given device.

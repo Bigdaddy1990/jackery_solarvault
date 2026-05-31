@@ -140,7 +140,7 @@ def test_stale_drop_helper_logic_unit() -> None:
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
-    def drop(packs):
+    def drop(packs):  # noqa: ANN001, ANN202
         """Filter packs by their `_last_seen_at` ISO 8601 timestamp, dropping those older than the configured threshold.
 
         Parameters:
@@ -196,7 +196,7 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
         "_last_seen_at": (now - timedelta(hours=4)).isoformat(),
     }
 
-    def drop(packs):
+    def drop(packs):  # noqa: ANN001, ANN202
         """Filter out battery packs whose `_last_seen_at` timestamp is older than the configured threshold.
 
         Parameters:

@@ -20,7 +20,7 @@ PERCENT_PLACEHOLDER = re.compile(
 )
 
 
-def _load_util_module():
+def _load_util_module():  # noqa: ANN202
     package_dir = CUSTOM_COMPONENT
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
@@ -889,7 +889,7 @@ def test_unredacted_diagnostics_option_reaches_redaction_surfaces() -> None:
     )
 
 
-def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) -> None:
+def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) -> None:  # noqa: ANN001
     """The HAOS-friendly option should replace the env-var for local raw logs."""
     monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
     entry = types.SimpleNamespace(
@@ -2983,7 +2983,7 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py313-plus" not in config
 
 
-def _load_py314_exception_guard_module():
+def _load_py314_exception_guard_module():  # noqa: ANN202
     """Load the local Python 3.14 exception-style guard script."""
     spec = importlib.util.spec_from_file_location(
         "verify_py314_exception_style",

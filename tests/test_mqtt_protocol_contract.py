@@ -206,7 +206,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         self._property_overrides = {}
         captured: dict[str, object] = {}
 
-        async def _debug_event(_event_or_factory: object) -> None:
+        async def _debug_event(_event_or_factory: object) -> None:  # noqa: RUF029
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:
@@ -450,7 +450,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         self._property_overrides = {}
         captured: dict[str, object] = {}
 
-        async def _debug_event(_event_or_factory: object) -> None:
+        async def _debug_event(_event_or_factory: object) -> None:  # noqa: RUF029
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:

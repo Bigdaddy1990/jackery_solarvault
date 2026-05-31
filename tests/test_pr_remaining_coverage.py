@@ -41,7 +41,7 @@ async def test_emit_payload_debug_passes_dict_to_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def sync_callback(arg: Any) -> None:
+    def sync_callback(arg: Any) -> None:  # noqa: ANN401
         received.append(arg)
 
     api.payload_debug_callback = sync_callback
@@ -58,7 +58,7 @@ async def test_emit_payload_debug_passes_callable_to_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def sync_callback(arg: Any) -> None:
+    def sync_callback(arg: Any) -> None:  # noqa: ANN401
         received.append(arg)
 
     api.payload_debug_callback = sync_callback
@@ -81,7 +81,7 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
     """Exceptions raised by the debug callback must be swallowed, not propagated."""
     api = JackeryApi.__new__(JackeryApi)
 
-    def exploding_callback(arg: Any) -> None:
+    def exploding_callback(arg: Any) -> None:  # noqa: ANN401
         raise RuntimeError("debug callback failure")
 
     api.payload_debug_callback = exploding_callback
@@ -95,7 +95,7 @@ async def test_emit_payload_debug_awaits_async_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     awaited: list[bool] = []
 
-    async def async_callback(arg: Any) -> None:
+    async def async_callback(arg: Any) -> None:  # noqa: ANN401, RUF029
         awaited.append(True)
 
     api.payload_debug_callback = async_callback
@@ -109,7 +109,7 @@ async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
     """Exceptions raised inside an async debug callback must be suppressed."""
     api = JackeryApi.__new__(JackeryApi)
 
-    async def async_exploding(arg: Any) -> None:
+    async def async_exploding(arg: Any) -> None:  # noqa: ANN401, RUF029
         raise ValueError("async debug failure")
 
     api.payload_debug_callback = async_exploding
@@ -132,7 +132,7 @@ async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_http_payload_debug_returns_dict_with_required_keys() -> None:
+async def test_http_payload_debug_returns_dict_with_required_keys() -> None:  # noqa: RUF029
     """_http_payload_debug must return a dict with expected shape."""
     result = JackeryApi._http_payload_debug(
         method="GET",
@@ -155,7 +155,7 @@ async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def callback(arg: Any) -> None:
+    def callback(arg: Any) -> None:  # noqa: ANN401
         received.append(arg)
 
     api.payload_debug_callback = callback

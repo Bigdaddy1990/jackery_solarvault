@@ -161,7 +161,7 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
 
     This is the regression that motivated
     accepting both key lengths.
-    """
+    """  # noqa: D205
     import base64
 
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
@@ -206,7 +206,7 @@ def test_build_plaintext_frame_smali_layout() -> None:
 
     The string must match ``"DFED" + "0001" + 4×hex16(idx,cnt,actionId,bleCmd)
     + "0001" + hex16(len) + chunk_hex`` exactly, byte by byte.
-    """
+    """  # noqa: RUF002
     frame = BleFrame(
         frame_index=1,
         chunk_count=1,
@@ -452,7 +452,7 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 
     Decoding them recovers the JSON telemetry that the integration would otherwise have to wait for from
     the cloud.
-    """
+    """  # noqa: D205
     import base64
     import json as _json
 
@@ -782,7 +782,7 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
             """Simulate a runner task that waits for the listener stop event with a 30-second backoff.
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
-            """
+            """  # noqa: D205
             await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)
 
         task = asyncio.create_task(_stuck())
@@ -814,8 +814,8 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # noqa: RUF012
+        options = {  # noqa: RUF012
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -859,8 +859,8 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # noqa: RUF012
+        options = {  # noqa: RUF012
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -918,8 +918,8 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # noqa: RUF012
+        options = {  # noqa: RUF012
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -1011,7 +1011,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
     async def _run() -> None:
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(
+        async def _send_ble(  # noqa: RUF029
             device_id: str,
             *,
             cmd: int,
@@ -1047,7 +1047,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             captured["mtu_override"] = mtu_override
             return True
 
-        async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:
+        async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:  # noqa: RUF029
             """Sentinel coroutine that fails immediately if the MQTT fallback path is invoked.
 
             This async function is intended for tests and will raise an AssertionError to indicate that MQTT publishing was not expected to be called in the current execution path.
@@ -1101,10 +1101,10 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # noqa: RUF029
             return False
 
-        async def _publish_mqtt(
+        async def _publish_mqtt(  # noqa: RUF029
             device_id: str,
             *,
             message_type: str,
@@ -1174,7 +1174,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # noqa: RUF029
             """Send a BLE command and wait for its acknowledgement (ACK).
 
             Returns:
@@ -1185,7 +1185,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
             """
             raise RuntimeError("BLE ack timeout")
 
-        async def _publish_mqtt(
+        async def _publish_mqtt(  # noqa: RUF029
             device_id: str,
             *,
             message_type: str,
@@ -1202,7 +1202,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """
+            """  # noqa: D205
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1251,7 +1251,7 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # noqa: RUF029
             """Send a BLE command and wait for its acknowledgement (ACK).
 
             Returns:
@@ -1262,7 +1262,7 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
             """
             raise RuntimeError("BLE ack timeout")
 
-        async def _publish_mqtt(
+        async def _publish_mqtt(  # noqa: RUF029
             device_id: str,
             *,
             message_type: str,
@@ -1324,7 +1324,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
     async def _run() -> None:
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:
+        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # noqa: RUF029
             """Guard that prevents attempting BLE sends for command 0.
 
             Raises:
@@ -1332,7 +1332,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             """
             raise AssertionError("cmd=0 must not attempt BLE")
 
-        async def _publish_mqtt(
+        async def _publish_mqtt(  # noqa: RUF029
             device_id: str,
             *,
             message_type: str,
@@ -1642,7 +1642,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
-    """
+    """  # noqa: D205
     import asyncio
     import base64
 
@@ -1744,7 +1744,7 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
     """Invalid ACK filters fail before registering a pending future."""
     import asyncio
 
-    async def _run() -> None:
+    async def _run() -> None:  # noqa: RUF029
         listener = _build_bare_listener()
 
         with pytest.raises(ValueError, match="ack_cmds must be an integer"):
@@ -1762,7 +1762,7 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
     async def _run() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
         Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
-        """
+        """  # noqa: D205
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
@@ -1802,7 +1802,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
         Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _ExplodingClient()}  # type: ignore[attr-defined]
@@ -1836,8 +1836,8 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # noqa: RUF012
+        options = {  # noqa: RUF012
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -1870,7 +1870,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
 
             Returns:
                 bool: `True` if the command was sent or enqueued successfully, `False` otherwise.
-            """
+            """  # noqa: D205
             captured["device_id"] = device_id
             captured["cmd"] = cmd
             captured["body"] = body
@@ -1898,7 +1898,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
         )
         assert sent is True
         assert captured["wait_for_ack"] is True
-        assert captured["ack_timeout_sec"] == 3.5
+        assert captured["ack_timeout_sec"] == 3.5  # noqa: RUF069
         assert captured["ack_cmds"] == (107, 111)
         assert captured["mtu_override"] == 120
 
@@ -1950,7 +1950,7 @@ def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
 def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
-    """
+    """  # noqa: D205
     import asyncio
     import base64
 
@@ -1976,7 +1976,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         - exactly two GATT write blobs were produced,
         - each decrypted binary frame has the correct `frame_index`, shared `chunk_count`, and `cmd`,
         - the concatenation of decrypted `body` fields equals the original payload.
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -2024,7 +2024,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
     async def _run() -> None:
         """Verifies that a bare listener splits an oversized body according to an MTU override, sends the expected number of encrypted chunked frames, and that those frames reassemble to the original body.
         Sets up a bare listener with a fake client and a fixed AES key/MTU, sends a command with mtu_override=70 for a 25-byte body, and asserts that three writes occur, frame indices progress 1..3, each frame reports the same chunk_count (3), and concatenating the decrypted frame bodies equals the original payload.
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -2063,7 +2063,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
             Raises:
                 AssertionError: with message "invalid MTU must not write to GATT".
-            """
+            """  # noqa: D205
             raise AssertionError("invalid MTU must not write to GATT")
 
     async def _run() -> None:
@@ -2073,7 +2073,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -2133,7 +2133,7 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
-    """
+    """  # noqa: D205
     import asyncio
     import base64
 
@@ -2145,7 +2145,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     async def _run() -> None:
         """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
         This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
@@ -2182,7 +2182,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
     async def _run() -> None:
         """Exercise the listener's chunked-write + ACK flow and assert it resolves a single pending ACK.
         Sets up a bare listener with a fake client and the captured AES key, sends a 250-byte command which is split into two chunked writes, drives a single encrypted echo notification to resolve the ACK, and asserts the send succeeded, two writes occurred, one ACK was received, no ACKs timed out, and the pending-ack registry is cleared.
-        """
+        """  # noqa: D205
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
@@ -2193,7 +2193,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             # one echo frame — that single notify must complete the ack.
             """Waits for two chunked writes to be observed, then injects an encrypted echo notification carrying cmd 107 and body '{"ok":1}' to drive ACK completion in the listener.
             This helper is used by the test to simulate the device-side echo that should resolve a pending ACK after multi-chunk writes.
-            """
+            """  # noqa: D205
             for _ in range(100):
                 if len(writes) >= 2:
                     break

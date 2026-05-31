@@ -9,7 +9,7 @@ TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
 LANGUAGES = ("en", "de", "es", "fr")
 
 
-def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
+def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # noqa: ANN401
     """Return the set of dotted "leaf" key paths from a nested dictionary structure.
 
     Parameters:

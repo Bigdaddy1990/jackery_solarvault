@@ -46,7 +46,7 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
     return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
 
 
-def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
+def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # noqa: ANN401
     """Create and initialize an instance of the given sensor class for tests using the provided device payload.
 
     Parameters:

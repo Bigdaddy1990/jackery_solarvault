@@ -34,7 +34,7 @@ def mock_jackery_login() -> Generator[None]:
     cloud I/O.
     """
 
-    async def _fake_login(api) -> str:
+    async def _fake_login(api) -> str:  # noqa: ANN001, RUF029
         """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
 
         Parameters:

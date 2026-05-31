@@ -163,7 +163,7 @@ async def test_async_get_device_eps_stat_calls_correct_path() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["path"] = path
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: {"totalInEpsEnergy": "1.5"}}
@@ -187,7 +187,7 @@ async def test_async_get_device_eps_stat_stores_raw_response() -> None:
     api = JackeryApi.__new__(JackeryApi)
     api.last_device_period_stat_responses = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {FIELD_CODE: 0, FIELD_DATA: {"totalOutEpsEnergy": "0.5"}}
 
     api._get_json = _get_json
@@ -208,7 +208,7 @@ async def test_async_get_device_eps_stat_returns_empty_dict_for_null_payload() -
     api = JackeryApi.__new__(JackeryApi)
     api.last_device_period_stat_responses = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
     api._get_json = _get_json
@@ -234,7 +234,7 @@ async def test_async_get_device_eps_stat_integer_device_id_is_stringified() -> N
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
@@ -261,7 +261,7 @@ async def test_async_get_today_energy_calls_correct_path_with_device_sn() -> Non
     captured: dict[str, Any] = {}
     expected_response = {FIELD_CODE: 0, FIELD_DATA: {"de": "0.5", "dg": "1.2"}}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["path"] = path
         captured["params"] = dict(params)
         return expected_response
@@ -281,7 +281,7 @@ async def test_async_get_today_energy_device_sn_is_stringified() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["params"] = dict(params)
         return {}
 
@@ -300,7 +300,7 @@ async def test_async_get_today_energy_returns_raw_response() -> None:
         FIELD_DATA: {"de": "2.1", "dg": "0.0", "dh": "3.5", "ds": "1.1"},
     }
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return full_response
 
     api._get_json = _get_json
@@ -314,7 +314,7 @@ async def test_async_get_today_energy_forwards_empty_response() -> None:
     """Empty response from _get_json is forwarded without modification."""
     api = JackeryApi.__new__(JackeryApi)
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {}
 
     api._get_json = _get_json
@@ -334,7 +334,7 @@ async def test_async_get_device_eps_stat_does_not_include_system_id() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 

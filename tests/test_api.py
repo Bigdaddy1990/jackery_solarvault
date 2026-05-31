@@ -47,7 +47,7 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
         {},
     ))
 
-    async def _put_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _put_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured.append((path, payload))
         return next(responses)
 
@@ -77,7 +77,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         {FIELD_DATA: 0},
     ))
 
-    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured.append((path, payload))
         return next(responses)
 
@@ -153,7 +153,7 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
     """Invalid tariff writer inputs must fail before the HTTP request."""
     api = JackeryApi.__new__(JackeryApi)
 
-    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         """Test stub that prevents performing an HTTP form POST for tariff-related operations.
 
         Used in unit tests to ensure input validation stops execution before any network request is made.
@@ -188,7 +188,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: list[tuple[str, dict[str, Any]]] = []
 
-    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         captured.append((path, payload))
         return {FIELD_DATA: True}
 
@@ -221,7 +221,7 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
     api = JackeryApi.__new__(JackeryApi)
     api.last_device_period_stat_responses = {}
 
-    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # noqa: RUF029
         assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
@@ -259,7 +259,7 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
     api = JackeryApi.__new__(JackeryApi)
     api.last_battery_pack_responses = {}
 
-    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # noqa: RUF029
         assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 

@@ -65,13 +65,15 @@ class _FakeHass:
         self._bg_tasks: list[asyncio.Task[Any]] = []
 
     def async_create_background_task(
-        self, coro: Any, name: str = ""
+        self,
+        coro: Any,
+        name: str = "",  # noqa: ANN401
     ) -> asyncio.Task[Any]:
         task = asyncio.get_event_loop().create_task(coro)
         self._bg_tasks.append(task)
         return task
 
-    def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:
+    def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:  # noqa: ANN401
         task = asyncio.get_event_loop().create_task(coro)
         return task
 
@@ -94,7 +96,7 @@ class _FakeEntry:
         self.data = data or {}
         self._unload_callbacks: list[Any] = []
 
-    def async_on_unload(self, callback: Any) -> None:
+    def async_on_unload(self, callback: Any) -> None:  # noqa: ANN401
         self._unload_callbacks.append(callback)
 
 
@@ -322,7 +324,7 @@ async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client()
     stop_called: list[bool] = []
     client = bucket[_LOCAL_MQTT_RUNTIME_KEY]
 
-    async def _fake_stop() -> None:
+    async def _fake_stop() -> None:  # noqa: RUF029
         stop_called.append(True)
 
     with patch.object(client, "async_stop", new=_fake_stop):
@@ -345,7 +347,7 @@ async def test_async_start_local_mqtt_unload_does_not_fail_when_stop_raises() ->
     bucket = hass.data[DOMAIN][entry.entry_id]
     client = bucket[_LOCAL_MQTT_RUNTIME_KEY]
 
-    async def _exploding_stop() -> None:
+    async def _exploding_stop() -> None:  # noqa: RUF029
         raise RuntimeError("broker went away")
 
     with patch.object(client, "async_stop", new=_exploding_stop):
