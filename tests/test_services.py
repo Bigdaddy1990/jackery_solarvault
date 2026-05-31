@@ -3,11 +3,6 @@
 from dataclasses import dataclass
 import sys
 
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    HomeAssistantError,
-    ServiceValidationError,
-)
 import pytest
 import voluptuous as vol
 
@@ -30,6 +25,11 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_TOKEN,
     SERVICE_FIELD_USERNAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
+)
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
 )
 
 
@@ -61,7 +61,7 @@ class _OverflowFloat:
         Raises:
             OverflowError: always raised with the message "too large".
         """
-        raise OverflowError('too large')
+        raise OverflowError("too large")
 
 
 def test_service_integer_parser_rejects_oversized_digit_strings() -> None:
@@ -70,7 +70,7 @@ def test_service_integer_parser_rejects_oversized_digit_strings() -> None:
     sys.set_int_max_str_digits(640)
     try:
         with pytest.raises(vol.Invalid):
-            services._coerce_service_int('9' * 700)
+            services._coerce_service_int("9" * 700)
     finally:
         sys.set_int_max_str_digits(old_limit)
 
@@ -108,7 +108,7 @@ class _AuthApi:
         Raises:
             JackeryAuthError: If the request fails due to authentication (invalid or expired credentials).
         """
-        raise JackeryAuthError('invalid token')
+        raise JackeryAuthError("invalid token")
 
 
 class _AuthCoordinator:
@@ -120,7 +120,7 @@ class _AuthCoordinator:
         Raises:
             AssertionError: Always raised to fail the test if a refresh is attempted.
         """
-        raise AssertionError('auth failures must not refresh')
+        raise AssertionError("auth failures must not refresh")
 
 
 def test_resolve_jackery_device_id_follows_subdevice_parent(
@@ -128,26 +128,26 @@ def test_resolve_jackery_device_id_follows_subdevice_parent(
 ) -> None:
     """Device-picker accessory selections resolve to the parent SolarVault."""
     registry = _Registry({
-        'solarvault-ha-id': _Device({(DOMAIN, '573702884982521856')}),
-        'smart-plug-ha-id': _Device(
-            {(DOMAIN, '573702884982521856_smart_plug_1')},
-            via_device_id='solarvault-ha-id',
+        "solarvault-ha-id": _Device({(DOMAIN, "573702884982521856")}),
+        "smart-plug-ha-id": _Device(
+            {(DOMAIN, "573702884982521856_smart_plug_1")},
+            via_device_id="solarvault-ha-id",
         ),
     })
 
-    monkeypatch.setattr(services.dr, 'async_get', lambda _hass: registry)
+    monkeypatch.setattr(services.dr, "async_get", lambda _hass: registry)
 
     assert (
-        services._resolve_jackery_device_id(object(), 'smart-plug-ha-id')
-        == '573702884982521856'
+        services._resolve_jackery_device_id(object(), "smart-plug-ha-id")
+        == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(object(), 'solarvault-ha-id')
-        == '573702884982521856'
+        services._resolve_jackery_device_id(object(), "solarvault-ha-id")
+        == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(object(), '573702884982521856')
-        == '573702884982521856'
+        services._resolve_jackery_device_id(object(), "573702884982521856")
+        == "573702884982521856"
     )
 
 
@@ -158,7 +158,7 @@ async def test_rename_service_rejects_false_api_result(
     coordinator = _Coordinator(api_result=False)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_system',
+        "_coordinator_for_system",
         lambda _hass, _system_id: coordinator,
     )
 
@@ -166,13 +166,13 @@ async def test_rename_service_rejects_false_api_result(
         await services._async_handle_rename(
             object(),
             _Call({
-                SERVICE_FIELD_SYSTEM_ID: '123',
-                SERVICE_FIELD_NEW_NAME: 'SolarVault',
+                SERVICE_FIELD_SYSTEM_ID: "123",
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
             }),
         )
 
-    assert err.value.translation_key == 'rename_system_failed'
-    assert coordinator.api.calls == [('123', 'SolarVault')]
+    assert err.value.translation_key == "rename_system_failed"
+    assert coordinator.api.calls == [("123", "SolarVault")]
     assert coordinator.refreshed is False
 
 
@@ -182,7 +182,7 @@ async def test_rename_service_reauth_on_auth_error(
     """Rename service must preserve auth failures so HA can open reauth."""
     monkeypatch.setattr(
         services,
-        '_coordinator_for_system',
+        "_coordinator_for_system",
         lambda _hass, _system_id: _AuthCoordinator(),
     )
 
@@ -190,18 +190,18 @@ async def test_rename_service_reauth_on_auth_error(
         await services._async_handle_rename(
             object(),
             _Call({
-                SERVICE_FIELD_SYSTEM_ID: '123',
-                SERVICE_FIELD_NEW_NAME: 'SolarVault',
+                SERVICE_FIELD_SYSTEM_ID: "123",
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
             }),
         )
 
 
 @pytest.mark.parametrize(
-    ('system_id', 'expected_system_id', 'expected_error'),
+    ("system_id", "expected_system_id", "expected_error"),
     [
-        ('  ', '', 'system_id must not be empty'),
-        ('abc', 'abc', 'system_id must be numeric'),
-        (None, '', 'system_id must be text'),
+        ("  ", "", "system_id must not be empty"),
+        ("abc", "abc", "system_id must be numeric"),
+        (None, "", "system_id must be text"),
     ],
 )
 async def test_rename_service_rejects_direct_invalid_system_id(
@@ -226,31 +226,31 @@ async def test_rename_service_rejects_direct_invalid_system_id(
         Raises:
             AssertionError: Always raised with message "invalid system_id must stop before coordinator lookup".
         """
-        raise AssertionError('invalid system_id must stop before coordinator lookup')
+        raise AssertionError("invalid system_id must stop before coordinator lookup")
 
-    monkeypatch.setattr(services, '_coordinator_for_system', _fail_coordinator_lookup)
+    monkeypatch.setattr(services, "_coordinator_for_system", _fail_coordinator_lookup)
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_rename(
             object(),
             _Call({
                 SERVICE_FIELD_SYSTEM_ID: system_id,
-                SERVICE_FIELD_NEW_NAME: 'SolarVault',
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
             }),
         )
 
-    assert err.value.translation_key == 'rename_system_failed'
+    assert err.value.translation_key == "rename_system_failed"
     assert err.value.translation_placeholders == {
-        'system_id': expected_system_id,
-        'error': expected_error,
+        "system_id": expected_system_id,
+        "error": expected_error,
     }
 
 
 @pytest.mark.parametrize(
-    ('new_name', 'expected_error'),
+    ("new_name", "expected_error"),
     [
-        ('  ', 'new_name must not be empty'),
-        ('x' * 65, 'new_name must be at most 64 characters'),
+        ("  ", "new_name must not be empty"),
+        ("x" * 65, "new_name must be at most 64 characters"),
     ],
 )
 async def test_rename_service_rejects_direct_invalid_new_name(
@@ -262,7 +262,7 @@ async def test_rename_service_rejects_direct_invalid_new_name(
     coordinator = _Coordinator(api_result=True)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_system',
+        "_coordinator_for_system",
         lambda _hass, _system_id: coordinator,
     )
 
@@ -270,15 +270,15 @@ async def test_rename_service_rejects_direct_invalid_new_name(
         await services._async_handle_rename(
             object(),
             _Call({
-                SERVICE_FIELD_SYSTEM_ID: '123',
+                SERVICE_FIELD_SYSTEM_ID: "123",
                 SERVICE_FIELD_NEW_NAME: new_name,
             }),
         )
 
-    assert err.value.translation_key == 'rename_system_failed'
+    assert err.value.translation_key == "rename_system_failed"
     assert err.value.translation_placeholders == {
-        'system_id': '123',
-        'error': expected_error,
+        "system_id": "123",
+        "error": expected_error,
     }
     assert coordinator.api.calls == []
     assert coordinator.refreshed is False
@@ -290,7 +290,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     """MQTT command errors are surfaced through the service translation key."""
 
     class _FailingCoordinator:
-        data = {'dev1': {}}
+        data = {"dev1": {}}
 
         async def async_query_weather_plan(self, device_id: str) -> None:
             """Request a weather plan update for the given device.
@@ -305,33 +305,33 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
 
     monkeypatch.setattr(
         services,
-        '_resolve_jackery_device_id',
+        "_resolve_jackery_device_id",
         lambda _hass, raw: str(raw),
     )
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _FailingCoordinator(),
     )
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_refresh_weather_plan(
             object(),
-            _Call({SERVICE_FIELD_DEVICE_ID: 'dev1'}),
+            _Call({SERVICE_FIELD_DEVICE_ID: "dev1"}),
         )
 
-    assert err.value.translation_key == 'refresh_weather_plan_failed'
+    assert err.value.translation_key == "refresh_weather_plan_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'MQTT command failed for dev1',
+        "device_id": "dev1",
+        "error": "MQTT command failed for dev1",
     }
 
 
 @pytest.mark.parametrize(
-    ('device_id', 'expected_error'),
+    ("device_id", "expected_error"),
     [
-        ('  ', 'device_id must not be empty'),
-        (None, 'device_id must be text'),
+        ("  ", "device_id must not be empty"),
+        (None, "device_id must be text"),
     ],
 )
 async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
@@ -346,9 +346,9 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
 
         Always raises an AssertionError with the message "invalid device_id must stop before registry lookup" when invoked.
         """
-        raise AssertionError('invalid device_id must stop before registry lookup')
+        raise AssertionError("invalid device_id must stop before registry lookup")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', _fail_resolve)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", _fail_resolve)
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_refresh_weather_plan(
@@ -356,10 +356,10 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
             _Call({SERVICE_FIELD_DEVICE_ID: device_id}),
         )
 
-    assert err.value.translation_key == 'refresh_weather_plan_failed'
+    assert err.value.translation_key == "refresh_weather_plan_failed"
     assert err.value.translation_placeholders == {
-        'device_id': '',
-        'error': expected_error,
+        "device_id": "",
+        "error": expected_error,
     }
 
 
@@ -377,12 +377,12 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
             Raises:
                 AssertionError: Always raised to indicate the coordinator should not be reached for invalid input.
             """
-            raise AssertionError('blank alert_id must stop before coordinator call')
+            raise AssertionError("blank alert_id must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _StormAlertCoordinator(),
     )
 
@@ -390,16 +390,16 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
         await services._async_handle_delete_storm_alert(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
-                SERVICE_FIELD_ALERT_ID: '  ',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ALERT_ID: "  ",
             }),
         )
 
-    assert err.value.translation_key == 'delete_storm_alert_failed'
+    assert err.value.translation_key == "delete_storm_alert_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'alert_id': '',
-        'error': 'alert_id must not be empty',
+        "device_id": "dev1",
+        "alert_id": "",
+        "error": "alert_id must not be empty",
     }
 
 
@@ -428,43 +428,43 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
             """
             self.calls.append({
-                'device_id': device_id,
-                'enable': enable,
-                'ip': ip,
-                'port': port,
-                'username': username,
-                'password': password,
-                'token': token,
+                "device_id": device_id,
+                "enable": enable,
+                "ip": ip,
+                "port": port,
+                "username": username,
+                "password": password,
+                "token": token,
             })
 
     coordinator = _ThirdPartyCoordinator()
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: coordinator
+        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
     await services._async_handle_set_third_party_mqtt_config(
         object(),
         _Call({
-            SERVICE_FIELD_DEVICE_ID: 'dev1',
-            SERVICE_FIELD_ENABLE: 'false',
-            SERVICE_FIELD_IP: ' 192.0.2.10 ',
-            SERVICE_FIELD_PORT: '1883',
-            SERVICE_FIELD_USERNAME: 'user',
-            SERVICE_FIELD_PASSWORD: 'pass',
-            SERVICE_FIELD_TOKEN: 'token',
+            SERVICE_FIELD_DEVICE_ID: "dev1",
+            SERVICE_FIELD_ENABLE: "false",
+            SERVICE_FIELD_IP: " 192.0.2.10 ",
+            SERVICE_FIELD_PORT: "1883",
+            SERVICE_FIELD_USERNAME: "user",
+            SERVICE_FIELD_PASSWORD: "pass",
+            SERVICE_FIELD_TOKEN: "token",
         }),
     )
 
     assert coordinator.calls == [
         {
-            'device_id': 'dev1',
-            'enable': False,
-            'ip': '192.0.2.10',
-            'port': 1883,
-            'username': 'user',
-            'password': 'pass',
-            'token': 'token',
+            "device_id": "dev1",
+            "enable": False,
+            "ip": "192.0.2.10",
+            "port": 1883,
+            "username": "user",
+            "password": "pass",
+            "token": "token",
         }
     ]
 
@@ -494,27 +494,27 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
             """
             self.calls.append({
-                'device_id': device_id,
-                'enable': enable,
-                'ip': ip,
-                'port': port,
-                'username': username,
-                'password': password,
-                'token': token,
+                "device_id": device_id,
+                "enable": enable,
+                "ip": ip,
+                "port": port,
+                "username": username,
+                "password": password,
+                "token": token,
             })
 
     coordinator = _ThirdPartyCoordinator()
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: coordinator
+        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
     await services._async_handle_set_third_party_mqtt_config(
         object(),
         _Call({
-            SERVICE_FIELD_DEVICE_ID: 'dev1',
+            SERVICE_FIELD_DEVICE_ID: "dev1",
             SERVICE_FIELD_ENABLE: True,
-            SERVICE_FIELD_IP: '192.0.2.10',
+            SERVICE_FIELD_IP: "192.0.2.10",
             SERVICE_FIELD_PORT: 1883,
             SERVICE_FIELD_USERNAME: None,
             SERVICE_FIELD_PASSWORD: None,
@@ -524,13 +524,13 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
 
     assert coordinator.calls == [
         {
-            'device_id': 'dev1',
-            'enable': True,
-            'ip': '192.0.2.10',
-            'port': 1883,
-            'username': '',
-            'password': '',
-            'token': '',
+            "device_id": "dev1",
+            "enable": True,
+            "ip": "192.0.2.10",
+            "port": 1883,
+            "username": "",
+            "password": "",
+            "token": "",
         }
     ]
 
@@ -551,13 +551,13 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
                 AssertionError: with message "non-text credentials must stop before coordinator call"
             """
             raise AssertionError(
-                'non-text credentials must stop before coordinator call'
+                "non-text credentials must stop before coordinator call"
             )
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _ThirdPartyCoordinator(),
     )
 
@@ -565,18 +565,18 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
         await services._async_handle_set_third_party_mqtt_config(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: '192.0.2.10',
+                SERVICE_FIELD_IP: "192.0.2.10",
                 SERVICE_FIELD_PORT: 1883,
-                SERVICE_FIELD_USERNAME: {'name': 'user'},
+                SERVICE_FIELD_USERNAME: {"name": "user"},
             }),
         )
 
-    assert err.value.translation_key == 'set_third_party_mqtt_config_failed'
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'username must be text',
+        "device_id": "dev1",
+        "error": "username must be text",
     }
 
 
@@ -591,12 +591,12 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
 
             Test-only stub: raises AssertionError if invoked to assert that input validation prevented the coordinator from being called.
             """
-            raise AssertionError('invalid boolean must stop before coordinator call')
+            raise AssertionError("invalid boolean must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _ThirdPartyCoordinator(),
     )
 
@@ -604,25 +604,25 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
         await services._async_handle_set_third_party_mqtt_config(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
-                SERVICE_FIELD_ENABLE: 'maybe',
-                SERVICE_FIELD_IP: '192.0.2.10',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: "maybe",
+                SERVICE_FIELD_IP: "192.0.2.10",
                 SERVICE_FIELD_PORT: 1883,
             }),
         )
 
-    assert err.value.translation_key == 'set_third_party_mqtt_config_failed'
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'enable must be a boolean',
+        "device_id": "dev1",
+        "error": "enable must be a boolean",
     }
 
 
 @pytest.mark.parametrize(
-    ('port', 'expected_error'),
+    ("port", "expected_error"),
     [
-        (0, 'port must be between 1 and 65535'),
-        (1883.9, 'port must be an integer'),
+        (0, "port must be between 1 and 65535"),
+        (1883.9, "port must be an integer"),
     ],
 )
 async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
@@ -641,12 +641,12 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
             Raises:
                 AssertionError: In the test stub, always raised to indicate the coordinator should not be called.
             """
-            raise AssertionError('invalid port must stop before coordinator call')
+            raise AssertionError("invalid port must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _ThirdPartyCoordinator(),
     )
 
@@ -654,30 +654,30 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
         await services._async_handle_set_third_party_mqtt_config(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: '192.0.2.10',
+                SERVICE_FIELD_IP: "192.0.2.10",
                 SERVICE_FIELD_PORT: port,
             }),
         )
 
-    assert err.value.translation_key == 'set_third_party_mqtt_config_failed'
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': expected_error,
+        "device_id": "dev1",
+        "error": expected_error,
     }
 
 
 @pytest.mark.parametrize(
-    ('schema', 'extra_data'),
+    ("schema", "extra_data"),
     [
         (services.REFRESH_WEATHER_PLAN_SCHEMA, {}),
-        (services.DELETE_STORM_ALERT_SCHEMA, {SERVICE_FIELD_ALERT_ID: 'alert-1'}),
+        (services.DELETE_STORM_ALERT_SCHEMA, {SERVICE_FIELD_ALERT_ID: "alert-1"}),
         (
             services.SET_THIRD_PARTY_MQTT_SCHEMA,
             {
                 SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: '192.0.2.10',
+                SERVICE_FIELD_IP: "192.0.2.10",
                 SERVICE_FIELD_PORT: 1883,
             },
         ),
@@ -686,7 +686,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
             services.SEND_BLE_COMMAND_SCHEMA,
             {
                 SERVICE_FIELD_CMD: 107,
-                SERVICE_FIELD_BODY: {'cmd': 107},
+                SERVICE_FIELD_BODY: {"cmd": 107},
             },
         ),
     ],
@@ -698,7 +698,7 @@ def test_device_id_service_schemas_reject_whitespace_only_values(
     """Device-id service schemas must reject values the handlers trim to empty."""
     with pytest.raises(vol.Invalid):
         schema({
-            SERVICE_FIELD_DEVICE_ID: '  ',
+            SERVICE_FIELD_DEVICE_ID: "  ",
             **extra_data,
         })
 
@@ -719,12 +719,12 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
             Returns:
                 None
             """
-            raise AssertionError('blank IP must stop before coordinator call')
+            raise AssertionError("blank IP must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _ThirdPartyCoordinator(),
     )
 
@@ -732,17 +732,17 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
         await services._async_handle_set_third_party_mqtt_config(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: '  ',
+                SERVICE_FIELD_IP: "  ",
                 SERVICE_FIELD_PORT: 1883,
             }),
         )
 
-    assert err.value.translation_key == 'set_third_party_mqtt_config_failed'
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'ip must not be empty',
+        "device_id": "dev1",
+        "error": "ip must not be empty",
     }
 
 
@@ -753,12 +753,12 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
 
     class _ThirdPartyCoordinator:
         async def async_set_third_party_mqtt_config(self, *args: object) -> None:
-            raise AssertionError('long token must stop before coordinator call')
+            raise AssertionError("long token must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
         services,
-        '_coordinator_for_device',
+        "_coordinator_for_device",
         lambda _hass, _device_id: _ThirdPartyCoordinator(),
     )
 
@@ -766,18 +766,18 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
         await services._async_handle_set_third_party_mqtt_config(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: '192.0.2.10',
+                SERVICE_FIELD_IP: "192.0.2.10",
                 SERVICE_FIELD_PORT: 1883,
-                SERVICE_FIELD_TOKEN: 'x' * 513,
+                SERVICE_FIELD_TOKEN: "x" * 513,
             }),
         )
 
-    assert err.value.translation_key == 'set_third_party_mqtt_config_failed'
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'token must be at most 512 characters',
+        "device_id": "dev1",
+        "error": "token must be at most 512 characters",
     }
 
 
@@ -816,33 +816,33 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
                 bool: `True` if the command was accepted, `False` otherwise.
             """
             self.calls.append({
-                'device_id': device_id,
-                'cmd': cmd,
-                'body': body,
-                'flags': flags,
-                'wait_for_ack': wait_for_ack,
-                'ack_timeout_sec': ack_timeout_sec,
-                'connect_timeout_sec': connect_timeout_sec,
+                "device_id": device_id,
+                "cmd": cmd,
+                "body": body,
+                "flags": flags,
+                "wait_for_ack": wait_for_ack,
+                "ack_timeout_sec": ack_timeout_sec,
+                "connect_timeout_sec": connect_timeout_sec,
             })
             return True
 
     coordinator = _BleCoordinator()
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: coordinator
+        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
     await services._async_handle_send_ble_command(
         object(),
         _Call({
-            SERVICE_FIELD_DEVICE_ID: 'dev1',
-            SERVICE_FIELD_CMD: '107',
-            SERVICE_FIELD_BODY: {'cmd': 107},
-            SERVICE_FIELD_WAIT_FOR_ACK: 'false',
+            SERVICE_FIELD_DEVICE_ID: "dev1",
+            SERVICE_FIELD_CMD: "107",
+            SERVICE_FIELD_BODY: {"cmd": 107},
+            SERVICE_FIELD_WAIT_FOR_ACK: "false",
         }),
     )
 
-    assert coordinator.calls[0]['wait_for_ack'] is False
+    assert coordinator.calls[0]["wait_for_ack"] is False
 
 
 async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
@@ -860,37 +860,37 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
             Returns:
                 bool: `True` if the device acknowledged the command, `False` otherwise.
             """
-            raise AssertionError('invalid boolean must stop before coordinator call')
+            raise AssertionError("invalid boolean must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: _BleCoordinator()
+        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
     )
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_CMD: 107,
-                SERVICE_FIELD_BODY: {'cmd': 107},
-                SERVICE_FIELD_WAIT_FOR_ACK: 'maybe',
+                SERVICE_FIELD_BODY: {"cmd": 107},
+                SERVICE_FIELD_WAIT_FOR_ACK: "maybe",
             }),
         )
 
-    assert err.value.translation_key == 'send_ble_command_failed'
+    assert err.value.translation_key == "send_ble_command_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'wait_for_ack must be a boolean',
+        "device_id": "dev1",
+        "error": "wait_for_ack must be a boolean",
     }
 
 
 @pytest.mark.parametrize(
-    ('body', 'expected_error'),
+    ("body", "expected_error"),
     [
-        ({1: 'x'}, 'body object keys must be strings'),
-        ({'cmd': object()}, 'body must contain only JSON-compatible values'),
-        ('{"cmd": NaN}', 'body is not valid JSON: invalid JSON constant: NaN'),
+        ({1: "x"}, "body object keys must be strings"),
+        ({"cmd": object()}, "body must contain only JSON-compatible values"),
+        ('{"cmd": NaN}', "body is not valid JSON: invalid JSON constant: NaN"),
     ],
 )
 async def test_send_ble_command_service_rejects_non_json_native_body(
@@ -920,48 +920,48 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
             Returns:
                 bool: `True` if the BLE command succeeded, `False` otherwise.
             """
-            raise AssertionError('invalid body must stop before coordinator call')
+            raise AssertionError("invalid body must stop before coordinator call")
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: _BleCoordinator()
+        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
     )
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_CMD: 107,
                 SERVICE_FIELD_BODY: body,
             }),
         )
 
-    assert err.value.translation_key == 'send_ble_command_failed'
+    assert err.value.translation_key == "send_ble_command_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': expected_error,
+        "device_id": "dev1",
+        "error": expected_error,
     }
 
 
 @pytest.mark.parametrize(
-    ('call_data', 'expected_error'),
+    ("call_data", "expected_error"),
     [
         (
             {
                 SERVICE_FIELD_CMD: 107,
-                SERVICE_FIELD_BODY: {'cmd': 107},
+                SERVICE_FIELD_BODY: {"cmd": 107},
                 SERVICE_FIELD_FLAGS: -1,
                 SERVICE_FIELD_ACK_TIMEOUT: 5.0,
             },
-            'flags must be between 0 and 65535',
+            "flags must be between 0 and 65535",
         ),
         (
             {
                 SERVICE_FIELD_CMD: 107.5,
-                SERVICE_FIELD_BODY: {'cmd': 107},
+                SERVICE_FIELD_BODY: {"cmd": 107},
             },
-            'cmd must be an integer',
+            "cmd must be an integer",
         ),
     ],
 )
@@ -982,28 +982,28 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
                 input validation should have prevented invocation.
             """
             raise AssertionError(
-                'invalid numeric field must stop before coordinator call'
+                "invalid numeric field must stop before coordinator call"
             )
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: _BleCoordinator()
+        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
     )
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             object(),
-            _Call({SERVICE_FIELD_DEVICE_ID: 'dev1', **call_data}),
+            _Call({SERVICE_FIELD_DEVICE_ID: "dev1", **call_data}),
         )
 
-    assert err.value.translation_key == 'send_ble_command_failed'
+    assert err.value.translation_key == "send_ble_command_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': expected_error,
+        "device_id": "dev1",
+        "error": expected_error,
     }
 
 
-@pytest.mark.parametrize('ack_timeout', ['nan', True, _OverflowFloat()])
+@pytest.mark.parametrize("ack_timeout", ["nan", True, _OverflowFloat()])
 async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     monkeypatch: pytest.MonkeyPatch,
     ack_timeout: object,
@@ -1018,27 +1018,27 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
                 AssertionError: Always raised to indicate the coordinator method should not be called during validation tests.
             """
             raise AssertionError(
-                'invalid ack_timeout must stop before coordinator call'
+                "invalid ack_timeout must stop before coordinator call"
             )
 
-    monkeypatch.setattr(services, '_resolve_jackery_device_id', lambda _hass, raw: raw)
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, '_coordinator_for_device', lambda _hass, _device_id: _BleCoordinator()
+        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
     )
 
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             object(),
             _Call({
-                SERVICE_FIELD_DEVICE_ID: 'dev1',
+                SERVICE_FIELD_DEVICE_ID: "dev1",
                 SERVICE_FIELD_CMD: 107,
-                SERVICE_FIELD_BODY: {'cmd': 107},
+                SERVICE_FIELD_BODY: {"cmd": 107},
                 SERVICE_FIELD_ACK_TIMEOUT: ack_timeout,
             }),
         )
 
-    assert err.value.translation_key == 'send_ble_command_failed'
+    assert err.value.translation_key == "send_ble_command_failed"
     assert err.value.translation_placeholders == {
-        'device_id': 'dev1',
-        'error': 'ack_timeout must be a number',
+        "device_id": "dev1",
+        "error": "ack_timeout must be a number",
     }

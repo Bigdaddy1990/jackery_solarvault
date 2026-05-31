@@ -1,6 +1,5 @@
 """Unit tests for coordinator price writer behavior."""
 
-from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -17,6 +16,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
+from homeassistant.exceptions import HomeAssistantError
 
 
 class _RejectingPriceApi:
@@ -68,16 +68,16 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = _RejectingPriceApi()
     coordinator.data = {
-        'dev1': {
+        "dev1": {
             PAYLOAD_PRICE: {
-                FIELD_CURRENCY: 'EUR',
+                FIELD_CURRENCY: "EUR",
                 FIELD_SINGLE_PRICE: 0.25,
                 FIELD_PLATFORM_COMPANY_ID: 7,
-                FIELD_SYSTEM_REGION: 'DE',
+                FIELD_SYSTEM_REGION: "DE",
             }
         }
     }
-    coordinator._device_index = {'dev1': {FIELD_SYSTEM_ID: 'sys1'}}
+    coordinator._device_index = {"dev1": {FIELD_SYSTEM_ID: "sys1"}}
     coordinator._slow_cache = {}
     coordinator._price_overrides = {}
 
@@ -90,7 +90,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         Raises:
             AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
         """
-        raise AssertionError('rejected writer must not patch local price data')
+        raise AssertionError("rejected writer must not patch local price data")
 
     coordinator._push_partial_update = _fail_push
     return coordinator
@@ -98,45 +98,45 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
 async def test_single_price_rejects_false_api_response() -> None:
     """Rejected single-price writes must not update local price state."""
-    with pytest.raises(HomeAssistantError, match='single tariff'):
-        await _coordinator().async_set_single_price('dev1', 0.30)
+    with pytest.raises(HomeAssistantError, match="single tariff"):
+        await _coordinator().async_set_single_price("dev1", 0.30)
 
 
 async def test_single_price_rejects_invalid_value_before_api_call() -> None:
     """Invalid single-price writes must stop before API/local state mutation."""
-    with pytest.raises(HomeAssistantError, match='invalid singlePrice'):
-        await _coordinator().async_set_single_price('dev1', float('nan'))
+    with pytest.raises(HomeAssistantError, match="invalid singlePrice"):
+        await _coordinator().async_set_single_price("dev1", float("nan"))
 
 
 async def test_single_price_mode_rejects_invalid_cached_price() -> None:
     """Switching to single mode must not cast corrupt cached prices directly."""
     coordinator = _coordinator()
-    coordinator.data['dev1'][PAYLOAD_PRICE][FIELD_SINGLE_PRICE] = 'nan'
+    coordinator.data["dev1"][PAYLOAD_PRICE][FIELD_SINGLE_PRICE] = "nan"
 
-    with pytest.raises(HomeAssistantError, match='invalid singlePrice'):
-        await coordinator.async_set_price_mode_single('dev1')
+    with pytest.raises(HomeAssistantError, match="invalid singlePrice"):
+        await coordinator.async_set_price_mode_single("dev1")
 
 
 async def test_dynamic_price_rejects_false_api_response() -> None:
     """Rejected dynamic-price writes must not update local price state."""
-    with pytest.raises(HomeAssistantError, match='dynamic tariff'):
-        await _coordinator().async_set_price_mode_dynamic('dev1')
+    with pytest.raises(HomeAssistantError, match="dynamic tariff"):
+        await _coordinator().async_set_price_mode_dynamic("dev1")
 
 
 def test_valid_price_sources_filters_blank_company_and_region() -> None:
     """Coordinator price-source validation rejects whitespace-only fields."""
     assert JackerySolarVaultCoordinator._valid_price_sources([
-        {FIELD_PLATFORM_COMPANY_ID: '', FIELD_COUNTRY: 'DE'},
-        {FIELD_PLATFORM_COMPANY_ID: '  ', FIELD_COUNTRY: 'DE'},
-        {FIELD_PLATFORM_COMPANY_ID: 'abc', FIELD_COUNTRY: 'DE'},
-        {FIELD_PLATFORM_COMPANY_ID: '8.9', FIELD_COUNTRY: 'DE'},
-        {FIELD_PLATFORM_COMPANY_ID: 7, FIELD_COUNTRY: ''},
-        {FIELD_PLATFORM_COMPANY_ID: 7, FIELD_COUNTRY: '  '},
-        {FIELD_PLATFORM_COMPANY_ID: 9, FIELD_COUNTRY: '  ', FIELD_SYSTEM_REGION: 'AT'},
-        {FIELD_PLATFORM_COMPANY_ID: 8, FIELD_COUNTRY: 'DE'},
+        {FIELD_PLATFORM_COMPANY_ID: "", FIELD_COUNTRY: "DE"},
+        {FIELD_PLATFORM_COMPANY_ID: "  ", FIELD_COUNTRY: "DE"},
+        {FIELD_PLATFORM_COMPANY_ID: "abc", FIELD_COUNTRY: "DE"},
+        {FIELD_PLATFORM_COMPANY_ID: "8.9", FIELD_COUNTRY: "DE"},
+        {FIELD_PLATFORM_COMPANY_ID: 7, FIELD_COUNTRY: ""},
+        {FIELD_PLATFORM_COMPANY_ID: 7, FIELD_COUNTRY: "  "},
+        {FIELD_PLATFORM_COMPANY_ID: 9, FIELD_COUNTRY: "  ", FIELD_SYSTEM_REGION: "AT"},
+        {FIELD_PLATFORM_COMPANY_ID: 8, FIELD_COUNTRY: "DE"},
     ]) == [
-        {FIELD_PLATFORM_COMPANY_ID: 9, FIELD_COUNTRY: '  ', FIELD_SYSTEM_REGION: 'AT'},
-        {FIELD_PLATFORM_COMPANY_ID: 8, FIELD_COUNTRY: 'DE'},
+        {FIELD_PLATFORM_COMPANY_ID: 9, FIELD_COUNTRY: "  ", FIELD_SYSTEM_REGION: "AT"},
+        {FIELD_PLATFORM_COMPANY_ID: 8, FIELD_COUNTRY: "DE"},
     ]
 
 
@@ -147,14 +147,14 @@ def test_find_matching_price_source_normalizes_current_price_fields() -> None:
 
     source = {
         FIELD_PLATFORM_COMPANY_ID: 8,
-        FIELD_COUNTRY: 'DE, AT',
+        FIELD_COUNTRY: "DE, AT",
     }
 
     assert (
         coordinator._find_matching_price_source(
-            'dev1',
+            "dev1",
             [source],
-            {FIELD_PLATFORM_COMPANY_ID: ' 8 ', FIELD_SYSTEM_REGION: ' de '},
+            {FIELD_PLATFORM_COMPANY_ID: " 8 ", FIELD_SYSTEM_REGION: " de "},
         )
         == source
     )
@@ -165,18 +165,18 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
     api = _AcceptingPriceApi()
     coordinator = _coordinator()
     coordinator.api = api
-    coordinator.data['dev1'][PAYLOAD_PRICE] = {
-        FIELD_PLATFORM_COMPANY_ID: ' 8.0 ',
-        FIELD_SYSTEM_REGION: ' DE ',
+    coordinator.data["dev1"][PAYLOAD_PRICE] = {
+        FIELD_PLATFORM_COMPANY_ID: " 8.0 ",
+        FIELD_SYSTEM_REGION: " DE ",
     }
-    coordinator._push_partial_update = lambda data: setattr(coordinator, 'data', data)
+    coordinator._push_partial_update = lambda data: setattr(coordinator, "data", data)
 
-    await coordinator.async_set_price_mode_dynamic('dev1')
+    await coordinator.async_set_price_mode_dynamic("dev1")
 
-    assert api.dynamic_calls == [('sys1', 8, 'DE')]
-    price = coordinator.data['dev1'][PAYLOAD_PRICE]
+    assert api.dynamic_calls == [("sys1", 8, "DE")]
+    price = coordinator.data["dev1"][PAYLOAD_PRICE]
     assert price[FIELD_PLATFORM_COMPANY_ID] == 8
-    assert price[FIELD_SYSTEM_REGION] == 'DE'
+    assert price[FIELD_SYSTEM_REGION] == "DE"
 
 
 async def test_price_source_write_normalizes_blank_company_name() -> None:
@@ -184,17 +184,17 @@ async def test_price_source_write_normalizes_blank_company_name() -> None:
     api = _AcceptingPriceApi()
     coordinator = _coordinator()
     coordinator.api = api
-    coordinator._push_partial_update = lambda data: setattr(coordinator, 'data', data)
+    coordinator._push_partial_update = lambda data: setattr(coordinator, "data", data)
 
     await coordinator.async_set_price_source(
-        'dev1',
+        "dev1",
         {
-            FIELD_COMPANY_NAME: ' ',
-            FIELD_NAME: 'Grid Co',
-            FIELD_PLATFORM_COMPANY_ID: '8.0',
-            FIELD_COUNTRY: 'DE',
+            FIELD_COMPANY_NAME: " ",
+            FIELD_NAME: "Grid Co",
+            FIELD_PLATFORM_COMPANY_ID: "8.0",
+            FIELD_COUNTRY: "DE",
         },
     )
 
-    price = coordinator.data['dev1'][PAYLOAD_PRICE]
-    assert price[FIELD_COMPANY_NAME] == 'Grid Co'
+    price = coordinator.data["dev1"][PAYLOAD_PRICE]
+    assert price[FIELD_COMPANY_NAME] == "Grid Co"

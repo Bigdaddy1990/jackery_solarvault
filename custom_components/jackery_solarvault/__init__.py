@@ -15,7 +15,8 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .client import JackeryApi, JackeryAuthError, JackeryError
+from .client.local_mqtt import JackeryLocalMqttClient
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -27,7 +28,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
@@ -35,10 +36,9 @@ from .const import (
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
@@ -85,28 +85,26 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 def _async_clean_legacy_entities(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
-    """Remove legacy entity-registry entries and stale energy helper entities no longer part of the integration's current data model.
+    """Drop entity-registry entries from older releases or disabled options.
 
-    This function always removes stale energy helper entities and sensor/binary_sensor entries whose unique IDs match known legacy suffixes. It also conditionally removes groups of derived or calculated sensors when the corresponding `create_*` config options on the entry are disabled.
-
-    Parameters:
-        hass (HomeAssistant): Home Assistant instance.
-        entry (JackeryConfigEntry): The config entry for the Jackery SolarVault integration.
+    Keep entity-registry cleanup explicit and setup-local. This avoids hidden
+    entry-version side effects while still removing entities that are no
+    longer part of the documented app/HTTP/MQTT data model.
     """
     _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain='sensor',
+        domain="sensor",
         suffixes=REMOVED_SENSOR_SUFFIXES,
-        log_label='removed Jackery sensor',
+        log_label="removed Jackery sensor",
     )
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain='sensor',
+        domain="sensor",
         suffixes=CT_PERIOD_SENSOR_SUFFIXES,
-        log_label='removed CT period sensor',
+        log_label="removed CT period sensor",
     )
     if not config_entry_bool_option(
         entry,
@@ -116,9 +114,9 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain='sensor',
+            domain="sensor",
             suffixes=SMART_METER_DERIVED_SENSOR_SUFFIXES,
-            log_label='disabled calculated smart-meter sensor',
+            log_label="disabled calculated smart-meter sensor",
         )
     if not config_entry_bool_option(
         entry,
@@ -128,9 +126,9 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain='sensor',
+            domain="sensor",
             suffixes=CALCULATED_POWER_SENSOR_SUFFIXES,
-            log_label='disabled calculated power sensor',
+            log_label="disabled calculated power sensor",
         )
     if not config_entry_bool_option(
         entry,
@@ -140,28 +138,30 @@ def _async_clean_legacy_entities(
         _async_remove_entities_with_suffixes(
             hass,
             entry,
-            domain='sensor',
+            domain="sensor",
             suffixes=SAVINGS_DETAIL_SENSOR_SUFFIXES,
-            log_label='disabled savings detail sensor',
+            log_label="disabled savings detail sensor",
         )
     _async_remove_entities_with_suffixes(
         hass,
         entry,
-        domain='binary_sensor',
+        domain="binary_sensor",
         suffixes=DUPLICATE_BINARY_SENSOR_SUFFIXES,
-        log_label='duplicate binary sensor',
+        log_label="duplicate binary sensor",
     )
 
 
 async def _async_authenticate(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
-    """Build the API client and run the initial login.
+    """Authenticate to the Jackery cloud using credentials from the config entry and return an authenticated API client.
 
-    Bad credentials raise ``ConfigEntryAuthFailed`` so HA routes the entry
-    into the re-auth flow without removing it. Transient cloud errors raise
-    ``ConfigEntryNotReady`` so HA retries setup after the configured backoff
-    instead of marking the entry as failed.
+    Returns:
+        JackeryApi: An authenticated API client ready for use.
+
+    Raises:
+        ConfigEntryAuthFailed: If the provided credentials are rejected (triggers re-auth flow).
+        ConfigEntryNotReady: If the Jackery cloud cannot be reached (setup should be retried later).
     """
     session = async_get_clientsession(hass)
     api = JackeryApi(
@@ -184,25 +184,47 @@ async def _async_authenticate(
     return api
 
 
-async def _async_push_third_party_mqtt_config(
-    coordinator: JackerySolarVaultCoordinator, entry: JackeryConfigEntry
-) -> None:
-    """Push third-party MQTT bridge settings from the config entry to each device managed by the coordinator.
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
-    If the third-party MQTT option is disabled or no IP is configured, the push is skipped. Attempts are best-effort per device; failures are logged and do not raise, and the user may retry via the `set_third_party_mqtt_config` service.
+
+def _local_mqtt_client(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> JackeryLocalMqttClient | None:
+    """Return the per-entry local MQTT client stored in hass.data for the given config entry.
+
+    Returns:
+        JackeryLocalMqttClient instance for the entry, or None if no client is stored or the stored value is not a JackeryLocalMqttClient.
+    """
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not isinstance(bucket, dict):
+        return None
+    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
+    return client if isinstance(client, JackeryLocalMqttClient) else None
+
+
+async def _async_start_local_mqtt(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> None:
+    """Start a per-entry local MQTT client when the entry is explicitly scoped.
+
+    The listener only starts when the Third-Party MQTT bridge is enabled, the
+    host is set, and a non-empty topic filter is configured. This prevents an
+    accidental broad wildcard subscription from ingesting unrelated broker
+    traffic and causing high CPU load.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
     ):
         return
-    ip = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP
-    )
-    if not ip:
-        _LOGGER.debug(
-            'Jackery: Third-Party MQTT bridge enabled in options but no IP '
-            'configured; skipping setup-time push'
-        )
+    host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
+    if not host:
+        return
+    topic_filter = config_entry_str_option(
+        entry,
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    ).strip()
+    if not topic_filter:
         return
     port = config_entry_int_option(
         entry, CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT
@@ -213,38 +235,37 @@ async def _async_push_third_party_mqtt_config(
     password = config_entry_str_option(
         entry, CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
     )
-    token = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN
+    client = JackeryLocalMqttClient(
+        hass,
+        host=host,
+        port=port,
+        username=username or None,
+        password=password or None,
+        client_id=f"ha-jackery-{entry.entry_id[:8]}",
+        topic_filter=topic_filter,
     )
-    for device_id in list((coordinator.data or {}).keys()):
-        try:
-            await coordinator.async_set_third_party_mqtt_config(
-                device_id,
-                enable=True,
-                ip=ip,
-                port=port,
-                username=username,
-                password=password,
-                token=token,
-            )
-        except (JackeryError, LookupError, RuntimeError, ValueError) as err:
-            _LOGGER.warning(
-                'Jackery: third-party MQTT bridge push to %s failed '
-                '(BLE writes or cloud MQTT may be unavailable); the user can '
-                'retry via the set_third_party_mqtt_config service: %s',
-                device_id,
-                err,
-            )
+    bucket = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
+    bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
+
+    async def _async_stop_local_mqtt() -> None:
+        """Stop the stored per-entry local MQTT client and remove its hass.data reference if it matches the stored instance.
+
+        Exceptions raised while stopping the client are suppressed.
+        """
+        with contextlib.suppress(Exception):
+            await client.async_stop()
+        stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+        if isinstance(stashed, dict) and stashed.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
+            stashed.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
+
+    entry.async_on_unload(_async_stop_local_mqtt)
+    await client.async_start()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Perform per-entry setup for the Jackery SolarVault integration.
+    """Set up the Jackery SolarVault config entry, start its coordinator and optional transports, and forward platform setup.
 
-    This authenticates the account, initializes and configures the integration coordinator, performs device discovery and initial data refresh, starts MQTT/optional BLE transports, forwards platform setup, pushes third-party MQTT settings when configured, and registers an update listener. On failure, the partially initialized coordinator is shut down and the error is propagated.
-
-    Parameters:
-        hass (HomeAssistant): Home Assistant core object.
-        entry (JackeryConfigEntry): Configuration entry for this integration.
+    Performs authentication, constructs the coordinator, runs discovery and the initial refresh, and starts cloud MQTT plus an optional local MQTT listener and BLE transport. Transport startup failures that indicate invalid credentials will surface re-auth; other transport failures are logged and do not block setup. On successful setup the coordinator is stored on the entry's runtime state and platform setups and listeners are registered. If setup fails after the coordinator is created, the coordinator is shut down and the entry's runtime state is cleared before the error is re-raised.
 
     Returns:
         True if setup completed successfully.
@@ -256,7 +277,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     coordinator = JackerySolarVaultCoordinator(
         hass, entry, api, timedelta(seconds=interval_sec)
     )
-    _LOGGER.info('Jackery: coordinator polling interval set to %ss', interval_sec)
+    _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
     try:
         # Discovery must run first (MQTT subscriptions and the first refresh
@@ -270,11 +291,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # asyncio.gather(return_exceptions=True) widens the result element
         # type to ``T | BaseException``; the cast surfaces that contract for
         # mypy without changing runtime behaviour.
-        refresh_result, mqtt_result = cast(
-            tuple[None | BaseException, None | BaseException],
+        refresh_result, mqtt_result, local_mqtt_result = cast(
+            tuple[
+                None | BaseException,
+                None | BaseException,
+                None | BaseException,
+            ],
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
+                _async_start_local_mqtt(hass, entry),
                 return_exceptions=True,
             ),
         )
@@ -289,7 +315,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             # Other MQTT failures (network, TLS handshake, broker outage) must
             # not block setup — push is an optional channel on top of polling.
             _LOGGER.warning(
-                'Jackery MQTT push could not start during setup: %s', mqtt_result
+                "Jackery MQTT push could not start during setup: %s", mqtt_result
+            )
+        if isinstance(local_mqtt_result, BaseException):
+            # Local broker outage / wrong credentials must not block setup.
+            _LOGGER.warning(
+                "Jackery local MQTT listener could not start during setup: %s",
+                local_mqtt_result,
             )
 
         entry.runtime_data = coordinator
@@ -303,13 +335,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # the coordinator: BLE is an opt-in diagnostic extra, never a
         # hard dependency of integration setup.
         await coordinator.async_start_ble_transport()
-        await _async_push_third_party_mqtt_config(coordinator, entry)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
         with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
         if entry.runtime_data is coordinator:
-            entry.runtime_data = None
+            # HA convention: clear runtime_data on setup failure so the next
+            # retry sees a clean slate. The typed alias narrows the attribute
+            # to ``JackerySolarVaultCoordinator``; the None assignment here
+            # is the documented cleanup path and matches HA core integrations.
+            entry.runtime_data = None  # type: ignore[assignment]
         raise
     return True
 
@@ -322,20 +357,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     """Remove stale Energy helper entities that were created without a unit of measurement.
 
-    Scans the entity registry for entities whose IDs match the integration's stale-energy helper pattern, have no `unit_of_measurement` in their current state, and reference a known vendor token; removes matching entities from the registry and logs an informational message for each removal.
+    Scans the entity registry for entities whose entity_id starts with the configured
+    STALE_ENERGY_HELPER_PREFIX and ends with STALE_NET_POWER_SUFFIX. If an entity's
+    current state has no `unit_of_measurement` (missing or empty) and its entity_id
+    contains any token from STALE_HELPER_VENDOR_TOKENS, the entity is removed from
+    the registry and an informational log entry is emitted.
     """
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
-        entity_id = ent.entity_id or ''
+        entity_id = ent.entity_id or ""
         if not entity_id.startswith(STALE_ENERGY_HELPER_PREFIX):
             continue
         if not entity_id.endswith(STALE_NET_POWER_SUFFIX):
             continue
         lowered = entity_id.lower()
         state = hass.states.get(entity_id)
-        unit = None if state is None else state.attributes.get('unit_of_measurement')
-        if unit not in (None, ''):
+        unit = None if state is None else state.attributes.get("unit_of_measurement")
+        if unit not in (None, ""):
             continue
 
         # Only stale helpers that explicitly reference this integration should
@@ -346,27 +385,23 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
 
     for entity_id in to_remove:
         _LOGGER.info(
-            'Removing stale Energy helper without unit: %s '
-            '(please recreate with Jackery battery_net_power)',
+            "Removing stale Energy helper without unit: %s "
+            "(please recreate with Jackery battery_net_power)",
             entity_id,
         )
         registry.async_remove(entity_id)
 
 
-_LEGACY_UID_HEAD_RE = re.compile(r'\d+(?:_battery_pack_\d+)?')
+_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
-    """Determine whether a unique ID exactly matches a legacy "<device_id><key_suffix>" pattern.
+    """Determine whether `uid` consists of a legacy device head immediately followed by `key_suffix`.
 
-    Checks that `uid` ends with `key_suffix` and that the portion before the suffix is a valid legacy head (either `<device_id>_` or `<device_id>_battery_pack_<index>_`), preventing accidental matches where a current key contains a legacy key as its tail.
-
-    Parameters:
-        uid (str): The entity unique ID to test.
-        key_suffix (str): The legacy suffix to match.
+    A legacy device head has the form `<digits>` or `<digits>_battery_pack_<digits>`. This function returns `True` only when `uid` ends with `key_suffix` and the substring before that suffix exactly matches the legacy head pattern.
 
     Returns:
-        True if `uid` is exactly `<legacy_head><key_suffix>`, `False` otherwise.
+        `True` if `uid` is a legacy head concatenated with `key_suffix`, `False` otherwise.
     """
     if not uid.endswith(key_suffix):
         return False
@@ -382,18 +417,14 @@ def _async_remove_entities_with_suffixes(
     suffixes: Iterable[str],
     log_label: str,
 ) -> None:
-    """Remove entity-registry entries whose unique_id ends with any suffix.
+    """Remove entity-registry entries for the given config entry and domain whose legacy unique IDs end with any of the provided legacy suffixes.
 
-    Unique IDs for this integration follow ``<device_id>_<key_suffix>`` per
-    docs/PROTOCOL.md §11, so suffix matching is the right way to drop
-    legacy or option-disabled entities without scanning HA-wide registry
-    entries owned by other integrations. The match is anchored via
-    :func:`_legacy_suffix_matches` so a legacy suffix cannot accidentally
-    delete a current entity whose key happens to contain the legacy tail.
+    Matching only applies when the unique ID conforms to the legacy unique-id shape to avoid accidental removal of current entities. If `suffixes` is empty, the function performs no action.
 
-    Synchronous because the entity registry is already in-memory; the helper
-    only schedules removals against it. Setup-local cleanup deliberately
-    avoids hidden entry-version side effects.
+    Parameters:
+        domain (str): Entity domain to restrict removals (e.g., "sensor", "binary_sensor").
+        suffixes (Iterable[str]): Iterable of legacy unique-id suffix strings; an entity is removed if its unique ID matches any suffix.
+        log_label (str): Human-readable label included in removal log messages.
     """
     suffix_tuple = tuple(suffixes)
     if not suffix_tuple:
@@ -402,10 +433,10 @@ def _async_remove_entities_with_suffixes(
     for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
         if ent.domain != domain:
             continue
-        uid = ent.unique_id or ''
+        uid = ent.unique_id or ""
         if any(_legacy_suffix_matches(uid, suffix) for suffix in suffix_tuple):
             _LOGGER.info(
-                'Removing %s %s (%s)',
+                "Removing %s %s (%s)",
                 log_label,
                 ent.entity_id,
                 ent.unique_id,
@@ -426,7 +457,13 @@ async def _async_update_listener(
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload the config entry and tear down its runtime resources.
+
+    If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime data to avoid retaining the coordinator. Teardown is performed only when platforms are successfully unloaded.
+
+    Returns:
+        True if platforms were unloaded and runtime teardown completed, False otherwise.
+    """
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     # Keep the successful teardown explicitly gated by unload_ok so future
@@ -435,5 +472,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
         return False
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
-    entry.runtime_data = None
+    # HA convention on unload: drop the runtime_data reference so any
+    # stragglers cannot keep the coordinator alive. Same narrowing caveat
+    # as the setup-failure path above.
+    entry.runtime_data = None  # type: ignore[assignment]
     return True

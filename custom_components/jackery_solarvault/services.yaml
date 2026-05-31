@@ -144,3 +144,41 @@ send_ble_command:
           step: 0.5
           unit_of_measurement: s
           mode: box
+
+# Experimental: publish a DownloadDeviceSchedule frame (TIMER_TASK_ADD=3015,
+# DELETE=3016, UPDATE=3017, READ=3018). Body shape is the Frida-PCAP layout
+# documented in docs/Markdown/MQTT_PROTOCOL.md §DownloadDeviceSchedule:
+# {actionType, taskType, mode, pw, sysSwitch, end, loops, start, tid}.
+# The integration injects only cmd=112; the rest of the body is passed
+# verbatim so users can match the observed wire layout. Use this service
+# with caution — schedule semantics may differ per SolarVault firmware.
+send_device_schedule:
+  fields:
+    device_id:
+      required: true
+      example: "573702884982521856"
+      selector:
+        device:
+          integration: jackery_solarvault
+    action_id:
+      required: true
+      example: 3015
+      selector:
+        number:
+          min: 3015
+          max: 3018
+          mode: box
+    body:
+      required: true
+      example:
+        actionType: 3
+        taskType: 2
+        mode: 2
+        pw: 700
+        sysSwitch: 1
+        end: "06:00"
+        loops: "1111111"
+        start: "04:00"
+        tid: "1776477689"
+      selector:
+        object:

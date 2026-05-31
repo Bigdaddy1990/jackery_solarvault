@@ -21,9 +21,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     Registers the ini option named `asyncio_mode` with a default value of `"strict"`, so source-only test runs (when `pytest-asyncio` is not auto-loaded) still expose the configuration key.
     """
     parser.addini(
-        'asyncio_mode',
-        'asyncio mode for plugin-free source-only tests',
-        default='strict',
+        "asyncio_mode",
+        "asyncio mode for plugin-free source-only tests",
+        default="strict",
     )
 
 
@@ -39,7 +39,7 @@ def _pytest_asyncio_loaded(config: pytest.Config) -> bool:
     pluginmanager = config.pluginmanager
     return any(
         pluginmanager.hasplugin(name)
-        for name in ('asyncio', 'pytest_asyncio', 'pytest_asyncio.plugin')
+        for name in ("asyncio", "pytest_asyncio", "pytest_asyncio.plugin")
     )
 
 
