@@ -3,6 +3,7 @@ The wire-format constants and crypto come from reverse-engineered Jackery
 app smali. These tests lock down the bit-level layout, the CRC reference
 vector and the AES round-trip so future refactors cannot silently break
 compatibility with the Jackery firmware.
+
 No real Bluetooth I/O happens here — everything is pure Python so the
 tests run on every supported platform without bleak or BlueZ.
 """
@@ -155,7 +156,9 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     """AES-128 with the SolarVault-shaped 16-byte key round-trips too.
     Pinned input is the actual ``bluetoothKey`` captured 2026-05-16 from
     a SolarVault 3 Pro Max: ``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-    → ``b"hr2c0hh361336138"``. This is the regression that motivated
+    → ``b"hr2c0hh361336138"``. 
+    
+    This is the regression that motivated
     accepting both key lengths.
     """
     import base64
@@ -199,6 +202,7 @@ def test_random_iv_returns_fresh_16_byte_values() -> None:
 
 def test_build_plaintext_frame_smali_layout() -> None:
     """Verify the exact frame string against the smali format string.
+    
     The string must match ``"DFED" + "0001" + 4×hex16(idx,cnt,actionId,bleCmd)
     + "0001" + hex16(len) + chunk_hex`` exactly, byte by byte.
     """
@@ -443,8 +447,9 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
 def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     """The live binary decoder reproduces real device JSON bodies.
     Pinned inputs are wire-bytes captured 2026-05-16 from a SolarVault 3
-    Pro Max via the ESPHome BLE proxy. Decoding them recovers the JSON
-    telemetry that the integration would otherwise have to wait for from
+    Pro Max via the ESPHome BLE proxy. 
+    
+    Decoding them recovers the JSON telemetry that the integration would otherwise have to wait for from
     the cloud.
     """
     import base64
@@ -485,6 +490,7 @@ def test_decrypt_binary_notify_rejects_short_frame() -> None:
 
 def test_build_then_decrypt_binary_frame_round_trips() -> None:
     """Encode a frame, encrypt it, then run the live decoder to recover it.
+    
     Pins the symmetry between :func:`build_binary_frame` /
     :func:`encrypt_binary_notify` and the read-path
     :func:`decrypt_binary_notify`. The trailer is opaque (see
@@ -513,6 +519,7 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
 
 def test_listener_async_send_command_returns_false_without_client() -> None:
     """``async_send_command`` falls back to ``False`` when no GATT session exists.
+    
     This is the contract callers (coordinator setter routing) rely on to
     decide whether to fall back to the cloud-MQTT pipeline when the BLE
     proxy hasn't (re-)connected yet.
@@ -544,6 +551,7 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
 
 def test_listener_async_send_command_writes_through_fake_client() -> None:
     """The writer path encrypts the right body and writes to char 0xEE01.
+    
     Drives ``async_send_command`` against an in-memory client double that
     captures the ``write_gatt_char`` invocation, then decrypts the captured
     blob with the same key to confirm it round-trips through the live
@@ -582,6 +590,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
     async def _run() -> None:
         """Set up a minimal JackeryBleListener with a fake client, send a BLE command, and assert the resulting GATT write and decryption match expectations.
+        
         This coroutine constructs a listener with a single fake client and a fixed AES key, calls its async_send_command with cmd 107, flags 42, and a JSON byte body, then verifies:
         - the write used the BLE write characteristic UUID and requested no response,
         - the written blob decrypts to a binary frame with the same cmd, flags, and body.
