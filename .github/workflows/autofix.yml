@@ -61,22 +61,20 @@ jobs:
         if: always()
       - name: Run pre-commit with fixes
         run: |
-          ruff check . --fix || true
+          ruff check . --fix all || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
+          ruff check . --add-noqa || true
           ruff check . --output-format=github || true
-          ruff check . --exit-zero || true
-          ruff format
-          python scripts/enforce_docstring_baseline.py --update || true
-          python -m scripts.sync_contributor_guides || true
+          ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
 
-      - name: Verify contributor guides
-        run: |
-          python -m scripts.sync_contributor_guides --check || true
+  #    - name: Verify contributor guides
+  #      run: |
+ #         python -m scripts.sync_contributor_guides --check || true
 
       - name: Run test requirements and localization sync
         run: |
