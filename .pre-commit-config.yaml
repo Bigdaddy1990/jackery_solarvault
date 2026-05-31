@@ -18,6 +18,7 @@ repos:
     hooks:
       - id: pyupgrade
         args:
+          - --py313-plus
           - --py314-plus
 
   - repo: https://github.com/JelleZijlstra/autotyping
