@@ -14,15 +14,10 @@ Covers:
   handling path.
 """
 
-from __future__ import annotations
-
 import logging
-import re
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # api.py compatibility shim — __all__ uses double-quoted strings (PR change)
@@ -215,9 +210,7 @@ def test_legacy_suffix_matches_rejects_alphanumeric_head() -> None:
 
 def test_legacy_suffix_matches_rejects_battery_pack_with_non_digit_index() -> None:
     """battery_pack with a non-numeric index must not match."""
-    assert (
-        _legacy_suffix_matches("12345_battery_pack_abc_voltage", "_voltage") is False
-    )
+    assert _legacy_suffix_matches("12345_battery_pack_abc_voltage", "_voltage") is False
 
 
 def test_legacy_suffix_matches_rejects_suffix_mismatch() -> None:
@@ -307,9 +300,7 @@ def test_local_mqtt_result_warning_logged_via_logger(
     Simulates the code path in async_setup_entry that logs a warning for
     local_mqtt_result being a BaseException.
     """
-    _logger = logging.getLogger(
-        "custom_components.jackery_solarvault"
-    )
+    _logger = logging.getLogger("custom_components.jackery_solarvault")
     err = RuntimeError("local broker unreachable")
 
     # Replicate the async_setup_entry condition inline.
@@ -329,9 +320,7 @@ def test_local_mqtt_result_no_warning_when_none(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """When local_mqtt_result is None, no warning must be emitted."""
-    _logger = logging.getLogger(
-        "custom_components.jackery_solarvault"
-    )
+    _logger = logging.getLogger("custom_components.jackery_solarvault")
     local_mqtt_result: Any = None
 
     with caplog.at_level(logging.WARNING, logger=_logger.name):
