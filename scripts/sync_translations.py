@@ -22,15 +22,15 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _load_json(path: Path) -> Any:
+def _load_json(path: Path) -> Any:  # noqa: ANN401
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _dump_json(data: Any) -> str:
+def _dump_json(data: Any) -> str:  # noqa: ANN401
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
 
-def _sync_tree(source: Any, existing: Any) -> Any:
+def _sync_tree(source: Any, existing: Any) -> Any:  # noqa: ANN401
     """Recursively merge *source* structure into *existing*.
 
     Preserve existing translations and back-fill missing keys with English

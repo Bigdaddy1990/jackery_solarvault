@@ -31,7 +31,7 @@ def _read_allowlist(path: Path) -> set[str]:
         return set()
 
 
-def _load_json(path: Path) -> Any:
+def _load_json(path: Path) -> Any:  # noqa: ANN401
     return json.loads(path.read_text(encoding="utf-8"))
 
 
