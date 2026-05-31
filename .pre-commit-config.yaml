@@ -74,9 +74,6 @@ repos:
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
       - id: detect-private-key
-      - id: detect-aws-credentials
-        args:
-          - --allow-missing-credentials
       - id: destroyed-symlinks
       
   - repo: https://github.com/pre-commit/mirrors-mypy
