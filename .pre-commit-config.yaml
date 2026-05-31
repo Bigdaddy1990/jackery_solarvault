@@ -13,6 +13,35 @@ default_install_hook_types:
   - pre-push
 
 repos:
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.16.0
+    hooks:
+    -   id: reorder-python-imports
+        exclude: ^pre_commit/resources/
+        args: [--py3-plus, --py310-plus, --py36-plus, --py39-plus, --add-import, 'from __future__ import annotations']
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v4.0.0
+    hooks:
+    -   id: add-trailing-comma
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.2
+    hooks:
+    -   id: pyupgrade
+        args: [--py39-plus, --py310-plus, --py311-plus, --py313-plus]
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.2
+    hooks:
+    -   id: autopep8
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+    -   id: flake8
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-pyyaml, pydantic]
+        exclude: ^testing/resources/
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
@@ -20,7 +49,6 @@ repos:
         args:
           - --py313-plus
           - --py314-plus
-
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:
@@ -77,9 +105,3 @@ repos:
       - id: detect-private-key
       - id: destroyed-symlinks
       
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
-    hooks:
-      - id: mypy
-        additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^testing/resources/
