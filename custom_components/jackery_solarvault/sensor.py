@@ -338,13 +338,16 @@ from .util import (
     jackery_corrected_home_consumption_power,
     jackery_grid_side_input_power,
     jackery_grid_side_output_power,
+    meter_head_serial,
     redacted_json_safe_payload,
     safe_float,
     safe_int,
     signed_phase_power_values,
     smart_meter_net_power,
     smart_plug_serial,
+    sorted_meter_heads,
     sorted_smart_plugs,
+    stable_subdevice_key,
     subdevice_branding,
     task_plan_value,
     trend_series_has_value,
@@ -3221,6 +3224,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
                     continue
+                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
                 for plug_desc in SMART_PLUG_SENSOR_DESCRIPTIONS:
                     if (
                         plug_desc.field in SMART_PLUG_STATISTIC_FIELDS
@@ -3239,6 +3243,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                             dev_id,
                             plug_index=index,
                             plug_sn=plug_sn,
+                            plug_key=plug_key,
                             description=plug_desc,
                         ),
                     )
@@ -3246,26 +3251,28 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             # Meter heads / collectors are app MQTT `CollectorSub` payloads.
             # Expose them as disabled-by-default diagnostics until real payloads
             # confirm whether their energy totals should be user-facing.
-            meter_heads = payload.get(PAYLOAD_METER_HEADS) or []
-            if isinstance(meter_heads, list):
-                valid_meter_heads = [
-                    meter_head
-                    for meter_head in meter_heads
-                    if isinstance(meter_head, dict)
-                ]
-                for index, meter_head in enumerate(valid_meter_heads, start=1):
-                    for meter_desc in METER_HEAD_SENSOR_DESCRIPTIONS:
-                        if meter_desc.field not in meter_head:
-                            continue
-                        _append_unique(
-                            entities,
-                            JackeryMeterHeadSensor(
-                                coordinator,
-                                dev_id,
-                                meter_head_index=index,
-                                description=meter_desc,
-                            ),
-                        )
+            valid_meter_heads = sorted_meter_heads(payload.get(PAYLOAD_METER_HEADS))
+            for index, meter_head in enumerate(valid_meter_heads, start=1):
+                meter_head_sn = meter_head_serial(meter_head)
+                if meter_head_sn is None:
+                    continue
+                meter_head_key = stable_subdevice_key(
+                    "meter_head", meter_head_sn, index
+                )
+                for meter_desc in METER_HEAD_SENSOR_DESCRIPTIONS:
+                    if meter_desc.field not in meter_head:
+                        continue
+                    _append_unique(
+                        entities,
+                        JackeryMeterHeadSensor(
+                            coordinator,
+                            dev_id,
+                            meter_head_index=index,
+                            meter_head_sn=meter_head_sn,
+                            meter_head_key=meter_head_key,
+                            description=meter_desc,
+                        ),
+                    )
 
             # Smart meter / CT values arrive through MQTT sub-device responses.
             # Create them when discovery confirms a meter accessory, or when a
@@ -4078,6 +4085,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         *,
         plug_index: int,
         plug_sn: str,
+        plug_key: str,
         description: JackerySmartPlugSensorDescription,
     ) -> None:
         """Initialize a smart-plug sensor entity for a specific plug (by index and serial) using the provided sensor description.
@@ -4094,10 +4102,11 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         super().__init__(
             coordinator,
             device_id,
-            f"smart_plug_{plug_index}_{description.key}",
+            f"{plug_key}_{description.key}",
         )
         self._plug_index = plug_index
         self._plug_sn = plug_sn
+        self._plug_key = plug_key
         self.entity_description = description
         self._attr_translation_key = description.translation_key
         self._attr_icon = description.icon
@@ -4111,7 +4120,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         # Build the per-plug device_info once at construction (see PROTOCOL §8
         # and binary_sensor.py for the rationale).
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug
+            plug_index, self._plug, plug_key
         )
 
     @property
@@ -4205,6 +4214,8 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         device_id: str,
         *,
         meter_head_index: int,
+        meter_head_sn: str,
+        meter_head_key: str,
         description: JackeryMeterHeadSensorDescription,
     ) -> None:
         """Create a diagnostic sensor entity for a specific meter head using the provided coordinator and description.
@@ -4218,9 +4229,11 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         super().__init__(
             coordinator,
             device_id,
-            f"meter_head_{meter_head_index}_{description.key}",
+            f"{meter_head_key}_{description.key}",
         )
         self._meter_head_index = meter_head_index
+        self._meter_head_sn = meter_head_sn
+        self._meter_head_key = meter_head_key
         self.entity_description = description
         self._attr_translation_key = description.translation_key
         self._attr_icon = description.icon
@@ -4232,21 +4245,17 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     @property
     def _meter_head(self) -> dict[str, Any]:
-        """Return the meter-head entry corresponding to this entity's configured index.
+        """Return the meter-head entry matching this entity's captured identity.
 
         Returns:
             dict: The meter-head dictionary from payload's `PAYLOAD_METER_HEADS` at
             `self._meter_head_index` (1-based) when present and valid; otherwise an
             empty dict.
         """
-        meter_heads = self._payload.get(PAYLOAD_METER_HEADS) or []
-        if not isinstance(meter_heads, list):
-            return {}
-        try:
-            meter_head = meter_heads[self._meter_head_index - 1]
-        except IndexError:
-            return {}
-        return meter_head if isinstance(meter_head, dict) else {}
+        for meter_head in sorted_meter_heads(self._payload.get(PAYLOAD_METER_HEADS)):
+            if meter_head_serial(meter_head) == self._meter_head_sn:
+                return meter_head
+        return {}
 
     @property
     def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
@@ -4303,9 +4312,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         )
         version = meter_head.get(FIELD_VERSION) or meter_head.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
-            identifiers={
-                (DOMAIN, f"{self._device_id}_meter_head_{self._meter_head_index}")
-            },
+            identifiers={(DOMAIN, f"{self._device_id}_{self._meter_head_key}")},
             manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),
@@ -4326,7 +4333,10 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values.
         """
-        attrs: dict[str, Any] = {"meter_head_index": self._meter_head_index}
+        attrs: dict[str, Any] = {
+            "meter_head_index": self._meter_head_index,
+            "meter_head_id": self._meter_head_sn,
+        }
         for key in (
             FIELD_DEVICE_NAME,
             FIELD_SCAN_NAME,

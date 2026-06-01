@@ -113,6 +113,48 @@
       },
       "read_smart_plug_schedule": {
         "name": "Read smart-plug schedule"
+      },
+      "refresh_system_info": {
+        "name": "Refresh system info"
+      },
+      "refresh_device_info": {
+        "name": "Refresh device info"
+      },
+      "refresh_wifi_list": {
+        "name": "Refresh Wi-Fi list"
+      },
+      "refresh_time_zone": {
+        "name": "Refresh time zone"
+      },
+      "sync_cloud_mqtt_info": {
+        "name": "Sync cloud MQTT info"
+      },
+      "refresh_device_ota_version": {
+        "name": "Refresh device OTA version"
+      },
+      "refresh_third_party_mqtt_config": {
+        "name": "Refresh Third-Party MQTT config"
+      },
+      "refresh_wifi_config": {
+        "name": "Refresh Wi-Fi config"
+      },
+      "refresh_battery_packs": {
+        "name": "Refresh battery packs"
+      },
+      "refresh_smart_meter": {
+        "name": "Refresh smart meter / CT"
+      },
+      "refresh_meter_heads": {
+        "name": "Refresh meter heads"
+      },
+      "refresh_smart_plugs": {
+        "name": "Refresh smart plugs"
+      },
+      "refresh_subdevice_combo": {
+        "name": "Refresh combo subdevices"
+      },
+      "sync_time_zone": {
+        "name": "Sync time zone"
       }
     },
     "number": {
@@ -133,6 +175,9 @@
       },
       "soc_discharge_limit_set": {
         "name": "Discharge limit"
+      },
+      "third_party_mqtt_port": {
+        "name": "Third-Party MQTT port"
       }
     },
     "select": {
@@ -886,11 +931,29 @@
       },
       "smart_plug_switch": {
         "name": "Smart plug"
+      },
+      "third_party_mqtt_enable": {
+        "name": "Third-Party MQTT bridge"
       }
     },
     "text": {
       "system_name": {
         "name": "System name"
+      },
+      "grid_standard": {
+        "name": "Grid standard code"
+      },
+      "third_party_mqtt_ip": {
+        "name": "Third-Party MQTT broker"
+      },
+      "third_party_mqtt_username": {
+        "name": "Third-Party MQTT username"
+      },
+      "third_party_mqtt_password": {
+        "name": "Third-Party MQTT password"
+      },
+      "third_party_mqtt_token": {
+        "name": "Third-Party MQTT token"
       }
     }
   },

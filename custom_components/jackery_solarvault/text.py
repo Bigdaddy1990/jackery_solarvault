@@ -14,6 +14,7 @@ from .client import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
     FIELD_DEVICE_NAME,
+    FIELD_GRID_STANDARD,
     FIELD_ID,
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_NAME,
@@ -108,6 +109,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
+            if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
+                _append_unique(entities, JackeryGridStandardText(coordinator, dev_id))
             if coordinator.device_supports_advanced(
                 dev_id
             ) or coordinator.device_bluetooth_key(dev_id):
@@ -248,6 +251,73 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         # Trigger a coordinator refresh so every dependent entity also
         # picks up the new name next cycle
         await self.coordinator.async_request_refresh()
+
+
+class JackeryGridStandardText(JackeryEntity, TextEntity):
+    """Write the app grid-standard code via SYNC_GRID_STANDARD."""
+
+    _attr_translation_key = "grid_standard"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:transmission-tower"
+    _attr_native_min = 1
+    _attr_native_max = 8
+    _attr_pattern = r"^\d{1,8}$"
+
+    def __init__(
+        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+    ) -> None:
+        """Initialise the grid-standard text entity."""
+        super().__init__(coordinator, device_id, "grid_standard")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the current app grid-standard code."""
+        raw = self._system.get(FIELD_GRID_STANDARD)
+        if raw in (None, ""):
+            return None
+        return str(raw)
+
+    async def async_set_value(self, value: str) -> None:
+        """Write the grid-standard code using the app's safety/unbind body."""
+        new_value = str(value or "").strip()
+        if not new_value.isdecimal():
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_text_value",
+                translation_placeholders={
+                    "entity": "grid_standard",
+                    "device_id": self._device_id,
+                },
+            )
+        try:
+            await self.coordinator.async_sync_grid_standard(
+                self._device_id, int(new_value)
+            )
+            await self.coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="entity_action_failed",
+                translation_placeholders={
+                    "entity": "grid_standard",
+                    "device_id": self._device_id,
+                    "error": str(err),
+                },
+            ) from err
+        except Exception as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="entity_action_failed",
+                translation_placeholders={
+                    "entity": "grid_standard",
+                    "device_id": self._device_id,
+                    "error": str(err),
+                },
+            ) from err
 
 
 class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):

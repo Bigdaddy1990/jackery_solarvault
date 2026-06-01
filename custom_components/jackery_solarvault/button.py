@@ -1,5 +1,7 @@
 """Button platform for Jackery SolarVault."""
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 import logging
 from typing import Any
 
@@ -11,20 +13,58 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
 from .const import (
+    ACTION_ID_GET_DEVICE_OTA_VERSION,
+    ACTION_ID_GET_TIME_ZONE,
+    ACTION_ID_QUERY_COMBINE_DATA,
+    ACTION_ID_QUERY_DEVICE_PROPERTY,
+    ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    ACTION_ID_QUERY_WIFI_CONFIG,
+    ACTION_ID_READ_WIFI_LIST,
+    ACTION_ID_SEND_TIME_ZONE,
+    ACTION_ID_SUBDEVICE_3014,
+    ACTION_ID_SUBDEVICE_3031,
+    ACTION_ID_SUBDEVICE_3032,
+    ACTION_ID_SUBDEVICE_3033,
+    ACTION_ID_SUBDEVICE_3037,
+    ACTION_ID_SYNC_MQTT_CONNECT_INFO,
     DOMAIN,
     FIELD_ALERT_ID,
+    FIELD_CMD,
     FIELD_DEV_SN,
+    FIELD_DEV_TYPE,
     FIELD_DEVICE_SN,
     FIELD_END_TS,
     FIELD_MANUAL,
+    FIELD_MESSAGE_TYPE,
     FIELD_REBOOT,
     FIELD_SN,
     FIELD_START_TS,
     FIELD_STATUS,
     FIELD_STORM,
+    MQTT_CMD_GET_DEVICE_OTA_VERSION,
+    MQTT_CMD_GET_TIME_ZONE,
+    MQTT_CMD_QUERY_COMBINE_DATA,
+    MQTT_CMD_QUERY_DEVICE_PROPERTY,
+    MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_CMD_QUERY_WIFI_CONFIG,
+    MQTT_CMD_READ_WIFI_LIST,
+    MQTT_CMD_SEND_TIME_ZONE,
+    MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
+    MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+    MQTT_MESSAGE_QUERY_COMBINE_DATA,
+    MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
+    MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_MESSAGE_QUERY_WIFI_CONFIG,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
+    SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+    SUBDEVICE_DEV_TYPE_COMBO,
+    SUBDEVICE_DEV_TYPE_CT,
+    SUBDEVICE_DEV_TYPE_METER_HEAD,
+    SUBDEVICE_DEV_TYPE_SOCKET,
     TIMER_TASK_TYPE_CUSTOM_MODE,
     TIMER_TASK_TYPE_SMART_PLUG,
     TIMER_TASK_TYPE_TIME_ELEC,
@@ -40,6 +80,242 @@ from .util import append_unique_entity, coordinator_entity_signature, sorted_sma
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
+
+
+QueryButtonAction = Callable[[JackerySolarVaultCoordinator, str], Awaitable[None]]
+
+
+@dataclass(frozen=True, kw_only=True)
+class JackeryQueryButtonDescription:
+    """Metadata for a documented app read/query command."""
+
+    key: str
+    translation_key: str
+    icon: str
+    action: QueryButtonAction
+    message_type: str
+    action_id: int
+    cmd: int
+    dev_type: int | None = None
+
+
+async def _query_system_info(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_system_info(device_id)
+
+
+async def _query_device_info(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_device_info(device_id)
+
+
+async def _query_wifi_list(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_wifi_list(device_id)
+
+
+async def _get_time_zone(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_get_time_zone(device_id)
+
+
+async def _send_time_zone(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_send_time_zone(device_id)
+
+
+async def _sync_mqtt_connect_info(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_sync_mqtt_connect_info(device_id)
+
+
+async def _query_device_ota_version(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_device_ota_version(device_id)
+
+
+async def _query_third_party_mqtt_config(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_third_party_mqtt_config(device_id)
+
+
+async def _query_wifi_config(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_wifi_config(device_id)
+
+
+async def _query_battery_packs(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_battery_packs(device_id)
+
+
+async def _query_smart_meter(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_smart_meter(device_id)
+
+
+async def _query_meter_heads(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_meter_heads(device_id)
+
+
+async def _query_smart_plugs(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_smart_plugs(device_id)
+
+
+async def _query_subdevice_combo(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    await coordinator.async_query_subdevice_combo(device_id)
+
+
+QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
+    JackeryQueryButtonDescription(
+        key="refresh_system_info",
+        translation_key="refresh_system_info",
+        icon="mdi:home-lightning-bolt",
+        action=_query_system_info,
+        message_type=MQTT_MESSAGE_QUERY_COMBINE_DATA,
+        action_id=ACTION_ID_QUERY_COMBINE_DATA,
+        cmd=MQTT_CMD_QUERY_COMBINE_DATA,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_device_info",
+        translation_key="refresh_device_info",
+        icon="mdi:database-refresh",
+        action=_query_device_info,
+        message_type=MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
+        action_id=ACTION_ID_QUERY_DEVICE_PROPERTY,
+        cmd=MQTT_CMD_QUERY_DEVICE_PROPERTY,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_wifi_list",
+        translation_key="refresh_wifi_list",
+        icon="mdi:wifi-refresh",
+        action=_query_wifi_list,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_READ_WIFI_LIST,
+        cmd=MQTT_CMD_READ_WIFI_LIST,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_time_zone",
+        translation_key="refresh_time_zone",
+        icon="mdi:map-clock",
+        action=_get_time_zone,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_GET_TIME_ZONE,
+        cmd=MQTT_CMD_GET_TIME_ZONE,
+    ),
+    JackeryQueryButtonDescription(
+        key="sync_time_zone",
+        translation_key="sync_time_zone",
+        icon="mdi:clock-check",
+        action=_send_time_zone,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_SEND_TIME_ZONE,
+        cmd=MQTT_CMD_SEND_TIME_ZONE,
+    ),
+    JackeryQueryButtonDescription(
+        key="sync_cloud_mqtt_info",
+        translation_key="sync_cloud_mqtt_info",
+        icon="mdi:cloud-sync",
+        action=_sync_mqtt_connect_info,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_SYNC_MQTT_CONNECT_INFO,
+        cmd=MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_device_ota_version",
+        translation_key="refresh_device_ota_version",
+        icon="mdi:update",
+        action=_query_device_ota_version,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_GET_DEVICE_OTA_VERSION,
+        cmd=MQTT_CMD_GET_DEVICE_OTA_VERSION,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_third_party_mqtt_config",
+        translation_key="refresh_third_party_mqtt_config",
+        icon="mdi:mqtt",
+        action=_query_third_party_mqtt_config,
+        message_type=MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+        action_id=ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
+        cmd=MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_wifi_config",
+        translation_key="refresh_wifi_config",
+        icon="mdi:wifi-cog",
+        action=_query_wifi_config,
+        message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
+        action_id=ACTION_ID_QUERY_WIFI_CONFIG,
+        cmd=MQTT_CMD_QUERY_WIFI_CONFIG,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_battery_packs",
+        translation_key="refresh_battery_packs",
+        icon="mdi:battery-sync",
+        action=_query_battery_packs,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_SUBDEVICE_3014,
+        cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        dev_type=SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_smart_meter",
+        translation_key="refresh_smart_meter",
+        icon="mdi:meter-electric",
+        action=_query_smart_meter,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_SUBDEVICE_3031,
+        cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        dev_type=SUBDEVICE_DEV_TYPE_CT,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_meter_heads",
+        translation_key="refresh_meter_heads",
+        icon="mdi:meter-electric-outline",
+        action=_query_meter_heads,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_SUBDEVICE_3033,
+        cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        dev_type=SUBDEVICE_DEV_TYPE_METER_HEAD,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_smart_plugs",
+        translation_key="refresh_smart_plugs",
+        icon="mdi:power-plug-battery",
+        action=_query_smart_plugs,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_SUBDEVICE_3032,
+        cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
+    ),
+    JackeryQueryButtonDescription(
+        key="refresh_subdevice_combo",
+        translation_key="refresh_subdevice_combo",
+        icon="mdi:devices",
+        action=_query_subdevice_combo,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_SUBDEVICE_3037,
+        cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        dev_type=SUBDEVICE_DEV_TYPE_COMBO,
+    ),
+)
 
 
 def _storm_alert_id(alert: object) -> str | None:
@@ -114,6 +390,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
+            for description in QUERY_BUTTON_DESCRIPTIONS:
+                _append_unique(
+                    entities,
+                    JackeryQueryButton(coordinator, dev_id, description=description),
+                )
             _append_unique(
                 entities, JackeryRefreshWeatherPlanButton(coordinator, dev_id)
             )
@@ -191,6 +472,63 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     _add_new_entities()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+
+
+class JackeryQueryButton(JackeryEntity, ButtonEntity):
+    """Run one documented app read/query command."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        description: JackeryQueryButtonDescription,
+    ) -> None:
+        """Initialise the app query button."""
+        super().__init__(coordinator, device_id, description.key)
+        self._query_description = description
+        self._attr_translation_key = description.translation_key
+        self._attr_icon = description.icon
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the exact app command metadata sent by this button."""
+        description = self._query_description
+        attrs: dict[str, Any] = {
+            FIELD_MESSAGE_TYPE: description.message_type,
+            "actionId": description.action_id,
+            FIELD_CMD: description.cmd,
+        }
+        if description.dev_type is not None:
+            attrs[FIELD_DEV_TYPE] = description.dev_type
+        return attrs
+
+    def _raise_action_error(self, error: object) -> None:
+        """Raise a translatable HA action error for this button."""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="entity_action_failed",
+            translation_placeholders={
+                "entity": str(self._attr_translation_key),
+                "device_id": self._device_id,
+                "error": str(error),
+            },
+        )
+
+    async def async_press(self) -> None:
+        """Send the documented getter over BLE-first MQTT transport."""
+        try:
+            await self._query_description.action(self.coordinator, self._device_id)
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            self._raise_action_error(err)
+        except Exception as err:
+            self._raise_action_error(err)
 
 
 class JackeryRebootButton(JackeryEntity, ButtonEntity):

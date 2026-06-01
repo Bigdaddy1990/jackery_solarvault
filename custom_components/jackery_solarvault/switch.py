@@ -58,6 +58,7 @@ from .util import (
     safe_bool,
     smart_plug_serial,
     sorted_smart_plugs,
+    stable_subdevice_key,
     task_plan_value,
 )
 
@@ -386,6 +387,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         *,
         plug_index: int,
         plug_sn: str,
+        plug_key: str,
     ) -> None:
         """Create a switch entity bound to a specific smart plug.
 
@@ -395,13 +397,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             plug_index (int): 1-based index of the smart plug within the device's sorted plug list.
             plug_sn (str): Smart plug serial number used to identify and bind to the physical plug.
         """
-        super().__init__(coordinator, device_id, f"smart_plug_{plug_index}_switch")
+        super().__init__(coordinator, device_id, f"{plug_key}_switch")
         self._plug_index = plug_index
         self._plug_sn = plug_sn
+        self._plug_key = plug_key
         # Build the per-plug device_info once at construction (see PROTOCOL §8
         # and binary_sensor.py for the rationale).
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug
+            plug_index, self._plug, plug_key
         )
 
     @property
@@ -569,6 +572,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         *,
         plug_index: int,
         plug_sn: str,
+        plug_key: str,
     ) -> None:
         """Create a smart-plug priority-enabled switch entity bound to a specific smart plug.
 
@@ -580,10 +584,14 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
             self,
             coordinator,
             device_id,
-            f"smart_plug_{plug_index}_priority_enabled",
+            f"{plug_key}_priority_enabled",
         )
         self._plug_index = plug_index
         self._plug_sn = plug_sn
+        self._plug_key = plug_key
+        self._attr_device_info = self._build_smart_plug_device_info(
+            plug_index, self._plug, plug_key
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -718,6 +726,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
                     continue
+                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
                 _append_unique(
                     entities,
                     JackerySmartPlugSwitch(
@@ -725,6 +734,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                         dev_id,
                         plug_index=index,
                         plug_sn=plug_sn,
+                        plug_key=plug_key,
                     ),
                 )
                 if FIELD_SOCKET_PRIORITY in plug:
@@ -735,6 +745,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                             dev_id,
                             plug_index=index,
                             plug_sn=plug_sn,
+                            plug_key=plug_key,
                         ),
                     )
         return entities

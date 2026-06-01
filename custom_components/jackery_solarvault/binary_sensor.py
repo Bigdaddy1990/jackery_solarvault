@@ -36,6 +36,7 @@ from .util import (
     safe_bool,
     smart_plug_serial,
     sorted_smart_plugs,
+    stable_subdevice_key,
 )
 
 # Coordinator-backed read-only platform: entities never perform their own
@@ -122,6 +123,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
                     continue
+                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
                 _append_unique(
                     entities,
                     JackerySmartPlugStateBinarySensor(
@@ -129,6 +131,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                         dev_id,
                         plug_index=index,
                         plug_sn=plug_sn,
+                        plug_key=plug_key,
                     ),
                 )
         return entities
@@ -198,6 +201,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         *,
         plug_index: int,
         plug_sn: str,
+        plug_key: str,
     ) -> None:
         """Create a binary sensor entity representing a specific smart plug's switch state.
 
@@ -210,16 +214,15 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Notes:
             Builds and stores the plug's device_info at construction so the device registry can use it when the entity is added.
         """
-        super().__init__(
-            coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
-        )
+        super().__init__(coordinator, device_id, f"{plug_key}_switch_state")
         self._plug_index = plug_index
         self._plug_sn = plug_sn
+        self._plug_key = plug_key
         # Build the per-plug device_info once at construction. Allocating it
         # on every state read is wasted work — HA reads the registry metadata
         # at entity-add time and merges later updates via the device registry.
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug
+            plug_index, self._plug, plug_key
         )
 
     @property

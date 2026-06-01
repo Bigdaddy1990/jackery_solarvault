@@ -18,6 +18,7 @@ These tests lock down two things:
 
 from pathlib import Path
 import re
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
@@ -39,7 +40,7 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
         JackerySolarVaultCoordinator,
     )
 
-    idx = {
+    idx: dict[str, Any] = {
         FIELD_SYSTEM_ID: "595364183558991872",
         PAYLOAD_SYSTEM_META: {
             FIELD_ACCESSORIES: [
@@ -70,7 +71,7 @@ def test_accessory_id_none_without_smart_meter() -> None:
         JackerySolarVaultCoordinator,
     )
 
-    idx = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
+    idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
     assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None
 
 

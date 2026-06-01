@@ -298,6 +298,10 @@ PAYLOAD_LOCATION: Final = "location"
 PAYLOAD_WEATHER_PLAN: Final = "weather_plan"
 PAYLOAD_TASK_PLAN: Final = "task_plan"
 PAYLOAD_THIRD_PARTY_MQTT_CONFIG: Final = "third_party_mqtt_config"
+PAYLOAD_WIFI_CONFIG: Final = "wifi_config"
+PAYLOAD_WIFI_LIST: Final = "wifi_list"
+PAYLOAD_TIMEZONE_CONFIG: Final = "timezone_config"
+PAYLOAD_MQTT_CONNECT_INFO: Final = "mqtt_connect_info"
 PAYLOAD_PRICE_SOURCES: Final = "price_sources"
 PAYLOAD_BATTERY_PACKS: Final = "battery_packs"
 PAYLOAD_CT_METER: Final = "ct_meter"
@@ -466,7 +470,11 @@ FIELD_SINGLE_CURRENCY: Final = "singleCurrency"
 FIELD_SINGLE_CURRENCY_CODE: Final = "singleCurrencyCode"
 FIELD_REGION: Final = "region"
 FIELD_TIMEZONE: Final = "timezone"
+FIELD_UO: Final = "uo"
+FIELD_TS: Final = "ts"
 FIELD_GRID_STANDARD: Final = "gridStandard"
+FIELD_SAFETY: Final = "safety"
+FIELD_UNBIND: Final = "unbind"
 FIELD_LONGITUDE: Final = "longitude"
 FIELD_LATITUDE: Final = "latitude"
 
@@ -948,7 +956,11 @@ APP_DEVICE_STAT_ONGRID_TO_BATTERY: Final = "ongridOtBatEgy"
 APP_DEVICE_STAT_EPS_INPUT: Final = "inEpsEgy"
 APP_DEVICE_STAT_EPS_OUTPUT: Final = "outEpsEgy"
 APP_DEVICE_STAT_AC_TO_BATTERY: Final = "acOtBatEgy"
+APP_DEVICE_STAT_AC_TO_ONGRID: Final = "acOtOngridEgy"
 APP_DEVICE_STAT_BATTERY_TO_AC: Final = "batOtAcEgy"
+APP_DEVICE_STAT_ONGRID_TO_AC_LOAD: Final = "ongridOtAcLoadEgy"
+APP_DEVICE_STAT_PV_TO_AC: Final = "pvOtAcEgy"
+APP_DEVICE_STAT_PV_TO_ONGRID: Final = "pvOtOngridEgy"
 
 APP_CHART_METRIC_KEY_BY_SECTION_PREFIX: Final = {
     APP_SECTION_PV_STAT: {
@@ -1080,8 +1092,12 @@ PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX: Final = ".1"
 # emitted immediately because the dedup check runs *before* the throttle.
 PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 REDACT_KEYS: Final = {
+    "p",
+    "s",
     "password",
     "username",
+    "ssid",
+    "bssid",
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
     FIELD_MAC_ID,
@@ -1395,9 +1411,16 @@ MQTT_MESSAGE_CONTROL_SUB_DEVICE: Final = "ControlSubDevice"
 # honours the frame when the cloud broker relays it.
 MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"
 MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "QueryThirdPartMQTTConfig"
+MQTT_MESSAGE_QUERY_WIFI_CONFIG: Final = "QueryWifiConfig"
 
 MQTT_CMD_NONE: Final = 0
+MQTT_CMD_READ_WIFI_LIST: Final = 1
+MQTT_CMD_WRITE_WIFI_INFO: Final = 2
+MQTT_CMD_SEND_TIME_ZONE: Final = 3
 MQTT_CMD_QUERY_WEATHER_PLAN: Final = 23
+MQTT_CMD_GET_TIME_ZONE: Final = 22
+MQTT_CMD_SYNC_MQTT_CONNECT_INFO: Final = 99
+MQTT_CMD_GET_DEVICE_OTA_VERSION: Final = 100
 MQTT_CMD_QUERY_DEVICE_PROPERTY: Final = 106
 MQTT_CMD_DEVICE_PROPERTY_CHANGE: Final = 107
 MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = 110
@@ -1412,6 +1435,8 @@ MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE: Final = 112
 # Third-party MQTT bridge cmd values (HomeCmdAction.smali bleMsgType).
 MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113
 MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
+MQTT_CMD_QUERY_WIFI_CONFIG: Final = 124
+MQTT_CMD_SYNC_GRID_STANDARD: Final = 105
 
 # --- MQTT action IDs (Jackery cloud command/upload protocol) ----------------
 # These IDs are sent in MQTT command payloads' `actionId` field. Keep them
@@ -1497,14 +1522,17 @@ ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG: Final = 3046  # cmd=113 ThirdPartMQTTConf
 ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = (
     3047  # cmd=114 QueryThirdPartMQTTConfig
 )
+ACTION_ID_QUERY_WIFI_CONFIG: Final = 3045  # cmd=124 QueryWifiConfig
 
-# Setter-Konstanten aus docs/html/hbxn_commands.html home-family, deren
-# Wiring (Service-Handler oder Switch/Number/Select-Entity) NICHT in
-# diesem Code-Stand vollständig implementiert ist. Aufgenommen als
-# Single-Source-of-Truth für msg_id ↔ name ↔ ble_msg_type ↔ MQTT-Type;
-# tatsächliche Service-Verdrahtung ist offen und braucht
-# empirisch verifizierte Body-Shapes (MQTT-Mitschnitt der App, dann
-# Service-Handler in services.py + ggf. Coordinator-Helper).
+# Early app maintenance/read commands from HomeCmdAction.smali. These use the
+# same DevicePropertyChange message type as live properties, so the coordinator
+# routes their responses into dedicated buckets before the generic property merge.
+ACTION_ID_READ_WIFI_LIST: Final = 3001  # cmd=1 DevicePropertyChange
+ACTION_ID_WRITE_WIFI_INFO: Final = 3002  # cmd=2 DevicePropertyChange
+ACTION_ID_SEND_TIME_ZONE: Final = 3003  # cmd=3 DevicePropertyChange
+ACTION_ID_GET_TIME_ZONE: Final = 3004  # cmd=22 DevicePropertyChange
+ACTION_ID_SYNC_MQTT_CONNECT_INFO: Final = 3005  # cmd=99 DevicePropertyChange
+ACTION_ID_GET_DEVICE_OTA_VERSION: Final = 3006  # cmd=100 DevicePropertyChange
 ACTION_ID_SYNC_GRID_STANDARD: Final = 3010  # cmd=105 DevicePropertyChange
 ACTION_ID_TIMER_TASK_ADD: Final = 3015  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_DELETE: Final = 3016  # cmd=112 DownloadDeviceSchedule

@@ -113,6 +113,48 @@
       },
       "read_smart_plug_schedule": {
         "name": "Lire le programme de prise intelligente"
+      },
+      "refresh_system_info": {
+        "name": "Actualiser les informations système"
+      },
+      "refresh_device_info": {
+        "name": "Actualiser les informations appareil"
+      },
+      "refresh_wifi_list": {
+        "name": "Actualiser la liste Wi-Fi"
+      },
+      "refresh_time_zone": {
+        "name": "Actualiser le fuseau horaire"
+      },
+      "sync_cloud_mqtt_info": {
+        "name": "Synchroniser les infos MQTT cloud"
+      },
+      "refresh_device_ota_version": {
+        "name": "Actualiser la version OTA appareil"
+      },
+      "refresh_third_party_mqtt_config": {
+        "name": "Actualiser la configuration MQTT tierce"
+      },
+      "refresh_wifi_config": {
+        "name": "Actualiser la configuration Wi-Fi"
+      },
+      "refresh_battery_packs": {
+        "name": "Actualiser les batteries supplémentaires"
+      },
+      "refresh_smart_meter": {
+        "name": "Actualiser le compteur intelligent / CT"
+      },
+      "refresh_meter_heads": {
+        "name": "Actualiser les têtes de compteur"
+      },
+      "refresh_smart_plugs": {
+        "name": "Actualiser les prises connectées"
+      },
+      "refresh_subdevice_combo": {
+        "name": "Actualiser les sous-appareils combinés"
+      },
+      "sync_time_zone": {
+        "name": "Synchroniser le fuseau horaire"
       }
     },
     "number": {
@@ -133,6 +175,9 @@
       },
       "soc_discharge_limit_set": {
         "name": "Limite de décharge"
+      },
+      "third_party_mqtt_port": {
+        "name": "Port MQTT tiers"
       }
     },
     "select": {
@@ -161,7 +206,7 @@
           "phase_1": "Phase 1",
           "phase_2": "Phase 2",
           "phase_3": "Phase 3",
-          "phase_4": "Phases combinées"
+          "phase_4": "Phases combinees"
         }
       },
       "storm_warning_minutes_select": {
@@ -886,11 +931,29 @@
       },
       "smart_plug_switch": {
         "name": "Prise connectee"
+      },
+      "third_party_mqtt_enable": {
+        "name": "Pont MQTT tiers"
       }
     },
     "text": {
       "system_name": {
         "name": "Nom du système"
+      },
+      "grid_standard": {
+        "name": "Code standard reseau"
+      },
+      "third_party_mqtt_ip": {
+        "name": "Broker MQTT tiers"
+      },
+      "third_party_mqtt_username": {
+        "name": "Nom utilisateur MQTT tiers"
+      },
+      "third_party_mqtt_password": {
+        "name": "Mot de passe MQTT tiers"
+      },
+      "third_party_mqtt_token": {
+        "name": "Jeton MQTT tiers"
       }
     }
   },

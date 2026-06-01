@@ -383,11 +383,7 @@ class JackeryLocalMqttClient:
     def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
         """Return True for HA event-stream JSON published on a shared topic."""
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
-        return (
-            b'"event_type"' in head
-            and b'"event_data"' in head
-            and (b'"state_changed"' in head or b'"entity_id"' in head)
-        )
+        return b'"event_type"' in head and b'"event_data"' in head
 
     def _is_broad_topic_filter(self) -> bool:
         """Return True when the current topic filter is globally broad."""

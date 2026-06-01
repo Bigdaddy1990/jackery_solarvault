@@ -113,6 +113,48 @@
       },
       "read_smart_plug_schedule": {
         "name": "Leer horario de enchufe inteligente"
+      },
+      "refresh_system_info": {
+        "name": "Actualizar información del sistema"
+      },
+      "refresh_device_info": {
+        "name": "Actualizar información del dispositivo"
+      },
+      "refresh_wifi_list": {
+        "name": "Actualizar lista Wi-Fi"
+      },
+      "refresh_time_zone": {
+        "name": "Actualizar zona horaria"
+      },
+      "sync_cloud_mqtt_info": {
+        "name": "Sincronizar información MQTT en la nube"
+      },
+      "refresh_device_ota_version": {
+        "name": "Actualizar versión OTA del dispositivo"
+      },
+      "refresh_third_party_mqtt_config": {
+        "name": "Actualizar configuración MQTT de terceros"
+      },
+      "refresh_wifi_config": {
+        "name": "Actualizar configuración Wi-Fi"
+      },
+      "refresh_battery_packs": {
+        "name": "Actualizar baterías adicionales"
+      },
+      "refresh_smart_meter": {
+        "name": "Actualizar medidor inteligente / CT"
+      },
+      "refresh_meter_heads": {
+        "name": "Actualizar cabezales de medición"
+      },
+      "refresh_smart_plugs": {
+        "name": "Actualizar enchufes inteligentes"
+      },
+      "refresh_subdevice_combo": {
+        "name": "Actualizar subdispositivos combinados"
+      },
+      "sync_time_zone": {
+        "name": "Sincronizar zona horaria"
       }
     },
     "number": {
@@ -133,6 +175,9 @@
       },
       "soc_discharge_limit_set": {
         "name": "Límite de descarga"
+      },
+      "third_party_mqtt_port": {
+        "name": "Puerto MQTT de terceros"
       }
     },
     "select": {
@@ -886,11 +931,29 @@
       },
       "smart_plug_switch": {
         "name": "Enchufe inteligente"
+      },
+      "third_party_mqtt_enable": {
+        "name": "Bridge MQTT de terceros"
       }
     },
     "text": {
       "system_name": {
         "name": "Nombre del sistema"
+      },
+      "grid_standard": {
+        "name": "Codigo de estandar de red"
+      },
+      "third_party_mqtt_ip": {
+        "name": "Broker MQTT de terceros"
+      },
+      "third_party_mqtt_username": {
+        "name": "Usuario MQTT de terceros"
+      },
+      "third_party_mqtt_password": {
+        "name": "Contrasena MQTT de terceros"
+      },
+      "third_party_mqtt_token": {
+        "name": "Token MQTT de terceros"
       }
     }
   },

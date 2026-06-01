@@ -32,6 +32,8 @@ from .const import (
     ACTION_ID_DELETE_STORM_ALERT,
     ACTION_ID_EPS_ENABLED,
     ACTION_ID_FOLLOW_METER_PW,
+    ACTION_ID_GET_DEVICE_OTA_VERSION,
+    ACTION_ID_GET_TIME_ZONE,
     ACTION_ID_MAX_FEED_GRID,
     ACTION_ID_MAX_OUT_PW,
     ACTION_ID_OFF_GRID_DOWN,
@@ -40,7 +42,10 @@ from .const import (
     ACTION_ID_QUERY_DEVICE_PROPERTY,
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
     ACTION_ID_QUERY_WEATHER_PLAN,
+    ACTION_ID_QUERY_WIFI_CONFIG,
+    ACTION_ID_READ_WIFI_LIST,
     ACTION_ID_REBOOT_DEVICE,
+    ACTION_ID_SEND_TIME_ZONE,
     ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG,
     ACTION_ID_SOC_LIMITS,
     ACTION_ID_STANDBY,
@@ -51,6 +56,8 @@ from .const import (
     ACTION_ID_SUBDEVICE_3032,
     ACTION_ID_SUBDEVICE_3033,
     ACTION_ID_SUBDEVICE_3037,
+    ACTION_ID_SYNC_GRID_STANDARD,
+    ACTION_ID_SYNC_MQTT_CONNECT_INFO,
     ACTION_ID_TEMP_UNIT,
     ACTION_ID_TIMER_TASK_ADD,
     ACTION_ID_TIMER_TASK_DELETE,
@@ -62,6 +69,7 @@ from .const import (
     APP_CHART_STAT_PERIODS,
     APP_DAY_CHART_BUCKET_LABEL,
     APP_DEVICE_STAT_AC_TO_BATTERY,
+    APP_DEVICE_STAT_AC_TO_ONGRID,
     APP_DEVICE_STAT_BATTERY_CHARGE,
     APP_DEVICE_STAT_BATTERY_DISCHARGE,
     APP_DEVICE_STAT_BATTERY_TO_AC,
@@ -70,9 +78,12 @@ from .const import (
     APP_DEVICE_STAT_EPS_OUTPUT,
     APP_DEVICE_STAT_ONGRID_INPUT,
     APP_DEVICE_STAT_ONGRID_OUTPUT,
+    APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_DEVICE_STAT_PV_ENERGY,
+    APP_DEVICE_STAT_PV_TO_AC,
     APP_DEVICE_STAT_PV_TO_BATTERY,
+    APP_DEVICE_STAT_PV_TO_ONGRID,
     APP_PERIOD_DATE_TYPES,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
@@ -173,6 +184,7 @@ from .const import (
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
+    FIELD_GRID_STANDARD,
     FIELD_HOST,
     FIELD_ICON,
     FIELD_ICON_PATH,
@@ -218,6 +230,7 @@ from .const import (
     FIELD_PV_PW,
     FIELD_RB,
     FIELD_REBOOT,
+    FIELD_SAFETY,
     FIELD_SCAN_NAME,
     FIELD_SCHE_PHASE,
     FIELD_SINGLE_CURRENCY,
@@ -253,9 +266,13 @@ from .const import (
     FIELD_THIRD_PARTY_MQTT_TOKEN,
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     FIELD_TIMESTAMP,
+    FIELD_TIMEZONE,
     FIELD_TODAY_ENERGY,
     FIELD_TOTAL_ENERGY,
+    FIELD_TS,
     FIELD_TYPE_NAME,
+    FIELD_UNBIND,
+    FIELD_UO,
     FIELD_UPDATE_CONTENT,
     FIELD_UPDATE_STATUS,
     FIELD_UPDATES,
@@ -276,18 +293,26 @@ from .const import (
     MQTT_CMD_CONTROL_SUB_DEVICE,
     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
     MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE,
+    MQTT_CMD_GET_DEVICE_OTA_VERSION,
+    MQTT_CMD_GET_TIME_ZONE,
     MQTT_CMD_NONE,
     MQTT_CMD_QUERY_COMBINE_DATA,
     MQTT_CMD_QUERY_DEVICE_PROPERTY,
     MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
     MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
     MQTT_CMD_QUERY_WEATHER_PLAN,
+    MQTT_CMD_QUERY_WIFI_CONFIG,
+    MQTT_CMD_READ_WIFI_LIST,
+    MQTT_CMD_SEND_TIME_ZONE,
+    MQTT_CMD_SYNC_GRID_STANDARD,
+    MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
     MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
     MQTT_CMD_UPLOAD_DEVICE_ALERT,
     MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
     MQTT_CREDENTIAL_USER_ID,
     MQTT_CREDENTIAL_USERNAME,
+    MQTT_HOST,
     MQTT_LIVE_THRESHOLD_SEC,
     MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
     MQTT_MESSAGE_CONTROL_COMBINE,
@@ -299,12 +324,14 @@ from .const import (
     MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
     MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
     MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+    MQTT_MESSAGE_QUERY_WIFI_CONFIG,
     MQTT_MESSAGE_SEND_WEATHER_ALERT,
     MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG,
     MQTT_MESSAGE_UPLOAD_COMBINE_DATA,
     MQTT_MESSAGE_UPLOAD_DEVICE_ALERT,
     MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA,
     MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
+    MQTT_PORT,
     MQTT_RECONNECT_THROTTLE_SEC,
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
@@ -327,6 +354,7 @@ from .const import (
     PAYLOAD_LIFETIME_COUNTERS,
     PAYLOAD_LOCATION,
     PAYLOAD_METER_HEADS,
+    PAYLOAD_MQTT_CONNECT_INFO,
     PAYLOAD_MQTT_LAST,
     PAYLOAD_NOTICE,
     PAYLOAD_OTA,
@@ -341,7 +369,10 @@ from .const import (
     PAYLOAD_SYSTEM_META,
     PAYLOAD_TASK_PLAN,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+    PAYLOAD_TIMEZONE_CONFIG,
     PAYLOAD_WEATHER_PLAN,
+    PAYLOAD_WIFI_CONFIG,
+    PAYLOAD_WIFI_LIST,
     PRESERVED_FAST_PAYLOAD_KEYS,
     PRICE_CONFIG_INTERVAL_SEC,
     REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
@@ -656,7 +687,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         APP_DEVICE_STAT_EPS_INPUT,
         APP_DEVICE_STAT_EPS_OUTPUT,
         APP_DEVICE_STAT_AC_TO_BATTERY,
+        APP_DEVICE_STAT_AC_TO_ONGRID,
         APP_DEVICE_STAT_BATTERY_TO_AC,
+        APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
+        APP_DEVICE_STAT_PV_TO_AC,
+        APP_DEVICE_STAT_PV_TO_ONGRID,
     })
     _MAIN_LIVE_PROPERTY_KEYS = frozenset({
         FIELD_SOC,
@@ -924,7 +959,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return
         # Bound the dedup cache to prevent unbounded memory growth. With
         # ~10 topics per device the cap is never hit in normal operation;
-        # it only guards against pathological churn (BUGFIXTODO patch).
+        # it only guards against pathological churn.
         if len(self._payload_debug_last_sig) >= 256:
             oldest = next(iter(self._payload_debug_last_sig))
             self._payload_debug_last_sig.pop(oldest, None)
@@ -1965,6 +2000,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
             )
         )
+        is_wifi_config = (
+            msg_type == MQTT_MESSAGE_QUERY_WIFI_CONFIG
+            or action_id == ACTION_ID_QUERY_WIFI_CONFIG
+            or body.get(FIELD_CMD) == MQTT_CMD_QUERY_WIFI_CONFIG
+        )
+        is_wifi_list = (
+            action_id == ACTION_ID_READ_WIFI_LIST
+            or body.get(FIELD_CMD) == MQTT_CMD_READ_WIFI_LIST
+        )
+        is_time_zone_config = action_id in (
+            ACTION_ID_GET_TIME_ZONE,
+            ACTION_ID_SEND_TIME_ZONE,
+        ) or body.get(FIELD_CMD) in (MQTT_CMD_GET_TIME_ZONE, MQTT_CMD_SEND_TIME_ZONE)
+        is_grid_standard_sync = (
+            action_id == ACTION_ID_SYNC_GRID_STANDARD
+            or body.get(FIELD_CMD) == MQTT_CMD_SYNC_GRID_STANDARD
+        )
+        is_mqtt_connect_info = (
+            action_id == ACTION_ID_SYNC_MQTT_CONNECT_INFO
+            or body.get(FIELD_CMD) == MQTT_CMD_SYNC_MQTT_CONNECT_INFO
+        )
+        is_device_ota_version = (
+            action_id == ACTION_ID_GET_DEVICE_OTA_VERSION
+            or body.get(FIELD_CMD) == MQTT_CMD_GET_DEVICE_OTA_VERSION
+        )
         if body:
             has_lifetime_counters = any(
                 key in body for key in self._DEVICE_LIFETIME_COUNTER_KEYS
@@ -1976,7 +2036,37 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         if topic.endswith("/device") or topic.endswith("/config"):
             if body:
-                if is_third_party_mqtt_config:
+                if is_wifi_config:
+                    updated[PAYLOAD_WIFI_CONFIG] = body
+                    touched = True
+                elif is_wifi_list:
+                    updated[PAYLOAD_WIFI_LIST] = body
+                    touched = True
+                elif is_time_zone_config:
+                    updated[PAYLOAD_TIMEZONE_CONFIG] = body
+                    if body.get(FIELD_TIMEZONE) is not None:
+                        system = dict(current.get(PAYLOAD_SYSTEM) or {})
+                        system[FIELD_TIMEZONE] = body.get(FIELD_TIMEZONE)
+                        updated[PAYLOAD_SYSTEM] = system
+                    touched = True
+                elif is_grid_standard_sync:
+                    value = body.get(FIELD_GRID_STANDARD)
+                    if value is None:
+                        value = body.get(FIELD_SAFETY)
+                    if value is not None:
+                        system = dict(current.get(PAYLOAD_SYSTEM) or {})
+                        system[FIELD_GRID_STANDARD] = str(value)
+                        updated[PAYLOAD_SYSTEM] = system
+                    touched = True
+                elif is_mqtt_connect_info:
+                    updated[PAYLOAD_MQTT_CONNECT_INFO] = body
+                    touched = True
+                elif is_device_ota_version:
+                    ota = dict(current.get(PAYLOAD_OTA) or {})
+                    ota.update(body)
+                    updated[PAYLOAD_OTA] = ota
+                    touched = True
+                elif is_third_party_mqtt_config:
                     updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = {
                         **body,
                         "_ha_plaintext": False,
@@ -2057,6 +2147,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # READ_DEVICE_INFO (QueryDeviceProperty, actionId=3011, cmd=106).
         if (
             not is_subdevice
+            and not (
+                is_wifi_config
+                or is_wifi_list
+                or is_time_zone_config
+                or is_grid_standard_sync
+                or is_mqtt_connect_info
+                or is_device_ota_version
+                or is_third_party_mqtt_config
+            )
             and (
                 msg_type
                 in (
@@ -2624,13 +2723,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if device_id is None:
                         device_id = removal_device_id
                     for pack_index in dropped_indices:
+                        # Pack entities/device identifiers are 1-based while
+                        # enumerate() returns the original list position.
+                        entity_pack_index = pack_index + 1
                         identifier = (
                             DOMAIN,
-                            f"{device_id}_battery_pack_{pack_index}",
+                            f"{device_id}_battery_pack_{entity_pack_index}",
                         )
                         # Idempotent append: repeated refreshes that re-detect
                         # the same dropped pack must not stack duplicate
-                        # removal entries (BUGFIXTODO patch).
+                        # removal entries.
                         if identifier not in self._pending_device_removals:
                             self._pending_device_removals.append(identifier)
             touched = True
@@ -2914,7 +3016,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ``device_registry`` identifiers and call ``async_remove_device``).
 
         Cleanup is deliberately conservative: a pack must have been
-        silent for the full threshold (default 7 days) before it is
+        silent for the full threshold (default 30 days) before it is
         dropped, so daily WiFi blips or manual reboots do not trigger
         spurious removal.
 
@@ -3004,11 +3106,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             registry.async_remove_device(device.id)
             removed += 1
-        # BUGFIXTODO Bug D: registry removal alone leaks per-device cache
-        # entries. Extract the parent device id from the battery-pack
-        # identifier and drop the matching ``_slow_cache`` /
-        # ``_last_*_query`` rows so the next refresh does not keep
-        # paying memory for a device that no longer exists.
+        # Registry removal alone would leave per-device cache entries behind.
+        # Extract the parent device id from the battery-pack identifier and
+        # drop the matching ``_slow_cache`` / ``_last_*_query`` rows so the next
+        # refresh does not keep paying memory for a device that no longer
+        # exists.
         removed_device_ids: set[str] = set()
         for _domain, unique_id in pending:
             if "_battery_pack_" in unique_id:
@@ -3748,6 +3850,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         new_data[device_id] = entry
         self._push_partial_update(new_data)
 
+    def _apply_local_system_patch(
+        self,
+        device_id: str,
+        updates: dict[str, Any],
+    ) -> None:
+        """Mirror app system metadata writes into coordinator data."""
+        if not updates or not self.data or device_id not in self.data:
+            return
+        new_data = dict(self.data)
+        entry = dict(new_data[device_id])
+        system = dict(entry.get(PAYLOAD_SYSTEM) or {})
+        system.update(updates)
+        entry[PAYLOAD_SYSTEM] = system
+        system_meta = dict(entry.get(PAYLOAD_SYSTEM_META) or {})
+        if system_meta:
+            system_meta.update(updates)
+            entry[PAYLOAD_SYSTEM_META] = system_meta
+        new_data[device_id] = entry
+        self._push_partial_update(new_data)
+
     def _invalidate_system_cache(self, system_id: str | None, *cache_keys: str) -> None:
         """Drop stale slow-cache entries after write endpoints."""
         if not system_id:
@@ -4045,6 +4167,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         action_id: int,
         cmd: int,
         body_fields: dict[str, Any],
+        ble_extra_body_fields: dict[str, Any] | None = None,
         ensure_mqtt: bool = True,
     ) -> None:
         """Try the experimental BLE write path before falling back to MQTT.
@@ -4062,10 +4185,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         if cmd_value > 0:
             try:
+                ble_body_fields = body_fields
+                if ble_extra_body_fields is not None:
+                    ble_body_fields = {**body_fields, **ble_extra_body_fields}
                 sent = await self.async_send_ble_command(
                     device_id,
                     cmd=cmd_value,
-                    body=self._command_body_for_transport(body_fields, cmd=cmd_value),
+                    body=self._command_body_for_transport(
+                        ble_body_fields, cmd=cmd_value
+                    ),
                     wait_for_ack=True,
                 )
             except (RuntimeError, ValueError) as err:
@@ -4118,6 +4246,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         body_fields: dict[str, Any],
         ensure_mqtt: bool = True,
     ) -> None:
+        if self._mqtt is None and ensure_mqtt:
+            await self._async_ensure_mqtt(force=True, wait_connected=True)
         if self._mqtt is None:
             raise HomeAssistantError("MQTT client not initialized")
 
@@ -4774,6 +4904,107 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             ensure_mqtt=ensure_mqtt,
         )
 
+    async def async_query_wifi_list(
+        self, device_id: str, *, ensure_mqtt: bool = True
+    ) -> None:
+        """Query nearby Wi-Fi list (READ_WIFI_LIST, actionId 3001/cmd 1)."""
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_READ_WIFI_LIST,
+            cmd=MQTT_CMD_READ_WIFI_LIST,
+            body_fields={},
+            ensure_mqtt=ensure_mqtt,
+        )
+
+    async def async_get_time_zone(
+        self, device_id: str, *, ensure_mqtt: bool = True
+    ) -> None:
+        """Query device time-zone config (GET_TIME_ZONE, actionId 3004/cmd 22)."""
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_GET_TIME_ZONE,
+            cmd=MQTT_CMD_GET_TIME_ZONE,
+            body_fields={},
+            ensure_mqtt=ensure_mqtt,
+        )
+
+    async def async_send_time_zone(
+        self,
+        device_id: str,
+        *,
+        timezone_name: str | None = None,
+        ensure_mqtt: bool = True,
+    ) -> None:
+        """Sync the Home Assistant time zone via the app's SEND_TIME_ZONE body."""
+        name = (timezone_name or self.hass.config.time_zone or "UTC").strip()
+        timezone = dt_util.get_time_zone(name)
+        if timezone is None:
+            raise HomeAssistantError(f"Invalid time zone: {name}")
+        now = dt_util.now(timezone)
+        offset = now.utcoffset()
+        utc_offset_seconds = int(offset.total_seconds()) if offset is not None else 0
+        body = {
+            FIELD_UO: utc_offset_seconds,
+            FIELD_TIMEZONE: name,
+        }
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_SEND_TIME_ZONE,
+            cmd=MQTT_CMD_SEND_TIME_ZONE,
+            body_fields=body,
+            ble_extra_body_fields={FIELD_TS: int(now.timestamp())},
+            ensure_mqtt=ensure_mqtt,
+        )
+        self._apply_local_system_patch(device_id, {FIELD_TIMEZONE: name})
+
+    async def async_sync_grid_standard(
+        self,
+        device_id: str,
+        safety: int,
+        *,
+        ensure_mqtt: bool = True,
+    ) -> None:
+        """Sync the app grid standard (SYNC_GRID_STANDARD, actionId 3010/cmd 105)."""
+        value = int(safety)
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_SYNC_GRID_STANDARD,
+            cmd=MQTT_CMD_SYNC_GRID_STANDARD,
+            body_fields={FIELD_SAFETY: value, FIELD_UNBIND: 1},
+            ensure_mqtt=ensure_mqtt,
+        )
+        self._apply_local_system_patch(device_id, {FIELD_GRID_STANDARD: str(value)})
+
+    async def async_sync_mqtt_connect_info(
+        self, device_id: str, *, ensure_mqtt: bool = True
+    ) -> None:
+        """Sync app cloud-MQTT broker endpoint to device (3005/cmd 99)."""
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_SYNC_MQTT_CONNECT_INFO,
+            cmd=MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
+            body_fields={FIELD_HOST: MQTT_HOST, "port": MQTT_PORT},
+            ensure_mqtt=ensure_mqtt,
+        )
+
+    async def async_query_device_ota_version(
+        self, device_id: str, *, ensure_mqtt: bool = True
+    ) -> None:
+        """Query device OTA version (GET_DEVICE_OTA_VERSION, 3006/cmd 100)."""
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            action_id=ACTION_ID_GET_DEVICE_OTA_VERSION,
+            cmd=MQTT_CMD_GET_DEVICE_OTA_VERSION,
+            body_fields={},
+            ensure_mqtt=ensure_mqtt,
+        )
+
     async def async_query_weather_plan(
         self, device_id: str, *, ensure_mqtt: bool = True
     ) -> None:
@@ -4783,6 +5014,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             message_type=MQTT_MESSAGE_QUERY_WEATHER_PLAN,
             action_id=ACTION_ID_QUERY_WEATHER_PLAN,
             cmd=MQTT_CMD_QUERY_WEATHER_PLAN,
+            body_fields={},
+            ensure_mqtt=ensure_mqtt,
+        )
+
+    async def async_query_wifi_config(
+        self, device_id: str, *, ensure_mqtt: bool = True
+    ) -> None:
+        """Query the app Wi-Fi config (GET_WIFI_CONFIG, actionId 3045/cmd 124)."""
+        await self._async_publish_command_ble_first(
+            device_id,
+            message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
+            action_id=ACTION_ID_QUERY_WIFI_CONFIG,
+            cmd=MQTT_CMD_QUERY_WIFI_CONFIG,
             body_fields={},
             ensure_mqtt=ensure_mqtt,
         )
@@ -6979,10 +7223,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             for cache in self._slow_cache.values():
                 for cache_key in cache_keys_to_clear:
                     cache.pop(cache_key, None)
-            # Stat-import dedup cache spans calendar days; stale
-            # signatures from yesterday would prevent fresh buckets
-            # from being written to the HA recorder after midnight
-            # (BUGFIXTODO patch).
+            # Stat-import dedup cache spans calendar days; stale signatures
+            # from yesterday would prevent fresh buckets from being written to
+            # the HA recorder after midnight.
             self._stat_import_last_sig.clear()
         self._cached_date = today
 
@@ -7060,11 +7303,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         async def _fetch_system(sys_id: str) -> dict[str, Any]:
             if sys_id in system_cache:
                 return system_cache[sys_id]
-            # BUGFIXTODO Bug A: gather without return_exceptions previously
-            # let a single TimeoutError / aiohttp.ClientError / SSL drop
-            # propagate out and abort the whole update cycle, marking every
-            # Jackery entity unavailable. We isolate failures per slot and
-            # map them to the same defaults already wired in the
+            # Keep slow endpoint failures isolated per slot. A single
+            # TimeoutError / aiohttp.ClientError / SSL drop must not abort the
+            # whole update cycle and mark every Jackery entity unavailable.
+            # Map failures to the same defaults already wired in the
             # ``_get_with_ttl(... default)`` calls below.
             slow_results = await asyncio.gather(
                 _get_with_ttl(
@@ -7348,12 +7590,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             {},
                         )
 
-                    # BUGFIXTODO Bug C: a single 404 (e.g. the device was
-                    # bought mid-year and earlier months legitimately do
-                    # not exist) used to abort the whole year backfill.
-                    # ``return_exceptions`` lets the ``isinstance(source,
-                    # dict)`` filter below quietly skip BaseException
-                    # entries.
+                    # A single 404 (e.g. the device was bought mid-year and
+                    # earlier months legitimately do not exist) must not abort
+                    # the whole year backfill. ``return_exceptions`` lets the
+                    # ``isinstance(source, dict)`` filter below quietly skip
+                    # BaseException entries.
                     sources = await asyncio.gather(
                         *(
                             _fetch_previous_home_month(month, prefix)
@@ -7560,10 +7801,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         backoff_key=backoff_today_key,
                     )
                 )
-            # BUGFIXTODO Bug B: gather without return_exceptions previously
-            # let one device-metric failure (HTTP 5xx, timeout, payload-
-            # parse error) abort the whole zip, leaving every per-device
-            # entity blank. Map exceptions back to the structural default
+            # Keep device-metric failures local. One HTTP 5xx, timeout, or
+            # payload-parse error must not abort the whole zip and blank every
+            # per-device entity; map exceptions back to the structural default
             # expected by downstream consumers.
             raw_values = await asyncio.gather(*tasks, return_exceptions=True)
             device_extras_defaults: dict[str, Any] = {
@@ -7712,9 +7952,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 if isinstance(current_month_source, dict):
                     months[today.month] = current_month_source
                 previous_months = list(range(1, today.month))
-                # BUGFIXTODO Bug C: same year-backfill robustness as the
-                # home-trends path — a single 404/timeout for one early
-                # month must not abort the entire year.
+                # Same year-backfill robustness as the home-trends path: a
+                # single 404/timeout for one early month must not abort the
+                # entire year.
                 sources = await asyncio.gather(
                     *(_fetch_device_month(prefix, month) for month in previous_months),
                     return_exceptions=True,
@@ -8088,3 +8328,60 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         diag["connect_backoff_signature"] = self._mqtt_connect_backoff_signature
         return diag
+
+    def app_chart_import_diagnostics(self) -> dict[str, Any]:
+        """Return current app-chart import coverage for diagnostics.
+
+        This makes the day-to-hourly backfill routing explicit: every metric in
+        ``APP_CHART_STAT_METRICS`` is evaluated against its documented day
+        source candidates, not just PV.
+        """
+        now = self._local_now()
+        devices: dict[str, Any] = {}
+        for index, device_id in enumerate(sorted((self.data or {}).keys()), start=1):
+            payload = (self.data or {}).get(device_id) or {}
+            metric_rows: dict[str, Any] = {}
+            for section_prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
+                candidate_rows: list[dict[str, Any]] = []
+                point_count = 0
+                for section, source_stat_key in self._day_chart_source_candidates(
+                    section_prefix,
+                    stat_key,
+                    metric_key,
+                ):
+                    source = payload.get(section)
+                    if not isinstance(source, dict):
+                        candidate_rows.append({
+                            "section": section,
+                            "stat_key": source_stat_key,
+                            "present": False,
+                            "point_count": 0,
+                        })
+                        continue
+                    points = day_power_energy_points(
+                        source,
+                        section,
+                        source_stat_key,
+                        bucket_minutes=60,
+                        today=now.date(),
+                        now=now,
+                    )
+                    candidate_rows.append({
+                        "section": section,
+                        "stat_key": source_stat_key,
+                        "present": True,
+                        "unit": source.get("unit"),
+                        "point_count": len(points),
+                    })
+                    point_count = max(point_count, len(points))
+                metric_rows[metric_key] = {
+                    "label": label,
+                    "day_hourly_point_count": point_count,
+                    "candidates": candidate_rows,
+                }
+            devices[f"device_{index}"] = metric_rows
+        return {
+            "bucket": EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+            "bucket_label": APP_DAY_CHART_BUCKET_LABEL,
+            "devices": devices,
+        }

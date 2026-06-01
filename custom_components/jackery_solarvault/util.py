@@ -123,6 +123,7 @@ from .const import (
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
+_SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
 _DEV_MODE_CACHED: bool | None = None
 
@@ -277,7 +278,7 @@ def coordinator_entity_signature(
 
     Returns:
         tuple[tuple[Any, ...], ...]: A tuple of per-device signature tuples. Each entry preserves the device ID and includes,
-        in order: a tuple of smart-plug serials, battery pack count, meter head count, a boolean indicating presence of an
+        in order: a tuple of smart-plug serials, battery pack count, a tuple of meter-head serials, a boolean indicating presence of an
         alarm payload, a boolean indicating presence of an OTA current version, and a boolean indicating presence of a CT meter.
     """
     if not coordinator_data:
@@ -293,18 +294,14 @@ def coordinator_entity_signature(
             if isinstance(packs, list)
             else 0
         )
-        meter_heads = payload.get(PAYLOAD_METER_HEADS) or []
-        meter_count = (
-            sum(1 for item in meter_heads if isinstance(item, dict))
-            if isinstance(meter_heads, list)
-            else 0
-        )
+        meter_heads = sorted_meter_heads(payload.get(PAYLOAD_METER_HEADS))
+        meter_keys = tuple(meter_head_serial(p) for p in meter_heads)
 
         sig.append((
             dev_id,
             plug_keys,
             pack_count,
-            meter_count,
+            meter_keys,
             payload.get(PAYLOAD_ALARM) is not None,
             bool((payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION)),
             payload.get(PAYLOAD_CT_METER) is not None,
@@ -795,6 +792,45 @@ def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
         entries.append((sn, entry))
     entries.sort(key=lambda item: item[0])
     return [entry for _, entry in entries]
+
+
+def meter_head_serial(meter_head: object) -> str | None:
+    """Extract the stable identity from a meter-head/collector payload."""
+    if not isinstance(meter_head, dict):
+        return None
+    raw = (
+        meter_head.get(FIELD_DEVICE_SN)
+        or meter_head.get(FIELD_DEV_SN)
+        or meter_head.get(FIELD_SN)
+        or meter_head.get(FIELD_DEVICE_ID)
+        or meter_head.get(FIELD_ID)
+        or meter_head.get(FIELD_DEV_ID)
+    )
+    if raw is None:
+        return None
+    serial = str(raw).strip()
+    return serial or None
+
+
+def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
+    """Return meter-head entries sorted by stable serial/id values."""
+    if not isinstance(meter_heads, list):
+        return []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in meter_heads:
+        sn = meter_head_serial(entry)
+        if sn is None:
+            continue
+        entries.append((sn, entry))
+    entries.sort(key=lambda item: item[0])
+    return [entry for _, entry in entries]
+
+
+def stable_subdevice_key(prefix: str, identity: str | None, fallback_index: int) -> str:
+    """Build a safe stable suffix for a subdevice unique/device id."""
+    raw = str(identity or "").strip() or str(fallback_index)
+    normalized = _SUBDEVICE_ID_RE.sub("_", raw).strip("_").lower()
+    return f"{prefix}_{normalized or fallback_index}"
 
 
 def jackery_online_state(value: object) -> bool | None:

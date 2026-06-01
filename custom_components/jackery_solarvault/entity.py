@@ -9,7 +9,6 @@ from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
     FIELD_DEV_MODEL,
-    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_MODEL,
@@ -17,7 +16,6 @@ from .const import (
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,
     FIELD_SCAN_NAME,
-    FIELD_SN,
     FIELD_TYPE_NAME,
     FIELD_VERSION,
     FIELD_WNAME,
@@ -40,7 +38,12 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .util import jackery_online_state, subdevice_branding
+from .util import (
+    jackery_online_state,
+    smart_plug_serial,
+    stable_subdevice_key,
+    subdevice_branding,
+)
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -161,7 +164,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         )
 
     def _build_smart_plug_device_info(
-        self, plug_index: int, plug: dict[str, Any]
+        self, plug_index: int, plug: dict[str, Any], plug_key: str | None = None
     ) -> DeviceInfo:
         """Construct DeviceInfo for a smart-plug subdevice attached to the parent SolarVault.
 
@@ -178,7 +181,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or self._properties.get(FIELD_WNAME)
             or "SolarVault"
         )
-        sn = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+        sn = smart_plug_serial(plug)
+        stable_key = plug_key or stable_subdevice_key("smart_plug", sn, plug_index)
         # Branding lookup against the documented accessory catalog so the
         # UI shows "Shelly Plus Plug S" instead of the raw "shellyplusplugs"
         # wire identifier (PROTOCOL §3 + docs/html scanName table).
@@ -198,7 +202,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         )
         version = plug.get(FIELD_VERSION) or plug.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._device_id}_smart_plug_{plug_index}")},
+            identifiers={(DOMAIN, f"{self._device_id}_{stable_key}")},
             manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),

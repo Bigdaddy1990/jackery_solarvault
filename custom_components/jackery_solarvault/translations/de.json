@@ -113,6 +113,48 @@
       },
       "read_smart_plug_schedule": {
         "name": "Smart-Plug-Zeitplan lesen"
+      },
+      "refresh_system_info": {
+        "name": "Systeminfo aktualisieren"
+      },
+      "refresh_device_info": {
+        "name": "Geräteinfo aktualisieren"
+      },
+      "refresh_wifi_list": {
+        "name": "WLAN-Liste aktualisieren"
+      },
+      "refresh_time_zone": {
+        "name": "Zeitzone aktualisieren"
+      },
+      "sync_cloud_mqtt_info": {
+        "name": "Cloud-MQTT-Info synchronisieren"
+      },
+      "refresh_device_ota_version": {
+        "name": "Geräte-OTA-Version aktualisieren"
+      },
+      "refresh_third_party_mqtt_config": {
+        "name": "Third-Party-MQTT-Konfig aktualisieren"
+      },
+      "refresh_wifi_config": {
+        "name": "WLAN-Konfiguration aktualisieren"
+      },
+      "refresh_battery_packs": {
+        "name": "Zusatzbatterien aktualisieren"
+      },
+      "refresh_smart_meter": {
+        "name": "Smart-Meter / CT aktualisieren"
+      },
+      "refresh_meter_heads": {
+        "name": "Meter-Heads aktualisieren"
+      },
+      "refresh_smart_plugs": {
+        "name": "Smart-Plugs aktualisieren"
+      },
+      "refresh_subdevice_combo": {
+        "name": "Combo-Zusatzgeräte aktualisieren"
+      },
+      "sync_time_zone": {
+        "name": "Zeitzone synchronisieren"
       }
     },
     "number": {
@@ -133,6 +175,9 @@
       },
       "soc_discharge_limit_set": {
         "name": "Entladelimit"
+      },
+      "third_party_mqtt_port": {
+        "name": "Third-Party MQTT Port"
       }
     },
     "select": {
@@ -886,11 +931,29 @@
       },
       "smart_plug_switch": {
         "name": "Smart-Plug"
+      },
+      "third_party_mqtt_enable": {
+        "name": "Third-Party MQTT Bridge"
       }
     },
     "text": {
       "system_name": {
         "name": "Systemname"
+      },
+      "grid_standard": {
+        "name": "Netzstandard-Code"
+      },
+      "third_party_mqtt_ip": {
+        "name": "Third-Party MQTT Broker"
+      },
+      "third_party_mqtt_username": {
+        "name": "Third-Party MQTT Benutzername"
+      },
+      "third_party_mqtt_password": {
+        "name": "Third-Party MQTT Passwort"
+      },
+      "third_party_mqtt_token": {
+        "name": "Third-Party MQTT Token"
       }
     }
   },
