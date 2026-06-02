@@ -1,6 +1,6 @@
 # pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
-requires = ["setuptools==78.1.1", "wheel"]
+requires = ["setuptools>=82.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -23,6 +23,9 @@ requires-python = ">=3.14"
 
 [options]
 python_requires = ">=3.14"
+
+[tool.ty.environment]
+python-version = "3.14"
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
@@ -237,20 +240,50 @@ filterwarnings = [
 ]
 
 [tool.ruff]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
 target-version = "py314"
 line-length = 88
-#src = ["custom_components", "tests"]
+src = ["custom_components", "tests"]
 indent-width = 4
 show-fixes = true
 fix = true
 unsafe-fixes = true
-force-exclude = true
-output-format= "github"
+#force-exclude = true
+#output-format= "github"
+preview = true
 
 [tool.ruff.analyze]
 detect-string-imports = true
 direction = "dependencies"
 string-imports-min-dots = 2
+preview= true
 
 [tool.ruff.format]
 preview = true
@@ -263,11 +296,13 @@ skip-magic-trailing-comma = false
 
 [tool.ruff.lint]
 preview = true
-select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D", "W", "RUF", "NPY", "ASYNC", "N", "ANN"]
+select = ["E", "F", "I", "UP", "B", "SIM", "Q", "D", "W", "C", "RUF", "NPY", "ASYNC", "N", "ANN"]
 ignore = ["E501"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+logger-objects = ["logging_setup.logger"]
 
 [tool.ruff.lint.per-file-ignores]
 # RUF067 (preview): the integration root __init__.py legitimately holds
@@ -290,6 +325,14 @@ force-sort-within-sections = true
 known-first-party = ["homeassistant", "custom_components", "pytest_"]
 combine-as-imports = true
 split-on-trailing-comma = false
+case-sensitive = true
+order-by-type = true
+required-imports = ["from __future__ import annotations"]
+single-line-exclusions = ["os", "json"]
+
+[tool.ruff.lint.pyupgrade]
+# Preserve types, even if a file imports `from __future__ import annotations`.
+keep-runtime-typing = true
 
 [tool.ruff.lint.flake8-annotations]
 # HA entity methods (async_turn_on/off, set_*, etc.) carry the framework's
@@ -308,13 +351,34 @@ docstring-quotes = "double"
 
 [tool.ruff.lint.flake8-type-checking]
 exempt-modules = ["typing", "typing_extensions"]
+# Add quotes around type annotations, if doing so would allow
+# an import to be moved into a type-checking block.
+quote-annotations = true
+strict = true
 
 [tool.ruff.lint.flake8-pytest-style]
-fixture-parentheses = false
-mark-parentheses = false
+fixture-parentheses = true
+mark-parentheses = true
 parametrize-names-type = "list"
 parametrize-values-row-type = "list"
 parametrize-values-type = "list"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Require lazy imports for specific modules.
+require-lazy = ["typing", "foo"]
+# Require lazy imports by default, except for modules with import-time side effects.
+require-lazy = { include = "all", exclude = ["sitecustomize"] }
+
+[tool.ruff.lint.flake8-unused-arguments]
+ignore-variadic-names = true
 
 [tool.mypy]
 python_version = "3.14"
@@ -409,3 +473,4 @@ ignored-classes = [
   "_CountingAttr", # for attrs
 ]
 mixin-class-rgx = ".*[Mm]ix[Ii]n"
+
