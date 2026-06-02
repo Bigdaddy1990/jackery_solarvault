@@ -1,7 +1,7 @@
 aiohttp>=3.13.3
 aiomqtt
 annotatedyaml>=1.0.2
-coverage>=7.10.6
+coverage>=7.14.1
 coverage[toml]>=7.5.4
 hypothesis
 jinja2>=3.1.6
