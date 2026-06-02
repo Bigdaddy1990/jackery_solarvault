@@ -430,7 +430,8 @@ class TestQueryButtonDescriptions:
 
 
 def _make_mock_coordinator(
-    device_id: str = "12345", payload: dict | None = None
+    device_id: str = "12345",
+    payload: dict | None = None,
 ) -> MagicMock:
     """Create a mock coordinator with given device data."""
     coordinator = MagicMock()
