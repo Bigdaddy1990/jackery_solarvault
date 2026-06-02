@@ -2245,6 +2245,57 @@ def _day_power_sample_minute(
     return minute if 0 <= minute < 24 * 60 else None
 
 
+def _day_power_sample_energy_value(
+    raw: object,
+    section: str,
+    stat_key: str,
+) -> float | None:
+    """Return the directional app day-curve sample value to integrate."""
+    value = safe_float(raw)
+    if value is None:
+        return None
+    if section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS)):
+        if stat_key in {
+            APP_STAT_TOTAL_CHARGE,
+            APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+        }:
+            return max(value, 0.0)
+        if stat_key in {
+            APP_STAT_TOTAL_DISCHARGE,
+            APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+        }:
+            return abs(value) if value < 0 else max(value, 0.0)
+    return max(value, 0.0)
+
+
+def _scalar_day_energy_points(
+    *,
+    begin: date,
+    scalar_total: float | None,
+    current_day_limit_minute: int,
+    bucket_minutes: int,
+) -> list[TrendStatisticPoint]:
+    """Represent a scalar-only app day total as one safe Recorder bucket."""
+    if scalar_total is None or scalar_total < 0:
+        return []
+    bucket_minute = (current_day_limit_minute // bucket_minutes) * bucket_minutes
+    bucket_minute = min(bucket_minute, 24 * 60 - bucket_minutes)
+    if bucket_minute < 0:
+        return []
+    return [
+        TrendStatisticPoint(
+            datetime(
+                begin.year,
+                begin.month,
+                begin.day,
+                bucket_minute // 60,
+                bucket_minute % 60,
+            ),
+            round(scalar_total, 5),
+        )
+    ]
+
+
 def day_power_energy_points(
     source: dict[str, Any],
     section: str,
@@ -2256,7 +2307,7 @@ def day_power_energy_points(
 ) -> list[TrendStatisticPoint]:
     """Convert a day chart curve into kWh statistic buckets for the requested day.
 
-    Parses a chart-series day curve (watts or kWh sampled at ~5-minute intervals) and aggregates samples into contiguous buckets of `bucket_minutes`, optionally constraining to `today`/`now` when the request begins today. If the payload includes a scalar period total, bucket values are scaled to match that total; if the scalar total is present but the raw series sums to zero, the function returns an empty list.
+    Parses a chart-series day curve (watts or kWh sampled at ~5-minute intervals) and aggregates samples into contiguous buckets of `bucket_minutes`, optionally constraining to `today`/`now` when the request begins today. If the payload includes a scalar period total, bucket values are scaled to match that total; scalar-only non-zero day totals are represented as one safe bucket so empty app curves still reach Recorder.
 
     Parameters:
         source (dict[str, Any]): App payload containing chart series, optional labels and request meta.
@@ -2305,10 +2356,15 @@ def day_power_energy_points(
         now.hour * 60 + now.minute if begin == now.date() else 24 * 60 - 1
     )
     series = source.get(series_key)
+    scalar_total = effective_period_total_value(source, section, stat_key)
     if not isinstance(series, list) or not series:
-        scalar_total = effective_period_total_value(source, section, stat_key)
         if scalar_total != 0.0:  # noqa: RUF069  # exact zero means safe zero-fill
-            return []
+            return _scalar_day_energy_points(
+                begin=begin,
+                scalar_total=scalar_total,
+                current_day_limit_minute=current_day_limit_minute,
+                bucket_minutes=bucket_minutes,
+            )
         zero_fill_max_bucket_minute = (current_day_limit_minute // bucket_minutes) * (
             bucket_minutes
         )
@@ -2326,7 +2382,7 @@ def day_power_energy_points(
         minute = _day_power_sample_minute(parsed_labels, index)
         if minute is None or minute > current_day_limit_minute:
             continue
-        sample_value = safe_float(raw)
+        sample_value = _day_power_sample_energy_value(raw, section, stat_key)
         if sample_value is None:
             continue
 
@@ -2337,20 +2393,22 @@ def day_power_energy_points(
             else max(last_bucket_minute, bucket_minute)
         )
         sample_kwh = (
-            max(sample_value, 0.0)
-            if unit == APP_UNIT_KWH
-            else max(sample_value, 0.0) * 5 / 60 / 1000
+            sample_value if unit == APP_UNIT_KWH else sample_value * 5 / 60 / 1000
         )
         buckets[bucket_minute] = buckets.get(bucket_minute, 0.0) + sample_kwh
 
     if last_bucket_minute is None:
-        return []
+        return _scalar_day_energy_points(
+            begin=begin,
+            scalar_total=scalar_total,
+            current_day_limit_minute=current_day_limit_minute,
+            bucket_minutes=bucket_minutes,
+        )
 
     for minute in range(0, last_bucket_minute + 1, bucket_minutes):
         buckets.setdefault(minute, 0.0)
 
     raw_total = sum(buckets.values())
-    scalar_total = effective_period_total_value(source, section, stat_key)
     if scalar_total is not None:
         if scalar_total < 0:
             return []
@@ -2358,7 +2416,12 @@ def day_power_energy_points(
             scale = scalar_total / raw_total
             buckets = {minute: value * scale for minute, value in buckets.items()}
         elif scalar_total > 0:
-            return []
+            return _scalar_day_energy_points(
+                begin=begin,
+                scalar_total=scalar_total,
+                current_day_limit_minute=current_day_limit_minute,
+                bucket_minutes=bucket_minutes,
+            )
 
     bucket_items = sorted(buckets.items())
     rounded_values = [round(max(value, 0.0), 5) for _minute, value in bucket_items]
@@ -2692,6 +2755,14 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
     return None
 
 
+def _series_contains_negative_samples(source: dict[str, Any], series_key: str) -> bool:
+    """Return true if an app chart series contains signed negative samples."""
+    series = source.get(series_key)
+    if not isinstance(series, list):
+        return False
+    return any((value := safe_float(raw)) is not None and value < 0 for raw in series)
+
+
 def trend_series_key(section: str, stat_key: str) -> str | None:
     """Map a section and statistic key to the corresponding chart-series key for week/month/year payloads.
 
@@ -2721,6 +2792,16 @@ def day_power_series_key(
     """
     if not _is_day_period_payload(source, section):
         return None
+    if (
+        section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
+        and stat_key
+        in {
+            APP_STAT_TOTAL_DISCHARGE,
+            APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+        }
+        and _series_contains_negative_samples(source, APP_CHART_SERIES_Y1)
+    ):
+        return APP_CHART_SERIES_Y1
     return _chart_series_key_for_stat(section, stat_key)
 
 

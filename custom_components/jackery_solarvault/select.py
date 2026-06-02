@@ -89,9 +89,10 @@ _CT_PHASE_TO_OPTION = {
     2: "phase_2",
     3: "phase_3",
     # App schePhase=4 is not a fourth conductor; it means combined phases.
-    4: "phase_4",
+    4: "combined_phases",
 }
 _OPTION_TO_CT_PHASE = {value: key for key, value in _CT_PHASE_TO_OPTION.items()}
+_OPTION_TO_CT_PHASE["phase_4"] = 4  # legacy option name kept for service callers
 
 
 def _raise_select_action_error(
@@ -644,7 +645,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         key="ct_phase_select",
         translation_key="ct_phase_select",
         icon="mdi:transmission-tower",
-        options=list(_OPTION_TO_CT_PHASE.keys()),
+        options=list(_CT_PHASE_TO_OPTION.values()),
         current_fn=_ct_phase_current,
         select_fn=_ct_phase_select,
     ),

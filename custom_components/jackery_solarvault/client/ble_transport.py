@@ -43,6 +43,7 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
+from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
 
 if TYPE_CHECKING:
@@ -324,7 +325,7 @@ class JackeryBleListener:
         flags: int = 0,
         timeout_sec: float = 10.0,
         wait_for_ack: bool = False,
-        ack_timeout_sec: float = 5.0,
+        ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:

@@ -46,13 +46,13 @@
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
-          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled."
+          "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
+          "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription. Default is `homeassistant`; adjust to your broker topic as needed."
         },
         "description": "Actualiza la contraseña y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID único de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
         "title": "Reconfigurar Jackery SolarVault"
@@ -206,6 +206,7 @@
           "phase_1": "Fase 1",
           "phase_2": "Fase 2",
           "phase_3": "Fase 3",
+          "combined_phases": "Fases combinadas",
           "phase_4": "Fases combinadas"
         }
       },
@@ -738,6 +739,30 @@
       "smart_meter_import_year_energy": {
         "name": "Importación anual de red del Smart Meter"
       },
+      "smart_meter_lifetime_import_energy": {
+        "name": "Importación acumulada de red del Smart Meter"
+      },
+      "smart_meter_lifetime_export_energy": {
+        "name": "Exportación acumulada a red del Smart Meter"
+      },
+      "smart_meter_phase_1_lifetime_import_energy": {
+        "name": "Importación acumulada de red fase 1 del Smart Meter"
+      },
+      "smart_meter_phase_2_lifetime_import_energy": {
+        "name": "Importación acumulada de red fase 2 del Smart Meter"
+      },
+      "smart_meter_phase_3_lifetime_import_energy": {
+        "name": "Importación acumulada de red fase 3 del Smart Meter"
+      },
+      "smart_meter_phase_1_lifetime_export_energy": {
+        "name": "Exportación acumulada a red fase 1 del Smart Meter"
+      },
+      "smart_meter_phase_2_lifetime_export_energy": {
+        "name": "Exportación acumulada a red fase 2 del Smart Meter"
+      },
+      "smart_meter_phase_3_lifetime_export_energy": {
+        "name": "Exportación acumulada a red fase 3 del Smart Meter"
+      },
       "smart_meter_net_export_power": {
         "name": "Potencia neta de exportación del Smart Meter"
       },
@@ -1036,13 +1061,13 @@
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
           "enable_unredacted_diagnostics": "Desactiva la redacción en la exportación de diagnóstico y el JSONL de depuración de payload para pruebas locales. Expone credenciales, números de serie, IDs de dispositivo, temas MQTT y valores bluetoothKey. Desactívalo antes de compartir archivos.",
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Credentials are sent in plaintext today; if the device rejects them the bridge stays off and a warning is logged.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
-          "third_party_mqtt_token": "Optional MQTT bridge token used by some firmware variants. Leave blank if unsure.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription (for example hb/app/123456/device). Leave empty to keep the local listener disabled."
+          "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
+          "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription. Default is `homeassistant`; adjust to your broker topic as needed."
         },
         "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usan la potencia neta del Smart Meter más la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
         "title": "Opciones de Jackery"

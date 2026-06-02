@@ -30,6 +30,7 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .client import JackeryError
 from .const import (
+    DEFAULT_BLE_ACK_TIMEOUT_SEC,
     DOMAIN,
     FIELD_ID,
     FIELD_SYSTEM_ID,
@@ -126,9 +127,9 @@ SEND_BLE_COMMAND_SCHEMA = vol.Schema({
         vol.Coerce(int), vol.Range(min=0, max=65535)
     ),
     vol.Optional(SERVICE_FIELD_WAIT_FOR_ACK, default=False): cv.boolean,
-    vol.Optional(SERVICE_FIELD_ACK_TIMEOUT, default=5.0): vol.All(
-        vol.Coerce(float), vol.Range(min=0.5, max=60.0)
-    ),
+    vol.Optional(
+        SERVICE_FIELD_ACK_TIMEOUT, default=DEFAULT_BLE_ACK_TIMEOUT_SEC
+    ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=60.0)),
 })
 SEND_DEVICE_SCHEDULE_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
@@ -507,7 +508,7 @@ async def _async_handle_send_ble_command(
             - SERVICE_FIELD_BODY: either a mapping (dict) or a JSON-encoded object string that decodes to a mapping.
             - SERVICE_FIELD_FLAGS (optional): integer flags (default 0).
             - SERVICE_FIELD_WAIT_FOR_ACK (optional): boolean indicating whether to wait for an acknowledgement (default False).
-            - SERVICE_FIELD_ACK_TIMEOUT (optional): float acknowledgement timeout in seconds (default 5.0).
+            - SERVICE_FIELD_ACK_TIMEOUT (optional): float acknowledgement timeout in seconds.
 
     Raises:
         ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
@@ -529,7 +530,9 @@ async def _async_handle_send_ble_command(
             body=body,
             flags=int(call.data.get(SERVICE_FIELD_FLAGS, 0)),
             wait_for_ack=bool(call.data.get(SERVICE_FIELD_WAIT_FOR_ACK, False)),
-            ack_timeout_sec=float(call.data.get(SERVICE_FIELD_ACK_TIMEOUT, 5.0)),
+            ack_timeout_sec=float(
+                call.data.get(SERVICE_FIELD_ACK_TIMEOUT, DEFAULT_BLE_ACK_TIMEOUT_SEC)
+            ),
         )
     except (RuntimeError, ValueError) as err:
         raise _service_validation_error(

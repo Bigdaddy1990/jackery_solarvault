@@ -1182,10 +1182,14 @@ class JackeryApi:
         if isinstance(raw, list):
             return [item for item in raw if isinstance(item, dict)]
         if isinstance(raw, dict):
+            bound_devices = raw.get("boundDevices")
+            if isinstance(bound_devices, list):
+                return [item for item in bound_devices if isinstance(item, dict)]
             devices = raw.get("devices")
             if isinstance(devices, list):
                 return [item for item in devices if isinstance(item, dict)]
-            return [raw]
+            if raw.get(FIELD_DEVICE_ID) is not None:
+                return [raw]
         return []
 
     async def async_get_shelly_realtime_power(

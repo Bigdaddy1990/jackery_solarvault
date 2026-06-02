@@ -54,6 +54,25 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 
 _HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
 
+_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
+    "actionId",
+    "batSoc",
+    "body",
+    "cmd",
+    "data",
+    "devId",
+    "devSn",
+    "deviceId",
+    "deviceSn",
+    "gridInPw",
+    "gridOutPw",
+    "messageType",
+    "payload",
+    "pvPw",
+    "sn",
+    "soc",
+}
+
 
 # Sink signature kept loose so the wiring layer can pass any async callable
 # that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
@@ -333,7 +352,7 @@ class JackeryLocalMqttClient:
             self._payload_too_large_count += 1
             self._messages_dropped += 1
             return
-        if self._looks_like_home_assistant_event_payload(raw_bytes):
+        if self._looks_like_home_assistant_state_event_payload(raw_bytes):
             self._home_assistant_event_count += 1
             self._messages_dropped += 1
             return
@@ -357,7 +376,11 @@ class JackeryLocalMqttClient:
             except json.JSONDecodeError, ValueError:
                 parsed = None
             if isinstance(parsed, dict):
-                data = parsed
+                data = self._extract_local_jackery_payload(parsed)
+                if data is None:
+                    self._home_assistant_event_count += 1
+                    self._messages_dropped += 1
+                    return
             elif parsed is not None:
                 # Non-object JSON (list/scalar) is unusual for these devices;
                 # surface it via dropped counter so diagnostics shows the rate.
@@ -380,10 +403,39 @@ class JackeryLocalMqttClient:
         return topic.startswith("homeassistant/")
 
     @staticmethod
-    def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
-        """Return True for HA event-stream JSON published on a shared topic."""
+    def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
+        """Return True for high-volume HA state events on a shared topic."""
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
-        return b'"event_type"' in head and b'"event_data"' in head
+        return (
+            b'"event_type"' in head
+            and b'"state_changed"' in head
+            and b'"event_data"' in head
+            and b'"old_state"' in head
+            and b'"new_state"' in head
+        )
+
+    @staticmethod
+    def _extract_local_jackery_payload(
+        payload: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Return a Jackery payload from raw JSON or an HA-event wrapper."""
+        if "event_type" not in payload or "event_data" not in payload:
+            return payload
+        event_data = payload.get("event_data")
+        if not isinstance(event_data, dict):
+            return None
+        candidates = (
+            event_data.get("payload"),
+            event_data.get("body"),
+            event_data.get("data"),
+            event_data,
+        )
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            if _LOCAL_MQTT_JACKERY_MARKER_KEYS.intersection(candidate):
+                return candidate
+        return None
 
     def _is_broad_topic_filter(self) -> bool:
         """Return True when the current topic filter is globally broad."""
@@ -472,6 +524,13 @@ class JackeryLocalMqttClient:
             target = {"host": self._host, "port": self._port}
             last_topic = self._last_topic
             topics = list(self._topics_seen)
+        routing_warning = None
+        if (
+            self._messages_received > 0
+            and self._messages_forwarded == 0
+            and self._home_assistant_event_count == self._messages_received
+        ):
+            routing_warning = "topic_receives_home_assistant_event_stream_only"
         return {
             "enabled": True,
             "configured_target": target,
@@ -493,6 +552,7 @@ class JackeryLocalMqttClient:
             "blocked_by_filter_count": self._blocked_by_filter_count,
             "payload_too_large_count": self._payload_too_large_count,
             "home_assistant_event_count": self._home_assistant_event_count,
+            "routing_warning": routing_warning,
             "library": MQTT_CLIENT_LIBRARY,
         }
 

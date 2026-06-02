@@ -166,6 +166,10 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             coordinator.statistics_backfill_diagnostics,
             redact_keys,
         ),
+        "endpoint_backoff": async_redact_data(
+            coordinator.endpoint_backoff_diagnostics(),
+            redact_keys,
+        ),
         "app_chart_import": async_redact_data(
             coordinator.app_chart_import_diagnostics(),
             redact_keys,

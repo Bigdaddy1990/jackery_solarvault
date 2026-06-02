@@ -22,7 +22,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
-from .client.third_party_mqtt_codec import encode_third_party_mqtt_field
+from .client.third_party_mqtt_codec import (
+    decode_third_party_mqtt_field,
+    encode_third_party_mqtt_field,
+)
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_CONTROL_SOCKET_PRIORITY,
@@ -125,9 +128,11 @@ from .const import (
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_REPAIR_EXAMPLE_LIMIT,
     DATE_TYPE_DAY,
+    DATE_TYPE_HOUR,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
+    DEFAULT_BLE_ACK_TIMEOUT_SEC,
     DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_ENABLE_BLE_WRITES,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
@@ -411,7 +416,9 @@ from .util import (
     apply_year_month_backfill,
     chart_series_debug,
     day_power_energy_points,
+    day_power_series_key,
     diagnostic_redactions_disabled,
+    effective_period_total_value,
     external_trend_statistic_id,
     format_data_quality_warning,
     guard_statistic_totals_from_year,
@@ -693,6 +700,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         APP_DEVICE_STAT_PV_TO_AC,
         APP_DEVICE_STAT_PV_TO_ONGRID,
     })
+    _BLE_MAIN_LIFETIME_COUNTER_KEYS = _DEVICE_LIFETIME_COUNTER_KEYS
     _MAIN_LIVE_PROPERTY_KEYS = frozenset({
         FIELD_SOC,
         FIELD_BAT_SOC,
@@ -826,11 +834,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._ble_pending_updates: dict[str, dict[str, Any]] = {}
         self._ble_coalesce_tasks: dict[str, asyncio.Task[None]] = {}
         self._skipped_refresh_ticks = 0
-        # Adaptive polling: when MQTT push is live, fast HTTP refreshes are
-        # short-circuited and a full HTTP refresh only runs every keep-alive
+        # Adaptive polling: when property-equivalent push is live, fast HTTP
+        # refreshes are short-circuited and a full HTTP refresh only runs every keep-alive
         # window. Initialise to ``-inf`` so the first coordinator refresh after
         # setup always runs and primes the interval bookkeeping.
         self._last_http_refresh_completed_monotonic: float = float("-inf")
+        # Last time a push transport delivered fields equivalent to
+        # /v1/device/property. Generic MQTT traffic (CT frames, config echoes,
+        # HA recorder events on local MQTT) must not suppress HTTP properties.
+        self._last_property_push_monotonic: float = float("-inf")
+        # MqttMsgActivity generates a 9-digit fallback token once for the
+        # form. Keep the integration-generated equivalent stable for this
+        # config-entry session instead of rotating it on every write.
+        self._generated_third_party_mqtt_token: str | None = None
         # Dedup cache for payload-debug records:
         # (kind, channel, message_type) -> (last_signature, last_emit_monotonic).
         # Bounded by the number of distinct topics the device publishes
@@ -874,9 +890,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _STATISTICS_BACKFILL_STORE_DEVICES: {}
         }
         self._statistics_backfill_state_loaded = False
-        # Endpoint+device scoped backoff for persistent cloud parameter/bind
-        # failures (e.g. code=10422/10432). Keeps poll cycles lean and avoids
-        # repeating known-failing calls every refresh.
+        # Endpoint+device+period scoped backoff for persistent cloud
+        # parameter/bind failures (e.g. code=10422/10432). Keeps poll cycles
+        # lean and avoids repeating known-failing calls every refresh.
         self._endpoint_backoff: dict[str, dict[str, Any]] = {}
         # Cloud MQTT connection setup/backoff. TLS and broker setup failures
         # must not be retried on every fast coordinator tick.
@@ -1294,30 +1310,42 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return True when the fast ``/v1/device/property`` fetch is redundant.
 
         Per PROTOCOL.md §0 rule 2 + §2 the HTTP property endpoint (30 s
-        cadence) is the only call we may suppress when MQTT is delivering
-        state at < ``MQTT_LIVE_THRESHOLD_SEC`` cadence. Slow stat endpoints,
-        trends, day-cache rollover and the Recorder statistic imports stay
-        on their own slow cadence regardless of MQTT liveness — they are
-        gated by ``SLOW_METRICS_INTERVAL_SEC`` in their own TTL caches.
+        cadence) is the only call we may suppress when a push transport is
+        delivering main-device property state at < ``MQTT_LIVE_THRESHOLD_SEC``
+        cadence. Generic MQTT traffic is deliberately ignored here.
 
         Within the ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC`` window the property
-        fetch is skipped; the rest of the refresh cycle continues so the
-        slow path keeps producing fresh ``dateType=day`` payloads (and the
-        Recorder backfill keeps running) even while MQTT is live.
+        fetch is skipped only while the slow HTTP endpoints are not in active
+        backoff. A skipped property endpoint is not evidence that HTTP
+        statistics are fresh; diagnostics expose the actual app-chart coverage.
         """
         if not self.data:
             return False
-        if self._mqtt is None:
+        if any(
+            not isinstance(entry, dict) or not entry.get(PAYLOAD_HTTP_PROPERTIES)
+            for entry in self.data.values()
+        ):
             return False
-        if not self._mqtt.is_connected:
+        now_monotonic = time.monotonic()
+        if self._endpoint_backoff_active_count(now_monotonic) > 0:
             return False
-        elapsed = self._mqtt.seconds_since_last_message
-        if elapsed is None or elapsed > MQTT_LIVE_THRESHOLD_SEC:
+        push_elapsed = now_monotonic - self._last_property_push_monotonic
+        if push_elapsed > MQTT_LIVE_THRESHOLD_SEC:
             return False
-        since_last_refresh = (
-            time.monotonic() - self._last_http_refresh_completed_monotonic
-        )
+        since_last_refresh = now_monotonic - self._last_http_refresh_completed_monotonic
         return since_last_refresh < ADAPTIVE_KEEPALIVE_INTERVAL_SEC
+
+    def _note_property_equivalent_push(self, body: dict[str, Any]) -> None:
+        """Remember push traffic that can safely stand in for HTTP properties."""
+        if any(key in body for key in self._MAIN_LIVE_PROPERTY_KEYS):
+            self._last_property_push_monotonic = time.monotonic()
+
+    @staticmethod
+    def _monotonic_age_seconds(timestamp: float, now_monotonic: float) -> float | None:
+        """Return elapsed monotonic seconds for diagnostics/logging."""
+        if timestamp == float("-inf"):
+            return None
+        return max(0.0, now_monotonic - timestamp)
 
     # Legacy alias kept so external callers/diagnostics that reference the
     # old name keep working. New code calls ``_should_skip_fast_property_fetch``.
@@ -1370,7 +1398,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         body: dict[str, Any] | bytes,
         flags: int = 0,
         wait_for_ack: bool = False,
-        ack_timeout_sec: float = 5.0,
+        ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
@@ -1622,7 +1650,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             touched = False
 
             if cmd in (MQTT_CMD_DEVICE_PROPERTY_CHANGE, MQTT_CMD_CONTROL_COMBINE):
-                touched = self._merge_lifetime_counter_data(updated, payload) or touched
+                counter_payload = self._normalize_ble_main_lifetime_counters(payload)
+                touched = (
+                    self._merge_lifetime_counter_data(updated, counter_payload)
+                    or touched
+                )
                 property_payload = self._strip_lifetime_counters(payload)
                 props = self._merge_main_properties_for_device(
                     device_id,
@@ -1630,13 +1662,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     property_payload,
                 )
                 updated[PAYLOAD_PROPERTIES] = props
+                self._note_property_equivalent_push(property_payload)
                 touched = bool(property_payload) or touched
             elif cmd == MQTT_CMD_CONTROL_SUB_DEVICE:
                 touched = self._merge_subdevice_data(
                     updated, payload, device_id=device_id
                 )
             elif cmd == MQTT_CMD_QUERY_COMBINE_DATA:
-                touched = self._merge_lifetime_counter_data(updated, payload) or touched
+                counter_payload = self._normalize_ble_main_lifetime_counters(payload)
+                touched = (
+                    self._merge_lifetime_counter_data(updated, counter_payload)
+                    or touched
+                )
                 if self._is_subdevice_payload(payload, payload):
                     touched = (
                         self._merge_subdevice_data(
@@ -1664,6 +1701,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         property_payload,
                     )
                     updated[PAYLOAD_PROPERTIES] = props
+                    self._note_property_equivalent_push(property_payload)
                     touched = bool(property_payload) or touched
             else:
                 # Track unrouted frames in the listener stats so they
@@ -2067,10 +2105,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     updated[PAYLOAD_OTA] = ota
                     touched = True
                 elif is_third_party_mqtt_config:
-                    updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = {
-                        **body,
-                        "_ha_plaintext": False,
-                    }
+                    updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = (
+                        self._decode_third_party_mqtt_config_body(device_id, body)
+                    )
                     touched = True
                 elif is_subdevice:
                     touched = (
@@ -2085,6 +2122,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         property_body,
                     )
                     updated[PAYLOAD_PROPERTIES] = props
+                    self._note_property_equivalent_push(property_body)
                     touched = bool(property_body) or touched
 
             # Keep known metadata in sync when the envelope includes it.
@@ -2178,6 +2216,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 property_body,
             )
             updated[PAYLOAD_PROPERTIES] = props
+            self._note_property_equivalent_push(property_body)
             touched = bool(property_body) or touched
 
         # System/config snapshots (work mode, temp unit, standby/off-grid,
@@ -2206,6 +2245,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 property_body,
             )
             updated[PAYLOAD_PROPERTIES] = props
+            self._note_property_equivalent_push(property_body)
             touched = bool(property_body) or touched
 
         # Local third-party MQTT can publish the same app field names on a
@@ -2226,6 +2266,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 property_body,
             )
             updated[PAYLOAD_PROPERTIES] = props
+            self._note_property_equivalent_push(property_body)
             touched = bool(property_body) or touched
 
         # Sub-device status: battery packs and CT/smart meter values are
@@ -2816,6 +2857,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return False
         updated[PAYLOAD_DEVICE_STATISTIC] = merged
         return True
+
+    @classmethod
+    def _normalize_ble_main_lifetime_counters(
+        cls,
+        source: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Convert BLE main-device energy counters from Wh wire units to kWh."""
+        normalized = dict(source)
+        for key in cls._BLE_MAIN_LIFETIME_COUNTER_KEYS:
+            value = safe_float(normalized.get(key))
+            if value is not None:
+                normalized[key] = round(value / 1000, 5)
+        return normalized
 
     def _merge_lifetime_counter_data(
         self,
@@ -3555,6 +3609,33 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return str(dev_id) if dev_id else None
 
     @classmethod
+    def _shelly_cloud_api_device_id(cls, item: dict[str, Any]) -> str | None:
+        """Return the native Shelly Cloud id used by realtime/control APIs."""
+        scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
+        is_shelly = scan_name.startswith("shelly")
+        if not (
+            is_shelly
+            or str(item.get(FIELD_IS_CLOUD)).lower() in {"1", "true"}
+            or item.get(FIELD_HOST) is not None
+            or item.get(FIELD_DEVICE_CODE) is not None
+        ):
+            return None
+
+        direct_id = item.get(FIELD_DEVICE_ID)
+        if is_shelly:
+            # System-list accessories use a numeric Jackery accessory id in
+            # deviceId, while Shelly Cloud realtime/control expects the native
+            # Shelly device id (`5c...`). The app-linked boundDevices payload
+            # exposes that id either as deviceId or, in system-list, deviceSn.
+            if direct_id not in (None, "") and not str(direct_id).isdecimal():
+                return str(direct_id)
+            serial = cls._subdevice_serial(item)
+            if serial:
+                return serial
+
+        return cls._subdevice_id(item)
+
+    @classmethod
     def _subdevice_dev_type(cls, item: Mapping[str, Any]) -> int | None:
         """Return the documented subdevice devType, including Shelly scan names."""
         raw_type = item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE)
@@ -3721,13 +3802,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return app Shelly Cloud device IDs known for this entry."""
         ids: list[str] = []
         for candidate in cls._entry_subdevice_candidates(entry):
-            scan_name = str(candidate.get(FIELD_SCAN_NAME) or "").lower()
-            if not (
-                str(candidate.get(FIELD_IS_CLOUD)).lower() in {"1", "true"}
-                or scan_name.startswith("shelly")
-            ):
-                continue
-            dev_id = cls._subdevice_id(candidate)
+            dev_id = cls._shelly_cloud_api_device_id(candidate)
             if dev_id and dev_id not in ids:
                 ids.append(dev_id)
         return ids
@@ -3965,6 +4040,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         until = safe_float(state.get("until")) or 0.0
         return until > now_monotonic
 
+    def _endpoint_backoff_active_count(self, now_monotonic: float | None = None) -> int:
+        """Return the number of slow HTTP endpoint keys currently in backoff."""
+        now = time.monotonic() if now_monotonic is None else now_monotonic
+        active_count = 0
+        for state in self._endpoint_backoff.values():
+            until = safe_float(state.get("until")) or 0.0
+            if until > now:
+                active_count += 1
+        return active_count
+
     def _endpoint_backoff_note_failure(self, key: str, err: JackeryError) -> bool:
         """Record backoff state for known persistent cloud endpoint failures."""
         code = self._jackery_error_code(err)
@@ -4013,6 +4098,27 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 key,
                 code,
             )
+
+    def endpoint_backoff_diagnostics(self) -> dict[str, Any]:
+        """Return active endpoint-backoff windows for diagnostics."""
+        now_monotonic = time.monotonic()
+        active: dict[str, dict[str, int]] = {}
+        for key, state in self._endpoint_backoff.items():
+            until = safe_float(state.get("until")) or 0.0
+            remaining_raw = until - now_monotonic
+            if remaining_raw <= 0:
+                continue
+            remaining = int(remaining_raw)
+            active[key] = {
+                "code": int(safe_float(state.get("code")) or 0),
+                "level": int(safe_float(state.get("level")) or 0),
+                "remaining_seconds": remaining,
+            }
+        return {
+            "active_count": len(active),
+            "active": active,
+            "delay_seconds": list(_ENDPOINT_BACKOFF_DELAYS_SEC),
+        }
 
     def _push_partial_update(self, new_data: dict[str, dict[str, Any]]) -> None:
         """Push updated coordinator data through HA's coordinator mechanism."""
@@ -5045,14 +5151,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # These methods bypass the REST relay and publish the same app command
     # body to the device over the available write transport.
     #
-    # HomeDeviceController.g1(...) sends ``userName``/``password``/``token``
-    # through ``Lbb/c;->d(String)`` before publishing. For SolarVault home
-    # devices the concrete codec is ``bb/e.d``: AES/CBC/PKCS7 with the decoded
-    # bluetoothKey as key+IV and Base64 ciphertext output.
+    # MqttMsgActivity creates a fallback token by iterating range 0..8 and
+    # appending Random.nextInt(10). HomeDeviceController.g1(...) then sends
+    # ``userName``/``password``/``token`` through the bb/* codec before
+    # publishing. For SolarVault home devices the concrete codec is AES/CBC
+    # with the decoded bluetoothKey as key+IV and Base64 ciphertext output.
 
     def _third_party_mqtt_config_from_options(self) -> dict[str, Any]:
         """Return the HA-configured third-party MQTT settings as app fields."""
         options = self.entry.options
+        token = str(
+            options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN)
+            or ""
+        ).strip()
+        if not token and self._generated_third_party_mqtt_token is not None:
+            token = self._generated_third_party_mqtt_token
         return {
             FIELD_THIRD_PARTY_MQTT_ENABLE: 1
             if bool(
@@ -5083,11 +5196,70 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
                 or ""
             ),
-            FIELD_THIRD_PARTY_MQTT_TOKEN: str(
-                options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN)
-                or ""
-            ),
+            FIELD_THIRD_PARTY_MQTT_TOKEN: token,
         }
+
+    def _stable_third_party_mqtt_token(self, token: str) -> tuple[str, bool]:
+        """Return a valid app-style token and whether HA generated it."""
+        raw_token = str(token).strip()
+        if raw_token:
+            if len(raw_token) != 9 or not raw_token.isdecimal():
+                raise HomeAssistantError(
+                    "Third-party MQTT token must be a separate 9-digit decimal "
+                    "value; topic belongs in the topic filter option"
+                )
+            if raw_token == self._generated_third_party_mqtt_token:
+                return raw_token, True
+            return raw_token, False
+
+        if self._generated_third_party_mqtt_token is None:
+            self._generated_third_party_mqtt_token = _generate_third_party_mqtt_token()
+            options = dict(self.entry.options)
+            if not str(options.get(CONF_THIRD_PARTY_MQTT_TOKEN) or "").strip():
+                options[CONF_THIRD_PARTY_MQTT_TOKEN] = (
+                    self._generated_third_party_mqtt_token
+                )
+                self.hass.config_entries.async_update_entry(
+                    self.entry,
+                    options=options,
+                )
+            _LOGGER.debug("Jackery: generated stable 9-digit third-party MQTT token")
+        return self._generated_third_party_mqtt_token, True
+
+    def _decode_third_party_mqtt_config_body(
+        self,
+        device_id: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Decode app-encoded ThirdPartMQTTConfig credential fields."""
+        config = dict(body)
+        bluetooth_key = self.device_bluetooth_key(device_id)
+        if bluetooth_key is None:
+            config["_ha_plaintext"] = False
+            config["_decode_error"] = "missing_bluetooth_key"
+            return config
+
+        decoded_any = False
+        failed_fields: list[str] = []
+        for key in (
+            FIELD_THIRD_PARTY_MQTT_USERNAME,
+            FIELD_THIRD_PARTY_MQTT_PASSWORD,
+            FIELD_THIRD_PARTY_MQTT_TOKEN,
+        ):
+            value = body.get(key)
+            if not isinstance(value, str) or not value:
+                continue
+            try:
+                config[key] = decode_third_party_mqtt_field(value, bluetooth_key)
+            except ValueError:
+                failed_fields.append(key)
+                continue
+            decoded_any = True
+
+        config["_ha_plaintext"] = decoded_any
+        if failed_fields:
+            config["_decode_failed_fields"] = failed_fields
+        return config
 
     def third_party_mqtt_config_plaintext(self, device_id: str) -> dict[str, Any]:
         """Return plaintext third-party MQTT config for HA entities.
@@ -5173,18 +5345,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         token: str = "",
     ) -> None:
         """Configure the device's third-party MQTT bridge via app-compatible body."""
-        raw_token = str(token).strip()
-        use_generated_token = not raw_token
-        if raw_token and (len(raw_token) != 9 or not raw_token.isdecimal()):
-            raise HomeAssistantError(
-                "Third-party MQTT token must be a separate 9-digit decimal "
-                "value; topic belongs in the topic filter option"
-            )
-        normalized_token = (
-            _generate_third_party_mqtt_token() if use_generated_token else raw_token
+        normalized_token, use_generated_token = self._stable_third_party_mqtt_token(
+            token
         )
-        if use_generated_token:
-            _LOGGER.debug("Jackery: generated 9-digit third-party MQTT token")
         bluetooth_key = self.device_bluetooth_key(device_id)
         if bluetooth_key is None:
             raise HomeAssistantError(
@@ -7111,20 +7274,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         skip_fast_property_fetch = self._should_skip_fast_property_fetch()
         if skip_fast_property_fetch:
             self._skipped_refresh_ticks += 1
+            now_monotonic = time.monotonic()
+            property_push_age = self._monotonic_age_seconds(
+                self._last_property_push_monotonic,
+                now_monotonic,
+            )
+            http_property_age = self._monotonic_age_seconds(
+                self._last_http_refresh_completed_monotonic,
+                now_monotonic,
+            )
             _LOGGER.debug(
-                "Jackery: skipping fast /v1/device/property fetch because MQTT "
-                "push is live (last property keep-alive %.0fs ago); slow HTTP "
-                "statistics still refresh on their own cadence",
-                time.monotonic() - self._last_http_refresh_completed_monotonic,
+                "Jackery: skipping fast /v1/device/property fetch because "
+                "property-equivalent push is live (last push %.0fs ago, last "
+                "HTTP property %.0fs ago); only the fast property endpoint is "
+                "suppressed; slow HTTP freshness is not inferred",
+                property_push_age or 0.0,
+                http_property_age or 0.0,
             )
 
         started = time.monotonic()
 
-        # Once per slow-metrics window: log which HTTP statistics families
-        # are about to be (re)fetched. Network calls themselves are still
-        # TTL-gated by ``_get_with_ttl_for`` — this log just announces the
-        # cadence boundary so operators can confirm cloud trends are being
-        # pulled. We log per family (not per endpoint) to keep noise low.
+        # Once per slow-metrics window: log which HTTP statistics families are
+        # evaluated. Individual calls are TTL/backoff-gated and may serve
+        # cached/default data, so this must not claim fresh cloud data.
         device_count = len(self._device_index)
         system_ids: set[str] = set()
         for idx_ in self._device_index.values():
@@ -7138,33 +7310,34 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             self._last_slow_poll_log_monotonic = started
             _LOGGER.info(
-                "Jackery: fetching system trends (pv/home/battery) stats for "
-                "%d device(s) / %d system(s)",
+                "Jackery: checking system trends (pv/home/battery) stats for "
+                "%d device(s) / %d system(s); TTL/backoff may serve cached data",
                 device_count,
                 system_count,
             )
             _LOGGER.info(
-                "Jackery: fetching system statistic stats for %d device(s) / "
-                "%d system(s)",
+                "Jackery: checking system statistic stats for %d device(s) / "
+                "%d system(s); TTL/backoff may serve cached data",
                 device_count,
                 system_count,
             )
             _LOGGER.info(
-                "Jackery: fetching device period (pv/battery/onGrid/ct) stats "
-                "for %d device(s) / %d system(s)",
+                "Jackery: checking device period (pv/battery/onGrid/ct/eps) "
+                "stats for %d device(s) / %d system(s); TTL/backoff may serve "
+                "cached data",
                 device_count,
                 system_count,
             )
             _LOGGER.info(
-                "Jackery: fetching device statistic stats for %d device(s) / "
-                "%d system(s)",
+                "Jackery: checking device statistic stats for %d device(s) / "
+                "%d system(s); TTL/backoff may serve cached data",
                 device_count,
                 system_count,
             )
             if not skip_fast_property_fetch:
                 _LOGGER.info(
-                    "Jackery: fetching device property stats for %d device(s)"
-                    " / %d system(s)",
+                    "Jackery: fetching fast device property endpoint for "
+                    "%d device(s) / %d system(s)",
                     device_count,
                     system_count,
                 )
@@ -7642,6 +7815,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             backoff_eps_key = f"{per_dev_key}:eps_stat"
             backoff_today_key = f"{per_dev_key}:today_energy"
 
+            def _period_backoff_key(base_key: str, date_type: str) -> str:
+                return f"{base_key}:{date_type}"
+
+            def _month_backoff_key(base_key: str, month: int) -> str:
+                return f"{base_key}:{DATE_TYPE_MONTH}:{today.year}-{month:02d}"
+
             task_names: list[str] = [PAYLOAD_DEVICE_STATISTIC, PAYLOAD_LOCATION]
             tasks = [
                 _get_with_ttl_for(
@@ -7685,7 +7864,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_pv_key,
+                            backoff_key=_period_backoff_key(
+                                backoff_pv_key,
+                                date_type,
+                            ),
                         )
                     )
                 task_names.append(battery_key)
@@ -7702,7 +7884,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             ),
                         ),
                         {},
-                        backoff_key=backoff_battery_key,
+                        backoff_key=_period_backoff_key(
+                            backoff_battery_key,
+                            date_type,
+                        ),
                     )
                 )
                 task_names.append(home_key)
@@ -7719,7 +7904,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             ),
                         ),
                         {},
-                        backoff_key=backoff_home_key,
+                        backoff_key=_period_backoff_key(
+                            backoff_home_key,
+                            date_type,
+                        ),
                     )
                 )
                 # /v1/device/stat/ct — CT/smart-meter period statistics
@@ -7739,7 +7927,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             ),
                         ),
                         {},
-                        backoff_key=backoff_ct_key,
+                        backoff_key=_period_backoff_key(
+                            backoff_ct_key,
+                            date_type,
+                        ),
                     )
                 )
                 # /v1/device/stat/eps — EPS / off-grid in/out period
@@ -7759,7 +7950,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             ),
                         ),
                         {},
-                        backoff_key=backoff_eps_key,
+                        backoff_key=_period_backoff_key(
+                            backoff_eps_key,
+                            date_type,
+                        ),
                     )
                 )
             if dev_sn:
@@ -7857,7 +8051,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_pv_key,
+                            backoff_key=_month_backoff_key(backoff_pv_key, month),
                         ),
                     )
                 if prefix == APP_SECTION_BATTERY_STAT:
@@ -7875,7 +8069,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_battery_key,
+                            backoff_key=_month_backoff_key(
+                                backoff_battery_key,
+                                month,
+                            ),
                         ),
                     )
                 if prefix == APP_SECTION_HOME_STAT:
@@ -7893,7 +8090,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_home_key,
+                            backoff_key=_month_backoff_key(backoff_home_key, month),
                         ),
                     )
                 if prefix == APP_SECTION_CT_STAT:
@@ -7911,7 +8108,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_ct_key,
+                            backoff_key=_month_backoff_key(backoff_ct_key, month),
                         ),
                     )
                 if prefix == APP_SECTION_EPS_STAT:
@@ -7929,7 +8126,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 ),
                             ),
                             {},
-                            backoff_key=backoff_eps_key,
+                            backoff_key=_month_backoff_key(backoff_eps_key, month),
                         ),
                     )
                 return {}
@@ -8320,6 +8517,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         diag["stale_battery_packs_dropped"] = self._stale_battery_packs_dropped
         diag["app_conflict_pause_cycles"] = self._mqtt_app_conflict_pause_cycles
         now_mono = time.monotonic()
+        last_property_push_age = self._monotonic_age_seconds(
+            self._last_property_push_monotonic,
+            now_mono,
+        )
+        last_http_property_age = self._monotonic_age_seconds(
+            self._last_http_refresh_completed_monotonic,
+            now_mono,
+        )
+        diag["last_property_push_age_seconds"] = (
+            None if last_property_push_age is None else round(last_property_push_age, 3)
+        )
+        diag["last_http_property_age_seconds"] = (
+            None if last_http_property_age is None else round(last_http_property_age, 3)
+        )
+        diag["property_push_live_threshold_seconds"] = MQTT_LIVE_THRESHOLD_SEC
+        diag["adaptive_http_keepalive_seconds"] = ADAPTIVE_KEEPALIVE_INTERVAL_SEC
+        diag["property_skip_requires_http_baseline"] = True
+        active_endpoint_backoff_count = self._endpoint_backoff_active_count(now_mono)
+        diag["active_endpoint_backoff_count"] = active_endpoint_backoff_count
+        diag["property_skip_blocked_by_slow_http_backoff"] = (
+            active_endpoint_backoff_count > 0
+        )
+        diag["third_party_mqtt_generated_token_active"] = (
+            self._generated_third_party_mqtt_token is not None
+        )
         diag["app_conflict_pause_remaining_seconds"] = max(
             0, int(self._mqtt_paused_until_monotonic - now_mono)
         )
@@ -8344,6 +8566,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             for section_prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
                 candidate_rows: list[dict[str, Any]] = []
                 point_count = 0
+                hour_section = self._app_period_section(section_prefix, DATE_TYPE_HOUR)
+                hour_endpoint = {
+                    "section": hour_section,
+                    "queried": False,
+                    "disabled_reason": "unsupported_app_2_1_1_date_type",
+                    "replacement": "day_curve_to_day_hourly_recorder_buckets",
+                }
                 for section, source_stat_key in self._day_chart_source_candidates(
                     section_prefix,
                     stat_key,
@@ -8356,6 +8585,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             "stat_key": source_stat_key,
                             "present": False,
                             "point_count": 0,
+                            "source_mode": "missing",
                         })
                         continue
                     points = day_power_energy_points(
@@ -8366,17 +8596,47 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         today=now.date(),
                         now=now,
                     )
+                    series_key = day_power_series_key(
+                        source,
+                        section,
+                        source_stat_key,
+                    )
+                    series = source.get(series_key) if series_key is not None else None
+                    numeric_samples: list[float] = []
+                    if isinstance(series, list):
+                        numeric_samples = [
+                            sample
+                            for raw in series
+                            if (sample := safe_float(raw)) is not None
+                        ]
+                    scalar_total = effective_period_total_value(
+                        source,
+                        section,
+                        source_stat_key,
+                    )
+                    source_mode = "unavailable"
+                    if points:
+                        if any(abs(sample) > 0 for sample in numeric_samples):
+                            source_mode = "chart_series"
+                        elif scalar_total is not None:
+                            source_mode = "scalar_total"
+                        else:
+                            source_mode = "zero_fill"
                     candidate_rows.append({
                         "section": section,
                         "stat_key": source_stat_key,
                         "present": True,
                         "unit": source.get("unit"),
+                        "series_key": series_key,
+                        "scalar_total": scalar_total,
+                        "source_mode": source_mode,
                         "point_count": len(points),
                     })
                     point_count = max(point_count, len(points))
                 metric_rows[metric_key] = {
                     "label": label,
                     "day_hourly_point_count": point_count,
+                    "native_hour_endpoint": hour_endpoint,
                     "candidates": candidate_rows,
                 }
             devices[f"device_{index}"] = metric_rows
