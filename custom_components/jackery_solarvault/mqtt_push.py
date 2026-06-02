@@ -2,4 +2,4 @@
 
 from .client.mqtt_push import JackeryMqttPushClient
 
-__all__ = ['JackeryMqttPushClient']
+__all__ = ["JackeryMqttPushClient"]

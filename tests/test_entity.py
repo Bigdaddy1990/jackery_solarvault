@@ -3,35 +3,31 @@
 from types import SimpleNamespace
 from typing import Any
 
-from custom_components.jackery_solarvault.const import (
-    FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
-    FIELD_DEV_SN,
-    FIELD_DEVICE_NAME,
-    FIELD_DEVICE_SN,
-    FIELD_MAC,
-    FIELD_MODEL,
-    FIELD_MODEL_NAME,
-    FIELD_SCAN_NAME,
-    FIELD_SN,
-    FIELD_TYPE_NAME,
-    FIELD_VERSION,
-    FIELD_WNAME,
-    PAYLOAD_BATTERY_PACKS,
-    PAYLOAD_CT_METER,
-    PAYLOAD_DEVICE,
-    PAYLOAD_DISCOVERY,
-    PAYLOAD_METER_HEADS,
-    PAYLOAD_OTA,
-    PAYLOAD_PROPERTIES,
-    PAYLOAD_SYSTEM,
-)
+from custom_components.jackery_solarvault.const import FIELD_CURRENT_VERSION
+from custom_components.jackery_solarvault.const import FIELD_DEV_MODEL
+from custom_components.jackery_solarvault.const import FIELD_DEV_SN
+from custom_components.jackery_solarvault.const import FIELD_DEVICE_NAME
+from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN
+from custom_components.jackery_solarvault.const import FIELD_MAC
+from custom_components.jackery_solarvault.const import FIELD_MODEL
+from custom_components.jackery_solarvault.const import FIELD_MODEL_NAME
+from custom_components.jackery_solarvault.const import FIELD_SCAN_NAME
+from custom_components.jackery_solarvault.const import FIELD_SN
+from custom_components.jackery_solarvault.const import FIELD_TYPE_NAME
+from custom_components.jackery_solarvault.const import FIELD_VERSION
+from custom_components.jackery_solarvault.const import FIELD_WNAME
+from custom_components.jackery_solarvault.const import PAYLOAD_BATTERY_PACKS
+from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER
+from custom_components.jackery_solarvault.const import PAYLOAD_DEVICE
+from custom_components.jackery_solarvault.const import PAYLOAD_DISCOVERY
+from custom_components.jackery_solarvault.const import PAYLOAD_METER_HEADS
+from custom_components.jackery_solarvault.const import PAYLOAD_OTA
+from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
+from custom_components.jackery_solarvault.const import PAYLOAD_SYSTEM
 from custom_components.jackery_solarvault.entity import JackeryEntity
-from custom_components.jackery_solarvault.sensor import (
-    JackeryBatteryPackSensor,
-    JackeryMeterHeadSensor,
-    JackerySmartMeterSensor,
-)
+from custom_components.jackery_solarvault.sensor import JackeryBatteryPackSensor
+from custom_components.jackery_solarvault.sensor import JackeryMeterHeadSensor
+from custom_components.jackery_solarvault.sensor import JackerySmartMeterSensor
 
 
 def _entity(payload: dict[str, object]) -> JackeryEntity:
@@ -58,7 +54,10 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     """
     entity = cls.__new__(cls)
     JackeryEntity.__init__(
-        entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"
+        entity,
+        SimpleNamespace(data={"dev1": payload}),
+        "dev1",
+        "test",
     )
     return entity
 
@@ -129,7 +128,7 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
                     FIELD_MODEL_NAME: " Battery Model ",
                     FIELD_VERSION: " ",
                     FIELD_CURRENT_VERSION: " 2.3.4 ",
-                }
+                },
             ],
         },
     )
@@ -160,7 +159,7 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
                     FIELD_TYPE_NAME: " Meter Model ",
                     FIELD_VERSION: " ",
                     FIELD_CURRENT_VERSION: " 3.4.5 ",
-                }
+                },
             ],
         },
     )

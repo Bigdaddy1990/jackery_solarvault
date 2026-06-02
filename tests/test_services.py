@@ -1,36 +1,32 @@
 """Unit tests for integration service helpers."""
 
-from dataclasses import dataclass
 import sys
+from dataclasses import dataclass
 
 import pytest
 import voluptuous as vol
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.jackery_solarvault import services
 from custom_components.jackery_solarvault.api import JackeryAuthError
-from custom_components.jackery_solarvault.const import (
-    DOMAIN,
-    SERVICE_FIELD_ACK_TIMEOUT,
-    SERVICE_FIELD_ALERT_ID,
-    SERVICE_FIELD_BODY,
-    SERVICE_FIELD_CMD,
-    SERVICE_FIELD_DEVICE_ID,
-    SERVICE_FIELD_ENABLE,
-    SERVICE_FIELD_FLAGS,
-    SERVICE_FIELD_IP,
-    SERVICE_FIELD_NEW_NAME,
-    SERVICE_FIELD_PASSWORD,
-    SERVICE_FIELD_PORT,
-    SERVICE_FIELD_SYSTEM_ID,
-    SERVICE_FIELD_TOKEN,
-    SERVICE_FIELD_USERNAME,
-    SERVICE_FIELD_WAIT_FOR_ACK,
-)
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    HomeAssistantError,
-    ServiceValidationError,
-)
+from custom_components.jackery_solarvault.const import DOMAIN
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_ACK_TIMEOUT
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_ALERT_ID
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_BODY
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_CMD
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_DEVICE_ID
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_ENABLE
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_FLAGS
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_IP
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_NEW_NAME
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_PASSWORD
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_PORT
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_SYSTEM_ID
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_TOKEN
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_USERNAME
+from custom_components.jackery_solarvault.const import SERVICE_FIELD_WAIT_FOR_ACK
 
 
 @dataclass(slots=True)
@@ -440,7 +436,9 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
     coordinator = _ThirdPartyCoordinator()
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: coordinator,
     )
 
     await services._async_handle_set_third_party_mqtt_config(
@@ -465,7 +463,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
             "username": "user",
             "password": "pass",
             "token": "token",
-        }
+        },
     ]
 
 
@@ -506,7 +504,9 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
     coordinator = _ThirdPartyCoordinator()
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: coordinator,
     )
 
     await services._async_handle_set_third_party_mqtt_config(
@@ -531,7 +531,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
             "username": "",
             "password": "",
             "token": "",
-        }
+        },
     ]
 
 
@@ -551,7 +551,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
                 AssertionError: with message "non-text credentials must stop before coordinator call"
             """
             raise AssertionError(
-                "non-text credentials must stop before coordinator call"
+                "non-text credentials must stop before coordinator call",
             )
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -829,7 +829,9 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
     coordinator = _BleCoordinator()
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: coordinator,
     )
 
     await services._async_handle_send_ble_command(
@@ -864,7 +866,9 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: _BleCoordinator(),
     )
 
     with pytest.raises(ServiceValidationError) as err:
@@ -924,7 +928,9 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: _BleCoordinator(),
     )
 
     with pytest.raises(ServiceValidationError) as err:
@@ -982,12 +988,14 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
                 input validation should have prevented invocation.
             """
             raise AssertionError(
-                "invalid numeric field must stop before coordinator call"
+                "invalid numeric field must stop before coordinator call",
             )
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: _BleCoordinator(),
     )
 
     with pytest.raises(ServiceValidationError) as err:
@@ -1018,12 +1026,14 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
                 AssertionError: Always raised to indicate the coordinator method should not be called during validation tests.
             """
             raise AssertionError(
-                "invalid ack_timeout must stop before coordinator call"
+                "invalid ack_timeout must stop before coordinator call",
             )
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
-        services, "_coordinator_for_device", lambda _hass, _device_id: _BleCoordinator()
+        services,
+        "_coordinator_for_device",
+        lambda _hass, _device_id: _BleCoordinator(),
     )
 
     with pytest.raises(ServiceValidationError) as err:

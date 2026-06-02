@@ -1,11 +1,13 @@
 """Coordinator endpoint-backoff unit tests."""
 
-from pathlib import Path
 import time
+from pathlib import Path
 
 from custom_components.jackery_solarvault.client.api import JackeryError
 from custom_components.jackery_solarvault.coordinator import (
     _ENDPOINT_BACKOFF_DELAYS_SEC,
+)
+from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 
@@ -70,7 +72,7 @@ def test_endpoint_backoff_ignores_unrelated_errors() -> None:
 def test_endpoint_backoff_is_wired_for_period_stat_endpoints() -> None:
     """Coordinator must pass backoff keys into all noisy period-stat fetches."""
     src = Path("custom_components/jackery_solarvault/coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     assert "backoff_key=backoff_pv_key" in src
     assert "backoff_key=backoff_battery_key" in src

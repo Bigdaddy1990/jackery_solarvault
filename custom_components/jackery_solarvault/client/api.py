@@ -15,128 +15,130 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
-from collections.abc import Awaitable, Callable
 import hashlib
 import inspect
 import json
 import logging
 import re
-from typing import Any
 import uuid
+from collections.abc import Awaitable
+from collections.abc import Callable
+from typing import Any
 
 import aiohttp
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers import algorithms
+from cryptography.hazmat.primitives.ciphers import Cipher
+from cryptography.hazmat.primitives.ciphers import modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
-    AES_KEY,
-    ALARM_PATH,
-    APP_REQUEST_BEGIN_DATE,
-    APP_REQUEST_DATE_TYPE,
-    APP_REQUEST_END_DATE,
-    APP_REQUEST_META,
-    APP_VERSION,
-    APP_VERSION_CODE,
-    BASE_URL,
-    BATTERY_PACK_PATH,
-    BATTERY_TRENDS_PATH,
-    CODE_OK,
-    CODE_TOKEN_EXPIRED,
-    DATE_TYPE_DAY,
-    DEVICE_BATTERY_STAT_PATH,
-    DEVICE_CT_STAT_PATH,
-    DEVICE_HOME_STAT_PATH,
-    DEVICE_LIST_PATH,
-    DEVICE_METER_STAT_PATH,
-    DEVICE_MODEL_HEADER,
-    DEVICE_PROPERTY_PATH,
-    DEVICE_PV_STAT_PATH,
-    DEVICE_SOCKET_STAT_PATH,
-    DEVICE_SOCKET_STATISTIC_PATH,
-    DEVICE_STATISTIC_PATH,
-    FIELD_ACCOUNT,
-    FIELD_BAT_SOC,
-    FIELD_BATTERY_PACKS,
-    FIELD_BODY,
-    FIELD_CELL_TEMP,
-    FIELD_CODE,
-    FIELD_COUNTRY_CODE,
-    FIELD_CURRENCY,
-    FIELD_CURRENT_VERSION,
-    FIELD_DATA,
-    FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
-    FIELD_DEVICE_SN_LIST,
-    FIELD_ID,
-    FIELD_IN_PW,
-    FIELD_IP,
-    FIELD_IS_FIRMWARE_UPGRADE,
-    FIELD_LOGIN_TYPE,
-    FIELD_MAC_ID,
-    FIELD_MAX_POWER,
-    FIELD_MODEL,
-    FIELD_MQTT_PASSWORD,
-    FIELD_MSG,
-    FIELD_OP,
-    FIELD_OUT_PW,
-    FIELD_PASSWORD,
-    FIELD_PLATFORM_COMPANY_ID,
-    FIELD_RAW_TEXT,
-    FIELD_RB,
-    FIELD_REGION_CODE,
-    FIELD_REGISTER_APP_ID,
-    FIELD_SINGLE_PRICE,
-    FIELD_SMART_SOCKET_ID,
-    FIELD_SYSTEM_ID,
-    FIELD_SYSTEM_NAME,
-    FIELD_SYSTEM_REGION,
-    FIELD_TARGET_MODULE_VERSION,
-    FIELD_TARGET_VERSION,
-    FIELD_TOKEN,
-    FIELD_UPDATE_CONTENT,
-    FIELD_UPDATE_STATUS,
-    FIELD_UPGRADE_TYPE,
-    FIELD_USER_ID,
-    FIELD_VERSION,
-    HOME_TRENDS_PATH,
-    HTTP_CONTENT_TYPE_FORM,
-    HTTP_CONTENT_TYPE_JSON,
-    HTTP_HEADER_CONTENT_TYPE,
-    HTTP_METHOD_GET,
-    HTTP_METHOD_POST,
-    HTTP_METHOD_PUT,
-    HTTP_RAW_TEXT_LIMIT,
-    LOCATION_PATH,
-    LOGIN_PATH,
-    LOGIN_TIMEOUT_SEC,
-    MAX_POWER_SAVE_PATH,
-    MQTT_CLIENT_ID_SUFFIX,
-    MQTT_CREDENTIAL_CLIENT_ID,
-    MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
-    MQTT_CREDENTIAL_USERNAME,
-    MQTT_MAC_ID_PREFIX,
-    MQTT_USERNAME_SEPARATOR,
-    OTA_LIST_PATH,
-    PLATFORM_HEADER,
-    POWER_PRICE_PATH,
-    PRICE_HISTORY_CONFIG_PATH,
-    PRICE_SOURCE_LIST_PATH,
-    PV_TRENDS_PATH,
-    REGISTER_APP_ID,
-    REQUEST_TIMEOUT_SEC,
-    RSA_PUBLIC_KEY_B64,
-    SAVE_DYNAMIC_MODE_PATH,
-    SAVE_SINGLE_MODE_PATH,
-    SYS_VERSION,
-    SYSTEM_LIST_PATH,
-    SYSTEM_NAME_PATH,
-    SYSTEM_STATISTIC_PATH,
-    USER_AGENT,
-)
-from ..util import app_period_date_bounds, chart_series_debug
+from ..const import AES_KEY
+from ..const import ALARM_PATH
+from ..const import APP_REQUEST_BEGIN_DATE
+from ..const import APP_REQUEST_DATE_TYPE
+from ..const import APP_REQUEST_END_DATE
+from ..const import APP_REQUEST_META
+from ..const import APP_VERSION
+from ..const import APP_VERSION_CODE
+from ..const import BASE_URL
+from ..const import BATTERY_PACK_PATH
+from ..const import BATTERY_TRENDS_PATH
+from ..const import CODE_OK
+from ..const import CODE_TOKEN_EXPIRED
+from ..const import DATE_TYPE_DAY
+from ..const import DEVICE_BATTERY_STAT_PATH
+from ..const import DEVICE_CT_STAT_PATH
+from ..const import DEVICE_HOME_STAT_PATH
+from ..const import DEVICE_LIST_PATH
+from ..const import DEVICE_METER_STAT_PATH
+from ..const import DEVICE_MODEL_HEADER
+from ..const import DEVICE_PROPERTY_PATH
+from ..const import DEVICE_PV_STAT_PATH
+from ..const import DEVICE_SOCKET_STAT_PATH
+from ..const import DEVICE_SOCKET_STATISTIC_PATH
+from ..const import DEVICE_STATISTIC_PATH
+from ..const import FIELD_ACCOUNT
+from ..const import FIELD_BAT_SOC
+from ..const import FIELD_BATTERY_PACKS
+from ..const import FIELD_BODY
+from ..const import FIELD_CELL_TEMP
+from ..const import FIELD_CODE
+from ..const import FIELD_COUNTRY_CODE
+from ..const import FIELD_CURRENCY
+from ..const import FIELD_CURRENT_VERSION
+from ..const import FIELD_DATA
+from ..const import FIELD_DEVICE_ID
+from ..const import FIELD_DEVICE_SN
+from ..const import FIELD_DEVICE_SN_LIST
+from ..const import FIELD_ID
+from ..const import FIELD_IN_PW
+from ..const import FIELD_IP
+from ..const import FIELD_IS_FIRMWARE_UPGRADE
+from ..const import FIELD_LOGIN_TYPE
+from ..const import FIELD_MAC_ID
+from ..const import FIELD_MAX_POWER
+from ..const import FIELD_MODEL
+from ..const import FIELD_MQTT_PASSWORD
+from ..const import FIELD_MSG
+from ..const import FIELD_OP
+from ..const import FIELD_OUT_PW
+from ..const import FIELD_PASSWORD
+from ..const import FIELD_PLATFORM_COMPANY_ID
+from ..const import FIELD_RAW_TEXT
+from ..const import FIELD_RB
+from ..const import FIELD_REGION_CODE
+from ..const import FIELD_REGISTER_APP_ID
+from ..const import FIELD_SINGLE_PRICE
+from ..const import FIELD_SMART_SOCKET_ID
+from ..const import FIELD_SYSTEM_ID
+from ..const import FIELD_SYSTEM_NAME
+from ..const import FIELD_SYSTEM_REGION
+from ..const import FIELD_TARGET_MODULE_VERSION
+from ..const import FIELD_TARGET_VERSION
+from ..const import FIELD_TOKEN
+from ..const import FIELD_UPDATE_CONTENT
+from ..const import FIELD_UPDATE_STATUS
+from ..const import FIELD_UPGRADE_TYPE
+from ..const import FIELD_USER_ID
+from ..const import FIELD_VERSION
+from ..const import HOME_TRENDS_PATH
+from ..const import HTTP_CONTENT_TYPE_FORM
+from ..const import HTTP_CONTENT_TYPE_JSON
+from ..const import HTTP_HEADER_CONTENT_TYPE
+from ..const import HTTP_METHOD_GET
+from ..const import HTTP_METHOD_POST
+from ..const import HTTP_METHOD_PUT
+from ..const import HTTP_RAW_TEXT_LIMIT
+from ..const import LOCATION_PATH
+from ..const import LOGIN_PATH
+from ..const import LOGIN_TIMEOUT_SEC
+from ..const import MAX_POWER_SAVE_PATH
+from ..const import MQTT_CLIENT_ID_SUFFIX
+from ..const import MQTT_CREDENTIAL_CLIENT_ID
+from ..const import MQTT_CREDENTIAL_PASSWORD
+from ..const import MQTT_CREDENTIAL_USER_ID
+from ..const import MQTT_CREDENTIAL_USERNAME
+from ..const import MQTT_MAC_ID_PREFIX
+from ..const import MQTT_USERNAME_SEPARATOR
+from ..const import OTA_LIST_PATH
+from ..const import PLATFORM_HEADER
+from ..const import POWER_PRICE_PATH
+from ..const import PRICE_HISTORY_CONFIG_PATH
+from ..const import PRICE_SOURCE_LIST_PATH
+from ..const import PV_TRENDS_PATH
+from ..const import REGISTER_APP_ID
+from ..const import REQUEST_TIMEOUT_SEC
+from ..const import RSA_PUBLIC_KEY_B64
+from ..const import SAVE_DYNAMIC_MODE_PATH
+from ..const import SAVE_SINGLE_MODE_PATH
+from ..const import SYS_VERSION
+from ..const import SYSTEM_LIST_PATH
+from ..const import SYSTEM_NAME_PATH
+from ..const import SYSTEM_STATISTIC_PATH
+from ..const import USER_AGENT
+from ..util import app_period_date_bounds
+from ..util import chart_series_debug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,9 +189,9 @@ def _generate_udid(seed: str) -> str:
     Returns:
         mqtt_mac_id (str): The MQTT MAC id formed by concatenating `MQTT_MAC_ID_PREFIX` with a UUIDv3 generated from the MD5 digest of `seed`, with dashes removed.
     """
-    md5_digest = hashlib.md5(seed.encode('utf-8')).digest()
+    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
-    return MQTT_MAC_ID_PREFIX + str(u).replace('-', '')
+    return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
 
 
 # ---------------------------------------------------------------------------
@@ -221,9 +223,9 @@ class JackeryApi:
         self._session = session
         self._account = account
         self._password = password
-        self._region_code = (region_code or '').strip().upper() or None
+        self._region_code = (region_code or "").strip().upper() or None
         self._mqtt_mac_id_configured = mqtt_mac_id
-        self._mqtt_mac_id_source = 'generated'
+        self._mqtt_mac_id_source = "generated"
         self._token: str | None = None
         self._lock = asyncio.Lock()
         self._mqtt_user_id: str | None = None
@@ -259,12 +261,12 @@ class JackeryApi:
         if self._region_code:
             return
         for item in systems:
-            country = str(item.get(FIELD_COUNTRY_CODE) or '').strip().upper()
+            country = str(item.get(FIELD_COUNTRY_CODE) or "").strip().upper()
             if not country:
                 continue
             self._region_code = country
             _LOGGER.debug(
-                'Jackery: inferred regionCode=%s from /v1/device/system/list',
+                "Jackery: inferred regionCode=%s from /v1/device/system/list",
                 country,
             )
             return
@@ -280,17 +282,17 @@ class JackeryApi:
             dict[str, str]: Mapping of header names to header values to be sent with HTTP requests.
         """
         h = {
-            'accept-encoding': 'gzip',
-            'accept-language': 'de-DE',
-            'app_version': APP_VERSION,
-            'app_version_code': APP_VERSION_CODE,
-            'connection': 'Keep-Alive',
-            'host': 'iot.jackeryapp.com',
+            "accept-encoding": "gzip",
+            "accept-language": "de-DE",
+            "app_version": APP_VERSION,
+            "app_version_code": APP_VERSION_CODE,
+            "connection": "Keep-Alive",
+            "host": "iot.jackeryapp.com",
             FIELD_MODEL: DEVICE_MODEL_HEADER,
-            'network': 'wifi',
-            'platform': PLATFORM_HEADER,
-            'sys_version': SYS_VERSION,
-            'user-agent': USER_AGENT,
+            "network": "wifi",
+            "platform": PLATFORM_HEADER,
+            "sys_version": SYS_VERSION,
+            "user-agent": USER_AGENT,
         }
         if with_token and self._token:
             h[FIELD_TOKEN] = self._token
@@ -314,10 +316,10 @@ class JackeryApi:
         """
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
-        if not re.fullmatch(r'[0-9a-f]{33}', mac_id):
+        if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
             raise JackeryAuthError(
-                'Invalid mqtt_mac_id format. Expected 33 lowercase hex chars '
-                '(example: 271c55f5731fa3d9ba1fe131e088946e0).'
+                "Invalid mqtt_mac_id format. Expected 33 lowercase hex chars "
+                "(example: 271c55f5731fa3d9ba1fe131e088946e0).",
             )
         return mac_id
 
@@ -337,16 +339,16 @@ class JackeryApi:
                 mac_id = self._normalize_mqtt_mac_id(configured)
             except JackeryAuthError as err:
                 _LOGGER.warning(
-                    'Ignoring invalid configured mqtt_mac_id (%s); '
-                    'falling back to generated value',
+                    "Ignoring invalid configured mqtt_mac_id (%s); "
+                    "falling back to generated value",
                     err,
                 )
-                self._mqtt_mac_id_source = 'generated_fallback_invalid_config'
+                self._mqtt_mac_id_source = "generated_fallback_invalid_config"
             else:
-                self._mqtt_mac_id_source = 'configured'
+                self._mqtt_mac_id_source = "configured"
                 return mac_id
         # Fallback for headless environments without Android ID access.
-        self._mqtt_mac_id_source = 'generated'
+        self._mqtt_mac_id_source = "generated"
         return _generate_udid(self._account)
 
     async def async_login(self) -> str:
@@ -372,13 +374,13 @@ class JackeryApi:
         if self._region_code:
             login_bean[FIELD_REGION_CODE] = self._region_code
 
-        plaintext = json.dumps(login_bean, ensure_ascii=False).encode('utf-8')
+        plaintext = json.dumps(login_bean, ensure_ascii=False).encode("utf-8")
         aes_blob = base64.b64encode(_aes_ecb_encrypt(plaintext, AES_KEY)).decode(
-            'ascii'
+            "ascii",
         )
         rsa_blob = base64.b64encode(
-            _rsa_pkcs1v15_encrypt(AES_KEY, RSA_PUBLIC_KEY_B64)
-        ).decode('ascii')
+            _rsa_pkcs1v15_encrypt(AES_KEY, RSA_PUBLIC_KEY_B64),
+        ).decode("ascii")
 
         url = f"{BASE_URL}{LOGIN_PATH}"
 
@@ -386,7 +388,7 @@ class JackeryApi:
         # query string. This matches the captured traffic byte-for-byte.
         headers = self._headers()
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
-        form_body = {'aesEncryptData': aes_blob, 'rsaForAesKey': rsa_blob}
+        form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
         try:
             async with self._session.post(
@@ -407,11 +409,11 @@ class JackeryApi:
                 ) as err:
                     raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
                     raise JackeryApiError(
-                        f"Login returned invalid JSON: {raw!r}"
+                        f"Login returned invalid JSON: {raw!r}",
                     ) from err
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
-                f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
+                f"Login request failed: {type(err).__name__}: {err or '(no message)'}",
             ) from err
 
         self.last_login_response = dict(data)
@@ -419,24 +421,24 @@ class JackeryApi:
             lambda: self._http_payload_debug(
                 method=HTTP_METHOD_POST,
                 path=LOGIN_PATH,
-                body={'form_fields': sorted(form_body)},
+                body={"form_fields": sorted(form_body)},
                 status=200,
                 response=dict(data),
-            )
+            ),
         )
 
         if self._extract_code(data) != CODE_OK:
             raise JackeryAuthError(
-                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
+                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})",
             )
 
-        token = data.get(FIELD_TOKEN) or ''
+        token = data.get(FIELD_TOKEN) or ""
         if not token:
-            raise JackeryAuthError('Login succeeded but no token returned')
+            raise JackeryAuthError("Login succeeded but no token returned")
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
-        self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or '') or None
+        self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id
         return token
@@ -459,18 +461,18 @@ class JackeryApi:
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
             raise JackeryAuthError(
-                'Login response missing MQTT fields (userId/mqttPassWord/macId)'
+                "Login response missing MQTT fields (userId/mqttPassWord/macId)",
             )
 
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
         except (binascii.Error, ValueError) as err:
             raise JackeryAuthError(
-                'Invalid mqttPassWord base64 in login response'
+                "Invalid mqttPassWord base64 in login response",
             ) from err
         if len(seed) != 32:
             raise JackeryAuthError(
-                f"Unexpected mqttPassWord decoded length: {len(seed)} (expected 32)"
+                f"Unexpected mqttPassWord decoded length: {len(seed)} (expected 32)",
             )
 
         client_id = (
@@ -478,11 +480,11 @@ class JackeryApi:
         )
         username = f"{self._mqtt_user_id}{MQTT_USERNAME_SEPARATOR}{self._mqtt_mac_id}"
         encrypted = _aes_cbc_encrypt(
-            username.encode('utf-8'),
+            username.encode("utf-8"),
             key=seed,
             iv=seed[:16],
         )
-        password = base64.b64encode(encrypted).decode('ascii')
+        password = base64.b64encode(encrypted).decode("ascii")
         return {
             MQTT_CREDENTIAL_CLIENT_ID: client_id,
             MQTT_CREDENTIAL_USERNAME: username,
@@ -521,7 +523,7 @@ class JackeryApi:
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError('Login succeeded without returning a token')
+            raise JackeryAuthError("Login succeeded without returning a token")
         return self._token
 
     @staticmethod
@@ -545,7 +547,9 @@ class JackeryApi:
         return None
 
     def _is_token_expired_response(
-        self, status: int, data: dict[str, Any] | Any
+        self,
+        status: int,
+        data: dict[str, Any] | Any,
     ) -> bool:
         """Determine whether a response indicates an expired authentication token.
 
@@ -561,8 +565,8 @@ class JackeryApi:
         code = self._extract_code(data)
         if code == CODE_TOKEN_EXPIRED:
             return True
-        msg = str(data.get(FIELD_MSG) or '').lower()
-        return 'token expires' in msg or 'token expired' in msg
+        msg = str(data.get(FIELD_MSG) or "").lower()
+        return "token expires" in msg or "token expired" in msg
 
     @staticmethod
     def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
@@ -578,38 +582,40 @@ class JackeryApi:
             return False
         parts = [
             data.get(FIELD_MSG),
-            data.get('message'),
-            data.get('error'),
+            data.get("message"),
+            data.get("error"),
             data.get(FIELD_RAW_TEXT),
         ]
-        text = ' '.join(str(part) for part in parts if part not in (None, '')).lower()
+        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
         if not text:
             return False
         return any(
             marker in text
             for marker in (
-                'unauthorized',
-                'unauthorised',
-                'not authorized',
-                'not authorised',
-                'forbidden',
-                'invalid token',
-                'token invalid',
-                'token expires',
-                'token expired',
-                'login',
-                'log in',
-                'please login',
-                'please log in',
-                'auth',
-                'authentication',
-                'authorization',
-                'credential',
+                "unauthorized",
+                "unauthorised",
+                "not authorized",
+                "not authorised",
+                "forbidden",
+                "invalid token",
+                "token invalid",
+                "token expires",
+                "token expired",
+                "login",
+                "log in",
+                "please login",
+                "please log in",
+                "auth",
+                "authentication",
+                "authorization",
+                "credential",
             )
         )
 
     def _is_auth_failure_response(
-        self, status: int, data: dict[str, Any] | Any
+        self,
+        status: int,
+        data: dict[str, Any] | Any,
     ) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in (401, 403):
@@ -620,7 +626,7 @@ class JackeryApi:
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
         return code not in (CODE_OK, None) and self._response_has_auth_failure_text(
-            data
+            data,
         )
 
     @staticmethod
@@ -637,7 +643,7 @@ class JackeryApi:
             str: Single-line message containing the method, path, HTTP status, response code (if present), and response message (if present).
         """
         code = data.get(FIELD_CODE)
-        msg = data.get(FIELD_MSG) or data.get('message') or data.get('error')
+        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
@@ -664,7 +670,7 @@ class JackeryApi:
             if inspect.isawaitable(result):
                 await result
         except Exception as err:
-            _LOGGER.debug('Jackery payload debug logging failed: %s', err)
+            _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
     def _http_payload_debug(
@@ -691,18 +697,18 @@ class JackeryApi:
         """
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
-            'kind': 'http',
-            'method': method,
-            'path': path,
-            'params': params or {},
-            'request_body': body or {},
-            'status': status,
-            'response': response or {},
-            'response_data_type': type(payload).__name__,
+            "kind": "http",
+            "method": method,
+            "path": path,
+            "params": params or {},
+            "request_body": body or {},
+            "status": status,
+            "response": response or {},
+            "response_data_type": type(payload).__name__,
         }
         series_debug = chart_series_debug(payload)
         if series_debug:
-            event['chart_series_debug'] = series_debug
+            event["chart_series_debug"] = series_debug
         return event
 
     @staticmethod
@@ -724,7 +730,7 @@ class JackeryApi:
         if payload is None:
             return {}
         _LOGGER.warning(
-            'Jackery %s returned unexpected data shape for dict payload: %s',
+            "Jackery %s returned unexpected data shape for dict payload: %s",
             path,
             type(payload).__name__,
         )
@@ -745,7 +751,7 @@ class JackeryApi:
         if payload is None:
             return []
         _LOGGER.warning(
-            'Jackery %s returned unexpected data shape for list payload: %s',
+            "Jackery %s returned unexpected data shape for list payload: %s",
             path,
             type(payload).__name__,
         )
@@ -767,7 +773,7 @@ class JackeryApi:
         """
         requested_sn = str(device_sn)
         for item in items:
-            if str(item.get(FIELD_DEVICE_SN) or '') == requested_sn:
+            if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
                 return item
         return items[0] if items else {}
 
@@ -813,10 +819,10 @@ class JackeryApi:
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_GET} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
         if self._is_token_expired_response(status, data):
-            _LOGGER.info('Jackery token expired — re-login')
+            _LOGGER.info("Jackery token expired — re-login")
             self._token = None
             await self._ensure_token()
             try:
@@ -824,19 +830,19 @@ class JackeryApi:
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_GET, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_GET, path, status, data),
             )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
         code = self._extract_code(data)
         if code not in (CODE_OK, None):
             raise JackeryApiError(
-                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
             )
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
@@ -845,7 +851,7 @@ class JackeryApi:
                 params=params,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
@@ -874,7 +880,8 @@ class JackeryApi:
     async def async_get_device_property(self, device_id: str | int) -> dict:
         """GET /v1/device/property — device + properties dict."""
         data = await self._get_json(
-            DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_PROPERTY_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
@@ -882,7 +889,8 @@ class JackeryApi:
     async def async_get_alarm(self, system_id: str | int) -> Any:
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
-            ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            ALARM_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_alarm_response = data
         return data.get(FIELD_DATA)
@@ -895,7 +903,8 @@ class JackeryApi:
             totalGeneration, totalRevenue, totalCarbon, isSetPrice
         """
         data = await self._get_json(
-            SYSTEM_STATISTIC_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            SYSTEM_STATISTIC_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_statistic_response = data
         return self._payload_dict(data, SYSTEM_STATISTIC_PATH)
@@ -910,7 +919,9 @@ class JackeryApi:
     ) -> dict:
         """GET /v1/device/stat/sys/pv/trends — historical curves."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -930,13 +941,15 @@ class JackeryApi:
     async def async_get_power_price(self, system_id: str | int) -> dict:
         """GET /v1/device/dynamic/powerPriceConfig — tariff config."""
         data = await self._get_json(
-            POWER_PRICE_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            POWER_PRICE_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_response = data
         return self._payload_dict(data, POWER_PRICE_PATH)
 
     async def async_get_price_sources(
-        self, system_id: str | int
+        self,
+        system_id: str | int,
     ) -> list[dict[str, Any]]:
         """GET /v1/device/dynamic/priceCompany — dynamic-price providers.
 
@@ -946,17 +959,20 @@ class JackeryApi:
             item fields: platformCompanyId, cid, country, companyName, loginAllowed
         """
         data = await self._get_json(
-            PRICE_SOURCE_LIST_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            PRICE_SOURCE_LIST_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_sources_response = data
         return self._payload_list(data, PRICE_SOURCE_LIST_PATH)
 
     async def async_get_price_history_config(
-        self, system_id: str | int
+        self,
+        system_id: str | int,
     ) -> dict[str, Any]:
         """GET /v1/device/dynamic/historyConfig — provider auth/status metadata."""
         data = await self._get_json(
-            PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            PRICE_HISTORY_CONFIG_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_history_config_response = data
         return self._payload_dict(data, PRICE_HISTORY_CONFIG_PATH)
@@ -971,7 +987,8 @@ class JackeryApi:
             acOtBatEgy, batOtAcEgy, batChgEgy
         """
         data = await self._get_json(
-            DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_STATISTIC_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
@@ -995,7 +1012,9 @@ class JackeryApi:
         # PROTOCOL.md §2: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params: dict[str, str] = {
             FIELD_DEVICE_ID: str(device_id),
@@ -1098,7 +1117,8 @@ class JackeryApi:
         not the SolarVault main deviceId.
         """
         data = await self._get_json(
-            DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_METER_STAT_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_period_stat_responses[
             f"{DEVICE_METER_STAT_PATH}:{device_id}:panel"
@@ -1152,7 +1172,8 @@ class JackeryApi:
                 list[dict[str, Any]]: A list of battery pack dictionaries; an empty list if no packs are present or the response shape is not recognized.
         """
         data = await self._get_json(
-            BATTERY_PACK_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
+            BATTERY_PACK_PATH,
+            params={FIELD_DEVICE_SN: str(device_sn)},
         )
         self.last_battery_pack_responses[str(device_sn)] = data
         raw = data.get(FIELD_DATA)
@@ -1190,7 +1211,7 @@ class JackeryApi:
                 return [raw]
         if raw is not None:
             _LOGGER.warning(
-                'Jackery %s returned unexpected data shape for battery packs: %s',
+                "Jackery %s returned unexpected data shape for battery packs: %s",
                 BATTERY_PACK_PATH,
                 type(raw).__name__,
             )
@@ -1206,7 +1227,9 @@ class JackeryApi:
     ) -> dict:
         """GET /v1/device/stat/sys/home/trends — home consumption breakdown."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -1233,7 +1256,9 @@ class JackeryApi:
     ) -> dict:
         """GET /v1/device/stat/sys/battery/trends — battery charge/discharge history."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -1253,7 +1278,8 @@ class JackeryApi:
     async def async_get_ota_info(self, device_sn: str) -> dict:
         """GET /v1/device/ota/list — firmware version + available updates."""
         data = await self._get_json(
-            OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
+            OTA_LIST_PATH,
+            params={FIELD_DEVICE_SN_LIST: device_sn},
         )
         self.last_ota_responses[device_sn] = data
         raw = data.get(FIELD_DATA)
@@ -1297,7 +1323,8 @@ class JackeryApi:
     async def async_get_location(self, device_id: str | int) -> dict:
         """GET /v1/device/location — GPS coordinates set by the user."""
         data = await self._get_json(
-            LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            LOCATION_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_location_responses[str(device_id)] = data
         return self._payload_dict(data, LOCATION_PATH)
@@ -1351,11 +1378,13 @@ class JackeryApi:
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_PUT} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                'Jackery token expired — re-login for %s %s', HTTP_METHOD_PUT, path
+                "Jackery token expired — re-login for %s %s",
+                HTTP_METHOD_PUT,
+                path,
             )
             self._token = None
             await self._ensure_token()
@@ -1364,19 +1393,19 @@ class JackeryApi:
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data),
             )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
         code = self._extract_code(data)
         if code not in (CODE_OK, None):
             raise JackeryApiError(
-                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
             )
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
@@ -1385,12 +1414,14 @@ class JackeryApi:
                 body=payload,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     async def async_set_system_name(
-        self, system_id: str | int, system_name: str
+        self,
+        system_id: str | int,
+        system_name: str,
     ) -> bool:
         """Rename a system on the remote API.
 
@@ -1405,7 +1436,7 @@ class JackeryApi:
             JackeryApiError: If `system_name` is empty or only whitespace.
         """
         if not system_name or not system_name.strip():
-            raise JackeryApiError('system_name must be a non-empty string')
+            raise JackeryApiError("system_name must be a non-empty string")
         data = await self._put_json(
             SYSTEM_NAME_PATH,
             {FIELD_SYSTEM_NAME: system_name.strip(), FIELD_ID: str(system_id)},
@@ -1468,11 +1499,13 @@ class JackeryApi:
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                'Jackery token expired — re-login for %s %s', HTTP_METHOD_POST, path
+                "Jackery token expired — re-login for %s %s",
+                HTTP_METHOD_POST,
+                path,
             )
             self._token = None
             await self._ensure_token()
@@ -1481,12 +1514,12 @@ class JackeryApi:
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_POST, path, status, data),
             )
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
@@ -1495,7 +1528,7 @@ class JackeryApi:
             # Surface the whole response so callers can show it to the user
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
-                f"data={data.get(FIELD_DATA)!r}"
+                f"data={data.get(FIELD_DATA)!r}",
             )
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
@@ -1504,7 +1537,7 @@ class JackeryApi:
                 body=body,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
@@ -1524,7 +1557,7 @@ class JackeryApi:
             JackeryApiError: If `max_power` validation fails or the API call reports an error.
         """
         if not isinstance(max_power, int) or max_power < 0:
-            raise JackeryApiError('max_power must be a non-negative integer')
+            raise JackeryApiError("max_power must be a non-negative integer")
         data = await self._post_form(
             MAX_POWER_SAVE_PATH,
             {FIELD_MAX_POWER: max_power, FIELD_DEVICE_ID: str(device_id)},
@@ -1553,12 +1586,12 @@ class JackeryApi:
         """
         price = float(single_price)
         if price < 0:
-            raise JackeryApiError('single_price must be >= 0')
-        cur = str(currency or '').strip()
+            raise JackeryApiError("single_price must be >= 0")
+        cur = str(currency or "").strip()
         if not cur:
-            raise JackeryApiError('currency must be a non-empty string')
+            raise JackeryApiError("currency must be a non-empty string")
         # Keep stable decimal formatting for backend parsing.
-        price_text = f"{price:.4f}".rstrip('0').rstrip('.')
+        price_text = f"{price:.4f}".rstrip("0").rstrip(".")
         data = await self._post_form(
             SAVE_SINGLE_MODE_PATH,
             {
@@ -1590,9 +1623,9 @@ class JackeryApi:
         Raises:
             JackeryApiError: If `system_region` is empty or the API request fails.
         """
-        region = str(system_region or '').strip()
+        region = str(system_region or "").strip()
         if not region:
-            raise JackeryApiError('system_region must be a non-empty string')
+            raise JackeryApiError("system_region must be a non-empty string")
         data = await self._post_form(
             SAVE_DYNAMIC_MODE_PATH,
             {

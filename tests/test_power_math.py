@@ -6,9 +6,9 @@ CT saldierung, gross phase flow and live home consumption.
 """
 
 import importlib.util
-from pathlib import Path
 import sys
 import types
+from pathlib import Path
 
 
 def _load_util_module():
@@ -139,13 +139,17 @@ def test_app_period_date_bounds_fills_only_missing_sides() -> None:
         "2026-05-31",
     )
     assert util.app_period_date_bounds(
-        "month", begin_date="2026-05-02", today=today
+        "month",
+        begin_date="2026-05-02",
+        today=today,
     ) == (
         "2026-05-02",
         "2026-05-31",
     )
     assert util.app_period_date_bounds(
-        "month", end_date=util.date(2026, 5, 20), today=today
+        "month",
+        end_date=util.date(2026, 5, 20),
+        today=today,
     ) == (
         "2026-05-01",
         "2026-05-20",
@@ -205,7 +209,7 @@ def test_parse_utc_datetime_normalizes_iso_z_and_naive_values() -> None:
         "2026-05-06T10:23:07+00:00"
     )
     assert util.parse_utc_datetime(
-        util.datetime(2026, 5, 6, 10, 23, 7)
+        util.datetime(2026, 5, 6, 10, 23, 7),
     ).isoformat() == ("2026-05-06T10:23:07+00:00")
 
 
@@ -329,16 +333,16 @@ def test_coordinator_entity_signature_changes_when_stat_curve_becomes_usable() -
             source_key: {
                 util.APP_STAT_UNIT: "w",
                 util.APP_CHART_SERIES_Y: [None, None],
-            }
-        }
+            },
+        },
     })
     live = util.coordinator_entity_signature({
         "dev": {
             source_key: {
                 util.APP_STAT_UNIT: "w",
                 util.APP_CHART_SERIES_Y: [None, 232],
-            }
-        }
+            },
+        },
     })
 
     assert empty != live
@@ -552,13 +556,17 @@ def test_device_period_stats_follow_app_series_keys() -> None:
     )
     assert (
         util.trend_series_total(
-            battery_month, "device_battery_stat_month", "totalCharge"
+            battery_month,
+            "device_battery_stat_month",
+            "totalCharge",
         )
         == 3.5
     )
     assert (
         util.trend_series_total(
-            battery_month, "device_battery_stat_month", "totalDischarge"
+            battery_month,
+            "device_battery_stat_month",
+            "totalDischarge",
         )
         == 3.25
     )
@@ -583,13 +591,17 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
 
     assert (
         util.trend_series_total(
-            grid_month, "device_home_stat_month", "totalInGridEnergy"
+            grid_month,
+            "device_home_stat_month",
+            "totalInGridEnergy",
         )
         == 3.5
     )
     assert (
         util.trend_series_total(
-            grid_month, "device_home_stat_month", "totalOutGridEnergy"
+            grid_month,
+            "device_home_stat_month",
+            "totalOutGridEnergy",
         )
         == 1.0
     )
@@ -1398,7 +1410,7 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
                 "x": list(range(1, 32)),
                 "y": [81.51] + [0.0] * 30,
             },
-        }
+        },
     }
 
     util.apply_year_month_backfill(payload, month_history)
@@ -1624,7 +1636,9 @@ def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -
     }
     assert (
         util.trend_series_total(
-            month_source, "device_pv_stat_month", "totalSolarEnergy"
+            month_source,
+            "device_pv_stat_month",
+            "totalSolarEnergy",
         )
         == 40.96
     )
@@ -1656,11 +1670,15 @@ def test_device_year_compact_bucket_expands_previous_and_current_months() -> Non
     }
 
     assert util.effective_trend_series_values(
-        source, "device_battery_stat_year", "totalDischarge"
+        source,
+        "device_battery_stat_year",
+        "totalDischarge",
     ) == [0.0, 0.0, 0.0, 13.0, 26.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     assert (
         util.effective_period_total_value(
-            source, "device_battery_stat_year", "totalDischarge"
+            source,
+            "device_battery_stat_year",
+            "totalDischarge",
         )
         == 39.0
     )
@@ -1695,11 +1713,15 @@ def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw(
     }
 
     assert util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     assert (
         util.effective_period_total_value(
-            source, "device_pv_stat_year", "totalSolarEnergy"
+            source,
+            "device_pv_stat_year",
+            "totalSolarEnergy",
         )
         == 71.72
     )
@@ -1733,7 +1755,9 @@ def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None
 
     # Raw is published verbatim — no silent "repair" to either 71.72 or 143.
     values = util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     )
     assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     assert (
@@ -1757,7 +1781,9 @@ def test_month_series_does_not_use_compact_year_expansion() -> None:
     }
 
     assert util.effective_trend_series_values(
-        source, "device_battery_stat_month", "totalDischarge"
+        source,
+        "device_battery_stat_month",
+        "totalDischarge",
     ) == [13.26, 0.0, 0.0]
     assert (
         util.trend_series_total(source, "device_battery_stat_month", "totalDischarge")

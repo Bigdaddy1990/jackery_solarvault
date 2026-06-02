@@ -15,15 +15,13 @@ These tests pin the new behaviour and guard against regressions.
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble import (
-    BLE_FRAME_MAGIC,
-    BLE_FRAME_PAYLOAD_MARKER,
-    BLE_FRAME_VERSION,
-    BLE_NOTIFY_CHAR_UUID,
-    BLE_SERVICE_UUID,
-    BLE_WRITE_CHAR_UUID,
-    build_binary_frame,
-)
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_MAGIC
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_PAYLOAD_MARKER
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_VERSION
+from custom_components.jackery_solarvault.client.ble import BLE_NOTIFY_CHAR_UUID
+from custom_components.jackery_solarvault.client.ble import BLE_SERVICE_UUID
+from custom_components.jackery_solarvault.client.ble import BLE_WRITE_CHAR_UUID
+from custom_components.jackery_solarvault.client.ble import build_binary_frame
 
 # ---------------------------------------------------------------------------
 # build_binary_frame — assert replaces RuntimeError for header length
@@ -140,7 +138,11 @@ def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")  # 16-byte device key
     body = b'{"cmd":107,"swEps":1}'
     plain = build_binary_frame(
-        cmd=107, body=body, flags=7, frame_index=1, chunk_count=1
+        cmd=107,
+        body=body,
+        flags=7,
+        frame_index=1,
+        chunk_count=1,
     )
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
     parsed = decrypt_binary_notify(blob, key)

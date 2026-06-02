@@ -1,12 +1,12 @@
 """BLE update-coalescing regression tests for coordinator partial updates."""
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 def _source() -> str:
     return Path("custom_components/jackery_solarvault/coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
 

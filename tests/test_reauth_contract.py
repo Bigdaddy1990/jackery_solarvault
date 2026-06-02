@@ -16,8 +16,8 @@ Together these are the Silver-tier ``reauthentication-flow`` rule.
 
 import ast
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"

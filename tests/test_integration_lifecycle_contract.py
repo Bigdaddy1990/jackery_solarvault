@@ -1,8 +1,8 @@
 """Source-level lifecycle contracts for the Jackery SolarVault integration."""
 
 import ast
-from pathlib import Path
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"

@@ -11,38 +11,36 @@ tests run on every supported platform without bleak or BlueZ.
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble import (
-    BLE_AES_IV_LEN,
-    BLE_AES_KEY_LEN,
-    BLE_AES_KEY_LEN_AES128,
-    BLE_AES_KEY_LEN_AES256,
-    BLE_AES_KEY_LENGTHS,
-    BLE_FRAME_MAGIC,
-    BLE_FRAME_PAYLOAD_MARKER,
-    BLE_FRAME_VERSION,
-    BLE_MANUFACTURER_ID,
-    BLE_NOTIFY_CHAR_UUID,
-    BLE_SERVICE_UUID,
-    BLE_WRITE_CHAR_UUID,
-    BleBinaryFrame,
-    BleFrame,
-    aes_decrypt,
-    aes_encrypt,
-    build_plaintext_frame,
-    chunk_size_for_mtu,
-    crc16_hex,
-    crc16_modbus,
-    decrypt_binary_notify,
-    decrypt_frame,
-    encrypt_frame,
-    hex16,
-    hex_decode,
-    hex_encode,
-    parse_hex16,
-    parse_plaintext_frame,
-    random_iv,
-    split_payload_into_frames,
-)
+from custom_components.jackery_solarvault.client.ble import aes_decrypt
+from custom_components.jackery_solarvault.client.ble import aes_encrypt
+from custom_components.jackery_solarvault.client.ble import BLE_AES_IV_LEN
+from custom_components.jackery_solarvault.client.ble import BLE_AES_KEY_LEN
+from custom_components.jackery_solarvault.client.ble import BLE_AES_KEY_LEN_AES128
+from custom_components.jackery_solarvault.client.ble import BLE_AES_KEY_LEN_AES256
+from custom_components.jackery_solarvault.client.ble import BLE_AES_KEY_LENGTHS
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_MAGIC
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_PAYLOAD_MARKER
+from custom_components.jackery_solarvault.client.ble import BLE_FRAME_VERSION
+from custom_components.jackery_solarvault.client.ble import BLE_MANUFACTURER_ID
+from custom_components.jackery_solarvault.client.ble import BLE_NOTIFY_CHAR_UUID
+from custom_components.jackery_solarvault.client.ble import BLE_SERVICE_UUID
+from custom_components.jackery_solarvault.client.ble import BLE_WRITE_CHAR_UUID
+from custom_components.jackery_solarvault.client.ble import BleBinaryFrame
+from custom_components.jackery_solarvault.client.ble import BleFrame
+from custom_components.jackery_solarvault.client.ble import build_plaintext_frame
+from custom_components.jackery_solarvault.client.ble import chunk_size_for_mtu
+from custom_components.jackery_solarvault.client.ble import crc16_hex
+from custom_components.jackery_solarvault.client.ble import crc16_modbus
+from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify
+from custom_components.jackery_solarvault.client.ble import decrypt_frame
+from custom_components.jackery_solarvault.client.ble import encrypt_frame
+from custom_components.jackery_solarvault.client.ble import hex16
+from custom_components.jackery_solarvault.client.ble import hex_decode
+from custom_components.jackery_solarvault.client.ble import hex_encode
+from custom_components.jackery_solarvault.client.ble import parse_hex16
+from custom_components.jackery_solarvault.client.ble import parse_plaintext_frame
+from custom_components.jackery_solarvault.client.ble import random_iv
+from custom_components.jackery_solarvault.client.ble import split_payload_into_frames
 
 # ---------------------------------------------------------------------------
 # Constants — pinned to the smali-verified literals
@@ -252,7 +250,7 @@ def test_parse_plaintext_frame_rejects_bad_magic_or_marker() -> None:
             action_id=1,
             ble_cmd=107,
             chunk_payload=b"",
-        )
+        ),
     )
     with pytest.raises(ValueError):
         parse_plaintext_frame("BEEF" + valid[4:])
@@ -271,7 +269,7 @@ def test_parse_plaintext_frame_detects_truncation() -> None:
             action_id=1,
             ble_cmd=107,
             chunk_payload=b"deadbeef",
-        )
+        ),
     )
     with pytest.raises(ValueError):
         parse_plaintext_frame(valid[:-4])
@@ -574,7 +572,11 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, uuid: str, blob: bytes, *, response: bool
+            self,
+            uuid: str,
+            blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             """Record a GATT characteristic write attempt into the shared `captured` mapping.
 
@@ -657,8 +659,8 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads(
         (root / "custom_components" / "jackery_solarvault" / "manifest.json").read_text(
-            encoding="utf-8"
-        )
+            encoding="utf-8",
+        ),
     )
     matchers = manifest.get("bluetooth", [])
     assert any(
@@ -713,11 +715,13 @@ def test_ble_write_option_is_options_only() -> None:
     user_schema = source.split("USER_SCHEMA = vol.Schema(", 1)[1].split("\n})", 1)[0]
     assert "CONF_ENABLE_BLE_WRITES" not in user_schema
     options_block = source.split("class JackeryOptionsFlow", 1)[1].split(
-        "class JackeryConfigFlow", 1
+        "class JackeryConfigFlow",
+        1,
     )[0]
     assert "CONF_ENABLE_BLE_WRITES" in options_block
     reconfigure_block = source.split("async def async_step_reconfigure", 1)[1].split(
-        "async def async_step_reauth", 1
+        "async def async_step_reauth",
+        1,
     )[0]
     assert "CONF_ENABLE_BLE_WRITES" in reconfigure_block
 
@@ -1452,7 +1456,7 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
                 # System-level key — base64-decoded "hr2c0hh361336138".
                 FIELD_BLUETOOTH_KEY: "aHIyYzBoaDM2MTMzNjEzOA==",
             },
-        }
+        },
     }
     key = JackerySolarVaultCoordinator.device_bluetooth_key(self, "573702884982521856")
     assert key == b"hr2c0hh361336138"
@@ -1485,7 +1489,7 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
         "dev1": {
             PAYLOAD_DEVICE_META: {FIELD_BLUETOOTH_KEY: device_key},
             PAYLOAD_SYSTEM_META: {FIELD_BLUETOOTH_KEY: system_key},
-        }
+        },
     }
     assert JackerySolarVaultCoordinator.device_bluetooth_key(self, "dev1") == b"D" * 16
 
@@ -1513,7 +1517,7 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
     self._device_index = {
         "573702884982521856": {
             PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "HR2C04000280HH3"},
-        }
+        },
     }
 
     assert (
@@ -1580,7 +1584,11 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             """Record a GATT characteristic write payload and response flag into the test capture map.
 
@@ -1599,8 +1607,10 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_ack() -> None:
             # Give async_send_command a tick to register its pending ack
@@ -1648,7 +1658,11 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, _blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            _blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             return None
 
@@ -1659,8 +1673,10 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(RuntimeError, match="ack timeout"):
             await listener.async_send_command(
@@ -1692,7 +1708,11 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, _blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            _blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             return None
 
@@ -1703,15 +1723,18 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_wrong_cmd_then_right_cmd() -> None:
             await asyncio.sleep(0)
             # First a frame the caller doesn't want — must NOT complete
             # the pending ack.
             mismatched = encrypt_binary_notify(
-                build_binary_frame(cmd=42, body=b"unrelated"), key
+                build_binary_frame(cmd=42, body=b"unrelated"),
+                key,
             )
             await listener._handle_notification("dev", mismatched)
             assert listener._pending_acks.get("dev"), (
@@ -1719,7 +1742,8 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
             )
             # Then the expected echo — this fulfils the future.
             matching = encrypt_binary_notify(
-                build_binary_frame(cmd=111, body=b'{"ok":1}'), key
+                build_binary_frame(cmd=111, body=b'{"ok":1}'),
+                key,
             )
             await listener._handle_notification("dev", matching)
 
@@ -1748,7 +1772,8 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
         listener = _build_bare_listener()
 
         with pytest.raises(ValueError, match="ack_cmds must be an integer"):
-            listener._register_pending_ack("dev", (True,))  # type: ignore[attr-defined]
+            # type: ignore[attr-defined]
+            listener._register_pending_ack("dev", (True,))
 
         assert listener._pending_acks == {}  # type: ignore[attr-defined]
 
@@ -1785,7 +1810,11 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
 
     class _ExplodingClient:
         async def write_gatt_char(
-            self, _uuid: str, _blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            _blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             """Simulate a GATT characteristic write that always fails.
 
@@ -1805,8 +1834,10 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _ExplodingClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _ExplodingClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(RuntimeError, match="simulated GATT failure"):
             await listener.async_send_command(
@@ -1963,7 +1994,11 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, uuid: str, blob: bytes, *, response: bool
+            self,
+            uuid: str,
+            blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             assert uuid == BLE_WRITE_CHAR_UUID
             assert response is False
@@ -1979,8 +2014,10 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         body = b'{"big":"' + (b"A" * 200) + b'"}'  # > 187 bytes
         sent = await listener.async_send_command(
@@ -2017,7 +2054,11 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             writes.append(bytes(blob))
 
@@ -2027,9 +2068,11 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
         listener._mtu = {"dev": 247}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         body = b"x" * 25
         # MTU 70 → 10 bytes / chunk → three frames.
@@ -2056,7 +2099,11 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, _blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            _blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             """Fail fast when an invalid MTU write attempt occurs.
             This stub is not intended to perform BLE writes; it raises an AssertionError to indicate a call was attempted despite an invalid MTU.
@@ -2076,8 +2123,10 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(ValueError, match="mtu_override must be an integer"):
             await listener.async_send_command(
@@ -2095,9 +2144,11 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU
 
     listener = _build_bare_listener()
-    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU
     listener._mtu["known"] = 120  # type: ignore[attr-defined]
-    assert listener.mtu_for_device("known") == 120  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    assert listener.mtu_for_device("known") == 120
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -2126,8 +2177,10 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     listener._record_negotiated_mtu("dev", _NoMtu())  # type: ignore[attr-defined]
     listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]
     # Both fall back to the default — the cache stays untouched.
-    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
-    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU
+    # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU
 
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
@@ -2148,7 +2201,8 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
         stats = listener.stats_for("dev")
         stats.last_error = "notify: Bluetooth GATT Error error=133"
 
@@ -2175,7 +2229,11 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
     class _FakeClient:
         async def write_gatt_char(
-            self, _uuid: str, blob: bytes, *, response: bool
+            self,
+            _uuid: str,
+            blob: bytes,
+            *,
+            response: bool,
         ) -> None:
             writes.append(bytes(blob))
 
@@ -2185,8 +2243,10 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
-        listener._clients = {"dev": _FakeClient()}  # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        listener._clients = {"dev": _FakeClient()}
+        # type: ignore[attr-defined]
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_ack_after_writes() -> None:
             # Wait until both chunked writes have hit the wire, then push
@@ -2199,7 +2259,8 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
                     break
                 await asyncio.sleep(0.005)
             echo = encrypt_binary_notify(
-                build_binary_frame(cmd=107, body=b'{"ok":1}'), key
+                build_binary_frame(cmd=107, body=b'{"ok":1}'),
+                key,
             )
             await listener._handle_notification("dev", echo)
 
@@ -2255,7 +2316,8 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
         "inEgy": 5648,
     }
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
+        updated,
+        body,
     )
     assert touched is True
     pack = updated["battery_packs"][0]
@@ -2296,7 +2358,8 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
         "inEgy": 88,
     }
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
+        updated,
+        body,
     )
     assert touched is True
     assert len(updated["battery_packs"]) == 2
@@ -2320,6 +2383,7 @@ def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None
     }
     body = {"deviceSn": "HQ2C01400955HP3", "devType": 1, "subType": 0}
     touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
+        updated,
+        body,
     )
     assert touched is False

@@ -8,8 +8,8 @@ responsible for async tests.
 """
 
 import asyncio
-from collections.abc import Mapping
 import inspect
+from collections.abc import Mapping
 from typing import Any
 
 import pytest

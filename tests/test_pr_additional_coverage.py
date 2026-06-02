@@ -21,7 +21,9 @@ syntax/dependency regressions are obvious.
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -115,7 +117,9 @@ def _make_hass() -> Any:
             self._tasks: list[asyncio.Task[Any]] = []
 
         def async_create_background_task(
-            self, coro: Any, name: str = ""
+            self,
+            coro: Any,
+            name: str = "",
         ) -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
             self._tasks.append(task)
@@ -215,7 +219,8 @@ def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
         return None
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
-    client._schedule_coroutine = lambda coro, label: coro.close()  # type: ignore[method-assign]
+    # type: ignore[method-assign]
+    client._schedule_coroutine = lambda coro, label: coro.close()
     payload = bytearray(b"\xff\xfe\xfd")  # invalid UTF-8 sequence
     client._handle_message("jackery/data", payload)
     assert client._messages_received == 1
@@ -230,7 +235,8 @@ def test_handle_message_bytearray_json_array_increments_dropped() -> None:
         return None
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
-    client._schedule_coroutine = lambda coro, label: coro.close()  # type: ignore[method-assign]
+    # type: ignore[method-assign]
+    client._schedule_coroutine = lambda coro, label: coro.close()
     payload = bytearray(b"[1, 2, 3]")
     client._handle_message("jackery/data", payload)
     assert client._messages_dropped == 1
@@ -495,7 +501,8 @@ def test_diagnostics_snapshot_messages_dropped_in_snapshot() -> None:
         return None
 
     client = _make_client(sink=_sink, topic_filter="t")
-    client._schedule_coroutine = lambda coro, label: coro.close()  # type: ignore[method-assign]
+    # type: ignore[method-assign]
+    client._schedule_coroutine = lambda coro, label: coro.close()
     client._handle_message("t", b"[1,2,3]")  # non-dict JSON → dropped
     snap = client.diagnostics_snapshot()
     assert snap["messages_dropped"] == 1
@@ -519,7 +526,10 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
     """Empty string username must be coerced to None in the stored client."""
     hass = _make_hass()
     entry = _make_local_mqtt_entry(
-        enable=True, host="192.168.1.100", username="", password="secret"
+        enable=True,
+        host="192.168.1.100",
+        username="",
+        password="secret",
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
@@ -535,7 +545,10 @@ async def test_async_start_local_mqtt_empty_password_stored_as_none_in_client() 
     """Empty string password must be coerced to None in the stored client."""
     hass = _make_hass()
     entry = _make_local_mqtt_entry(
-        enable=True, host="192.168.1.100", username="user", password=""
+        enable=True,
+        host="192.168.1.100",
+        username="user",
+        password="",
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
@@ -550,7 +563,10 @@ async def test_async_start_local_mqtt_non_empty_credentials_preserved() -> None:
     """Non-empty credentials must be stored verbatim on the client."""
     hass = _make_hass()
     entry = _make_local_mqtt_entry(
-        enable=True, host="192.168.1.100", username="mqttuser", password="mqttpass"
+        enable=True,
+        host="192.168.1.100",
+        username="mqttuser",
+        password="mqttpass",
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):

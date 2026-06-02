@@ -6,10 +6,11 @@ as monotonically increasing lifetime counters.
 """
 
 import ast
-from datetime import UTC, datetime
 import json
-from pathlib import Path
 import re
+from datetime import datetime
+from datetime import UTC
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
@@ -202,7 +203,8 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
             if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
                 continue
             if isinstance(node.value, ast.Constant) and isinstance(
-                node.value.value, str
+                node.value.value,
+                str,
             ):
                 assignments[node.targets[0].id] = node.value.value
             continue
@@ -210,7 +212,8 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
             if not isinstance(node.target, ast.Name):
                 continue
             if isinstance(node.value, ast.Constant) and isinstance(
-                node.value.value, str
+                node.value.value,
+                str,
             ):
                 assignments[node.target.id] = node.value.value
     return assignments
@@ -386,7 +389,7 @@ def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None
     assert "device_ct_stat_year" not in source
     const_source = CONST_PATH.read_text(encoding="utf-8")
     chart_metric_block = const_source.partition("APP_CHART_STAT_METRICS")[2].partition(
-        ")\n\n# Service names"
+        ")\n\n# Service names",
     )[0]
     assert "device_ct_stat" not in chart_metric_block
 
@@ -604,10 +607,12 @@ def test_app_chart_curves_use_official_recorder_imports() -> None:
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     util_source = (COMPONENT_PATH / "util.py").read_text(encoding="utf-8")
     day_import = coordinator_source.split(
-        "async def _async_import_day_chart_statistics", 1
+        "async def _async_import_day_chart_statistics",
+        1,
     )[1].split("async def _async_import_app_chart_statistics", 1)[0]
     period_import = coordinator_source.split(
-        "async def _async_import_app_chart_statistics", 1
+        "async def _async_import_app_chart_statistics",
+        1,
     )[1].split("async def _async_import_current_app_chart_statistics_job", 1)[0]
 
     assert "def day_power_energy_points(" in util_source
@@ -638,7 +643,8 @@ def test_app_chart_curves_use_official_recorder_imports() -> None:
     assert "StatisticsShortTerm.id.in_(orphan_short_ids)" not in coordinator_source
     assert "async_clear_statistics" not in coordinator_source
     offset_reader = coordinator_source.split(
-        "async def _async_entity_statistic_offsets", 1
+        "async def _async_entity_statistic_offsets",
+        1,
     )[1].split("\n    async def _async_compiled_statistic_hour_starts", 1)[0]
     assert "statistics_during_period" in offset_reader
     assert "homeassistant.components.recorder.db_schema" not in offset_reader
@@ -816,7 +822,8 @@ def test_conversion_loss_required_component_check_uses_components_values() -> No
     """Conversion-loss sensor should validate all component values directly."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     block = sensor_source.split(
-        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("BATTERY_PACK_SENSOR_DESCRIPTIONS", 1)[0]
 
     assert "if any(value is None for value in c.values()):" in block
@@ -997,7 +1004,7 @@ def test_zero_period_totals_create_entities_without_chart_series() -> None:
     assert "trend_series_has_value(" in helper
     assert "effective_period_total_value(" in helper
     assert helper.index("trend_series_has_value(") < helper.index(
-        "effective_period_total_value("
+        "effective_period_total_value(",
     )
 
 
@@ -1005,7 +1012,8 @@ def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
     """Day sensors use today's month/week bucket when the day endpoint is empty."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     stat_block = sensor_source.split(
-        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryStatSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
     assert "def _chart_value_for_day" in sensor_source
@@ -1067,9 +1075,11 @@ def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
     """
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     import_source = coordinator_source.split(
-        "async def _async_import_current_app_chart_statistics_job", 1
+        "async def _async_import_current_app_chart_statistics_job",
+        1,
     )[1].split(
-        "\n    # ------------------------------------------------------------------", 1
+        "\n    # ------------------------------------------------------------------",
+        1,
     )[0]
 
     assert "async def _async_repair_missing_app_chart_statistics" not in (
@@ -1084,17 +1094,18 @@ def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
     assert "_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION" not in coordinator_source
     assert "_ENTITY_STATISTICS_REPAIR_VERSION" not in coordinator_source
     current_import = import_source.index(
-        "successful_devices = await self._async_import_app_chart_statistics(snapshot)"
+        "successful_devices = await self._async_import_app_chart_statistics(snapshot)",
     )
     current_entity_import = import_source.index(
-        "_async_import_current_app_chart_entity_statistics(snapshot)"
+        "_async_import_current_app_chart_entity_statistics(snapshot)",
     )
     http_backfill = import_source.index("_async_http_backfill_recent_day_statistics(")
     assert "_async_repair_missing_app_chart_statistics(" not in import_source
     assert "_statistics_repair_from_date(" not in import_source
     assert "_statistics_rolling_backfill_from_date(" not in import_source
     current_payload_source = coordinator_source.split(
-        "def _current_app_chart_entity_source_batches", 1
+        "def _current_app_chart_entity_source_batches",
+        1,
     )[1].split("\n    async def _async_import_current_app_chart_entity_statistics", 1)[
         0
     ]
@@ -1113,7 +1124,8 @@ def test_day_entity_repair_can_replace_recorder_spikes() -> None:
         1
     ].split("\n    def _completed_entity_app_points", 1)[0]
     month_branch = targets_fn.split("if date_type == DATE_TYPE_MONTH:", 1)[1].split(
-        "return tuple(targets)", 1
+        "return tuple(targets)",
+        1,
     )[0]
 
     assert "if date_type == DATE_TYPE_DAY:" in targets_fn
@@ -1123,7 +1135,8 @@ def test_day_entity_repair_can_replace_recorder_spikes() -> None:
     assert "periods.get(DATE_TYPE_YEAR)" in month_branch
 
     importer = coordinator_source.split(
-        "async def _async_import_app_chart_entity_statistics_for_device", 1
+        "async def _async_import_app_chart_entity_statistics_for_device",
+        1,
     )[1].split("\n    def _current_app_chart_entity_source_batches", 1)[0]
     assert "if date_type == DATE_TYPE_DAY:" in importer
     assert "day_power_energy_points(" in importer
@@ -1133,10 +1146,12 @@ def test_day_entity_repair_can_replace_recorder_spikes() -> None:
     assert "include_current_day_completed" in importer
 
     current_import = coordinator_source.split(
-        "async def _async_import_current_app_chart_entity_statistics", 1
+        "async def _async_import_current_app_chart_entity_statistics",
+        1,
     )[1].split("\n    async def _async_update_data_quality_issue", 1)[0]
     day_call = current_import.split("if day_batches:", 1)[1].split(
-        "if period_batches:", 1
+        "if period_batches:",
+        1,
     )[0]
     assert "replace_existing_hours=True" in day_call
     assert "include_current_day_completed=True" in day_call
@@ -1158,7 +1173,8 @@ def test_day_chart_sources_prefer_device_minute_curves_for_pv_and_battery() -> N
         1
     ].split("\n    def _day_chart_points_for_metric", 1)[0]
     fetch_system = coordinator_source.split("async def _fetch_system", 1)[1].split(
-        "\n        async def _fetch_device_extras", 1
+        "\n        async def _fetch_device_extras",
+        1,
     )[0]
 
     assert '"pv_energy"' not in source_map
@@ -1228,7 +1244,8 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
     assert "def _enabled_app_chart_date_types" in coordinator_source
 
     import_fn = coordinator_source.split(
-        "async def _async_import_app_chart_statistics", 1
+        "async def _async_import_app_chart_statistics",
+        1,
     )[1].split("\n    async def _async_import_current_app_chart_statistics_job", 1)[0]
     assert "enabled_date_types = self._enabled_app_chart_date_types()" in import_fn
     assert "if date_type not in enabled_date_types:" in import_fn
@@ -1238,7 +1255,8 @@ def test_week_month_year_statistic_toggles_filter_imports() -> None:
     )
 
     current_source = coordinator_source.split(
-        "def _current_app_chart_entity_source_batches", 1
+        "def _current_app_chart_entity_source_batches",
+        1,
     )[1].split("\n    async def _async_import_current_app_chart_entity_statistics", 1)[
         0
     ]
@@ -1332,14 +1350,16 @@ def test_day_external_history_backfill_uses_http_day_curves() -> None:
     )
 
     current_day_source = coordinator_source.split(
-        "async def _async_import_day_chart_statistics", 1
+        "async def _async_import_day_chart_statistics",
+        1,
     )[1].split("\n    def _enabled_app_chart_date_types", 1)[0]
     assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in current_day_source
     assert "APP_DAY_CHART_BUCKET_LABEL" in current_day_source
     assert "_day_chart_points_for_metric(" in current_day_source
 
     backfill_source = coordinator_source.split(
-        "async def _async_import_historical_day_chart_statistics_for_device", 1
+        "async def _async_import_historical_day_chart_statistics_for_device",
+        1,
     )[1].split("\n    async def _async_http_backfill_recent_day_statistics", 1)[0]
     assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in backfill_source
     assert "_day_chart_points_for_metric(" in backfill_source
@@ -1360,7 +1380,8 @@ def test_historical_entity_statistics_repair_uses_http_day_curves() -> None:
         coordinator_source
     )
     backfill_source = coordinator_source.split(
-        "async def _async_http_backfill_recent_day_statistics", 1
+        "async def _async_http_backfill_recent_day_statistics",
+        1,
     )[1].split("\n    async def _async_update_data_quality_issue", 1)[0]
     assert "source_batches=[(DATE_TYPE_DAY, section_sources)]" in backfill_source
     assert "replace_existing_hours=True" in backfill_source
@@ -1371,7 +1392,8 @@ def test_entity_statistics_import_handles_day_week_month_not_year() -> None:
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     importer = coordinator_source.split(
-        "async def _async_import_app_chart_entity_statistics_for_device", 1
+        "async def _async_import_app_chart_entity_statistics_for_device",
+        1,
     )[1].split("\n    def _current_app_chart_entity_source_batches", 1)[0]
     assert "if date_type == DATE_TYPE_DAY:" in importer
     assert "day_power_energy_points(" in importer
@@ -1440,9 +1462,11 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
         assert removed not in src
 
     import_job = src.split(
-        "async def _async_import_current_app_chart_statistics_job", 1
+        "async def _async_import_current_app_chart_statistics_job",
+        1,
     )[1].split(
-        "\n    # ------------------------------------------------------------------", 1
+        "\n    # ------------------------------------------------------------------",
+        1,
     )[0]
     assert "_statistics_repair_from_date(device_id, today)" not in import_job
     assert "_statistics_rolling_backfill_from_date(" not in import_job
