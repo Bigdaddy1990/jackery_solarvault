@@ -70,4 +70,4 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff|| true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
