@@ -31,6 +31,6 @@ types-python-slugify>=8.0.2.20240310
 types-pytz>=2025.2.0.20251108
 types-PyYAML>=6.0.12.20250915
 types-requests>=2.32.4.20260107
-types-xmltodict>=1.0.1.20260113
+types-xmltodict>=1.0.1.20260518
 typing-extensions>=4.15.0,<5.0
 voluptuous>=0.15.2
