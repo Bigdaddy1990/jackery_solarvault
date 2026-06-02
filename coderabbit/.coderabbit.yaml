@@ -1,3 +1,35 @@
+		"enable_free_tier": {
+			"default": true,
+			"description": "Enable free tier features for users not on a paid plan.",
+			"type": "boolean"
+		},
+		"inheritance": {
+			"default": false,
+			"description": "Inheritance | Use parent settings for any values not defined here. Inheritance only propagates upward if enabled at each level.",
+			"type": "boolean"
+		},
+		"reviews": {
+			"default": {},
+			"description": "Settings related to reviews.",
+			"type": "object",
+			"properties": {
+				profile: assertive
+				request_changes_workflow: true
+        high_level_summary: true
+				high_level_summary_placeholder: true
+        high_level_summary_in_walkthrough: true
+				review_status: true
+        review_details: true
+				collapse_walkthrough: true
+				changed_files_summary: true
+        estimate_code_review_effort: true
+				assess_linked_issues: true
+				related_issues: true
+				related_prs: true
+
+          
+          
+          
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
 early_access: true
@@ -8,9 +40,19 @@ commit_status: true
 fail_commit_status: true
 reviews.auto_review.auto_pause_after_reviewed_commits: true
 reviews:
-  profile: "chill"
-  request_changes_workflow: true
+	profile: assertive
+	request_changes_workflow: true
   high_level_summary: true
+	high_level_summary_placeholder: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  review_details: true
+  collapse_walkthrough: true
+  changed_files_summary: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+	related_prs: true
   poem: true
   review_status: true
   review_details: true
