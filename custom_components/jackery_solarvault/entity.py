@@ -96,22 +96,10 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _pv_trends(self) -> dict[str, Any]:
-        """
-        Return photovoltaic (PV) trend data for this device from the coordinator payload.
-        
-        Returns:
-            dict: PV trends payload for the device, or an empty dict if no PV trends are present.
-        """
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
     def _alarm(self) -> object:
-        """
-        Retrieve the alarm section from the device payload.
-        
-        Returns:
-            alarm (object | None): The alarm payload for the device if present, otherwise `None`.
-        """
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -144,13 +132,12 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """
-        Builds DeviceInfo for the parent SolarVault device.
-        
-        Name is chosen in order: system.device_name, discovery.device_name, properties.wname, then "Jackery {device_id}". Model is chosen in order: discovery.dev_model, device_meta.model_name, then "SolarVault". Includes serial_number when present in device metadata or discovery, and sw_version when present in OTA data.
-        
+        """Constructs the DeviceInfo for the parent SolarVault device.
+
+        The returned DeviceInfo includes identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version. The display name is chosen from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". The model is chosen from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Serial number and software version are included when present in device metadata/discovery and OTA data, respectively.
+
         Returns:
-            DeviceInfo: DeviceInfo containing identifiers, manufacturer, name, model, and optional serial_number and sw_version.
+            DeviceInfo: DeviceInfo populated for the parent SolarVault device.
         """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)

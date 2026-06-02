@@ -24,18 +24,6 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
-    """
-    Lazily import and return the JackeryMqttPushClient class when accessed as a module attribute.
-    
-    Parameters:
-        name (str): Attribute name being accessed on the module.
-    
-    Returns:
-        Any: The `JackeryMqttPushClient` class when `name` equals `"JackeryMqttPushClient"`.
-    
-    Raises:
-        AttributeError: If `name` is not `"JackeryMqttPushClient"`.
-    """
     if name == "JackeryMqttPushClient":
         from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 

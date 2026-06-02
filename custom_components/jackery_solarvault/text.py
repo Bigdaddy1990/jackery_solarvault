@@ -75,20 +75,20 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Register text entities for Jackery devices present in the entry's coordinator.
-    
-    Adds editable text entities (system name, grid standard, and third-party MQTT fields) for devices discovered in the coordinator, avoids duplicate registrations by tracking unique IDs, and installs a coordinator listener that detects changes to the set of devices (via a data signature) and adds newly discovered entities. The listener is removed when the config entry is unloaded.
+    """Set up text entities for renaming Jackery system devices from a config entry.
+
+    Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """
-        Append the given TextEntity to the entities list if its unique ID has not already been registered.
-        
+        """Append a TextEntity to the provided list if its unique identifier has not been registered.
+
+        Modifies the `entities` list by appending `entity` when its unique id is new, and records that id to prevent duplicate entities from being added.
+
         Parameters:
-            entities (list[TextEntity]): List to append to when the entity's unique id is new.
+            entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
             entity (TextEntity): Candidate text entity to append.
         """
         append_unique_entity(
@@ -96,16 +96,12 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         )
 
     def _collect_entities() -> list[TextEntity]:
-        """
-        Collect text entity instances for devices that expose editable system or third-party MQTT configuration fields.
-        
-        For each device in the coordinator data this will:
-        - Create a JackerySystemNameText when the system contains `FIELD_ID` or `FIELD_SYSTEM_ID`.
-        - Create a JackeryGridStandardText when the system contains `FIELD_GRID_STANDARD`.
-        - Create JackeryThirdPartyMqttText entities for each entry in `_THIRD_PARTY_MQTT_TEXT_FIELDS` when the device either supports advanced mode or has a Bluetooth key.
-        
+        """Collects text entities for devices that expose a system identifier.
+
+        Creates a JackerySystemNameText for each coordinator data entry whose system contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
+
         Returns:
-            list[TextEntity]: The created text entity instances.
+            list[TextEntity]: TextEntity instances created for devices that support renaming their system.
         """
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -172,38 +168,30 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
-        """
-        Create a JackerySystemNameText entity bound to the given coordinator and device.
-        
-        Parameters:
-            coordinator (JackerySolarVaultCoordinator): Coordinator that provides device data and API methods.
-            device_id (str): Unique identifier for the device whose system name this entity will manage.
-        """
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "system_name")
 
     @property
     def native_value(self) -> str | None:
-        """
-        Get the current editable name for the device.
-        
-        Prefers the system name (FIELD_SYSTEM_NAME); if that is missing, falls back to the device product name (FIELD_DEVICE_NAME). Returns None if neither value is present.
-        
+        """Return the current editable system name for the device.
+
+        Prefers the stored system name (FIELD_SYSTEM_NAME); falls back to the device product name (FIELD_DEVICE_NAME). Returns None if neither value is available.
+
         Returns:
-            The system name, the device product name, or None.
+            The editable system name, the device product name, or None.
         """
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
-        """
-        Rename the remote system and update local state so the new name is reflected in the UI.
-        
-        Trim leading and trailing whitespace from `value`, validate the trimmed name is not empty, send the rename request to the Jackery API, apply an optimistic local update on success, and request a coordinator refresh so dependent entities reflect the new name.
-        
+        """Rename the remote system and update local state so the change appears in the UI.
+
+        Trims leading and trailing whitespace from `value`, sends the rename request to the Jackery API, applies an optimistic local update on success, and requests a coordinator refresh so dependent entities reflect the new name.
+
         Parameters:
             value (str): New system name; leading and trailing whitespace will be removed.
-        
+
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is empty, or the remote API reports a failure.
@@ -283,28 +271,14 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """
-        Get the current app grid-standard code.
-        
-        Returns:
-            The grid-standard code as a string, or None if the value is missing or an empty string.
-        """
+        """Return the current app grid-standard code."""
         raw = self._system.get(FIELD_GRID_STANDARD)
         if raw in (None, ""):
             return None
         return str(raw)
 
     async def async_set_value(self, value: str) -> None:
-        """
-        Set the device's grid-standard code and request a coordinator refresh.
-        
-        Parameters:
-            value (str): New grid-standard code; must consist only of decimal digits. Leading and trailing whitespace are trimmed.
-        
-        Raises:
-            ConfigEntryAuthFailed: If the config entry requires re-authentication.
-            HomeAssistantError: If the value is invalid (non‑decimal) or the update fails; raised errors include translation keys and placeholders for the entity ("grid_standard") and the device id.
-        """
+        """Write the grid-standard code using the app's safety/unbind body."""
         new_value = str(value or "").strip()
         if not new_value.isdecimal():
             raise HomeAssistantError(
@@ -364,18 +338,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         mode: TextMode,
         pattern: str | None,
     ) -> None:
-        """
-        Create a Third-Party MQTT editable text entity for a specific device.
-        
-        Parameters:
-            coordinator: Coordinator providing device state and API methods.
-            device_id (str): Unique identifier of the target device.
-            key_suffix (str): Suffix used to form the entity's unique key.
-            translation_key (str): Translation key used for the entity's user-facing name.
-            field (str): Configuration field name in the third-party MQTT config this entity reads/writes.
-            mode (TextMode): Display mode for the text entity (e.g., single-line, password).
-            pattern (str | None): Optional regex pattern to validate the entity's input; pass None to omit validation.
-        """
+        """Initialise the Third-Party MQTT text field."""
         super().__init__(coordinator, device_id, key_suffix)
         self._field = field
         self._attr_translation_key = translation_key
@@ -385,12 +348,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """
-        Return the current plaintext value for this third-party MQTT field.
-        
-        Returns:
-            The plaintext string value for the field, or None if the field is unset.
-        """
+        """Return the current plaintext value used for writes."""
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
             self._field
         )
@@ -399,12 +357,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         return str(value)
 
     def _raise_action_error(self, error: object) -> None:
-        """
-        Raise a Home Assistant error with a translatable "entity_action_failed" message that includes this entity's translation key, device ID, and the original error text.
-        
-        Parameters:
-            error (object): The original exception or message to include in the translation placeholders.
-        """
+        """Raise a translatable HA action error for this text entity."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -416,18 +369,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         )
 
     async def async_set_value(self, value: str) -> None:
-        """
-        Update a third-party MQTT text configuration field for the device.
-        
-        Trims leading/trailing whitespace from `value`, sends the new value to the coordinator, and requests a refresh on success.
-        
-        Parameters:
-            value (str): The new text to set for the configured third-party MQTT field; leading and trailing whitespace will be removed.
-        
-        Raises:
-            ConfigEntryAuthFailed: If the coordinator reports an authentication failure (propagated).
-            HomeAssistantError: If an action error occurs. If an existing HomeAssistantError has a `translation_key`, it is re-raised unchanged; otherwise a translatable `entity_action_failed` HomeAssistantError is raised.
-        """
+        """Write this ThirdPartMQTTConfig string field."""
         new_value = str(value or "").strip()
         try:
             await self.coordinator.async_update_third_party_mqtt_config(

@@ -14,13 +14,12 @@ _KEY_DEVICE_INDEX: Final = "device_index"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """
-    Create a Store for this integration's discovery cache.
-    
-    The Store is configured with the module's storage key and storage version.
-    
+    """Create a Store configured for this integration's discovery cache.
+
+    The Store is initialized with the module's storage key and storage version.
+
     Returns:
-        Store[dict[str, Any]]: Store configured to persist this integration's discovery cache.
+        Store: A Store configured with the integration's storage key and storage version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
@@ -28,13 +27,12 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_discovery_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
-    """
-    Load the cached device index for a config entry from persistent storage.
-    
-    If the stored payload is missing or does not match the expected nested mapping structure, an empty dict is returned.
-    
+    """Retrieve the cached device index for the specified config entry from persistent storage.
+
+    If the stored payload is missing or does not match the expected nested structure, an empty dict is returned.
+
     Returns:
-        Mapping of device ID strings to shallow copies of each device's metadata dict; empty dict if no valid cache exists.
+        Mapping of device ID (as `str`) to a shallow copy of the stored metadata `dict` for each device. Returns an empty dict if no valid cache exists.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -60,15 +58,16 @@ async def async_save_discovery_cache(
     entry_id: str,
     device_index: dict[str, dict[str, Any]],
 ) -> None:
-    """
-    Persistently save the discovery device index for a config entry in the integration's Store.
-    
-    Overwrites any existing cache for the specified config entry. All device IDs are converted to strings and each device metadata dict is shallow-copied before storing.
-    
+    """Persist discovery metadata for a config entry to the integration's Store.
+
+    This overwrites any existing cache for the given config entry and normalizes
+    device IDs to strings while copying each device's metadata.
+
     Parameters:
-        hass (HomeAssistant): Home Assistant core instance.
-        entry_id (str): Config entry identifier whose cache will be saved.
-        device_index (dict[str, dict[str, Any]]): Mapping of device IDs to metadata; each metadata dict will be shallow-copied and saved with the device ID converted to a string.
+        entry_id (str): Config entry identifier whose cache to save.
+        device_index (dict[str, dict[str, Any]]): Mapping of device IDs to metadata;
+            each metadata dict will be shallow-copied and stored with the device ID
+            converted to a string.
     """
     store = _store(hass)
     data = await store.async_load()

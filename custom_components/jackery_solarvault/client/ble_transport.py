@@ -229,10 +229,13 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     def _record_negotiated_mtu(self, device_id: str, client: BleakClient) -> None:
-        """
-        Cache the negotiated GATT MTU for a device when it becomes available.
-        
-        Attempts to read common Bleak client attributes (`mtu_size`, `mtu`) and, if a usable integer greater than the frame overhead is found, stores it in the listener's MTU cache for the given device and logs the negotiated size; otherwise leaves the cache unset so callers will use the default MTU.
+        """Cache the negotiated GATT MTU after ``start_notify`` returns.
+
+        Different bleak backends expose the MTU under different attribute
+        names, and at different points in the connect lifecycle. We try
+        the well-known ones in order and keep the cache empty if none
+        produce a usable integer — the writer then falls back to
+        :data:`ble.DEFAULT_BLE_MTU`.
         """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
@@ -253,12 +256,7 @@ class JackeryBleListener:
         )
 
     def mtu_for_device(self, device_id: str) -> int:
-        """
-        Get the negotiated BLE MTU cached for the device.
-        
-        Returns:
-        	The negotiated MTU for the given device, or `ble.DEFAULT_BLE_MTU` if no negotiated MTU is cached.
-        """
+        """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
@@ -331,23 +329,24 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """
-        Send a logical command frame to a device over BLE and optionally wait for a matching acknowledgement.
-        
-        If the device has no active BLE client this returns False. When sending, the command payload is split to fit the effective MTU (which can be overridden) and written as one or more encrypted GATT writes. If requested, the call waits for a decoded notify frame that matches the configured acknowledgement criteria.
-        
+        """Send a logical command frame to the device over BLE and optionally wait for a matching acknowledgement.
+
         Parameters:
+            device_id (str): Target device identifier.
+            cmd (int): Logical command identifier to send.
+            body (bytes): Command payload bytes.
+            flags (int): Frame flags included in the sent binary frame.
+            timeout_sec (float): Per-GATT-write timeout in seconds.
             wait_for_ack (bool): If True, wait for a matching decoded notify frame before returning.
-            ack_timeout_sec (float): Timeout in seconds to wait for the acknowledgement when `wait_for_ack` is True.
-            ack_cmds (tuple[int, ...] | None): Optional tuple of `cmd` values that qualify as the acknowledgement; when `None`, any decoded frame from the device qualifies.
-            mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU; must be an integer when provided.
-        
+            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is True.
+            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted, any decoded frame from the same device within the window qualifies.
+            mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU (used for tests/diagnostics).
+
         Returns:
-            bool: `True` if the GATT write completed (and a matching ACK was received when requested); `False` if no active BLE client exists for the device.
-        
+            bool: `True` if the GATT write completed (and, when requested, a matching ACK was received); `False` if no active BLE client exists for the device.
+
         Raises:
-            ValueError: If `mtu_override` is provided but is not an integer.
-            RuntimeError: If the payload cannot be chunked for the selected MTU, on GATT-layer failures (including per-write timeouts), or when an acknowledgement wait times out.
+            RuntimeError: When the payload cannot be chunked for the selected MTU, on GATT-layer failures (including write timeouts), or when an ACK wait times out.
         """
         client = self._clients.get(device_id)
         if client is None:
@@ -532,11 +531,10 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def async_start(self, device_ids: list[str]) -> None:
-        """
-        Start monitoring for Jackery BLE advertisements and register callbacks that spawn per-device connection runners on the first matching advertisement.
-        
+        """Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners when a matching advertisement is observed.
+
         Parameters:
-            device_ids (list[str]): Device IDs to monitor. A background connection task for a device is created lazily the first time an advertisement matching the listener's BLE matcher is observed.
+            device_ids (list[str]): Device IDs to monitor; a background connection task will be created lazily for a device the first time an advertisement matching the listener's BLE matcher is seen.
         """
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
@@ -625,10 +623,11 @@ class JackeryBleListener:
         service_info: BluetoothServiceInfoBleak,
         change: BluetoothChange,
     ) -> None:
-        """
-        Handle a Home Assistant Bluetooth advertisement and start a per-device connection runner when a matching Jackery device is discovered.
-        
-        This callback is invoked synchronously by Home Assistant and must not await; it increments advertisement stats and spawns an asyncio background task to manage the device connection when a first matching advertisement is seen.
+        """HA bluetooth-callback. Triggers a connect task on first match.
+
+        Per HA's bluetooth-integration contract this is a synchronous
+        callback. We may not await anything here; instead we spawn an
+        asyncio task on the loop.
         """
         device_id = self._device_id_from_service_info(service_info)
         if device_id is None:
@@ -651,11 +650,10 @@ class JackeryBleListener:
         self,
         service_info: BluetoothServiceInfoBleak,
     ) -> str | None:
-        """
-        Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE address on first match.
-        
-        The function checks a cached address-to-device mapping, extracts a serial from the advertisement's manufacturer data, and asks the configured serial resolver for a device id. If a device id is found and not already cached, the address is stored for future fast resolution.
-        
+        """Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE MAC address.
+
+        If the advertisement corresponds to a device the integration knows about, the function records device_id -> address in the internal cache on first match so future advertisements skip resolution. It returns the mapped device id when found, or `None` if no mapping could be determined.
+
         Returns:
             `device_id` if the advertisement maps to a known device, `None` otherwise.
         """
@@ -698,9 +696,10 @@ class JackeryBleListener:
         return device_id
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:
-        """
-        Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss until the listener is stopped.
-        
+        """Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
+
+        This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
+
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
         """
@@ -796,12 +795,6 @@ class JackeryBleListener:
                 async def _notify_callback(
                     _characteristic: object, data: bytearray
                 ) -> None:
-                    """
-                    Forward a BLE characteristic notification payload to the listener's notification handler.
-                    
-                    Parameters:
-                        data (bytearray): Raw notification payload from the BLE characteristic; converted to `bytes` and delivered to the instance notification processor.
-                    """
                     await self._handle_notification(device_id, bytes(data))
 
                 keep_alive_task: asyncio.Task[None] | None = None

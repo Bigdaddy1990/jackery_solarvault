@@ -79,11 +79,12 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029
-    """
-    Register global services required by the Jackery SolarVault integration.
-    
-    Returns:
-        True if setup completed successfully, False otherwise.
+    """Set up global Jackery SolarVault services.
+
+    Declared ``async`` because Home Assistant awaits the integration's
+    ``async_setup`` entry point; the framework contract mandates the
+    coroutine signature even though the body currently performs only
+    synchronous service registration. Hence RUF029 is suppressed here.
     """
     async_setup_services(hass)
     return True
@@ -92,10 +93,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF02
 def _async_clean_legacy_entities(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
-    """
-    Remove legacy and option-disabled entities from the entity registry for the given config entry.
-    
-    This performs targeted, setup-local cleanup only: it removes stale energy helper entities, sensor entities whose legacy unique IDs match configured removal suffixes, CT period sensors, and duplicate binary sensors. It also conditionally removes calculated smart‑meter derived sensors, calculated power sensors, and savings detail sensors when the corresponding config entry options are disabled.
+    """Drop entity-registry entries from older releases or disabled options.
+
+    Keep entity-registry cleanup explicit and setup-local. This avoids hidden
+    entry-version side effects while still removing entities that are no
+    longer part of the documented app/HTTP/MQTT data model.
     """
     _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
@@ -196,11 +198,10 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 def _local_mqtt_client(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
-    """
-    Get the per-entry local MQTT client stored in hass.data for the given config entry.
-    
+    """Return the per-entry local MQTT client stored in hass.data for the given config entry.
+
     Returns:
-        JackeryLocalMqttClient | None: The `JackeryLocalMqttClient` for the entry, or `None` if no client is stored or the stored value is not a `JackeryLocalMqttClient`.
+        JackeryLocalMqttClient instance for the entry, or None if no client is stored or the stored value is not a JackeryLocalMqttClient.
     """
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
@@ -214,16 +215,12 @@ async def _async_start_local_mqtt(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """
-    Start a per-entry local MQTT client when the entry is explicitly scoped.
-    
-    The listener is started only if the third-party MQTT bridge is enabled, a non-empty
-    host and topic filter are configured, and the topic filter is not in the blocked
-    safety set. Incoming parsed JSON messages are forwarded to the coordinator via
-    its async_handle_local_mqtt_message method. The created client is stored in
-    hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY] and an unload callback
-    is registered to stop the client and remove that runtime reference (exceptions
-    during stop are suppressed).
+    """Start a per-entry local MQTT client when the entry is explicitly scoped.
+
+    The listener only starts when the Third-Party MQTT bridge is enabled, the
+    host is set, and a non-empty topic filter is configured. This prevents an
+    accidental broad wildcard subscription from ingesting unrelated broker
+    traffic and causing high CPU load.
     """
     if not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -261,13 +258,7 @@ async def _async_start_local_mqtt(
         data: dict[str, Any] | None,
         _raw_bytes: bytes,
     ) -> None:
-        """
-        Forward parsed LAN MQTT JSON messages to the coordinator's local MQTT handler.
-        
-        Parameters:
-            topic (str): MQTT topic the message was received on.
-            data (dict[str, Any] | None): Parsed JSON payload from the message; when `None`, the message is ignored.
-        """
+        """Forward parsed LAN MQTT JSON into the coordinator payload router."""
         if data is None:
             return
         await coordinator.async_handle_local_mqtt_message(topic, data)
@@ -286,10 +277,9 @@ async def _async_start_local_mqtt(
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
 
     async def _async_stop_local_mqtt() -> None:
-        """
-        Stop the stored per-entry local MQTT client and remove its runtime reference from hass.data if it matches the stored instance.
-        
-        If stopping the client raises an exception, it will be suppressed; the hass.data entry is removed only when it still references the same client instance.
+        """Stop the stored per-entry local MQTT client and remove its hass.data reference if it matches the stored instance.
+
+        Exceptions raised while stopping the client are suppressed.
         """
         with contextlib.suppress(Exception):
             await client.async_stop()
@@ -394,9 +384,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
 
 def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
-    """
-    Remove stale Energy helper entities that were created without a unit of measurement.
-    
+    """Remove stale Energy helper entities that were created without a unit of measurement.
+
     Scans the entity registry for entities whose entity_id starts with the configured
     STALE_ENERGY_HELPER_PREFIX and ends with STALE_NET_POWER_SUFFIX. If an entity's
     current state has no `unit_of_measurement` (missing or empty) and its entity_id

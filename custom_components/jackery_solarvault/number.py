@@ -109,14 +109,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 async def _set_soc_charge(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
-    """
-    Set the state-of-charge (SOC) charge limit for the specified device.
-    
-    Parameters:
-        coord (JackerySolarVaultCoordinator): Coordinator used to send the update.
-        dev_id (str): Device identifier.
-        value (float): Desired SOC charge limit; converted to an integer percentage before sending.
-    """
+    """Set the SOC charge limit on a device."""
     await coord.async_set_soc_limits(dev_id, charge_limit=int(value))
 
 
@@ -151,11 +144,10 @@ async def _set_default_power(
 async def _set_single_price(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
-    """
-    Set the device's single-tariff electricity price.
-    
-    The price must be expressed in the device's current currency/unit and match the entity's unit of measurement.
-    
+    """Set the device's single-tariff electricity price.
+
+    The price value must be expressed in the device's current currency/unit and match the entity's unit of measurement.
+
     Parameters:
         value (float): Price to set, in the device's currency/unit.
     """
@@ -165,14 +157,7 @@ async def _set_single_price(
 async def _set_third_party_mqtt_port(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
-    """
-    Set the third-party MQTT broker port for a device.
-    
-    Parameters:
-        coord (JackerySolarVaultCoordinator): Coordinator used to update the device configuration.
-        dev_id (str): Identifier of the device to update.
-        value (float): Port number to set; converted to an integer before writing.
-    """
+    """Set the Third-Party MQTT broker port."""
     await coord.async_update_third_party_mqtt_config(
         dev_id,
         {FIELD_THIRD_PARTY_MQTT_PORT: int(value)},
@@ -185,14 +170,7 @@ async def _set_third_party_mqtt_port(
 
 
 def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
-    """
-    Determine the device's maximum feed-in option (either 800.0 or 2500.0) from the coordinator payload.
-    
-    The function examines payload properties and metadata (model code and various feed/grid fields) to decide whether a higher-capacity feed-in option (2500.0) is supported; if no indicators of higher capacity are found it returns 800.0, using a fallback maximum-outlet value when present.
-    
-    Returns:
-        `2500.0` when payload indicates a higher-capacity feed-in option, `800.0` otherwise.
-    """
+    """Return the feed-in choices exposed by the SolarVault app."""
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
@@ -216,15 +194,7 @@ def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
 
 
 def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
-    """
-    Return the currency string used for the single-tariff price, falling back to "€" if no currency fields are present.
-    
-    Parameters:
-        payload (dict[str, Any]): Coordinator payload that may contain a PAYLOAD_PRICE mapping.
-    
-    Returns:
-        str: The currency/unit found in PAYLOAD_PRICE using FIELD_SINGLE_CURRENCY, FIELD_CURRENCY, FIELD_SINGLE_CURRENCY_CODE, or FIELD_CURRENCY_CODE, or "€" if none are present.
-    """
+    """Currency of the single-tariff price; defaults to '€'."""
     price = payload.get(PAYLOAD_PRICE) or {}
     return str(
         price.get(FIELD_SINGLE_CURRENCY)
@@ -362,31 +332,12 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         device_id: str,
         description: JackeryNumberDescription,
     ) -> None:
-        """
-        Initialize the JackeryNumber entity using the coordinator, device identifier, and entity description.
-        
-        Parameters:
-            coordinator (JackerySolarVaultCoordinator): Coordinator providing device payloads and write helpers.
-            device_id (str): Unique identifier of the device this entity represents.
-            description (JackeryNumberDescription): Description that defines how the number entity reads, presents, and writes values.
-        """
+        """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
 
     def _raise_action_error(self, translation_key: str, **placeholders: object) -> None:
-        """
-        Raise a translatable Home Assistant action error tied to this entity.
-        
-        Parameters:
-            translation_key (str): Translation key used to look up the localized error message.
-            **placeholders (object): Additional placeholder values included in the translation; each value is converted to a string.
-        
-        Raises:
-            HomeAssistantError: Error with translation_domain set to DOMAIN and translation_placeholders containing:
-                - "entity": the entity description key
-                - "device_id": this entity's device id
-                - any provided placeholders (stringified)
-        """
+        """Raise a translatable HA action error for this entity."""
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
@@ -398,14 +349,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         )
 
     def _section(self) -> dict[str, Any]:
-        """
-        Selects the payload section dictionary used as the source for this entity.
-        
-        If the description's source_section is the third-party MQTT config, the coordinator's plaintext MQTT config for the device is returned; otherwise the configured section from the cached payload is returned.
-        
-        Returns:
-            dict[str, Any]: The section dictionary to read values from, or an empty dict if the section is missing or not a dict.
-        """
+        """Read the configured payload section (properties/price/...)."""
         if self.entity_description.source_section == PAYLOAD_THIRD_PARTY_MQTT_CONFIG:
             section = self.coordinator.third_party_mqtt_config_plaintext(
                 self._device_id
@@ -416,14 +360,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """
-        Get the entity's current numeric value from its configured payload section.
-        
-        Looks up keys in the description's `source_keys` in order and returns the first non-`None` value converted to a float; if no key yields a value, returns the description's `none_fallback`.
-        
-        Returns:
-            float: The converted value from payload, or the description's `none_fallback` (may be `None`).
-        """
+        """Return the entity's current value."""
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -433,15 +370,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
-        """
-        Get the maximum writable value for the entity.
-        
-        If a dynamic maximum is configured on the description, that value is obtained from the current payload.
-        Otherwise the statically configured maximum is returned; if the static maximum is unset, returns 0.0.
-        
-        Returns:
-            float: Maximum writable value; 0.0 when no static maximum is configured.
-        """
+        """Return the highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(self._payload)
         max_value = self.entity_description.native_max_value
@@ -551,41 +480,15 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     seen_unique_ids: set[str] = set()
 
     def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
-        """
-        Append an entity to the list if its unique ID has not already been seen.
-        
-        Parameters:
-        	entities (list[NumberEntity]): Target list of entities to append into.
-        	entity (NumberEntity): Entity to conditionally add; will be skipped if its unique ID is already present.
-        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
         )
 
     def _has_props(payload: dict[str, Any], *keys: str) -> bool:
-        """
-        Check whether any of the specified keys exist in the payload's properties section (PAYLOAD_PROPERTIES).
-        
-        Parameters:
-            payload (dict[str, Any]): The device payload dictionary to inspect.
-            *keys (str): One or more property keys to look for inside the payload's properties section.
-        
-        Returns:
-            `true` if any of the provided keys are present in the properties section, `false` otherwise.
-        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
     def _has_price_or_system(payload: dict[str, Any]) -> bool:
-        """
-        Determine whether the given device payload contains price information or system identifiers.
-        
-        Parameters:
-            payload (dict[str, Any]): The device payload mapping potentially containing PAYLOAD_PRICE and PAYLOAD_SYSTEM sections.
-        
-        Returns:
-            bool: `true` if `FIELD_SINGLE_PRICE` or `FIELD_DYNAMIC_OR_SINGLE` exists in the price section, or if `FIELD_ID` or `FIELD_SYSTEM_ID` is present in the system section; `false` otherwise.
-        """
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (

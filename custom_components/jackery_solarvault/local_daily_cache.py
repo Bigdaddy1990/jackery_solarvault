@@ -57,16 +57,19 @@ def _isoformat_day(today: date) -> str:
 async def async_load_daily_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
-    """
-    Load cached midnight snapshots for a config entry.
-    
-    Returns a mapping keyed by device_id where each value is a normalized snapshot object with the shape {"day": "YYYY-MM-DD", "values": {metric: wh}}. Malformed or non-dict store entries are ignored and an empty dict is returned when no valid snapshots are available.
-    
+    """Load cached midnight snapshots for a config entry.
+
+    Returns a mapping keyed by device_id where each value is a snapshot object with the shape
+    {"day": "YYYY-MM-DD", "values": {metric: wh}}. Malformed store entries are ignored; an
+    empty dict is returned when the store is missing or contains no valid snapshots. Callers
+    should compare each snapshot's "day" to the current date before using its values.
+
     Parameters:
         entry_id (str): Config entry identifier whose snapshots to load.
-    
+
     Returns:
-        dict[str, dict[str, Any]]: Mapping from device ID to validated snapshot data.
+        dict[str, dict[str, Any]]: Device-id -> snapshot mapping containing validated
+        and normalized snapshot data.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -156,19 +159,16 @@ def daily_delta(
     *,
     today: date,
 ) -> int | None:
-    """
-    Compute today's energy delta for a metric using a stored midnight anchor.
-    
-    Calculates `current_lifetime_wh - anchor` when a valid snapshot for `today` contains an integer anchor for `metric_key` and `current_lifetime_wh` can be converted to an integer and is greater than or equal to the anchor. Returns `None` for any invalid, missing, or out-of-order inputs (including `current_lifetime_wh is None`, snapshot not for `today`, missing anchor, non-integer conversions, or `current < anchor`).
-    
+    """Compute today's energy delta for a metric using a stored midnight anchor.
+
     Parameters:
-        snapshot (dict | None): Snapshot with keys `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values). May be `None`.
+        snapshot (dict | None): Stored snapshot with keys `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
         metric_key (str): Metric key to read from `snapshot["values"]`.
         current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
         today (date): Local date used to validate that `snapshot["day"]` matches the current day.
-    
+
     Returns:
-        int | None: Delta in watt-hours as an `int` if calculable, `None` otherwise.
+        int | None: The computed delta in watt-hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None

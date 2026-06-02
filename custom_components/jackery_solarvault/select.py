@@ -100,24 +100,7 @@ def _raise_select_action_error(
     translation_key: str,
     **placeholders: object,
 ) -> NoReturn:
-    """
-    Raise a localized Home Assistant action error for the given select entity.
-    
-    The raised HomeAssistantError uses the integration translation domain and the provided
-    translation_key. Translation placeholders include the select entity's description key
-    as "entity", the entity's device id as "device_id", and any additional keyword
-    placeholders converted to strings.
-    
-    Parameters:
-        entity (JackerySelect): The select entity that caused the action failure.
-        translation_key (str): The translation key to use for the error message.
-        **placeholders: object: Additional placeholder values included in the translation
-            payload; each value is converted to a string.
-    
-    Raises:
-        HomeAssistantError: Always raised with translation_domain set to the integration
-            domain and translation_placeholders populated as described above.
-    """
+    """Raise a translatable HA action error for a select entity."""
     raise HomeAssistantError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
@@ -139,16 +122,15 @@ def _storm_minutes_value(
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
 ) -> int | None:
-    """
-    Determine the storm-warning lead time in minutes from the provided payload sections.
-    
-    Searches for `FIELD_WPC` or `FIELD_MINS_INTERVAL` in `properties`, then in `weather_plan`, then via `task_plan_value` in `task_plan`, and finally within dict entries of `weather_plan[FIELD_STORM]`. Parses the first found value as an integer and returns it only when the parsed value is greater than or equal to `STORM_MINUTES_MIN_VALID`; otherwise returns `None`.
-    
+    """Extract the storm-warning lead time in minutes from device payload sections.
+
+    Searches for `FIELD_WPC` or `FIELD_MINS_INTERVAL` in `properties`, then `weather_plan`, then `task_plan`, and finally scans list entries in `weather_plan[FIELD_STORM]` (each entry must be a dict). Converts the first found raw value to an integer and returns it only when the parsed value is greater than or equal to `STORM_MINUTES_MIN_VALID`; otherwise returns `None`.
+
     Parameters:
         properties (dict[str, object]): The device `properties` payload section to inspect.
         weather_plan (dict[str, object]): The device `weather_plan` payload section to inspect.
         task_plan (dict[str, object]): The device `task_plan` payload section to inspect.
-    
+
     Returns:
         int | None: The storm lead time in minutes when a valid value is found, or `None` if no valid value is present.
     """
@@ -191,13 +173,12 @@ def _storm_minutes_fallback(
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
 ) -> int | None:
-    """
-    Return a default storm-warning lead time when a storm-enabled marker is present but no explicit minutes are set.
-    
-    Searches for a storm-enabled indicator (`FIELD_WPS`) in `properties`, then `weather_plan`, then `task_plan` (via `task_plan_value`). If such a marker exists and parses as an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
-    
+    """Return `DEFAULT_STORM_WARNING_MINUTES` when a storm-enabled indicator exists but no explicit lead time.
+
+    Checks for a storm-enabled marker (`FIELD_WPS`) in `properties`, then `weather_plan`, then `task_plan`; if the marker is present and parses to an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
+
     Returns:
-        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback lead time applies, `None` otherwise.
+        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
     """
     raw = properties.get(FIELD_WPS)
     if raw is None:
@@ -229,18 +210,6 @@ def _storm_minutes_label(minutes: int) -> str:
 
 
 def _price_source_label(source: dict[str, object]) -> str:
-    """
-    Builds a human-readable label for a price source dictionary.
-    
-    Parameters:
-        source (dict[str, object]): Price-source data; may contain keys for company name, name, cid,
-            platform company id, country, or system region.
-    
-    Returns:
-        str: A label composed of a preferred name (company/name/cid/platform id or "Provider"),
-             optionally " (country)" if a country/region is present, and appended " #<platform_id>"
-             when `FIELD_PLATFORM_COMPANY_ID` is non-empty.
-    """
     name = str(
         source.get(FIELD_COMPANY_NAME)
         or source.get(FIELD_NAME)
@@ -259,17 +228,6 @@ def _price_source_label(source: dict[str, object]) -> str:
 
 
 def _price_source_regions(source: dict[str, object]) -> list[str]:
-    """
-    Extract a list of trimmed region strings from a price-source mapping.
-    
-    Checks FIELD_COUNTRY first, then FIELD_SYSTEM_REGION; if the selected value is empty or None, returns an empty list. Otherwise splits the value on commas, trims whitespace from each segment, and returns only non-empty segments.
-    
-    Parameters:
-        source (dict[str, object]): Price-source dictionary that may contain FIELD_COUNTRY or FIELD_SYSTEM_REGION.
-    
-    Returns:
-        list[str]: Non-empty, trimmed region strings derived from the source value, or an empty list if none.
-    """
     raw = source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION)
     if raw in (None, ""):
         return []
@@ -281,17 +239,6 @@ def _price_source_matches_current(
     company_id: object,
     region: object,
 ) -> bool:
-    """
-    Determine whether a price-source entry corresponds to the given company_id and region.
-    
-    Parameters:
-        source (dict[str, object]): Price-source dictionary (expects a platform company id and optional country/system region fields).
-        company_id (object): Company id to match; compared to the source's platform company id using string equality.
-        region (object): Region to match; if `None` or the empty string, any region is accepted. Otherwise the string is matched against the source's parsed regions.
-    
-    Returns:
-        bool: `True` if the source's platform company id matches `company_id` and the region is accepted, `False` otherwise.
-    """
     if str(source.get(FIELD_PLATFORM_COMPANY_ID)) != str(company_id):
         return False
     if region in (None, ""):
@@ -300,21 +247,6 @@ def _price_source_matches_current(
 
 
 def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, object]]:
-    """
-    Extract valid electricity price source entries from a device payload.
-    
-    Accepts a payload dict and returns a list of price-source dictionaries extracted from payload[PAYLOAD_PRICE_SOURCES] when:
-    - the top-level value is a list,
-    - each entry is a dict,
-    - the dict's FIELD_PLATFORM_COMPANY_ID is non-empty (not None or empty string), and
-    - at least one of FIELD_COUNTRY or FIELD_SYSTEM_REGION is truthy.
-    
-    Parameters:
-        payload (dict[str, object]): Device payload potentially containing PAYLOAD_PRICE_SOURCES.
-    
-    Returns:
-        list[dict[str, object]]: Filtered list of valid price-source dicts; empty if none found.
-    """
     raw = payload.get(PAYLOAD_PRICE_SOURCES)
     if not isinstance(raw, list):
         return []
@@ -329,12 +261,6 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
 
 
 def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
-    """
-    Determine whether dynamic electricity-price mode is available for the entity.
-    
-    Returns:
-        `true` if a platform company id and a non-empty region are set on the entity or if the device payload exposes price sources, `false` otherwise.
-    """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
     if company_id not in (None, "") and bool(region):
@@ -424,25 +350,11 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        """
-        Get the entity's currently selected option.
-        
-        Returns:
-            str | None: The selected option string, or `None` if no current option is available.
-        """
+        """Return the currently-selected option."""
         return self.entity_description.current_fn(self)
 
     async def async_select_option(self, option: str) -> None:
-        """
-        Send the selected option to the device coordinator and refresh entity data.
-        
-        Parameters:
-            option (str): The option key to apply.
-        
-        Raises:
-            ConfigEntryAuthFailed: If authentication with the config entry fails (re-raised).
-            HomeAssistantError: A translated action failure error when the selection or refresh fails.
-        """
+        """Forward the chosen option to the coordinator."""
         try:
             await self.entity_description.select_fn(self, option)
             await self.coordinator.async_request_refresh()
@@ -456,14 +368,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
             _raise_select_action_error(self, "entity_action_failed", error=err)
 
     def _warn_unknown_once(self, value: object) -> None:
-        """
-        Record and log an unmapped raw value once for this entity instance.
-        
-        If `entity_description.warn_unknown_kind` is None, this function does nothing. Otherwise the raw `value` is added to the instance's seen set and a single warning is emitted for that value; subsequent calls with the same value on the same instance are ignored.
-        
-        Parameters:
-            value (object): Raw value that could not be mapped to a translated option; logged once per entity instance.
-        """
+        """Log an unmapped raw value once per instance / value combination."""
         kind = self.entity_description.warn_unknown_kind
         if kind is None or value in self._state.warned_unknown_values:
             return
@@ -501,15 +406,6 @@ def _work_mode_current(entity: JackerySelect) -> str | None:
 
 
 async def _work_mode_select(entity: JackerySelect, option: str) -> None:
-    """
-    Set the device work mode corresponding to the selected option.
-    
-    Raises a standardized translated action error if the option does not map to a valid numeric work mode.
-    
-    Parameters:
-        entity (JackerySelect): The select entity for the target device.
-        option (str): The option string to apply; must map to an internal work-mode integer.
-    """
     mode = _OPTION_TO_WORK_MODE.get(option)
     if mode is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -524,15 +420,6 @@ def _temp_unit_current(entity: JackerySelect) -> str | None:
 
 
 async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
-    """
-    Set the device's temperature unit according to the selected option.
-    
-    Parameters:
-        option (str): The select option key that maps to a temperature unit.
-    
-    Raises:
-        HomeAssistantError: if `option` is not a valid temperature-unit key.
-    """
     if option not in _OPTION_TO_TEMP_UNIT:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
@@ -562,16 +449,6 @@ def _island_auto_off_current(entity: JackerySelect) -> str | None:
 
 
 async def _island_auto_off_select(entity: JackerySelect, option: str) -> None:
-    """
-    Set the device's island (off-grid) auto-off interval based on the selected option.
-    
-    Parameters:
-        entity (JackerySelect): The select entity representing the device.
-        option (str): The option key representing the desired auto-off duration (mapped to hours).
-    
-    Raises:
-        HomeAssistantError: With translation_key "invalid_select_option" when `option` is not a supported choice.
-    """
     if option not in _AUTO_OFF_OPTION_TO_HOURS:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     hours = _AUTO_OFF_OPTION_TO_HOURS[option]
@@ -605,15 +482,6 @@ def _storm_minutes_current(entity: JackerySelect) -> str | None:
 
 
 async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
-    """
-    Set the storm-warning lead time from a select option label and apply it to the device.
-    
-    Parameters:
-        option (str): Option label in the form "min_{minutes}", where {minutes} is an integer number of minutes.
-    
-    Raises:
-        HomeAssistantError: with translation key "invalid_select_option" when `option` does not match the required "min_{minutes}" pattern.
-    """
     match = re.fullmatch(r"min_(\d+)", option)
     if not match:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -633,19 +501,6 @@ def _price_mode_current(entity: JackerySelect) -> str | None:
 
 
 async def _price_mode_select(entity: JackerySelect, option: str) -> None:
-    """
-    Select the electricity price mode for the given entity.
-    
-    Validates the provided option and requests the coordinator to set either dynamic or single price mode. If `option` does not map to a known price mode, raises an action error. If dynamic mode is requested but not available for this entity (and the entity is not already in dynamic mode), raises an action error.
-    
-    Parameters:
-    	entity (JackerySelect): The select entity instance to act on.
-    	option (str): The option label to select; must map to a known price mode.
-    
-    Raises:
-    	HomeAssistantError: With translation_key `"invalid_select_option"` when `option` is not valid.
-    	HomeAssistantError: With translation_key `"dynamic_tariff_unavailable"` when dynamic mode is requested but unavailable and the entity is not already using dynamic mode.
-    """
     mode = _OPTION_TO_PRICE_MODE.get(option)
     if mode is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -676,17 +531,6 @@ def _price_provider_options(entity: JackerySelect) -> list[str]:
 
 
 def _price_provider_current(entity: JackerySelect) -> str | None:
-    """
-    Determine the current electricity price provider option label for the given select entity.
-    
-    If the entity has no configured provider company id, returns `None`. Otherwise returns the label of the first matching provider found in the entity payload; if none match, returns a synthetic label built from the entity's current company id, region, and company name.
-    
-    Parameters:
-        entity (JackerySelect): Select entity whose price configuration and payload are evaluated.
-    
-    Returns:
-        str | None: The provider label when available, or `None` if no provider company id is configured.
-    """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
     if company_id in (None, ""):
@@ -702,16 +546,6 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
 
 
 async def _price_provider_select(entity: JackerySelect, option: str) -> None:
-    """
-    Selects the electricity price provider whose label matches the given option and sets it on the device.
-    
-    Parameters:
-        entity (JackerySelect): The select entity whose coordinator and payload are used to locate available price sources.
-        option (str): The provider label to match against labels derived from payload price sources.
-    
-    Raises:
-        HomeAssistantError: with translation_key "invalid_select_option" when no matching provider label is found.
-    """
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_label(source) == option:
             await entity.coordinator.async_set_price_source(entity._device_id, source)
@@ -720,12 +554,6 @@ async def _price_provider_select(entity: JackerySelect, option: str) -> None:
 
 
 def _ct_phase_current(entity: JackerySelect) -> str | None:
-    """
-    Map the device CT meter's configured phase value from the payload to the corresponding select option.
-    
-    Returns:
-        str: The mapped option string for the CT phase, or `None` if the CT meter payload is missing, the phase value is absent/unparseable, or there is no mapping for the parsed phase.
-    """
     ct = entity._payload.get(PAYLOAD_CT_METER) or {}
     if not isinstance(ct, dict):
         return None
@@ -736,17 +564,6 @@ def _ct_phase_current(entity: JackerySelect) -> str | None:
 
 
 async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
-    """
-    Set the CT meter phase for the entity using the provided select option.
-    
-    Maps the given option to a numeric CT phase, validates the CT meter payload and serial number, and requests the coordinator to apply the phase.
-    
-    Parameters:
-        option (str): Label that corresponds to a CT phase option; must match a recognized CT-phase select option.
-    
-    Raises:
-        HomeAssistantError: if `option` is not recognized (`invalid_select_option`), if the CT meter payload is missing or not a dict (`entity_action_failed`), or if the CT meter serial is missing (`entity_action_failed`).
-    """
     phase = _OPTION_TO_CT_PHASE.get(option)
     if phase is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -858,13 +675,6 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[SelectEntity], entity: SelectEntity) -> None:
-        """
-        Append a select entity to the provided list if its unique ID has not already been registered.
-        
-        Parameters:
-            entities (list[SelectEntity]): Target list to which the entity will be appended when unique.
-            entity (SelectEntity): The select entity to append if not already seen.
-        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="select", logger=_LOGGER
         )
@@ -872,16 +682,17 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
     def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
-        """
-        Decides whether a select entity type should be created for the given device payload.
-        
+        """Determine whether a select entity identified by `key` should be created for a device described by `payload`.
+
+        Checks device payload fields and the `supports_advanced` flag to decide if the given select type is applicable for the device.
+
         Parameters:
-            key: Description key identifying the select entity type (for example, "work_mode_select").
-            payload: Device payload containing properties, price, weather-plan, and related fields.
-            supports_advanced: When True, enables selects that otherwise require specific payload fields.
-        
+            key (str): Description key identifying the select entity type (e.g., "work_mode_select").
+            payload (dict[str, Any]): Device payload containing properties, price and weather-plan information.
+            supports_advanced (bool): Whether the device advertises advanced feature support; enables selects that otherwise require specific payload fields.
+
         Returns:
-            True if the select identified by `key` is applicable to the device described by `payload`, False otherwise.
+            bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
         """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
@@ -918,13 +729,12 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         return False
 
     def _collect_entities() -> list[SelectEntity]:
-        """
-        Collect Select entities for coordinator-managed devices whose payloads indicate the feature is applicable.
-        
-        Instantiates a JackerySelect for each device/description pair when the device payload and capabilities indicate the description should be created, and filters duplicates so each returned entity has a unique identifier.
-        
+        """Collect JackerySelect entities for coordinator devices that meet the module gating rules.
+
+        Iterates coordinator.data and, for each device, instantiates a JackerySelect for each description whose key passes _gate(description.key, payload, supports_advanced). Ensures created entities have unique identifiers by filtering duplicates.
+
         Returns:
-            list[SelectEntity]: Created select entity instances for eligible devices.
+            list[SelectEntity]: Created JackerySelect instances for eligible devices.
         """
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
