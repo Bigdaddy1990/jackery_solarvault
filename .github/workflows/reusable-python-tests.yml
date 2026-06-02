@@ -200,7 +200,7 @@ jobs:
           )
           PY
 
-          ruff check . --fix all || true
+          ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --add-noqa || true
