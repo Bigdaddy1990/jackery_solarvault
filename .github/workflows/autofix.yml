@@ -61,7 +61,7 @@ jobs:
         if: always()
       - name: Run pre-commit with fixes
         run: |
-          ruff check . --fix all || true
+          ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --extend-select RUF100 || true
