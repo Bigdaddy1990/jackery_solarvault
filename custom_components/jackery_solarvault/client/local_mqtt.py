@@ -193,9 +193,10 @@ class JackeryLocalMqttClient:
     # ------------------------------------------------------------------
 
     async def _async_run_session(self) -> None:
-        """Run one MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
-
-        On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
+        """
+        Run a single MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
+        
+        On successful connection, update internal connection state and timestamps, subscribe to the configured topic filter, and dispatch each received message to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Ensure the internal connected event is set before exiting so callers waiting in startup cannot deadlock.
         """
         connected = False
         try:
@@ -311,13 +312,18 @@ class JackeryLocalMqttClient:
         topic: str,
         payload: bytes | bytearray | str,
     ) -> None:
-        """Process a received MQTT message: record diagnostics, decode the payload, and forward a parsed JSON object (if any) to the configured sink.
-
-        If the payload is UTF-8 text and parses as a JSON object, that dict is delivered to the sink as `data`. If the payload is binary or cannot be decoded as UTF-8, the message is counted as dropped and `data` is `None`. If UTF-8 text parses as JSON but the result is not an object (e.g., a list or scalar), the message is counted as dropped and `data` is `None`. If JSON parsing fails (invalid JSON), `data` remains `None` but the dropped counter is not incremented. First-seen topic names are recorded up to LOCAL_MQTT_MAX_TOPIC_NAMES for diagnostics.
-
-        Parameters:
-            topic (str): MQTT topic name of the message.
-            payload (bytes | bytearray | str): Raw message payload; may be a string or bytes-like object.
+        """
+        Process a received MQTT message: update diagnostics, apply topic and payload guards, decode JSON object payloads, extract Jackery payload content when present, and forward the result to the configured sink.
+        
+        Behavior summary:
+        - Records first-seen topics (up to configured limit) and updates receive timestamps/counters.
+        - Drops messages that do not match the configured topic filter, match known high-volume noise topics, exceed the maximum payload size, or appear to be Home Assistant state event payloads; these increments the appropriate drop counters.
+        - If no sink is configured, parsing and forwarding are skipped.
+        - Treats string payloads as UTF-8 text and attempts to parse JSON. Only JSON objects are accepted for extraction; non-object JSON and binary/non-decodable payloads are counted as dropped.
+        - When a JSON object is present, extracts the local Jackery payload via the module extractor; if extraction fails the message is counted as a Home Assistant event and dropped.
+        - If extraction succeeds (or JSON object is accepted), schedules the sink callback with (topic, data, raw_bytes); `data` is the extracted dict or `None` if no object payload is available.
+        
+        Note: This function does not return a value; forwarding is performed asynchronously via the configured sink.
         """
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
@@ -395,7 +401,12 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
-        """Return True for known high-volume non-device topics."""
+        """
+        Determines whether a topic is a known high-volume non-device topic that should be ignored.
+        
+        Returns:
+            True if the topic should be dropped (for example topics starting with `$SYS/`, or topics starting with `homeassistant/` when the configured topic filter is globally broad), False otherwise.
+        """
         if topic.startswith("$SYS/"):
             return True
         if not self._is_broad_topic_filter():
@@ -404,7 +415,12 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
-        """Return True for high-volume HA state events on a shared topic."""
+        """
+        Detect whether a payload looks like a Home Assistant "state_changed" event by scanning its initial bytes for event markers.
+        
+        Returns:
+            bool: `True` if the first 1024 bytes contain the JSON keys "event_type", "state_changed", "event_data", "old_state", and "new_state"; `False` otherwise.
+        """
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
             b'"event_type"' in head
@@ -418,7 +434,15 @@ class JackeryLocalMqttClient:
     def _extract_local_jackery_payload(
         payload: dict[str, Any],
     ) -> dict[str, Any] | None:
-        """Return a Jackery payload from raw JSON or an HA-event wrapper."""
+        """
+        Extract the Jackery device payload from a JSON object or a Home Assistant event wrapper.
+        
+        Parameters:
+            payload (dict[str, Any]): Parsed JSON object that may be a raw Jackery payload or an HA event wrapper.
+        
+        Returns:
+            dict[str, Any] | None: The extracted Jackery payload dict when found; the original `payload` if it is not an HA event wrapper; or `None` if `event_data` is malformed or no Jackery payload can be identified.
+        """
         if "event_type" not in payload or "event_data" not in payload:
             return payload
         event_data = payload.get("event_data")
@@ -438,12 +462,28 @@ class JackeryLocalMqttClient:
         return None
 
     def _is_broad_topic_filter(self) -> bool:
-        """Return True when the current topic filter is globally broad."""
+        """
+        Determine whether the configured topic filter matches all topics.
+        
+        Returns:
+            bool: `True` if the configured topic filter is exactly "#" or "+/#", `False` otherwise.
+        """
         return self._topic_filter in {"#", "+/#"}
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
-        """Evaluate MQTT wildcard matching for one topic filter."""
+        """
+        Determine whether an MQTT topic matches a single MQTT topic filter supporting `+` and `#` wildcards.
+        
+        The filter follows MQTT rules: `+` matches exactly one topic level, `#` matches all remaining levels and only valid at the final filter level, and an empty filter never matches.
+        
+        Parameters:
+        	topic_filter (str): MQTT topic filter to evaluate (may contain `+` and `#`).
+        	topic (str): Concrete MQTT topic to test against the filter.
+        
+        Returns:
+        	bool: `true` if `topic` matches `topic_filter`, `false` otherwise.
+        """
         if not topic_filter:
             return False
         if topic_filter == "#":
@@ -461,14 +501,20 @@ class JackeryLocalMqttClient:
         return len(filter_levels) == len(topic_levels)
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        """Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions from it.
-
+        """
+        Schedule an awaitable to run as a Home Assistant background task and log any non-cancellation exceptions.
+        
         Parameters:
-            coro (Awaitable[None]): Coroutine to run as a background task.
-            label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
+            coro (Awaitable[None]): Awaitable to execute in the background.
+            label (str): Short label used to name the task as `jackery_local_mqtt_{label}` and included in error logs.
         """
 
         async def _runner() -> None:
+            """
+            Await the provided coroutine until it completes.
+            
+            This helper awaits the captured coroutine and allows any exceptions (including CancelledError) to propagate to the task so they can be observed by the task's completion handlers.
+            """
             await coro
 
         task = self._hass.async_create_task(
@@ -476,12 +522,13 @@ class JackeryLocalMqttClient:
         )
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """Log any non-cancellation exception from a completed asyncio Task.
-
-            Retrieves the task result to surface exceptions raised by the task; ignores CancelledError. Logs other exceptions at error level with context identifying the handler label.
-
+            """
+            Log any exception raised by a completed asyncio Task, ignoring cancellations.
+            
+            Retrieves the task result to surface exceptions raised by the task; if the task was cancelled the function returns silently. Any other exception is logged at error level with handler label context.
+            
             Parameters:
-                done (asyncio.Task[None]): Completed task whose exception, if raised, will be logged.
+                done (asyncio.Task[None]): Completed asyncio Task whose exception, if any, will be logged.
             """
             try:
                 done.result()

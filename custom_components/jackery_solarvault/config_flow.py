@@ -93,8 +93,9 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
 
 
 def _normalize_account(value: str) -> str:
-    """Normalize an account identifier by stripping leading and trailing whitespace.
-
+    """
+    Normalize an account identifier by removing leading and trailing whitespace.
+    
     Returns:
         The account identifier with leading and trailing whitespace removed.
     """
@@ -126,14 +127,15 @@ def _flow_options(
     user_input: dict[str, Any],
     current_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Produce a complete options dictionary by taking values from `user_input` when present, otherwise preserving `current_options`, and finally falling back to the integration's typed defaults.
-
+    """
+    Build a complete options mapping where each known option key is resolved from the submitted value, otherwise preserved from current options, otherwise taken from the integration defaults.
+    
     Parameters:
-        user_input (dict[str, Any]): Option values provided by the user; may omit keys.
-        current_options (dict[str, Any] | None): Existing stored option values to preserve when `user_input` omits a key.
-
+        user_input (dict[str, Any]): Option values submitted by the user; may omit keys.
+        current_options (dict[str, Any] | None): Previously stored option values to use when `user_input` omits a key.
+    
     Returns:
-        dict[str, Any]: A merged options dictionary containing every known option key with its resolved value.
+        dict[str, Any]: Mapping of every known option key to its resolved value.
     """
     current = current_options or {}
     merged: dict[str, Any] = {}
@@ -177,15 +179,16 @@ class JackeryOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Present the options form for the integration or create an options entry from submitted values.
-
-        When `user_input` is provided, merge the submitted values with the current stored options and create an options entry. When `user_input` is None, show the options form populated with defaults from the current entry options (BLE, sensor-creation, diagnostics, and third-party MQTT settings).
-
+        """
+        Show the options form for the integration or create an options entry from submitted values.
+        
+        If `user_input` is provided, merge it with the current stored options and create an options entry. If `user_input` is `None`, display the options form populated with defaults from the current entry options (BLE, sensor-creation, diagnostics, and third-party MQTT settings).
+        
         Parameters:
-            user_input (dict[str, Any] | None): Submitted form values, or None to render the form.
-
+            user_input (dict[str, Any] | None): Submitted form values, or `None` to render the form.
+        
         Returns:
-            ConfigFlowResult: The created options entry result, or a form result to display to the user.
+            ConfigFlowResult: The created options entry when values were submitted, or a form result to display to the user.
         """
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
@@ -329,12 +332,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Reconfigure an existing config entry by validating provided account credentials and updating stored username, password, and options.
-
-        Validates that the submitted username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. If input is missing or invalid, presents the reconfigure form prefilled with current option defaults. Aborts if the reconfigure target is missing or the provided account does not match the entry.
-
+        """
+        Handle reconfiguration of an existing config entry by validating credentials and updating the stored account data and options.
+        
+        Validates that the submitted username matches the entry being reconfigured, authenticates the credentials against the Jackery service, and on success updates the entry's username, password, and options (then reloads the entry). If input is missing or invalid, presents the reconfigure form prefilled with current option defaults. Aborts if the reconfigure target is missing or the provided account does not match the entry.
+        
         Returns:
-            A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.
+            A ConfigFlowResult that either shows the reconfigure form with any validation errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.
         """
         try:
             entry = self._get_reconfigure_entry()
@@ -459,13 +463,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for the account's current password and validate it against Jackery to complete reauthentication.
-
+        """
+        Prompt for the account's current password and validate it with Jackery to complete reauthentication.
+        
+        If the submitted password authenticates, update the stored entry password, reload the entry, and finish the reauthentication flow. If authentication fails or no input is provided, show the password form with appropriate error feedback.
+        
         Parameters:
-            user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when submitted.
-
+            user_input (dict[str, Any] | None): Form data containing CONF_PASSWORD when submitted.
+        
         Returns:
-            ConfigFlowResult: The next flow result (shows the password form on error or missing input, aborts and updates the entry on successful reauthentication).
+            ConfigFlowResult: The next flow result — shows the password form on missing/invalid input, or aborts after a successful reauthentication and update.
         """
         try:
             entry = self._get_reauth_entry()
