@@ -24,6 +24,9 @@ updates:
           - "pytest*"
           - "hypothesis"
           - "coverage"
+          - "codecov"
+          - "codefactor"
+          - "mypy"
       security:
         patterns:
           - "bandit"
@@ -32,6 +35,8 @@ updates:
         patterns:
           - "ruff"
           - "mypy"
+          - "pre-commit"
+          - "typing*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -48,8 +53,20 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "⬆️"
+      prefix-development: "⬆️ [dev]"
   - package-ecosystem: "uv" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "⬆️"
+      prefix-development: "⬆️ [dev]"
 
