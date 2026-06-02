@@ -602,20 +602,19 @@ class JackeryApi:
         )
 
     @staticmethod
-     def _auth_failure_message(  # noqa: E111, E113
-         method: str, path: str, status: int, data: object
-     ) -> str:
-         """Build a compact auth-failure message without exposing secrets."""  # noqa: E111
-         if isinstance(data, dict):  # noqa: E111
-             code = data.get(FIELD_CODE)  # noqa: E111
-             msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")  # noqa: E111
-         else:  # noqa: E111
-             code = None  # noqa: E111
-             msg = data  # noqa: E111
-          return (  # noqa: E305
-              f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
-          )
-
+    def _auth_failure_message(
+        method: str, path: str, status: int, data: object
+    ) -> str:
+        """Build a compact auth-failure message without exposing secrets."""
+        if isinstance(data, dict):
+            code = data.get(FIELD_CODE)
+            msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
+        else:
+            code = None
+            msg = data
+        return (
+            f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
+        )
     async def _emit_payload_debug(  # noqa: E113
         self,
         event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
