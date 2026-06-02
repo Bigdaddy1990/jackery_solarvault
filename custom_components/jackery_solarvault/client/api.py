@@ -602,13 +602,19 @@ class JackeryApi:
         )
 
     @staticmethod
-    def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
-        """Build a compact auth-failure message without exposing secrets."""
-        code = data.get(FIELD_CODE)
-        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
-        return (
-            f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
-        )
+     def _auth_failure_message(
+         method: str, path: str, status: int, data: object
+     ) -> str:
+         """Build a compact auth-failure message without exposing secrets."""
+         if isinstance(data, dict):
+             code = data.get(FIELD_CODE)
+             msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
+         else:
+             code = None
+             msg = data
+          return (
+              f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
+          )
 
     async def _emit_payload_debug(
         self,
