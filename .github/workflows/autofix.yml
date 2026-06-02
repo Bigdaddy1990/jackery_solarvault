@@ -23,8 +23,7 @@ jobs:
     timeout-minutes: 30
     env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '2026.5.4' }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -70,4 +69,12 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+          pre-commit run --hook-stage manual python-typing-update pyupgrade --check --py314-plus || true
+
+
+      - name: Run test requirements and localization sync
+        run: |
+          python -m scripts.enforce_test_requirements || true
+          python -m scripts.sync_localization_flags \
+            --allowlist scripts/sync_localization_flags.allowlist \
+            --check || true
