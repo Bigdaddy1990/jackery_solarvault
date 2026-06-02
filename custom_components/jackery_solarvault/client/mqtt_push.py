@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
-logging.getLogger("aiomqtt").setLevel(logging.WARNING)
+_AIOMQTT_LOGGER.setLevel(logging.WARNING)
 
 
 class _AioMqttPassiveDisconnectFilter(logging.Filter):

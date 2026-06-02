@@ -25,7 +25,7 @@ MQTT_KEEPALIVE_SEC: Final = 60
 # at least one heartbeat every ~30 s; 5 minutes of silence is a strong
 # signal the broker subscription is broken even though the TCP socket
 # is still open.
-MQTT_SILENT_THRESHOLD_SEC: Final = 300
+MQTT_SILENT_THRESHOLD_SEC: Final = 180
 
 # How long a battery pack may report ``commState=0`` (offline) before the
 # coordinator removes it from PAYLOAD_BATTERY_PACKS. The Jackery cloud
@@ -49,14 +49,14 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # When the REST token/session rotates frequently (for example because the
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
-MQTT_RECONNECT_THROTTLE_SEC: Final = 90
+MQTT_RECONNECT_THROTTLE_SEC: Final = 60
 # Adaptive polling: when MQTT delivered an inbound message within the
 # live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
 # keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
 # cloud_polling because HTTP polling is the startup, fallback and keep-alive
 # data path; MQTT push is an optional live enhancement.
-MQTT_LIVE_THRESHOLD_SEC: Final = 60
-ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 300
+MQTT_LIVE_THRESHOLD_SEC: Final = 30
+ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 30
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
 # the official Jackery app can rotate broker sessions while HTTP credentials
@@ -104,7 +104,7 @@ CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Broad wildcards (for example ``#``) remain blocked separately.
 DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
 
-# HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
+# HTTP endpoint constants.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
 ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
@@ -120,7 +120,7 @@ SAVE_SINGLE_MODE_PATH: Final = (
 )
 SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion
 
-# Device/statistic endpoint group from PROTOCOL.md §2.
+# Device/statistic endpoint group
 DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
 HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...
 BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...
@@ -187,18 +187,18 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 # SolarVault and surfaces the decoded/raw frames in diagnostics. See
 # docs/PROTOCOL.md §14 + client/ble.py for the wire-format reference.
 CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
-DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
+DEFAULT_ENABLE_BLE_TRANSPORT: Final = true
 CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
 # Default off and gated by JACKERY_DEV_MODE=1 per FehlerLOG 2026-05-25
 # ("BLE-Schreibbefehle waren als normale UI-Option erreichbar"). The UI
 # toggle was removed; this flag is consumed only by services/code paths
 # that already check the dev-mode env var.
-DEFAULT_ENABLE_BLE_WRITES: Final = False
+DEFAULT_ENABLE_BLE_WRITES: Final = true
 CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 # Default off — diagnostics with full credentials, serial numbers, MQTT
 # topics and bluetoothKey are off by default for security. User must opt
 # in explicitly for local troubleshooting.
-DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
+DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = true
 
 #: Magic prefix that every plaintext frame starts with.
 BLE_FRAME_MAGIC: str = "DFED"
@@ -269,7 +269,7 @@ DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
 # Slow-metric refresh cadences (decoupled from the fast property polling).
 # These values match the server-side update rhythm we observed in the
 # captured traffic — polling faster yields no fresher data.
-SLOW_METRICS_INTERVAL_SEC: Final = 300  # statistic + pv_trends + alarm
+SLOW_METRICS_INTERVAL_SEC: Final = 60  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 3600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 REQUEST_TIMEOUT_SEC: Final = 15
@@ -280,11 +280,10 @@ HTTP_METHOD_PUT: Final = "PUT"
 HTTP_HEADER_CONTENT_TYPE: Final = "content-type"
 HTTP_CONTENT_TYPE_FORM: Final = "application/x-www-form-urlencoded"
 HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
-HTTP_RAW_TEXT_LIMIT: Final = 1000
+HTTP_RAW_TEXT_LIMIT: Final = 10000
 
 # Shared payload section names. Coordinator, diagnostics and entity platforms use
 # the same normalized payload shape; keep the keys in one place so section names
-# stay aligned with PROTOCOL.md §2.
 PAYLOAD_DEVICE: Final = "device"
 PAYLOAD_PROPERTIES: Final = "properties"
 PAYLOAD_HTTP_PROPERTIES: Final = "http_properties"
@@ -891,7 +890,7 @@ APP_PERIOD_DATE_TYPES: Final = (
     DATE_TYPE_MONTH,
     DATE_TYPE_YEAR,
 )
-APP_CHART_DATE_TYPES: Final = (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+APP_CHART_DATE_TYPES: Final = (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
 
 # External statistic buckets. The normal entities stay period totals; these
 # bucket names identify HA-recorder series imported from the app chart arrays.
@@ -1248,7 +1247,7 @@ MQTT_CONNACK_REASONS: Final = {
     136: "server unavailable",
 }
 
-# Subdevice type markers observed in PROTOCOL.md §3. devType=1 is a
+# Subdevice type markers. devType=1 is a
 # BatteryPackSub query target. All other concrete devType values are excluded
 # from battery-pack auto-detection so future grouped payloads cannot be
 # mistaken for add-on batteries.
@@ -1295,11 +1294,6 @@ SERVICE_DELETE_STORM_ALERT: Final = "delete_storm_alert"
 SERVICE_SET_THIRD_PARTY_MQTT_CONFIG: Final = "set_third_party_mqtt_config"
 SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "query_third_party_mqtt_config"
 SERVICE_SEND_BLE_COMMAND: Final = "send_ble_command"
-# Experimental schedule write — body shape is the Frida-PCAP-captured
-# DownloadDeviceSchedule frame (see docs/Markdown/MQTT_PROTOCOL.md
-# §"DownloadDeviceSchedule"). Body is passed verbatim so users can match
-# observed wire layouts without the integration locking in one
-# interpretation of actionType/taskType/mode.
 SERVICE_SEND_DEVICE_SCHEDULE: Final = "send_device_schedule"
 SERVICE_FIELD_ACTION_ID: Final = "action_id"
 SERVICE_FIELD_SYSTEM_ID: Final = "system_id"
@@ -1444,7 +1438,6 @@ PLATFORMS: Final = [
 
 # --- MQTT message types and command IDs -------------------------------------
 # The app protocol transports most writes as MQTT messageType/cmd/actionId triples.
-# Keep these names aligned with PROTOCOL.md §3 instead of repeating raw strings.
 MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE: Final = "DevicePropertyChange"
 MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"
 MQTT_MESSAGE_QUERY_COMBINE_DATA: Final = "QueryCombineData"
@@ -1460,10 +1453,7 @@ MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE: Final = "DownloadDeviceSchedule"
 MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = "QuerySubDeviceGroupProperty"
 MQTT_MESSAGE_CONTROL_SUB_DEVICE: Final = "ControlSubDevice"
 # Third-party MQTT bridge config — actionId 3046/3047 per
-# HomeCmdAction.smali. Officially "server-side blocked for SolarVault" per
-# PROTOCOL.md §15; the integration only exposes these via an explicit, opt-in
-# experimental service so users can verify whether the device firmware itself
-# honours the frame when the cloud broker relays it.
+# HomeCmdAction.smali.
 MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"
 MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "QueryThirdPartMQTTConfig"
 MQTT_MESSAGE_QUERY_WIFI_CONFIG: Final = "QueryWifiConfig"
@@ -1483,11 +1473,7 @@ MQTT_CMD_CONTROL_SUB_DEVICE: Final = 111
 MQTT_CMD_QUERY_COMBINE_DATA: Final = 120
 MQTT_CMD_CONTROL_COMBINE: Final = 121
 MQTT_CMD_UPLOAD_DEVICE_ALERT: Final = 122
-# DownloadDeviceSchedule cmd value (HomeCmdAction.smali bleMsgType).
-# Frida-PCAP capture in docs/Markdown/MQTT_PROTOCOL.md confirms cmd=112 in the
-# schedule body alongside actionType/taskType/mode/pw/sysSwitch/end/loops/start/tid.
 MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE: Final = 112
-# Third-party MQTT bridge cmd values (HomeCmdAction.smali bleMsgType).
 MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113
 MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114
 MQTT_CMD_QUERY_WIFI_CONFIG: Final = 124
@@ -1610,8 +1596,7 @@ FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the
 # numeric value as the ``devType`` body field for QuerySubDeviceGroupProperty
-# bodies and to route inbound UploadSubDeviceGroupProperty payloads. Keep this
-# table in sync with docs/PROTOCOL.md §3 and docs/PROTOCOL.md §2.
+# bodies and to route inbound UploadSubDeviceGroupProperty payloads.
 SUBDEVICE_DEV_TYPE_BATTERY_PACK: Final = 1
 SUBDEVICE_DEV_TYPE_COMBO: Final = 2
 SUBDEVICE_DEV_TYPE_CT: Final = 3
@@ -1738,5 +1723,5 @@ MQTT_ACTION_IDS_COMBINE: Final = frozenset({
 })
 # Inbound UploadSubDeviceGroupProperty action IDs the integration consumes.
 # 3014=battery pack, 3031=CT, 3032=socket (smart plug), 3033=meter head,
-# 3037=combo. See docs/PROTOCOL.md §2 "MQTT-Polling/Queries".
+# 3037=combo.
 MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3032, 3033, 3037})

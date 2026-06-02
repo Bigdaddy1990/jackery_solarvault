@@ -94,8 +94,10 @@ async def async_load_daily_cache(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
-                continue
+            except TypeError:
+                 continue
+            except ValueError:
+                 continue
         result[str(device_id)] = {
             _KEY_DAY: day,
             _KEY_VALUES: clean_values,
@@ -141,8 +143,10 @@ async def async_save_daily_cache(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
-                continue
+            except TypeError:
+                 continue
+            except ValueError:
+                 continue
         cleaned[str(device_id)] = {
             _KEY_DAY: day,
             _KEY_VALUES: clean_values,
@@ -222,8 +226,10 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
-                continue
+            except TypeError:
+                 continue
+            except ValueError:
+                 continue
         return {_KEY_DAY: today_iso, _KEY_VALUES: clean_values}
     existing_values = snapshot.get(_KEY_VALUES)
     if not isinstance(existing_values, dict):
@@ -234,8 +240,10 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
-            continue
+        except TypeError:
+                 continue
+        except ValueError:
+                 continue
     for metric, value in current_values.items():
         if metric in merged:
             continue
@@ -243,8 +251,10 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
-            continue
+        except TypeError:
+                 continue
+             except ValueError:
+                 continue
     return {_KEY_DAY: today_iso, _KEY_VALUES: merged}
 
 

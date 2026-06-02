@@ -89,8 +89,10 @@ def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401  # arbitrary payloa
         return None
     try:
         return int(raw) == 1
-    except TypeError, ValueError:
-        return safe_bool(raw)
+    except ValueError:
+         return safe_bool(raw)
+    except TypeError:
+         return safe_bool(raw)
 
 
 @dataclass(frozen=True, kw_only=True)

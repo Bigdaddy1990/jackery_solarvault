@@ -615,7 +615,8 @@ class JackeryApi:
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
-    async def _emit_payload_debug(  # noqa: E113
+
+    async def _emit_payload_debug(
         self,
         event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
     ) -> None:
@@ -1111,10 +1112,11 @@ class JackeryApi:
         Returns:
             dict: Parsed JSON response containing KPI fields such as `de` (feed-in), `dg` (grid import), `dh` (home load), and `ds` (battery energy).
         """
-        return await self._get_json(
+        data = await self._get_json(
             DEVICE_TODAY_ENERGY_PATH,
             params={FIELD_DEVICE_SN: str(device_sn)},
         )
+        return self._payload_dict(data, DEVICE_TODAY_ENERGY_PATH)
 
     async def async_get_device_meter_stat(
         self,
@@ -1653,9 +1655,15 @@ class JackeryApi:
             JackeryApiError: If `single_price` is negative or `currency` is empty.
         """
         price = float(single_price)
+        try:
+            price = float(single_price)
+        except TypeError as err:
+            raise JackeryApiError("single_price has invalid type") from err
+        except ValueError as err:
+            raise JackeryApiError("single_price has invalid value") from err
         if price < 0:
             raise JackeryApiError("single_price must be >= 0")
-        cur = str(currency or "").strip()
+         cur = str(currency or "").strip()
         if not cur:
             raise JackeryApiError("currency must be a non-empty string")
         # Keep stable decimal formatting for backend parsing.

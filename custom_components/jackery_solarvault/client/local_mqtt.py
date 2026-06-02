@@ -471,7 +471,7 @@ class JackeryLocalMqttClient:
         async def _runner() -> None:
             await coro
 
-        task = self._hass.async_create_background_task(
+        task = self._hass.async_create_task(
             _runner(), name=f"jackery_local_mqtt_{label}"
         )
 

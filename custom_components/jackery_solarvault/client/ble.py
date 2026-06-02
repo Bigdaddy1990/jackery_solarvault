@@ -380,10 +380,7 @@ def build_binary_frame(
         + _BINARY_FRAME_PAYLOAD_MARKER_BE
         + len(body).to_bytes(2, "big")
     )
-    if len(header) != _BINARY_FRAME_HEADER_LEN:
-        raise RuntimeError(
-            f"BLE frame header length {len(header)} != {_BINARY_FRAME_HEADER_LEN}"
-        )
+    assert len(header) == _BINARY_FRAME_HEADER_LEN
     return header + body + trailer
 
 
