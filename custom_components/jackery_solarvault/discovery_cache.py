@@ -1,6 +1,7 @@
 """Persistent discovery cache for local offline startup."""
 
-from typing import Any, Final
+from typing import Any
+from typing import Final
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -9,8 +10,8 @@ from .const import DOMAIN
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"
-_KEY_ENTRIES: Final = 'entries'
-_KEY_DEVICE_INDEX: Final = 'device_index'
+_KEY_ENTRIES: Final = "entries"
+_KEY_DEVICE_INDEX: Final = "device_index"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -23,7 +24,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 
 async def async_load_discovery_cache(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant,
+    entry_id: str,
 ) -> dict[str, dict[str, Any]]:
     """Load the cached device index for one config entry."""
     data = await _store(hass).async_load()
@@ -61,7 +63,7 @@ async def async_save_discovery_cache(
     entries[entry_id] = {
         _KEY_DEVICE_INDEX: {
             str(device_id): dict(value) for device_id, value in device_index.items()
-        }
+        },
     }
     data[_KEY_ENTRIES] = entries
     await store.async_save(data)

@@ -18,7 +18,8 @@ is explicit.
 import asyncio
 import logging
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -342,7 +343,8 @@ def test_handle_message_drops_non_dict_json() -> None:
         return None
 
     client = _make_client(sink=_sink, topic_filter="topic")
-    client._schedule_coroutine = lambda coro, label: coro.close()  # type: ignore[method-assign]
+    # type: ignore[method-assign]
+    client._schedule_coroutine = lambda coro, label: coro.close()
     client._handle_message("topic", b"[1, 2, 3]")
     assert client._messages_dropped == 1
     assert client._messages_received == 1
@@ -355,7 +357,8 @@ def test_handle_message_drops_non_utf8_binary() -> None:
         return None
 
     client = _make_client(sink=_sink, topic_filter="topic")
-    client._schedule_coroutine = lambda coro, label: coro.close()  # type: ignore[method-assign]
+    # type: ignore[method-assign]
+    client._schedule_coroutine = lambda coro, label: coro.close()
     client._handle_message("topic", b"\xff\xfe\xfd")  # invalid UTF-8
     assert client._messages_dropped == 1
 

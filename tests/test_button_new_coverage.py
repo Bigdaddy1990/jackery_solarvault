@@ -16,7 +16,9 @@ Covers:
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -147,7 +149,7 @@ class TestStormAlerts:
                 {"alertId": None},  # None alertId
                 {"alertId": ""},  # empty alertId
                 {"alertId": "valid-id"},  # valid alert
-            ]
+            ],
         }
         result = fn(weather_plan)
         assert len(result) == 1
@@ -161,7 +163,7 @@ class TestStormAlerts:
                 {"alertId": "alert-1", "status": 1},
                 {"alertId": "alert-2", "status": 0},
                 {"alertId": "alert-3"},
-            ]
+            ],
         }
         result = fn(weather_plan)
         assert len(result) == 3
@@ -175,7 +177,7 @@ class TestStormAlerts:
                 None,
                 42,
                 {"alertId": "valid"},
-            ]
+            ],
         }
         result = fn(weather_plan)
         assert len(result) == 1
@@ -339,13 +341,17 @@ class TestQueryButtonDescriptions:
 
     def test_is_a_tuple(self) -> None:
         """QUERY_BUTTON_DESCRIPTIONS must be a tuple."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         assert isinstance(QUERY_BUTTON_DESCRIPTIONS, tuple)
 
     def test_has_expected_count(self) -> None:
         """Must have exactly 14 descriptions as implemented."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         assert len(QUERY_BUTTON_DESCRIPTIONS) == 14
 
@@ -361,7 +367,9 @@ class TestQueryButtonDescriptions:
 
     def test_subdevice_entries_have_dev_type(self) -> None:
         """All subdevice query descriptions must have a non-None dev_type."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         subdevice_keys = {
             "refresh_battery_packs",
@@ -372,13 +380,13 @@ class TestQueryButtonDescriptions:
         }
         for desc in QUERY_BUTTON_DESCRIPTIONS:
             if desc.key in subdevice_keys:
-                assert desc.dev_type is not None, (
-                    f"{desc.key} should have dev_type"
-                )
+                assert desc.dev_type is not None, f"{desc.key} should have dev_type"
 
     def test_non_subdevice_entries_have_no_dev_type(self) -> None:
         """Non-subdevice query descriptions must have dev_type=None."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         non_subdevice_keys = {
             "refresh_system_info",
@@ -393,23 +401,27 @@ class TestQueryButtonDescriptions:
         }
         for desc in QUERY_BUTTON_DESCRIPTIONS:
             if desc.key in non_subdevice_keys:
-                assert desc.dev_type is None, (
-                    f"{desc.key} should not have dev_type"
-                )
+                assert desc.dev_type is None, f"{desc.key} should not have dev_type"
 
     def test_all_entries_have_unique_keys(self) -> None:
         """All description keys must be unique."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         keys = [desc.key for desc in QUERY_BUTTON_DESCRIPTIONS]
         assert len(keys) == len(set(keys))
 
     def test_all_entries_have_mdi_icons(self) -> None:
         """All descriptions must have an mdi: icon."""
-        from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+        from custom_components.jackery_solarvault.button import (
+            QUERY_BUTTON_DESCRIPTIONS,
+        )
 
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert desc.icon.startswith("mdi:"), f"{desc.key} icon should start with mdi:"
+            assert desc.icon.startswith("mdi:"), (
+                f"{desc.key} icon should start with mdi:"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -417,7 +429,9 @@ class TestQueryButtonDescriptions:
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_coordinator(device_id: str = "12345", payload: dict | None = None) -> MagicMock:
+def _make_mock_coordinator(
+    device_id: str = "12345", payload: dict | None = None
+) -> MagicMock:
     """Create a mock coordinator with given device data."""
     coordinator = MagicMock()
     coordinator.data = {device_id: payload or {}}
@@ -695,7 +709,9 @@ def _make_delete_storm_alert_button(
     coordinator_data: dict | None = None,
 ):
     """Construct a JackeryDeleteStormAlertButton with a mock coordinator."""
-    from custom_components.jackery_solarvault.button import JackeryDeleteStormAlertButton
+    from custom_components.jackery_solarvault.button import (
+        JackeryDeleteStormAlertButton,
+    )
 
     coordinator = _make_mock_coordinator(
         device_id,
@@ -731,8 +747,8 @@ class TestJackeryDeleteStormAlertButton:
                 "storm": [
                     {"alertId": "alert-1", "status": 1, "startTs": 100},
                     {"alertId": "alert-2", "status": 0},
-                ]
-            }
+                ],
+            },
         }
         btn = _make_delete_storm_alert_button("alert-1", coordinator_data=payload)
         alert = btn._alert
@@ -745,8 +761,8 @@ class TestJackeryDeleteStormAlertButton:
             "weather_plan": {
                 "storm": [
                     {"alertId": "alert-99"},
-                ]
-            }
+                ],
+            },
         }
         btn = _make_delete_storm_alert_button("missing-alert", coordinator_data=payload)
         assert btn._alert == {}
@@ -783,9 +799,9 @@ class TestJackeryDeleteStormAlertButton:
                         "endTs": 2000,
                         "status": 1,
                         "manual": True,
-                    }
-                ]
-            }
+                    },
+                ],
+            },
         }
         btn = _make_delete_storm_alert_button("a1", coordinator_data=payload)
         attrs = btn.extra_state_attributes
@@ -822,7 +838,9 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_calls_delete_and_refresh(self) -> None:
         """async_press must call async_delete_storm_alert and async_request_refresh."""
-        from custom_components.jackery_solarvault.button import JackeryDeleteStormAlertButton
+        from custom_components.jackery_solarvault.button import (
+            JackeryDeleteStormAlertButton,
+        )
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock()
@@ -837,11 +855,13 @@ class TestJackeryDeleteStormAlertButton:
         """ConfigEntryAuthFailed must propagate from async_press."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
-        from custom_components.jackery_solarvault.button import JackeryDeleteStormAlertButton
+        from custom_components.jackery_solarvault.button import (
+            JackeryDeleteStormAlertButton,
+        )
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
-            side_effect=ConfigEntryAuthFailed("bad creds")
+            side_effect=ConfigEntryAuthFailed("bad creds"),
         )
         coordinator.async_request_refresh = AsyncMock()
 
@@ -853,11 +873,13 @@ class TestJackeryDeleteStormAlertButton:
         """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""
         from homeassistant.exceptions import HomeAssistantError
 
-        from custom_components.jackery_solarvault.button import JackeryDeleteStormAlertButton
+        from custom_components.jackery_solarvault.button import (
+            JackeryDeleteStormAlertButton,
+        )
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
-            side_effect=RuntimeError("broker down")
+            side_effect=RuntimeError("broker down"),
         )
         coordinator.async_request_refresh = AsyncMock()
 
@@ -937,7 +959,9 @@ class TestJackeryReadScheduleButton:
 
     def test_custom_mode_task_type(self) -> None:
         """TIMER_TASK_TYPE_CUSTOM_MODE should be task type 2."""
-        from custom_components.jackery_solarvault.const import TIMER_TASK_TYPE_CUSTOM_MODE
+        from custom_components.jackery_solarvault.const import (
+            TIMER_TASK_TYPE_CUSTOM_MODE,
+        )
 
         assert TIMER_TASK_TYPE_CUSTOM_MODE == 2
         btn = _make_read_schedule_button(task_type=TIMER_TASK_TYPE_CUSTOM_MODE)
@@ -945,7 +969,9 @@ class TestJackeryReadScheduleButton:
 
     def test_smart_plug_task_type(self) -> None:
         """TIMER_TASK_TYPE_SMART_PLUG should be task type 1."""
-        from custom_components.jackery_solarvault.const import TIMER_TASK_TYPE_SMART_PLUG
+        from custom_components.jackery_solarvault.const import (
+            TIMER_TASK_TYPE_SMART_PLUG,
+        )
 
         assert TIMER_TASK_TYPE_SMART_PLUG == 1
         btn = _make_read_schedule_button(task_type=TIMER_TASK_TYPE_SMART_PLUG)
@@ -970,7 +996,9 @@ class TestJackeryReadScheduleButton:
 
     async def test_async_press_calls_read_schedule_and_refresh(self) -> None:
         """async_press must call async_read_device_schedule and async_request_refresh."""
-        from custom_components.jackery_solarvault.button import JackeryReadScheduleButton
+        from custom_components.jackery_solarvault.button import (
+            JackeryReadScheduleButton,
+        )
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_read_device_schedule = AsyncMock()
@@ -986,13 +1014,17 @@ class TestJackeryReadScheduleButton:
         )
         await btn.async_press()
         coordinator.async_read_device_schedule.assert_called_once_with(
-            "12345", task_type=2, plug_sn=""
+            "12345",
+            task_type=2,
+            plug_sn="",
         )
         coordinator.async_request_refresh.assert_called_once()
 
     async def test_async_press_with_plug_sn(self) -> None:
         """async_press with a plug_sn must pass it to async_read_device_schedule."""
-        from custom_components.jackery_solarvault.button import JackeryReadScheduleButton
+        from custom_components.jackery_solarvault.button import (
+            JackeryReadScheduleButton,
+        )
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_read_device_schedule = AsyncMock()
@@ -1009,7 +1041,9 @@ class TestJackeryReadScheduleButton:
         )
         await btn.async_press()
         coordinator.async_read_device_schedule.assert_called_once_with(
-            "12345", task_type=1, plug_sn="PLUG-SN-001"
+            "12345",
+            task_type=1,
+            plug_sn="PLUG-SN-001",
         )
 
 
@@ -1076,7 +1110,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
-            side_effect=ConfigEntryAuthFailed("creds rejected")
+            side_effect=ConfigEntryAuthFailed("creds rejected"),
         )
         coordinator.async_request_refresh = AsyncMock()
 
@@ -1094,7 +1128,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
-            side_effect=RuntimeError("cloud unreachable")
+            side_effect=RuntimeError("cloud unreachable"),
         )
         coordinator.async_request_refresh = AsyncMock()
 
@@ -1191,7 +1225,7 @@ def test_storm_alerts_preserves_order() -> None:
             {"alertId": "first"},
             {"alertId": "second"},
             {"alertId": "third"},
-        ]
+        ],
     }
     result = fn(weather)
     assert [a["alertId"] for a in result] == ["first", "second", "third"]

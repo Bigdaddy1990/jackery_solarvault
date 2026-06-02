@@ -25,11 +25,11 @@ def test_client_local_mqtt_can_be_imported() -> None:
         mod = importlib.import_module(mod_name)
     except SyntaxError as err:
         raise AssertionError(
-            f"client/local_mqtt.py has a SyntaxError — fix the except clause: {err}"
+            f"client/local_mqtt.py has a SyntaxError — fix the except clause: {err}",
         ) from err
     except ImportError as err:
         raise AssertionError(
-            f"client/local_mqtt.py raised ImportError — check dependencies: {err}"
+            f"client/local_mqtt.py raised ImportError — check dependencies: {err}",
         ) from err
 
     assert hasattr(mod, "JackeryLocalMqttClient"), (

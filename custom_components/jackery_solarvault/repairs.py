@@ -3,13 +3,14 @@
 import logging
 from typing import Any
 
+import voluptuous as vol
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-import voluptuous as vol
 
-from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
+from .const import DOMAIN
+from .const import REPAIR_ISSUE_APP_DATA_INCONSISTENCY
 from .coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,20 +26,24 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
     """
 
     def __init__(
-        self, entry_id: str | None, description_placeholders: dict[str, str]
+        self,
+        entry_id: str | None,
+        description_placeholders: dict[str, str],
     ) -> None:
         """Initialize the repair flow for one config entry."""
         self._entry_id = entry_id
         self._description_placeholders = description_placeholders
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Route the initial repair step to the confirmation form."""
         return await self.async_step_confirm()
 
     async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Show a confirmation form, and after the user submits, refresh integration data and complete the repair.
 
@@ -49,7 +54,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await self._async_force_refresh()
             return self.async_create_entry(data={})
         return self.async_show_form(
-            step_id='confirm',
+            step_id="confirm",
             data_schema=vol.Schema({}),
             description_placeholders=self._description_placeholders,
         )
@@ -70,7 +75,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         except ConfigEntryAuthFailed:
             raise
         except Exception as err:
-            _LOGGER.debug('Force refresh from repair flow failed: %s', err)
+            _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
         """Retrieve the runtime coordinator for the associated config entry.
@@ -85,7 +90,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None:
             return None
-        coordinator = getattr(entry, 'runtime_data', None)
+        coordinator = getattr(entry, "runtime_data", None)
         if isinstance(coordinator, JackerySolarVaultCoordinator):
             return coordinator
         return None
@@ -113,13 +118,13 @@ async def async_create_fix_flow(
     """
     if issue_id.endswith(f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"):
         issue_data = data or {}
-        entry_id = issue_data.get('entry_id')
+        entry_id = issue_data.get("entry_id")
         description_placeholders = {
-            'count': str(issue_data.get('count', 'unknown')),
-            'metric': str(issue_data.get('metric', 'unknown')),
-            'examples': str(issue_data.get('examples', 'unknown')),
+            "count": str(issue_data.get("count", "unknown")),
+            "metric": str(issue_data.get("metric", "unknown")),
+            "examples": str(issue_data.get("examples", "unknown")),
         }
         return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
     raise data_entry_flow.UnknownFlow(
-        f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
+        f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'",
     )

@@ -51,7 +51,7 @@ jobs:
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
-        
+
       - name: Commit baseline changes
         run: |
           if [ -z "$(git status --porcelain)" ]; then

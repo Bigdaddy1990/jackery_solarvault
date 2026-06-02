@@ -82,7 +82,7 @@ jobs:
           python -m scripts.sync_localization_flags \
             --allowlist scripts/sync_localization_flags.allowlist \
             --check || true
-            
+
       - name: Commit baseline changes
         run: |
           if [ -z "$(git status --porcelain)" ]; then

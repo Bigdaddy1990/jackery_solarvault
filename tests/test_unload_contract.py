@@ -54,7 +54,8 @@ def test_unload_platforms_before_coordinator_shutdown() -> None:
     function = _async_unload_entry()
 
     assert _call_line(function, "async_unload_platforms") < _call_line(
-        function, "async_shutdown"
+        function,
+        "async_shutdown",
     )
 
 

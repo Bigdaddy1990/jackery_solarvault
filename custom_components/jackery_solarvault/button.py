@@ -6,14 +6,18 @@ from typing import Any
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import DOMAIN, FIELD_REBOOT, PAYLOAD_PROPERTIES
+from .const import DOMAIN
+from .const import FIELD_REBOOT
+from .const import PAYLOAD_PROPERTIES
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, coordinator_entity_signature
+from .util import append_unique_entity
+from .util import coordinator_entity_signature
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -44,7 +48,11 @@ async def async_setup_entry(
             entity (ButtonEntity): Button entity to append; skipped if its unique ID is already tracked.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='button', logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="button",
+            logger=_LOGGER,
         )
 
     def _collect_entities() -> list[ButtonEntity]:
@@ -81,12 +89,14 @@ async def async_setup_entry(
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
     """Restart the SolarVault device via PROTOCOL.md §4 reboot command."""
 
-    _attr_translation_key = 'reboot_device'
+    _attr_translation_key = "reboot_device"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = 'mdi:restart'
+    _attr_icon = "mdi:restart"
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialize the reboot button entity for a specific SolarVault device.
 
@@ -94,7 +104,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
             coordinator (JackerySolarVaultCoordinator): Coordinator that manages device state and actions.
             device_id (str): Unique identifier of the target device.
         """
-        super().__init__(coordinator, device_id, 'reboot_device')
+        super().__init__(coordinator, device_id, "reboot_device")
 
     def _raise_action_error(self, error: object) -> None:
         """Raise a Home Assistant error with translation metadata for a failed entity action.
@@ -109,11 +119,11 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'reboot_device',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "reboot_device",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -132,7 +142,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:

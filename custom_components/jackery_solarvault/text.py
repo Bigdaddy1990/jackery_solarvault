@@ -6,22 +6,23 @@ from typing import Any
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .api import JackeryAuthError, JackeryError
-from .const import (
-    DOMAIN,
-    FIELD_DEVICE_NAME,
-    FIELD_ID,
-    FIELD_SYSTEM_ID,
-    FIELD_SYSTEM_NAME,
-    PAYLOAD_SYSTEM,
-)
+from .api import JackeryAuthError
+from .api import JackeryError
+from .const import DOMAIN
+from .const import FIELD_DEVICE_NAME
+from .const import FIELD_ID
+from .const import FIELD_SYSTEM_ID
+from .const import FIELD_SYSTEM_NAME
+from .const import PAYLOAD_SYSTEM
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity, coordinator_entity_signature
+from .util import append_unique_entity
+from .util import coordinator_entity_signature
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -57,7 +58,11 @@ async def async_setup_entry(
             entity (TextEntity): Entity to append; its unique ID will be recorded to prevent duplicates.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='text', logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="text",
+            logger=_LOGGER,
         )
 
     def _collect_entities() -> list[TextEntity]:
@@ -95,15 +100,17 @@ async def async_setup_entry(
 class JackerySystemNameText(JackeryEntity, TextEntity):
     """Rename the SolarVault system using SYSTEM_NAME_PATH from const.py."""
 
-    _attr_translation_key = 'system_name'
+    _attr_translation_key = "system_name"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = 'mdi:rename-box'
+    _attr_icon = "mdi:rename-box"
     _attr_native_min = 1
     _attr_native_max = 64
-    _attr_pattern = r'^.{1,64}$'
+    _attr_pattern = r"^.{1,64}$"
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialize the text entity for a specific Jackery system using the coordinator.
 
@@ -111,7 +118,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
             coordinator (JackerySolarVaultCoordinator): Coordinator providing system data and API.
             device_id (str): Identifier of the system whose name this entity exposes.
         """
-        super().__init__(coordinator, device_id, 'system_name')
+        super().__init__(coordinator, device_id, "system_name")
 
     @property
     def native_value(self) -> str | None:
@@ -141,18 +148,18 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         if not system_id:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
-                translation_key='missing_system_id',
-                translation_placeholders={'device_id': self._device_id},
+                translation_key="missing_system_id",
+                translation_placeholders={"device_id": self._device_id},
             )
 
-        new_name = (value or '').strip()
+        new_name = (value or "").strip()
         if not new_name:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
-                translation_key='invalid_text_value',
+                translation_key="invalid_text_value",
                 translation_placeholders={
-                    'entity': 'system_name',
-                    'device_id': self._device_id,
+                    "entity": "system_name",
+                    "device_id": self._device_id,
                 },
             )
 
@@ -160,27 +167,27 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
             ok = await self.coordinator.api.async_set_system_name(system_id, new_name)
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed(
-                'Jackery credentials were rejected while renaming a system. '
-                'Re-authentication is required.'
+                "Jackery credentials were rejected while renaming a system. "
+                "Re-authentication is required.",
             ) from err
         except JackeryError as err:
-            _LOGGER.debug('Failed to rename system %s: %s', system_id, err)
+            _LOGGER.debug("Failed to rename system %s: %s", system_id, err)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
-                translation_key='rename_system_failed',
+                translation_key="rename_system_failed",
                 translation_placeholders={
-                    'system_id': str(system_id),
-                    'error': str(err),
+                    "system_id": str(system_id),
+                    "error": str(err),
                 },
             ) from err
 
         if not ok:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
-                translation_key='rename_system_failed',
+                translation_key="rename_system_failed",
                 translation_placeholders={
-                    'system_id': str(system_id),
-                    'error': 'server returned false',
+                    "system_id": str(system_id),
+                    "error": "server returned false",
                 },
             )
 

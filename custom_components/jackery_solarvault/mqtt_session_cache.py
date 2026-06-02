@@ -14,23 +14,22 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from typing import Any, Final
+from typing import Any
+from typing import Final
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import (
-    DOMAIN,
-    MQTT_SESSION_MAC_ID,
-    MQTT_SESSION_MAC_ID_SOURCE,
-    MQTT_SESSION_SEED_B64,
-    MQTT_SESSION_USER_ID,
-)
+from .const import DOMAIN
+from .const import MQTT_SESSION_MAC_ID
+from .const import MQTT_SESSION_MAC_ID_SOURCE
+from .const import MQTT_SESSION_SEED_B64
+from .const import MQTT_SESSION_USER_ID
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
-_KEY_ENTRIES: Final = 'entries'
-_KEY_CACHED_AT: Final = 'cached_at'
+_KEY_ENTRIES: Final = "entries"
+_KEY_CACHED_AT: Final = "cached_at"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -42,7 +41,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 
 async def async_load_mqtt_session(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant,
+    entry_id: str,
 ) -> dict[str, str] | None:
     """Return cached MQTT session fields for ``entry_id`` or ``None``.
 

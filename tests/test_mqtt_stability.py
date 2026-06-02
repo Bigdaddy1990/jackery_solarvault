@@ -18,8 +18,8 @@ session against accidental regressions:
 """
 
 import datetime
-from pathlib import Path
 import re
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT_COMPONENT = ROOT / "custom_components" / "jackery_solarvault" / "client"
@@ -449,7 +449,7 @@ def test_http_property_polling_is_not_skipped_when_mqtt_is_live() -> None:
     assert "if skip_fast_property_fetch:" in body, body
     assert "payload = await self.api.async_get_device_property(dev_id)" in body, body
     assert body.index(
-        "payload = await self.api.async_get_device_property"
+        "payload = await self.api.async_get_device_property",
     ) < body.index("extras = await _fetch_device_extras")
     assert body.index("self._schedule_statistics_import(result)") < (
         body.index("self._schedule_mqtt_backfill_queries(result)")

@@ -50,7 +50,7 @@ jobs:
      #    title: "chore: ruff baseline (format+fix)"
      #    commit-message: "chore: ruff baseline (format+fix)"
      #    body: "Automated ruff baseline via GitHub Actions."
-     
+
           #python -m scripts/enforce_docstring_baseline --update  || true
           #python -m scripts.sync_contributor_guides --check  || true
           #python -m scripts.enforce_test_requirements  || true

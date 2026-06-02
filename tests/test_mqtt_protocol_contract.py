@@ -103,7 +103,8 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
     assert "cmd=MQTT_CMD_QUERY_DEVICE_PROPERTY" in query_device
 
     query_backfill = _function_source(
-        COORDINATOR_PATH, "_async_query_system_info_for_missing"
+        COORDINATOR_PATH,
+        "_async_query_system_info_for_missing",
     )
     assert "async_query_device_info" in query_backfill
 
@@ -356,7 +357,8 @@ def test_meter_head_subdevice_protocol_is_wired() -> None:
     assert "_merge_subdevice_lists_by_sn" in merge
 
     query_backfill = _function_source(
-        COORDINATOR_PATH, "_async_query_subdevices_for_missing"
+        COORDINATOR_PATH,
+        "_async_query_subdevices_for_missing",
     )
     assert "_has_meter_head_accessory" in query_backfill
     assert "async_query_meter_heads" in query_backfill
@@ -390,7 +392,8 @@ def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
     assert "SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION" in const_source
     assert "SUBDEVICE_DEV_TYPES_ENUM_ONLY" in const_source
     queryable = const_source.split("SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION", 1)[1].split(
-        "SUBDEVICE_DEV_TYPES_ENUM_ONLY", 1
+        "SUBDEVICE_DEV_TYPES_ENUM_ONLY",
+        1,
     )[0]
     enum_only = const_source.split("SUBDEVICE_DEV_TYPES_ENUM_ONLY", 1)[1].split(
         "# Sets used",
@@ -477,7 +480,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
                 FIELD_BODY: {
                     FIELD_CMD: f"{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0",
                     "new": 2,
-                }
+                },
             },
         )
 
@@ -685,7 +688,7 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
 def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
     """The MQTT password must use the REST login userId/mqttPassWord/macId triple."""
     api_source = _read(
-        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
+        ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py",
     )
     login = _function_source(
         ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py",
@@ -710,7 +713,7 @@ def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
 def test_setup_passes_configured_login_context_to_api() -> None:
     """Setup must honor stored app login context for cloud and MQTT parity."""
     init_source = _read(
-        ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
+        ROOT / "custom_components" / "jackery_solarvault" / "__init__.py",
     )
     assert "CONF_MQTT_MAC_ID" in init_source
     assert "CONF_REGION_CODE" in init_source

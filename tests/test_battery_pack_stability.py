@@ -10,9 +10,11 @@ Locks down the contract:
 4. Pure unit-test coverage of the cleanup helper without HA fixtures.
 """
 
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
 import re
+from datetime import datetime
+from datetime import timedelta
+from datetime import UTC
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
@@ -276,13 +278,13 @@ def test_battery_pack_query_need_accepts_text_count_and_rejects_bad_values() -> 
     )
 
     assert JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: "2.0"}
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: "2.0"},
     })
     assert not JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: True}
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: True},
     })
     assert not JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: float("nan")}
+        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: float("nan")},
     })
 
 

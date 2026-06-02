@@ -1,68 +1,65 @@
 """Config flow for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
+from collections.abc import Mapping
 from typing import Any
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+import voluptuous as vol
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.config_entries import OptionsFlow
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import voluptuous as vol
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
-from .const import (
-    CONF_CREATE_CALCULATED_POWER_SENSORS,
-    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_BLE_WRITES,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
-    CONF_MQTT_MAC_ID,
-    CONF_REGION_CODE,
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_PASSWORD,
-    CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOKEN,
-    CONF_THIRD_PARTY_MQTT_USERNAME,
-    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_ENABLE_BLE_TRANSPORT,
-    DEFAULT_ENABLE_BLE_WRITES,
-    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
-    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
-    DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
-    DOMAIN,
-    FLOW_ABORT_REAUTH_ENTRY_MISSING,
-    FLOW_ABORT_REAUTH_SUCCESSFUL,
-    FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
-    FLOW_ABORT_RECONFIGURE_ENTRY_MISSING,
-    FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
-    FLOW_ERROR_ACCOUNT_REQUIRED,
-    FLOW_ERROR_BASE,
-    FLOW_ERROR_CANNOT_CONNECT,
-    FLOW_ERROR_INVALID_AUTH,
-    FLOW_STEP_INIT,
-    FLOW_STEP_REAUTH_CONFIRM,
-    FLOW_STEP_RECONFIGURE,
-    FLOW_STEP_USER,
-)
-from .util import (
-    config_entry_bool_option,
-    config_entry_int_option,
-    config_entry_str_option,
-)
+from .api import JackeryApi
+from .api import JackeryAuthError
+from .api import JackeryError
+from .const import CONF_CREATE_CALCULATED_POWER_SENSORS
+from .const import CONF_CREATE_SAVINGS_DETAIL_SENSORS
+from .const import CONF_CREATE_SMART_METER_DERIVED_SENSORS
+from .const import CONF_ENABLE_BLE_TRANSPORT
+from .const import CONF_ENABLE_BLE_WRITES
+from .const import CONF_ENABLE_UNREDACTED_DIAGNOSTICS
+from .const import CONF_MQTT_MAC_ID
+from .const import CONF_REGION_CODE
+from .const import CONF_THIRD_PARTY_MQTT_ENABLE
+from .const import CONF_THIRD_PARTY_MQTT_IP
+from .const import CONF_THIRD_PARTY_MQTT_PASSWORD
+from .const import CONF_THIRD_PARTY_MQTT_PORT
+from .const import CONF_THIRD_PARTY_MQTT_TOKEN
+from .const import CONF_THIRD_PARTY_MQTT_USERNAME
+from .const import DEFAULT_CREATE_CALCULATED_POWER_SENSORS
+from .const import DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS
+from .const import DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS
+from .const import DEFAULT_ENABLE_BLE_TRANSPORT
+from .const import DEFAULT_ENABLE_BLE_WRITES
+from .const import DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS
+from .const import DEFAULT_THIRD_PARTY_MQTT_ENABLE
+from .const import DEFAULT_THIRD_PARTY_MQTT_IP
+from .const import DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+from .const import DEFAULT_THIRD_PARTY_MQTT_PORT
+from .const import DEFAULT_THIRD_PARTY_MQTT_TOKEN
+from .const import DEFAULT_THIRD_PARTY_MQTT_USERNAME
+from .const import DOMAIN
+from .const import FLOW_ABORT_REAUTH_ENTRY_MISSING
+from .const import FLOW_ABORT_REAUTH_SUCCESSFUL
+from .const import FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH
+from .const import FLOW_ABORT_RECONFIGURE_ENTRY_MISSING
+from .const import FLOW_ABORT_RECONFIGURE_SUCCESSFUL
+from .const import FLOW_ERROR_ACCOUNT_REQUIRED
+from .const import FLOW_ERROR_BASE
+from .const import FLOW_ERROR_CANNOT_CONNECT
+from .const import FLOW_ERROR_INVALID_AUTH
+from .const import FLOW_STEP_INIT
+from .const import FLOW_STEP_REAUTH_CONFIRM
+from .const import FLOW_STEP_RECONFIGURE
+from .const import FLOW_STEP_USER
+from .util import config_entry_bool_option
+from .util import config_entry_int_option
+from .util import config_entry_str_option
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -150,7 +147,8 @@ class JackeryOptionsFlow(OptionsFlow):
     # No __init__: HA injects self.config_entry automatically since 2024.11.
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Present and handle the options form for the integration's initial options step.
 
@@ -166,7 +164,7 @@ class JackeryOptionsFlow(OptionsFlow):
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
-                title='',
+                title="",
                 data=_flow_options(user_input, current_options),
             )
 
@@ -243,7 +241,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Handle the initial user-driven configuration step by validating credentials, attempting login, and creating the config entry on success.
 
@@ -278,7 +277,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug('Cannot connect to Jackery during setup: %s', err)
+                _LOGGER.debug("Cannot connect to Jackery during setup: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
@@ -297,7 +296,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Handle a user-initiated reconfigure of an existing entry.
 
@@ -318,7 +318,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             account = _normalize_account(user_input[CONF_USERNAME])
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
-            elif account.lower() != str(entry.unique_id or '').lower():
+            elif account.lower() != str(entry.unique_id or "").lower():
                 return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
             else:
                 await self.async_set_unique_id(account.lower())
@@ -337,7 +337,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
                 except JackeryError as err:
                     _LOGGER.debug(
-                        'Cannot connect to Jackery during reconfigure: %s', err
+                        "Cannot connect to Jackery during reconfigure: %s",
+                        err,
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
@@ -348,7 +349,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
                         options=_flow_options(
-                            user_input, _current_option_values(entry)
+                            user_input,
+                            _current_option_values(entry),
                         ),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
@@ -356,7 +358,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         current_options = _current_option_values(entry)
         schema = vol.Schema({
             vol.Required(
-                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, '')
+                CONF_USERNAME,
+                default=entry.data.get(CONF_USERNAME, ""),
             ): vol.All(str, vol.Length(min=1)),
             vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
             vol.Optional(
@@ -412,19 +415,21 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id=FLOW_STEP_RECONFIGURE,
             data_schema=schema,
             description_placeholders={
-                'username': str(entry.data.get(CONF_USERNAME, '')),
+                "username": str(entry.data.get(CONF_USERNAME, "")),
             },
             errors=errors,
         )
 
     async def async_step_reauth(
-        self, entry_data: Mapping[str, Any]
+        self,
+        entry_data: Mapping[str, Any],
     ) -> ConfigFlowResult:
         """Handle reauth started by ConfigEntryAuthFailed."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Handle reauthentication by prompting for a new password and validating it.
 
@@ -456,7 +461,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug('Cannot connect to Jackery during reauth: %s', err)
+                _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_update_reload_and_abort(
@@ -468,10 +473,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
             data_schema=vol.Schema({
-                vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
+                vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
             }),
             description_placeholders={
-                'username': entry.data[CONF_USERNAME],
+                "username": entry.data[CONF_USERNAME],
             },
             errors=errors,
         )

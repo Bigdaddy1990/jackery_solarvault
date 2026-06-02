@@ -14,7 +14,9 @@ an explicit reason so syntax/dependency regressions are easy to spot.
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -65,7 +67,9 @@ class _FakeHass:
         self._bg_tasks: list[asyncio.Task[Any]] = []
 
     def async_create_background_task(
-        self, coro: Any, name: str = ""
+        self,
+        coro: Any,
+        name: str = "",
     ) -> asyncio.Task[Any]:
         task = asyncio.get_event_loop().create_task(coro)
         self._bg_tasks.append(task)
@@ -213,7 +217,8 @@ async def test_async_start_local_mqtt_does_nothing_when_disabled() -> None:
 
     # No client stored.
     assert DOMAIN not in hass.data or not hass.data.get(DOMAIN, {}).get(
-        entry.entry_id, {}
+        entry.entry_id,
+        {},
     ).get(_LOCAL_MQTT_RUNTIME_KEY)
     assert not entry._unload_callbacks
 

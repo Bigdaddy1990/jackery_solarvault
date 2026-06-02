@@ -22,7 +22,8 @@ and is stored under HA's standard :class:`Store`.
 """
 
 from datetime import date
-from typing import Any, Final
+from typing import Any
+from typing import Final
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -31,9 +32,9 @@ from .const import DOMAIN
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
-_KEY_ENTRIES: Final = 'entries'
-_KEY_DAY: Final = 'day'
-_KEY_VALUES: Final = 'values'
+_KEY_ENTRIES: Final = "entries"
+_KEY_DAY: Final = "day"
+_KEY_VALUES: Final = "values"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -51,7 +52,8 @@ def _isoformat_day(today: date) -> str:
 
 
 async def async_load_daily_cache(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant,
+    entry_id: str,
 ) -> dict[str, dict[str, Any]]:
     """Return cached midnight snapshots for ``entry_id``.
 
@@ -247,10 +249,10 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 
 
 __all__ = [
-    'async_load_daily_cache',
-    'async_save_daily_cache',
-    'daily_delta',
-    'is_new_day',
-    'refresh_snapshot',
-    'snapshot_day',
+    "async_load_daily_cache",
+    "async_save_daily_cache",
+    "daily_delta",
+    "is_new_day",
+    "refresh_snapshot",
+    "snapshot_day",
 ]

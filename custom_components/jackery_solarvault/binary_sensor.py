@@ -1,42 +1,36 @@
 """Binary sensor platform for Jackery SolarVault."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-import logging
 from typing import Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-    BinarySensorEntityDescription,
-)
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import (
-    FIELD_COMM_MODE,
-    FIELD_COMM_STATE,
-    FIELD_DEVICE_NAME,
-    FIELD_ETH_PORT,
-    FIELD_ONLINE_STATUS,
-    FIELD_SCAN_NAME,
-    FIELD_SW_EPS_STATE,
-    FIELD_SWITCH_STATE,
-    FIELD_SYS_SWITCH,
-    FIELD_VERSION,
-    PAYLOAD_SMART_PLUGS,
-)
+from .const import FIELD_COMM_MODE
+from .const import FIELD_COMM_STATE
+from .const import FIELD_DEVICE_NAME
+from .const import FIELD_ETH_PORT
+from .const import FIELD_ONLINE_STATUS
+from .const import FIELD_SCAN_NAME
+from .const import FIELD_SW_EPS_STATE
+from .const import FIELD_SWITCH_STATE
+from .const import FIELD_SYS_SWITCH
+from .const import FIELD_VERSION
+from .const import PAYLOAD_SMART_PLUGS
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import (
-    append_unique_entity,
-    coordinator_entity_signature,
-    safe_bool,
-    smart_plug_serial,
-    sorted_smart_plugs,
-)
+from .util import append_unique_entity
+from .util import coordinator_entity_signature
+from .util import safe_bool
+from .util import smart_plug_serial
+from .util import sorted_smart_plugs
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
@@ -56,22 +50,22 @@ class JackeryBinaryDescription(BinarySensorEntityDescription):
 # payload names documented in PROTOCOL.md §2.
 BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
     JackeryBinaryDescription(
-        key='online',
-        translation_key='online',
+        key="online",
+        translation_key="online",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         getter=lambda p, d: d.get(FIELD_ONLINE_STATUS),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackeryBinaryDescription(
-        key='eps_active',
-        translation_key='eps_active',
+        key="eps_active",
+        translation_key="eps_active",
         device_class=BinarySensorDeviceClass.RUNNING,
         getter=lambda p, d: p.get(FIELD_SW_EPS_STATE),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackeryBinaryDescription(
-        key='eth_connected',
-        translation_key='eth_connected',
+        key="eth_connected",
+        translation_key="eth_connected",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         getter=lambda p, d: p.get(FIELD_ETH_PORT),
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -92,7 +86,8 @@ async def async_setup_entry(
     seen_unique_ids: set[str] = set()
 
     def _append_unique(
-        entities: list[BinarySensorEntity], entity: BinarySensorEntity
+        entities: list[BinarySensorEntity],
+        entity: BinarySensorEntity,
     ) -> None:
         """Add a binary sensor entity to the provided list if its unique ID for this platform has not already been seen.
 
@@ -101,7 +96,11 @@ async def async_setup_entry(
             entity (BinarySensorEntity): Binary sensor entity to add.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='binary_sensor', logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="binary_sensor",
+            logger=_LOGGER,
         )
 
     def _collect_entities() -> list[BinarySensorEntity]:
@@ -119,7 +118,8 @@ async def async_setup_entry(
             for desc in BINARY_DESCRIPTIONS:
                 _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
             for index, plug in enumerate(
-                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)), start=1
+                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)),
+                start=1,
             ):
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
@@ -174,16 +174,16 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return True when the entity is on."""
         return safe_bool(
-            self.entity_description.getter(self._properties, self._device_meta)
+            self.entity_description.getter(self._properties, self._device_meta),
         )
 
 
 class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     """Current on/off state for one smart-plug subdevice."""
 
-    _attr_translation_key = 'smart_plug_switch_state'
+    _attr_translation_key = "smart_plug_switch_state"
     _attr_device_class = BinarySensorDeviceClass.POWER
-    _attr_icon = 'mdi:power-socket-de'
+    _attr_icon = "mdi:power-socket-de"
 
     def __init__(
         self,
@@ -198,7 +198,9 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Builds and stores the per-plug `device_info` at construction so the entity is registered with the correct device metadata.
         """
         super().__init__(
-            coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
+            coordinator,
+            device_id,
+            f"smart_plug_{plug_index}_switch_state",
         )
         self._plug_index = plug_index
         self._plug_sn = plug_sn
@@ -206,7 +208,8 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         # on every state read is wasted work — HA reads the registry metadata
         # at entity-add time and merges later updates via the device registry.
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug
+            plug_index,
+            self._plug,
         )
 
     @property
@@ -236,7 +239,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values; always contains `"plug_index"`.
         """
-        attrs: dict[str, Any] = {'plug_index': self._plug_index}
+        attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
             FIELD_SCAN_NAME,

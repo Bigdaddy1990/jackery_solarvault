@@ -7,49 +7,48 @@ section, an optional task-plan fallback and the coordinator setter that pushes
 the new state to the cloud / MQTT command path.
 """
 
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 import logging
+from collections.abc import Awaitable
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import (
-    DOMAIN,
-    FIELD_AUTO_STANDBY,
-    FIELD_COMM_MODE,
-    FIELD_COMM_STATE,
-    FIELD_DEVICE_NAME,
-    FIELD_FOLLOW_METER,
-    FIELD_IS_AUTO_STANDBY,
-    FIELD_IS_FOLLOW_METER_PW,
-    FIELD_OFF_GRID_DOWN,
-    FIELD_SCAN_NAME,
-    FIELD_SOCKET_PRIORITY,
-    FIELD_SW_EPS,
-    FIELD_SWITCH_STATE,
-    FIELD_SYS_SWITCH,
-    FIELD_VERSION,
-    FIELD_WPS,
-    PAYLOAD_PROPERTIES,
-    PAYLOAD_SMART_PLUGS,
-    PAYLOAD_WEATHER_PLAN,
-)
+from .const import DOMAIN
+from .const import FIELD_AUTO_STANDBY
+from .const import FIELD_COMM_MODE
+from .const import FIELD_COMM_STATE
+from .const import FIELD_DEVICE_NAME
+from .const import FIELD_FOLLOW_METER
+from .const import FIELD_IS_AUTO_STANDBY
+from .const import FIELD_IS_FOLLOW_METER_PW
+from .const import FIELD_OFF_GRID_DOWN
+from .const import FIELD_SCAN_NAME
+from .const import FIELD_SOCKET_PRIORITY
+from .const import FIELD_SW_EPS
+from .const import FIELD_SWITCH_STATE
+from .const import FIELD_SYS_SWITCH
+from .const import FIELD_VERSION
+from .const import FIELD_WPS
+from .const import PAYLOAD_PROPERTIES
+from .const import PAYLOAD_SMART_PLUGS
+from .const import PAYLOAD_WEATHER_PLAN
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import (
-    append_unique_entity,
-    coordinator_entity_signature,
-    safe_bool,
-    smart_plug_serial,
-    sorted_smart_plugs,
-    task_plan_value,
-)
+from .util import append_unique_entity
+from .util import coordinator_entity_signature
+from .util import safe_bool
+from .util import smart_plug_serial
+from .util import sorted_smart_plugs
+from .util import task_plan_value
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -113,42 +112,54 @@ class JackerySwitchDescription(SwitchEntityDescription):
 
 
 async def _set_eps(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle the EPS output on a device."""
     await coord.async_set_eps(dev_id, value)
 
 
 async def _set_auto_standby(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle auto-standby on a device."""
     await coord.async_set_auto_standby(dev_id, value)
 
 
 async def _set_standby(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle manual standby on a device."""
     await coord.async_set_standby(dev_id, value)
 
 
 async def _set_follow_meter(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle smart-meter following on a device."""
     await coord.async_set_follow_meter(dev_id, value)
 
 
 async def _set_off_grid_shutdown(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle off-grid shutdown on a device."""
     await coord.async_set_off_grid_shutdown(dev_id, value)
 
 
 async def _set_storm_warning(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
 ) -> None:
     """Toggle storm warning on a device."""
     await coord.async_set_storm_warning(dev_id, value)
@@ -163,54 +174,54 @@ _smart_plug_serial = smart_plug_serial
 
 SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
     JackerySwitchDescription(
-        key='eps_output',
-        translation_key='eps_output',
+        key="eps_output",
+        translation_key="eps_output",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-plug',
+        icon="mdi:power-plug",
         source_keys=(FIELD_SW_EPS,),
         setter=_set_eps,
     ),
     JackerySwitchDescription(
-        key='auto_standby_set',
-        translation_key='auto_standby_set',
+        key="auto_standby_set",
+        translation_key="auto_standby_set",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-sleep',
+        icon="mdi:power-sleep",
         source_keys=(FIELD_IS_AUTO_STANDBY,),
         use_task_plan_fallback=True,
         setter=_set_auto_standby,
     ),
     JackerySwitchDescription(
-        key='standby',
-        translation_key='standby',
+        key="standby",
+        translation_key="standby",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-sleep',
+        icon="mdi:power-sleep",
         source_keys=(FIELD_AUTO_STANDBY,),
         setter=_set_standby,
         is_on_transform=_standby_is_on,
     ),
     JackerySwitchDescription(
-        key='follow_meter',
-        translation_key='follow_meter',
+        key="follow_meter",
+        translation_key="follow_meter",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:gauge',
+        icon="mdi:gauge",
         source_keys=(FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER),
         use_task_plan_fallback=True,
         setter=_set_follow_meter,
     ),
     JackerySwitchDescription(
-        key='off_grid_shutdown',
-        translation_key='off_grid_shutdown',
+        key="off_grid_shutdown",
+        translation_key="off_grid_shutdown",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:power-off',
+        icon="mdi:power-off",
         source_keys=(FIELD_OFF_GRID_DOWN,),
         use_task_plan_fallback=True,
         setter=_set_off_grid_shutdown,
     ),
     JackerySwitchDescription(
-        key='storm_warning',
-        translation_key='storm_warning',
+        key="storm_warning",
+        translation_key="storm_warning",
         entity_category=EntityCategory.CONFIG,
-        icon='mdi:weather-lightning-rainy',
+        icon="mdi:weather-lightning-rainy",
         source_keys=(FIELD_WPS,),
         fallback_section=PAYLOAD_WEATHER_PLAN,
         use_task_plan_fallback=True,
@@ -251,11 +262,11 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': self.entity_description.key,
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": self.entity_description.key,
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -292,13 +303,15 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return
         try:
             await self.entity_description.setter(
-                self.coordinator, self._device_id, True
+                self.coordinator,
+                self._device_id,
+                True,
             )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -313,13 +326,15 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return
         try:
             await self.entity_description.setter(
-                self.coordinator, self._device_id, False
+                self.coordinator,
+                self._device_id,
+                False,
             )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -329,8 +344,8 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
 class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     """Writable switch for one smart-plug subdevice."""
 
-    _attr_translation_key = 'smart_plug_switch'
-    _attr_icon = 'mdi:power-socket-de'
+    _attr_translation_key = "smart_plug_switch"
+    _attr_icon = "mdi:power-socket-de"
 
     def __init__(
         self,
@@ -355,7 +370,8 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         # Build the per-plug device_info once at construction (see PROTOCOL §8
         # and binary_sensor.py for the rationale).
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug
+            plug_index,
+            self._plug,
         )
 
     @property
@@ -388,11 +404,11 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'smart_plug_switch',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "smart_plug_switch",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -408,7 +424,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
-            self._raise_action_error('missing deviceSn')
+            self._raise_action_error("missing deviceSn")
             return
         try:
             await self.coordinator.async_set_smart_plug_switch(
@@ -420,7 +436,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -444,7 +460,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to their values.
         """
-        attrs: dict[str, Any] = {'plug_index': self._plug_index}
+        attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
             FIELD_SCAN_NAME,
@@ -463,8 +479,8 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
     """Writable priority toggle for one smart-plug subdevice."""
 
-    _attr_translation_key = 'smart_plug_priority_enabled'
-    _attr_icon = 'mdi:priority-high'
+    _attr_translation_key = "smart_plug_priority_enabled"
+    _attr_icon = "mdi:priority-high"
 
     def __init__(
         self,
@@ -508,11 +524,11 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
-            translation_key='entity_action_failed',
+            translation_key="entity_action_failed",
             translation_placeholders={
-                'entity': 'smart_plug_priority_enabled',
-                'device_id': self._device_id,
-                'error': str(error),
+                "entity": "smart_plug_priority_enabled",
+                "device_id": self._device_id,
+                "error": str(error),
             },
         )
 
@@ -530,7 +546,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         """
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
-            self._raise_action_error('missing deviceSn')
+            self._raise_action_error("missing deviceSn")
             return
         try:
             await self.coordinator.async_set_smart_plug_priority(
@@ -542,7 +558,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         except ConfigEntryAuthFailed:
             raise
         except HomeAssistantError as err:
-            if getattr(err, 'translation_key', None):
+            if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
         except Exception as err:
@@ -579,21 +595,25 @@ async def async_setup_entry(
             entity (SwitchEntity): Switch entity to add; its unique identifier will be recorded to prevent future duplicates.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform='switch', logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="switch",
+            logger=_LOGGER,
         )
 
     # PROTOCOL.md §2/§4 documents SolarVault advanced controls as app
     # state plus MQTT command paths. Create those entities eagerly for known
     # SolarVault devices; otherwise gate them by the observed property keys.
     gating: dict[str, Callable[[dict[str, Any], bool], bool]] = {
-        'eps_output': lambda props, _adv: FIELD_SW_EPS in props,
-        'auto_standby_set': lambda props, adv: (
+        "eps_output": lambda props, _adv: FIELD_SW_EPS in props,
+        "auto_standby_set": lambda props, adv: (
             adv or FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props
         ),
-        'standby': lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
-        'follow_meter': lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
-        'off_grid_shutdown': lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
-        'storm_warning': lambda props, adv: adv or FIELD_WPS in props,
+        "standby": lambda props, adv: adv or FIELD_AUTO_STANDBY in props,
+        "follow_meter": lambda props, adv: adv or FIELD_IS_FOLLOW_METER_PW in props,
+        "off_grid_shutdown": lambda props, adv: adv or FIELD_OFF_GRID_DOWN in props,
+        "storm_warning": lambda props, adv: adv or FIELD_WPS in props,
     }
 
     def _collect_entities() -> list[SwitchEntity]:
@@ -619,7 +639,8 @@ async def async_setup_entry(
                         JackeryDescriptionSwitch(coordinator, dev_id, description),
                     )
             for index, plug in enumerate(
-                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)), start=1
+                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)),
+                start=1,
             ):
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
