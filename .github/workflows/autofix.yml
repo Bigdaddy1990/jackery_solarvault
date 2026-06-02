@@ -24,7 +24,6 @@ jobs:
     env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
       HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -70,11 +69,8 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+          pre-commit run --hook-stage manual python-typing-update pyupgrade --check --py314-plus || true
 
-  #    - name: Verify contributor guides
-  #      run: |
- #         python -m scripts.sync_contributor_guides --check || true
 
       - name: Run test requirements and localization sync
         run: |
@@ -82,15 +78,3 @@ jobs:
           python -m scripts.sync_localization_flags \
             --allowlist scripts/sync_localization_flags.allowlist \
             --check || true
-
-      - name: Commit baseline changes
-        run: |
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No ruff baseline changes to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: ruff baseline (format+fix)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -30,7 +30,7 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+          pre-commit run --hook-stage manual python-typing-update --check --ruff || true
 
       - name: Commit baseline changes
         run: |
@@ -50,10 +50,3 @@ jobs:
      #    title: "chore: ruff baseline (format+fix)"
      #    commit-message: "chore: ruff baseline (format+fix)"
      #    body: "Automated ruff baseline via GitHub Actions."
-
-          #python -m scripts/enforce_docstring_baseline --update  || true
-          #python -m scripts.sync_contributor_guides --check  || true
-          #python -m scripts.enforce_test_requirements  || true
-          #python -m scripts.sync_localization_flags \
-          #  --allowlist scripts/sync_localization_flags.allowlist \
-          #  --check  || true
