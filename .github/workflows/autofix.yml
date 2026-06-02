@@ -70,18 +70,4 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
-       #   python scripts/enforce_docstring_baseline.py --update || true
-       #   python -m scripts.sync_contributor_guides || true
-
-
-#      - name: Verify contributor guides
- #       run: |
-#          python -m scripts.sync_contributor_guides --check || true
-
-      - name: Run test requirements and localization sync
-        run: |
-          python -m scripts.enforce_test_requirements || true
-          python -m scripts.sync_localization_flags \
-            --allowlist scripts/sync_localization_flags.allowlist \
-            --check || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff|| true
