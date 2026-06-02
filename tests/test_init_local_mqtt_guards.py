@@ -512,7 +512,15 @@ class TestLocalMqttSink:
         captured_sink = None
 
         def _capture_client(
-            hass_arg, *, host, port, username, password, client_id, sink, topic_filter
+            hass_arg,
+            *,
+            host,
+            port,
+            username,
+            password,
+            client_id,
+            sink,
+            topic_filter,
         ):
             nonlocal captured_sink
             captured_sink = sink
@@ -557,7 +565,15 @@ class TestLocalMqttSink:
         captured_sink = None
 
         def _capture_client(
-            hass_arg, *, host, port, username, password, client_id, sink, topic_filter
+            hass_arg,
+            *,
+            host,
+            port,
+            username,
+            password,
+            client_id,
+            sink,
+            topic_filter,
         ):
             nonlocal captured_sink
             captured_sink = sink
@@ -631,7 +647,8 @@ class TestRsaPkcs1V15Encrypt:
         )
         pub_key = private_key.public_key()
         der_bytes = pub_key.public_bytes(
-            Encoding.DER, PublicFormat.SubjectPublicKeyInfo
+            Encoding.DER,
+            PublicFormat.SubjectPublicKeyInfo,
         )
         b64_key = base64.b64encode(der_bytes).decode()
 
