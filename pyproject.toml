@@ -469,4 +469,3 @@ ignored-classes = [
   "_CountingAttr", # for attrs
 ]
 mixin-class-rgx = ".*[Mm]ix[Ii]n"
-
