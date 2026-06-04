@@ -7,27 +7,16 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from . import JackeryConfigEntry, _local_mqtt_client
-from .const import (
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
-    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    REDACT_KEYS as _STATIC_REDACT_KEYS,
-)
+from . import JackeryConfigEntry
+from .const import REDACT_KEYS as _STATIC_REDACT_KEYS
 from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
-    config_entry_bool_option,
-    config_entry_str_option,
     dev_mode_redactions_disabled,
     diagnostic_redactions_disabled,
 )
 
 _LOGGER = logging.getLogger(__name__)
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 
 # Kept as an import alias so tests / external callers can still reference the
 # static redact-key set when needed. Runtime redaction in this module always
@@ -41,17 +30,16 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
+    """Redact payloads without exposing device IDs or serials as dict keys.
 
-    Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
+    Home Assistant's ``async_redact_data`` redacts values by key inside
+    payloads. It does not anonymize mapping keys such as device IDs,
+    system IDs or battery serial numbers, so diagnostics that are safe to
+    share must replace those outer keys with stable local labels.
 
-    Parameters:
-        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
-        prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
-        redact_keys (frozenset[str]): Field names to redact from each payload.
-
-    Returns:
-        dict[str, Any]: Mapping of generated labels to redacted payloads.
+    The redact set comes from :func:`.util.active_redact_keys` so the entry
+    option and legacy ``JACKERY_DEV_MODE`` env var can disable redaction during
+    local integration development.
     """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(
@@ -66,20 +54,10 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this entry point
+async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
-    """Build a diagnostics export for the given config entry.
-
-    The returned payload contains redacted copies of the entry's stored data and options, a stable mapping of labeled device payloads, and raw diagnostics from the coordinator, API responses, and transports. If diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and `bluetoothKey` may be included unredacted.
-
-    Returns:
-        dict[str, Any]: Diagnostics export with keys:
-            - `entry_data`: redacted copy of the config entry's stored data.
-            - `options`: redacted copy of the config entry's options.
-            - `devices`: mapping of stable local device labels to redacted device payloads.
-            - `raw_api`: raw diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill (redacted according to the entry's redaction settings).
-    """
+    """Get config entry diagnostics."""
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
@@ -166,14 +144,6 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             coordinator.statistics_backfill_diagnostics,
             redact_keys,
         ),
-        "endpoint_backoff": async_redact_data(
-            coordinator.endpoint_backoff_diagnostics(),
-            redact_keys,
-        ),
-        "app_chart_import": async_redact_data(
-            coordinator.app_chart_import_diagnostics(),
-            redact_keys,
-        ),
     }
 
     return {
@@ -189,38 +159,11 @@ def _local_mqtt_diagnostics(
     entry: JackeryConfigEntry,
     redactions_disabled: bool,
 ) -> dict[str, Any]:
-    """Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
+    """Return the local-MQTT diagnostics block.
 
-    Parameters:
-        redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
-
-    Returns:
-        dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
-        MQTT client is available, otherwise the client's diagnostics snapshot.
+    The local MQTT client is not yet integrated into the coordinator; this
+    block is a placeholder so the diagnostics schema stays stable when the
+    feature ships. Setting enabled=False explicitly documents the state
+    rather than omitting the key entirely.
     """
-    enabled = config_entry_bool_option(
-        entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
-    )
-    host = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP
-    ).strip()
-    topic_filter = config_entry_str_option(
-        entry,
-        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    ).strip()
-
-    client = _local_mqtt_client(hass, entry)
-    if client is None:
-        if not enabled:
-            reason = "bridge_disabled"
-        elif not host:
-            reason = "missing_broker_host"
-        elif topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
-            reason = "broad_topic_filter_blocked"
-        elif not topic_filter:
-            reason = "missing_topic_filter"
-        else:
-            reason = "client_not_started"
-        return {"enabled": False, "disabled_reason": reason}
-    return client.diagnostics_snapshot(redact=not redactions_disabled)
+    return {"enabled": False}

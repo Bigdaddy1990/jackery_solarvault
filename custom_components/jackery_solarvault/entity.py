@@ -1,6 +1,9 @@
 """Shared entity base class."""
 
+import logging
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -8,9 +11,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
@@ -229,4 +232,10 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             parsed_online = jackery_online_state(online)
             if parsed_online is not None:
                 return parsed_online
+            _LOGGER.debug(
+                "Device %s: unrecognized online state %r — treating as unavailable",
+                self._device_id,
+                online,
+            )
+            return False
         return self._device_id in (self.coordinator.data or {})

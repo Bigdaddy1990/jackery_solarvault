@@ -30,8 +30,8 @@ from .const import (
     FIELD_CID,
     FIELD_COMPANY_NAME,
     FIELD_COUNTRY,
-    FIELD_DEV_SN,
     FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_MINS_INTERVAL,
     FIELD_NAME,
@@ -575,7 +575,7 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
             error="ct meter payload missing",
         )
     ct_sn = str(
-        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ct.get("deviceSn") or ""
+        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ""
     ).strip()
     if not ct_sn:
         _raise_select_action_error(

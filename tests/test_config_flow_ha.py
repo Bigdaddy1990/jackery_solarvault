@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.jackery_solarvault.const import (
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
 )
@@ -50,10 +49,10 @@ async def test_user_flow_happy_path(
 
 async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
     """A login rejection must surface as an invalid_auth form error."""
-    from custom_components.jackery_solarvault.client.api import JackeryAuthError
+    from custom_components.jackery_solarvault.api import JackeryAuthError
 
     with patch(
-        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
         side_effect=JackeryAuthError("login rejected"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -69,14 +68,11 @@ async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
-    """Show a "cannot_connect" form error when the API raises a network error during the user config flow.
-
-    Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
-    """
-    from custom_components.jackery_solarvault.client.api import JackeryError
+    """A network error must surface as a cannot_connect form error."""
+    from custom_components.jackery_solarvault.api import JackeryError
 
     with patch(
-        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
         side_effect=JackeryError("network down"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -152,59 +148,3 @@ async def test_reauth_flow_updates_password_and_reloads(
     # Entry data must reflect the new password without changing username
     assert entry.data[CONF_PASSWORD] == "new-password"
     assert entry.data[CONF_USERNAME] == "user@example.com"
-
-
-async def test_options_flow_persists_local_mqtt_topic_filter_default(
-    hass: HomeAssistant,
-) -> None:
-    """Options flow must persist the local MQTT topic-filter option and default it to empty."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id="user@example.com",
-        data={
-            CONF_USERNAME: "user@example.com",
-            CONF_PASSWORD: "secret",
-        },
-        options={},
-    )
-    entry.add_to_hass(hass)
-
-    flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["type"] == FlowResultType.FORM
-    assert flow["step_id"] == "init"
-
-    result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""
-
-
-async def test_options_flow_accepts_local_mqtt_topic_filter_value(
-    hass: HomeAssistant,
-) -> None:
-    """Options flow must store user-provided local MQTT topic filters."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id="user@example.com",
-        data={
-            CONF_USERNAME: "user@example.com",
-            CONF_PASSWORD: "secret",
-        },
-        options={},
-    )
-    entry.add_to_hass(hass)
-
-    flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["type"] == FlowResultType.FORM
-
-    result = await hass.config_entries.options.async_configure(
-        flow["flow_id"],
-        {
-            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/app/+/device",
-        },
-    )
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == "hb/app/+/device"

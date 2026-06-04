@@ -54,6 +54,11 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
     async def _async_force_refresh(self) -> None:
         coordinator = self._coordinator()
         if coordinator is None:
+            _LOGGER.warning(
+                "Jackery repair flow: coordinator not found for entry %s; "
+                "repair action had no effect",
+                self._entry_id,
+            )
             return
         try:
             await coordinator.async_request_refresh()
@@ -74,7 +79,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
+async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,

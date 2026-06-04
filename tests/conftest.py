@@ -6,10 +6,66 @@ configures pytest-asyncio and provides a couple of helpers shared
 across config-flow and entry-setup tests.
 """
 
+import sys
+from unittest.mock import MagicMock, patch
+
+# Mock fcntl for Windows compatibility
+if sys.platform == "win32":
+    sys.modules["fcntl"] = MagicMock()
+
+# Create alias custom_components.jackery_solarvault.api -> custom_components.jackery_solarvault.client.api
+import custom_components.jackery_solarvault.client.api as client_api
+sys.modules["custom_components.jackery_solarvault.api"] = client_api
+
+import asyncio
 from collections.abc import Generator
-from unittest.mock import patch
 
 import pytest
+
+
+
+# HA 2026.6+ compatibility: ConfigEntries._entries changed from list to ConfigEntryItems.
+# MockConfigEntry.add_to_hass (from pytest_homeassistant_custom_component) writes
+# directly to _entries; patch it to ensure the type is correct first.
+try:
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from homeassistant.config_entries import ConfigEntryItems as _ConfigEntryItems
+    _orig_add = MockConfigEntry.add_to_hass
+
+    def _patched_add_to_hass(self, hass):
+        ce = hass.config_entries
+        if not isinstance(ce._entries, _ConfigEntryItems):
+            items = _ConfigEntryItems(hass)
+            _src = ce._entries
+            if isinstance(_src, dict):
+                for k, v in _src.items():
+                    items.data[k] = v
+            elif isinstance(_src, list):
+                for v in _src:
+                    if hasattr(v, "entry_id"):
+                        items.data[v.entry_id] = v
+            ce._entries = items
+        _orig_add(self, hass)
+
+    MockConfigEntry.add_to_hass = _patched_add_to_hass
+except Exception:
+    pass
+
+@pytest.fixture
+def event_loop():
+    """Create an instance of the default event loop."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture
+def loop(event_loop):
+    """Alias event_loop to loop."""
+    return event_loop
+
+
+
 
 
 @pytest.fixture(autouse=True)
@@ -34,15 +90,7 @@ def mock_jackery_login() -> Generator[None]:
     cloud I/O.
     """
 
-    async def _fake_login(api) -> str:  # noqa: ANN001, RUF029
-        """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
-
-        Parameters:
-            api: The Jackery API client instance whose internal authentication and MQTT-related attributes will be populated for testing.
-
-        Returns:
-            str: The authentication token assigned to the API instance.
-        """
+    async def _fake_login(api) -> str:
         api._token = "test-token"
         api._mqtt_user_id = "test-user"
         api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
@@ -51,15 +99,15 @@ def mock_jackery_login() -> Generator[None]:
 
     with (
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
             new=_fake_login,
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_get_system_list",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
             return_value=[],
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_list_devices_legacy",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
             return_value=[],
         ),
     ):

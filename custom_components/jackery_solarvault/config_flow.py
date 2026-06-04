@@ -17,35 +17,30 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
+from .mqtt_session_cache import async_clear_mqtt_session
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_BLE_WRITES,
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CONF_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_PASSWORD,
-    CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOKEN,
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_ENABLE_BLE_WRITES,
+    DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    DEFAULT_ENABLE_MONTH_STATISTICS,
     DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
-    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
-    DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
+    DEFAULT_ENABLE_WEEK_STATISTICS,
+    DEFAULT_ENABLE_YEAR_STATISTICS,
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
@@ -61,90 +56,47 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_USER,
 )
-from .util import (
-    config_entry_bool_option,
-    config_entry_int_option,
-    config_entry_str_option,
-)
+from .util import config_entry_bool_option
 
 _LOGGER = logging.getLogger(__name__)
 
-_BOOL_OPTION_DEFAULTS: dict[str, bool] = {
+_OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES,
     CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
-    CONF_THIRD_PARTY_MQTT_ENABLE: DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-}
-
-_STR_OPTION_DEFAULTS: dict[str, str] = {
-    CONF_THIRD_PARTY_MQTT_IP: DEFAULT_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_USERNAME: DEFAULT_THIRD_PARTY_MQTT_USERNAME,
-    CONF_THIRD_PARTY_MQTT_PASSWORD: DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
-    CONF_THIRD_PARTY_MQTT_TOKEN: DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-}
-
-_INT_OPTION_DEFAULTS: dict[str, int] = {
-    CONF_THIRD_PARTY_MQTT_PORT: DEFAULT_THIRD_PARTY_MQTT_PORT,
+    CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
 }
 
 
 def _normalize_account(value: str) -> str:
-    """Normalize an account identifier by stripping leading and trailing whitespace.
-
-    Returns:
-        The account identifier with leading and trailing whitespace removed.
-    """
+    """Normalize user-facing account identifiers before auth and unique IDs."""
     return value.strip()
 
 
-def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
-    """Resolve the current option values for a configuration entry.
-
-    For each known option key (grouped by boolean, string, and integer types), the value is taken from the entry's stored options, falling back to any legacy setup-data value for that key and then to the type-specific default.
-
-    Parameters:
-        entry (ConfigEntry): Configuration entry to read option and legacy setup-data values from.
-
-    Returns:
-        dict[str, Any]: Mapping of option keys to their resolved current values.
-    """
-    values: dict[str, Any] = {}
-    for key, bool_default in _BOOL_OPTION_DEFAULTS.items():
-        values[key] = config_entry_bool_option(entry, key, bool_default)
-    for key, str_default in _STR_OPTION_DEFAULTS.items():
-        values[key] = config_entry_str_option(entry, key, str_default)
-    for key, int_default in _INT_OPTION_DEFAULTS.items():
-        values[key] = config_entry_int_option(entry, key, int_default)
-    return values
+def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
+    """Return current option values with legacy setup-data fallback."""
+    return {
+        key: config_entry_bool_option(entry, key, default)
+        for key, default in _OPTION_DEFAULTS.items()
+    }
 
 
 def _flow_options(
     user_input: dict[str, Any],
-    current_options: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Produce a complete options dictionary by taking values from `user_input` when present, otherwise preserving `current_options`, and finally falling back to the integration's typed defaults.
-
-    Parameters:
-        user_input (dict[str, Any]): Option values provided by the user; may omit keys.
-        current_options (dict[str, Any] | None): Existing stored option values to preserve when `user_input` omits a key.
-
-    Returns:
-        dict[str, Any]: A merged options dictionary containing every known option key with its resolved value.
-    """
+    current_options: dict[str, bool] | None = None,
+) -> dict[str, bool]:
+    """Build complete options, preserving current values when fields are omitted."""
     current = current_options or {}
-    merged: dict[str, Any] = {}
-    for defaults in (
-        _BOOL_OPTION_DEFAULTS,
-        _STR_OPTION_DEFAULTS,
-        _INT_OPTION_DEFAULTS,
-    ):
-        for key, default in defaults.items():
-            merged[key] = user_input.get(key, current.get(key, default))
-    return merged
+    return {
+        key: user_input.get(key, current.get(key, default))
+        for key, default in _OPTION_DEFAULTS.items()
+    }
 
 
 USER_SCHEMA = vol.Schema({
@@ -177,16 +129,7 @@ class JackeryOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Present the options form for the integration or create an options entry from submitted values.
-
-        When `user_input` is provided, merge the submitted values with the current stored options and create an options entry. When `user_input` is None, show the options form populated with defaults from the current entry options (BLE, sensor-creation, diagnostics, and third-party MQTT settings).
-
-        Parameters:
-            user_input (dict[str, Any] | None): Submitted form values, or None to render the form.
-
-        Returns:
-            ConfigFlowResult: The created options entry result, or a form result to display to the user.
-        """
+        """Step init."""
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
@@ -207,6 +150,12 @@ class JackeryOptionsFlow(OptionsFlow):
         current_enable_ble_writes = current_options[CONF_ENABLE_BLE_WRITES]
         current_enable_unredacted_diagnostics = current_options[
             CONF_ENABLE_UNREDACTED_DIAGNOSTICS
+        ]
+        current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
+        current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
+        current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
+        current_enable_derived_home_fallback = current_options[
+            CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
         schema = vol.Schema({
             vol.Optional(
@@ -234,33 +183,21 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_enable_unredacted_diagnostics,
             ): bool,
             vol.Optional(
-                CONF_THIRD_PARTY_MQTT_ENABLE,
-                default=current_options[CONF_THIRD_PARTY_MQTT_ENABLE],
+                CONF_ENABLE_WEEK_STATISTICS,
+                default=current_enable_week_statistics,
             ): bool,
             vol.Optional(
-                CONF_THIRD_PARTY_MQTT_IP,
-                default=current_options[CONF_THIRD_PARTY_MQTT_IP],
-            ): str,
+                CONF_ENABLE_MONTH_STATISTICS,
+                default=current_enable_month_statistics,
+            ): bool,
             vol.Optional(
-                CONF_THIRD_PARTY_MQTT_PORT,
-                default=current_options[CONF_THIRD_PARTY_MQTT_PORT],
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+                CONF_ENABLE_YEAR_STATISTICS,
+                default=current_enable_year_statistics,
+            ): bool,
             vol.Optional(
-                CONF_THIRD_PARTY_MQTT_USERNAME,
-                default=current_options[CONF_THIRD_PARTY_MQTT_USERNAME],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_PASSWORD,
-                default=current_options[CONF_THIRD_PARTY_MQTT_PASSWORD],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOKEN,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
+                CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+                default=current_enable_derived_home_fallback,
+            ): bool,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
@@ -273,16 +210,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial user-driven configuration step and authenticate the provided Jackery account.
-
-        Validates and normalizes the submitted username, prevents creating a duplicate entry for the same account, attempts to authenticate with the Jackery service using the provided credentials, and on success creates the configuration entry with the supplied credentials and merged initial options. On validation or authentication failure, returns the form populated with appropriate error messages.
-
-        Parameters:
-            user_input (dict[str, Any] | None): Form input submitted by the user. Expected keys include `CONF_USERNAME` and `CONF_PASSWORD`, and may include optional integration option fields.
-
-        Returns:
-            ConfigFlowResult: A flow result that either shows the user form with errors or creates the new configuration entry on successful authentication.
-        """
+        """Handle the initial user-driven config flow step."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -329,12 +257,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Reconfigure an existing config entry by validating provided account credentials and updating stored username, password, and options.
+        """Handle a user-initiated reconfigure of an existing entry.
 
-        Validates that the submitted username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. If input is missing or invalid, presents the reconfigure form prefilled with current option defaults. Aborts if the reconfigure target is missing or the provided account does not match the entry.
-
-        Returns:
-            A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.
+        HA's reconfigure flow lets the user change credentials and toggle
+        the calculated-sensor options without removing the entry. The
+        normalized account from user input must match the entry that
+        triggered the flow; otherwise we abort to keep unique-id semantics
+        stable across the reconfigure round-trip.
         """
         try:
             entry = self._get_reconfigure_entry()
@@ -409,37 +338,25 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 default=current_options[CONF_ENABLE_BLE_WRITES],
             ): bool,
             vol.Optional(
+                CONF_ENABLE_WEEK_STATISTICS,
+                default=current_options[CONF_ENABLE_WEEK_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_MONTH_STATISTICS,
+                default=current_options[CONF_ENABLE_MONTH_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_YEAR_STATISTICS,
+                default=current_options[CONF_ENABLE_YEAR_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+                default=current_options[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK],
+            ): bool,
+            vol.Optional(
                 CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
                 default=current_options[CONF_ENABLE_UNREDACTED_DIAGNOSTICS],
             ): bool,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_ENABLE,
-                default=current_options[CONF_THIRD_PARTY_MQTT_ENABLE],
-            ): bool,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_IP,
-                default=current_options[CONF_THIRD_PARTY_MQTT_IP],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_PORT,
-                default=current_options[CONF_THIRD_PARTY_MQTT_PORT],
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_USERNAME,
-                default=current_options[CONF_THIRD_PARTY_MQTT_USERNAME],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_PASSWORD,
-                default=current_options[CONF_THIRD_PARTY_MQTT_PASSWORD],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOKEN,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
-            ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
         })
         return self.async_show_form(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -459,14 +376,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for the account's current password and validate it against Jackery to complete reauthentication.
-
-        Parameters:
-            user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when submitted.
-
-        Returns:
-            ConfigFlowResult: The next flow result (shows the password form on error or missing input, aborts and updates the entry on successful reauthentication).
-        """
+        """Prompt the user for a fresh password and re-test against Jackery."""
         try:
             entry = self._get_reauth_entry()
         except KeyError, RuntimeError:
@@ -490,6 +400,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
+                # The cloud may have rotated the MQTT seed on password change.
+                # Clear the cached session so the next setup derives fresh
+                # MQTT credentials from the new login instead of replaying
+                # a potentially stale AES-256 seed.
+                await async_clear_mqtt_session(self.hass, entry.entry_id)
                 return self.async_update_reload_and_abort(
                     entry,
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},

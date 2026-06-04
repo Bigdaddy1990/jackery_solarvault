@@ -10,7 +10,7 @@ rules:
   action-setup:
     status: done
     comment: >-
-      async_setup registers all three service actions once per domain and
+      async_setup registers all six service actions once per domain and
       forwards work to the loaded config-entry coordinators. services.yaml
       defines the action schema, translations/*.json define
       labels/descriptions, and icons.json defines action icons.
@@ -20,9 +20,9 @@ rules:
     status: done
     comment: >-
       30 s DataUpdateCoordinator interval matches the Jackery app polling rate.
-      MQTT push is optional and can short-circuit fast HTTP property refreshes
-      between keep-alive windows, while slow stat endpoints stay on their own
-      cadence. Confirmed against docs/PROTOCOL.md §2.
+      HTTP property polling stays active on every coordinator cycle; MQTT push
+      only overlays fresher live/subdevice values. Slow stat endpoints stay on
+      their own cadence.
   brands: done
   common-modules: done
   config-flow-test-coverage:
@@ -39,9 +39,9 @@ rules:
     status: done
     comment: >-
       README.md and localized README files document rename_system,
-      refresh_weather_plan and delete_storm_alert; services.yaml defines their
-      field schemas and translations/*.json define the user-facing action and
-      field text.
+      refresh_weather_plan, delete_storm_alert, set/query_third_party_mqtt_config
+      and send_ble_command; services.yaml defines their field schemas and
+      translations/*.json define the user-facing action and field text.
   docs-high-level-description: done
   docs-installation-instructions: done
   docs-removal-instructions: done
@@ -49,7 +49,7 @@ rules:
   entity-unique-id:
     status: done
     comment: >-
-      Unique ID contract documented in docs/PROTOCOL.md §11 and
+      Unique ID contract documented in local implementation notes §11 and
       enforced by tests/test_code_quality.py.
   has-entity-name: done
   runtime-data: done
@@ -121,8 +121,7 @@ rules:
   exception-translations:
     status: done
     comment: >-
-      All five user-facing exceptions (3 service-action handlers in
-      __init__.py, 2 MQTT-command paths in coordinator.py) carry
+      User-facing service/entity action exceptions carry
       translation_domain=DOMAIN + translation_key + placeholders.
       translations/*.json define the matching exceptions block; strings.json is
       kept only as a local parity fixture for tests and is not relied on by

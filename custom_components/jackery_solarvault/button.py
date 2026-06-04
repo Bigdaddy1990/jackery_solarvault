@@ -30,9 +30,9 @@ from .const import (
     DOMAIN,
     FIELD_ALERT_ID,
     FIELD_CMD,
+    FIELD_DEVICE_SN,
     FIELD_DEV_SN,
     FIELD_DEV_TYPE,
-    FIELD_DEVICE_SN,
     FIELD_END_TS,
     FIELD_MANUAL,
     FIELD_MESSAGE_TYPE,
@@ -519,6 +519,8 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Send the documented getter over BLE-first MQTT transport."""
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self._query_description.action(self.coordinator, self._device_id)
         except ConfigEntryAuthFailed:
@@ -558,6 +560,8 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Forward a button press to the device."""
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_reboot_device(self._device_id)
             await self.coordinator.async_request_refresh()

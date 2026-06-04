@@ -10,6 +10,8 @@ from pathlib import Path
 import re
 from typing import Any, NamedTuple, cast
 
+_LOGGER = logging.getLogger(__name__)
+
 from .const import (
     APP_CHART_LABELS,
     APP_CHART_SERIES_Y,
@@ -55,6 +57,7 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_TOTAL_SOLAR_REVENUE,
     APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
     APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
     APP_STAT_UNIT,
@@ -71,6 +74,7 @@ from .const import (
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
+    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
     DATA_QUALITY_KEY_SOURCE_SECTION,
@@ -79,18 +83,20 @@ from .const import (
     DATA_QUALITY_LEVEL_WARNING,
     DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
     DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
+    DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY,
     DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
     DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
+    DATA_QUALITY_REASON_ZERO_UNCONFIRMED,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_ID,
-    FIELD_DEV_SN,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
+    FIELD_DEV_ID,
+    FIELD_DEV_SN,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
@@ -113,8 +119,8 @@ from .const import (
     PAYLOAD_PRICE,
     PAYLOAD_SMART_PLUGS,
     PAYLOAD_STATISTIC,
-    REDACT_KEYS,
     REDACTED_VALUE,
+    REDACT_KEYS,
     SUBDEVICE_SCAN_NAME_LABELS,
     SUBDEVICE_SCAN_NAME_MANUFACTURERS,
     TASK_PLAN_BODY,
@@ -518,6 +524,30 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload val
             return None
 
 
+def first_nonblank_int(value: object) -> int | None:
+    """Return the first integer-parseable, non-blank token of ``value``.
+
+    Accepts a scalar or a whitespace/comma-separated string and returns the
+    first token that parses as an integer, or None when the value is
+    None/blank/unparseable. Used by the cloud client to coerce loosely typed
+    id/code fields that may arrive as zero-padded or whitespace-wrapped strings.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    for token in text.replace(",", " ").split():
+        parsed = safe_int(token)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def dev_mode_redactions_disabled() -> bool:
     """Indicates whether developer-mode redactions are disabled based on the JACKERY_DEV_MODE environment variable.
 
@@ -917,6 +947,10 @@ class AppDataQualityWarning(NamedTuple):
             payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
                 self.source_chart_series_key
             )
+        if self.reference_chart_series_key is not None:
+            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
+                self.reference_chart_series_key
+            )
         if self.total_method is not None:
             payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
         return payload
@@ -1000,6 +1034,61 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     if source_request or reference_request:
         text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"
     return text
+
+
+def verify_and_backfill(
+    cloud_value: float | None,
+    local_value: float | None,
+    *,
+    label: str = "value",
+    tolerance_fraction: float = 0.10,
+) -> float | None:
+    """Arbitrate between cloud and local source per AGENTS.md §2.3.
+
+    Rules (cloud is authoritative unless):
+    - Both None → None (no data).
+    - Cloud is None → local (cloud unavailable).
+    - Cloud == 0 and local > 0 → local with warning (cloud boundary reset).
+    - |cloud - local| > tolerance_fraction * cloud → min(cloud, local) with warning
+      (implausible divergence; conservative choice avoids Energy Dashboard spikes).
+    - Otherwise → cloud.
+
+    Parameters:
+        cloud_value: Value from the authoritative HTTP cloud endpoint.
+        local_value: Value from a local/fallback source (BLE, MQTT, or secondary endpoint).
+        label: Human-readable metric name for log messages.
+        tolerance_fraction: Relative divergence threshold (default 10 %).
+    """
+    if cloud_value is None and local_value is None:
+        return None
+    if cloud_value is None:
+        return local_value
+    if local_value is None:
+        return cloud_value
+    if cloud_value == 0.0 and local_value > 0:
+        _LOGGER.debug(
+            "verify_and_backfill %s: cloud=0 but local=%.4f — "
+            "using local (cloud likely in boundary-reset window)",
+            label,
+            local_value,
+        )
+        return local_value
+    if cloud_value > 0:
+        divergence = abs(cloud_value - local_value) / cloud_value
+        if divergence > tolerance_fraction:
+            chosen = min(cloud_value, local_value)
+            _LOGGER.debug(
+                "verify_and_backfill %s: cloud=%.4f local=%.4f diverge %.0f%% > %.0f%% — "
+                "using conservative min=%.4f",
+                label,
+                cloud_value,
+                local_value,
+                divergence * 100,
+                tolerance_fraction * 100,
+                chosen,
+            )
+            return chosen
+    return cloud_value
 
 
 def app_data_quality_warnings(
@@ -1122,7 +1211,10 @@ def app_data_quality_warnings(
             )
         )
 
+    day_in_current_week = True  # today is always within the current week
+
     for prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
+        day = _period_total(prefix, DATE_TYPE_DAY, stat_key)
         week = _period_total(prefix, DATE_TYPE_WEEK, stat_key)
         month = _period_total(prefix, DATE_TYPE_MONTH, stat_key)
         year = _period_total(prefix, DATE_TYPE_YEAR, stat_key)
@@ -1169,6 +1261,46 @@ def app_data_quality_warnings(
                 source_value=month,
                 reference_section=_section(prefix, DATE_TYPE_WEEK),
                 reference_value=week,
+            )
+
+        # §2.2: day ≤ week — today's value cannot exceed the current week total.
+        if (
+            day_in_current_week
+            and week_inside_current_year
+            and week is not None
+            and day is not None
+            and week + tolerance < day
+        ):
+            _add_warning(
+                reason=DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY,
+                metric_key=metric_key,
+                label=label,
+                stat_key=stat_key,
+                source_section=_section(prefix, DATE_TYPE_WEEK),
+                source_value=week,
+                reference_section=_section(prefix, DATE_TYPE_DAY),
+                reference_value=day,
+            )
+
+        # §2.2 §5: 0-value confirmation — flag when day=0 but week/month are
+        # meaningfully non-zero, indicating a probable cloud boundary-reset zero
+        # that has not been confirmed by an adjacent period.
+        if day == 0.0 and (
+            (week is not None and week > tolerance)
+            or (month is not None and month > tolerance)
+        ):
+            _add_warning(
+                reason=DATA_QUALITY_REASON_ZERO_UNCONFIRMED,
+                metric_key=metric_key,
+                label=label,
+                stat_key=stat_key,
+                source_section=_section(prefix, DATE_TYPE_DAY),
+                source_value=0.0,
+                reference_section=_section(
+                    prefix,
+                    DATE_TYPE_WEEK if week is not None and week > tolerance else DATE_TYPE_MONTH,
+                ),
+                reference_value=week if week is not None and week > tolerance else (month or 0.0),
             )
 
     statistic = payload.get(PAYLOAD_STATISTIC)
@@ -1288,12 +1420,15 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
     """Determine whether a section represents a device-level "year" period statistic.
 
     Returns:
-        `true` if the section's request dateType is year and the section name starts with a device statistic prefix (PV, home, battery, or CT), `false` otherwise.
+        `true` if the section's request dateType is year and the section name starts with a device statistic or trends prefix, `false` otherwise.
     """
     return _trend_date_type(section, source) == DATE_TYPE_YEAR and section.startswith((
         APP_SECTION_PV_STAT,
+        APP_SECTION_PV_TRENDS,
         APP_SECTION_HOME_STAT,
+        APP_SECTION_HOME_TRENDS,
         APP_SECTION_BATTERY_STAT,
+        APP_SECTION_BATTERY_TRENDS,
         APP_SECTION_CT_STAT,
     ))
 
@@ -1511,7 +1646,7 @@ def _month_value(
 
 
 def _pv_revenue_value(source: dict[str, Any]) -> float | None:
-    revenue = safe_float(source.get("totalSolarRevenue"))
+    revenue = safe_float(source.get(APP_STAT_TOTAL_SOLAR_REVENUE))
     if revenue is not None:
         return revenue
     profit = safe_float(source.get("pvProfit"))
@@ -1574,7 +1709,7 @@ def _pv_revenue_candidates(
     if isinstance(backfill, dict):
         corrected = backfill.get("corrected")
         if isinstance(corrected, dict):
-            revenue_meta = corrected.get("totalSolarRevenue")
+            revenue_meta = corrected.get(APP_STAT_TOTAL_SOLAR_REVENUE)
             if isinstance(revenue_meta, dict):
                 for key in ("raw_total", "corrected_total"):
                     value = safe_float(revenue_meta.get(key))
@@ -1751,6 +1886,7 @@ def _savings_publish_decision(
     calculated_revenue: float,
     raw_generation: float | None,
     year_generation: float | None,
+    year_revenue: float | None,
     pv_revenue_candidates: list[float],
 ) -> tuple[bool, str]:
     if raw_revenue is None:
@@ -1768,9 +1904,24 @@ def _savings_publish_decision(
         and raw_generation
         > year_generation + _tolerance_for_values(raw_generation, year_generation)
     )
-    if not has_prior_lifetime_generation and _matches_pv_revenue_shape(
-        raw_revenue, pv_revenue_candidates
-    ):
+    # Shape-match: only check raw_revenue against year_revenue (the YTD
+    # PV-revenue from pv_stat_year.totalSolarRevenue). If they match, the
+    # cloud is reporting the current-year PV income instead of cumulative
+    # savings, so the calculated savings figure is more accurate.
+    # Do NOT match against the derived raw_generation * price candidate —
+    # that coincides with the cloud value whenever the cloud correctly
+    # aggregates lifetime revenue at the current tariff.
+    ytd_only_candidates = [year_revenue] if year_revenue is not None else []
+    if ytd_only_candidates and _matches_pv_revenue_shape(raw_revenue, ytd_only_candidates):
+        if has_prior_lifetime_generation:
+            return True, "cloud_total_matches_pv_revenue_shape_despite_lifetime_generation"
+        return True, "cloud_total_matches_pv_revenue_not_savings"
+
+    if has_prior_lifetime_generation:
+        return False, "cloud_total_is_lifetime_higher_than_ytd_calculated"
+
+    # Full-candidate shape-match for non-lifetime cloud totals
+    if _matches_pv_revenue_shape(raw_revenue, pv_revenue_candidates):
         return True, "cloud_total_matches_pv_revenue_not_savings"
 
     return False, "cloud_total_higher_than_current_year_savings"
@@ -1793,7 +1944,7 @@ def _backfill_pv_revenue(
         meta (dict[str, Any]): Mutable metadata dictionary; when a correction is applied, `meta["corrected"]["totalSolarRevenue"]` is set with keys `raw_total`, `corrected_total`, and `months`.
 
     Side effects:
-        - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
+        - May set `out[APP_STAT_TOTAL_SOLAR_REVENUE]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
     """
     revenue_values = [0.0 for _ in range(12)]
@@ -1816,12 +1967,14 @@ def _backfill_pv_revenue(
     ):
         return
 
-    out["totalSolarRevenue"] = monthly_total
+    out[APP_STAT_TOTAL_SOLAR_REVENUE] = monthly_total
     out["pvProfit"] = round(monthly_total * 10_000_000, 1)
-    out[APP_CHART_SERIES_Y6] = [
-        round(value * 10_000_000, 1) for value in revenue_values
-    ]
-    meta.setdefault("corrected", {})["totalSolarRevenue"] = {
+    # y6 stores per-month revenue in the payload's declared currency unit (EUR/USD).
+    # pvProfit keeps the 1e7-scaled wire value for protocol compatibility, but y6
+    # must match the kWh/W convention of sibling series so external consumers
+    # (apexcharts-card, energy templates) can read it without a divisor.
+    out[APP_CHART_SERIES_Y6] = [round(value, 5) for value in revenue_values]
+    meta.setdefault("corrected", {})[APP_STAT_TOTAL_SOLAR_REVENUE] = {
         "raw_total": raw_total,
         "corrected_total": monthly_total,
         "months": found_months,
@@ -2084,16 +2237,22 @@ def guard_statistic_totals_from_year(
                 calculated_revenue=calculated_revenue,
                 raw_generation=raw_generation,
                 year_generation=year_generation,
+                year_revenue=year_revenue,
                 pv_revenue_candidates=candidates,
             )
+            published_value = calculated_revenue if publish_calculated else raw_revenue
             savings.update({
                 "raw_cloud_total": raw_revenue,
                 "pv_revenue_candidates": candidates,
                 "decision": reason,
                 "would_replace_cloud_total": publish_calculated,
-                "published_value": raw_revenue,
-                "published_value_source": "cloud_total",
+                "published_value": published_value,
+                "published_value_source": (
+                    "calculated_savings" if publish_calculated else "cloud_total"
+                ),
             })
+            if publish_calculated:
+                out[APP_STAT_TOTAL_REVENUE] = published_value
             out[APP_SAVINGS_CALC_META] = savings
 
     raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
@@ -2519,9 +2678,23 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     total = directional_power_value(
         ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],)
     )
-    if total is not None:
-        return total
     phases = signed_phase_power_values(ct)
+    if total is not None:
+        if phases is not None:
+            phase_sum = sum(phases)
+            drift = abs(phase_sum - total)
+            threshold = max(50.0, abs(total) * 0.05)
+            if drift > threshold:
+                _LOGGER.debug(
+                    "CT meter per-phase sum (%.1f W) deviates from tPhasePw "
+                    "(%.1f W) by %.1f W (%.1f%%). Shelly 3EM ADC sampling "
+                    "jitter; using tPhasePw as authoritative.",
+                    phase_sum,
+                    total,
+                    drift,
+                    100 * drift / abs(total) if total else 0,
+                )
+        return total
     return sum(phases) if phases is not None else None
 
 
@@ -2764,14 +2937,15 @@ def _series_contains_negative_samples(source: dict[str, Any], series_key: str) -
 
 
 def trend_series_key(section: str, stat_key: str) -> str | None:
-    """Map a section and statistic key to the corresponding chart-series key for week/month/year payloads.
+    """Map a section and statistic key to the corresponding chart-series key for day/week/month/year payloads.
 
-    Only returns a chart-series key when `section` denotes a week, month, or year payload; otherwise returns `None`.
+    Only returns a chart-series key when `section` denotes a day, week, month, or year payload; otherwise returns `None`.
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a week/month/year payload or no mapping exists.
     """
     if not section.endswith((
+        f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
         f"_{DATE_TYPE_MONTH}",
         f"_{DATE_TYPE_YEAR}",

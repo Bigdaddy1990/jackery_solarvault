@@ -25,11 +25,11 @@ from .const import (
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
     FIELD_CONTROL_ALLOWED,
-    FIELD_DEV_ID,
-    FIELD_DEV_SN,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_ID,
+    FIELD_DEV_SN,
     FIELD_FOLLOW_METER,
     FIELD_ID,
     FIELD_IS_AUTO_STANDBY,
@@ -39,8 +39,8 @@ from .const import (
     FIELD_SCAN_NAME,
     FIELD_SN,
     FIELD_SOCKET_PRIORITY,
-    FIELD_SW_EPS,
     FIELD_SWITCH_STATE,
+    FIELD_SW_EPS,
     FIELD_SYS_SWITCH,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_VERSION,
@@ -89,10 +89,8 @@ def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401  # arbitrary payloa
         return None
     try:
         return int(raw) == 1
-    except ValueError:
-         return safe_bool(raw)
-    except TypeError:
-         return safe_bool(raw)
+    except (TypeError, ValueError):
+        return safe_bool(raw)
 
 
 @dataclass(frozen=True, kw_only=True)

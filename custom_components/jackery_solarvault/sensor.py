@@ -6,20 +6,11 @@ This module is a thin entity layer. The data path is:
                      --> coordinator.data device payload
                      --> JackerySensor.native_value
 
-The descriptions in ``SENSOR_DESCRIPTIONS`` and the period builders below
-each carry inline references to the source-of-truth ``docs/PROTOCOL.md``
-(§2 HTTP, §3-§5 MQTT, §8 data-source priority, §10 entity → source mapping,
-§11 unique-ID contract) so the mapping from raw API field to HA entity can
-be verified without re-reading the parser.
-
 Conventions used in the per-sensor doc strings:
 
-* ``HTTP:`` lines name the documented endpoint from PROTOCOL.md §2 (HTTP
-  endpoints table).
-* ``MQTT:`` lines name the telemetry message and the field from PROTOCOL.md
-  §5 (telemetry messages).
-* ``Source-priority:`` follows PROTOCOL.md §8: live MQTT wins over HTTP
-  property; period sensors use the documented app endpoint, with the
+* ``HTTP:`` lines name the documented endpoint(HTTP endpoints table).
+* ``MQTT:`` lines name the telemetry message and the field (telemetry messages).
+* period sensors use the documented app endpoint, with the
   documented same-endpoint month backfill for broken year payloads.
 
 Field-to-source mapping (consolidated reference for live entities):
@@ -56,13 +47,12 @@ home_energy_*                 /v1/device/stat/sys/home/trends (home_trends_*)   
 ============================  ==========================================================  ==================
 
 Lifetime totals (``total_generation``, ``total_revenue``, ``total_carbon``)
-prefer ``/v1/device/stat/systemStatistic``. Per
-``PROTOCOL.md §8`` generation/carbon are guarded against broken
+prefer ``/v1/device/stat/systemStatistic``. Per generation/carbon are guarded against broken
 month-only cloud totals. ``total_revenue`` stays the raw Jackery app savings
 KPI, while the separate ``_savings_calculation`` metadata and optional detail
 sensor expose the locally calculated savings from self-consumed AC energy.
 
-Unique IDs follow ``PROTOCOL.md §11`` strictly:
+Unique IDs follow strictly:
 ``<device_id>_<stable_key_suffix>`` for the main device and
 ``<device_id>_battery_pack_<index>_<stable_key_suffix>`` for battery packs.
 The ``key`` attribute of each ``JackerySensorDescription`` is the
@@ -180,19 +170,19 @@ from .const import (
     FIELD_CHARGING_ENERGY,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
-    FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
-    FIELD_CT_A_PHASE_ENERGY,
     FIELD_CT_APPARENT_POWER,
     FIELD_CT_APPARENT_POWER1,
     FIELD_CT_APPARENT_POWER2,
     FIELD_CT_APPARENT_POWER3,
+    FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_A_PHASE_ENERGY,
     FIELD_CT_B_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_B_PHASE_ENERGY,
-    FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
-    FIELD_CT_C_PHASE_ENERGY,
     FIELD_CT_CURRENT1,
     FIELD_CT_CURRENT2,
     FIELD_CT_CURRENT3,
+    FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_C_PHASE_ENERGY,
     FIELD_CT_FREQUENCY,
     FIELD_CT_FUN_FORM,
     FIELD_CT_POWER,
@@ -217,9 +207,9 @@ from .const import (
     FIELD_CT_VOLT3,
     FIELD_CURRENT_VERSION,
     FIELD_DEFAULT_PW,
-    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_DISCHARGING_ENERGY,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_EC,
@@ -258,8 +248,8 @@ from .const import (
     FIELD_OFF_GRID_DOWN,
     FIELD_OFF_GRID_DOWN_TIME,
     FIELD_OFF_GRID_TIME,
-    FIELD_ON_GRID_STAT,
     FIELD_ONGRID_STAT,
+    FIELD_ON_GRID_STAT,
     FIELD_OP,
     FIELD_OT,
     FIELD_OTHER_LOAD_PW,
@@ -278,22 +268,22 @@ from .const import (
     FIELD_SINGLE_PRICE,
     FIELD_SN,
     FIELD_SOC,
+    FIELD_SOCKET_LAST_UPDATE_TS,
+    FIELD_SOCKET_PRIORITY,
+    FIELD_SOCKET_SWITCH_CYCLE,
     FIELD_SOC_CHARGE_LIMIT,
     FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
-    FIELD_SOCKET_LAST_UPDATE_TS,
-    FIELD_SOCKET_PRIORITY,
-    FIELD_SOCKET_SWITCH_CYCLE,
     FIELD_STACK_IN_PW,
     FIELD_STACK_OUT_PW,
     FIELD_STANDBY_PW,
     FIELD_STAT,
     FIELD_STORM,
+    FIELD_SWITCH_STATE,
     FIELD_SW_EPS_IN_PW,
     FIELD_SW_EPS_OUT_PW,
     FIELD_SW_EPS_STATE,
-    FIELD_SWITCH_STATE,
     FIELD_SYS_SWITCH,
     FIELD_TARGET_MODULE_VERSION,
     FIELD_TARGET_VERSION,
@@ -350,6 +340,7 @@ from .util import (
     redacted_json_safe_payload,
     safe_float,
     safe_int,
+    verify_and_backfill,
     signed_phase_power_values,
     smart_meter_net_power,
     smart_plug_serial,
@@ -886,7 +877,6 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
             ),
         ),
     ),
-    # Removed max_feed_grid sensor
     JackerySensorDescription(
         key="max_system_output_power",
         translation_key="max_system_output_power",
@@ -958,7 +948,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # Removed duplicate grid_side_in_power and grid_side_out_power sensors;
-    # use grid_in_power and grid_out_power which read the same payload keys.
+    # use grid_in_power and grid_out_power which read the same payload keys.#TODO Check if same in other files
     JackerySensorDescription(
         key="follow_meter_state",
         translation_key="follow_meter_state",
@@ -1059,7 +1049,7 @@ def _period_start(
         reset_period (StatResetPeriod): Period identifier (e.g., `DATE_TYPE_DAY`,
             `DATE_TYPE_WEEK`, `DATE_TYPE_MONTH`, or year default).
         timezone (Any | None): Timezone to use for computing the boundary; when
-            None the Home Assistant local timezone is used.
+            None the Home Assistant local timezone is used.   #TODO check if periods DATE_TYPE_DAY in all functions and statistic/backfill/trends
 
     Returns:
         datetime: Timezone-aware datetime at 00:00:00 representing the start of
@@ -1116,8 +1106,7 @@ class JackerySmartPlugSensorDescription(SensorEntityDescription):
     """Sensor description for one entry from ``smart_plugs``.
 
     Smart-plug payloads come from ``UploadSubDeviceGroupProperty`` (cmd=110,
-    actionId=3032) with the ``plugs`` array. Per-plug fields documented in
-    PROTOCOL.md §2 "Smart-Plug-/Socket-Appmodell".
+    actionId=3032) with the ``plugs`` array.
     """
 
     field: str
@@ -1356,8 +1345,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     ),
     # Source: statistic_response.data.totalRevenue (lifetime cumulative
     # revenue / "App-Gesamtersparnis" from /v1/device/stat/systemStatistic).
-    # PROTOCOL.md §10, DATA_SOURCE_PRIORITY.md and APP_CLOUD_VALUES.md
-    # do NOT prescribe device_class=MONETARY for this entity — the docs
+    # NOT prescribe device_class=MONETARY for this entity — the docs
     # describe it as a raw € counter. Removing the MONETARY device_class
     # avoids the HA-validator restriction (MONETARY allows state_class
     # TOTAL only) and restores the CHANGELOG "Three-part fix" choice of
@@ -1371,7 +1359,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="total_revenue",
         stat_key=APP_STAT_TOTAL_REVENUE,
         transform=safe_float,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=CURRENCY_EURO,
         icon="mdi:currency-eur",
     ),
@@ -1416,7 +1405,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_year_energy",
         translation_key="pv_year_energy",
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
-        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",  # TODO check DATE_TYPE_DAY in all Sensors!
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -1633,7 +1622,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-panel",
     ),
-    # System-level trend sensors (system_pv_*, system_home_*, system_battery_*).
+    # System-level trend sensors (system_pv_*, system_home_*, system_battery_*).                   #TODO check comment versus docs/ and make it right
     # These values largely duplicate the per-device and home sensors and were
     # removed to reduce redundancy in Home Assistant. Removing them here ensures
     # the integration only exposes one set of PV, home and battery statistics.
@@ -1679,7 +1668,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- PROTOCOL.md §2: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY      #TODO NO DATE_TYPE_DAY again
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -1937,9 +1926,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         icon="mdi:battery-arrow-down",
     ),
     # ------------------------------------------------------------------
-    # EPS / off-grid period totals (PROTOCOL.md §2.4 + EpsStatApi$Bean).
-    # Polled by the coordinator under APP_SECTION_EPS_STAT per dateType
-    # since #14. The fields stay ``unknown`` on hardware that never
+    # EPS / off-grid period totals (EpsStatApi$Bean).
+    # Polled by the coordinator under APP_SECTION_EPS_STAT per dateType  #TODO check comment and make it right
+    #  The fields stay ``unknown`` on hardware that never
     # operates off-grid: that is correct HA behaviour. This installer's
     # SolarVault may not exercise EPS often, but the contract is in the
     # Smali docs (jackery_smali_home_assistant_report.html "Statistik-
@@ -2053,6 +2042,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="today_feed_in_energy",
         stat_key=APP_STAT_TODAY_FEED_IN_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
+        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_ONGRID_OUTPUT),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2065,6 +2055,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="today_grid_import_energy",
         stat_key=APP_STAT_TODAY_GRID_IMPORT_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
+        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_ONGRID_INPUT),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2077,6 +2068,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="today_home_load_energy",
         stat_key=APP_STAT_TODAY_HOME_LOAD_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
+        fallback_sources=((PAYLOAD_STATISTIC, APP_STAT_TODAY_LOAD),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2089,6 +2081,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="today_battery_energy",
         stat_key=APP_STAT_TODAY_BATTERY_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
+        # ds = "Batterie-Energie" (battery energy today). The log-verified
+        # equivalent in device_statistic is batDisChgEgy (battery discharge
+        # energy) which matches in magnitude and direction. This fallback is
+        # only active during the midnight reset window when ds=0 but the cloud
+        # has not yet zeroed batDisChgEgy.
+        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_DISCHARGE),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2105,6 +2103,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=FIELD_SINGLE_PRICE,
         section=PAYLOAD_PRICE,
         transform=safe_float,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:currency-eur",
     ),
@@ -2263,6 +2263,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         translation_key="savings_conversion_loss_year_energy",
         path=("source_energy", "conversion_loss_year_kwh"),
         device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-off",
     ),
@@ -2271,6 +2272,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         translation_key="savings_pv_residual_year_energy",
         path=("source_energy", "pv_residual_after_self_consumption_year_kwh"),
         device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant-outline",
     ),
@@ -3658,14 +3660,16 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         return self._statistic
 
     def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401  # passes through dynamic state value
-        """Clamp negative energy period totals to zero when applicable.
+        """Guard against negative energy period totals.
 
         If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
-        parses `raw` as a float and returns `0` when the parsed value is less than zero.
-        Otherwise returns the original `raw` value unchanged.
+        parses `raw` as a float and returns `None` when the parsed value is less than zero.
+        Returning `None` renders the sensor unavailable for that update, which avoids a
+        false-zero spike in the HA Energy Dashboard (clamping to 0 causes a negative
+        delta on the next positive reading).
 
         Returns:
-            The original `raw` value, or `0` when a negative energy total was detected.
+            The original `raw` value, or `None` when a negative energy total was detected.
         """
         if self._reset_period is None:
             return raw
@@ -3673,7 +3677,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return raw
         parsed = safe_float(raw)
         if parsed is not None and parsed < 0:
-            return 0
+            return None
         return raw
 
     def _current_day_bucket_from_period_chart(
@@ -3748,9 +3752,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             _, values, chart_series_sum, server_total = self._resolve_period_value(
                 source, section, stat_key
             )
-            raw: float | None = chart_series_sum
-            if raw is None:
-                raw = server_total
+            raw: float | None = server_total
             if raw is None:
                 # PROTOCOL.md §2 fallback — try documented alternate
                 # source (e.g. deviceStatistic for today_* sensors).
@@ -3775,20 +3777,44 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             # Stale-period guard per CHANGELOG "Three-part fix" / Midnight
             # race. When the wall clock has crossed a period boundary but
             # the source data is still stamped with the previous period's
-            # begin_date, native_value is set to None for ALL periods
-            # (including DAY). HA Recorder writes "unavailable" for that
-            # brief window and never sees an artificial spike+drop. DO
-            # NOT reintroduce a DAY-only carve-out (raw=0) — that recreates
-            # the midnight delta bug the three-part fix was designed to
-            # prevent (observed regression on 2026-05-16 battery year
-            # energy spike where the cloud briefly served 0 inside the
-            # same period anchor and the Energy Dashboard rendered a
-            # -X kWh delta).
+            # begin_date:
+            #
+            # - MONTH / YEAR: set raw=None so HA Recorder writes
+            #   "unavailable" for the brief cloud-lag window. These periods
+            #   are cumulative chart sums; using an arbitrary fallback risks
+            #   the spike+drop seen on 2026-05-16 (cloud briefly served 0
+            #   inside the same period anchor → Energy Dashboard −X kWh).
+            #
+            # - DAY / WEEK: fall back to server_total (the wire-reported
+            #   aggregate field). server_total is not derived from the chart
+            #   series so it is unaffected by the boundary-window lag and
+            #   avoids a spurious "unavailable" gap in daily energy tracking.
+            #   Using raw=0 here is NOT acceptable — see 2026-05-16 note.
             self._cached_source_section = section
             stale_period = self._reset_period and self._is_period_data_stale()
             future_period = self._reset_period and self._is_period_data_future()
             if stale_period or future_period:
-                raw = None
+                if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR):
+                    raw = None
+                else:
+                    raw = server_total
+            # Cross-validation: flag when server_total is zero but the chart
+            # series has a meaningful non-zero sum (possible cloud-side zero
+            # payload before the daily stat is propagated). This does not change
+            # the sensor value — it only surfaces the inconsistency in debug
+            # logs so telemetry issues are diagnosable without unredacted exports.
+            if (
+                raw == 0.0
+                and not (stale_period or future_period)
+                and chart_series_sum is not None
+                and chart_series_sum > 0
+            ):
+                _LOGGER.debug(
+                    "%s %s: server_total=0 but chart_series_sum=%.2f — cloud may "                    "be serving a zero-payload during a period boundary window",
+                    self.entity_id,
+                    section,
+                    chart_series_sum,
+                )
             raw = self._non_negative_period_raw(raw)
             self._cached_native_value = (
                 self.entity_description.transform(raw) if raw is not None else None
@@ -3817,16 +3843,52 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             if stale_period:
                 attrs["stale_period_data"] = True
                 attrs["stale_period_begin_date"] = self._period_begin_from_meta()
-                attrs["stale_period_fallback"] = "unknown_until_local_period"
+                attrs["stale_period_fallback"] = (
+                    "unknown_until_local_period"
+                    if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+                    else "server_total"
+                )
             if future_period:
                 attrs["future_period_data"] = True
                 attrs["future_period_begin_date"] = self._period_begin_from_meta()
-                attrs["future_period_fallback"] = "unknown_until_local_period"
+                attrs["future_period_fallback"] = (
+                    "unknown_until_local_period"
+                    if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+                    else "server_total"
+                )
             self._cached_attrs = attrs
             return
 
         # ---- non-period stat path (totalGeneration, todayLoad, price, ...)
-        raw = source.get(stat_key)
+        # Apply verify_and_backfill (AGENTS.md §2.3) when a fallback source
+        # exists: cross-validate cloud primary against local/secondary value
+        # so a cloud boundary-reset zero doesn't overwrite a valid local reading.
+        cloud_raw = source.get(stat_key)
+        local_raw: object = None
+        fb_section_used: str | None = None
+        fb_stat_key_used: str | None = None
+        for fb_section, fb_stat_key in self.entity_description.fallback_sources:
+            fb_source = self._source_for_section(fb_section)
+            candidate = fb_source.get(fb_stat_key)
+            if candidate is not None:
+                local_raw = candidate
+                fb_section_used = fb_section
+                fb_stat_key_used = fb_stat_key
+                break
+        if self.entity_description.fallback_sources and local_raw is not None:
+            raw = verify_and_backfill(
+                safe_float(cloud_raw),
+                safe_float(local_raw),
+                label=f"{self.entity_id}:{stat_key}",
+            )
+            if raw is None and local_raw is not None:
+                raw = local_raw
+                if fb_section_used:
+                    section = fb_section_used
+                    stat_key = fb_stat_key_used or stat_key
+                    source = self._source_for_section(section)
+        else:
+            raw = cloud_raw if cloud_raw is not None else local_raw
         day_bucket_fallback: str | None = None
         if raw is None:
             for fb_section, fb_stat_key in self.entity_description.fallback_sources:
@@ -3921,7 +3983,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         # for a smart-meter total. The smart_meter_derived sensors expose
         # the real home consumption when the option is enabled.
         if stat_key == APP_STAT_TODAY_LOAD:
-            self._cached_attrs["cloud_field"] = "todayLoad"
+            self._cached_attrs["cloud_field"] = APP_STAT_TODAY_LOAD
             self._cached_attrs["cloud_caveat"] = (
                 "Jackery cloud reports the inverter's on-grid output for "
                 "today; this is not smart-meter home consumption. For "

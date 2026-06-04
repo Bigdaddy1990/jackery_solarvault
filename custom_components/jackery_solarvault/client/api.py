@@ -1656,11 +1656,7 @@ class JackeryApi:
         """
         price = float(single_price)
         try:
-            price = float(single_price)
-        except TypeError as err:
-            raise JackeryApiError("single_price has invalid type") from err
-        except ValueError as err:
-            raise JackeryApiError("single_price has invalid value") from err
+          price = float(single_price)
         if price < 0:
             raise JackeryApiError("single_price must be >= 0")
          cur = str(currency or "").strip()
