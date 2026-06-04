@@ -83,4 +83,3 @@ repos:
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
-
