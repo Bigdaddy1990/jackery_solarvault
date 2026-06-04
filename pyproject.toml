@@ -319,6 +319,8 @@ property-decorators = ["propcache.api.cached_property"]
 "pytz".msg = "use zoneinfo instead"
 "tests".msg = "You should not import tests"
 "__future__.annotations".msg = "It should not be needed because Home Assistant requires Python 3.14+"
+"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
+"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -357,10 +359,6 @@ mark-parentheses = true
 parametrize-names-type = "list"
 parametrize-values-row-type = "list"
 parametrize-values-type = "list"
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
-"typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
