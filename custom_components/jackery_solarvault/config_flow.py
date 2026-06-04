@@ -17,7 +17,6 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
-from .mqtt_session_cache import async_clear_mqtt_session
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -56,6 +55,7 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_USER,
 )
+from .mqtt_session_cache import async_clear_mqtt_session
 from .util import config_entry_bool_option
 
 _LOGGER = logging.getLogger(__name__)

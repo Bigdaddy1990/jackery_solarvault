@@ -54,14 +54,14 @@ from ..const import (
     DEVICE_MODEL_HEADER,
     DEVICE_PROPERTY_PATH,
     DEVICE_PV_STAT_PATH,
-    DEVICE_SOCKET_STAT_PATH,
     DEVICE_SOCKET_STATISTIC_PATH,
+    DEVICE_SOCKET_STAT_PATH,
     DEVICE_STATISTIC_PATH,
     DEVICE_TODAY_ENERGY_PATH,
     FIELD_ACCOUNT,
     FIELD_ACTION,
-    FIELD_BAT_SOC,
     FIELD_BATTERY_PACKS,
+    FIELD_BAT_SOC,
     FIELD_BODY,
     FIELD_CELL_TEMP,
     FIELD_CODE,
@@ -119,8 +119,8 @@ from ..const import (
     MQTT_CLIENT_ID_SUFFIX,
     MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
     MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
     MQTT_MAC_ID_PREFIX,
     MQTT_USERNAME_SEPARATOR,
     OTA_LIST_PATH,
@@ -137,10 +137,10 @@ from ..const import (
     SHELLY_CONTROL_PATH,
     SHELLY_DEVICES_PATH,
     SHELLY_REALTIME_POWER_PATH,
-    SYS_VERSION,
     SYSTEM_LIST_PATH,
     SYSTEM_NAME_PATH,
     SYSTEM_STATISTIC_PATH,
+    SYS_VERSION,
     USER_AGENT,
 )
 from ..util import app_period_date_bounds, chart_series_debug
@@ -602,9 +602,7 @@ class JackeryApi:
         )
 
     @staticmethod
-    def _auth_failure_message(
-        method: str, path: str, status: int, data: object
-    ) -> str:
+    def _auth_failure_message(method: str, path: str, status: int, data: object) -> str:
         """Build a compact auth-failure message without exposing secrets."""
         if isinstance(data, dict):
             code = data.get(FIELD_CODE)
@@ -1652,14 +1650,17 @@ class JackeryApi:
             `true` if the backend indicates the change was accepted, `false` otherwise.
 
         Raises:
-            JackeryApiError: If `single_price` is negative or `currency` is empty.
+            JackeryApiError: If `single_price` is invalid, negative, or `currency` is empty.
         """
-        price = float(single_price)
         try:
-          price = float(single_price)
+            price = float(single_price)
+        except TypeError as err:
+            raise JackeryApiError("single_price must be a valid number") from err
+        except ValueError as err:
+            raise JackeryApiError("single_price must be a valid number") from err
         if price < 0:
             raise JackeryApiError("single_price must be >= 0")
-         cur = str(currency or "").strip()
+        cur = str(currency or "").strip()
         if not cur:
             raise JackeryApiError("currency must be a non-empty string")
         # Keep stable decimal formatting for backend parsing.

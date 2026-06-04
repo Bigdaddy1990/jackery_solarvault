@@ -406,6 +406,7 @@ class JackeryMqttPushClient:
             return
         self._last_connect_failure_signature = message
         if self._is_connect_auth_failure_rc(rc):
+            _LOGGER.warning("Jackery MQTT connect failed: %s", message)
             _LOGGER.debug(
                 "Jackery MQTT connect failed: %s (streak=%d)",
                 message,

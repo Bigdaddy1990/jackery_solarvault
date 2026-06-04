@@ -5,12 +5,11 @@ import contextlib
 from datetime import UTC, date, datetime, timedelta
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
 from typing import Any, NamedTuple, cast
-
-_LOGGER = logging.getLogger(__name__)
 
 from .const import (
     APP_CHART_LABELS,
@@ -44,6 +43,7 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_PV_PROFIT,
     APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
@@ -71,10 +71,10 @@ from .const import (
     DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
+    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
-    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
     DATA_QUALITY_KEY_SOURCE_SECTION,
@@ -126,6 +126,8 @@ from .const import (
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
@@ -1065,7 +1067,7 @@ def verify_and_backfill(
         return local_value
     if local_value is None:
         return cloud_value
-    if cloud_value == 0.0 and local_value > 0:
+    if math.isclose(cloud_value, 0.0) and local_value > 0:
         _LOGGER.debug(
             "verify_and_backfill %s: cloud=0 but local=%.4f — "
             "using local (cloud likely in boundary-reset window)",
@@ -1285,9 +1287,13 @@ def app_data_quality_warnings(
         # §2.2 §5: 0-value confirmation — flag when day=0 but week/month are
         # meaningfully non-zero, indicating a probable cloud boundary-reset zero
         # that has not been confirmed by an adjacent period.
-        if day == 0.0 and (
-            (week is not None and week > tolerance)
-            or (month is not None and month > tolerance)
+        if (
+            day is not None
+            and math.isclose(day, 0.0)
+            and (
+                (week is not None and week > tolerance)
+                or (month is not None and month > tolerance)
+            )
         ):
             _add_warning(
                 reason=DATA_QUALITY_REASON_ZERO_UNCONFIRMED,
@@ -1298,9 +1304,13 @@ def app_data_quality_warnings(
                 source_value=0.0,
                 reference_section=_section(
                     prefix,
-                    DATE_TYPE_WEEK if week is not None and week > tolerance else DATE_TYPE_MONTH,
+                    DATE_TYPE_WEEK
+                    if week is not None and week > tolerance
+                    else DATE_TYPE_MONTH,
                 ),
-                reference_value=week if week is not None and week > tolerance else (month or 0.0),
+                reference_value=week
+                if week is not None and week > tolerance
+                else (month or 0.0),
             )
 
     statistic = payload.get(PAYLOAD_STATISTIC)
@@ -1649,7 +1659,7 @@ def _pv_revenue_value(source: dict[str, Any]) -> float | None:
     revenue = safe_float(source.get(APP_STAT_TOTAL_SOLAR_REVENUE))
     if revenue is not None:
         return revenue
-    profit = safe_float(source.get("pvProfit"))
+    profit = safe_float(source.get(APP_STAT_PV_PROFIT))
     if profit is None:
         return None
     return round(profit / 10_000_000, 5)
@@ -1912,9 +1922,14 @@ def _savings_publish_decision(
     # that coincides with the cloud value whenever the cloud correctly
     # aggregates lifetime revenue at the current tariff.
     ytd_only_candidates = [year_revenue] if year_revenue is not None else []
-    if ytd_only_candidates and _matches_pv_revenue_shape(raw_revenue, ytd_only_candidates):
+    if ytd_only_candidates and _matches_pv_revenue_shape(
+        raw_revenue, ytd_only_candidates
+    ):
         if has_prior_lifetime_generation:
-            return True, "cloud_total_matches_pv_revenue_shape_despite_lifetime_generation"
+            return (
+                True,
+                "cloud_total_matches_pv_revenue_shape_despite_lifetime_generation",
+            )
         return True, "cloud_total_matches_pv_revenue_not_savings"
 
     if has_prior_lifetime_generation:
@@ -1944,7 +1959,7 @@ def _backfill_pv_revenue(
         meta (dict[str, Any]): Mutable metadata dictionary; when a correction is applied, `meta["corrected"]["totalSolarRevenue"]` is set with keys `raw_total`, `corrected_total`, and `months`.
 
     Side effects:
-        - May set `out[APP_STAT_TOTAL_SOLAR_REVENUE]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
+        - May set `out[APP_STAT_TOTAL_SOLAR_REVENUE]`, `out[APP_STAT_PV_PROFIT]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
     """
     revenue_values = [0.0 for _ in range(12)]
@@ -1968,7 +1983,7 @@ def _backfill_pv_revenue(
         return
 
     out[APP_STAT_TOTAL_SOLAR_REVENUE] = monthly_total
-    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
+    out[APP_STAT_PV_PROFIT] = round(monthly_total * 10_000_000, 1)
     # y6 stores per-month revenue in the payload's declared currency unit (EUR/USD).
     # pvProfit keeps the 1e7-scaled wire value for protocol compatibility, but y6
     # must match the kWh/W convention of sibling series so external consumers

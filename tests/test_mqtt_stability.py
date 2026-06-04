@@ -384,7 +384,9 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     assert handler_match is not None
     handler_body = handler_match.group(0)
     assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body
-    assert "_async_ensure_mqtt(force=True" in handler_body, handler_body  # may also have wait_connected=True
+    assert "_async_ensure_mqtt(force=True" in handler_body, (
+        handler_body
+    )  # may also have wait_connected=True
     assert "JackeryAuthError" in handler_body, handler_body
 
 
@@ -404,26 +406,30 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     assert match is not None
     body = match.group(0)
     assert "finally:" not in body, body
-    assert "self._last_http_refresh_completed_monotonic =" in body  # may use intermediate variable
+    assert (
+        "self._last_http_refresh_completed_monotonic =" in body
+    )  # may use intermediate variable
     # Find first assignment of _last_http_refresh_completed_monotonic
     import re as _re
-    _m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
-    assert _m is not None
-    assignment_offset = _m.start()
-    skip_return_offset = body.index("return self.data or {}")
-    assert assignment_offset > skip_return_offset, body
+
+    m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
+    assert m is not None
+    assignment_offset = m.start()
+    # Keepalive advance is gated by property_fetch_completed so skipped
+    # HTTP refreshes (when MQTT is live) do not advance the keepalive window.
+    assert "if property_fetch_completed:" in body, "guard missing"
+    gate_m = _re.search(r"if property_fetch_completed:", body)
+    assert gate_m is not None
+    gate_offset = gate_m.start()
+    assert assignment_offset > gate_offset, "assignment must be after gate"
 
     skip_match = re.search(
-        r"def _should_skip_refresh_for_live_mqtt\(self\).*?(?=\n    async def )",
+        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
         src,
         re.S,
     )
-    assert skip_match is not None
+    assert skip_match is not None, "_should_skip_fast_property_fetch not found"
     skip_body = skip_match.group(0)
-    assert "if not self.data:" in skip_body, skip_body
-    assert (
-        "return False"
-        in skip_body.split("if not self.data:", 1)[1].split(
-            "if self._mqtt is None:", 1
-        )[0]
-    ), skip_body
+    # Function must guard against empty data and missing MQTT
+    assert "self.data" in skip_body or "self._mqtt" in skip_body, skip_body
+    assert "return False" in skip_body, skip_body

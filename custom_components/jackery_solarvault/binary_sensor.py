@@ -79,7 +79,7 @@ BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
 )
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029 - HA platform hook must stay async.
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,

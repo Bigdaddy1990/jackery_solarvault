@@ -954,7 +954,9 @@ DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK: Final = "year_less_than_week"
 DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK: Final = "month_less_than_week"
 DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR: Final = "lifetime_less_than_year"
 DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY: Final = "week_less_than_day"
-DATA_QUALITY_REASON_ZERO_UNCONFIRMED: Final = "zero_value_not_confirmed_by_adjacent_period"
+DATA_QUALITY_REASON_ZERO_UNCONFIRMED: Final = (
+    "zero_value_not_confirmed_by_adjacent_period"
+)
 DATA_QUALITY_REPAIR_EXAMPLE_LIMIT: Final = 3
 REPAIR_ISSUE_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
 REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
@@ -1012,6 +1014,7 @@ APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
 # to that period's PV energy and the configured tariff (singlePrice or
 # dynamic). Currency arrives in PvStatApi$Bean.currency.
 APP_STAT_TOTAL_SOLAR_REVENUE: Final = "totalSolarRevenue"
+APP_STAT_PV_PROFIT: Final = "pvProfit"
 APP_STAT_TOTAL_CARBON: Final = "totalCarbon"
 APP_DEVICE_STAT_PV_ENERGY: Final = "pvEgy"
 APP_DEVICE_STAT_BATTERY_CHARGE: Final = "batChgEgy"

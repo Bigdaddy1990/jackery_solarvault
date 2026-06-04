@@ -8,6 +8,7 @@ from custom_components.jackery_solarvault.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 
 pytestmark = pytest.mark.asyncio
 
@@ -90,3 +91,61 @@ async def test_services_register_on_setup(
     assert "rename_system" in services
     assert "refresh_weather_plan" in services
     assert "delete_storm_alert" in services
+
+
+async def test_setup_entry_preserves_first_refresh_failure_before_runtime_data(
+    hass: HomeAssistant,
+    mock_jackery_login: None,
+) -> None:
+    """Setup cleanup must not mask first-refresh failures before runtime_data exists."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="user@example.com",
+        data={
+            CONF_USERNAME: "user@example.com",
+            CONF_PASSWORD: "pass",
+        },
+    )
+    entry.add_to_hass(hass)
+    refresh_failure = ConfigEntryNotReady("first refresh failed")
+
+    with (
+        patch(
+            "custom_components.jackery_solarvault.JackerySolarVaultCoordinator."
+            "async_load_statistics_backfill_state",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.JackerySolarVaultCoordinator."
+            "async_discover",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.JackerySolarVaultCoordinator."
+            "async_config_entry_first_refresh",
+            side_effect=refresh_failure,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.JackerySolarVaultCoordinator."
+            "async_start_mqtt",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault._async_start_local_mqtt",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.JackerySolarVaultCoordinator."
+            "async_shutdown",
+            return_value=None,
+        ) as shutdown_mock,
+    ):
+        with pytest.raises(ConfigEntryNotReady) as exc_info:
+            await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert exc_info.value is refresh_failure
+    shutdown_mock.assert_awaited_once()
+    assert not hasattr(entry, "runtime_data")

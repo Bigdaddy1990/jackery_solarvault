@@ -368,7 +368,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     except Exception:
         with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
-        if entry.runtime_data is coordinator:
+        if getattr(entry, "runtime_data", None) is coordinator:
             # HA convention: clear runtime_data on setup failure so the next
             # retry sees a clean slate. The typed alias narrows the attribute
             # to ``JackerySolarVaultCoordinator``; the None assignment here

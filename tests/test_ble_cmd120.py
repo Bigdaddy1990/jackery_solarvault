@@ -12,7 +12,6 @@ logic. This file is the audit trail that makes that future change visible
 in code review.
 """
 
-
 CMD_QUERY_COMBINE_DATA = 120  # MQTT_CMD_QUERY_COMBINE_DATA
 SUBDEVICE_DEV_TYPE_BATTERY_PACK = 1  # devType=1 identifies add-on battery packs
 
@@ -30,6 +29,7 @@ def _should_route(payload: dict) -> bool:
 # Routed variant
 # ---------------------------------------------------------------------------
 
+
 def test_battery_pack_frame_is_routed() -> None:
     """devType=1 + deviceSn → routed to _merge_battery_pack_lifetime_from_ble."""
     payload = {
@@ -45,6 +45,7 @@ def test_battery_pack_frame_is_routed() -> None:
 # ---------------------------------------------------------------------------
 # Unrouted variants — intentionally not routed (Finding E)
 # ---------------------------------------------------------------------------
+
 
 def test_system_level_frame_is_not_routed() -> None:
     """System-level cmd=120 (no devType) → unrouted.
@@ -103,4 +104,6 @@ def test_battery_pack_frame_without_sn_is_not_routed() -> None:
         "inEgy": 45000,
         "outEgy": 38000,
     }
-    assert not _should_route(payload), "battery-pack frame with no SN must NOT be routed"
+    assert not _should_route(payload), (
+        "battery-pack frame with no SN must NOT be routed"
+    )

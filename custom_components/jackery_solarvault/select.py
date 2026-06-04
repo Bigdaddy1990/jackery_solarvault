@@ -18,7 +18,7 @@ from typing import Any, NoReturn
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -574,9 +574,7 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
             "entity_action_failed",
             error="ct meter payload missing",
         )
-    ct_sn = str(
-        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ""
-    ).strip()
+    ct_sn = str(ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or "").strip()
     if not ct_sn:
         _raise_select_action_error(
             entity,
@@ -748,6 +746,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
 

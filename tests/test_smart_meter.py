@@ -15,8 +15,10 @@ from pathlib import Path
 import sys
 import types
 
+import pytest
 
-def _load_util_module():
+
+def _load_util_module() -> types.ModuleType:
     package_dir = (
         Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
@@ -77,7 +79,9 @@ def test_smart_meter_net_power_prefers_total() -> None:
 
 def test_smart_meter_net_power_falls_back_to_phases() -> None:
     """Per-phase sum is used when total pair is absent."""
-    ct = {k: v for k, v in SHELLY_SNAPSHOT.items() if k not in ("tPhasePw", "tnPhasePw")}
+    ct = {
+        k: v for k, v in SHELLY_SNAPSHOT.items() if k not in ("tPhasePw", "tnPhasePw")
+    }
     result = util.smart_meter_net_power(ct)
     # (2-0) + (0-254) + (235-0) = -17
     assert result == -17, f"expected -17 W (phase sum fallback), got {result}"
@@ -96,7 +100,7 @@ def test_smart_meter_net_power_all_zero_returns_zero_not_none() -> None:
         "cnPhasePw": 0,
     }
     result = util.smart_meter_net_power(ct)
-    assert result == 0.0, f"expected 0.0 W, got {result}"
+    assert result == pytest.approx(0.0), f"expected 0.0 W, got {result}"
     assert result is not None, "0.0 W reading must not be None (that means unavailable)"
 
 
@@ -114,8 +118,7 @@ def test_smart_meter_net_power_missing_one_phase_uses_total() -> None:
 
 
 def test_smart_meter_net_power_missing_full_phase_no_total_returns_none() -> None:
-    """Both keys of phase A absent and no total pair → signed_phase_power_values returns
-    None → smart_meter_net_power returns None (no reliable data).
+    """Both keys of phase A absent and no total pair return None.
 
     Note: removing only aPhasePw while anPhasePw is still present still produces
     0.0 for that phase (negative key found, positive absent=0). Both keys of the
@@ -127,7 +130,9 @@ def test_smart_meter_net_power_missing_full_phase_no_total_returns_none() -> Non
         if k not in ("tPhasePw", "tnPhasePw", "aPhasePw", "anPhasePw")
     }
     result = util.smart_meter_net_power(ct)
-    assert result is None, f"expected None with full phase-A absent + no total, got {result}"
+    assert result is None, (
+        f"expected None with full phase-A absent + no total, got {result}"
+    )
 
 
 def test_directional_power_value_keys_absent_returns_none() -> None:
@@ -140,4 +145,4 @@ def test_directional_power_value_zero_values_return_zero() -> None:
     result = util.directional_power_value(
         {"tPhasePw": 0, "tnPhasePw": 0}, ("tPhasePw",), ("tnPhasePw",)
     )
-    assert result == 0.0
+    assert result == pytest.approx(0.0)

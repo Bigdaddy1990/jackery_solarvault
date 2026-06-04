@@ -3,8 +3,6 @@
 import logging
 from typing import Any
 
-_LOGGER = logging.getLogger(__name__)
-
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -47,6 +45,8 @@ from .util import (
     stable_subdevice_key,
     subdevice_branding,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):

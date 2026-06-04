@@ -14,7 +14,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -89,7 +89,7 @@ def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401  # arbitrary payloa
         return None
     try:
         return int(raw) == 1
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return safe_bool(raw)
 
 
@@ -752,6 +752,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Add newly discovered switch entities when the coordinator's entity signature changes.
 

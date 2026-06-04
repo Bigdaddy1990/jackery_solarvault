@@ -121,8 +121,8 @@ def test_stale_drop_helper_logic_unit() -> None:
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
-    def drop(packs):
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+        kept: list[dict[str, str]] = []
         stale = 0
         for pack in packs:
             last_seen = pack.get("_last_seen_at")
@@ -169,8 +169,8 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
         "_last_seen_at": (now - timedelta(hours=4)).isoformat(),
     }
 
-    def drop(packs):
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> list[dict[str, str]]:
+        kept: list[dict[str, str]] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
             if not isinstance(last_seen, str):

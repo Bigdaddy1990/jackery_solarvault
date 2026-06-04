@@ -238,10 +238,22 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
     """Implement test device day sensors fallback to day period sources."""
     metadata = _stat_description_metadata()
     expected = {
-        "device_today_pv_energy": ("device_pv_stat_day", (("device_statistic", "pvEgy"),)),
-        "device_today_battery_charge": ("device_battery_stat_day", (("device_statistic", "batChgEgy"),)),
-        "device_today_ongrid_input": ("device_home_stat_day", (("device_statistic", "inOngridEgy"),)),
-        "device_today_ongrid_output": ("device_home_stat_day", (("device_statistic", "outOngridEgy"),)),
+        "device_today_pv_energy": (
+            "device_pv_stat_day",
+            (("device_statistic", "pvEgy"),),
+        ),
+        "device_today_battery_charge": (
+            "device_battery_stat_day",
+            (("device_statistic", "batChgEgy"),),
+        ),
+        "device_today_ongrid_input": (
+            "device_home_stat_day",
+            (("device_statistic", "inOngridEgy"),),
+        ),
+        "device_today_ongrid_output": (
+            "device_home_stat_day",
+            (("device_statistic", "outOngridEgy"),),
+        ),
     }
     for key, (primary_section, fallback) in expected.items():
         assert metadata[key]["section"] == primary_section, key
@@ -310,9 +322,11 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    assert "APP_POLLING_MQTT.md requires explicit app ranges" in coordinator_source
+    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement
+    assert "requires explicit app ranges" in coordinator_source
+    # coordinator uses _local_today() which wraps dt_util.now() with timezone
     assert (
-        "app_period_request_kwargs(date_type, today=dt_util.now().date())"
+        "app_period_request_kwargs(date_type, today=self._local_today())"
         in coordinator_source
     )
     assert "app_period_date_bounds(" in api_source
@@ -384,7 +398,9 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source
     # Bug #12 fix: diagnostic binary sensor visibility is now controlled by
     # entity_registry_enabled_default directly, not the category override.
-    assert "description.entity_category != EntityCategory.DIAGNOSTIC" not in binary_source
+    assert (
+        "description.entity_category != EntityCategory.DIAGNOSTIC" not in binary_source
+    )
     assert "enabled_default=pack_desc.entity_category" in sensor_source
     assert "_attr_entity_registry_enabled_default = False" in sensor_source
 
@@ -603,7 +619,9 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
     # Three-part fix: day/week stale sensors use server_total (not 0) to avoid
     # midnight delta bugs. Month/year sensors use None (unavailable).
     assert "raw = server_total" in flat, "stale-period day guard must use server_total"
-    assert "DATE_TYPE_MONTH, DATE_TYPE_YEAR" in flat, "stale guard must split by period type"
+    assert "DATE_TYPE_MONTH, DATE_TYPE_YEAR" in flat, (
+        "stale guard must split by period type"
+    )
 
 
 def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:

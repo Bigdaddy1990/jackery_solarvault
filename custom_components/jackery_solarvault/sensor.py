@@ -64,6 +64,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
 import logging
+import math
 from typing import Any, Literal
 
 from homeassistant.components.sensor import (
@@ -340,7 +341,6 @@ from .util import (
     redacted_json_safe_payload,
     safe_float,
     safe_int,
-    verify_and_backfill,
     signed_phase_power_values,
     smart_meter_net_power,
     smart_plug_serial,
@@ -352,6 +352,7 @@ from .util import (
     trend_series_has_value,
     trend_series_key,
     trend_series_total,
+    verify_and_backfill,
 )
 
 # Coordinator-backed read-only platform: entities never perform their own
@@ -2086,7 +2087,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # energy) which matches in magnitude and direction. This fallback is
         # only active during the midnight reset window when ds=0 but the cloud
         # has not yet zeroed batDisChgEgy.
-        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_DISCHARGE),),
+        fallback_sources=(
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_DISCHARGE),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -3407,6 +3410,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     # (verified in the 2026-05-16 production audit).
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Detects changes in the coordinator data signature and adds any newly discovered entities to Home Assistant.
 
@@ -3783,7 +3787,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             #   "unavailable" for the brief cloud-lag window. These periods
             #   are cumulative chart sums; using an arbitrary fallback risks
             #   the spike+drop seen on 2026-05-16 (cloud briefly served 0
-            #   inside the same period anchor → Energy Dashboard −X kWh).
+            #   inside the same period anchor -> Energy Dashboard -X kWh).
             #
             # - DAY / WEEK: fall back to server_total (the wire-reported
             #   aggregate field). server_total is not derived from the chart
@@ -3804,13 +3808,14 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             # the sensor value — it only surfaces the inconsistency in debug
             # logs so telemetry issues are diagnosable without unredacted exports.
             if (
-                raw == 0.0
+                math.isclose(raw, 0.0)
                 and not (stale_period or future_period)
                 and chart_series_sum is not None
                 and chart_series_sum > 0
             ):
                 _LOGGER.debug(
-                    "%s %s: server_total=0 but chart_series_sum=%.2f — cloud may "                    "be serving a zero-payload during a period boundary window",
+                    "%s %s: server_total=0 but chart_series_sum=%.2f — cloud may "
+                    "be serving a zero-payload during a period boundary window",
                     self.entity_id,
                     section,
                     chart_series_sum,

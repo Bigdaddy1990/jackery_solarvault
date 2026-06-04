@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> Any:  # noqa: ANN401 - PEP 562 lazy import hook.
     if name == "JackeryMqttPushClient":
         from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 

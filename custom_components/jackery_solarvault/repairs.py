@@ -79,7 +79,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(
+async def async_create_fix_flow(  # noqa: RUF029 - HA repairs hook is async.
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,
