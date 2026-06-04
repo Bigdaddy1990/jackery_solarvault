@@ -32,7 +32,7 @@ try:
     from homeassistant.config_entries import ConfigEntryItems as _ConfigEntryItems
     _orig_add = MockConfigEntry.add_to_hass
 
-    def _patched_add_to_hass(self, hass):
+    def _patched_add_to_hass(self, hass) -> None:
         ce = hass.config_entries
         if not isinstance(ce._entries, _ConfigEntryItems):
             items = _ConfigEntryItems(hass)

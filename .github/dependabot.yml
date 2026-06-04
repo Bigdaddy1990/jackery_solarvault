@@ -69,4 +69,3 @@ updates:
     commit-message:
       prefix: "⬆️"
       prefix-development: "⬆️ [dev]"
-
