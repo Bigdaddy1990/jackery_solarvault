@@ -275,12 +275,12 @@ exclude = [
 ]
 target-version = "py314"
 line-length = 88
-#src = ["custom_components", "tests"]
+src = ["custom_components", "tests"]
 indent-width = 4
 show-fixes = true
 fix = true
 unsafe-fixes = true
-#force-exclude = true
+force-exclude = true
 output-format= "github"
 preview = true
 
