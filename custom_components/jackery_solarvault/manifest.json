@@ -11,7 +11,7 @@
     "zeroconf"
   ],
   "bluetooth": [
-    { 
+    {
       "connectable": true,
       "manufacturer_id": 18434,
       "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb"

@@ -4,8 +4,8 @@ aiohttp-asyncmdnsresolver==0.2.0
 aiomqtt
 annotatedyaml>=1.0.2
 async-interrupt==1.2.2
-attrs==26.1.0
 atomicwrites-homeassistant==1.4.1
+attrs==26.1.0
 codecov
 coverage
 coverage[toml]
@@ -18,14 +18,14 @@ mypy>=2.1.0
 packaging>=26.0
 pip>=26.0
 psutil-home-assistant==0.0.1
-python-slugify==8.0.4
+pylint
 pytest
 pytest-asyncio
 pytest-cov
 pytest-github-actions-annotate-failures
 pytest-homeassistant-custom-component  # follows daily HA version
+python-slugify==8.0.4
 pyyaml
-pylint
 requests==2.34.2
 ruff>=0.15.15
 types-aiofiles>=25.1.0.20260518
@@ -48,8 +48,8 @@ typing-extensions>=4.15.0,<5.0
 urllib3>=2.0
 uv==0.11.16
 voluptuous==0.15.2
-voluptuous-serialize==2.7.0
 voluptuous-openapi==0.3.0
-yarl==1.24.2"
+voluptuous-serialize==2.7.0
 webrtc-models==0.3.0
+yarl==1.24.2"
 zeroconf==0.149.16
