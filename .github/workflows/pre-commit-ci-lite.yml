@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 30
     env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '2026.6.1' }}
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
@@ -39,7 +39,7 @@ jobs:
             requirements-test.txt
             pyproject.toml
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
@@ -47,19 +47,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
          version: ">=0.4.0"
-      - run: ruff check --fix --preview -target-version py314 || true
-      - run: ruff format
+      - run: ruff check --fix --preview --target-version py314 || true
+      - run: ruff format || true
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
-
-      - name: Commit baseline changes
-        run: |
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No ruff baseline changes to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: ruff baseline (format+fix)"
-          git push origin "HEAD:${GITHUB_REF_NAME}"

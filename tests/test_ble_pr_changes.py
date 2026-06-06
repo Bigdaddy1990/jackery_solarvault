@@ -15,13 +15,15 @@ These tests pin the new behaviour and guard against regressions.
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble import BLE_FRAME_MAGIC
-from custom_components.jackery_solarvault.client.ble import BLE_FRAME_PAYLOAD_MARKER
-from custom_components.jackery_solarvault.client.ble import BLE_FRAME_VERSION
-from custom_components.jackery_solarvault.client.ble import BLE_NOTIFY_CHAR_UUID
-from custom_components.jackery_solarvault.client.ble import BLE_SERVICE_UUID
-from custom_components.jackery_solarvault.client.ble import BLE_WRITE_CHAR_UUID
-from custom_components.jackery_solarvault.client.ble import build_binary_frame
+from custom_components.jackery_solarvault.client.ble import (
+    BLE_FRAME_MAGIC,
+    BLE_FRAME_PAYLOAD_MARKER,
+    BLE_FRAME_VERSION,
+    BLE_NOTIFY_CHAR_UUID,
+    BLE_SERVICE_UUID,
+    BLE_WRITE_CHAR_UUID,
+    build_binary_frame,
+)
 
 # ---------------------------------------------------------------------------
 # build_binary_frame — assert replaces RuntimeError for header length

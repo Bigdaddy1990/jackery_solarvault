@@ -1,10 +1,12 @@
 """Unit tests for Jackery device discovery filters."""
 
-from custom_components.jackery_solarvault.const import FIELD_BIND_KEY
-from custom_components.jackery_solarvault.const import FIELD_DEV_MODEL
-from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
-from custom_components.jackery_solarvault.const import FIELD_IS_CLOUD
-from custom_components.jackery_solarvault.const import FIELD_MODEL_CODE
+from custom_components.jackery_solarvault.const import (
+    FIELD_BIND_KEY,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_TYPE,
+    FIELD_IS_CLOUD,
+    FIELD_MODEL_CODE,
+)
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )

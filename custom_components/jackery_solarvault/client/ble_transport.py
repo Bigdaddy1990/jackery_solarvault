@@ -36,15 +36,12 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 import asyncio
 import base64
 import binascii
+from collections.abc import Awaitable, Callable
 import contextlib
-import logging
-from collections.abc import Awaitable
-from collections.abc import Callable
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Any
 
 from . import ble
 
@@ -685,6 +682,7 @@ class JackeryBleListener:
         """
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
+
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)

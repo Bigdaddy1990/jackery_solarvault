@@ -6,55 +6,57 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-import logging
-from collections.abc import Awaitable
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 from typing import Any
 
-from homeassistant.components.number import NumberDeviceClass
-from homeassistant.components.number import NumberEntity
-from homeassistant.components.number import NumberEntityDescription
-from homeassistant.components.number import NumberMode
-from homeassistant.const import EntityCategory
-from homeassistant.const import PERCENTAGE
-from homeassistant.const import UnitOfPower
+from homeassistant.components.number import (
+    NumberDeviceClass,
+    NumberEntity,
+    NumberEntityDescription,
+    NumberMode,
+)
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
 from .api import JackeryAuthError
-from .const import DOMAIN
-from .const import FIELD_CURRENCY
-from .const import FIELD_CURRENCY_CODE
-from .const import FIELD_DEFAULT_PW
-from .const import FIELD_DYNAMIC_OR_SINGLE
-from .const import FIELD_ID
-from .const import FIELD_MAX_FEED_GRID
-from .const import FIELD_MAX_GRID_STD_PW
-from .const import FIELD_MAX_OUT_PW
-from .const import FIELD_MODEL_CODE
-from .const import FIELD_SINGLE_CURRENCY
-from .const import FIELD_SINGLE_CURRENCY_CODE
-from .const import FIELD_SINGLE_PRICE
-from .const import FIELD_SOC_CHARGE_LIMIT
-from .const import FIELD_SOC_CHG_LIMIT
-from .const import FIELD_SOC_DISCHARGE_LIMIT
-from .const import FIELD_SOC_DISCHG_LIMIT
-from .const import FIELD_SYSTEM_ID
-from .const import PAYLOAD_DEVICE
-from .const import PAYLOAD_DISCOVERY
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_SYSTEM
+from .const import (
+    DOMAIN,
+    FIELD_CURRENCY,
+    FIELD_CURRENCY_CODE,
+    FIELD_DEFAULT_PW,
+    FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_ID,
+    FIELD_MAX_FEED_GRID,
+    FIELD_MAX_GRID_STD_PW,
+    FIELD_MAX_OUT_PW,
+    FIELD_MODEL_CODE,
+    FIELD_SINGLE_CURRENCY,
+    FIELD_SINGLE_CURRENCY_CODE,
+    FIELD_SINGLE_PRICE,
+    FIELD_SOC_CHARGE_LIMIT,
+    FIELD_SOC_CHG_LIMIT,
+    FIELD_SOC_DISCHARGE_LIMIT,
+    FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SYSTEM_ID,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DISCOVERY,
+    PAYLOAD_PRICE,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_SYSTEM,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import coordinator_entity_signature
-from .util import safe_float
-from .util import safe_int
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_float,
+    safe_int,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -92,7 +94,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     allowed_values: (
         Callable[[dict[str, Any]], tuple[float, ...]] | tuple[float, ...] | None
     ) = None
-    value_transform: Callable[[float], Any] = lambda v: int(round(v))
+    value_transform: Callable[[float], Any] = lambda v: round(v)
     validate_range: bool = False
     raise_on_setter_error: bool = True
 
@@ -399,7 +401,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 max=f"{self.native_max_value:.0f}",
             )
         allowed = self._allowed_values()
-        if allowed and int(round(value)) not in {int(round(v)) for v in allowed}:
+        if allowed and round(value) not in {round(v) for v in allowed}:
             allowed_text = ", ".join(f"{int(v)}" for v in allowed)
             self._raise_action_error(
                 "invalid_number_allowed_values",

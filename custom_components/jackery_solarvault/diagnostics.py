@@ -1,7 +1,7 @@
 """Diagnostics support for Jackery SolarVault."""
 
-import logging
 from collections.abc import Mapping
+import logging
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -10,9 +10,11 @@ from homeassistant.core import HomeAssistant
 from . import JackeryConfigEntry
 from .const import REDACT_KEYS as _STATIC_REDACT_KEYS
 from .coordinator import JackerySolarVaultCoordinator
-from .util import active_redact_keys
-from .util import dev_mode_redactions_disabled
-from .util import diagnostic_redactions_disabled
+from .util import (
+    active_redact_keys,
+    dev_mode_redactions_disabled,
+    diagnostic_redactions_disabled,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

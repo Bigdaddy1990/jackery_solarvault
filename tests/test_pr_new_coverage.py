@@ -1,8 +1,6 @@
 """Tests for PR changes not covered by earlier test files.
 
 Covers:
-- api.py compatibility shim: all four public names are importable and are the
-  same objects as those exported by client/api.py (double-quote __all__ style change).
 - __init__.py new import path: JackeryLocalMqttClient is imported from
   .client.local_mqtt (new import added in this PR).
 - _legacy_suffix_matches: the regex pattern was changed from single-quote to
@@ -19,82 +17,33 @@ from typing import Any
 
 import pytest
 
+from custom_components.jackery_solarvault.client import (
+    JackeryApi,
+    JackeryAuthError,
+    JackeryError,
+)
+
 # ---------------------------------------------------------------------------
-# api.py compatibility shim — __all__ uses double-quoted strings (PR change)
+# Exception hierarchy (exported from the client sub-package)
 # ---------------------------------------------------------------------------
 
 
-def test_api_shim_exports_jackery_api() -> None:
-    """JackeryApi must be importable from the compatibility shim module."""
-    from custom_components.jackery_solarvault.api import JackeryApi
-
-    assert JackeryApi is not None
-
-
-def test_api_shim_exports_jackery_api_error() -> None:
-    """JackeryApiError must be importable from the compatibility shim module."""
-    from custom_components.jackery_solarvault.api import JackeryApiError
-
-    assert JackeryApiError is not None
-
-
-def test_api_shim_exports_jackery_auth_error() -> None:
-    """JackeryAuthError must be importable from the compatibility shim module."""
-    from custom_components.jackery_solarvault.api import JackeryAuthError
-
-    assert JackeryAuthError is not None
-
-
-def test_api_shim_exports_jackery_error() -> None:
-    """JackeryError must be importable from the compatibility shim module."""
-    from custom_components.jackery_solarvault.api import JackeryError
-
-    assert JackeryError is not None
-
-
-def test_api_shim_all_exports_same_objects_as_client_api() -> None:
-    """The shim re-exports must be identical objects to those in client/api.py."""
-    from custom_components.jackery_solarvault.api import (
-        JackeryApi as ShimApi,
-        JackeryApiError as ShimApiError,
-        JackeryAuthError as ShimAuthError,
-        JackeryError as ShimError,
-    )
-    from custom_components.jackery_solarvault.client.api import (
-        JackeryApi,
-        JackeryApiError,
+def test_auth_error_is_subclass_of_error() -> None:
+    """JackeryAuthError must be a subclass of JackeryError (hierarchy check)."""
+    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
         JackeryAuthError,
         JackeryError,
     )
 
-    assert ShimApi is JackeryApi
-    assert ShimApiError is JackeryApiError
-    assert ShimAuthError is JackeryAuthError
-    assert ShimError is JackeryError
-
-
-def test_api_shim_dunder_all_contains_four_names() -> None:
-    """api.py __all__ must export exactly four public names."""
-    import custom_components.jackery_solarvault.api as api_mod
-
-    assert set(api_mod.__all__) == {
-        "JackeryApi",
-        "JackeryApiError",
-        "JackeryAuthError",
-        "JackeryError",
-    }
-
-
-def test_api_shim_auth_error_is_subclass_of_error() -> None:
-    """JackeryAuthError must be a subclass of JackeryError (hierarchy check)."""
-    from custom_components.jackery_solarvault.api import JackeryAuthError, JackeryError
-
     assert issubclass(JackeryAuthError, JackeryError)
 
 
-def test_api_shim_api_error_is_subclass_of_error() -> None:
+def test_api_error_is_subclass_of_error() -> None:
     """JackeryApiError must be a subclass of JackeryError."""
-    from custom_components.jackery_solarvault.api import JackeryApiError, JackeryError
+    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+        JackeryApiError,
+        JackeryError,
+    )
 
     assert issubclass(JackeryApiError, JackeryError)
 
@@ -111,7 +60,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
     __init__.py. This test verifies the import works without error.
     """
     try:
-        from custom_components.jackery_solarvault.client.local_mqtt import (
+        from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
             JackeryLocalMqttClient,
         )
 
@@ -125,22 +74,16 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
     The PR changed __init__.py to import from .client instead of .api.
     """
-    from custom_components.jackery_solarvault.client import JackeryApi
-
     assert JackeryApi is not None
 
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryAuthError
-
     assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryError
-
     assert JackeryError is not None
 
 
@@ -154,7 +97,9 @@ def test_client_init_imports_jackery_error() -> None:
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     """Thin wrapper that imports and calls the production function."""
-    from custom_components.jackery_solarvault import _legacy_suffix_matches as _fn
+    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        _legacy_suffix_matches as _fn,  # noqa: PLC2701
+    )
 
     return _fn(uid, key_suffix)
 
@@ -300,14 +245,14 @@ def test_local_mqtt_result_warning_logged_via_logger(
     Simulates the code path in async_setup_entry that logs a warning for
     local_mqtt_result being a BaseException.
     """
-    _logger = logging.getLogger("custom_components.jackery_solarvault")
+    logger = logging.getLogger("custom_components.jackery_solarvault")
     err = RuntimeError("local broker unreachable")
 
     # Replicate the async_setup_entry condition inline.
     local_mqtt_result: Any = err
-    with caplog.at_level(logging.WARNING, logger=_logger.name):
+    with caplog.at_level(logging.WARNING, logger=logger.name):
         if isinstance(local_mqtt_result, BaseException):
-            _logger.warning(
+            logger.warning(
                 "Jackery local MQTT listener could not start during setup: %s",
                 local_mqtt_result,
             )
@@ -320,12 +265,12 @@ def test_local_mqtt_result_no_warning_when_none(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """When local_mqtt_result is None, no warning must be emitted."""
-    _logger = logging.getLogger("custom_components.jackery_solarvault")
+    logger = logging.getLogger("custom_components.jackery_solarvault")
     local_mqtt_result: Any = None
 
-    with caplog.at_level(logging.WARNING, logger=_logger.name):
+    with caplog.at_level(logging.WARNING, logger=logger.name):
         if isinstance(local_mqtt_result, BaseException):
-            _logger.warning(
+            logger.warning(
                 "Jackery local MQTT listener could not start during setup: %s",
                 local_mqtt_result,
             )

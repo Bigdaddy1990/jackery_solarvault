@@ -15,10 +15,8 @@ Covers:
 - _raise_action_error: raises HomeAssistantError with correct fields
 """
 
-from typing import Any
-from unittest.mock import AsyncMock
-from unittest.mock import MagicMock
-from unittest.mock import patch
+import math
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -54,12 +52,12 @@ class TestStormAlertId:
     """Tests for _storm_alert_id()."""
 
     def test_returns_string_from_alertid_key(self) -> None:
-        """alertId present as string must be returned unchanged."""
+        """AlertId present as string must be returned unchanged."""
         fn = _get_storm_alert_id()
         assert fn({"alertId": "abc123"}) == "abc123"
 
     def test_coerces_int_alertid_to_string(self) -> None:
-        """alertId as integer must be coerced to string."""
+        """AlertId as integer must be coerced to string."""
         fn = _get_storm_alert_id()
         assert fn({"alertId": 42}) == "42"
 
@@ -78,7 +76,7 @@ class TestStormAlertId:
         assert fn({"other_key": "value"}) is None
 
     def test_returns_none_when_alertid_is_none(self) -> None:
-        """alertId explicitly set to None must return None."""
+        """AlertId explicitly set to None must return None."""
         fn = _get_storm_alert_id()
         assert fn({"alertId": None}) is None
 
@@ -96,7 +94,7 @@ class TestStormAlertId:
     def test_returns_string_for_float_alertid(self) -> None:
         """Float alertId must be coerced to string."""
         fn = _get_storm_alert_id()
-        assert fn({"alertId": 3.14}) == "3.14"
+        assert fn({"alertId": math.pi}) == "3.14"
 
     def test_other_keys_are_ignored(self) -> None:
         """Extra keys in the dict must not affect the result."""
@@ -128,7 +126,7 @@ class TestStormAlerts:
         assert fn({"other": "data"}) == []
 
     def test_returns_empty_when_storm_is_not_a_list(self) -> None:
-        """storm value that is not a list must return an empty list."""
+        """Storm value that is not a list must return an empty list."""
         fn = _get_storm_alerts()
         assert fn({"storm": None}) == []
         assert fn({"storm": "alert_string"}) == []
@@ -208,19 +206,19 @@ class TestSmartPlugDeviceSn:
         assert fn([]) is None
 
     def test_returns_device_sn_when_present(self) -> None:
-        """deviceSn has highest priority."""
+        """DeviceSn has highest priority."""
         fn = _get_smart_plug_device_sn()
         plug = {"deviceSn": "SN001", "devSn": "SN002", "sn": "SN003"}
         assert fn(plug) == "SN001"
 
     def test_falls_back_to_dev_sn(self) -> None:
-        """devSn is used when deviceSn is missing."""
+        """DevSn is used when deviceSn is missing."""
         fn = _get_smart_plug_device_sn()
         plug = {"devSn": "SN002", "sn": "SN003"}
         assert fn(plug) == "SN002"
 
     def test_falls_back_to_sn(self) -> None:
-        """sn is used when deviceSn and devSn are missing."""
+        """Sn is used when deviceSn and devSn are missing."""
         fn = _get_smart_plug_device_sn()
         plug = {"sn": "SN003"}
         assert fn(plug) == "SN003"
@@ -358,8 +356,8 @@ class TestQueryButtonDescriptions:
     def test_all_entries_are_query_button_descriptions(self) -> None:
         """All entries must be JackeryQueryButtonDescription instances."""
         from custom_components.jackery_solarvault.button import (
-            JackeryQueryButtonDescription,
             QUERY_BUTTON_DESCRIPTIONS,
+            JackeryQueryButtonDescription,
         )
 
         for desc in QUERY_BUTTON_DESCRIPTIONS:
@@ -651,11 +649,10 @@ class TestJackeryQueryButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:
         """ConfigEntryAuthFailed must propagate unchanged from async_press."""
-        from homeassistant.exceptions import ConfigEntryAuthFailed
-
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         async def _auth_fail(coord, dev_id):
             raise ConfigEntryAuthFailed("bad creds")
@@ -675,11 +672,10 @@ class TestJackeryQueryButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:
         """Generic exceptions must be wrapped into HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         async def _fail(coord, dev_id):
             raise RuntimeError("unexpected")
@@ -854,11 +850,10 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:
         """ConfigEntryAuthFailed must propagate from async_press."""
-        from homeassistant.exceptions import ConfigEntryAuthFailed
-
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
@@ -872,11 +867,10 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_wraps_runtime_error(self) -> None:
         """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
@@ -927,7 +921,7 @@ class TestJackeryReadScheduleButton:
         assert attrs["taskType"] == 2
 
     def test_extra_state_attributes_omits_device_sn_when_empty(self) -> None:
-        """deviceSn must be absent from extra_state_attributes when plug_sn is empty."""
+        """DeviceSn must be absent from extra_state_attributes when plug_sn is empty."""
         from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN
 
         btn = _make_read_schedule_button(plug_sn="")
@@ -935,7 +929,7 @@ class TestJackeryReadScheduleButton:
         assert FIELD_DEVICE_SN not in attrs
 
     def test_extra_state_attributes_includes_device_sn_when_set(self) -> None:
-        """deviceSn must appear in extra_state_attributes when plug_sn is set."""
+        """DeviceSn must appear in extra_state_attributes when plug_sn is set."""
         from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN
 
         btn = _make_read_schedule_button(plug_sn="PLUG-SN-001")
@@ -1103,11 +1097,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:
         """ConfigEntryAuthFailed must propagate from async_press."""
-        from homeassistant.exceptions import ConfigEntryAuthFailed
-
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1121,11 +1114,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:
         """Generic exception from async_press must be wrapped into HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1140,11 +1132,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_raise_action_error_has_entity_in_placeholders(self) -> None:
         """The error placeholder must include the entity key 'refresh_weather_plan'."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRefreshWeatherPlanButton(coordinator, "12345")
@@ -1180,9 +1171,8 @@ class TestJackeryRebootButton:
 
     def test_raise_action_error_has_reboot_device_entity(self) -> None:
         """The error placeholder must include 'reboot_device' as entity."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRebootButton(coordinator, "12345")
@@ -1211,7 +1201,7 @@ class TestJackeryRebootButton:
 
 
 def test_storm_alert_id_zero_is_valid() -> None:
-    """alertId of integer 0 must be accepted (boundary: 0 is falsy but valid)."""
+    """AlertId of integer 0 must be accepted (boundary: 0 is falsy but valid)."""
     fn = _get_storm_alert_id()
     # 0 is in neither (None,) nor ("",) so should be returned as "0"
     result = fn({"alertId": 0})
@@ -1233,7 +1223,7 @@ def test_storm_alerts_preserves_order() -> None:
 
 
 def test_smart_plug_device_sn_with_mixed_case_values() -> None:
-    """deviceSn with mixed-case values must be returned as-is (no lowercasing)."""
+    """DeviceSn with mixed-case values must be returned as-is (no lowercasing)."""
     fn = _get_smart_plug_device_sn()
     plug = {"deviceSn": "SN-MixedCase"}
     assert fn(plug) == "SN-MixedCase"

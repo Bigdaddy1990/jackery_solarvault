@@ -7,48 +7,49 @@ section, an optional task-plan fallback and the coordinator setter that pushes
 the new state to the cloud / MQTT command path.
 """
 
-import logging
-from collections.abc import Awaitable
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+import logging
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity
-from homeassistant.components.switch import SwitchEntityDescription
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import DOMAIN
-from .const import FIELD_AUTO_STANDBY
-from .const import FIELD_COMM_MODE
-from .const import FIELD_COMM_STATE
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_FOLLOW_METER
-from .const import FIELD_IS_AUTO_STANDBY
-from .const import FIELD_IS_FOLLOW_METER_PW
-from .const import FIELD_OFF_GRID_DOWN
-from .const import FIELD_SCAN_NAME
-from .const import FIELD_SOCKET_PRIORITY
-from .const import FIELD_SW_EPS
-from .const import FIELD_SWITCH_STATE
-from .const import FIELD_SYS_SWITCH
-from .const import FIELD_VERSION
-from .const import FIELD_WPS
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_SMART_PLUGS
-from .const import PAYLOAD_WEATHER_PLAN
+from .const import (
+    DOMAIN,
+    FIELD_AUTO_STANDBY,
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_DEVICE_NAME,
+    FIELD_FOLLOW_METER,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_IS_FOLLOW_METER_PW,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_SCAN_NAME,
+    FIELD_SOCKET_PRIORITY,
+    FIELD_SWITCH_STATE,
+    FIELD_SW_EPS,
+    FIELD_SYS_SWITCH,
+    FIELD_VERSION,
+    FIELD_WPS,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_SMART_PLUGS,
+    PAYLOAD_WEATHER_PLAN,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import coordinator_entity_signature
-from .util import safe_bool
-from .util import smart_plug_serial
-from .util import sorted_smart_plugs
-from .util import task_plan_value
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_bool,
+    smart_plug_serial,
+    sorted_smart_plugs,
+    task_plan_value,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
