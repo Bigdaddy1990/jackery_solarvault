@@ -37,7 +37,7 @@ delete_storm_alert:
 
 # configure the device's third-party MQTT bridge. Sends
 # actionId 3046 (SET_THIRD_PARTY_MQTT_CONFIG) over the existing cloud MQTT
-# command topic with PLAINTEXT credentials. 
+# command topic with PLAINTEXT credentials.
 set_third_party_mqtt_config:
   fields:
     device_id:
