@@ -23,8 +23,8 @@ jobs:
       - run: |
           ruff check . --fix
           ruff check . --fix --unsafe-fixes
-          ruff check . --unsafe-fixes 
-          ruff check . --target-version py314 
+          ruff check . --unsafe-fixes
+          ruff check . --target-version py314
           ruff check . --preview
           ruff check . --line-length 88
           ruff check . --show-fixes
