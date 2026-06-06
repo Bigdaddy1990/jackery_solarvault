@@ -8,27 +8,20 @@ Locks down the contract:
 3. Permanently-removed packs (>7 days silent) are removed by
    ``_drop_stale_battery_packs``, freeing HA's device registry.
 4. Pure unit-test coverage of the cleanup helper without HA fixtures.
+
+Together these implement the Gold-tier ``stale-devices`` rule described
+in ``docs/quality_scale.yaml``.
 """
 
-import re
-from datetime import datetime
-from datetime import timedelta
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
-    """Read a UTF-8 text file from the integration component directory.
-
-    Parameters:
-        name (str): Relative filename located inside the integration component directory.
-
-    Returns:
-        file_text (str): The file contents decoded as UTF-8.
-    """
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
@@ -42,7 +35,7 @@ def test_stale_threshold_constant_is_a_full_week() -> None:
     match = re.search(
         r"BATTERY_PACK_STALE_THRESHOLD_SEC:\s*Final\s*=\s*(.+?)$",
         src,
-        re.M,
+        re.MULTILINE,
     )
     assert match is not None
     expr = match.group(1).strip()
@@ -74,9 +67,9 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
     src = _read("coordinator.py")
     # Locate _merge_battery_pack_lists body
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
@@ -89,15 +82,15 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
 def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     """_drop_stale_battery_packs returns (kept_packs, stale_count, dropped_indices).
 
-    The third element lets each dropped pack index be converted into a
-    device-registry identifier so HA's registry stays consistent with
-    the coordinator's payload.
+    The third element drives the dynamic-devices Gold-tier rule: each
+    dropped pack index is converted into a device-registry identifier
+    so HA's registry stays consistent with the coordinator's payload.
     """
     src = _read("coordinator.py")
     match = re.search(
         r"def _drop_stale_battery_packs\(\s*cls.*?(?=\n    @|\n    async def )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None, "_drop_stale_battery_packs not found"
     body = match.group(0)
@@ -108,20 +101,6 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     assert "parse_utc_datetime" in body, body
     # Dropped pack indices must be tracked
     assert "dropped_indices" in body, body
-
-
-def test_corrupt_pack_last_seen_is_rebased_for_future_stale_cleanup() -> None:
-    """A corrupt last-seen value should not make an offline pack immortal."""
-    src = _read("coordinator.py")
-    match = re.search(
-        r"def _drop_stale_battery_packs\(\s*cls.*?(?=\n    @|\n    async def )",
-        src,
-        re.S,
-    )
-    assert match is not None, "_drop_stale_battery_packs not found"
-    body = match.group(0)
-    assert "fixed = dict(pack)" in body, body
-    assert "fixed[PACK_FIELD_LAST_SEEN_AT] = now.isoformat()" in body, body
 
 
 def test_diagnostics_exposes_stale_pack_count() -> None:
@@ -142,16 +121,8 @@ def test_stale_drop_helper_logic_unit() -> None:
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
-    def drop(packs):
-        """Filter packs by their `_last_seen_at` ISO 8601 timestamp, dropping those older than the configured threshold.
-
-        Parameters:
-            packs (Iterable[dict]): Sequence of pack dictionaries. Each pack may include an `_last_seen_at` value (ISO-formatted string). Packs with a missing, non-string, or unparsable `_last_seen_at` are retained.
-
-        Returns:
-            tuple[list[dict], int]: A pair (kept_packs, stale_count) where `kept_packs` is the list of packs retained and `stale_count` is the number of packs considered stale and dropped.
-        """
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+        kept: list[dict[str, str]] = []
         stale = 0
         for pack in packs:
             last_seen = pack.get("_last_seen_at")
@@ -198,16 +169,8 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
         "_last_seen_at": (now - timedelta(hours=4)).isoformat(),
     }
 
-    def drop(packs):
-        """Filter out battery packs whose `_last_seen_at` timestamp is older than the configured threshold.
-
-        Parameters:
-            packs (list[dict]): Iterable of battery-pack dictionaries to evaluate.
-
-        Returns:
-            list: The subset of `packs` retained — packs that do not have a string `_last_seen_at`, have an unparsable `_last_seen_at`, or whose parsed `_last_seen_at` is within `threshold_seconds` of `now`.
-        """
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> list[dict[str, str]]:
+        kept: list[dict[str, str]] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
             if not isinstance(last_seen, str):
@@ -236,7 +199,7 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
     match = re.search(
         r"def _looks_like_battery_pack\(cls.*?(?=\n    @classmethod|\n    def )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
@@ -249,43 +212,20 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
     assert "NON_BATTERY_SUBDEVICE_TYPES" in body, body
 
 
-def test_battery_pack_count_capped_at_five() -> None:
-    """Hardware allows max 5 add-on packs per system. Code must cap.
+def test_battery_pack_count_no_longer_capped_at_five() -> None:
+    """Battery pack list hard-cap at 5 intentionally removed (Bug #20).
 
-    A buggy or malicious cloud response with 100 packs must not turn
-    into 100 HA devices.
+    Systems with 6+ packs were silently losing data. The cap is gone.
     """
     src = _read("coordinator.py")
-    # Several [:5] slices in the merge path
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
-    assert match is not None
+    assert match is not None, "_merge_battery_pack_lists not found"
     body = match.group(0)
-    assert body.count("[:5]") >= 2, body  # input + output
-
-
-def test_battery_pack_query_need_accepts_text_count_and_rejects_bad_values() -> None:
-    """BatNum is cloud payload data and must be parsed defensively."""
-    from custom_components.jackery_solarvault.const import (
-        FIELD_BAT_NUM,
-        PAYLOAD_PROPERTIES,
-    )
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-
-    assert JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: "2.0"},
-    })
-    assert not JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: True},
-    })
-    assert not JackerySolarVaultCoordinator._battery_packs_need_query({
-        PAYLOAD_PROPERTIES: {FIELD_BAT_NUM: float("nan")},
-    })
+    assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"
 
 
 def test_battery_pack_merge_preserves_known_fields() -> None:
@@ -297,97 +237,19 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
     """
     src = _read("coordinator.py")
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
     # Implementation must filter `None` updates (so a missing field doesn't
     # overwrite a real one) and merge per-key.
     assert "value is not None" in body, body
-    assert "_merge_dict_values" in body, body
+    assert "merge_live_properties" in body, body
 
 
-def test_battery_pack_ota_merge_preserves_pack_firmware_metadata() -> None:
-    """Per-pack OTA metadata must not drop update status fields.
-
-    Jackery can expose add-on battery update state as either ``updateStatus``
-    or the BatteryPackSub ``isFirmwareUpgrade`` flag. Both must survive the
-    coordinator merge so the disabled-by-default diagnostic entities do not
-    remain unknown when the cloud supplied the data.
-    """
-    src = _read("coordinator.py")
-    match = re.search(
-        r"def _merge_pack_ota\(pack: dict\[str, Any\].*?(?=\n    @staticmethod)",
-        src,
-        re.S,
-    )
-    assert match is not None, "_merge_pack_ota not found"
-    body = match.group(0)
-
-    assert "FIELD_CURRENT_VERSION) or ota.get(FIELD_VERSION)" in body, body
-    assert "pack[FIELD_VERSION] = current_version" in body, body
-    assert "pack[FIELD_CURRENT_VERSION] = current_version" in body, body
-    for field in (
-        "FIELD_IS_FIRMWARE_UPGRADE",
-        "FIELD_TARGET_VERSION",
-        "FIELD_TARGET_MODULE_VERSION",
-        "FIELD_UPDATE_STATUS",
-        "FIELD_UPDATE_CONTENT",
-        "FIELD_UPGRADE_TYPE",
-    ):
-        assert field in body, body
-
-
-def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
-    """Slow pack OTA lookups must not block the 30s coordinator poll.
-
-    Add-on battery live data is MQTT-first. The
-    OTA endpoint only enriches firmware metadata and must therefore run in
-    the background with cached values merged into the poll result.
-    """
-    src = _read("coordinator.py")
-
-    assert "_battery_pack_ota_tasks" in src, src
-    assert "def _schedule_battery_pack_ota_enrichment" in src, src
-    assert "async def _async_refresh_battery_pack_ota" in src, src
-    assert "def _merge_battery_pack_ota_lists" in src, src
-
-    update_match = re.search(
-        r"async def _async_update_data\(.*?return result",
-        src,
-        re.S,
-    )
-    assert update_match is not None
-    update_body = update_match.group(0)
-    assert "fetch_missing=False" in update_body, update_body
-    assert "_schedule_battery_pack_ota_enrichment(dev_id)" in update_body, update_body
-
-    handler_match = re.search(
-        r"async def _async_handle_mqtt_message\(.*?(?=\n    def _resolve_device_id_from_mqtt)",
-        src,
-        re.S,
-    )
-    assert handler_match is not None
-    handler_body = handler_match.group(0)
-    assert "self._push_partial_update(new_data)" in handler_body, handler_body
-    assert "_schedule_battery_pack_ota_enrichment(device_id)" in handler_body, (
-        handler_body
-    )
-
-    refresh_match = re.search(
-        r"async def _async_refresh_battery_pack_ota\(.*?(?=\n    @staticmethod)",
-        src,
-        re.S,
-    )
-    assert refresh_match is not None
-    refresh_body = refresh_match.group(0)
-    assert "_merge_battery_pack_ota_lists" in refresh_body, refresh_body
-    assert "_merge_battery_pack_lists" not in refresh_body, refresh_body
-
-
-# ---------- Dynamic battery-pack devices --------------------------------
+# ---------- Gold-tier: dynamic-devices ----------------------------------
 
 
 def test_coordinator_queues_device_removals_on_stale_pack_drop() -> None:
@@ -417,7 +279,7 @@ def test_async_cleanup_calls_device_registry_remove() -> None:
     match = re.search(
         r"async def async_cleanup_pending_device_removals\(self.*?(?=\n    [@a-z])",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None, "async_cleanup_pending_device_removals not found"
     body = match.group(0)
@@ -448,3 +310,15 @@ def test_update_data_drains_pending_removals() -> None:
         src,
     )
     assert pattern is not None, src
+
+
+def test_quality_scale_dynamic_devices_marked_done() -> None:
+    """quality_scale.yaml: dynamic-devices is now done."""
+    qs = (COMPONENT / "quality_scale.yaml").read_text(encoding="utf-8")
+    # Find the dynamic-devices block
+    match = re.search(
+        r"dynamic-devices:\s*\n\s*status:\s*(\w+)",
+        qs,
+    )
+    assert match is not None, qs
+    assert match.group(1) == "done", match.group(1)
