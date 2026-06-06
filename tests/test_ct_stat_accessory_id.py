@@ -31,12 +31,12 @@ COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordina
 
 def test_accessory_id_resolved_from_system_accessories() -> None:
     """A devType=3 accessory's deviceId is returned for the CT-stat call."""
-    from custom_components.jackery_solarvault.const import (
+    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
         FIELD_ACCESSORIES,
         FIELD_SYSTEM_ID,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
         JackerySolarVaultCoordinator,
     )
 
@@ -56,35 +56,35 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
     }
 
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)  # noqa: SLF001
         == "2057219036232777730"
     )
 
 
 def test_accessory_id_none_without_smart_meter() -> None:
     """No CT accessory present → None (caller then falls back to main id)."""
-    from custom_components.jackery_solarvault.const import (
+    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
         FIELD_ACCESSORIES,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
         JackerySolarVaultCoordinator,
     )
 
     idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
-    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None
+    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # noqa: SLF001
 
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
-    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
         JackerySolarVaultCoordinator,
     )
 
     source = {PAYLOAD_CT_METER: {"devType": 3, "deviceId": 2057219036232777730}}
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)  # noqa: SLF001
         == "2057219036232777730"
     )
 

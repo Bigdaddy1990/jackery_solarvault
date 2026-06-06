@@ -141,7 +141,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
-        """
+        """  # noqa: E501, RUF100
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -177,7 +177,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: Device registry metadata for the smart-plug including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
-        """
+        """  # noqa: E501, RUF100
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
@@ -222,7 +222,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             True if the entity is available, False otherwise.
-        """
+        """  # noqa: E501, RUF100
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)
@@ -233,7 +233,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             if parsed_online is not None:
                 return parsed_online
             _LOGGER.debug(
-                "Device %s: unrecognized online state %r; falling back to data membership",
+                "Device %s: unrecognized online state %r; falling back to data membership",  # noqa: E501, RUF100
                 self._device_id,
                 online,
             )

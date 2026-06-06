@@ -90,7 +90,7 @@ def test_app_period_range_rejects_unknown_date_types() -> None:
     try:
         util.app_period_range("quarter", today=util.date(2026, 5, 3))
     except ValueError as err:
-        assert "Unsupported Jackery app period dateType" in str(err)
+        assert "Unsupported Jackery app period dateType" in str(err)  # noqa: PT017
     else:
         raise AssertionError("unknown Jackery app dateType was silently accepted")
 
@@ -130,7 +130,7 @@ def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
         try:
             util.app_period_date_bounds("month", today=today, **kwargs)
         except ValueError as err:
-            assert "Jackery app period" in str(err)
+            assert "Jackery app period" in str(err)  # noqa: PT017
         else:
             raise AssertionError(f"invalid app period bounds were accepted: {kwargs!r}")
 
@@ -179,7 +179,7 @@ def test_parse_utc_datetime_rejects_invalid_values() -> None:
     try:
         util.parse_utc_datetime("not-a-time")
     except ValueError as err:
-        assert "invalid UTC timestamp" in str(err)
+        assert "invalid UTC timestamp" in str(err)  # noqa: PT017
     else:
         raise AssertionError("expected ValueError")
 

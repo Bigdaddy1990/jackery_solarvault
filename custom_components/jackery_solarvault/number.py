@@ -150,7 +150,7 @@ async def _set_single_price(
 
     Parameters:
         value (float): Price to set, in the device's currency/unit.
-    """
+    """  # noqa: E501, RUF100
     await coord.async_set_single_price(dev_id, value)
 
 
@@ -386,7 +386,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             The unit of measurement string, or None if no unit is configured.
-        """
+        """  # noqa: E501, RUF100
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
@@ -398,7 +398,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             tuple[float, ...]: Allowed native float values, or an empty tuple when no discrete constraint is defined.
-        """
+        """  # noqa: E501, RUF100
         allowed = self.entity_description.allowed_values
         if allowed is None:
             return ()
@@ -417,7 +417,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         Raises:
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when `raise_on_setter_error` is True and the setter fails.
-        """
+        """  # noqa: E501, RUF100
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
         ):
@@ -521,7 +521,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home Assistant.
-        """
+        """  # noqa: E501, RUF100
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for description in NUMBER_DESCRIPTIONS:
@@ -537,7 +537,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Rebuilds and adds number entities when the coordinator's entity signature changes.
 
         Computes the coordinator's entity signature and, if it differs from the last-seen signature, collects new entity instances and calls the platform's async_add_entities callback to register them; otherwise performs no action.
-        """
+        """  # noqa: E501, RUF100
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

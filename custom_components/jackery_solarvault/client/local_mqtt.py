@@ -108,7 +108,7 @@ class JackeryLocalMqttClient:
             client_id (str): MQTT client identifier to use when connecting.
             sink (LocalMqttSink | None): Optional async callback invoked for each received message as (topic, parsed_dict_or_None, raw_bytes).
             topic_filter (str): MQTT subscription topic filter to use when the client connects.
-        """
+        """  # noqa: E501, RUF100
         self._hass = hass
         self._host = host
         self._port = port
@@ -146,7 +146,7 @@ class JackeryLocalMqttClient:
         """Start the background MQTT session runner and trigger an initial connection attempt.
 
         If a runner is already active, this call is a no-op. Schedules the session task as a Home Assistant background task, resets connection state, increments the internal connect attempt counter, and waits up to 10 seconds for the initial connection result so diagnostics reflect the attempt.
-        """
+        """  # noqa: E501, RUF100
         async with self._lock:
             if self._runner_task is not None and not self._runner_task.done():
                 return
@@ -174,7 +174,7 @@ class JackeryLocalMqttClient:
         """Stop the background MQTT session task and reset internal connection state.
 
         If a background session task exists it will be cancelled and awaited; cancellation, MQTT, and other finalization errors are suppressed. The client's connection state and stored client reference are cleared.
-        """
+        """  # noqa: E501, RUF100
         async with self._lock:
             task = self._runner_task
             self._runner_task = None
@@ -196,9 +196,9 @@ class JackeryLocalMqttClient:
         """Run one MQTT session: connect to the configured broker, subscribe to the topic filter, and consume incoming messages until the session ends.
 
         On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
-        """
+        """  # noqa: E501, RUF100
         connected = False
-        try:
+        try:  # noqa: PLW0717
             async with aiomqtt.Client(
                 hostname=self._host,
                 port=self._port,
@@ -258,7 +258,7 @@ class JackeryLocalMqttClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code provided by the broker indicating the reason for refusal.
-        """
+        """  # noqa: E501, RUF100
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         self._last_error = f"connect rc={rc} ({reason})"
@@ -276,7 +276,7 @@ class JackeryLocalMqttClient:
         Parameters:
             error (str): Human-readable error message to record.
             was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened while attempting to connect.
-        """
+        """  # noqa: E501, RUF100
         if was_connected:
             self._last_error = f"disconnect: {error}"
             _LOGGER.debug("Jackery local MQTT disconnected: %s", error)
@@ -293,7 +293,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             int: The MQTT return code if present, otherwise `0`.
-        """
+        """  # noqa: E501, RUF100
         rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
@@ -318,7 +318,7 @@ class JackeryLocalMqttClient:
         Parameters:
             topic (str): MQTT topic name of the message.
             payload (bytes | bytearray | str): Raw message payload; may be a string or bytes-like object.
-        """
+        """  # noqa: E501, RUF100
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
@@ -466,7 +466,7 @@ class JackeryLocalMqttClient:
         Parameters:
             coro (Awaitable[None]): Coroutine to run as a background task.
             label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
-        """
+        """  # noqa: E501, RUF100
 
         async def _runner() -> None:
             await coro
@@ -482,7 +482,7 @@ class JackeryLocalMqttClient:
 
             Parameters:
                 done (asyncio.Task[None]): Completed task whose exception, if raised, will be logged.
-            """
+            """  # noqa: E501, RUF100
             try:
                 done.result()
             except asyncio.CancelledError:
@@ -504,7 +504,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             dict[str, Any]: A snapshot containing connection/configuration flags, topic diagnostics, message counters, last-seen timestamps/errors, connect attempts, and the MQTT client library identifier.
-        """
+        """  # noqa: E501, RUF100
         # Explicit annotation so the redacted (all-str) and unredacted (str + int
         # port) branches do not lock the inferred dict type to ``dict[str, str]``.
         target: dict[str, Any]
@@ -580,5 +580,5 @@ class JackeryLocalMqttClient:
 
         Returns:
             iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
-        """
+        """  # noqa: E501, RUF100
         return datetime.now(UTC).isoformat()

@@ -106,7 +106,7 @@ def _raise_select_action_error(
         translation_key=translation_key,
         translation_placeholders={
             "entity": entity.entity_description.key,
-            "device_id": entity._device_id,
+            "device_id": entity._device_id,  # noqa: SLF001
             **{key: str(value) for key, value in placeholders.items()},
         },
     )
@@ -133,7 +133,7 @@ def _storm_minutes_value(
 
     Returns:
         int | None: The storm lead time in minutes when a valid value is found, or `None` if no valid value is present.
-    """
+    """  # noqa: E501, RUF100
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
         raw = properties.get(key)
@@ -179,7 +179,7 @@ def _storm_minutes_fallback(
 
     Returns:
         int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
-    """
+    """  # noqa: E501, RUF100
     raw = properties.get(FIELD_WPS)
     if raw is None:
         raw = weather_plan.get(FIELD_WPS)
@@ -261,24 +261,26 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
 
 
 def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
-    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
-    region = entity._price.get(FIELD_SYSTEM_REGION)
+    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+    region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
     if company_id not in {None, ""} and bool(region):
         return True
-    return bool(_price_sources_from_payload(entity._payload))
+    return bool(_price_sources_from_payload(entity._payload))  # noqa: SLF001
 
 
 def _price_mode_current_int(entity: JackerySelect) -> int | None:
-    raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)
+    raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)  # noqa: SLF001
     if raw is None:
         raw = task_plan_value(
-            entity._task_plan, FIELD_DYNAMIC_OR_SINGLE, FIELD_PRICE_MODE
+            entity._task_plan,  # noqa: SLF001
+            FIELD_DYNAMIC_OR_SINGLE,
+            FIELD_PRICE_MODE,
         )
     if raw is None:
-        work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))
+        work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))  # noqa: SLF001
         if work_mode == 7:
             return 1
-        if entity._price.get(FIELD_SINGLE_PRICE) is not None:
+        if entity._price.get(FIELD_SINGLE_PRICE) is not None:  # noqa: SLF001
             return 2
         return None
     return safe_int(raw)
@@ -387,11 +389,11 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
 
 def _work_mode_current(entity: JackerySelect) -> str | None:
-    raw = entity._properties.get(FIELD_WORK_MODEL)
+    raw = entity._properties.get(FIELD_WORK_MODEL)  # noqa: SLF001
     if raw is None:
-        raw = task_plan_value(entity._task_plan, FIELD_WORK_MODEL)
+        raw = task_plan_value(entity._task_plan, FIELD_WORK_MODEL)  # noqa: SLF001
     if raw is None:
-        mode_hint = safe_int(entity._price.get(FIELD_DYNAMIC_OR_SINGLE))
+        mode_hint = safe_int(entity._price.get(FIELD_DYNAMIC_OR_SINGLE))  # noqa: SLF001
         if mode_hint == 1:
             return WORK_MODE_TO_OPTION[7]
         return None
@@ -401,7 +403,7 @@ def _work_mode_current(entity: JackerySelect) -> str | None:
     option = WORK_MODE_TO_OPTION.get(value) or WORK_MODE_READ_ALIASES.get(value)
     if option is not None:
         return option
-    entity._warn_unknown_once(value)
+    entity._warn_unknown_once(value)  # noqa: SLF001
     return None
 
 
@@ -409,11 +411,11 @@ async def _work_mode_select(entity: JackerySelect, option: str) -> None:
     mode = _OPTION_TO_WORK_MODE.get(option)
     if mode is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_set_work_model(entity._device_id, mode)
+    await entity.coordinator.async_set_work_model(entity._device_id, mode)  # noqa: SLF001
 
 
 def _temp_unit_current(entity: JackerySelect) -> str | None:
-    val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))
+    val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))  # noqa: SLF001
     if val is None:
         return None
     return TEMP_UNIT_TO_OPTION.get(val)
@@ -423,15 +425,16 @@ async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
     if option not in _OPTION_TO_TEMP_UNIT:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
-        entity._device_id, _OPTION_TO_TEMP_UNIT[option]
+        entity._device_id,  # noqa: SLF001
+        _OPTION_TO_TEMP_UNIT[option],
     )
 
 
 def _island_auto_off_current(entity: JackerySelect) -> str | None:
-    raw = entity._properties.get(FIELD_OFF_GRID_TIME)
+    raw = entity._properties.get(FIELD_OFF_GRID_TIME)  # noqa: SLF001
     if raw is None:
         raw = task_plan_value(
-            entity._task_plan,
+            entity._task_plan,  # noqa: SLF001
             FIELD_OFF_GRID_TIME,
             FIELD_OFF_GRID_DOWN_TIME,
             FIELD_OFF_GRID_AUTO_OFF_TIME,
@@ -452,17 +455,21 @@ async def _island_auto_off_select(entity: JackerySelect, option: str) -> None:
     if option not in _AUTO_OFF_OPTION_TO_HOURS:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     hours = _AUTO_OFF_OPTION_TO_HOURS[option]
-    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)
+    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)  # noqa: SLF001
 
 
 def _storm_minutes_current_value(entity: JackerySelect) -> int | None:
     current = _storm_minutes_value(
-        entity._properties, entity._weather_plan, entity._task_plan
+        entity._properties,  # noqa: SLF001
+        entity._weather_plan,  # noqa: SLF001
+        entity._task_plan,  # noqa: SLF001
     )
     if current is not None:
         return current
     return _storm_minutes_fallback(
-        entity._properties, entity._weather_plan, entity._task_plan
+        entity._properties,  # noqa: SLF001
+        entity._weather_plan,  # noqa: SLF001
+        entity._task_plan,  # noqa: SLF001
     )
 
 
@@ -487,7 +494,7 @@ async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     assert match is not None
     minutes = int(match.group(1))
-    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
+    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)  # noqa: SLF001
 
 
 def _price_mode_current(entity: JackerySelect) -> str | None:
@@ -497,7 +504,7 @@ def _price_mode_current(entity: JackerySelect) -> str | None:
     option = PRICE_MODE_TO_OPTION.get(mode)
     if option is not None:
         return option
-    entity._warn_unknown_once(mode)
+    entity._warn_unknown_once(mode)  # noqa: SLF001
     return None
 
 
@@ -515,9 +522,9 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
                 "dynamic_tariff_unavailable",
                 option=option,
             )
-        await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
+        await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)  # noqa: SLF001
     elif mode == 2:
-        await entity.coordinator.async_set_price_mode_single(entity._device_id)
+        await entity.coordinator.async_set_price_mode_single(entity._device_id)  # noqa: SLF001
     else:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
 
@@ -525,7 +532,7 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
 def _price_provider_options(entity: JackerySelect) -> list[str]:
     labels = [
         _price_source_label(source)
-        for source in _price_sources_from_payload(entity._payload)
+        for source in _price_sources_from_payload(entity._payload)  # noqa: SLF001
     ]
     current = entity.current_option
     if current and current not in labels:
@@ -534,30 +541,30 @@ def _price_provider_options(entity: JackerySelect) -> list[str]:
 
 
 def _price_provider_current(entity: JackerySelect) -> str | None:
-    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
-    region = entity._price.get(FIELD_SYSTEM_REGION)
+    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+    region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
     if company_id in {None, ""}:
         return None
-    for source in _price_sources_from_payload(entity._payload):
+    for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
         if _price_source_matches_current(source, company_id, region):
             return _price_source_label(source)
     return _price_source_label({
         FIELD_PLATFORM_COMPANY_ID: company_id,
         FIELD_COUNTRY: region,
-        FIELD_COMPANY_NAME: entity._price.get(FIELD_COMPANY_NAME),
+        FIELD_COMPANY_NAME: entity._price.get(FIELD_COMPANY_NAME),  # noqa: SLF001
     })
 
 
 async def _price_provider_select(entity: JackerySelect, option: str) -> None:
-    for source in _price_sources_from_payload(entity._payload):
+    for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
         if _price_source_label(source) == option:
-            await entity.coordinator.async_set_price_source(entity._device_id, source)
+            await entity.coordinator.async_set_price_source(entity._device_id, source)  # noqa: SLF001
             return
     _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 def _ct_phase_current(entity: JackerySelect) -> str | None:
-    ct = entity._payload.get(PAYLOAD_CT_METER) or {}
+    ct = entity._payload.get(PAYLOAD_CT_METER) or {}  # noqa: SLF001
     if not isinstance(ct, dict):
         return None
     raw_phase = safe_int(ct.get(FIELD_SCHE_PHASE))
@@ -570,7 +577,7 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
     phase = _OPTION_TO_CT_PHASE.get(option)
     if phase is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
-    ct = entity._payload.get(PAYLOAD_CT_METER) or {}
+    ct = entity._payload.get(PAYLOAD_CT_METER) or {}  # noqa: SLF001
     if not isinstance(ct, dict):
         _raise_select_action_error(
             entity,
@@ -584,7 +591,7 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
             "entity_action_failed",
             error="ct meter serial missing",
         )
-    await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)
+    await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -671,7 +678,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         hass (HomeAssistant): Home Assistant core instance.
         entry (JackeryConfigEntry): Config entry whose runtime_data provides the coordinator and device payloads.
         async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
-    """
+    """  # noqa: E501, RUF100
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -694,7 +701,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
-        """
+        """  # noqa: E501, RUF100
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -736,7 +743,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[SelectEntity]: Created JackerySelect instances for eligible devices.
-        """
+        """  # noqa: E501, RUF100
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             supports_advanced = coordinator.device_supports_advanced(dev_id)
@@ -754,7 +761,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
 
         When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature; if the signature is unchanged, take no action.
-        """
+        """  # noqa: E501, RUF100
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

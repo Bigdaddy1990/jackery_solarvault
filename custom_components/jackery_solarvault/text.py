@@ -78,7 +78,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     """Set up text entities for renaming Jackery system devices from a config entry.
 
     Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
-    """
+    """  # noqa: E501, RUF100
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -90,7 +90,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
             entity (TextEntity): Candidate text entity to append.
-        """
+        """  # noqa: E501, RUF100
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="text", logger=_LOGGER
         )
@@ -102,7 +102,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[TextEntity]: TextEntity instances created for devices that support renaming their system.
-        """
+        """  # noqa: E501, RUF100
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
@@ -142,7 +142,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Add newly discovered text entities when the coordinator's data changes.
 
         Checks the current signature of the coordinator data against the last seen signature; if different, collect entities and register them with `async_add_entities`, and update the stored signature.
-        """
+        """  # noqa: E501, RUF100
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -180,7 +180,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """
+        """  # noqa: E501, RUF100
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -196,7 +196,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is empty, or the remote API reports a failure.
-        """
+        """  # noqa: E501, RUF100
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:

@@ -155,7 +155,7 @@ def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinat
 
     Returns:
         list[JackerySolarVaultCoordinator]: Active coordinators for loaded Jackery config entries.
-    """
+    """  # noqa: E501, RUF100
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -183,7 +183,7 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
 
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g., "12345"), otherwise the original input.
-    """
+    """  # noqa: E501, RUF100
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
@@ -196,7 +196,7 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
 
     Returns:
         parent_id (str): The parent Jackery numeric device id with any documented subdevice suffix removed.
-    """
+    """  # noqa: E501, RUF100
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
     if device is not None:
@@ -220,7 +220,7 @@ def _coordinator_for_device(
 
     Returns:
         The coordinator that manages the device, or `None` if no matching coordinator is loaded.
-    """
+    """  # noqa: E501, RUF100
     for coordinator in _loaded_coordinators(hass):
         if device_id in (coordinator.data or {}):
             return coordinator
@@ -236,7 +236,7 @@ def _coordinator_for_system(
 
     Returns:
         The matching JackerySolarVaultCoordinator if found, `None` otherwise.
-    """
+    """  # noqa: E501, RUF100
     for coordinator in _loaded_coordinators(hass):
         for payload in (coordinator.data or {}).values():
             system: dict[str, Any] = payload.get(PAYLOAD_SYSTEM) or {}
@@ -261,7 +261,7 @@ def _service_validation_error(
 
     Returns:
         ServiceValidationError: Error with `translation_domain` set to DOMAIN, `translation_key` set to `translation_key`, and `translation_placeholders` containing `device_id` and `error`.
-    """
+    """  # noqa: E501, RUF100
     return ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
@@ -328,7 +328,7 @@ def _optional_text(call: ServiceCall, field: str, label: str) -> str:
     if raw is None:
         return ""
     if not isinstance(raw, str):
-        raise ValueError(f"{label} must be text")
+        raise ValueError(f"{label} must be text")  # noqa: TRY004
     return raw
 
 
@@ -359,7 +359,7 @@ def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
 
     Raises:
         ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object string, or if JSON parsing fails.
-    """
+    """  # noqa: E501, RUF100
     if isinstance(raw_body, dict):
         return dict(raw_body)
     if isinstance(raw_body, str):
@@ -497,7 +497,7 @@ async def _async_handle_delete_storm_alert(
 
     Raises:
         ServiceValidationError: If no coordinator owns the resolved device id, or if the coordinator reports an error while deleting the alert. The error includes translation placeholders `device_id`, `alert_id`, and `error`.
-    """
+    """  # noqa: E501, RUF100
     raw = _device_id_field(call, "delete_storm_alert_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     raw_alert_id = call.data.get(SERVICE_FIELD_ALERT_ID)
@@ -564,7 +564,7 @@ async def _async_handle_set_third_party_mqtt_config(
 
     Raises:
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or if applying the configuration fails. The error includes translation placeholders `device_id` and `error`.
-    """
+    """  # noqa: E501, RUF100
     raw = _device_id_field(call, "set_third_party_mqtt_config_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -614,7 +614,7 @@ async def _async_handle_query_third_party_mqtt_config(
 
     Raises:
         ServiceValidationError: If no Jackery coordinator owns the resolved device id, or if the coordinator query fails. The integration uses translation_key `query_third_party_mqtt_config_failed` for errors.
-    """
+    """  # noqa: E501, RUF100
     raw = _device_id_field(call, "query_third_party_mqtt_config_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -661,7 +661,7 @@ async def _async_handle_send_ble_command(
 
     Raises:
         ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
-    """
+    """  # noqa: E501, RUF100
     raw = _device_id_field(call, "send_ble_command_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -712,7 +712,7 @@ async def _async_handle_send_device_schedule(
 
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
-    """
+    """  # noqa: E501, RUF100
     raw = _device_id_field(call, "send_device_schedule_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -751,7 +751,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration's domain-scoped Home Assistant services and their handlers.
 
     Registers the following services (if not already present) and wires each to the integration's internal async handler: rename system, refresh weather plan, delete storm alert, set/query third-party MQTT config, send BLE command, and send device schedule. Each service is registered with this module's corresponding voluptuous schema and forwards validated ServiceCall objects to the integration handlers.
-    """
+    """  # noqa: E501, RUF100
     if not hass.services.has_service(DOMAIN, SERVICE_RENAME_SYSTEM):
 
         async def _handle_rename(call: ServiceCall) -> None:
@@ -794,7 +794,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             """Dispatches the Home Assistant service call to the integration handler that applies a device's third-party MQTT configuration.
 
             The `call` data must conform to `SET_THIRD_PARTY_MQTT_SCHEMA`.
-            """
+            """  # noqa: E501, RUF100
             await _async_handle_set_third_party_mqtt_config(hass, call)
 
         hass.services.async_register(
@@ -807,7 +807,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     if not hass.services.has_service(DOMAIN, SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG):
 
         async def _handle_query_third_party_mqtt(call: ServiceCall) -> None:
-            """Forward a "query third-party MQTT config" service call to the integration's async handler."""
+            """Forward a "query third-party MQTT config" service call to the integration's async handler."""  # noqa: E501, RUF100
             await _async_handle_query_third_party_mqtt_config(hass, call)
 
         hass.services.async_register(
@@ -830,7 +830,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     - `flags` (optional): flags for the command (int)
                     - `wait_for_ack` (optional): whether to wait for an acknowledgement (bool)
                     - `ack_timeout` (optional): acknowledgement timeout in seconds (float)
-            """
+            """  # noqa: E501, RUF100
             await _async_handle_send_ble_command(hass, call)
 
         hass.services.async_register(
@@ -847,7 +847,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
             Parameters:
                 call (ServiceCall): Service call data containing `device_id` (target device identifier), `action_id` (action code for the schedule), and `body` (schedule payload as a dict or JSON string).
-            """
+            """  # noqa: E501, RUF100
             await _async_handle_send_device_schedule(hass, call)
 
         hass.services.async_register(

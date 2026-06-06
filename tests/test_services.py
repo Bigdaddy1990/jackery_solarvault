@@ -113,7 +113,7 @@ class _Coordinator:
 
 
 class _AuthApi:
-    async def async_set_system_name(self, system_id: str, new_name: str) -> bool:
+    async def async_set_system_name(self, system_id: str, new_name: str) -> bool:  # noqa: PLR6301
         """Set the display name for the specified system.
 
         Parameters:
@@ -132,7 +132,7 @@ class _AuthApi:
 class _AuthCoordinator:
     api = _AuthApi()
 
-    async def async_request_refresh(self) -> None:
+    async def async_request_refresh(self) -> None:  # noqa: PLR6301
         """Ensure a refresh is not performed during authentication failure handling.
 
         Raises:
@@ -156,15 +156,15 @@ def test_resolve_jackery_device_id_follows_subdevice_parent(
     monkeypatch.setattr(services.dr, "async_get", lambda _hass: registry)
 
     assert (
-        services._resolve_jackery_device_id(_hass(), "smart-plug-ha-id")
+        services._resolve_jackery_device_id(_hass(), "smart-plug-ha-id")  # noqa: SLF001
         == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(_hass(), "solarvault-ha-id")
+        services._resolve_jackery_device_id(_hass(), "solarvault-ha-id")  # noqa: SLF001
         == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(_hass(), "573702884982521856")
+        services._resolve_jackery_device_id(_hass(), "573702884982521856")  # noqa: SLF001
         == "573702884982521856"
     )
 
@@ -181,7 +181,7 @@ async def test_rename_service_rejects_false_api_result(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(
+        await services._async_handle_rename(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -205,7 +205,7 @@ async def test_rename_service_reauth_on_auth_error(
     )
 
     with pytest.raises(ConfigEntryAuthFailed):
-        await services._async_handle_rename(
+        await services._async_handle_rename(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -259,21 +259,21 @@ async def test_device_services_preserve_auth_failures_for_reauth(
     """Device-scoped service handlers must let HA open reauth on auth failure."""
 
     class _AuthDeviceCoordinator:
-        async def async_query_weather_plan(self, *args: object) -> None:
+        async def async_query_weather_plan(self, *args: object) -> None:  # noqa: PLR6301
             raise JackeryAuthError("invalid token")
 
-        async def async_delete_storm_alert(self, *args: object) -> None:
+        async def async_delete_storm_alert(self, *args: object) -> None:  # noqa: PLR6301
             raise JackeryAuthError("invalid token")
 
-        async def async_set_third_party_mqtt_config(
+        async def async_set_third_party_mqtt_config(  # noqa: PLR6301
             self, *args: object, **kwargs: object
         ) -> None:
             raise JackeryAuthError("invalid token")
 
-        async def async_query_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_query_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             raise JackeryAuthError("invalid token")
 
-        async def async_send_device_schedule(
+        async def async_send_device_schedule(  # noqa: PLR6301
             self, *args: object, **kwargs: object
         ) -> None:
             raise JackeryAuthError("invalid token")
@@ -324,7 +324,7 @@ async def test_rename_service_rejects_direct_invalid_system_id(
     monkeypatch.setattr(services, "_coordinator_for_system", _fail_coordinator_lookup)
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(
+        await services._async_handle_rename(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_SYSTEM_ID: system_id,
@@ -360,7 +360,7 @@ async def test_rename_service_rejects_direct_invalid_new_name(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(
+        await services._async_handle_rename(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -385,7 +385,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     class _FailingCoordinator:
         data: ClassVar[dict[str, dict[str, object]]] = {"dev1": {}}
 
-        async def async_query_weather_plan(self, device_id: str) -> None:
+        async def async_query_weather_plan(self, device_id: str) -> None:  # noqa: PLR6301
             """Request a weather plan update for the given device.
 
             Parameters:
@@ -408,7 +408,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_refresh_weather_plan(
+        await services._async_handle_refresh_weather_plan(  # noqa: SLF001
             _hass(),
             _call({SERVICE_FIELD_DEVICE_ID: "dev1"}),
         )
@@ -444,7 +444,7 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
     monkeypatch.setattr(services, "_resolve_jackery_device_id", _fail_resolve)
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_refresh_weather_plan(
+        await services._async_handle_refresh_weather_plan(  # noqa: SLF001
             _hass(),
             _call({SERVICE_FIELD_DEVICE_ID: device_id}),
         )
@@ -462,7 +462,7 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
     """Direct delete handler calls must keep the alert_id non-empty constraint."""
 
     class _StormAlertCoordinator:
-        async def async_delete_storm_alert(self, *args: object) -> None:
+        async def async_delete_storm_alert(self, *args: object) -> None:  # noqa: PLR6301
             """Test stub for deleting a storm alert that fails if invoked.
 
             Used by tests to assert that input validation prevents coordinator calls; if this method is ever called it raises an AssertionError with the message "blank alert_id must stop before coordinator call".
@@ -480,7 +480,7 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_delete_storm_alert(
+        await services._async_handle_delete_storm_alert(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -536,7 +536,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_set_third_party_mqtt_config(
+    await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
         _hass(),
         _call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -602,7 +602,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_set_third_party_mqtt_config(
+    await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
         _hass(),
         _call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -634,7 +634,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
     """Direct service handler calls must not stringify credential objects."""
 
     class _ThirdPartyCoordinator:
-        async def async_set_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             """Test sentinel that fails if the coordinator API is invoked.
 
             This method always raises an AssertionError to ensure the coordinator is not called
@@ -655,7 +655,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(
+        await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -679,7 +679,7 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
     """Invalid service booleans should keep their translated field error."""
 
     class _ThirdPartyCoordinator:
-        async def async_set_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             """Apply third-party MQTT configuration to the coordinator.
 
             Test-only stub: raises AssertionError if invoked to assert that input validation prevented the coordinator from being called.
@@ -694,7 +694,7 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(
+        await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -726,7 +726,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
     """Direct service handler calls must keep the schema port constraints."""
 
     class _ThirdPartyCoordinator:
-        async def async_set_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             """Apply third-party MQTT configuration to the target device.
 
             This method persists the provided MQTT settings (enable, ip, port, username, password, token, etc.) for the device handled by this coordinator. In this test stub the method raises AssertionError to signal it must not be invoked by handlers when validation fails.
@@ -744,7 +744,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(
+        await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -802,7 +802,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
     """Direct service handler calls must keep the required IP text constraint."""
 
     class _ThirdPartyCoordinator:
-        async def async_set_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             """Apply a third-party MQTT configuration for the associated device.
 
             This handler accepts the normalized fields for third-party MQTT (enable, ip, port,
@@ -822,7 +822,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(
+        await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -845,7 +845,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
     """Direct service handler calls must keep optional text length limits."""
 
     class _ThirdPartyCoordinator:
-        async def async_set_third_party_mqtt_config(self, *args: object) -> None:
+        async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # noqa: PLR6301
             raise AssertionError("long token must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -856,7 +856,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(
+        await services._async_handle_set_third_party_mqtt_config(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -925,7 +925,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_send_ble_command(
+    await services._async_handle_send_ble_command(  # noqa: SLF001
         _hass(),
         _call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -944,7 +944,7 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
     """Invalid BLE wait_for_ack should keep the direct translated field error."""
 
     class _BleCoordinator:
-        async def async_send_ble_command(self, *args: object) -> bool:
+        async def async_send_ble_command(self, *args: object) -> bool:  # noqa: PLR6301
             """Send a BLE command to the target device and indicate whether the command was acknowledged.
 
             Parameters:
@@ -961,7 +961,7 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(
+        await services._async_handle_send_ble_command(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -1004,7 +1004,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     """
 
     class _BleCoordinator:
-        async def async_send_ble_command(self, *args: object) -> bool:
+        async def async_send_ble_command(self, *args: object) -> bool:  # noqa: PLR6301
             """Send a BLE command to the target device via the coordinator.
 
             Parameters:
@@ -1021,7 +1021,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(
+        await services._async_handle_send_ble_command(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -1066,7 +1066,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
     """Direct BLE service calls must keep schema numeric ranges."""
 
     class _BleCoordinator:
-        async def async_send_ble_command(self, *args: object) -> bool:
+        async def async_send_ble_command(self, *args: object) -> bool:  # noqa: PLR6301
             """Sentinel coordinator method that must not be called by service handlers.
 
             Raises:
@@ -1084,7 +1084,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(
+        await services._async_handle_send_ble_command(  # noqa: SLF001
             _hass(),
             _call({SERVICE_FIELD_DEVICE_ID: "dev1", **call_data}),
         )
@@ -1104,7 +1104,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     """Direct BLE service calls must reject non-finite ack_timeout values."""
 
     class _BleCoordinator:
-        async def async_send_ble_command(self, *args: object) -> bool:
+        async def async_send_ble_command(self, *args: object) -> bool:  # noqa: PLR6301
             """Test-only stub for sending a BLE command that must not be invoked.
 
             Raises:
@@ -1120,7 +1120,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(
+        await services._async_handle_send_ble_command(  # noqa: SLF001
             _hass(),
             _call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",

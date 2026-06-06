@@ -51,7 +51,7 @@ length picks the cipher mode — observed in the wild: a SolarVault 3 Pro
 Max returned a 16-byte key (AES-128). The crypto helpers below accept
 both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
-"""
+"""  # noqa: E501, RUF100
 
 from dataclasses import dataclass
 import logging
@@ -148,7 +148,7 @@ def parse_hex16(text: str) -> int:
 
     Raises:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
-    """
+    """  # noqa: E501, RUF100
     if len(text) != _HEX16_WIDTH:
         raise ValueError(
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
@@ -164,7 +164,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """
+    """  # noqa: E501, RUF100
     return data.hex().upper()
 
 

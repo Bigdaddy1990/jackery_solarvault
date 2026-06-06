@@ -364,7 +364,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     Parameters:
         entry (JackeryConfigEntry): Config entry whose runtime_data contains the integration coordinator.
         async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity instances with Home Assistant.
-    """
+    """  # noqa: E501, RUF100
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -374,7 +374,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[ButtonEntity]): Target list to append the entity to when it is unique.
             entity (ButtonEntity): Button entity to append if its unique identifier has not been seen.
-        """
+        """  # noqa: E501, RUF100
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
         )
@@ -386,7 +386,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[ButtonEntity]: Unique `ButtonEntity` instances representing reboot actions for matching devices.
-        """
+        """  # noqa: E501, RUF100
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -461,7 +461,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Register newly discovered reboot button entities when the coordinator's device signature changes.
 
         If the coordinator-derived signature differs from the last cached signature, update the cache, collect new entities, and add them via `async_add_entities`.
-        """
+        """  # noqa: E501, RUF100
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

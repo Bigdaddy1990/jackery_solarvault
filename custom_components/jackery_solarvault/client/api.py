@@ -30,7 +30,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
+from jackery_solarvault.const import (
     AES_KEY,
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
@@ -143,7 +143,7 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import app_period_date_bounds, chart_series_debug
+from jackery_solarvault.util import app_period_date_bounds, chart_series_debug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ def _generate_udid(seed: str) -> str:
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:
+class JackeryApi:  # noqa: PLR0904
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(
@@ -276,7 +276,7 @@ class JackeryApi:
 
         Returns:
                 headers (dict[str, str]): Mapping of HTTP header names to values. Includes the auth token header when `with_token` is True and a token is present.
-        """
+        """  # noqa: E501, RUF100
         h = {
             "accept-encoding": "gzip",
             "accept-language": "de-DE",
@@ -307,7 +307,7 @@ class JackeryApi:
 
         Raises:
             JackeryAuthError: If the normalized value does not match 33 lowercase hexadecimal characters.
-        """
+        """  # noqa: E501, RUF100
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
@@ -329,7 +329,7 @@ class JackeryApi:
 
         Returns:
             str: The resolved MAC ID string.
-        """
+        """  # noqa: E501, RUF100
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -355,7 +355,7 @@ class JackeryApi:
 
         Returns:
             token (str): The JWT session token returned by the server.
-        """
+        """  # noqa: E501, RUF100
         mac_id = self._resolve_login_mac_id()
         login_bean = {
             FIELD_ACCOUNT: self._account,
@@ -383,7 +383,7 @@ class JackeryApi:
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
         form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
-        try:
+        try:  # noqa: PLW0717
             async with self._session.post(
                 url,
                 data=form_body,
@@ -426,7 +426,7 @@ class JackeryApi:
 
         if self._extract_code(data) != CODE_OK:
             raise JackeryAuthError(
-                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
+                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"  # noqa: E501, RUF100
             )
 
         token = data.get(FIELD_TOKEN) or ""
@@ -458,7 +458,7 @@ class JackeryApi:
         Raises:
             JackeryAuthError: If the client is not logged in or required MQTT fields are missing,
                 if `mqttPassWord` is not valid base64, or if the decoded seed is not 32 bytes.
-        """
+        """  # noqa: E501, RUF100
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
             raise JackeryAuthError(
@@ -500,7 +500,7 @@ class JackeryApi:
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""
+        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""  # noqa: E501, RUF100
         return self._mqtt_mac_id_source
 
     @property
@@ -526,7 +526,7 @@ class JackeryApi:
 
         Returns:
             int | None: The `code` parsed as an integer when present as an integer or a numeric string, `None` otherwise.
-        """
+        """  # noqa: E501, RUF100
         if not isinstance(data, dict):
             return None
         code = data.get(FIELD_CODE)
@@ -551,7 +551,7 @@ class JackeryApi:
 
         Returns:
             True if the response indicates token expiration, False otherwise.
-        """
+        """  # noqa: E501, RUF100
         if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
@@ -708,7 +708,7 @@ class JackeryApi:
 
         Returns:
             list: The items from FIELD_DATA when it is a list (filtered to dict items), or an empty list otherwise.
-        """
+        """  # noqa: E501, RUF100
         payload = data.get(FIELD_DATA)
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
@@ -738,7 +738,7 @@ class JackeryApi:
 
         Returns:
             dict[str, Any]: The matching OTA item, the first item as a fallback, or `{}` if `items` is empty.
-        """
+        """  # noqa: E501, RUF100
         requested_sn = str(device_sn)
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
@@ -805,7 +805,7 @@ class JackeryApi:
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             raise JackeryApiError(
-                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # noqa: E501, RUF100
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -850,7 +850,7 @@ class JackeryApi:
 
     async def async_get_alarm(
         self, system_id: str | int
-    ) -> Any:  # parsed JSON response, indexed by callers
+    ) -> Any:  # parsed JSON response, indexed by callers  # noqa: ANN401, RUF100
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -931,7 +931,7 @@ class JackeryApi:
 
         Returns:
             dict: The response `data` payload as a dict; empty dict if the payload is missing or not a dict.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
         )
@@ -946,7 +946,7 @@ class JackeryApi:
 
         Returns:
             dict: Mapping of statistic keys to their values as strings in kWh.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -977,7 +977,7 @@ class JackeryApi:
 
         Returns:
             dict[str, Any]: Normalized payload dict from the endpoint's `data` field, augmented with `APP_REQUEST_META`.
-        """
+        """  # noqa: E501, RUF100
         # PROTOCOL.md §2: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
         begin_date, end_date = app_period_date_bounds(
@@ -1024,7 +1024,7 @@ class JackeryApi:
 
         Returns:
             dict: Parsed response payload from the endpoint, typically containing chart series and related metadata.
-        """
+        """  # noqa: E501, RUF100
         return await self._async_get_device_period_stat(
             DEVICE_PV_STAT_PATH,
             device_id=device_id,
@@ -1063,7 +1063,7 @@ class JackeryApi:
 
         Returns:
             payload (dict): Normalized response payload containing chart/statistics data. When available, includes `APP_REQUEST_META` with request metadata (excluding `deviceId`).
-        """
+        """  # noqa: E501, RUF100
         return await self._async_get_device_period_stat(
             DEVICE_HOME_STAT_PATH,
             device_id=device_id,
@@ -1090,7 +1090,7 @@ class JackeryApi:
 
         Returns:
                 dict[str, Any]: Parsed payload dictionary containing CT/smart-meter statistics. The payload may include request metadata (APP_REQUEST_META) when a date range was provided.
-        """
+        """  # noqa: E501, RUF100
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
             device_id=device_id,
@@ -1111,7 +1111,7 @@ class JackeryApi:
 
         Returns:
             dict: Payload containing aggregated totals (e.g., `totalInEpsEnergy`, `totalOutEpsEnergy`), chart series arrays (`x`, `y`, `y1`, `y2`), and, when present, an `APP_REQUEST_META` dict with the request parameters used.
-        """
+        """  # noqa: E501, RUF100
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
             device_id=device_id,
@@ -1128,7 +1128,7 @@ class JackeryApi:
 
         Returns:
             dict: Parsed JSON response containing KPI fields such as `de` (feed-in), `dg` (grid import), `dh` (home load), and `ds` (battery energy).
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             DEVICE_TODAY_ENERGY_PATH,
             params={FIELD_DEVICE_SN: str(device_sn)},
@@ -1146,7 +1146,7 @@ class JackeryApi:
 
         Returns:
             A dictionary containing the parsed payload with the meter panel totals from the device meter statistics endpoint.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -1166,7 +1166,7 @@ class JackeryApi:
 
         Returns:
             dict[str, Any]: The response `data` payload as a dictionary (empty if missing or not a dict).
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             DEVICE_SOCKET_STATISTIC_PATH,
             params={FIELD_SMART_SOCKET_ID: str(smart_socket_id)},
@@ -1190,7 +1190,7 @@ class JackeryApi:
 
         Returns:
             dict: The normalized `data` payload for the device socket chart.
-        """
+        """  # noqa: E501, RUF100
         return await self._async_get_device_period_stat(
             DEVICE_SOCKET_STAT_PATH,
             device_id=device_id,
@@ -1260,7 +1260,7 @@ class JackeryApi:
 
         Returns:
             list[dict]: Battery pack dictionaries extracted from the response; empty list if no packs are found or the response shape is unrecognized.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             BATTERY_PACK_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
         )
@@ -1348,7 +1348,7 @@ class JackeryApi:
 
         Returns:
             dict: Normalized payload dictionary extracted from the API response (may be empty).
-        """
+        """  # noqa: E501, RUF100
         begin_date, end_date = app_period_date_bounds(
             date_type, begin_date=begin_date, end_date=end_date
         )
@@ -1374,7 +1374,7 @@ class JackeryApi:
 
         Returns:
             dict: OTA information object for the device, or an empty dict if no suitable item is found.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
         )
@@ -1422,7 +1422,7 @@ class JackeryApi:
 
         Returns:
             dict: The API payload's `data` object containing location fields (e.g., `latitude`, `longitude`); an empty dict if `data` is missing or not a dict.
-        """
+        """  # noqa: E501, RUF100
         data = await self._get_json(
             LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -1441,7 +1441,7 @@ class JackeryApi:
         Raises:
             JackeryAuthError: When the response indicates an authorization or authentication failure.
             JackeryApiError: On network/request failures, non-200 HTTP status, or backend `code` that is neither `CODE_OK` nor `None`.
-        """
+        """  # noqa: E501, RUF100
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1499,7 +1499,7 @@ class JackeryApi:
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             raise JackeryApiError(
-                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # noqa: E501, RUF100
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -1526,7 +1526,7 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `system_name` is empty after trimming or if the API request fails.
-        """
+        """  # noqa: E501, RUF100
         if not system_name or not system_name.strip():
             raise JackeryApiError("system_name must be a non-empty string")
         data = await self._put_json(
@@ -1556,7 +1556,7 @@ class JackeryApi:
         Raises:
             JackeryApiError: On network/timeout failures, non-200 HTTP status, or when the response `code` indicates an error.
             JackeryAuthError: When the response indicates an authentication or authorization failure.
-        """
+        """  # noqa: E501, RUF100
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1617,7 +1617,7 @@ class JackeryApi:
         if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
             raise JackeryApiError(
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
+                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # noqa: E501, RUF100
                 f"data={data.get(FIELD_DATA)!r}"
             )
         await self._emit_payload_debug(
@@ -1645,7 +1645,7 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
-        """
+        """  # noqa: E501, RUF100
         if not isinstance(max_power, int) or max_power < 0:
             raise JackeryApiError("max_power must be a non-negative integer")
         data = await self._post_form(
@@ -1672,7 +1672,7 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `single_price` is invalid, negative, or `currency` is empty.
-        """
+        """  # noqa: E501, RUF100
         try:
             price = float(single_price)
         except TypeError as err:
@@ -1738,7 +1738,7 @@ class JackeryApi:
 
         Returns:
             list[dict[str, Any]]: Device objects parsed from the response, or an empty list if a non-auth `JackeryError` occurred.
-        """
+        """  # noqa: E501, RUF100
         try:
             data = await self._get_json(DEVICE_LIST_PATH)
         except JackeryAuthError:

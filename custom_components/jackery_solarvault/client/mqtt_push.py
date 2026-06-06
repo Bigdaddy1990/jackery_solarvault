@@ -42,7 +42,7 @@ _MAX_PENDING_MESSAGE_TASKS = 32
 class _AioMqttPassiveDisconnectFilter(logging.Filter):
     """Hide expected passive broker reset noise from aiomqtt internals."""
 
-    def filter(self, record: logging.LogRecord) -> bool:
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
         """Filter out common aiomqtt passive socket-reset log messages.
 
         Parameters:
@@ -84,7 +84,7 @@ class JackeryMqttPushClient:
             message_callback (Callable[[str, dict[str, Any]], Awaitable[None]]): Async callback invoked for each received message with arguments (topic, parsed JSON object).
             connect_callback (Callable[[], Awaitable[None]] | None): Optional async callback invoked once after a successful connection is established.
             disconnect_callback (Callable[[], Awaitable[None]] | None): Optional async callback invoked after a prior successful connection when the client disconnects.
-        """
+        """  # noqa: E501, RUF100
         self._hass = hass
         self._message_callback = message_callback
         self._connect_callback = connect_callback
@@ -131,7 +131,7 @@ class JackeryMqttPushClient:
             username (str): MQTT username for authentication.
             password (str): MQTT password for authentication.
             user_id (str): User identifier used to construct the subscription topic namespace.
-        """
+        """  # noqa: E501, RUF100
         fingerprint = self._credential_fingerprint(client_id, username, password)
         async with self._lock:
             if self._runner_task is not None and self._fingerprint == fingerprint:
@@ -187,7 +187,7 @@ class JackeryMqttPushClient:
 
         Returns:
             str: Hexadecimal SHA-256 digest of the provided credentials.
-        """
+        """  # noqa: E501, RUF100
         hasher = hashlib.sha256()
         for value in (client_id, username, password):
             encoded = value.encode()
@@ -199,7 +199,7 @@ class JackeryMqttPushClient:
         """Stop the MQTT runner and disconnect the client.
 
         Acquires the internal lock, stops any active background session task, and clears internal connection state before returning.
-        """
+        """  # noqa: E501, RUF100
         async with self._lock:
             await self._async_stop_locked()
 
@@ -226,7 +226,7 @@ class JackeryMqttPushClient:
 
         Raises:
                 RuntimeError: If the MQTT client is not running or the publish fails.
-        """
+        """  # noqa: E501, RUF100
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if not self._connected:
             await self._async_wait_connected(timeout_sec=12.0)
@@ -256,7 +256,7 @@ class JackeryMqttPushClient:
 
         Raises:
             RuntimeError: If the MQTT client runner is not started, or if the client fails to connect within `timeout_sec`.
-        """
+        """  # noqa: E501, RUF100
         if self._runner_task is None:
             raise RuntimeError("MQTT client is not running")
         await self._async_wait_connected(timeout_sec=timeout_sec)
@@ -271,7 +271,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """
+        """  # noqa: E501, RUF100
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
         except TimeoutError as err:
@@ -288,7 +288,7 @@ class JackeryMqttPushClient:
         """Stop the current runner task and clear internal connection state.
 
         If a background runner task exists, cancel it and wait for its completion while suppressing cancellation, MQTT, and generic exceptions. Clears the stored client, fingerprint, subscribed topics, connected flag, and connected event so the instance is left in a stopped state.
-        """
+        """  # noqa: E501, RUF100
         task = self._runner_task
         self._stopping = True
         if task is None:
@@ -315,9 +315,9 @@ class JackeryMqttPushClient:
         """Manage an MQTT client session: connect, subscribe to configured topics, process incoming messages, and update connection state.
 
         On successful connection, sets internal connection flags and timestamps, subscribes to topics in self._topics, and forwards incoming messages to the internal message handler. If configured, schedules the connect callback once connected and schedules the disconnect callback when a previously established session ends. On errors, updates internal error state and sets or clears the connected event to reflect whether the termination was a connect failure.
-        """
+        """  # noqa: E501, RUF100
         connected = False
-        try:
+        try:  # noqa: PLW0717
             async with aiomqtt.Client(
                 hostname=MQTT_HOST,
                 port=MQTT_PORT,
@@ -338,7 +338,7 @@ class JackeryMqttPushClient:
                 self._last_connect_failure_signature = None
                 self._consecutive_auth_failures = 0
                 _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
+                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # noqa: E501, RUF100
                     len(self._topics),
                     self._tls_certificate_source,
                 )
@@ -391,7 +391,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
-        """
+        """  # noqa: E501, RUF100
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         message = f"connect rc={rc} ({reason})"
@@ -436,7 +436,7 @@ class JackeryMqttPushClient:
         Parameters:
                 error (str): The error message to record.
                 was_connected (bool): If True, record the error as a disconnect; if False, record it as a connect failure.
-        """
+        """  # noqa: E501, RUF100
         if self._is_connect_failure_error(self._last_error):
             return
         if was_connected:
@@ -455,7 +455,7 @@ class JackeryMqttPushClient:
 
         Returns:
             int: Extracted integer return code, or 0 if no integer code is present.
-        """
+        """  # noqa: E501, RUF100
         rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
@@ -473,7 +473,7 @@ class JackeryMqttPushClient:
 
         Returns:
             True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes), False otherwise.
-        """
+        """  # noqa: E501, RUF100
         return rc in {4, 5, 134, 135}
 
     @staticmethod
@@ -485,7 +485,7 @@ class JackeryMqttPushClient:
 
         Returns:
             bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """
+        """  # noqa: E501, RUF100
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
@@ -498,7 +498,7 @@ class JackeryMqttPushClient:
 
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and `verify_mode = ssl.CERT_REQUIRED`.
-        """
+        """  # noqa: E501, RUF100
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -554,7 +554,7 @@ class JackeryMqttPushClient:
 
         Behavior:
                 Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or parse failure, or when the JSON value is not an object, increments `_messages_dropped` and sets `_last_message_error`. If the parsed object does not contain a dict at `FIELD_BODY` but does contain a dict at `FIELD_DATA`, copies `FIELD_DATA` into `FIELD_BODY`. On successful validation increments `_messages_seen`, records `_last_message_at` (UTC ISO), clears `_last_message_error`, and schedules the configured message callback with `(topic, data)`.
-        """
+        """  # noqa: E501, RUF100
         try:
             if isinstance(payload, str):
                 text = payload
@@ -633,7 +633,7 @@ class JackeryMqttPushClient:
 
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
-        """
+        """  # noqa: E501, RUF100
         if topic is None:
             return None
         parts = topic.split("/")
@@ -666,7 +666,7 @@ class JackeryMqttPushClient:
               - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
                 "tls_certificate_source": TLS and certificate source flags
               - "library": identifier of the MQTT client library
-        """
+        """  # noqa: E501, RUF100
 
         def topic_value(topic: str | None) -> str | None:
             """Produce the topic with the user-specific segment redacted when redaction is enabled.
@@ -676,7 +676,7 @@ class JackeryMqttPushClient:
 
             Returns:
                 str | None: The redacted topic when redaction is enabled, the original topic when redaction is disabled, or `None` if `topic` is `None`.
-            """
+            """  # noqa: E501, RUF100
             return self._redact_topic(topic) if redact_topics else topic
 
         return {
@@ -713,7 +713,7 @@ class JackeryMqttPushClient:
 
         Returns:
             dict[str, Any]: Diagnostics snapshot containing connection state and flags, timestamps for last connect/disconnect/message/publish, message counters and last message error, subscribed topics and last published topic (topics may be redacted), TLS status and certificate source, broker constants, connection attempt and authentication-failure metrics, and other fields useful for debugging and monitoring.
-        """
+        """  # noqa: E501, RUF100
         return self.diagnostics_snapshot()
 
     def _seconds_since_last_message(self) -> float | None:
@@ -723,7 +723,7 @@ class JackeryMqttPushClient:
 
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
-        """
+        """  # noqa: E501, RUF100
         if self._last_message_at is None:
             return None
         try:
@@ -739,7 +739,7 @@ class JackeryMqttPushClient:
 
         Returns:
             float | None: Number of seconds since the last message, or `None` if no last-message timestamp is available.
-        """
+        """  # noqa: E501, RUF100
         return self._seconds_since_last_message()
 
     @property
@@ -748,7 +748,7 @@ class JackeryMqttPushClient:
 
         Returns:
             int: Count of consecutive authentication failures observed for connect attempts.
-        """
+        """  # noqa: E501, RUF100
         return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
@@ -758,7 +758,7 @@ class JackeryMqttPushClient:
 
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
-        """
+        """  # noqa: E501, RUF100
         if not self._connected:
             return False
         elapsed = self._seconds_since_last_message()

@@ -77,7 +77,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _standby_is_on(
-    raw: Any,
+    raw: Any,  # noqa: ANN401, RUF100
 ) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
@@ -86,7 +86,7 @@ def _standby_is_on(
 
     Returns:
         `True` if the value represents on (for example, integer `1` or an equivalent truthy representation), `False` if the value represents off (for example, integer `0` or an equivalent falsey representation), or `None` if `raw` is `None` or the state cannot be determined.
-    """
+    """  # noqa: E501, RUF100
     if raw is None:
         return None
     try:
@@ -303,7 +303,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             `True` if the switch is on, `False` if the switch is off, `None` if the state cannot be determined.
-        """
+        """  # noqa: E501, RUF100
         description = self.entity_description
         section = self._payload.get(description.source_section) or {}
         raw: Any = None
@@ -333,7 +333,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Raises:
             ConfigEntryAuthFailed: if the config entry authentication has failed.
             HomeAssistantError: when the action fails; errors that include a `translation_key` are propagated, other failures are converted to a translated entity action failure.
-        """
+        """  # noqa: E501, RUF100
         if self.entity_description.setter is None:
             return
         try:
@@ -358,7 +358,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Raises:
             ConfigEntryAuthFailed: re-raised when authentication for the config entry failed.
             HomeAssistantError: re-raised when the caught error contains a `translation_key`; otherwise a translated `HomeAssistantError` describing the action failure is raised.
-        """
+        """  # noqa: E501, RUF100
         if self.entity_description.setter is None:
             return
         try:
@@ -398,7 +398,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Parameters:
             plug_index (int): 1-based index of the smart plug within the device's sorted plug list.
             plug_sn (str): Smart plug serial number used to identify and bind to the physical plug.
-        """
+        """  # noqa: E501, RUF100
         super().__init__(coordinator, device_id, f"{plug_key}_switch")
         self._plug_index = plug_index
         self._plug_sn = plug_sn
@@ -417,7 +417,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: The payload dictionary for the matching smart plug, or an empty dict if no matching plug is found.
-        """
+        """  # noqa: E501, RUF100
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -429,7 +429,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             True if the plug reports active output, False if it reports inactive, None if the state is unavailable.
-        """
+        """  # noqa: E501, RUF100
         raw = self._plug.get(FIELD_SWITCH_STATE)
         if raw is None:
             raw = self._plug.get(FIELD_SYS_SWITCH)
@@ -460,7 +460,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Raises:
             HomeAssistantError: Always raised with `translation_domain=DOMAIN`, `translation_key="entity_action_failed"`,
             and `translation_placeholders` containing `entity="smart_plug_switch"`, `device_id=self._device_id`, and `error=str(error)`.
-        """
+        """  # noqa: E501, RUF100
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -480,7 +480,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Raises:
             ConfigEntryAuthFailed: Re-raised when the coordinator reports an authentication failure.
             HomeAssistantError: Re-raised if the error contains a `translation_key`; other errors are converted to a translated action error via the entity's `_raise_action_error`.
-        """
+        """  # noqa: E501, RUF100
         plug = self._plug
         plug_sn = self._jackery_device_sn(plug)
         scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
@@ -540,7 +540,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of extra state attributes for the entity.
-        """
+        """  # noqa: E501, RUF100
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -581,7 +581,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         Parameters:
             plug_index (int): 1-based position of the smart plug in the device's sorted smart-plug list.
             plug_sn (str): Serial number of the target smart plug used to reliably identify the plug across payload updates.
-        """
+        """  # noqa: E501, RUF100
         JackeryEntity.__init__(
             self,
             coordinator,
@@ -601,7 +601,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 
         Returns:
             `true` if the plug's `socketPriority` indicates enabled, `false` if it indicates disabled, `None` if the field is absent or unknown.
-        """
+        """  # noqa: E501, RUF100
         return safe_bool(self._plug.get(FIELD_SOCKET_PRIORITY))
 
     def _raise_action_error(self, error: object) -> None:
@@ -616,7 +616,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 
         Raises:
             HomeAssistantError: Error with translation_key "entity_action_failed" and the placeholders described above.
-        """
+        """  # noqa: E501, RUF100
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -636,7 +636,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         Raises:
             ConfigEntryAuthFailed: If the config entry authentication fails (re-raised).
             HomeAssistantError: If the plug serial is missing or the update action fails; errors include translation placeholders when available.
-        """
+        """  # noqa: E501, RUF100
         plug_sn = self._jackery_device_sn(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
@@ -671,7 +671,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     """Create and register switch entities for devices and smart plugs based on coordinator data.
 
     Discover description-driven device switches and per-smart-plug switches (including priority switches when present), avoid duplicate unique IDs, and gate creation of certain description-driven switches by observed device properties or advanced-capability support. Register a listener that re-evaluates the coordinator data signature and adds newly discovered entities only when the signature changes.
-    """
+    """  # noqa: E501, RUF100
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -681,7 +681,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[SwitchEntity]): Mutable list to which the entity will be appended when unique.
             entity (SwitchEntity): Entity to add if its unique id has not already been recorded.
-        """
+        """  # noqa: E501, RUF100
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="switch", logger=_LOGGER
         )
@@ -710,7 +710,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[SwitchEntity]: Switch entity instances to add for the current coordinator dataset.
-        """
+        """  # noqa: E501, RUF100
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -759,7 +759,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Add newly discovered switch entities when the coordinator's entity signature changes.
 
         If the coordinator's current entity signature differs from the last recorded signature, update the stored signature, collect entities via _collect_entities(), and call async_add_entities() with any discovered entities.
-        """
+        """  # noqa: E501, RUF100
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

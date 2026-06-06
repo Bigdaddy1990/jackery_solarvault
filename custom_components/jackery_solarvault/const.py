@@ -125,7 +125,7 @@ PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?system
 SAVE_SINGLE_MODE_PATH: Final = (
     "/v1/device/dynamic/saveSingleMode"  # form: systemId,singlePrice,currency
 )
-SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion
+SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion  # noqa: E501, RUF100
 
 # Device/statistic endpoint group
 DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>

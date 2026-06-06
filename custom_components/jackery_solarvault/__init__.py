@@ -65,20 +65,20 @@ from .util import (
 # concrete coordinator type without sprinkling cast/getattr around
 # the integration. PEP 695 syntax requires Python 3.12+; HA 2025.x
 # already requires Python 3.14.
-type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
+type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]  # noqa: RUF067
 
-_LOGGER = logging.getLogger(__name__)
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
+_LOGGER = logging.getLogger(__name__)  # noqa: RUF067
+_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})  # noqa: RUF067
 
 
 # This integration is config-entry-only — there is no YAML configuration
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
 # accident.
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)  # noqa: RUF067
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029, RUF067
     """Set up global Jackery SolarVault services.
 
     Declared ``async`` because Home Assistant awaits the integration's
@@ -90,7 +90,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF02
     return True
 
 
-def _async_clean_legacy_entities(
+def _async_clean_legacy_entities(  # noqa: RUF067
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """Drop entity-registry entries from older releases or disabled options.
@@ -159,7 +159,7 @@ def _async_clean_legacy_entities(
     )
 
 
-async def _async_authenticate(
+async def _async_authenticate(  # noqa: RUF067
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
     """Authenticate to the Jackery cloud using credentials from the config entry and return an authenticated API client.
@@ -170,7 +170,7 @@ async def _async_authenticate(
     Raises:
         ConfigEntryAuthFailed: If the provided credentials are rejected (triggers re-auth flow).
         ConfigEntryNotReady: If the Jackery cloud cannot be reached (setup should be retried later).
-    """
+    """  # noqa: E501, RUF100
     session = async_get_clientsession(hass)
     api = JackeryApi(
         session=session,
@@ -192,17 +192,17 @@ async def _async_authenticate(
     return api
 
 
-_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # noqa: RUF067
 
 
-def _local_mqtt_client(
+def _local_mqtt_client(  # noqa: RUF067
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """Return the per-entry local MQTT client stored in hass.data for the given config entry.
 
     Returns:
         JackeryLocalMqttClient instance for the entry, or None if no client is stored or the stored value is not a JackeryLocalMqttClient.
-    """
+    """  # noqa: E501, RUF100
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None
@@ -210,7 +210,7 @@ def _local_mqtt_client(
     return client if isinstance(client, JackeryLocalMqttClient) else None
 
 
-async def _async_start_local_mqtt(
+async def _async_start_local_mqtt(  # noqa: RUF067
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -280,7 +280,7 @@ async def _async_start_local_mqtt(
         """Stop the stored per-entry local MQTT client and remove its hass.data reference if it matches the stored instance.
 
         Exceptions raised while stopping the client are suppressed.
-        """
+        """  # noqa: E501, RUF100
         with contextlib.suppress(Exception):
             await client.async_stop()
         stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
@@ -291,14 +291,14 @@ async def _async_start_local_mqtt(
     await client.async_start()
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067
     """Set up the Jackery SolarVault config entry, start its coordinator and optional transports, and forward platform setup.
 
     Performs authentication, constructs the coordinator, runs discovery and the initial refresh, and starts cloud MQTT plus an optional local MQTT listener and BLE transport. Transport startup failures that indicate invalid credentials will surface re-auth; other transport failures are logged and do not block setup. On successful setup the coordinator is stored on the entry's runtime state and platform setups and listeners are registered. If setup fails after the coordinator is created, the coordinator is shut down and the entry's runtime state is cleared before the error is re-raised.
 
     Returns:
         True if setup completed successfully.
-    """
+    """  # noqa: E501, RUF100
     _async_clean_legacy_entities(hass, entry)
     api = await _async_authenticate(hass, entry)
 
@@ -308,7 +308,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
-    try:
+    try:  # noqa: PLW0717
         # Discovery must run first (MQTT subscriptions and the first refresh
         # both rely on the device list it produces). The HTTP first refresh and
         # the MQTT connect afterwards are independent and run in parallel to
@@ -334,12 +334,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             ),
         )
         if isinstance(refresh_result, BaseException):
-            raise refresh_result
+            raise refresh_result  # noqa: TRY301
         if isinstance(mqtt_result, ConfigEntryAuthFailed):
             # Broker explicitly rejected MQTT credentials. HTTP login may have
             # succeeded, but the user must update credentials regardless —
             # surface this so HA opens the reauth UI.
-            raise mqtt_result
+            raise mqtt_result  # noqa: TRY301
         if isinstance(mqtt_result, BaseException):
             # Other MQTT failures (network, TLS handshake, broker outage) must
             # not block setup — push is an optional channel on top of polling.
@@ -383,7 +383,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 # -----------------------------------------------------------------------------
 
 
-def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
+def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF067
     """Remove stale Energy helper entities that were created without a unit of measurement.
 
     Scans the entity registry for entities whose entity_id starts with the configured
@@ -391,7 +391,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     current state has no `unit_of_measurement` (missing or empty) and its entity_id
     contains any token from STALE_HELPER_VENDOR_TOKENS, the entity is removed from
     the registry and an informational log entry is emitted.
-    """
+    """  # noqa: E501, RUF100
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
@@ -421,24 +421,24 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         registry.async_remove(entity_id)
 
 
-_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
+_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")  # noqa: RUF067
 
 
-def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
+def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067
     """Determine whether `uid` consists of a legacy device head immediately followed by `key_suffix`.
 
     A legacy device head has the form `<digits>` or `<digits>_battery_pack_<digits>`. This function returns `True` only when `uid` ends with `key_suffix` and the substring before that suffix exactly matches the legacy head pattern.
 
     Returns:
         `True` if `uid` is a legacy head concatenated with `key_suffix`, `False` otherwise.
-    """
+    """  # noqa: E501, RUF100
     if not uid.endswith(key_suffix):
         return False
     head = uid[: -len(key_suffix)]
     return _LEGACY_UID_HEAD_RE.fullmatch(head) is not None
 
 
-def _async_remove_entities_with_suffixes(
+def _async_remove_entities_with_suffixes(  # noqa: RUF067
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     *,
@@ -454,7 +454,7 @@ def _async_remove_entities_with_suffixes(
         domain (str): Entity domain to restrict removals (e.g., "sensor", "binary_sensor").
         suffixes (Iterable[str]): Iterable of legacy unique-id suffix strings; an entity is removed if its unique ID matches any suffix.
         log_label (str): Human-readable label included in removal log messages.
-    """
+    """  # noqa: E501, RUF100
     suffix_tuple = tuple(suffixes)
     if not suffix_tuple:
         return
@@ -473,7 +473,7 @@ def _async_remove_entities_with_suffixes(
             registry.async_remove(ent.entity_id)
 
 
-async def _async_update_listener(
+async def _async_update_listener(  # noqa: RUF067
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """Reload the entry when the user toggles options.
@@ -485,14 +485,14 @@ async def _async_update_listener(
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067
     """Unload the config entry and tear down its runtime resources.
 
     If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime data to avoid retaining the coordinator. Teardown is performed only when platforms are successfully unloaded.
 
     Returns:
         True if platforms were unloaded and runtime teardown completed, False otherwise.
-    """
+    """  # noqa: E501, RUF100
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     # Keep the successful teardown explicitly gated by unload_ok so future
