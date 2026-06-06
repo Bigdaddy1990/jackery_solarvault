@@ -63,7 +63,6 @@ from jackery_solarvault.const import (
     FIELD_BATTERY_PACKS,
     FIELD_BAT_SOC,
     FIELD_BODY,
-    FIELD_CELL_TEMP,
     FIELD_CODE,
     FIELD_COUNTRY_CODE,
     FIELD_CURRENCY,
@@ -72,10 +71,9 @@ from jackery_solarvault.const import (
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_SN_LIST,
+    FIELD_DEV_SN,
     FIELD_FUNCTION,
     FIELD_ID,
-    FIELD_IN_PW,
-    FIELD_IP,
     FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_LOGIN_TYPE,
     FIELD_MAC_ID,
@@ -83,12 +81,9 @@ from jackery_solarvault.const import (
     FIELD_MODEL,
     FIELD_MQTT_PASSWORD,
     FIELD_MSG,
-    FIELD_OP,
-    FIELD_OUT_PW,
     FIELD_PASSWORD,
     FIELD_PLATFORM_COMPANY_ID,
     FIELD_RAW_TEXT,
-    FIELD_RB,
     FIELD_REGION_CODE,
     FIELD_REGISTER_APP_ID,
     FIELD_SINGLE_PRICE,
@@ -146,6 +141,8 @@ from jackery_solarvault.const import (
 from jackery_solarvault.util import app_period_date_bounds, chart_series_debug
 
 _LOGGER = logging.getLogger(__name__)
+_HTTP_RETRY_ATTEMPTS = 3
+_HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
 
 
 class JackeryError(Exception):
@@ -210,7 +207,7 @@ def _generate_udid(seed: str) -> str:
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:  # noqa: PLR0904
+class JackeryApi:
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(
@@ -251,6 +248,64 @@ class JackeryApi:  # noqa: PLR0904
         self.payload_debug_callback: (
             Callable[[dict[str, Any]], Awaitable[None] | None] | None
         ) = None
+        self.auth_rejection_callback: Callable[[int, object], None] | None = None
+
+    @staticmethod
+    def _decode_response_json(body_bytes: bytes) -> Any:
+        """Decode JSON from a response body that was read exactly once."""
+        return json.loads(body_bytes)
+
+    @staticmethod
+    def _truncated_response_text(body_bytes: bytes) -> str:
+        """Return bounded raw response text for diagnostics."""
+        return body_bytes[:HTTP_RAW_TEXT_LIMIT].decode("utf-8", errors="replace")
+
+    @staticmethod
+    def _is_transient_http_status(status: int) -> bool:
+        """Return True for server-side statuses that are safe to retry."""
+        return 500 <= status < 600
+
+    async def _request_json_with_retry(
+        self,
+        method: str,
+        path: str,
+        request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+    ) -> tuple[int, dict[str, Any]]:
+        """Run one JSON HTTP request with bounded transient retry/backoff."""
+        for attempt in range(1, _HTTP_RETRY_ATTEMPTS + 1):
+            try:
+                status, data = await request()
+            except (TimeoutError, aiohttp.ClientConnectionError) as err:
+                if attempt >= _HTTP_RETRY_ATTEMPTS:
+                    raise
+                delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+                _LOGGER.debug(
+                    "Jackery %s %s transient %s on attempt %d/%d; retrying in %.1fs",
+                    method,
+                    path,
+                    type(err).__name__,
+                    attempt,
+                    _HTTP_RETRY_ATTEMPTS,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+            if not self._is_transient_http_status(status):
+                return status, data
+            if attempt >= _HTTP_RETRY_ATTEMPTS:
+                return status, data
+            delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+            _LOGGER.debug(
+                "Jackery %s %s HTTP %d on attempt %d/%d; retrying in %.1fs",
+                method,
+                path,
+                status,
+                attempt,
+                _HTTP_RETRY_ATTEMPTS,
+                delay,
+            )
+            await asyncio.sleep(delay)
+        raise JackeryApiError(f"{method} {path} retry loop exhausted")
 
     def _maybe_learn_region_code(self, systems: list[dict[str, Any]]) -> None:
         """Learn region code from system metadata when not configured manually."""
@@ -383,7 +438,7 @@ class JackeryApi:  # noqa: PLR0904
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
         form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
-        try:  # noqa: PLW0717
+        try:
             async with self._session.post(
                 url,
                 data=form_body,
@@ -392,15 +447,16 @@ class JackeryApi:  # noqa: PLR0904
             ) as resp:
                 if resp.status != 200:
                     raise JackeryApiError(f"Login HTTP {resp.status}")
+                body_bytes = await resp.read()
                 try:
-                    data = await resp.json(content_type=None)
+                    data = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ) as err:
-                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                    raw = self._truncated_response_text(body_bytes)
                     raise JackeryApiError(
                         f"Login returned invalid JSON: {raw!r}"
                     ) from err
@@ -600,15 +656,26 @@ class JackeryApi:  # noqa: PLR0904
     def _is_auth_failure_response(self, status: int, data: object) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in {401, 403}:
+            if self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
             return True
         if self._is_token_expired_response(status, data):
+            if self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
             return True
         if status != 200:
-            return self._response_has_auth_failure_text(data)
+            is_auth_failure = self._response_has_auth_failure_text(data)
+            if is_auth_failure and self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
+            return is_auth_failure
         code = self._extract_code(data)
-        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
-            data
-        )
+        is_auth_failure = code not in {
+            CODE_OK,
+            None,
+        } and self._response_has_auth_failure_text(data)
+        if is_auth_failure and self.auth_rejection_callback is not None:
+            self.auth_rejection_callback(status, data)
+        return is_auth_failure
 
     @staticmethod
     def _auth_failure_message(method: str, path: str, status: int, data: object) -> str:
@@ -653,8 +720,8 @@ class JackeryApi:  # noqa: PLR0904
         *,
         method: str,
         path: str,
-        params: dict | None = None,
-        body: dict | None = None,
+        params: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -687,7 +754,7 @@ class JackeryApi:  # noqa: PLR0904
         if isinstance(payload, dict):
             return payload
         if payload is None:
-            return {}
+            raise JackeryApiError(f"Jackery {path} returned null data")
         _LOGGER.warning(
             "Jackery %s returned unexpected data shape for dict payload: %s",
             path,
@@ -713,7 +780,7 @@ class JackeryApi:  # noqa: PLR0904
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
         if payload is None:
-            return []
+            raise JackeryApiError(f"Jackery {path} returned null data")
         _LOGGER.warning(
             "Jackery %s returned unexpected data shape for list payload: %s",
             path,
@@ -743,14 +810,14 @@ class JackeryApi:  # noqa: PLR0904
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
                 return item
-        return items[0] if items else {}
+        return {}
 
     # --- generic GET with auto re-login ------------------------------------
-    async def _get_json(self, path: str, params: dict | None = None) -> dict:
+    async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
-        async def _do() -> tuple[int, dict]:
+        async def _do() -> tuple[int, dict[str, Any]]:
             async with self._session.get(
                 url,
                 params=params,
@@ -758,15 +825,16 @@ class JackeryApi:  # noqa: PLR0904
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    body = await resp.json(content_type=None)
+                    body = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ) as err:
-                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                    raw = self._truncated_response_text(body_bytes)
                     raise JackeryApiError(
                         f"{HTTP_METHOD_GET} {path} returned invalid JSON: {raw!r}"
                     ) from err
@@ -778,7 +846,9 @@ class JackeryApi:  # noqa: PLR0904
                 return status, body
 
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_GET, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_GET} {path} request failed: "
@@ -789,19 +859,28 @@ class JackeryApi:  # noqa: PLR0904
             self._token = None
             await self._ensure_token()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_GET, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
+            if self._is_token_expired_response(status, data):
+                raise JackeryApiError(
+                    f"{HTTP_METHOD_GET} {path} token still expired after re-login"
+                )
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_GET, path, status, data)
             )
         if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
+            raise JackeryApiError(
+                f"{HTTP_METHOD_GET} {path} HTTP {status} "
+                f"code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r}"
+            )
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             raise JackeryApiError(
@@ -840,7 +919,7 @@ class JackeryApi:  # noqa: PLR0904
         self._maybe_learn_region_code(systems)
         return systems
 
-    async def async_get_device_property(self, device_id: str | int) -> dict:
+    async def async_get_device_property(self, device_id: str | int) -> dict[str, Any]:
         """GET /v1/device/property — device + properties dict."""
         data = await self._get_json(
             DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -858,7 +937,7 @@ class JackeryApi:  # noqa: PLR0904
         self.last_alarm_response = data
         return data.get(FIELD_DATA)
 
-    async def async_get_system_statistic(self, system_id: str | int) -> dict:
+    async def async_get_system_statistic(self, system_id: str | int) -> dict[str, Any]:
         """GET /v1/device/stat/systemStatistic — today/total KPIs.
 
         Response keys (verified):
@@ -878,7 +957,7 @@ class JackeryApi:  # noqa: PLR0904
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """GET /v1/device/stat/sys/pv/trends — historical curves."""
         begin_date, end_date = app_period_date_bounds(
             date_type, begin_date=begin_date, end_date=end_date
@@ -898,7 +977,7 @@ class JackeryApi:  # noqa: PLR0904
             )
         return payload
 
-    async def async_get_power_price(self, system_id: str | int) -> dict:
+    async def async_get_power_price(self, system_id: str | int) -> dict[str, Any]:
         """GET /v1/device/dynamic/powerPriceConfig — tariff config."""
         data = await self._get_json(
             POWER_PRICE_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -939,7 +1018,7 @@ class JackeryApi:  # noqa: PLR0904
         return self._payload_dict(data, PRICE_HISTORY_CONFIG_PATH)
 
     # --- Additional app-statistic endpoints from PROTOCOL.md §2 ----------
-    async def async_get_device_statistic(self, device_id: str | int) -> dict:
+    async def async_get_device_statistic(self, device_id: str | int) -> dict[str, Any]:
         """Retrieve current-day energy flow statistics for the specified device.
 
         The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. Keys present may vary by device and backend response.
@@ -1281,22 +1360,10 @@ class JackeryApi:  # noqa: PLR0904
                 if isinstance(candidate, list):
                     return [item for item in candidate if isinstance(item, dict)]
             # Some API variants return a single body object directly.
-            if any(
-                key in raw
-                for key in (
-                    FIELD_BAT_SOC,
-                    FIELD_CELL_TEMP,
-                    FIELD_IN_PW,
-                    FIELD_OUT_PW,
-                    FIELD_RB,
-                    FIELD_IP,
-                    FIELD_OP,
-                    FIELD_VERSION,
-                    FIELD_CURRENT_VERSION,
-                    FIELD_IS_FIRMWARE_UPGRADE,
-                    FIELD_UPDATE_STATUS,
-                )
-            ):
+            # Require both batSoc (telemetry) and devSn (identity) to avoid
+            # matching config payloads that carry version/updateStatus but no
+            # real pack data.
+            if FIELD_BAT_SOC in raw and FIELD_DEV_SN in raw:
                 return [raw]
         if raw is not None:
             _LOGGER.warning(
@@ -1313,7 +1380,7 @@ class JackeryApi:  # noqa: PLR0904
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """GET /v1/device/stat/sys/home/trends — home consumption breakdown."""
         begin_date, end_date = app_period_date_bounds(
             date_type, begin_date=begin_date, end_date=end_date
@@ -1340,7 +1407,7 @@ class JackeryApi:  # noqa: PLR0904
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Retrieve battery charge and discharge trends for the given system.
 
         If the returned payload is non-empty, attaches request metadata under `APP_REQUEST_META`
@@ -1367,7 +1434,7 @@ class JackeryApi:  # noqa: PLR0904
             )
         return payload
 
-    async def async_get_ota_info(self, device_sn: str) -> dict:
+    async def async_get_ota_info(self, device_sn: str) -> dict[str, Any]:
         """Retrieve OTA information for the device identified by `device_sn`.
 
         Normalizes multiple backend response shapes and selects the matching OTA item when available.
@@ -1417,7 +1484,7 @@ class JackeryApi:  # noqa: PLR0904
             return self._select_ota_item(items, device_sn)
         return {}
 
-    async def async_get_location(self, device_id: str | int) -> dict:
+    async def async_get_location(self, device_id: str | int) -> dict[str, Any]:
         """Retrieve the GPS coordinates previously set for the specified device.
 
         Returns:
@@ -1430,7 +1497,7 @@ class JackeryApi:  # noqa: PLR0904
         return self._payload_dict(data, LOCATION_PATH)
 
     # --- HTTP write endpoints documented in PROTOCOL.md §2 --------------
-    async def _put_json(self, path: str, payload: dict) -> dict:
+    async def _put_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Send a JSON PUT to the given API path, ensuring a valid auth token and retrying once after re-login if the token has expired.
 
         If the response body cannot be parsed as JSON, the returned dict contains `FIELD_RAW_TEXT` with truncated raw text.
@@ -1450,7 +1517,7 @@ class JackeryApi:  # noqa: PLR0904
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
-        async def _do() -> tuple[int, dict]:
+        async def _do() -> tuple[int, dict[str, Any]]:
             async with self._session.put(
                 url,
                 json=payload,
@@ -1458,19 +1525,22 @@ class JackeryApi:  # noqa: PLR0904
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    body = await resp.json(content_type=None)
+                    body = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    body = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, body
 
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_PUT, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_PUT} {path} request failed: "
@@ -1483,19 +1553,28 @@ class JackeryApi:  # noqa: PLR0904
             self._token = None
             await self._ensure_token()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_PUT, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
+            if self._is_token_expired_response(status, data):
+                raise JackeryApiError(
+                    f"{HTTP_METHOD_PUT} {path} token still expired after re-login"
+                )
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
             )
         if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
+            raise JackeryApiError(
+                f"{HTTP_METHOD_PUT} {path} HTTP {status} "
+                f"code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r}"
+            )
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             raise JackeryApiError(
@@ -1543,7 +1622,7 @@ class JackeryApi:  # noqa: PLR0904
     # the integration surfaces the server's full error response so the user
     # can troubleshoot. See const.py for caveats.
 
-    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
+    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict[str, Any]:
         """Send a form-urlencoded POST to the Jackery API, retrying once after automatic re-login if the token is expired.
 
         Parameters:
@@ -1567,7 +1646,7 @@ class JackeryApi:  # noqa: PLR0904
 
         body = {k: str(v) for k, v in fields.items()}
 
-        async def _do() -> tuple[int, dict]:
+        async def _do() -> tuple[int, dict[str, Any]]:
             async with self._session.post(
                 url,
                 data=body,
@@ -1575,19 +1654,22 @@ class JackeryApi:  # noqa: PLR0904
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    data = await resp.json(content_type=None)
+                    data = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    data = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, data
 
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_POST, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} request failed: "
@@ -1600,19 +1682,28 @@ class JackeryApi:  # noqa: PLR0904
             self._token = None
             await self._ensure_token()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_POST, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 raise JackeryApiError(
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
+            if self._is_token_expired_response(status, data):
+                raise JackeryApiError(
+                    f"{HTTP_METHOD_POST} {path} token still expired after re-login"
+                )
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
             )
         if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
+            raise JackeryApiError(
+                f"{HTTP_METHOD_POST} {path} HTTP {status} "
+                f"code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r}"
+            )
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
@@ -1646,7 +1737,7 @@ class JackeryApi:  # noqa: PLR0904
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
         """  # noqa: E501, RUF100
-        if not isinstance(max_power, int) or max_power < 0:
+        if not isinstance(max_power, int) or isinstance(max_power, bool) or max_power < 0:
             raise JackeryApiError("max_power must be a non-negative integer")
         data = await self._post_form(
             MAX_POWER_SAVE_PATH,

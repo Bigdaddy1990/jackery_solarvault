@@ -147,6 +147,7 @@ from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_ENABLE_BLE_TRANSPORT,
     CT_ATTRIBUTE_FIELDS,
     CT_NEGATIVE_PHASE_POWER_FIELDS,
     CT_POSITIVE_PHASE_POWER_FIELDS,
@@ -158,6 +159,7 @@ from .const import (
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_STORM_WARNING_MINUTES,
     DOMAIN,
     FIELD_ABILITY,
@@ -2257,6 +2259,9 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         key="savings_price",
         translation_key="savings_price",
         path=("price",),
+        transform=lambda v: (
+            None if (f := safe_float(v)) is None else round(f, SAVINGS_PRICE_PRECISION)
+        ),
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
         icon="mdi:currency-eur",
@@ -3076,10 +3081,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
             raw = raw.get(key)
         if raw is None:
             return None
-        value = self.entity_description.transform(raw)
-        if self.entity_description.key == "savings_price" and isinstance(value, float):
-            return round(value, SAVINGS_PRICE_PRECISION)
-        return value
+        return self.entity_description.transform(raw)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -3286,10 +3288,14 @@ async def async_setup_entry(  # noqa: C901, RUF029
             if (payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION):
                 _append_unique(entities, JackeryFirmwareSensor(coordinator, dev_id))
 
-            # Experimental BLE listener status (disabled by default; the
-            # entity is only meaningful when the integration option
-            # ``enable_ble_transport`` is on and shows zero otherwise).
-            _append_unique(entities, JackeryBleTransportSensor(coordinator, dev_id))
+            # BLE listener status entity is only meaningful when the
+            # enable_ble_transport option is on.
+            if config_entry_bool_option(
+                entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT
+            ):
+                _append_unique(
+                    entities, JackeryBleTransportSensor(coordinator, dev_id)
+                )
 
             # Add-on battery packs come from the app's MQTT BatteryPackSub model.
             # Create the complete pack entity set once a pack exists or batNum
@@ -3385,7 +3391,7 @@ async def async_setup_entry(  # noqa: C901, RUF029
             # Smart meter / CT values arrive through MQTT sub-device responses.
             # Create them when discovery confirms a meter accessory, or when a
             # CT payload was already received before entity setup.
-            if coordinator._has_smart_meter_accessory(payload) or payload.get(  # noqa: SLF001
+            if coordinator._has_smart_meter_accessory(payload) or payload.get(
                 PAYLOAD_CT_METER
             ):
                 for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
@@ -3545,17 +3551,17 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
     def last_reset(self) -> datetime | None:
         """Return the local period boundary (last_reset) for the statistic based on the source's request begin date.
 
-        When a reset period is set, use the source section's request metadata `begin_date` to compute the timezone-aware local midnight that marks the period start. If the source data is stale or from the future, or if no valid `begin_date` is available or parseable, fall back to the local period start computed from the current wall clock. This ensures the entity's `last_reset` only advances when the server-side period data is actually present.
+        When a reset period is set, use the source section's request metadata `begin_date` to compute the timezone-aware local midnight that marks the period start. Future period data returns `None`; stale data keeps the stale source period so Recorder never sees a stale value at the current period boundary.
 
         Returns:
             datetime | None: Timezone-aware local midnight for the period start, or `None` when no reset period is configured.
         """  # noqa: E501, RUF100
         if self._reset_period is None:
             return None
-        if self._reset_period == DATE_TYPE_DAY and self._is_period_data_stale():
-            return _period_start(self._reset_period, self._local_timezone())
+        if self._is_period_data_stale():
+            return None
         if self._is_period_data_future():
-            return _period_start(self._reset_period, self._local_timezone())
+            return None
         # Prefer the begin_date stamped on the source by the coordinator
         # (`source[APP_REQUEST_META][APP_REQUEST_BEGIN_DATE]`), fall
         # back to wall-clock period start for sources that have no
@@ -3728,7 +3734,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 return value, candidate_section, candidate_source
         return None
 
-    def _resolve_period_value(  # noqa: PLR6301
+    def _resolve_period_value(
         self,
         source: dict[str, Any],
         section: str,
@@ -3756,7 +3762,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         server_total = effective_period_total_value(source, section, stat_key)
         return None, values, chart_series_sum, server_total
 
-    def _refresh_cache(self) -> None:  # noqa: C901, PLR0914
+    def _refresh_cache(self) -> None:  # noqa: C901
         """Recompute native_value and extra_state_attributes once per update."""
         section = self.entity_description.section
         stat_key = self.entity_description.stat_key
@@ -3898,6 +3904,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 safe_float(cloud_raw),
                 safe_float(local_raw),
                 label=f"{self.entity_id}:{stat_key}",
+                on_rejection=self.coordinator.record_payload_validation_rejection,
             )
             if raw is None and local_raw is not None:
                 raw = local_raw
@@ -3979,7 +3986,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             )
             if self._reset_period == DATE_TYPE_DAY:
                 self._cached_attrs["stale_period_fallback"] = (
-                    "zero_until_fresh_day_data"
+                    "unavailable_until_fresh_day_data"
                 )
         if future_period:
             self._cached_attrs["future_period_data"] = True
@@ -4737,14 +4744,13 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         manufacturer = manufacturer_brand or (
             "Shelly" if "shelly" in scan_name.lower() else MANUFACTURER
         )
-        model = model_label or (
-            scan_name if scan_name and scan_name != "Smart Meter" else "Smart Meter"
-        )
+        model = model_label or scan_name
         sn = ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_SN) or ct.get(FIELD_MAC)
+        mac_suffix = f" ({str(sn)[-4:].upper()})" if sn and scan_name == "Smart Meter" else ""
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_smart_meter")},
             manufacturer=manufacturer,
-            name=f"{base_name} Smart Meter",
+            name=f"{base_name} Smart Meter{mac_suffix}",
             model=model,
             serial_number=str(sn) if sn else None,
             via_device=(DOMAIN, self._device_id),
@@ -5150,7 +5156,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             ct = {}
 
         result = self._home_consumption_power(ct, props)
-        meter_net = JackerySmartMeterSensor._net_power(ct)  # noqa: SLF001
+        meter_net = JackerySmartMeterSensor._net_power(ct)
         input_available = self._grid_side_input_power(props) is not None
         output_available = self._grid_side_output_power(props) is not None
         reported_load_available = (
@@ -5183,7 +5189,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 result.jackery_output_power, 2
             )
 
-        phases = JackerySmartMeterSensor._signed_phase_values(ct)  # noqa: SLF001
+        phases = JackerySmartMeterSensor._signed_phase_values(ct)
         if phases is not None:
             attrs["phase_a_signed_power"] = round(phases[0], 2)
             attrs["phase_b_signed_power"] = round(phases[1], 2)

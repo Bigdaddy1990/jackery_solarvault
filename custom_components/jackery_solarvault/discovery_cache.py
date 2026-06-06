@@ -1,7 +1,6 @@
 """Persistent discovery cache for local offline startup."""
 
-from __future__ import annotations
-
+import asyncio
 from typing import Any, Final
 
 from homeassistant.core import HomeAssistant
@@ -13,6 +12,12 @@ _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"
 _KEY_ENTRIES: Final = "entries"
 _KEY_DEVICE_INDEX: Final = "device_index"
+_ENTRY_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _entry_lock(entry_id: str) -> asyncio.Lock:
+    """Return the in-process lock for one config-entry cache row."""
+    return _ENTRY_LOCKS.setdefault(entry_id, asyncio.Lock())
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -49,17 +54,18 @@ async def async_save_discovery_cache(
     device_index: dict[str, dict[str, Any]],
 ) -> None:
     """Persist discovery metadata needed for local BLE startup."""
-    store = _store(hass)
-    data = await store.async_load()
-    if not isinstance(data, dict):
-        data = {}
-    entries = data.get(_KEY_ENTRIES)
-    if not isinstance(entries, dict):
-        entries = {}
-    entries[entry_id] = {
-        _KEY_DEVICE_INDEX: {
-            str(device_id): dict(value) for device_id, value in device_index.items()
+    async with _entry_lock(entry_id):
+        store = _store(hass)
+        data = await store.async_load()
+        if not isinstance(data, dict):
+            data = {}
+        entries = data.get(_KEY_ENTRIES)
+        if not isinstance(entries, dict):
+            entries = {}
+        entries[entry_id] = {
+            _KEY_DEVICE_INDEX: {
+                str(device_id): dict(value) for device_id, value in device_index.items()
+            }
         }
-    }
-    data[_KEY_ENTRIES] = entries
-    await store.async_save(data)
+        data[_KEY_ENTRIES] = entries
+        await store.async_save(data)

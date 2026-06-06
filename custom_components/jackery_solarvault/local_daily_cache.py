@@ -21,8 +21,7 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
-from __future__ import annotations
-
+import asyncio
 from datetime import date
 from typing import Any, Final
 
@@ -36,6 +35,12 @@ _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
 _KEY_ENTRIES: Final = "entries"
 _KEY_DAY: Final = "day"
 _KEY_VALUES: Final = "values"
+_ENTRY_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _entry_lock(entry_id: str) -> asyncio.Lock:
+    """Return the in-process lock for one config-entry cache row."""
+    return _ENTRY_LOCKS.setdefault(entry_id, asyncio.Lock())
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -80,7 +85,7 @@ async def async_load_daily_cache(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         result[str(device_id)] = {
             _KEY_DAY: day,
@@ -99,40 +104,41 @@ async def async_save_daily_cache(
 
     ``snapshots`` mirrors the shape returned by :func:`async_load_daily_cache`.
     """
-    store = _store(hass)
-    data = await store.async_load()
-    if not isinstance(data, dict):
-        data = {}
-    entries = data.get(_KEY_ENTRIES)
-    if not isinstance(entries, dict):
-        entries = {}
-    cleaned: dict[str, dict[str, Any]] = {}
-    for device_id, payload in snapshots.items():
-        day = payload.get(_KEY_DAY)
-        values = payload.get(_KEY_VALUES)
-        if not isinstance(day, str) or not isinstance(values, dict):
-            continue
-        clean_values: dict[str, int] = {}
-        for metric, value in values.items():
-            if not isinstance(metric, str):
+    async with _entry_lock(entry_id):
+        store = _store(hass)
+        data = await store.async_load()
+        if not isinstance(data, dict):
+            data = {}
+        entries = data.get(_KEY_ENTRIES)
+        if not isinstance(entries, dict):
+            entries = {}
+        cleaned: dict[str, dict[str, Any]] = {}
+        for device_id, payload in snapshots.items():
+            day = payload.get(_KEY_DAY)
+            values = payload.get(_KEY_VALUES)
+            if not isinstance(day, str) or not isinstance(values, dict):
                 continue
-            try:
-                clean_values[metric] = int(value)
-            except (TypeError, ValueError):
-                continue
-        cleaned[str(device_id)] = {
-            _KEY_DAY: day,
-            _KEY_VALUES: clean_values,
-        }
-    entries[entry_id] = cleaned
-    data[_KEY_ENTRIES] = entries
-    await store.async_save(data)
+            clean_values: dict[str, int] = {}
+            for metric, value in values.items():
+                if not isinstance(metric, str):
+                    continue
+                try:
+                    clean_values[metric] = int(value)
+                except TypeError, ValueError:
+                    continue
+            cleaned[str(device_id)] = {
+                _KEY_DAY: day,
+                _KEY_VALUES: clean_values,
+            }
+        entries[entry_id] = cleaned
+        data[_KEY_ENTRIES] = entries
+        await store.async_save(data)
 
 
 def daily_delta(
     snapshot: dict[str, Any] | None,
     metric_key: str,
-    current_lifetime_wh: int | float | None,
+    current_lifetime_wh: float | None,
     *,
     today: date,
 ) -> int | None:
@@ -166,6 +172,9 @@ def daily_delta(
     except (TypeError, ValueError):
         return None
     if current < anchor_int:
+        diff = anchor_int - current
+        if diff > 2**31:
+            return current + 2**32 - anchor_int
         return None
     return current - anchor_int
 
@@ -197,7 +206,7 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         return {_KEY_DAY: today_iso, _KEY_VALUES: clean_values}
     existing_values = snapshot.get(_KEY_VALUES)
@@ -209,7 +218,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     for metric, value in current_values.items():
         if metric in merged:
@@ -218,7 +227,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     return {_KEY_DAY: today_iso, _KEY_VALUES: merged}
 

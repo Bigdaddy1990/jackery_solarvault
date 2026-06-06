@@ -1,8 +1,9 @@
 """Shared helpers for Jackery SolarVault entities."""
 
 import calendar
+from collections.abc import Callable
 import contextlib
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo as TZInfo
 import json
 import logging
 import math
@@ -364,7 +365,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     """  # noqa: E501, RUF100
     date_type = validate_app_period_date_type(date_type)
     if today is None:
-        today = date.today()  # noqa: DTZ011
+        today = date.today()
     if date_type == DATE_TYPE_DAY:
         return today, today
     if date_type == DATE_TYPE_WEEK:
@@ -575,7 +576,7 @@ def dev_mode_redactions_disabled() -> bool:
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
     """  # noqa: E501, RUF100
-    global _DEV_MODE_CACHED  # noqa: PLW0603
+    global _DEV_MODE_CACHED
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
         _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
@@ -1068,6 +1069,7 @@ def verify_and_backfill(
     *,
     label: str = "value",
     tolerance_fraction: float = 0.10,
+    on_rejection: Callable[[str], None] | None = None,
 ) -> float | None:
     """Arbitrate between cloud and local source per AGENTS.md §2.3.
 
@@ -1084,11 +1086,20 @@ def verify_and_backfill(
         local_value: Value from a local/fallback source (BLE, MQTT, or secondary endpoint).
         label: Human-readable metric name for log messages.
         tolerance_fraction: Relative divergence threshold (default 10 %).
+        on_rejection: Optional callback for diagnostics rejection counters.
     """  # noqa: E501, RUF100
+
+    def _record(reason: str) -> None:
+        if on_rejection is not None:
+            on_rejection(f"{label}:{reason}")
+
     if cloud_value is None and local_value is None:
         return None
     if cloud_value is None:
-        if math.isnan(local_value) or local_value < 0:
+        if local_value is None:
+            return None
+        if math.isnan(local_value) or math.isinf(local_value) or local_value < 0:
+            _record("invalid_local")
             _LOGGER.debug(
                 "verify_and_backfill %s: rejecting invalid local value %.4f",
                 label,
@@ -1096,15 +1107,25 @@ def verify_and_backfill(
             )
             return None
         return local_value
+    if math.isinf(cloud_value):
+        _record("invalid_cloud")
+        _LOGGER.debug(
+            "verify_and_backfill %s: rejecting infinite cloud value %.4f",
+            label,
+            cloud_value,
+        )
+        return None
     if math.isnan(cloud_value) or cloud_value < 0:
         if local_value is None:
+            _record("invalid_cloud")
             _LOGGER.debug(
                 "verify_and_backfill %s: rejecting invalid cloud value %.4f",
                 label,
                 cloud_value,
             )
             return None
-        if math.isnan(local_value) or local_value < 0:
+        if math.isnan(local_value) or math.isinf(local_value) or local_value < 0:
+            _record("invalid_cloud_and_local")
             _LOGGER.debug(
                 "verify_and_backfill %s: rejecting invalid cloud=%.4f local=%.4f",
                 label,
@@ -1121,14 +1142,31 @@ def verify_and_backfill(
         return local_value
     if local_value is None:
         return cloud_value
+    if math.isinf(local_value):
+        _record("invalid_local")
+        _LOGGER.debug(
+            "verify_and_backfill %s: rejecting infinite local value %.4f",
+            label,
+            local_value,
+        )
+        return None
     if math.isnan(local_value) or local_value < 0:
+        _record("invalid_local")
         _LOGGER.debug(
             "verify_and_backfill %s: ignoring invalid local value %.4f",
             label,
             local_value,
         )
         return cloud_value
+    if math.isclose(cloud_value, 0.0) and math.isclose(local_value, 0.0):
+        _record("zero_unconfirmed")
+        _LOGGER.debug(
+            "verify_and_backfill %s: rejecting unconfirmed zero values",
+            label,
+        )
+        return None
     if math.isclose(cloud_value, 0.0) and local_value > 0:
+        _record("cloud_zero_local_positive")
         _LOGGER.debug(
             "verify_and_backfill %s: cloud=0 but local=%.4f — "
             "using local (cloud likely in boundary-reset window)",
@@ -1140,6 +1178,7 @@ def verify_and_backfill(
         divergence = abs(cloud_value - local_value) / cloud_value
         if divergence > tolerance_fraction:
             chosen = min(cloud_value, local_value)
+            _record("divergence")
             _LOGGER.debug(
                 "verify_and_backfill %s: cloud=%.4f local=%.4f diverge %.0f%% > %.0f%% — "  # noqa: E501, RUF100
                 "using conservative min=%.4f",
@@ -1179,6 +1218,9 @@ def app_data_quality_warnings(
     Parameters:
         payload (dict[str, Any]): App payload containing trend and statistic sections to inspect.
         today (date | None): Reference date used to determine "current" week/month/year boundaries; defaults to today.
+        now (datetime | None): Local wall-clock time used to gate the zero-confirm check on `now.hour`. Must be in the
+            HA local timezone (tz-aware) or naive local time — passing a UTC datetime causes the hour comparison to
+            use UTC hours instead of local hours, firing the gate at the wrong wall-clock time.
         tolerance (float): Absolute tolerance added to the smaller value when comparing totals; a warning is emitted only when
             left_value + tolerance < right_value.
 
@@ -1187,7 +1229,7 @@ def app_data_quality_warnings(
         source/reference values (5 decimal places) and optional request and chart-series metadata for diagnostics.
     """  # noqa: E501, RUF100
     if today is None:
-        today = date.today()  # noqa: DTZ011
+        today = date.today()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
     week_inside_current_month = (
         week_begin.year == today.year
@@ -1365,7 +1407,7 @@ def app_data_quality_warnings(
         # expected. When ``now`` is unknown the guard is skipped (legacy/tests).
         zero_confirm_ready = now is None or now.hour >= zero_confirm_min_hour
         if (
-            day is not None  # noqa: PLR0916
+            day is not None
             and zero_confirm_ready
             and math.isclose(day, 0.0)
             and (
@@ -1671,6 +1713,8 @@ def effective_period_total_value(
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
+            if not values:
+                return None
             return round(sum(values), 2)
     return safe_float(source.get(stat_key))
 
@@ -1724,7 +1768,7 @@ def year_payload_appears_current_month_only(
         if not isinstance(values, list) or len(values) < current_month:
             continue
         nonzero = _nonzero_months(values)
-        if not nonzero or set(nonzero).issubset({current_month}):
+        if nonzero and set(nonzero).issubset({current_month}):
             return True
     return False
 
@@ -1832,7 +1876,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(  # noqa: PLR0914
+def _calculated_savings_from_year(
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -2155,22 +2199,31 @@ def backfill_year_payload_from_months(
         ):
             continue
 
+        partial_year = len(found_months) < 12
+        corrected_total = (
+            round(monthly_total * 12 / len(found_months), 2)
+            if partial_year
+            else monthly_total
+        )
+
         out[series_key] = monthly_values
-        out[stat_key] = monthly_total
+        out[stat_key] = corrected_total
         if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
-            out["pvEgy"] = monthly_total
+            out["pvEgy"] = corrected_total
         elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
-            out["inOngridEgy"] = monthly_total
+            out["inOngridEgy"] = corrected_total
         elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
-            out["outOngridEgy"] = monthly_total
+            out["outOngridEgy"] = corrected_total
         elif stat_key == APP_STAT_TOTAL_DISCHARGE:
-            out["batOtGridEgy"] = monthly_total
+            out["batOtGridEgy"] = corrected_total
 
         meta.setdefault("corrected", {})[stat_key] = {
             "raw_total": raw_total,
-            "corrected_total": monthly_total,
+            "monthly_total": monthly_total,
+            "corrected_total": corrected_total,
             "series_key": series_key,
             "months": found_months,
+            "partial_year": partial_year,
         }
 
     if section_prefix in {APP_SECTION_PV_STAT, APP_SECTION_PV_TRENDS}:
@@ -2232,7 +2285,7 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(  # noqa: PLR0914
+def guard_statistic_totals_from_year(
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -2435,7 +2488,7 @@ def trend_series_points(
     if begin is None:
         return []
     if today is None:
-        today = date.today()  # noqa: DTZ011
+        today = date.today()
 
     points: list[TrendStatisticPoint] = []
     for index, value in enumerate(series_values):
@@ -2533,6 +2586,7 @@ def _scalar_day_energy_points(
     scalar_total: float | None,
     current_day_limit_minute: int,
     bucket_minutes: int,
+    local_tzinfo: TZInfo | None = None,
 ) -> list[TrendStatisticPoint]:
     """Represent a scalar-only app day total as one safe Recorder bucket."""
     if scalar_total is None or scalar_total < 0:
@@ -2541,21 +2595,21 @@ def _scalar_day_energy_points(
     bucket_minute = min(bucket_minute, 24 * 60 - bucket_minutes)
     if bucket_minute < 0:
         return []
-    return [
-        TrendStatisticPoint(
-            datetime(
-                begin.year,
-                begin.month,
-                begin.day,
-                bucket_minute // 60,
-                bucket_minute % 60,
-            ),
-            round(scalar_total, 5),
-        )
-    ]
+    naive_dt = datetime(
+        begin.year,
+        begin.month,
+        begin.day,
+        bucket_minute // 60,
+        bucket_minute % 60,
+    )
+    if local_tzinfo is not None:
+        dt: datetime = naive_dt.replace(tzinfo=local_tzinfo).astimezone(UTC)
+    else:
+        dt = naive_dt
+    return [TrendStatisticPoint(dt, round(scalar_total, 5))]
 
 
-def day_power_energy_points(  # noqa: PLR0914
+def day_power_energy_points(
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2603,7 +2657,7 @@ def day_power_energy_points(  # noqa: PLR0914
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
-        today = date.today()  # noqa: DTZ011
+        today = date.today()
     if begin > today:
         return []
     if now is None:
@@ -2623,6 +2677,7 @@ def day_power_energy_points(  # noqa: PLR0914
                 scalar_total=scalar_total,
                 current_day_limit_minute=current_day_limit_minute,
                 bucket_minutes=bucket_minutes,
+                local_tzinfo=now.tzinfo if now is not None else None,
             )
         zero_fill_max_bucket_minute = (current_day_limit_minute // bucket_minutes) * (
             bucket_minutes
@@ -2662,6 +2717,7 @@ def day_power_energy_points(  # noqa: PLR0914
             scalar_total=scalar_total,
             current_day_limit_minute=current_day_limit_minute,
             bucket_minutes=bucket_minutes,
+            local_tzinfo=now.tzinfo if now is not None else None,
         )
 
     for minute in range(0, last_bucket_minute + 1, bucket_minutes):
@@ -2680,6 +2736,7 @@ def day_power_energy_points(  # noqa: PLR0914
                 scalar_total=scalar_total,
                 current_day_limit_minute=current_day_limit_minute,
                 bucket_minutes=bucket_minutes,
+                local_tzinfo=now.tzinfo if now is not None else None,
             )
 
     bucket_items = sorted(buckets.items())

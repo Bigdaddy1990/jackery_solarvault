@@ -484,7 +484,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         plug = self._plug
         plug_sn = self._jackery_device_sn(plug)
         scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
-        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+        is_cloud = bool(safe_bool(plug.get(FIELD_IS_CLOUD))) or scan_name.startswith(
             "shelly"
         )
         if is_cloud:

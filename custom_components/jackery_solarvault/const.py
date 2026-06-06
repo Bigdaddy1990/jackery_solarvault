@@ -1242,6 +1242,7 @@ REDACT_KEYS: Final = {
     "raw_bytes",
     "raw_hex",
     "trailer_hex",
+    "credential_mac_id_source",
 }
 
 # MQTT client metadata and topic layout from PROTOCOL.md §3.
@@ -1482,6 +1483,8 @@ MQTT_MESSAGE_UPLOAD_DEVICE_ALERT: Final = "UploadDeviceAlert"
 MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE: Final = "DownloadDeviceSchedule"
 MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = "QuerySubDeviceGroupProperty"
 MQTT_MESSAGE_CONTROL_SUB_DEVICE: Final = "ControlSubDevice"
+MQTT_MESSAGE_BIND_SMART_ACCESSORY: Final = "BindSmartAccessory"
+MQTT_MESSAGE_REMOVE_SMART_ACCESSORY: Final = "RemoveSmartAccessory"
 # Third-party MQTT bridge config — actionId 3046/3047 per
 MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"
 MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "QueryThirdPartMQTTConfig"
@@ -1495,6 +1498,11 @@ MQTT_CMD_QUERY_WEATHER_PLAN: Final = 23
 MQTT_CMD_GET_TIME_ZONE: Final = 22
 MQTT_CMD_SYNC_MQTT_CONNECT_INFO: Final = 99
 MQTT_CMD_GET_DEVICE_OTA_VERSION: Final = 100
+MQTT_CMD_NOTIFY_DEVICE_CAN_OTA: Final = 101
+MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE: Final = 102
+MQTT_CMD_DEVICE_GET_OTA_PAGE_DATA: Final = 103
+MQTT_CMD_BIND_SMART_PART: Final = 108
+MQTT_CMD_UNBIND_SMART_PART: Final = 109
 MQTT_CMD_QUERY_DEVICE_PROPERTY: Final = 106
 MQTT_CMD_DEVICE_PROPERTY_CHANGE: Final = 107
 MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY: Final = 110
@@ -1587,11 +1595,16 @@ ACTION_ID_SEND_TIME_ZONE: Final = 3003  # cmd=3 DevicePropertyChange
 ACTION_ID_GET_TIME_ZONE: Final = 3004  # cmd=22 DevicePropertyChange
 ACTION_ID_SYNC_MQTT_CONNECT_INFO: Final = 3005  # cmd=99 DevicePropertyChange
 ACTION_ID_GET_DEVICE_OTA_VERSION: Final = 3006  # cmd=100 DevicePropertyChange
+ACTION_ID_NOTIFY_DEVICE_CAN_OTA: Final = 3007  # cmd=101 DevicePropertyChange
+ACTION_ID_NOTIFY_DEVICE_OTA_TOTAL_PAGE: Final = 3008  # cmd=102 DevicePropertyChange
+ACTION_ID_DEVICE_GET_OTA_PAGE_DATA: Final = 3009  # cmd=103 DevicePropertyChange
 ACTION_ID_SYNC_GRID_STANDARD: Final = 3010  # cmd=105 DevicePropertyChange
 ACTION_ID_TIMER_TASK_ADD: Final = 3015  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_DELETE: Final = 3016  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_UPDATE: Final = 3017  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
+ACTION_ID_BIND_SMART_PART: Final = 3012  # cmd=108 BindSmartAccessory
+ACTION_ID_UNBIND_SMART_PART: Final = 3013  # cmd=109 RemoveSmartAccessory
 
 # Third-party MQTT bridge body keys per ``ThirdPartyMqttBody.smali``.
 FIELD_THIRD_PARTY_MQTT_ENABLE: Final = "enable"

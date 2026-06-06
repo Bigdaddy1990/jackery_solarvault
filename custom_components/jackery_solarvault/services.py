@@ -24,6 +24,7 @@ from typing import Any, Final
 
 import voluptuous as vol
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -34,6 +35,12 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .client import JackeryAuthError, JackeryError
 from .const import (
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_BLE_ACK_TIMEOUT_SEC,
     DOMAIN,
     FIELD_ID,
@@ -209,8 +216,13 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
             device = parent
         for domain, identifier in device.identifiers:
             if domain == DOMAIN:
-                return _strip_jackery_subdevice_suffix(str(identifier))
-    return _strip_jackery_subdevice_suffix(raw)
+                candidate = _strip_jackery_subdevice_suffix(str(identifier))
+                if candidate.isdecimal():
+                    return candidate
+    candidate = _strip_jackery_subdevice_suffix(raw)
+    if candidate.isdecimal():
+        return candidate
+    return raw
 
 
 def _coordinator_for_device(
@@ -224,6 +236,16 @@ def _coordinator_for_device(
     for coordinator in _loaded_coordinators(hass):
         if device_id in (coordinator.data or {}):
             return coordinator
+    return None
+
+
+def _entry_for_coordinator(
+    hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
+) -> ConfigEntry | None:
+    """Locate the loaded config entry that owns a coordinator."""
+    for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        if getattr(loaded_entry, "runtime_data", None) is coordinator:
+            return loaded_entry
     return None
 
 
@@ -577,16 +599,35 @@ async def _async_handle_set_third_party_mqtt_config(
                 "error": "no Jackery entry owns this device id",
             },
         )
+    enable = _service_bool(call, SERVICE_FIELD_ENABLE, "enable")
+    ip = str(call.data[SERVICE_FIELD_IP]).strip()
+    port = int(call.data[SERVICE_FIELD_PORT])
+    username = _optional_text(call, SERVICE_FIELD_USERNAME, "username").strip()
+    password = _optional_text(call, SERVICE_FIELD_PASSWORD, "password").strip()
+    token = _optional_text(call, SERVICE_FIELD_TOKEN, "token").strip()
     try:
         await coordinator.async_set_third_party_mqtt_config(
             device_id,
-            enable=_service_bool(call, SERVICE_FIELD_ENABLE, "enable"),
-            ip=str(call.data[SERVICE_FIELD_IP]).strip(),
-            port=int(call.data[SERVICE_FIELD_PORT]),
-            username=_optional_text(call, SERVICE_FIELD_USERNAME, "username"),
-            password=_optional_text(call, SERVICE_FIELD_PASSWORD, "password"),
-            token=_optional_text(call, SERVICE_FIELD_TOKEN, "token").strip(),
+            enable=enable,
+            ip=ip,
+            port=port,
+            username=username,
+            password=password,
+            token=token,
         )
+        if (entry := _entry_for_coordinator(hass, coordinator)) is not None:
+            hass.config_entries.async_update_entry(
+                entry,
+                options={
+                    **entry.options,
+                    CONF_THIRD_PARTY_MQTT_ENABLE: enable,
+                    CONF_THIRD_PARTY_MQTT_IP: ip,
+                    CONF_THIRD_PARTY_MQTT_PORT: port,
+                    CONF_THIRD_PARTY_MQTT_USERNAME: username,
+                    CONF_THIRD_PARTY_MQTT_PASSWORD: password,
+                    CONF_THIRD_PARTY_MQTT_TOKEN: token,
+                },
+            )
     except JackeryAuthError as err:
         raise ConfigEntryAuthFailed(
             f"Jackery MQTT config update rejected authentication: {err}"

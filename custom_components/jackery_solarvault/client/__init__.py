@@ -25,7 +25,7 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:  # noqa: ANN401, RUF100
     if name == "JackeryMqttPushClient":
-        from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient  # noqa: I001, PLC0415
+        from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 
         return _JackeryMqttPushClient
     raise AttributeError(name)

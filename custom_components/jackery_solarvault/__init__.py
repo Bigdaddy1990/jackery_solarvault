@@ -90,7 +90,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF02
     return True
 
 
-def _async_clean_legacy_entities(  # noqa: RUF067
+async def _async_clean_legacy_entities(  # noqa: RUF067
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """Drop entity-registry entries from older releases or disabled options.
@@ -99,15 +99,15 @@ def _async_clean_legacy_entities(  # noqa: RUF067
     entry-version side effects while still removing entities that are no
     longer part of the documented app/HTTP/MQTT data model.
     """
-    _async_remove_stale_energy_helpers(hass)
-    _async_remove_entities_with_suffixes(
+    await _async_remove_stale_energy_helpers(hass)
+    await _async_remove_entities_with_suffixes(
         hass,
         entry,
         domain="sensor",
         suffixes=REMOVED_SENSOR_SUFFIXES,
         log_label="removed Jackery sensor",
     )
-    _async_remove_entities_with_suffixes(
+    await _async_remove_entities_with_suffixes(
         hass,
         entry,
         domain="sensor",
@@ -119,7 +119,7 @@ def _async_clean_legacy_entities(  # noqa: RUF067
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     ):
-        _async_remove_entities_with_suffixes(
+        await _async_remove_entities_with_suffixes(
             hass,
             entry,
             domain="sensor",
@@ -131,7 +131,7 @@ def _async_clean_legacy_entities(  # noqa: RUF067
         CONF_CREATE_CALCULATED_POWER_SENSORS,
         DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     ):
-        _async_remove_entities_with_suffixes(
+        await _async_remove_entities_with_suffixes(
             hass,
             entry,
             domain="sensor",
@@ -143,14 +143,14 @@ def _async_clean_legacy_entities(  # noqa: RUF067
         CONF_CREATE_SAVINGS_DETAIL_SENSORS,
         DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     ):
-        _async_remove_entities_with_suffixes(
+        await _async_remove_entities_with_suffixes(
             hass,
             entry,
             domain="sensor",
             suffixes=SAVINGS_DETAIL_SENSOR_SUFFIXES,
             log_label="disabled savings detail sensor",
         )
-    _async_remove_entities_with_suffixes(
+    await _async_remove_entities_with_suffixes(
         hass,
         entry,
         domain="binary_sensor",
@@ -174,8 +174,8 @@ async def _async_authenticate(  # noqa: RUF067
     session = async_get_clientsession(hass)
     api = JackeryApi(
         session=session,
-        account=entry.data[CONF_USERNAME],
-        password=entry.data[CONF_PASSWORD],
+        account=str(entry.data.get(CONF_USERNAME, "")).strip(),
+        password=str(entry.data.get(CONF_PASSWORD, "")).strip(),
         mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
         region_code=entry.data.get(CONF_REGION_CODE),
     )
@@ -195,25 +195,9 @@ async def _async_authenticate(  # noqa: RUF067
 _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # noqa: RUF067
 
 
-def _local_mqtt_client(  # noqa: RUF067
-    hass: HomeAssistant, entry: JackeryConfigEntry
-) -> JackeryLocalMqttClient | None:
-    """Return the per-entry local MQTT client stored in hass.data for the given config entry.
-
-    Returns:
-        JackeryLocalMqttClient instance for the entry, or None if no client is stored or the stored value is not a JackeryLocalMqttClient.
-    """  # noqa: E501, RUF100
-    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if not isinstance(bucket, dict):
-        return None
-    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
-    return client if isinstance(client, JackeryLocalMqttClient) else None
-
-
 async def _async_start_local_mqtt(  # noqa: RUF067
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
-    coordinator: JackerySolarVaultCoordinator,
 ) -> None:
     """Start a per-entry local MQTT client when the entry is explicitly scoped.
 
@@ -261,7 +245,14 @@ async def _async_start_local_mqtt(  # noqa: RUF067
         """Forward parsed LAN MQTT JSON into the coordinator payload router."""
         if data is None:
             return
-        await coordinator.async_handle_local_mqtt_message(topic, data)
+        # Late-bind via entry.runtime_data so a reload doesn't dispatch to
+        # the old coordinator instance if the local MQTT client outlives teardown.
+        current: JackerySolarVaultCoordinator | None = getattr(
+            entry, "runtime_data", None
+        )
+        if current is None:
+            return
+        await current.async_handle_local_mqtt_message(topic, data)
 
     client = JackeryLocalMqttClient(
         hass,
@@ -299,8 +290,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     Returns:
         True if setup completed successfully.
     """  # noqa: E501, RUF100
-    _async_clean_legacy_entities(hass, entry)
     api = await _async_authenticate(hass, entry)
+    await _async_clean_legacy_entities(hass, entry)
 
     interval_sec = DEFAULT_SCAN_INTERVAL_SEC
     coordinator = JackerySolarVaultCoordinator(
@@ -308,7 +299,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
-    try:  # noqa: PLW0717
+    try:
         # Discovery must run first (MQTT subscriptions and the first refresh
         # both rely on the device list it produces). The HTTP first refresh and
         # the MQTT connect afterwards are independent and run in parallel to
@@ -329,7 +320,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
-                _async_start_local_mqtt(hass, entry, coordinator),
+                _async_start_local_mqtt(hass, entry),
                 return_exceptions=True,
             ),
         )
@@ -383,7 +374,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 # -----------------------------------------------------------------------------
 
 
-def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF067
+async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF029, RUF067
     """Remove stale Energy helper entities that were created without a unit of measurement.
 
     Scans the entity registry for entities whose entity_id starts with the configured
@@ -438,7 +429,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067
     return _LEGACY_UID_HEAD_RE.fullmatch(head) is not None
 
 
-def _async_remove_entities_with_suffixes(  # noqa: RUF067
+async def _async_remove_entities_with_suffixes(  # noqa: RUF029, RUF067
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     *,

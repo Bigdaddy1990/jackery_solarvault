@@ -6,6 +6,10 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+from homeassistant.components.dhcp import DhcpServiceInfo
+from homeassistant.components.mqtt import MqttServiceInfo
+from homeassistant.components.zeroconf import ZeroconfServiceInfo
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -207,6 +211,38 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    async def async_step_bluetooth(
+        self, discovery_info: BluetoothServiceInfoBleak
+    ) -> ConfigFlowResult:
+        """Handle Bluetooth discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle DHCP discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_mqtt(
+        self, discovery_info: MqttServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle MQTT discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle Zeroconf discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -404,7 +440,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Clear the cached session so the next setup derives fresh
                 # MQTT credentials from the new login instead of replaying
                 # a potentially stale AES-256 seed.
-                await async_clear_mqtt_session(self.hass, entry.entry_id)
+                try:
+                    await async_clear_mqtt_session(self.hass, entry.entry_id)
+                except Exception:
+                    _LOGGER.debug(
+                        "Jackery reauth: failed to clear MQTT session; "
+                        "proceeding with reload"
+                    )
                 return self.async_update_reload_and_abort(
                     entry,
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
@@ -417,7 +459,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
             }),
             description_placeholders={
-                "username": entry.data[CONF_USERNAME],
+                "username": entry.data.get(CONF_USERNAME, ""),
             },
             errors=errors,
         )

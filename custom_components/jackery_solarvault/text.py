@@ -109,11 +109,13 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
-            if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
+            if (
+                isinstance(system, dict)
+                and FIELD_GRID_STANDARD in system
+                and coordinator.device_supports_advanced(dev_id)
+            ):
                 _append_unique(entities, JackeryGridStandardText(coordinator, dev_id))
-            if coordinator.device_supports_advanced(
-                dev_id
-            ) or coordinator.device_bluetooth_key(dev_id):
+            if coordinator.device_supports_third_party_mqtt(dev_id):
                 for (
                     key_suffix,
                     translation_key,

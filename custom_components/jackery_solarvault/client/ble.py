@@ -293,6 +293,7 @@ _BINARY_FRAME_HEADER_LEN: int = 16
 _BINARY_FRAME_TRAILER_LEN: int = 4
 _BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
 _BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
+_unrecognised_version_count: list[int] = [0]
 _BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 
 
@@ -436,10 +437,16 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
-        # Soft assertion — every frame seen so far carries 0x0064 here.
-        # We do not refuse parsing on mismatch, but the caller's debug
-        # log will surface unexpected values for analysis.
-        pass
+        _unrecognised_version_count[0] += 1
+        count = _unrecognised_version_count[0]
+        if count == 1 or count % 100 == 0:
+            _LOGGER.warning(
+                "BLE frame has unexpected version 0x%s (expected 0x%s); "
+                "parsing continues (occurrence #%d)",
+                plaintext[2:4].hex(),
+                _BINARY_FRAME_VERSION_BE.hex(),
+                count,
+            )
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
         raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
     frame_index = int.from_bytes(plaintext[4:6], "big")

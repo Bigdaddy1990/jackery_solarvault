@@ -35,12 +35,6 @@ classifiers = [
 ]
 dynamic = ["version"]
 requires-python = ">=3.14"
-dependencies = [
-    "pip>=26.1.2",
-    "pre-commit>=4.6.0",
-    "ruff>=0.15.16",
-    "ty>=0.0.44",
-]
 
 
 [project.urls]
@@ -255,13 +249,13 @@ filterwarnings = [
 target-version = "py314"
 required-version = ">=0.15.15"
 line-length = 88
-#src = ["custom_components","tests","scripts"]
+src = ["custom_components","tests","scripts"]
 indent-width = 4
 show-fixes = true
 fix = true
 unsafe-fixes = true
-#force-exclude = true
-#output-format= "github"
+force-exclude = true
+output-format= "github"
 preview = true
 exclude = [
     ".bzr",

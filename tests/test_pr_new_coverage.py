@@ -17,6 +17,8 @@ from typing import Any
 
 import pytest
 
+from custom_components.jackery_solarvault.client import JackeryApi, JackeryAuthError, JackeryError
+
 # ---------------------------------------------------------------------------
 # Exception hierarchy (exported from the client sub-package)
 # ---------------------------------------------------------------------------
@@ -68,22 +70,16 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
     The PR changed __init__.py to import from .client instead of .api.
     """
-    from custom_components.jackery_solarvault.client import JackeryApi  # noqa: PLC0415
-
     assert JackeryApi is not None
 
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryAuthError
-
     assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryError
-
     assert JackeryError is not None
 
 

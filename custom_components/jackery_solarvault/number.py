@@ -124,7 +124,7 @@ async def _set_max_feed_grid(
     coord: JackerySolarVaultCoordinator, dev_id: str, value: float
 ) -> None:
     """Set the maximum grid feed-in power on a device."""
-    await coord.async_set_max_feed_grid(dev_id, 800 if int(value) <= 800 else 2500)
+    await coord.async_set_max_feed_grid(dev_id, int(value))
 
 
 async def _set_max_output_power(

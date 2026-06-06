@@ -36,6 +36,7 @@ from .util import (
     safe_bool,
     smart_plug_serial,
     sorted_smart_plugs,
+    stable_subdevice_key,
 )
 
 # Coordinator-backed read-only platform: entities never perform their own
@@ -106,12 +107,14 @@ async def async_setup_entry(  # noqa: RUF029 - HA platform hook must stay async.
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
                     continue
+                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
                 _append_unique(
                     entities,
                     JackerySmartPlugStateBinarySensor(
                         coordinator,
                         dev_id,
                         plug_index=index,
+                        plug_key=plug_key,
                         plug_sn=plug_sn,
                     ),
                 )
@@ -150,6 +153,7 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         self.entity_description = description
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
+            and description.entity_category != EntityCategory.DIAGNOSTIC
         )
 
     @property
@@ -173,13 +177,13 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         device_id: str,
         *,
         plug_index: int,
+        plug_key: str,
         plug_sn: str,
     ) -> None:
         """Initialise the entity from the coordinator, sorted index and serial."""
-        super().__init__(
-            coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
-        )
+        super().__init__(coordinator, device_id, f"{plug_key}_switch_state")
         self._plug_index = plug_index
+        self._plug_key = plug_key
         self._plug_sn = plug_sn
         # Build the per-plug device_info once at construction. Allocating it
         # on every state read is wasted work — HA reads the registry metadata

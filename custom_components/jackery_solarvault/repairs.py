@@ -8,8 +8,9 @@ import voluptuous as vol
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
+from .client import JackeryError
 from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
 from .coordinator import JackerySolarVaultCoordinator
 
@@ -67,7 +68,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:
+        except (HomeAssistantError, TimeoutError, OSError, JackeryError) as err:
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:

@@ -21,8 +21,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, MqttError
-from aiomqtt.exceptions import MqttCodeError
+from aiomqtt import Client as MQTTClient, ConnectError, NegativeAckError, ProtocolError
 
 from jackery_solarvault.const import (
     MQTT_CLIENT_LIBRARY,
@@ -33,6 +32,8 @@ from jackery_solarvault.const import (
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+_MqttError = (ConnectError, NegativeAckError, ProtocolError)
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -185,7 +186,7 @@ class JackeryLocalMqttClient:
                 return
             if not task.done():
                 task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
+            with contextlib.suppress(asyncio.CancelledError, *_MqttError, Exception):
                 await task
 
     # ------------------------------------------------------------------
@@ -198,7 +199,7 @@ class JackeryLocalMqttClient:
         On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
         """  # noqa: E501, RUF100
         connected = False
-        try:  # noqa: PLW0717
+        try:
             async with aiomqtt.Client(
                 hostname=self._host,
                 port=self._port,
@@ -223,7 +224,7 @@ class JackeryLocalMqttClient:
                 )
                 try:
                     await client.subscribe(self._topic_filter, qos=0)
-                except MqttError as err:
+                except _MqttError as err:
                     self._last_error = f"subscribe failed: {err}"
                     _LOGGER.warning(
                         "Jackery local MQTT subscribe failed for %r: %s",
@@ -233,9 +234,9 @@ class JackeryLocalMqttClient:
                     return
                 async for message in client.messages:
                     self._handle_message(str(message.topic), message.payload)
-        except MqttCodeError as err:
+        except NegativeAckError as err:
             self._handle_connect_failure(self._extract_mqtt_code(err))
-        except MqttError as err:
+        except _MqttError as err:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
@@ -285,16 +286,10 @@ class JackeryLocalMqttClient:
             _LOGGER.debug("Jackery local MQTT connect setup failed: %s", error)
 
     @staticmethod
-    def _extract_mqtt_code(err: MqttCodeError) -> int:
-        """Extract the numeric MQTT return code from a MqttCodeError instance.
-
-        Parameters:
-            err (MqttCodeError): The exception object that may contain an `rc` attribute or an `rc.value` holding the numeric code.
-
-        Returns:
-            int: The MQTT return code if present, otherwise `0`.
-        """  # noqa: E501, RUF100
-        rc = getattr(err, "rc", None)
+    def _extract_mqtt_code(err: NegativeAckError) -> int:
+        """Extract the numeric MQTT return code from a NegativeAckError."""
+        packet = getattr(err, "packet", None)
+        rc = getattr(packet, "reason_code", None)
         if isinstance(rc, int):
             return rc
         value = getattr(rc, "value", None)
@@ -373,7 +368,8 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
+                self._messages_dropped += 1
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
@@ -536,7 +532,7 @@ class JackeryLocalMqttClient:
             "configured_target": target,
             "connected": self._connected,
             "started": self._runner_task is not None,
-            "topic_filter": self._topic_filter,
+            "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,

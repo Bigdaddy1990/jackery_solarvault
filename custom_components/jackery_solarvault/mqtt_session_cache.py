@@ -14,8 +14,6 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any, Final
 
@@ -99,25 +97,26 @@ async def async_save_mqtt_session(
     A subsequent successful login that returns different credentials overwrites
     the row; this is the same shape the in-memory ``JackeryApi`` fields take.
     """
-    store = _store(hass)
-    data = await store.async_load()
-    if not isinstance(data, dict):
-        data = {}
-    entries = data.get(_KEY_ENTRIES)
-    if not isinstance(entries, dict):
-        entries = {}
-    row: dict[str, Any] = {
-        MQTT_SESSION_USER_ID: user_id,
-        MQTT_SESSION_SEED_B64: seed_b64,
-        MQTT_SESSION_MAC_ID: mac_id,
-    }
-    if mac_id_source:
-        row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
-    if cached_at is not None:
-        row[_KEY_CACHED_AT] = cached_at
-    entries[entry_id] = row
-    data[_KEY_ENTRIES] = entries
-    await store.async_save(data)
+    async with _CACHE_LOCK:
+        store = _store(hass)
+        data = await store.async_load()
+        if not isinstance(data, dict):
+            data = {}
+        entries = data.get(_KEY_ENTRIES)
+        if not isinstance(entries, dict):
+            entries = {}
+        row: dict[str, Any] = {
+            MQTT_SESSION_USER_ID: user_id,
+            MQTT_SESSION_SEED_B64: seed_b64,
+            MQTT_SESSION_MAC_ID: mac_id,
+        }
+        if mac_id_source:
+            row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
+        if cached_at is not None:
+            row[_KEY_CACHED_AT] = cached_at
+        entries[entry_id] = row
+        data[_KEY_ENTRIES] = entries
+        await store.async_save(data)
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
@@ -126,15 +125,16 @@ async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
     Called after the broker explicitly rejects cached credentials so the next
     setup pass forces a fresh login instead of replaying stale values.
     """
-    store = _store(hass)
-    data = await store.async_load()
-    if not isinstance(data, dict):
-        return
-    entries = data.get(_KEY_ENTRIES)
-    if not isinstance(entries, dict):
-        return
-    if entry_id not in entries:
-        return
-    entries.pop(entry_id, None)
-    data[_KEY_ENTRIES] = entries
-    await store.async_save(data)
+    async with _CACHE_LOCK:
+        store = _store(hass)
+        data = await store.async_load()
+        if not isinstance(data, dict):
+            return
+        entries = data.get(_KEY_ENTRIES)
+        if not isinstance(entries, dict):
+            return
+        if entry_id not in entries:
+            return
+        entries.pop(entry_id, None)
+        data[_KEY_ENTRIES] = entries
+        await store.async_save(data)
