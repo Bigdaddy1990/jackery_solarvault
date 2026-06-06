@@ -19,14 +19,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install --upgrade pip ruff
+      - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
           ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
-          ruff check . --add-noqa || true
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
