@@ -26,7 +26,9 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_CT_METER,
     PAYLOAD_SYSTEM_META,
 )
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
