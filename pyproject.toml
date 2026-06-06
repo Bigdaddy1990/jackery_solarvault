@@ -383,7 +383,7 @@ hass = "homeassistant.__main__:main"
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402"]
+"**/__init__.py" = ["F401", "F403", "E402","RUF067"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
