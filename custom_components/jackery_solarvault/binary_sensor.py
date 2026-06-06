@@ -1,36 +1,42 @@
 """Binary sensor platform for Jackery SolarVault."""
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.components.binary_sensor import BinarySensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import FIELD_COMM_MODE
-from .const import FIELD_COMM_STATE
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_ETH_PORT
-from .const import FIELD_ONLINE_STATUS
-from .const import FIELD_SCAN_NAME
-from .const import FIELD_SW_EPS_STATE
-from .const import FIELD_SWITCH_STATE
-from .const import FIELD_SYS_SWITCH
-from .const import FIELD_VERSION
-from .const import PAYLOAD_SMART_PLUGS
+from .const import (
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_DEVICE_NAME,
+    FIELD_ETH_PORT,
+    FIELD_ONLINE_STATUS,
+    FIELD_SCAN_NAME,
+    FIELD_SWITCH_STATE,
+    FIELD_SW_EPS_STATE,
+    FIELD_SYS_SWITCH,
+    FIELD_VERSION,
+    PAYLOAD_SMART_PLUGS,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import coordinator_entity_signature
-from .util import safe_bool
-from .util import smart_plug_serial
-from .util import sorted_smart_plugs
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_bool,
+    smart_plug_serial,
+    sorted_smart_plugs,
+)
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.

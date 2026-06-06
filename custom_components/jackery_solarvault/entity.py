@@ -5,38 +5,40 @@ from typing import Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
-from .const import FIELD_CURRENT_VERSION
-from .const import FIELD_DEV_MODEL
-from .const import FIELD_DEV_SN
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_DEVICE_SN
-from .const import FIELD_MODEL
-from .const import FIELD_MODEL_NAME
-from .const import FIELD_ONLINE_STATE
-from .const import FIELD_ONLINE_STATUS
-from .const import FIELD_SCAN_NAME
-from .const import FIELD_SN
-from .const import FIELD_TYPE_NAME
-from .const import FIELD_VERSION
-from .const import FIELD_WNAME
-from .const import MANUFACTURER
-from .const import PAYLOAD_ALARM
-from .const import PAYLOAD_BATTERY_TRENDS
-from .const import PAYLOAD_DEVICE
-from .const import PAYLOAD_DEVICE_STATISTIC
-from .const import PAYLOAD_DISCOVERY
-from .const import PAYLOAD_HOME_TRENDS
-from .const import PAYLOAD_HTTP_PROPERTIES
-from .const import PAYLOAD_LOCATION
-from .const import PAYLOAD_OTA
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_PV_TRENDS
-from .const import PAYLOAD_STATISTIC
-from .const import PAYLOAD_SYSTEM
-from .const import PAYLOAD_TASK_PLAN
-from .const import PAYLOAD_WEATHER_PLAN
+from .const import (
+    DOMAIN,
+    FIELD_CURRENT_VERSION,
+    FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
+    FIELD_MODEL,
+    FIELD_MODEL_NAME,
+    FIELD_ONLINE_STATE,
+    FIELD_ONLINE_STATUS,
+    FIELD_SCAN_NAME,
+    FIELD_SN,
+    FIELD_TYPE_NAME,
+    FIELD_VERSION,
+    FIELD_WNAME,
+    MANUFACTURER,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DEVICE_STATISTIC,
+    PAYLOAD_DISCOVERY,
+    PAYLOAD_HOME_TRENDS,
+    PAYLOAD_HTTP_PROPERTIES,
+    PAYLOAD_LOCATION,
+    PAYLOAD_OTA,
+    PAYLOAD_PRICE,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_PV_TRENDS,
+    PAYLOAD_STATISTIC,
+    PAYLOAD_SYSTEM,
+    PAYLOAD_TASK_PLAN,
+    PAYLOAD_WEATHER_PLAN,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .util import jackery_online_state
 

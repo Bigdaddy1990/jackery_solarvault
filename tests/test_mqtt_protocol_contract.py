@@ -213,7 +213,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
             """
-            return None
+            return
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
             """Store a partial update payload into the test capture dictionary.
@@ -459,7 +459,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
             """
-            return None
+            return
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
             """Store a partial update payload into the test capture dictionary.

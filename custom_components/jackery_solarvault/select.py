@@ -10,61 +10,60 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 import logging
 import re
-from collections.abc import Awaitable
-from collections.abc import Callable
-from dataclasses import dataclass
-from dataclasses import field
-from typing import Any
-from typing import NoReturn
+from typing import Any, NoReturn
 
-from homeassistant.components.select import SelectEntity
-from homeassistant.components.select import SelectEntityDescription
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .const import AUTO_OFF_HOURS
-from .const import DEFAULT_STORM_WARNING_MINUTES
-from .const import DOMAIN
-from .const import FIELD_CID
-from .const import FIELD_COMPANY_NAME
-from .const import FIELD_COUNTRY
-from .const import FIELD_DYNAMIC_OR_SINGLE
-from .const import FIELD_MINS_INTERVAL
-from .const import FIELD_NAME
-from .const import FIELD_OFF_GRID_AUTO_OFF_TIME
-from .const import FIELD_OFF_GRID_DOWN
-from .const import FIELD_OFF_GRID_DOWN_TIME
-from .const import FIELD_OFF_GRID_TIME
-from .const import FIELD_PLATFORM_COMPANY_ID
-from .const import FIELD_PRICE_MODE
-from .const import FIELD_SINGLE_PRICE
-from .const import FIELD_STORM
-from .const import FIELD_SYSTEM_REGION
-from .const import FIELD_TEMP_UNIT
-from .const import FIELD_WORK_MODEL
-from .const import FIELD_WPC
-from .const import FIELD_WPS
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_PRICE_SOURCES
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_WEATHER_PLAN
-from .const import PRICE_MODE_TO_OPTION
-from .const import STORM_MINUTES_DEFAULT
-from .const import TEMP_UNIT_TO_OPTION
-from .const import WORK_MODE_READ_ALIASES
-from .const import WORK_MODE_TO_OPTION
+from .const import (
+    AUTO_OFF_HOURS,
+    DEFAULT_STORM_WARNING_MINUTES,
+    DOMAIN,
+    FIELD_CID,
+    FIELD_COMPANY_NAME,
+    FIELD_COUNTRY,
+    FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_MINS_INTERVAL,
+    FIELD_NAME,
+    FIELD_OFF_GRID_AUTO_OFF_TIME,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_OFF_GRID_DOWN_TIME,
+    FIELD_OFF_GRID_TIME,
+    FIELD_PLATFORM_COMPANY_ID,
+    FIELD_PRICE_MODE,
+    FIELD_SINGLE_PRICE,
+    FIELD_STORM,
+    FIELD_SYSTEM_REGION,
+    FIELD_TEMP_UNIT,
+    FIELD_WORK_MODEL,
+    FIELD_WPC,
+    FIELD_WPS,
+    PAYLOAD_PRICE,
+    PAYLOAD_PRICE_SOURCES,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_WEATHER_PLAN,
+    PRICE_MODE_TO_OPTION,
+    STORM_MINUTES_DEFAULT,
+    TEMP_UNIT_TO_OPTION,
+    WORK_MODE_READ_ALIASES,
+    WORK_MODE_TO_OPTION,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import coordinator_entity_signature
-from .util import safe_int
-from .util import task_plan_value
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    safe_int,
+    task_plan_value,
+)
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -217,7 +216,7 @@ def _price_source_label(source: dict[str, object]) -> str:
     ).strip()
     company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
     label = f"{name} ({country})" if country else name
-    if company_id not in (None, ""):
+    if company_id not in {None, ""}:
         return f"{label} #{company_id}"
     return label
 
@@ -232,7 +231,7 @@ def _price_source_regions(source: dict[str, object]) -> list[str]:
         list[str]: A list of trimmed, non-empty region parts split on commas from the first available of `FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`. Returns an empty list if neither field is present or is empty.
     """
     raw = source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION)
-    if raw in (None, ""):
+    if raw in {None, ""}:
         return []
     return [part.strip() for part in str(raw).split(",") if part.strip()]
 
@@ -254,7 +253,7 @@ def _price_source_matches_current(
     """
     if str(source.get(FIELD_PLATFORM_COMPANY_ID)) != str(company_id):
         return False
-    if region in (None, ""):
+    if region in {None, ""}:
         return True
     return str(region) in _price_source_regions(source)
 
@@ -279,7 +278,7 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
         if isinstance(item, dict):
             company_id = item.get(FIELD_PLATFORM_COMPANY_ID)
             country = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
-            if company_id not in (None, "") and country:
+            if company_id not in {None, ""} and country:
                 out.append(item)
     return out
 
@@ -292,7 +291,7 @@ def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
     """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id not in (None, "") and bool(region):
+    if company_id not in {None, ""} and bool(region):
         return True
     return bool(_price_sources_from_payload(entity._payload))
 
@@ -645,7 +644,7 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
     """
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id in (None, ""):
+    if company_id in {None, ""}:
         return None
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_matches_current(source, company_id, region):
@@ -802,10 +801,10 @@ async def async_setup_entry(
             current_company = (payload.get(PAYLOAD_PRICE) or {}).get(
                 FIELD_PLATFORM_COMPANY_ID,
             )
-            return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in (
+            return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in {
                 None,
                 "",
-            )
+            }
         return False
 
     def _collect_entities() -> list[SelectEntity]:

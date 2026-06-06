@@ -15,130 +15,128 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
+from collections.abc import Awaitable, Callable
 import hashlib
 import inspect
 import json
 import logging
 import re
-import uuid
-from collections.abc import Awaitable
-from collections.abc import Callable
 from typing import Any
+import uuid
 
 import aiohttp
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers import modes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import AES_KEY
-from ..const import ALARM_PATH
-from ..const import APP_REQUEST_BEGIN_DATE
-from ..const import APP_REQUEST_DATE_TYPE
-from ..const import APP_REQUEST_END_DATE
-from ..const import APP_REQUEST_META
-from ..const import APP_VERSION
-from ..const import APP_VERSION_CODE
-from ..const import BASE_URL
-from ..const import BATTERY_PACK_PATH
-from ..const import BATTERY_TRENDS_PATH
-from ..const import CODE_OK
-from ..const import CODE_TOKEN_EXPIRED
-from ..const import DATE_TYPE_DAY
-from ..const import DEVICE_BATTERY_STAT_PATH
-from ..const import DEVICE_CT_STAT_PATH
-from ..const import DEVICE_HOME_STAT_PATH
-from ..const import DEVICE_LIST_PATH
-from ..const import DEVICE_METER_STAT_PATH
-from ..const import DEVICE_MODEL_HEADER
-from ..const import DEVICE_PROPERTY_PATH
-from ..const import DEVICE_PV_STAT_PATH
-from ..const import DEVICE_SOCKET_STAT_PATH
-from ..const import DEVICE_SOCKET_STATISTIC_PATH
-from ..const import DEVICE_STATISTIC_PATH
-from ..const import FIELD_ACCOUNT
-from ..const import FIELD_BAT_SOC
-from ..const import FIELD_BATTERY_PACKS
-from ..const import FIELD_BODY
-from ..const import FIELD_CELL_TEMP
-from ..const import FIELD_CODE
-from ..const import FIELD_COUNTRY_CODE
-from ..const import FIELD_CURRENCY
-from ..const import FIELD_CURRENT_VERSION
-from ..const import FIELD_DATA
-from ..const import FIELD_DEVICE_ID
-from ..const import FIELD_DEVICE_SN
-from ..const import FIELD_DEVICE_SN_LIST
-from ..const import FIELD_ID
-from ..const import FIELD_IN_PW
-from ..const import FIELD_IP
-from ..const import FIELD_IS_FIRMWARE_UPGRADE
-from ..const import FIELD_LOGIN_TYPE
-from ..const import FIELD_MAC_ID
-from ..const import FIELD_MAX_POWER
-from ..const import FIELD_MODEL
-from ..const import FIELD_MQTT_PASSWORD
-from ..const import FIELD_MSG
-from ..const import FIELD_OP
-from ..const import FIELD_OUT_PW
-from ..const import FIELD_PASSWORD
-from ..const import FIELD_PLATFORM_COMPANY_ID
-from ..const import FIELD_RAW_TEXT
-from ..const import FIELD_RB
-from ..const import FIELD_REGION_CODE
-from ..const import FIELD_REGISTER_APP_ID
-from ..const import FIELD_SINGLE_PRICE
-from ..const import FIELD_SMART_SOCKET_ID
-from ..const import FIELD_SYSTEM_ID
-from ..const import FIELD_SYSTEM_NAME
-from ..const import FIELD_SYSTEM_REGION
-from ..const import FIELD_TARGET_MODULE_VERSION
-from ..const import FIELD_TARGET_VERSION
-from ..const import FIELD_TOKEN
-from ..const import FIELD_UPDATE_CONTENT
-from ..const import FIELD_UPDATE_STATUS
-from ..const import FIELD_UPGRADE_TYPE
-from ..const import FIELD_USER_ID
-from ..const import FIELD_VERSION
-from ..const import HOME_TRENDS_PATH
-from ..const import HTTP_CONTENT_TYPE_FORM
-from ..const import HTTP_CONTENT_TYPE_JSON
-from ..const import HTTP_HEADER_CONTENT_TYPE
-from ..const import HTTP_METHOD_GET
-from ..const import HTTP_METHOD_POST
-from ..const import HTTP_METHOD_PUT
-from ..const import HTTP_RAW_TEXT_LIMIT
-from ..const import LOCATION_PATH
-from ..const import LOGIN_PATH
-from ..const import LOGIN_TIMEOUT_SEC
-from ..const import MAX_POWER_SAVE_PATH
-from ..const import MQTT_CLIENT_ID_SUFFIX
-from ..const import MQTT_CREDENTIAL_CLIENT_ID
-from ..const import MQTT_CREDENTIAL_PASSWORD
-from ..const import MQTT_CREDENTIAL_USER_ID
-from ..const import MQTT_CREDENTIAL_USERNAME
-from ..const import MQTT_MAC_ID_PREFIX
-from ..const import MQTT_USERNAME_SEPARATOR
-from ..const import OTA_LIST_PATH
-from ..const import PLATFORM_HEADER
-from ..const import POWER_PRICE_PATH
-from ..const import PRICE_HISTORY_CONFIG_PATH
-from ..const import PRICE_SOURCE_LIST_PATH
-from ..const import PV_TRENDS_PATH
-from ..const import REGISTER_APP_ID
-from ..const import REQUEST_TIMEOUT_SEC
-from ..const import RSA_PUBLIC_KEY_B64
-from ..const import SAVE_DYNAMIC_MODE_PATH
-from ..const import SAVE_SINGLE_MODE_PATH
-from ..const import SYS_VERSION
-from ..const import SYSTEM_LIST_PATH
-from ..const import SYSTEM_NAME_PATH
-from ..const import SYSTEM_STATISTIC_PATH
-from ..const import USER_AGENT
-from ..util import app_period_date_bounds
-from ..util import chart_series_debug
+from ..const import (
+    AES_KEY,
+    ALARM_PATH,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_DATE_TYPE,
+    APP_REQUEST_END_DATE,
+    APP_REQUEST_META,
+    APP_VERSION,
+    APP_VERSION_CODE,
+    BASE_URL,
+    BATTERY_PACK_PATH,
+    BATTERY_TRENDS_PATH,
+    CODE_OK,
+    CODE_TOKEN_EXPIRED,
+    DATE_TYPE_DAY,
+    DEVICE_BATTERY_STAT_PATH,
+    DEVICE_CT_STAT_PATH,
+    DEVICE_HOME_STAT_PATH,
+    DEVICE_LIST_PATH,
+    DEVICE_METER_STAT_PATH,
+    DEVICE_MODEL_HEADER,
+    DEVICE_PROPERTY_PATH,
+    DEVICE_PV_STAT_PATH,
+    DEVICE_SOCKET_STATISTIC_PATH,
+    DEVICE_SOCKET_STAT_PATH,
+    DEVICE_STATISTIC_PATH,
+    FIELD_ACCOUNT,
+    FIELD_BATTERY_PACKS,
+    FIELD_BAT_SOC,
+    FIELD_BODY,
+    FIELD_CELL_TEMP,
+    FIELD_CODE,
+    FIELD_COUNTRY_CODE,
+    FIELD_CURRENCY,
+    FIELD_CURRENT_VERSION,
+    FIELD_DATA,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_SN,
+    FIELD_DEVICE_SN_LIST,
+    FIELD_ID,
+    FIELD_IN_PW,
+    FIELD_IP,
+    FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_LOGIN_TYPE,
+    FIELD_MAC_ID,
+    FIELD_MAX_POWER,
+    FIELD_MODEL,
+    FIELD_MQTT_PASSWORD,
+    FIELD_MSG,
+    FIELD_OP,
+    FIELD_OUT_PW,
+    FIELD_PASSWORD,
+    FIELD_PLATFORM_COMPANY_ID,
+    FIELD_RAW_TEXT,
+    FIELD_RB,
+    FIELD_REGION_CODE,
+    FIELD_REGISTER_APP_ID,
+    FIELD_SINGLE_PRICE,
+    FIELD_SMART_SOCKET_ID,
+    FIELD_SYSTEM_ID,
+    FIELD_SYSTEM_NAME,
+    FIELD_SYSTEM_REGION,
+    FIELD_TARGET_MODULE_VERSION,
+    FIELD_TARGET_VERSION,
+    FIELD_TOKEN,
+    FIELD_UPDATE_CONTENT,
+    FIELD_UPDATE_STATUS,
+    FIELD_UPGRADE_TYPE,
+    FIELD_USER_ID,
+    FIELD_VERSION,
+    HOME_TRENDS_PATH,
+    HTTP_CONTENT_TYPE_FORM,
+    HTTP_CONTENT_TYPE_JSON,
+    HTTP_HEADER_CONTENT_TYPE,
+    HTTP_METHOD_GET,
+    HTTP_METHOD_POST,
+    HTTP_METHOD_PUT,
+    HTTP_RAW_TEXT_LIMIT,
+    LOCATION_PATH,
+    LOGIN_PATH,
+    LOGIN_TIMEOUT_SEC,
+    MAX_POWER_SAVE_PATH,
+    MQTT_CLIENT_ID_SUFFIX,
+    MQTT_CREDENTIAL_CLIENT_ID,
+    MQTT_CREDENTIAL_PASSWORD,
+    MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
+    MQTT_MAC_ID_PREFIX,
+    MQTT_USERNAME_SEPARATOR,
+    OTA_LIST_PATH,
+    PLATFORM_HEADER,
+    POWER_PRICE_PATH,
+    PRICE_HISTORY_CONFIG_PATH,
+    PRICE_SOURCE_LIST_PATH,
+    PV_TRENDS_PATH,
+    REGISTER_APP_ID,
+    REQUEST_TIMEOUT_SEC,
+    RSA_PUBLIC_KEY_B64,
+    SAVE_DYNAMIC_MODE_PATH,
+    SAVE_SINGLE_MODE_PATH,
+    SYSTEM_LIST_PATH,
+    SYSTEM_NAME_PATH,
+    SYSTEM_STATISTIC_PATH,
+    SYS_VERSION,
+    USER_AGENT,
+)
+from ..util import app_period_date_bounds, chart_series_debug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -586,7 +584,7 @@ class JackeryApi:
             data.get("error"),
             data.get(FIELD_RAW_TEXT),
         ]
-        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
+        text = " ".join(str(part) for part in parts if part not in {None, ""}).lower()
         if not text:
             return False
         return any(
@@ -618,14 +616,14 @@ class JackeryApi:
         data: dict[str, Any] | Any,
     ) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
-        if status in (401, 403):
+        if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
             return True
         if status != 200:
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
-        return code not in (CODE_OK, None) and self._response_has_auth_failure_text(
+        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
             data,
         )
 
@@ -840,7 +838,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
             )
@@ -1403,7 +1401,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
             )
@@ -1524,7 +1522,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "

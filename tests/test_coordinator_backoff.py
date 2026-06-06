@@ -1,13 +1,11 @@
 """Coordinator endpoint-backoff unit tests."""
 
-import time
 from pathlib import Path
+import time
 
 from custom_components.jackery_solarvault.client.api import JackeryError
 from custom_components.jackery_solarvault.coordinator import (
     _ENDPOINT_BACKOFF_DELAYS_SEC,
-)
-from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 

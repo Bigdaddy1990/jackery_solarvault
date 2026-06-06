@@ -53,14 +53,12 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
+from dataclasses import dataclass
 import logging
 import os
 import secrets
-from dataclasses import dataclass
 
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers import modes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
 _LOGGER = logging.getLogger(__name__)
@@ -785,19 +783,19 @@ __all__ = [
     "BLE_NOTIFY_CHAR_UUID",
     "BLE_SERVICE_UUID",
     "BLE_WRITE_CHAR_UUID",
+    "DEFAULT_BLE_MTU",
     "BleBinaryFrame",
     "BleFrame",
-    "DEFAULT_BLE_MTU",
     "aes_decrypt",
     "aes_encrypt",
     "build_binary_frame",
     "build_plaintext_frame",
-    "decrypt_binary_notify",
-    "encrypt_binary_notify",
     "chunk_size_for_mtu",
     "crc16_hex",
     "crc16_modbus",
+    "decrypt_binary_notify",
     "decrypt_frame",
+    "encrypt_binary_notify",
     "encrypt_frame",
     "hex16",
     "hex_decode",

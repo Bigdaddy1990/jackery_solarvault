@@ -13,11 +13,13 @@ from typing import Any
 import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
-from custom_components.jackery_solarvault.client.ble import aes_encrypt
-from custom_components.jackery_solarvault.client.ble import BLE_AES_IV_LEN
-from custom_components.jackery_solarvault.client.ble import BleBinaryFrame
-from custom_components.jackery_solarvault.client.ble import build_binary_frame
-from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify
+from custom_components.jackery_solarvault.client.ble import (
+    BLE_AES_IV_LEN,
+    BleBinaryFrame,
+    aes_encrypt,
+    build_binary_frame,
+    decrypt_binary_notify,
+)
 
 # ---------------------------------------------------------------------------
 # _emit_payload_debug — pre-built dict vs callable factory
