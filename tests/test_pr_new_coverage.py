@@ -17,6 +17,8 @@ from typing import Any
 
 import pytest
 
+from custom_components.jackery_solarvault.client import JackeryApi, JackeryAuthError, JackeryError
+
 # ---------------------------------------------------------------------------
 # Exception hierarchy (exported from the client sub-package)
 # ---------------------------------------------------------------------------
@@ -24,7 +26,7 @@ import pytest
 
 def test_auth_error_is_subclass_of_error() -> None:
     """JackeryAuthError must be a subclass of JackeryError (hierarchy check)."""
-    from custom_components.jackery_solarvault.client.api import (
+    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
         JackeryAuthError,
         JackeryError,
     )
@@ -34,7 +36,7 @@ def test_auth_error_is_subclass_of_error() -> None:
 
 def test_api_error_is_subclass_of_error() -> None:
     """JackeryApiError must be a subclass of JackeryError."""
-    from custom_components.jackery_solarvault.client.api import (
+    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
         JackeryApiError,
         JackeryError,
     )
@@ -54,7 +56,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
     __init__.py. This test verifies the import works without error.
     """
     try:
-        from custom_components.jackery_solarvault.client.local_mqtt import (
+        from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
             JackeryLocalMqttClient,
         )
 
@@ -68,22 +70,16 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
     The PR changed __init__.py to import from .client instead of .api.
     """
-    from custom_components.jackery_solarvault.client import JackeryApi
-
     assert JackeryApi is not None
 
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryAuthError
-
     assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryError
-
     assert JackeryError is not None
 
 
@@ -97,7 +93,9 @@ def test_client_init_imports_jackery_error() -> None:
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     """Thin wrapper that imports and calls the production function."""
-    from custom_components.jackery_solarvault import _legacy_suffix_matches as _fn
+    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        _legacy_suffix_matches as _fn,  # noqa: PLC2701
+    )
 
     return _fn(uid, key_suffix)
 

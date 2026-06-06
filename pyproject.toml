@@ -1,7 +1,19 @@
 # pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools<=80.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.dynamic.optional-dependencies]
+tests = { file = ["requirements-test.txt"] }
 
 [tool.setuptools]
 include-package-data = true
@@ -9,11 +21,11 @@ include-package-data = true
 [project]
 name = "jackery_solarvault"
 description = "Solarvault integration for Home Assistant"
-readme = "README*.md"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Bigdaddy1990" }]
-keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "telemetry"]
+keywords = ["homeassistant", "jackery_solarvault", "solar", "automation", "telemetry"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
@@ -21,9 +33,9 @@ classifiers = [
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
-dynamic = ["version", "dependencies", "optional-dependencies"]
-dependencies = ["requirements","requirements-test","requirements-dev"]
-requires-python = ">=3.14.5"
+dynamic = ["version"]
+requires-python = ">=3.14"
+
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
@@ -274,8 +286,11 @@ exclude = [
     "node_modules",
     "site-packages",
     "venv",
+    "scripts",
     "docs",
-    "logs"
+    "logs",
+    "APP",
+    ".scripts"
 ]
 
 [tool.ruff.analyze]
@@ -424,13 +439,16 @@ fixable = ["ALL"]
 unfixable = []
 future-annotations = false
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+logger-objects = ["logging_setup.logger"]
 
+[project.scripts]
+hass = "homeassistant.__main__:main"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
+"**/__init__.py" = ["F401", "F403", "E402"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

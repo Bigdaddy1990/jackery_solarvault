@@ -34,7 +34,7 @@ def mock_jackery_login() -> Generator[None]:
     cloud I/O.
     """
 
-    async def _fake_login(api) -> str:  # noqa: RUF029
+    async def _fake_login(api) -> str:  # noqa: ANN001, RUF029, RUF100
         """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
 
         Parameters:
@@ -43,11 +43,11 @@ def mock_jackery_login() -> Generator[None]:
         Returns:
             str: The authentication token assigned to the API instance.
         """
-        api._token = "test-token"
-        api._mqtt_user_id = "test-user"
-        api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
-        api._mqtt_mac_id = api._resolve_login_mac_id()
-        return api._token
+        api._token = "test-token"  # noqa: SLF001
+        api._mqtt_user_id = "test-user"  # noqa: SLF001
+        api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="  # noqa: SLF001
+        api._mqtt_mac_id = api._resolve_login_mac_id()  # noqa: SLF001
+        return api._token  # noqa: SLF001
 
     with (
         patch(
