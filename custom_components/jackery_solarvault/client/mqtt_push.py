@@ -1,35 +1,34 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import contextlib
+from datetime import UTC, datetime
 import hashlib
 import json
 import logging
-import ssl
-from collections.abc import Awaitable
-from collections.abc import Callable
-from datetime import datetime
-from datetime import UTC
 from pathlib import Path
+import ssl
 from typing import Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient
-from aiomqtt import MqttError
+from aiomqtt import Client as MQTTClient, MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import FIELD_BODY
-from ..const import FIELD_DATA
-from ..const import MQTT_AUTH_FAILURE_TOLERANCE
-from ..const import MQTT_CLIENT_LIBRARY
-from ..const import MQTT_CONNACK_REASONS
-from ..const import MQTT_HOST
-from ..const import MQTT_KEEPALIVE_SEC
-from ..const import MQTT_PORT
-from ..const import MQTT_SILENT_THRESHOLD_SEC
-from ..const import MQTT_TOPIC_PREFIX
-from ..const import MQTT_TOPIC_SUFFIXES
-from ..const import REDACTED_VALUE
+from ..const import (
+    FIELD_BODY,
+    FIELD_DATA,
+    MQTT_AUTH_FAILURE_TOLERANCE,
+    MQTT_CLIENT_LIBRARY,
+    MQTT_CONNACK_REASONS,
+    MQTT_HOST,
+    MQTT_KEEPALIVE_SEC,
+    MQTT_PORT,
+    MQTT_SILENT_THRESHOLD_SEC,
+    MQTT_TOPIC_PREFIX,
+    MQTT_TOPIC_SUFFIXES,
+    REDACTED_VALUE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -483,7 +482,7 @@ class JackeryMqttPushClient:
     @staticmethod
     def _is_connect_auth_failure_rc(rc: int) -> bool:
         """Return True for CONNACK codes that mean credentials are rejected."""
-        return rc in (4, 5, 134, 135)
+        return rc in {4, 5, 134, 135}
 
     @staticmethod
     def _is_connect_failure_error(error: str | None) -> bool:

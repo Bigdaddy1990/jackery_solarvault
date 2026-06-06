@@ -1,7 +1,7 @@
 """BLE update-coalescing regression tests for coordinator partial updates."""
 
-import re
 from pathlib import Path
+import re
 
 
 def _source() -> str:
@@ -31,7 +31,7 @@ def test_push_partial_update_is_noop_when_data_unchanged() -> None:
     helper = re.search(
         r"def _push_partial_update\(.*?(?=\n    # --)",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert helper is not None
     body = helper.group(0)

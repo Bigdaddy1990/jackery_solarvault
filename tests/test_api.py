@@ -4,25 +4,26 @@ from typing import Any
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryApi
-from custom_components.jackery_solarvault.client.api import JackeryApiError
-from custom_components.jackery_solarvault.const import APP_REQUEST_META
-from custom_components.jackery_solarvault.const import BATTERY_PACK_PATH
-from custom_components.jackery_solarvault.const import DEVICE_PV_STAT_PATH
-from custom_components.jackery_solarvault.const import FIELD_CODE
-from custom_components.jackery_solarvault.const import FIELD_CURRENCY
-from custom_components.jackery_solarvault.const import FIELD_DATA
-from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID
-from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN
-from custom_components.jackery_solarvault.const import FIELD_ID
-from custom_components.jackery_solarvault.const import FIELD_PLATFORM_COMPANY_ID
-from custom_components.jackery_solarvault.const import FIELD_SINGLE_PRICE
-from custom_components.jackery_solarvault.const import FIELD_SYSTEM_ID
-from custom_components.jackery_solarvault.const import FIELD_SYSTEM_NAME
-from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION
-from custom_components.jackery_solarvault.const import SAVE_DYNAMIC_MODE_PATH
-from custom_components.jackery_solarvault.const import SAVE_SINGLE_MODE_PATH
-from custom_components.jackery_solarvault.const import SYSTEM_NAME_PATH
+from custom_components.jackery_solarvault.client.api import JackeryApi, JackeryApiError
+from custom_components.jackery_solarvault.const import (
+    APP_REQUEST_META,
+    BATTERY_PACK_PATH,
+    DEVICE_PV_STAT_PATH,
+    FIELD_CODE,
+    FIELD_CURRENCY,
+    FIELD_DATA,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_SN,
+    FIELD_ID,
+    FIELD_PLATFORM_COMPANY_ID,
+    FIELD_SINGLE_PRICE,
+    FIELD_SYSTEM_ID,
+    FIELD_SYSTEM_NAME,
+    FIELD_SYSTEM_REGION,
+    SAVE_DYNAMIC_MODE_PATH,
+    SAVE_SINGLE_MODE_PATH,
+    SYSTEM_NAME_PATH,
+)
 
 
 def test_extract_code_uses_shared_integer_parser() -> None:

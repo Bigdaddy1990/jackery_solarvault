@@ -2862,7 +2862,7 @@ def test_price_provider_gate_uses_validated_price_sources() -> None:
 def test_no_unresolved_git_merge_conflict_markers() -> None:
     """Catch real merge conflict markers without flagging reStructuredText tables."""
     marker_prefixes = ("<<<<<<< ", ">>>>>>> ")
-    for path in pathlib.Path(".").rglob("*"):
+    for path in pathlib.Path().rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         try:
@@ -2971,7 +2971,7 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             # Only check explicit JackeryApi usage. Other objects can have
             # methods with the same public name but unrelated signatures.
             receiver = call.func.value
-            if isinstance(receiver, ast.Name) and receiver.id not in {"api"}:
+            if isinstance(receiver, ast.Name) and receiver.id != "api":
                 continue
             if isinstance(receiver, ast.Attribute) and receiver.attr != "api":
                 continue

@@ -13,52 +13,39 @@ default_install_hook_types:
   - pre-push
 
 repos:
-  - repo: https://github.com/asottile/reorder-python-imports
-    rev: v3.16.0
-    hooks:
-    -   id: reorder-python-imports
-        exclude: ^pre_commit/resources/
-        args: [--py3-plus, --py310-plus, --py36-plus, --py39-plus, --add-import, 'from __future__ import annotations']
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v4.0.0
-    hooks:
-    -   id: add-trailing-comma
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
-    hooks:
-    -   id: pyupgrade
-        args: [--py39-plus, --py310-plus, --py311-plus, --py313-plus]
-  - repo: https://github.com/hhatto/autopep8
-    rev: v2.3.2
-    hooks:
-    -   id: autopep8
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.3.0
-    hooks:
-    -   id: flake8
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
-    hooks:
-      - id: mypy
-        additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^testing/resources/
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
       - id: pyupgrade
         args:
+          - --exit-zero-even-if-changed
+          - --keep-percent-format
+          - --keep-mock
+          - --keep-runtime-typing
+          - --py3-plus
+          - --py38-plus-plus
+          - --py39-plus-plus
+          - --py310-plus
+          - --py311-plus
+          - --py312-plus
           - --py313-plus
           - --py314-plus
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-pyyaml, pydantic]
+        exclude: ^(/manifest.*|docs/|scripts/)
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:
       - id: autotyping
         stages: [pre-commit]
         types: [python]
-        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
+        args: [--safe]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.15
+    rev: v0.15.16
     hooks:
       - id: ruff-check
         args:
@@ -67,8 +54,6 @@ repos:
           - --unsafe-fixes
           - --target-version py314
           - --extend-select RUF100
-          - --add-noqa
-          - --preview
           - --output-format=github
         types_or:
           - python
@@ -85,7 +70,7 @@ repos:
         args:
           - --allow-multiple-documents
           - --unsafe
-        exclude: ^(docs/)
+        exclude: ^(docs/|scripts/)
       - id: check-json
       - id: check-toml
       - id: check-ast

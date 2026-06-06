@@ -70,245 +70,248 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
-from datetime import datetime
-from datetime import timedelta
-from datetime import UTC
-from typing import Any
-from typing import Literal
+from datetime import UTC, date, datetime, timedelta
+import logging
+from typing import Any, Literal
 
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.sensor import SensorStateClass
-from homeassistant.const import CURRENCY_EURO
-from homeassistant.const import EntityCategory
-from homeassistant.const import PERCENTAGE
-from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT
-from homeassistant.const import UnitOfEnergy
-from homeassistant.const import UnitOfMass
-from homeassistant.const import UnitOfPower
-from homeassistant.const import UnitOfTemperature
-from homeassistant.core import callback
-from homeassistant.core import HomeAssistant
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import (
+    CURRENCY_EURO,
+    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfEnergy,
+    UnitOfMass,
+    UnitOfPower,
+    UnitOfTemperature,
+)
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import JackeryConfigEntry
-from .const import APP_CHART_BUCKET_BY_DATE_TYPE
-from .const import APP_CHART_METRIC_KEY_BY_SECTION_PREFIX
-from .const import APP_DEVICE_STAT_BATTERY_CHARGE
-from .const import APP_DEVICE_STAT_BATTERY_DISCHARGE
-from .const import APP_DEVICE_STAT_BATTERY_TO_GRID
-from .const import APP_DEVICE_STAT_ONGRID_INPUT
-from .const import APP_DEVICE_STAT_ONGRID_OUTPUT
-from .const import APP_DEVICE_STAT_ONGRID_TO_BATTERY
-from .const import APP_DEVICE_STAT_PV_ENERGY
-from .const import APP_DEVICE_STAT_PV_TO_BATTERY
-from .const import APP_REQUEST_BEGIN_DATE
-from .const import APP_REQUEST_BEGIN_DATE_ALT
-from .const import APP_REQUEST_END_DATE
-from .const import APP_REQUEST_END_DATE_ALT
-from .const import APP_REQUEST_META
-from .const import APP_SAVINGS_CALC_META
-from .const import APP_SECTION_BATTERY_STAT
-from .const import APP_SECTION_CT_STAT
-from .const import APP_SECTION_HOME_STAT
-from .const import APP_SECTION_HOME_TRENDS
-from .const import APP_SECTION_PV_STAT
-from .const import APP_STAT_PV1_ENERGY
-from .const import APP_STAT_PV2_ENERGY
-from .const import APP_STAT_PV3_ENERGY
-from .const import APP_STAT_PV4_ENERGY
-from .const import APP_STAT_TODAY_LOAD
-from .const import APP_STAT_TOTAL_CARBON
-from .const import APP_STAT_TOTAL_CHARGE
-from .const import APP_STAT_TOTAL_DISCHARGE
-from .const import APP_STAT_TOTAL_GENERATION
-from .const import APP_STAT_TOTAL_HOME_ENERGY
-from .const import APP_STAT_TOTAL_IN_GRID_ENERGY
-from .const import APP_STAT_TOTAL_OUT_GRID_ENERGY
-from .const import APP_STAT_TOTAL_REVENUE
-from .const import APP_STAT_TOTAL_SOLAR_ENERGY
-from .const import APP_STAT_UNIT
-from .const import APP_TOTAL_GUARD_META
-from .const import APP_UNIT_KWH
-from .const import APP_YEAR_BACKFILL_META
-from .const import CONF_CREATE_CALCULATED_POWER_SENSORS
-from .const import CONF_CREATE_SAVINGS_DETAIL_SENSORS
-from .const import CONF_CREATE_SMART_METER_DERIVED_SENSORS
-from .const import CT_ATTRIBUTE_FIELDS
-from .const import CT_NEGATIVE_PHASE_POWER_FIELDS
-from .const import CT_POSITIVE_PHASE_POWER_FIELDS
-from .const import CT_TOTAL_POWER_PAIR
-from .const import DATE_TYPE_DAY
-from .const import DATE_TYPE_MONTH
-from .const import DATE_TYPE_WEEK
-from .const import DATE_TYPE_YEAR
-from .const import DEFAULT_CREATE_CALCULATED_POWER_SENSORS
-from .const import DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS
-from .const import DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS
-from .const import DEFAULT_STORM_WARNING_MINUTES
-from .const import DOMAIN
-from .const import FIELD_ABILITY
-from .const import FIELD_BAT_IN_PW
-from .const import FIELD_BAT_NUM
-from .const import FIELD_BAT_OUT_PW
-from .const import FIELD_BAT_SOC
-from .const import FIELD_BAT_STATE
-from .const import FIELD_CELL_TEMP
-from .const import FIELD_CHARGE_PLAN_PW
-from .const import FIELD_CHARGING_ENERGY
-from .const import FIELD_COMM_MODE
-from .const import FIELD_COMM_STATE
-from .const import FIELD_CT_POWER
-from .const import FIELD_CT_POWER1
-from .const import FIELD_CT_POWER2
-from .const import FIELD_CT_POWER3
-from .const import FIELD_CT_STAT
-from .const import FIELD_CT_STATE
-from .const import FIELD_CURRENT_VERSION
-from .const import FIELD_DEFAULT_PW
-from .const import FIELD_DEV_SN
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_DEVICE_SN
-from .const import FIELD_DISCHARGING_ENERGY
-from .const import FIELD_DYNAMIC_OR_SINGLE
-from .const import FIELD_EC
-from .const import FIELD_ENERGY_PLAN_PW
-from .const import FIELD_ETH_PORT
-from .const import FIELD_FOLLOW_METER
-from .const import FIELD_FUNC_ENABLE
-from .const import FIELD_GRID_IN_PW
-from .const import FIELD_GRID_OUT_PW
-from .const import FIELD_GRID_STAT
-from .const import FIELD_GRID_STATE
-from .const import FIELD_GRID_STATE_ALT
-from .const import FIELD_HOME_LOAD_PW
-from .const import FIELD_IN_EGY
-from .const import FIELD_IN_GRID_SIDE_PW
-from .const import FIELD_IN_ONGRID_PW
-from .const import FIELD_IN_PW
-from .const import FIELD_IP
-from .const import FIELD_IS_AUTO_STANDBY
-from .const import FIELD_IS_FIRMWARE_UPGRADE
-from .const import FIELD_IS_FOLLOW_METER_PW
-from .const import FIELD_IT
-from .const import FIELD_LATITUDE
-from .const import FIELD_LOAD_PW
-from .const import FIELD_LONGITUDE
-from .const import FIELD_MAC
-from .const import FIELD_MAX_INV_STD_PW
-from .const import FIELD_MAX_IOT_NUM
-from .const import FIELD_MAX_OUT_PW
-from .const import FIELD_MAX_SYS_IN_PW
-from .const import FIELD_MAX_SYS_OUT_PW
-from .const import FIELD_MINS_INTERVAL
-from .const import FIELD_MODEL
-from .const import FIELD_MODEL_NAME
-from .const import FIELD_OFF_GRID_AUTO_OFF_TIME
-from .const import FIELD_OFF_GRID_DOWN
-from .const import FIELD_OFF_GRID_DOWN_TIME
-from .const import FIELD_OFF_GRID_TIME
-from .const import FIELD_ON_GRID_STAT
-from .const import FIELD_ONGRID_STAT
-from .const import FIELD_OP
-from .const import FIELD_OT
-from .const import FIELD_OTHER_LOAD_PW
-from .const import FIELD_OUT_EGY
-from .const import FIELD_OUT_GRID_SIDE_PW
-from .const import FIELD_OUT_ONGRID_PW
-from .const import FIELD_OUT_PW
-from .const import FIELD_PV1
-from .const import FIELD_PV2
-from .const import FIELD_PV3
-from .const import FIELD_PV4
-from .const import FIELD_PV_PW
-from .const import FIELD_RB
-from .const import FIELD_REBOOT
-from .const import FIELD_SCAN_NAME
-from .const import FIELD_SINGLE_PRICE
-from .const import FIELD_SN
-from .const import FIELD_SOC
-from .const import FIELD_SOC_CHARGE_LIMIT
-from .const import FIELD_SOC_CHG_LIMIT
-from .const import FIELD_SOC_DISCHARGE_LIMIT
-from .const import FIELD_SOC_DISCHG_LIMIT
-from .const import FIELD_SOCKET_PRIORITY
-from .const import FIELD_STACK_IN_PW
-from .const import FIELD_STACK_OUT_PW
-from .const import FIELD_STANDBY_PW
-from .const import FIELD_STAT
-from .const import FIELD_STORM
-from .const import FIELD_SW_EPS_IN_PW
-from .const import FIELD_SW_EPS_OUT_PW
-from .const import FIELD_SW_EPS_STATE
-from .const import FIELD_SWITCH_STATE
-from .const import FIELD_SYS_SWITCH
-from .const import FIELD_TARGET_MODULE_VERSION
-from .const import FIELD_TARGET_VERSION
-from .const import FIELD_TEMP_UNIT
-from .const import FIELD_TODAY_ENERGY
-from .const import FIELD_TOTAL_ENERGY
-from .const import FIELD_TYPE_NAME
-from .const import FIELD_UPDATE_CONTENT
-from .const import FIELD_UPDATE_STATUS
-from .const import FIELD_UPGRADE_TYPE
-from .const import FIELD_VERSION
-from .const import FIELD_WIP
-from .const import FIELD_WNAME
-from .const import FIELD_WORK_MODEL
-from .const import FIELD_WPC
-from .const import FIELD_WPS
-from .const import FIELD_WSIG
-from .const import MANUFACTURER
-from .const import PAYLOAD_ALARM
-from .const import PAYLOAD_BATTERY_PACKS
-from .const import PAYLOAD_BATTERY_TRENDS
-from .const import PAYLOAD_CT_METER
-from .const import PAYLOAD_DEVICE_STATISTIC
-from .const import PAYLOAD_HOME_TRENDS
-from .const import PAYLOAD_HTTP_PROPERTIES
-from .const import PAYLOAD_METER_HEADS
-from .const import PAYLOAD_OTA
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_PV_TRENDS
-from .const import PAYLOAD_SMART_PLUGS
-from .const import PAYLOAD_STATISTIC
-from .const import PAYLOAD_TASK_PLAN
-from .const import PAYLOAD_WEATHER_PLAN
-from .const import TASK_PLAN_BODY
-from .const import TASK_PLAN_TASKS
+from .const import (
+    APP_CHART_BUCKET_BY_DATE_TYPE,
+    APP_CHART_METRIC_KEY_BY_SECTION_PREFIX,
+    APP_DEVICE_STAT_BATTERY_CHARGE,
+    APP_DEVICE_STAT_BATTERY_DISCHARGE,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_INPUT,
+    APP_DEVICE_STAT_ONGRID_OUTPUT,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_PV_ENERGY,
+    APP_DEVICE_STAT_PV_TO_BATTERY,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_BEGIN_DATE_ALT,
+    APP_REQUEST_END_DATE,
+    APP_REQUEST_END_DATE_ALT,
+    APP_REQUEST_META,
+    APP_SAVINGS_CALC_META,
+    APP_SECTION_BATTERY_STAT,
+    APP_SECTION_CT_STAT,
+    APP_SECTION_HOME_STAT,
+    APP_SECTION_HOME_TRENDS,
+    APP_SECTION_PV_STAT,
+    APP_STAT_PV1_ENERGY,
+    APP_STAT_PV2_ENERGY,
+    APP_STAT_PV3_ENERGY,
+    APP_STAT_PV4_ENERGY,
+    APP_STAT_TODAY_LOAD,
+    APP_STAT_TOTAL_CARBON,
+    APP_STAT_TOTAL_CHARGE,
+    APP_STAT_TOTAL_DISCHARGE,
+    APP_STAT_TOTAL_GENERATION,
+    APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_TOTAL_REVENUE,
+    APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_UNIT,
+    APP_TOTAL_GUARD_META,
+    APP_UNIT_KWH,
+    APP_YEAR_BACKFILL_META,
+    CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CT_ATTRIBUTE_FIELDS,
+    CT_NEGATIVE_PHASE_POWER_FIELDS,
+    CT_POSITIVE_PHASE_POWER_FIELDS,
+    CT_TOTAL_POWER_PAIR,
+    DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
+    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_STORM_WARNING_MINUTES,
+    DOMAIN,
+    FIELD_ABILITY,
+    FIELD_BAT_IN_PW,
+    FIELD_BAT_NUM,
+    FIELD_BAT_OUT_PW,
+    FIELD_BAT_SOC,
+    FIELD_BAT_STATE,
+    FIELD_CELL_TEMP,
+    FIELD_CHARGE_PLAN_PW,
+    FIELD_CHARGING_ENERGY,
+    FIELD_COMM_MODE,
+    FIELD_COMM_STATE,
+    FIELD_CT_POWER,
+    FIELD_CT_POWER1,
+    FIELD_CT_POWER2,
+    FIELD_CT_POWER3,
+    FIELD_CT_STAT,
+    FIELD_CT_STATE,
+    FIELD_CURRENT_VERSION,
+    FIELD_DEFAULT_PW,
+    FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
+    FIELD_DISCHARGING_ENERGY,
+    FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_EC,
+    FIELD_ENERGY_PLAN_PW,
+    FIELD_ETH_PORT,
+    FIELD_FOLLOW_METER,
+    FIELD_FUNC_ENABLE,
+    FIELD_GRID_IN_PW,
+    FIELD_GRID_OUT_PW,
+    FIELD_GRID_STAT,
+    FIELD_GRID_STATE,
+    FIELD_GRID_STATE_ALT,
+    FIELD_HOME_LOAD_PW,
+    FIELD_IN_EGY,
+    FIELD_IN_GRID_SIDE_PW,
+    FIELD_IN_ONGRID_PW,
+    FIELD_IN_PW,
+    FIELD_IP,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_IS_FOLLOW_METER_PW,
+    FIELD_IT,
+    FIELD_LATITUDE,
+    FIELD_LOAD_PW,
+    FIELD_LONGITUDE,
+    FIELD_MAC,
+    FIELD_MAX_INV_STD_PW,
+    FIELD_MAX_IOT_NUM,
+    FIELD_MAX_OUT_PW,
+    FIELD_MAX_SYS_IN_PW,
+    FIELD_MAX_SYS_OUT_PW,
+    FIELD_MINS_INTERVAL,
+    FIELD_MODEL,
+    FIELD_MODEL_NAME,
+    FIELD_OFF_GRID_AUTO_OFF_TIME,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_OFF_GRID_DOWN_TIME,
+    FIELD_OFF_GRID_TIME,
+    FIELD_ONGRID_STAT,
+    FIELD_ON_GRID_STAT,
+    FIELD_OP,
+    FIELD_OT,
+    FIELD_OTHER_LOAD_PW,
+    FIELD_OUT_EGY,
+    FIELD_OUT_GRID_SIDE_PW,
+    FIELD_OUT_ONGRID_PW,
+    FIELD_OUT_PW,
+    FIELD_PV1,
+    FIELD_PV2,
+    FIELD_PV3,
+    FIELD_PV4,
+    FIELD_PV_PW,
+    FIELD_RB,
+    FIELD_REBOOT,
+    FIELD_SCAN_NAME,
+    FIELD_SINGLE_PRICE,
+    FIELD_SN,
+    FIELD_SOC,
+    FIELD_SOCKET_PRIORITY,
+    FIELD_SOC_CHARGE_LIMIT,
+    FIELD_SOC_CHG_LIMIT,
+    FIELD_SOC_DISCHARGE_LIMIT,
+    FIELD_SOC_DISCHG_LIMIT,
+    FIELD_STACK_IN_PW,
+    FIELD_STACK_OUT_PW,
+    FIELD_STANDBY_PW,
+    FIELD_STAT,
+    FIELD_STORM,
+    FIELD_SWITCH_STATE,
+    FIELD_SW_EPS_IN_PW,
+    FIELD_SW_EPS_OUT_PW,
+    FIELD_SW_EPS_STATE,
+    FIELD_SYS_SWITCH,
+    FIELD_TARGET_MODULE_VERSION,
+    FIELD_TARGET_VERSION,
+    FIELD_TEMP_UNIT,
+    FIELD_TODAY_ENERGY,
+    FIELD_TOTAL_ENERGY,
+    FIELD_TYPE_NAME,
+    FIELD_UPDATE_CONTENT,
+    FIELD_UPDATE_STATUS,
+    FIELD_UPGRADE_TYPE,
+    FIELD_VERSION,
+    FIELD_WIP,
+    FIELD_WNAME,
+    FIELD_WORK_MODEL,
+    FIELD_WPC,
+    FIELD_WPS,
+    FIELD_WSIG,
+    MANUFACTURER,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_CT_METER,
+    PAYLOAD_DEVICE_STATISTIC,
+    PAYLOAD_HOME_TRENDS,
+    PAYLOAD_HTTP_PROPERTIES,
+    PAYLOAD_METER_HEADS,
+    PAYLOAD_OTA,
+    PAYLOAD_PRICE,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_PV_TRENDS,
+    PAYLOAD_SMART_PLUGS,
+    PAYLOAD_STATISTIC,
+    PAYLOAD_TASK_PLAN,
+    PAYLOAD_WEATHER_PLAN,
+    TASK_PLAN_BODY,
+    TASK_PLAN_TASKS,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import calculated_smart_meter_power
-from .util import config_entry_bool_option
-from .util import coordinator_entity_signature
-from .util import directional_power_value
-from .util import effective_period_total_value
-from .util import effective_trend_series_values
-from .util import first_power_value
-from .util import HomeConsumptionPower
-from .util import jackery_corrected_home_consumption_power
-from .util import jackery_grid_side_input_power
-from .util import jackery_grid_side_output_power
-from .util import redacted_json_safe_payload
-from .util import safe_float
-from .util import safe_int
-from .util import signed_phase_power_values
-from .util import smart_meter_net_power
-from .util import smart_plug_serial
-from .util import sorted_smart_plugs
-from .util import task_plan_value
-from .util import trend_series_has_value
-from .util import trend_series_key
-from .util import trend_series_total
+from .util import (
+    HomeConsumptionPower,
+    append_unique_entity,
+    calculated_smart_meter_power,
+    config_entry_bool_option,
+    coordinator_entity_signature,
+    directional_power_value,
+    effective_period_total_value,
+    effective_trend_series_values,
+    first_power_value,
+    jackery_corrected_home_consumption_power,
+    jackery_grid_side_input_power,
+    jackery_grid_side_output_power,
+    redacted_json_safe_payload,
+    safe_float,
+    safe_int,
+    signed_phase_power_values,
+    smart_meter_net_power,
+    smart_plug_serial,
+    sorted_smart_plugs,
+    task_plan_value,
+    trend_series_has_value,
+    trend_series_key,
+    trend_series_total,
+)
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
@@ -2496,7 +2499,7 @@ async def async_setup_entry(
                     # add-on battery cards use BatteryPackSub entries. `batNum`
                     # is the expected pack/card count, not a reason to collapse
                     # the first pack into the main device.
-                    pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
+                    pack_count = min(5, max(len(valid_packs), 0, bat_num))
                 for index in range(1, pack_count + 1):
                     for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
                         if pack_desc.field == FIELD_CELL_TEMP and not any(

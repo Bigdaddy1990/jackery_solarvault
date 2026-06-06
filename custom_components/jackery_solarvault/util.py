@@ -2,115 +2,114 @@
 
 import calendar
 import contextlib
+from datetime import UTC, date, datetime, timedelta
 import json
+import operator
 import os
-import re
-from datetime import date
-from datetime import datetime
-from datetime import timedelta
-from datetime import UTC
 from pathlib import Path
-from typing import Any
-from typing import NamedTuple
+import re
+from typing import Any, NamedTuple
 
-from .const import APP_CHART_LABELS
-from .const import APP_CHART_SERIES_Y
-from .const import APP_CHART_SERIES_Y1
-from .const import APP_CHART_SERIES_Y2
-from .const import APP_CHART_SERIES_Y3
-from .const import APP_CHART_SERIES_Y4
-from .const import APP_CHART_SERIES_Y5
-from .const import APP_CHART_SERIES_Y6
-from .const import APP_CHART_STAT_METRICS
-from .const import APP_HOME_GRID_SERIES_KEYS
-from .const import APP_PERIOD_DATE_TYPES
-from .const import APP_REQUEST_BEGIN_DATE
-from .const import APP_REQUEST_BEGIN_DATE_ALT
-from .const import APP_REQUEST_DATE_TYPE
-from .const import APP_REQUEST_DATE_TYPE_ALT
-from .const import APP_REQUEST_END_DATE
-from .const import APP_REQUEST_END_DATE_ALT
-from .const import APP_REQUEST_META
-from .const import APP_SAVINGS_CALC_META
-from .const import APP_SECTION_BATTERY_STAT
-from .const import APP_SECTION_BATTERY_TRENDS
-from .const import APP_SECTION_CT_STAT
-from .const import APP_SECTION_HOME_STAT
-from .const import APP_SECTION_HOME_TRENDS
-from .const import APP_SECTION_PV_STAT
-from .const import APP_SECTION_PV_TRENDS
-from .const import APP_STAT_PV1_ENERGY
-from .const import APP_STAT_PV2_ENERGY
-from .const import APP_STAT_PV3_ENERGY
-from .const import APP_STAT_PV4_ENERGY
-from .const import APP_STAT_TOTAL_CARBON
-from .const import APP_STAT_TOTAL_CHARGE
-from .const import APP_STAT_TOTAL_CT_INPUT_ENERGY
-from .const import APP_STAT_TOTAL_CT_OUTPUT_ENERGY
-from .const import APP_STAT_TOTAL_DISCHARGE
-from .const import APP_STAT_TOTAL_GENERATION
-from .const import APP_STAT_TOTAL_HOME_ENERGY
-from .const import APP_STAT_TOTAL_IN_GRID_ENERGY
-from .const import APP_STAT_TOTAL_OUT_GRID_ENERGY
-from .const import APP_STAT_TOTAL_REVENUE
-from .const import APP_STAT_TOTAL_SOLAR_ENERGY
-from .const import APP_STAT_TOTAL_TREND_CHARGE_ENERGY
-from .const import APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY
-from .const import APP_STAT_UNIT
-from .const import APP_TOTAL_GUARD_META
-from .const import APP_UNIT_KWH
-from .const import APP_YEAR_BACKFILL_META
-from .const import CONF_ENABLE_UNREDACTED_DIAGNOSTICS
-from .const import CT_PHASE_POWER_PAIRS
-from .const import CT_TOTAL_POWER_PAIR
-from .const import DATA_QUALITY_KEY_LABEL
-from .const import DATA_QUALITY_KEY_LEVEL
-from .const import DATA_QUALITY_KEY_METRIC_KEY
-from .const import DATA_QUALITY_KEY_REASON
-from .const import DATA_QUALITY_KEY_REFERENCE_VALUE
-from .const import DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY
-from .const import DATA_QUALITY_KEY_SOURCE_REQUEST
-from .const import DATA_QUALITY_KEY_SOURCE_SECTION
-from .const import DATA_QUALITY_KEY_SOURCE_VALUE
-from .const import DATA_QUALITY_KEY_TOTAL_METHOD
-from .const import DATA_QUALITY_LEVEL_WARNING
-from .const import DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR
-from .const import DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK
-from .const import DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH
-from .const import DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK
-from .const import DATE_TYPE_DAY
-from .const import DATE_TYPE_MONTH
-from .const import DATE_TYPE_WEEK
-from .const import DATE_TYPE_YEAR
-from .const import DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS
-from .const import FIELD_CURRENT_VERSION
-from .const import FIELD_DEV_SN
-from .const import FIELD_DEVICE_SN
-from .const import FIELD_GRID_IN_PW
-from .const import FIELD_GRID_OUT_PW
-from .const import FIELD_HOME_LOAD_PW
-from .const import FIELD_IN_GRID_SIDE_PW
-from .const import FIELD_IN_ONGRID_PW
-from .const import FIELD_LOAD_PW
-from .const import FIELD_OTHER_LOAD_PW
-from .const import FIELD_OUT_GRID_SIDE_PW
-from .const import FIELD_OUT_ONGRID_PW
-from .const import FIELD_SINGLE_PRICE
-from .const import FIELD_SN
-from .const import PAYLOAD_ALARM
-from .const import PAYLOAD_BATTERY_PACKS
-from .const import PAYLOAD_CT_METER
-from .const import PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX
-from .const import PAYLOAD_DEBUG_LOG_MAX_BYTES
-from .const import PAYLOAD_METER_HEADS
-from .const import PAYLOAD_OTA
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_SMART_PLUGS
-from .const import PAYLOAD_STATISTIC
-from .const import REDACT_KEYS
-from .const import REDACTED_VALUE
-from .const import TASK_PLAN_BODY
-from .const import TASK_PLAN_TASKS
+from .const import (
+    APP_CHART_LABELS,
+    APP_CHART_SERIES_Y,
+    APP_CHART_SERIES_Y1,
+    APP_CHART_SERIES_Y2,
+    APP_CHART_SERIES_Y3,
+    APP_CHART_SERIES_Y4,
+    APP_CHART_SERIES_Y5,
+    APP_CHART_SERIES_Y6,
+    APP_CHART_STAT_METRICS,
+    APP_HOME_GRID_SERIES_KEYS,
+    APP_PERIOD_DATE_TYPES,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_BEGIN_DATE_ALT,
+    APP_REQUEST_DATE_TYPE,
+    APP_REQUEST_DATE_TYPE_ALT,
+    APP_REQUEST_END_DATE,
+    APP_REQUEST_END_DATE_ALT,
+    APP_REQUEST_META,
+    APP_SAVINGS_CALC_META,
+    APP_SECTION_BATTERY_STAT,
+    APP_SECTION_BATTERY_TRENDS,
+    APP_SECTION_CT_STAT,
+    APP_SECTION_HOME_STAT,
+    APP_SECTION_HOME_TRENDS,
+    APP_SECTION_PV_STAT,
+    APP_SECTION_PV_TRENDS,
+    APP_STAT_PV1_ENERGY,
+    APP_STAT_PV2_ENERGY,
+    APP_STAT_PV3_ENERGY,
+    APP_STAT_PV4_ENERGY,
+    APP_STAT_TOTAL_CARBON,
+    APP_STAT_TOTAL_CHARGE,
+    APP_STAT_TOTAL_CT_INPUT_ENERGY,
+    APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+    APP_STAT_TOTAL_DISCHARGE,
+    APP_STAT_TOTAL_GENERATION,
+    APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_TOTAL_REVENUE,
+    APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+    APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+    APP_STAT_UNIT,
+    APP_TOTAL_GUARD_META,
+    APP_UNIT_KWH,
+    APP_YEAR_BACKFILL_META,
+    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CT_PHASE_POWER_PAIRS,
+    CT_TOTAL_POWER_PAIR,
+    DATA_QUALITY_KEY_LABEL,
+    DATA_QUALITY_KEY_LEVEL,
+    DATA_QUALITY_KEY_METRIC_KEY,
+    DATA_QUALITY_KEY_REASON,
+    DATA_QUALITY_KEY_REFERENCE_VALUE,
+    DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
+    DATA_QUALITY_KEY_SOURCE_REQUEST,
+    DATA_QUALITY_KEY_SOURCE_SECTION,
+    DATA_QUALITY_KEY_SOURCE_VALUE,
+    DATA_QUALITY_KEY_TOTAL_METHOD,
+    DATA_QUALITY_LEVEL_WARNING,
+    DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
+    DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
+    DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH,
+    DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK,
+    DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
+    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    FIELD_CURRENT_VERSION,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
+    FIELD_GRID_IN_PW,
+    FIELD_GRID_OUT_PW,
+    FIELD_HOME_LOAD_PW,
+    FIELD_IN_GRID_SIDE_PW,
+    FIELD_IN_ONGRID_PW,
+    FIELD_LOAD_PW,
+    FIELD_OTHER_LOAD_PW,
+    FIELD_OUT_GRID_SIDE_PW,
+    FIELD_OUT_ONGRID_PW,
+    FIELD_SINGLE_PRICE,
+    FIELD_SN,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_CT_METER,
+    PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
+    PAYLOAD_DEBUG_LOG_MAX_BYTES,
+    PAYLOAD_METER_HEADS,
+    PAYLOAD_OTA,
+    PAYLOAD_PRICE,
+    PAYLOAD_SMART_PLUGS,
+    PAYLOAD_STATISTIC,
+    REDACTED_VALUE,
+    REDACT_KEYS,
+    TASK_PLAN_BODY,
+    TASK_PLAN_TASKS,
+)
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
@@ -682,7 +681,7 @@ def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
         if sn is None:
             continue
         entries.append((sn, entry))
-    entries.sort(key=lambda item: item[0])
+    entries.sort(key=operator.itemgetter(0))
     return [entry for _, entry in entries]
 
 
@@ -1129,7 +1128,7 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
         return None
 
     sign = -1.0 if text.startswith("-") else 1.0
-    unsigned = text[1:] if text.startswith("-") else text
+    unsigned = text.removeprefix("-")
     if "." not in unsigned:
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
