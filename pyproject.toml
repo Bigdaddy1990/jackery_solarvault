@@ -243,7 +243,7 @@ show-fixes = true
 fix = true
 unsafe-fixes = true
 force-exclude = true
-#output-format= "github"
+output-format= "github"
 preview = true
 exclude = [
     ".bzr",
@@ -430,7 +430,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402"]
+"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
