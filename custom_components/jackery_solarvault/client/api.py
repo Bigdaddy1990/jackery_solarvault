@@ -409,7 +409,11 @@ class JackeryApi:
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
             ) from err
 
-        self.last_login_response = dict(data)
+        if not isinstance(data, dict):
+            raise JackeryApiError(
+                f"Login returned JSON {type(data).__name__}, expected object"
+            )
+
         await self._emit_payload_debug(
             self._http_payload_debug(
                 method=HTTP_METHOD_POST,
@@ -431,6 +435,11 @@ class JackeryApi:
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
+        if not isinstance(payload, dict):
+            raise JackeryApiError(
+                f"Login returned {FIELD_DATA} {type(payload).__name__}, expected object"
+            )
+        self.last_login_response = dict(data)
         self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id
@@ -562,7 +571,7 @@ class JackeryApi:
             data.get("error"),
             data.get(FIELD_RAW_TEXT),
         ]
-        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
+        text = " ".join(str(part) for part in parts if part not in {None, ""}).lower()
         if not text:
             return False
         return any(
@@ -590,14 +599,14 @@ class JackeryApi:
 
     def _is_auth_failure_response(self, status: int, data: object) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
-        if status in (401, 403):
+        if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
             return True
         if status != 200:
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
-        return code not in (CODE_OK, None) and self._response_has_auth_failure_text(
+        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
             data
         )
 
@@ -756,8 +765,16 @@ class JackeryApi:
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
-                ):
-                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                ) as err:
+                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                    raise JackeryApiError(
+                        f"{HTTP_METHOD_GET} {path} returned invalid JSON: {raw!r}"
+                    ) from err
+                if not isinstance(body, dict):
+                    raise JackeryApiError(
+                        f"{HTTP_METHOD_GET} {path} returned JSON "
+                        f"{type(body).__name__}, expected object"
+                    )
                 return status, body
 
         try:
@@ -786,7 +803,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
@@ -831,7 +848,9 @@ class JackeryApi:
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
+    async def async_get_alarm(
+        self, system_id: str | int
+    ) -> Any:  # parsed JSON response, indexed by callers
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -1212,13 +1231,15 @@ class JackeryApi:
         self,
         device_id: str | int,
         *,
-        action: str,
-        function: str,
+        action: str | int | None,
+        function: str | int | None,
         control_allowed: bool = True,
     ) -> bool:
         """POST Shelly control using app-derived action/function values."""
         if not control_allowed:
             raise JackeryApiError("Shelly control is not allowed for this device")
+        if action is None or function is None:
+            raise JackeryApiError("Shelly control requires action and function")
         data = await self._post_form(
             SHELLY_CONTROL_PATH,
             {
@@ -1476,7 +1497,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
@@ -1593,7 +1614,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "

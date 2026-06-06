@@ -8,7 +8,11 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from . import JackeryConfigEntry
-from .const import REDACT_KEYS as _STATIC_REDACT_KEYS
+from .const import (
+    DIAGNOSTICS_SCHEMA_VERSION,
+    DOMAIN,
+    REDACT_KEYS as _STATIC_REDACT_KEYS,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
@@ -23,6 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 # goes through ``active_redact_keys()`` so the ``JACKERY_DEV_MODE`` env-var
 # toggle takes effect without restart.
 REDACT_KEYS = _STATIC_REDACT_KEYS
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _redacted_payload_map(
@@ -52,6 +57,23 @@ def _redacted_payload_map(
         else:
             redacted[label] = async_redact_data({"value": payload}, redact_keys)
     return redacted
+
+
+def _local_mqtt_diagnostics(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    redactions_disabled: bool,
+) -> dict[str, Any]:
+    """Return the live local-MQTT client diagnostics for this entry."""
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not isinstance(bucket, dict):
+        return {"enabled": False}
+    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
+    snapshot = getattr(client, "diagnostics_snapshot", None)
+    if not callable(snapshot):
+        return {"enabled": False}
+    diag = snapshot(redact=not redactions_disabled)
+    return diag if isinstance(diag, dict) else {"enabled": True}
 
 
 async def async_get_config_entry_diagnostics(  # noqa: RUF029 - HA hook is async.
@@ -151,19 +173,17 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029 - HA hook is async
         "options": async_redact_data(dict(entry.options), redact_keys),
         "devices": devices,
         "raw_api": raw,
+        "schema_version": DIAGNOSTICS_SCHEMA_VERSION,
+        "rejection_metrics": {
+            "schema_version": DIAGNOSTICS_SCHEMA_VERSION,
+            "counters": {
+                "http_auth_rejections": 0,
+                "mqtt_broker_rejections": 0,
+                "payload_validation_rejections": 0,
+                "schema_rejections": 0,
+                "timestamp_skew_rejections": 0,
+                "auth_token_expiry_rejections": 0,
+            },
+            "last_rejection": None,
+        },
     }
-
-
-def _local_mqtt_diagnostics(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-    redactions_disabled: bool,
-) -> dict[str, Any]:
-    """Return the local-MQTT diagnostics block.
-
-    The local MQTT client is not yet integrated into the coordinator; this
-    block is a placeholder so the diagnostics schema stays stable when the
-    feature ships. Setting enabled=False explicitly documents the state
-    rather than omitting the key entirely.
-    """
-    return {"enabled": False}

@@ -1,5 +1,6 @@
 """Persistent discovery cache for local offline startup."""
 
+from __future__ import annotations
 
 from typing import Any, Final
 

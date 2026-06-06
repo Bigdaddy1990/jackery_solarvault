@@ -233,9 +233,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             if parsed_online is not None:
                 return parsed_online
             _LOGGER.debug(
-                "Device %s: unrecognized online state %r — treating as unavailable",
+                "Device %s: unrecognized online state %r; falling back to data membership",
                 self._device_id,
                 online,
             )
-            return False
+            return self._device_id in (self.coordinator.data or {})
         return self._device_id in (self.coordinator.data or {})

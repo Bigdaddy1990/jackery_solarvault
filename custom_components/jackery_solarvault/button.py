@@ -323,7 +323,7 @@ def _storm_alert_id(alert: object) -> str | None:
     if not isinstance(alert, dict):
         return None
     raw = alert.get(FIELD_ALERT_ID)
-    if raw in (None, ""):
+    if raw in {None, ""}:
         return None
     return str(raw)
 
@@ -347,7 +347,7 @@ def _smart_plug_device_sn(plug: object) -> str | None:
     if not isinstance(plug, dict):
         return None
     raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
-    if raw in (None, ""):
+    if raw in {None, ""}:
         return None
     return str(raw)
 
@@ -603,6 +603,8 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Refresh the weather/storm plan from the device."""
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -661,11 +663,13 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Read this schedule bucket through the documented app command."""
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_read_device_schedule(
                 self._device_id,
                 task_type=self._task_type,
-                plug_sn=self._plug_sn,
+                smart_plug_sn=self._plug_sn or None,
             )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
@@ -733,6 +737,8 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Delete this storm alert through the documented app command."""
+        if not self.available:
+            self._raise_action_error("storm alert is no longer active")
         try:
             await self.coordinator.async_delete_storm_alert(
                 self._device_id,

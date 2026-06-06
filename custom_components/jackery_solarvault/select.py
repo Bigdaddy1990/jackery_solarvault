@@ -222,14 +222,14 @@ def _price_source_label(source: dict[str, object]) -> str:
     ).strip()
     company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
     label = f"{name} ({country})" if country else name
-    if company_id not in (None, ""):
+    if company_id not in {None, ""}:
         return f"{label} #{company_id}"
     return label
 
 
 def _price_source_regions(source: dict[str, object]) -> list[str]:
     raw = source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION)
-    if raw in (None, ""):
+    if raw in {None, ""}:
         return []
     return [part.strip() for part in str(raw).split(",") if part.strip()]
 
@@ -241,7 +241,7 @@ def _price_source_matches_current(
 ) -> bool:
     if str(source.get(FIELD_PLATFORM_COMPANY_ID)) != str(company_id):
         return False
-    if region in (None, ""):
+    if region in {None, ""}:
         return True
     return str(region) in _price_source_regions(source)
 
@@ -255,7 +255,7 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
         if isinstance(item, dict):
             company_id = item.get(FIELD_PLATFORM_COMPANY_ID)
             country = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
-            if company_id not in (None, "") and country:
+            if company_id not in {None, ""} and country:
                 out.append(item)
     return out
 
@@ -263,7 +263,7 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
 def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id not in (None, "") and bool(region):
+    if company_id not in {None, ""} and bool(region):
         return True
     return bool(_price_sources_from_payload(entity._payload))
 
@@ -485,6 +485,7 @@ async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
     match = re.fullmatch(r"min_(\d+)", option)
     if not match:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
+    assert match is not None
     minutes = int(match.group(1))
     await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
 
@@ -517,6 +518,8 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
         await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
     elif mode == 2:
         await entity.coordinator.async_set_price_mode_single(entity._device_id)
+    else:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 def _price_provider_options(entity: JackerySelect) -> list[str]:
@@ -533,7 +536,7 @@ def _price_provider_options(entity: JackerySelect) -> list[str]:
 def _price_provider_current(entity: JackerySelect) -> str | None:
     company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
     region = entity._price.get(FIELD_SYSTEM_REGION)
-    if company_id in (None, ""):
+    if company_id in {None, ""}:
         return None
     for source in _price_sources_from_payload(entity._payload):
         if _price_source_matches_current(source, company_id, region):
@@ -718,10 +721,10 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             current_company = (payload.get(PAYLOAD_PRICE) or {}).get(
                 FIELD_PLATFORM_COMPANY_ID
             )
-            return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in (
+            return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in {
                 None,
                 "",
-            )
+            }
         if key == "ct_phase_select":
             return isinstance(payload.get(PAYLOAD_CT_METER), dict)
         return False

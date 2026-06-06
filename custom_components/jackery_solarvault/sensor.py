@@ -368,7 +368,9 @@ SAVINGS_PRICE_PRECISION = 5
 # ---------------------------------------------------------------------------
 # Value extraction helpers
 # ---------------------------------------------------------------------------
-def _path(props: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # returns arbitrary nested payload value
+def _path(
+    props: dict[str, Any], *keys: str
+) -> Any:  # returns arbitrary nested payload value
     """Walk a nested path; return None on missing intermediate keys."""
     node: Any = props
     for k in keys:
@@ -388,7 +390,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
         Callable[[Any], float | None]: A function that accepts any value, returns the quotient rounded to 2 decimals when the value can be converted to float, or `None` when conversion fails.
     """
 
-    def _f(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+    def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime
         try:
             return round(float(value) / divisor, 2)
         except TypeError, ValueError:
@@ -1275,9 +1277,14 @@ def _stat_description_has_value(
     description: JackeryStatSensorDescription,
 ) -> bool:
     """Return True when a stat entity has a usable app value now."""
-    source = payload.get(description.section)
-    if not isinstance(source, dict):
-        return False
+    raw_source = payload.get(description.section)
+    # A missing or non-dict primary section (e.g. a trend section the cloud
+    # returned as [] after a timeout, or an endpoint that errored this cycle)
+    # must NOT short-circuit creation: the metric may still be available via
+    # fallback_sources or a day-period sibling. Treat it as empty and let the
+    # fallback/sibling checks below decide, so a sensor with good fallback data
+    # is created instead of silently missing.
+    source = raw_source if isinstance(raw_source, dict) else {}
     reset_period = _period_from_stat_description(description)
     if _trend_series_key(description.section, description.stat_key) is not None:
         if trend_series_has_value(source, description.section, description.stat_key):
@@ -2106,7 +2113,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=FIELD_SINGLE_PRICE,
         section=PAYLOAD_PRICE,
         transform=safe_float,
-        device_class=SensorDeviceClass.MONETARY,
+        # A €/kWh tariff is a fluctuating rate, not a money balance: HA forbids
+        # MONETARY + MEASUREMENT, so model it as a plain measurement (matching
+        # the savings_price entity) rather than the MONETARY device class.
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:currency-eur",
@@ -3058,7 +3067,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         return savings if isinstance(savings, dict) else {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Return the selected calculated value."""
         raw: Any = self._calculation
         for key in self.entity_description.path:
@@ -3296,7 +3305,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                     # add-on battery cards use BatteryPackSub entries. `batNum`
                     # is the expected pack/card count, not a reason to collapse
                     # the first pack into the main device.
-                    pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
+                    pack_count = min(5, max(len(valid_packs), 0, bat_num))
                 for index in range(1, pack_count + 1):
                     for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
                         if pack_desc.field == FIELD_CELL_TEMP and not any(
@@ -3452,7 +3461,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Return the entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
@@ -3663,7 +3672,9 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
-    def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401  # passes through dynamic state value
+    def _non_negative_period_raw(
+        self, raw: Any
+    ) -> Any:  # passes through dynamic state value
         """Guard against negative energy period totals.
 
         If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
@@ -3798,7 +3809,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             stale_period = self._reset_period and self._is_period_data_stale()
             future_period = self._reset_period and self._is_period_data_future()
             if stale_period or future_period:
-                if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR):
+                if self._reset_period in {DATE_TYPE_MONTH, DATE_TYPE_YEAR}:
                     raw = None
                 else:
                     raw = server_total
@@ -3808,7 +3819,8 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             # the sensor value — it only surfaces the inconsistency in debug
             # logs so telemetry issues are diagnosable without unredacted exports.
             if (
-                math.isclose(raw, 0.0)
+                raw is not None
+                and math.isclose(raw, 0.0)
                 and not (stale_period or future_period)
                 and chart_series_sum is not None
                 and chart_series_sum > 0
@@ -3850,7 +3862,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 attrs["stale_period_begin_date"] = self._period_begin_from_meta()
                 attrs["stale_period_fallback"] = (
                     "unknown_until_local_period"
-                    if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+                    if self._reset_period in {DATE_TYPE_MONTH, DATE_TYPE_YEAR}
                     else "server_total"
                 )
             if future_period:
@@ -3858,7 +3870,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 attrs["future_period_begin_date"] = self._period_begin_from_meta()
                 attrs["future_period_fallback"] = (
                     "unknown_until_local_period"
-                    if self._reset_period in (DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+                    if self._reset_period in {DATE_TYPE_MONTH, DATE_TYPE_YEAR}
                     else "server_total"
                 )
             self._cached_attrs = attrs
@@ -3869,7 +3881,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         # exists: cross-validate cloud primary against local/secondary value
         # so a cloud boundary-reset zero doesn't overwrite a valid local reading.
         cloud_raw = source.get(stat_key)
-        local_raw: object = None
+        local_raw: Any = None
         fb_section_used: str | None = None
         fb_stat_key_used: str | None = None
         for fb_section, fb_stat_key in self.entity_description.fallback_sources:
@@ -4018,7 +4030,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -4085,7 +4097,9 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             return {}
         return pack if isinstance(pack, dict) else {}
 
-    def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def _value_from_pack(
+        self, pack: dict[str, Any]
+    ) -> Any:  # dynamic sensor state value
         """Extracts the described battery-pack field from a battery-pack payload and applies the entity transform.
 
         Looks up the field named by the entity description in the provided pack dict. If the primary key is missing, checks a small set of known alias and alternate keys (including current firmware version, device serial candidates, and firmware-upgrade flag) before giving up.
@@ -4175,7 +4189,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Get the entity's last cached native value.
 
         Returns:
@@ -4301,7 +4315,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Get the smart plug entity's current sensor value from its plug payload.
 
         Reads the configured field from the plug data, falls back to known alias fields when the primary key is missing, and applies the entity description's transform.
@@ -4419,7 +4433,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Provide the current value for this meter-head sensor.
 
         Returns:
@@ -4555,7 +4569,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Calculate derived smart-meter powers from signed phase values."""
         return calculated_smart_meter_power(ct, calculation)
 
-    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value
         """Calculate the current value from a CT payload."""
         raw = None
 
@@ -4690,7 +4704,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -5300,7 +5314,7 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
         self._source_key = source_key
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value
         """Return the entity's current value."""
         return self._system.get(self._source_key)
 

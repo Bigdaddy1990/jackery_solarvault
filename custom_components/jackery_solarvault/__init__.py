@@ -403,7 +403,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         lowered = entity_id.lower()
         state = hass.states.get(entity_id)
         unit = None if state is None else state.attributes.get("unit_of_measurement")
-        if unit not in (None, ""):
+        if unit not in {None, ""}:
             continue
 
         # Only stale helpers that explicitly reference this integration should

@@ -64,8 +64,17 @@ _LOGGER = logging.getLogger(__name__)
 #: Default timeout for the GATT connect + notify-subscribe handshake.
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 
-#: Minimum time between (re)connect attempts when the device drops the link.
+#: Backoff after a failed connect *attempt* (device unreachable / GATT
+#: connect raised). Long, so we don't hammer a device that is off or out of
+#: range.
 _RECONNECT_BACKOFF_SEC: float = 30.0
+
+#: Backoff after a *clean* lost link (we were connected and the peripheral
+#: recycled its idle GATT session — normal for SolarVault every ~17 s). The
+#: device is present and advertising, so reconnect quickly instead of leaving
+#: BLE dark for 30 s. Using the long backoff here was capping BLE uptime at
+#: ~36 % (≈17 s up per ≈47 s cycle); a short retry roughly doubles it.
+_LOST_LINK_BACKOFF_SEC: float = 8.0
 
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
 #: runners to honour cancellation. HA's shutdown sequence reports tasks
@@ -281,7 +290,7 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+        from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
 
         try:
             while not self._stop_event.is_set():
@@ -407,6 +416,10 @@ class JackeryBleListener:
                     ),
                     timeout=timeout_sec,
                 )
+        except asyncio.CancelledError:
+            if pending is not None:
+                self._discard_pending_ack(device_id, pending)
+            raise
         except TimeoutError as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
@@ -427,6 +440,9 @@ class JackeryBleListener:
                 await asyncio.wait_for(
                     asyncio.shield(pending.future), timeout=ack_timeout_sec
                 )
+            except asyncio.CancelledError:
+                self._discard_pending_ack(device_id, pending)
+                raise
             except TimeoutError as err:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
@@ -823,7 +839,7 @@ class JackeryBleListener:
                     # do not all fire it reliably, so the 1s poll is a deliberate
                     # robustness net that a single ``Event.wait()`` cannot replace
                     # (hence ASYNC110 is suppressed below).
-                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110
+                    while not self._stop_event.is_set() and client.is_connected:
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"
@@ -860,11 +876,11 @@ class JackeryBleListener:
                 _LOGGER.info(
                     "Jackery BLE %s: lost link, backoff %ss before retry",
                     device_id,
-                    _RECONNECT_BACKOFF_SEC,
+                    _LOST_LINK_BACKOFF_SEC,
                 )
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(), timeout=_RECONNECT_BACKOFF_SEC
+                        self._stop_event.wait(), timeout=_LOST_LINK_BACKOFF_SEC
                     )
                 except TimeoutError:
                     continue

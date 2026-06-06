@@ -1,7 +1,7 @@
 """Repair flows for Jackery SolarVault."""
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 
@@ -44,11 +44,14 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
-            return self.async_create_entry(data={})
-        return self.async_show_form(
-            step_id="confirm",
-            data_schema=vol.Schema({}),
-            description_placeholders=self._description_placeholders,
+            return cast(data_entry_flow.FlowResult, self.async_create_entry(data={}))
+        return cast(
+            data_entry_flow.FlowResult,
+            self.async_show_form(
+                step_id="confirm",
+                data_schema=vol.Schema({}),
+                description_placeholders=self._description_placeholders,
+            ),
         )
 
     async def _async_force_refresh(self) -> None:

@@ -2,8 +2,15 @@
 
 from typing import Final
 
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+
 DOMAIN: Final = "jackery_solarvault"
 MANUFACTURER: Final = "Jackery"
+
+# Schema version of the diagnostics export. Bump on any structural change
+# to the diagnostics payload so downstream dashboards / docs ingest tools
+# can detect and adapt to the new shape.
+DIAGNOSTICS_SCHEMA_VERSION: Final = 1
 
 
 # --- API ---------------------------------------------------------------------
@@ -1162,11 +1169,15 @@ PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX: Final = ".1"
 # logger and forgot to disable it. Genuine first-of-its-kind records are still
 # emitted immediately because the dedup check runs *before* the throttle.
 PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
+# Per-device BLE AES key — base64-encoded 32-byte value from the device entry
+# in ``/v1/device/system/list``. Used to encrypt/decrypt the DFED-framed BLE
+# packets (PROTOCOL.md §14, ``bb/c`` helper).
+FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 REDACT_KEYS: Final = {
     "p",
     "s",
-    "password",
-    "username",
+    CONF_PASSWORD,
+    CONF_USERNAME,
     "ssid",
     "bssid",
     CONF_MQTT_MAC_ID,
@@ -1186,7 +1197,7 @@ REDACT_KEYS: Final = {
     FIELD_WNAME,
     FIELD_MAC,
     FIELD_WIP,
-    "bluetoothKey",
+    FIELD_BLUETOOTH_KEY,
     FIELD_DEVICE_SECRET,
     FIELD_RANDOM_SALT,
     "phone",
@@ -1590,11 +1601,6 @@ FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
 FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
 FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
 
-# Per-device BLE AES key — base64-encoded 32-byte value from the device entry
-# in ``/v1/device/system/list``. Used to encrypt/decrypt the DFED-framed BLE
-# packets (PROTOCOL.md §14, ``bb/c`` helper). Already in REDACT_KEYS.
-FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
-
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the
 # numeric value as the ``devType`` body field for QuerySubDeviceGroupProperty
@@ -1711,7 +1717,12 @@ SUBDEVICE_SCAN_TYPES: Final[frozenset[str]] = frozenset({
 # Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
 MQTT_ACTION_IDS_DEVICE_PROPERTY: Final = frozenset({3011})
 MQTT_ACTION_IDS_ALARM: Final = frozenset({3042})
-MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({3015, 3016, 3017, 3018})
+MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({
+    ACTION_ID_TIMER_TASK_ADD,
+    ACTION_ID_TIMER_TASK_DELETE,
+    ACTION_ID_TIMER_TASK_UPDATE,
+    ACTION_ID_TIMER_TASK_READ,
+})
 MQTT_ACTION_IDS_COMBINE: Final = frozenset({
     3019,
     3021,

@@ -25,15 +25,20 @@ from typing import Any, Final
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
-from .client import JackeryError
+from .client import JackeryAuthError, JackeryError
 from .const import (
     DEFAULT_BLE_ACK_TIMEOUT_SEC,
     DOMAIN,
     FIELD_ID,
     FIELD_SYSTEM_ID,
+    MQTT_ACTION_IDS_SCHEDULE,
     PAYLOAD_SYSTEM,
     SERVICE_DELETE_STORM_ALERT,
     SERVICE_FIELD_ACK_TIMEOUT,
@@ -134,7 +139,7 @@ SEND_BLE_COMMAND_SCHEMA = vol.Schema({
 SEND_DEVICE_SCHEDULE_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
     vol.Required(SERVICE_FIELD_ACTION_ID): vol.All(
-        vol.Coerce(int), vol.In((3015, 3016, 3017, 3018))
+        vol.Coerce(int), vol.In(MQTT_ACTION_IDS_SCHEDULE)
     ),
     vol.Required(SERVICE_FIELD_BODY): vol.Any(dict, cv.string),
 })
@@ -267,6 +272,79 @@ def _service_validation_error(
     )
 
 
+def _text_field(
+    call: ServiceCall,
+    field: str,
+    *,
+    translation_key: str,
+    placeholder_key: str,
+    max_length: int | None = None,
+    numeric: bool = False,
+) -> str:
+    raw = call.data.get(field)
+    if not isinstance(raw, str):
+        value = ""
+        error = f"{field} must be text"
+    else:
+        value = raw.strip()
+        if not value:
+            error = f"{field} must not be empty"
+        elif max_length is not None and len(value) > max_length:
+            error = f"{field} must be at most {max_length} characters"
+        elif numeric and not value.isdigit():
+            error = f"{field} must be numeric"
+        else:
+            return value
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key=translation_key,
+        translation_placeholders={
+            placeholder_key: value,
+            "error": error,
+        },
+    )
+
+
+def _device_id_field(call: ServiceCall, translation_key: str) -> str:
+    raw = call.data.get(SERVICE_FIELD_DEVICE_ID)
+    if not isinstance(raw, str):
+        raise _service_validation_error(
+            translation_key,
+            device_id="",
+            error="device_id must be text",
+        )
+    device_id = raw.strip()
+    if not device_id:
+        raise _service_validation_error(
+            translation_key,
+            device_id="",
+            error="device_id must not be empty",
+        )
+    return device_id
+
+
+def _optional_text(call: ServiceCall, field: str, label: str) -> str:
+    raw = call.data.get(field, "")
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError(f"{label} must be text")
+    return raw
+
+
+def _service_bool(call: ServiceCall, field: str, label: str) -> bool:
+    raw = call.data.get(field)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        if value in {"true", "1", "yes", "on", "enable", "enabled"}:
+            return True
+        if value in {"false", "0", "no", "off", "disable", "disabled"}:
+            return False
+    raise ValueError(f"{label} must be a boolean")
+
+
 def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
     """Parse a BLE command `body` value from a service call into a dict.
 
@@ -314,8 +392,34 @@ def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
 
 async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
     """Forward a rename to the API client of the matching coordinator."""
-    system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()
-    new_name = call.data[SERVICE_FIELD_NEW_NAME].strip()
+    system_id = _text_field(
+        call,
+        SERVICE_FIELD_SYSTEM_ID,
+        translation_key="rename_system_failed",
+        placeholder_key="system_id",
+        numeric=True,
+    )
+    raw_name = call.data.get(SERVICE_FIELD_NEW_NAME)
+    new_name = ""
+    if not isinstance(raw_name, str):
+        name_error = "new_name must be text"
+    else:
+        new_name = raw_name.strip()
+        if not new_name:
+            name_error = "new_name must not be empty"
+        elif len(new_name) > 64:
+            name_error = "new_name must be at most 64 characters"
+        else:
+            name_error = ""
+    if name_error:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="rename_system_failed",
+            translation_placeholders={
+                "system_id": system_id,
+                "error": name_error,
+            },
+        )
     coordinator = _coordinator_for_system(hass, system_id)
     if coordinator is None:
         raise ServiceValidationError(
@@ -327,7 +431,11 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
             },
         )
     try:
-        await coordinator.api.async_set_system_name(system_id, new_name)
+        renamed = await coordinator.api.async_set_system_name(system_id, new_name)
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery rename rejected authentication: {err}"
+        ) from err
     except JackeryError as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -337,6 +445,15 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
                 "error": str(err),
             },
         ) from err
+    if not renamed:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="rename_system_failed",
+            translation_placeholders={
+                "system_id": system_id,
+                "error": "Jackery API reported the rename was not applied",
+            },
+        )
     await coordinator.async_request_refresh()
 
 
@@ -344,7 +461,7 @@ async def _async_handle_refresh_weather_plan(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
     """Trigger a weather-plan refresh on the matching coordinator."""
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    raw = _device_id_field(call, "refresh_weather_plan_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -358,7 +475,11 @@ async def _async_handle_refresh_weather_plan(
         )
     try:
         await coordinator.async_query_weather_plan(device_id)
-    except (JackeryError, LookupError) as err:
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery weather-plan refresh rejected authentication: {err}"
+        ) from err
+    except (JackeryError, LookupError, HomeAssistantError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="refresh_weather_plan_failed",
@@ -377,9 +498,25 @@ async def _async_handle_delete_storm_alert(
     Raises:
         ServiceValidationError: If no coordinator owns the resolved device id, or if the coordinator reports an error while deleting the alert. The error includes translation placeholders `device_id`, `alert_id`, and `error`.
     """
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
-    alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()
+    raw = _device_id_field(call, "delete_storm_alert_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
+    raw_alert_id = call.data.get(SERVICE_FIELD_ALERT_ID)
+    if not isinstance(raw_alert_id, str):
+        alert_id = ""
+        alert_error = "alert_id must be text"
+    else:
+        alert_id = raw_alert_id.strip()
+        alert_error = "" if alert_id else "alert_id must not be empty"
+    if alert_error:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="delete_storm_alert_failed",
+            translation_placeholders={
+                "device_id": device_id,
+                "alert_id": alert_id,
+                "error": alert_error,
+            },
+        )
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
         raise ServiceValidationError(
@@ -393,6 +530,10 @@ async def _async_handle_delete_storm_alert(
         )
     try:
         await coordinator.async_delete_storm_alert(device_id, alert_id)
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery storm-alert delete rejected authentication: {err}"
+        ) from err
     except (JackeryError, LookupError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -424,7 +565,7 @@ async def _async_handle_set_third_party_mqtt_config(
     Raises:
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or if applying the configuration fails. The error includes translation placeholders `device_id` and `error`.
     """
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    raw = _device_id_field(call, "set_third_party_mqtt_config_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -439,13 +580,17 @@ async def _async_handle_set_third_party_mqtt_config(
     try:
         await coordinator.async_set_third_party_mqtt_config(
             device_id,
-            enable=bool(call.data[SERVICE_FIELD_ENABLE]),
+            enable=_service_bool(call, SERVICE_FIELD_ENABLE, "enable"),
             ip=str(call.data[SERVICE_FIELD_IP]).strip(),
             port=int(call.data[SERVICE_FIELD_PORT]),
-            username=str(call.data.get(SERVICE_FIELD_USERNAME, "")),
-            password=str(call.data.get(SERVICE_FIELD_PASSWORD, "")),
-            token=str(call.data.get(SERVICE_FIELD_TOKEN, "")).strip(),
+            username=_optional_text(call, SERVICE_FIELD_USERNAME, "username"),
+            password=_optional_text(call, SERVICE_FIELD_PASSWORD, "password"),
+            token=_optional_text(call, SERVICE_FIELD_TOKEN, "token").strip(),
         )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery MQTT config update rejected authentication: {err}"
+        ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -470,7 +615,7 @@ async def _async_handle_query_third_party_mqtt_config(
     Raises:
         ServiceValidationError: If no Jackery coordinator owns the resolved device id, or if the coordinator query fails. The integration uses translation_key `query_third_party_mqtt_config_failed` for errors.
     """
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    raw = _device_id_field(call, "query_third_party_mqtt_config_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -484,6 +629,10 @@ async def _async_handle_query_third_party_mqtt_config(
         )
     try:
         await coordinator.async_query_third_party_mqtt_config(device_id)
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery MQTT config query rejected authentication: {err}"
+        ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -513,7 +662,7 @@ async def _async_handle_send_ble_command(
     Raises:
         ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
     """
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    raw = _device_id_field(call, "send_ble_command_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -564,7 +713,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
     """
-    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    raw = _device_id_field(call, "send_device_schedule_failed")
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -580,6 +729,10 @@ async def _async_handle_send_device_schedule(
             action_id=int(call.data[SERVICE_FIELD_ACTION_ID]),
             body=body,
         )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed(
+            f"Jackery schedule send rejected authentication: {err}"
+        ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         raise _service_validation_error(
             "send_device_schedule_failed",

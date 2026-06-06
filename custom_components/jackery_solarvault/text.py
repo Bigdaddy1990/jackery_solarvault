@@ -274,7 +274,7 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
     def native_value(self) -> str | None:
         """Return the current app grid-standard code."""
         raw = self._system.get(FIELD_GRID_STANDARD)
-        if raw in (None, ""):
+        if raw in {None, ""}:
             return None
         return str(raw)
 

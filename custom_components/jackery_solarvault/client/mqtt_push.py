@@ -15,7 +15,7 @@ import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 _AIOMQTT_LOGGER.setLevel(logging.WARNING)
+_MAX_PENDING_MESSAGE_TASKS = 32
 
 
 class _AioMqttPassiveDisconnectFilter(logging.Filter):
@@ -110,6 +111,8 @@ class JackeryMqttPushClient:
         self._tls_custom_ca_loaded = False
         self._tls_certificate_source = "not_built"
         self._tls_x509_strict_disabled = False
+        self._stopping = False
+        self._message_tasks: set[asyncio.Task[None]] = set()
 
     async def async_start(
         self,
@@ -148,6 +151,7 @@ class JackeryMqttPushClient:
             self._connected = False
             self._last_error = None
             self._last_connect_failure_signature = None
+            self._stopping = False
 
             ssl_context = await self._hass.async_add_executor_job(
                 self._build_ssl_context_blocking
@@ -236,6 +240,11 @@ class JackeryMqttPushClient:
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
             raise RuntimeError(f"MQTT publish failed: {err}") from err
+        except Exception as err:
+            self._connected = False
+            self._connected_event.clear()
+            self._last_error = f"publish failed: {err}"
+            raise RuntimeError(f"MQTT publish failed: {err}") from err
         self._last_published_topic = topic
         self._last_publish_at = self._utc_now_iso()
 
@@ -281,6 +290,7 @@ class JackeryMqttPushClient:
         If a background runner task exists, cancel it and wait for its completion while suppressing cancellation, MQTT, and generic exceptions. Clears the stored client, fingerprint, subscribed topics, connected flag, and connected event so the instance is left in a stopped state.
         """
         task = self._runner_task
+        self._stopping = True
         if task is None:
             return
         self._runner_task = None
@@ -365,7 +375,11 @@ class JackeryMqttPushClient:
                 self._connected_event.set()
             else:
                 self._connected_event.clear()
-            if was_connected and self._disconnect_callback is not None:
+            if (
+                was_connected
+                and not self._stopping
+                and self._disconnect_callback is not None
+            ):
                 self._schedule_coroutine(
                     self._disconnect_callback(), "disconnect-recover"
                 )
@@ -460,7 +474,7 @@ class JackeryMqttPushClient:
         Returns:
             True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes), False otherwise.
         """
-        return rc in (4, 5, 134, 135)
+        return rc in {4, 5, 134, 135}
 
     @staticmethod
     def _is_connect_failure_error(error: str | None) -> bool:
@@ -563,21 +577,39 @@ class JackeryMqttPushClient:
         self._messages_seen += 1
         self._last_message_at = self._utc_now_iso()
         self._last_message_error = None
-        self._schedule_coroutine(self._message_callback(topic, data), "message")
+        if len(self._message_tasks) >= _MAX_PENDING_MESSAGE_TASKS:
+            self._messages_dropped += 1
+            self._last_message_error = "message callback backlog full"
+            return
+        self._schedule_coroutine(
+            self._message_callback(topic, data),
+            "message",
+            tracked_tasks=self._message_tasks,
+        )
 
-    def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
+    def _schedule_coroutine(
+        self,
+        coro: Awaitable[None],
+        label: str,
+        *,
+        tracked_tasks: set[asyncio.Task[None]] | None = None,
+    ) -> None:
         async def _runner() -> None:
             await coro
 
         task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
+        if tracked_tasks is not None:
+            tracked_tasks.add(task)
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
+            if tracked_tasks is not None:
+                tracked_tasks.discard(done)
             try:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
-                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
+            except Exception:
+                _LOGGER.exception("Jackery MQTT %s handler failed", label)
 
         task.add_done_callback(_log_task_result)
 

@@ -76,7 +76,9 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+def _standby_is_on(
+    raw: Any,
+) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
     Parameters:
@@ -437,7 +439,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     def _cloud_device_id(plug: dict[str, Any]) -> str | None:
         """Return the Shelly Cloud ``deviceId`` used by the app control API."""
         raw = plug.get(FIELD_DEVICE_ID) or plug.get(FIELD_ID) or plug.get(FIELD_DEV_ID)
-        if raw in (None, ""):
+        if raw in {None, ""}:
             return None
         return str(raw)
 
@@ -445,7 +447,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     def _jackery_device_sn(plug: dict[str, Any]) -> str | None:
         """Return the real Jackery subdevice serial for local/BLE setters."""
         raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
-        if raw in (None, ""):
+        if raw in {None, ""}:
             return None
         return str(raw)
 

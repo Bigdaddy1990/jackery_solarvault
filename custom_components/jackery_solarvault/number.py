@@ -365,7 +365,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         for key in self.entity_description.source_keys:
             val = section.get(key)
             if val is not None:
-                return safe_float(val)
+                parsed = safe_float(val)
+                if parsed is not None:
+                    return parsed
         return self.entity_description.none_fallback
 
     @property

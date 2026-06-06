@@ -24,7 +24,7 @@ import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_KEEPALIVE_SEC,
@@ -43,7 +43,7 @@ logging.getLogger("aiomqtt").setLevel(logging.WARNING)
 _AIOMQTT_LOGGER.setLevel(logging.WARNING)
 
 # Strict by default: no implicit wildcard subscription.
-LOCAL_MQTT_DEFAULT_TOPIC: str = ""
+LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
 
 # Track topic names with a sensible upper bound so a misconfigured broker
 # (foreign neighbours publishing on the same LAN) cannot explode memory.
@@ -487,8 +487,8 @@ class JackeryLocalMqttClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
-                _LOGGER.error("Jackery local MQTT %s handler failed: %s", label, err)
+            except Exception:
+                _LOGGER.exception("Jackery local MQTT %s handler failed", label)
 
         task.add_done_callback(_log_task_result)
 

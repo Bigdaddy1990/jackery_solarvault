@@ -4,7 +4,7 @@
   "after_dependencies": [
     "bluetooth",
     "dhcp",
-    "http"
+    "http",
     "mdns",
     "mqtt",
     "recorder",
@@ -23,45 +23,12 @@
   "config_flow": true,
   "dependencies": [],
   "dhcp": [
-        {
-        "domain": "jackery",
-        "hostname": "lwip-*",
-        "macaddress": "80F1B2F9E348"
-        },
+    {
+      "hostname": "lwip-*",
+      "macaddress": "80F1B2F9E348"
+    }
   ],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
-  "mqtt": [
-      {
-      "dsmr_reader": [
-        "dsmr/#",
-        ],
-      "esphome": [
-        "esphome/discover/#",
-        ],
-      "lwip": [
-        "hb/",
-        "#",
-        "homeassistant"
-        ],
-      "jackery": [
-        "hb/",
-        "homeassistant/",
-        "jackery/",
-        "#"
-        ],
-      "qbus": [
-        "cloudapp/QBUSMQTTGW/state",
-        "cloudapp/QBUSMQTTGW/config",
-        "cloudapp/QBUSMQTTGW/+/state",
-        ],
-      "tasmota": [
-        "tasmota/discovery/#",
-        ],
-      "tuya": [
-        "tuya/#"
-        ]
-      },
-  ],
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
@@ -77,11 +44,13 @@
     "aiomqtt",
     "aiodns",
     "aiohttp",
-    "ble",
-    "zeroconf",
-    "dhcp",
-    "mdns",
-    "lwip"
+    "bluetooth"
+    "http",
+    "zeroconf"
+  ],
+  "mqtt": [
+    "jackery/#",
+    "hb/#"
   ],
   "quality_scale": "custom",
   "requirements": [
@@ -90,40 +59,22 @@
   "version": "0.1.1",
   "zeroconf": [
     {
-    "_api._tcp.local.": [
-        {
-            "domain": "jackery",
-            "properties": {
-                "device": "SolarVault",
-                 },
-        },
-    ],
-    "_api._udp.local.": [
-        {
-          "domain": "jackery",
-            "properties": {
-                "device": "SolarVault",
-                },
-        },
-    ],
-    "_http._tcp.local.": [
-        {
-            "domain": "jackery",
-            "properties": {
-                "device": "SolarVault",
-                },
-        },
-    ],
-    "_ipp._tcp.local.": [
-        {
-            "domain": "ipp",
-        },
-    ],
-    "_ipps._tcp.local.": [
-        {
-            "domain": "ipp",
-        },
-        ],
+      "type": "_api._tcp.local.",
+      "properties": {
+        "device": "SolarVault"
+      }
     },
+    {
+      "type": "_api._udp.local.",
+      "properties": {
+        "device": "SolarVault"
+      }
+    },
+    {
+      "type": "_http._tcp.local.",
+      "properties": {
+        "device": "SolarVault"
+      }
+    }
   ]
 }

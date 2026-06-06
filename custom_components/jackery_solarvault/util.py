@@ -6,10 +6,11 @@ from datetime import UTC, date, datetime, timedelta
 import json
 import logging
 import math
+import operator
 import os
 from pathlib import Path
 import re
-from typing import Any, NamedTuple, cast
+from typing import Any, Final, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -231,7 +232,9 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401  # arbitrary payload timestamp, coerced at runtime
+def parse_utc_datetime(
+    value: Any,
+) -> datetime:  # arbitrary payload timestamp, coerced at runtime
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
 
     Parameters:
@@ -374,7 +377,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     return today.replace(month=1, day=1), today.replace(month=12, day=31)
 
 
-def _app_period_bound_to_date(value: str | date, *, field_name: str) -> date:
+def _app_period_bound_to_date(value: str | date | datetime, *, field_name: str) -> date:
     """Return a validated ISO date bound for a Jackery app period request."""
     if isinstance(value, datetime):
         return value.date()
@@ -476,7 +479,9 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def safe_float(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+def safe_float(
+    value: Any,
+) -> float | None:  # arbitrary payload value, coerced at runtime
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
 
     Parameters:
@@ -507,7 +512,7 @@ def safe_float(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload
         return None
 
 
-def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime
     """Convert a value to an integer when possible.
 
     Returns None for a None input or when the value cannot be converted to an integer.
@@ -515,15 +520,27 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload val
     Returns:
         int: The converted integer if successful, `None` otherwise.
     """
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return None
+        signless = candidate.removeprefix("-").removeprefix("+")
+        if not signless.isdigit():
+            return None
+        try:
+            return int(candidate)
+        except ValueError:
+            return None
     try:
         return int(value)
     except TypeError, ValueError:
-        try:
-            return int(float(value))
-        except TypeError, ValueError:
-            return None
+        return None
 
 
 def first_nonblank_int(value: object) -> int | None:
@@ -585,7 +602,9 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
     )
 
 
-def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def _payload_debug_redacted(
+    value: Any, redactions_disabled: bool | None = None
+) -> Any:  # recursive JSON walker over arbitrary payload
     """Create a JSON-serializable copy of `value` with sensitive fields redacted.
 
     When `redactions_disabled` is True (or when omitted and diagnostics redactions are disabled), returns a normalized passthrough of `value`. Otherwise, recursively replaces values for keys listed in `REDACT_KEYS` with `REDACTED_VALUE`, preserves overall structure, and converts tuples to lists so the result is JSON-serializable.
@@ -623,7 +642,9 @@ def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None)
     return value
 
 
-def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def _payload_debug_passthrough(
+    value: Any,
+) -> Any:  # recursive JSON walker over arbitrary payload
     """Normalize a nested structure into JSON-serializable types.
 
     Converts mapping keys to strings and converts tuples to lists while recursively
@@ -649,7 +670,9 @@ def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive 
     return value
 
 
-def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def redacted_json_safe_payload(
+    value: Any,
+) -> Any:  # recursive JSON walker over arbitrary payload
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
     The redaction is applied recursively to nested dicts/lists/tuples while preserving the overall structure and types that are JSON-serializable.
@@ -756,7 +779,7 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -822,7 +845,7 @@ def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
         if sn is None:
             continue
         entries.append((sn, entry))
-    entries.sort(key=lambda item: item[0])
+    entries.sort(key=operator.itemgetter(0))
     return [entry for _, entry in entries]
 
 
@@ -854,7 +877,7 @@ def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
         if sn is None:
             continue
         entries.append((sn, entry))
-    entries.sort(key=lambda item: item[0])
+    entries.sort(key=operator.itemgetter(0))
     return [entry for _, entry in entries]
 
 
@@ -1064,8 +1087,45 @@ def verify_and_backfill(
     if cloud_value is None and local_value is None:
         return None
     if cloud_value is None:
+        if math.isnan(local_value) or local_value < 0:
+            _LOGGER.debug(
+                "verify_and_backfill %s: rejecting invalid local value %.4f",
+                label,
+                local_value,
+            )
+            return None
+        return local_value
+    if math.isnan(cloud_value) or cloud_value < 0:
+        if local_value is None:
+            _LOGGER.debug(
+                "verify_and_backfill %s: rejecting invalid cloud value %.4f",
+                label,
+                cloud_value,
+            )
+            return None
+        if math.isnan(local_value) or local_value < 0:
+            _LOGGER.debug(
+                "verify_and_backfill %s: rejecting invalid cloud=%.4f local=%.4f",
+                label,
+                cloud_value,
+                local_value,
+            )
+            return None
+        _LOGGER.debug(
+            "verify_and_backfill %s: cloud=%.4f invalid; using local=%.4f",
+            label,
+            cloud_value,
+            local_value,
+        )
         return local_value
     if local_value is None:
+        return cloud_value
+    if math.isnan(local_value) or local_value < 0:
+        _LOGGER.debug(
+            "verify_and_backfill %s: ignoring invalid local value %.4f",
+            label,
+            local_value,
+        )
         return cloud_value
     if math.isclose(cloud_value, 0.0) and local_value > 0:
         _LOGGER.debug(
@@ -1093,11 +1153,20 @@ def verify_and_backfill(
     return cloud_value
 
 
+# Earliest local hour at which a zero day-total is considered suspicious.
+# Before this, a 0 for "today" is normal (PV makes nothing overnight, little
+# has charged since local midnight), so the §2.2 §5 zero-confirmation rule must
+# not raise a repair issue — otherwise it fires a false positive every night.
+ZERO_CONFIRM_MIN_LOCAL_HOUR: Final = 20
+
+
 def app_data_quality_warnings(
     payload: dict[str, Any],
     *,
     today: date | None = None,
+    now: datetime | None = None,
     tolerance: float = 0.05,
+    zero_confirm_min_hour: int = ZERO_CONFIRM_MIN_LOCAL_HOUR,
 ) -> list[AppDataQualityWarning]:
     """Detect contradictory statistics in an app payload and produce structured warnings.
 
@@ -1287,8 +1356,16 @@ def app_data_quality_warnings(
         # §2.2 §5: 0-value confirmation — flag when day=0 but week/month are
         # meaningfully non-zero, indicating a probable cloud boundary-reset zero
         # that has not been confirmed by an adjacent period.
+        #
+        # Gate on local time: overnight/early-morning a 0 day-total is normal
+        # (no PV yet, little charged since midnight), so the cloud returning an
+        # empty day-stat then is NOT an inconsistency. Only treat a zero day as
+        # suspicious once the local day is advanced enough that real data is
+        # expected. When ``now`` is unknown the guard is skipped (legacy/tests).
+        zero_confirm_ready = now is None or now.hour >= zero_confirm_min_hour
         if (
             day is not None
+            and zero_confirm_ready
             and math.isclose(day, 0.0)
             and (
                 (week is not None and week > tolerance)
@@ -1461,10 +1538,10 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
         return None
 
     sign = -1.0 if text.startswith("-") else 1.0
-    unsigned = text[1:] if text.startswith("-") else text
+    unsigned = text.removeprefix("-")
     if "." not in unsigned:
         parsed = safe_float(value)
-        return None if parsed is None else (0.0, parsed)
+        return None if parsed is None else (parsed, 0.0)
 
     whole_text, fraction_text = unsigned.split(".", 1)
     if not whole_text:
@@ -1474,11 +1551,11 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
         return None if parsed is None else (0.0, parsed)
 
     whole = sign * float(int(whole_text))
-    fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
+    fraction_int = int(fraction_text)
+    fraction = sign * (fraction_int / (10 ** len(fraction_text)))
 
     if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
-        parsed = safe_float(value)
-        return None if parsed is None else (0.0, parsed)
+        return whole, 0.0
     return whole, fraction
 
 
@@ -1511,12 +1588,8 @@ def expanded_year_series_values(
     raw_sum = round(sum(raw_values), 2)
     direct_total = safe_float(source.get(stat_key))
 
-    if direct_total is not None:
-        tolerance = max(0.05, abs(direct_total) * 0.005)
-        if abs(raw_sum - direct_total) <= tolerance:
-            return raw_values
-
     expanded = [0.0 for _ in series]
+    compact_encoded = False
     for index, raw_value in enumerate(series):
         parts = _compact_year_parts(raw_value)
         if parts is None:
@@ -1525,10 +1598,21 @@ def expanded_year_series_values(
         if previous_value:
             target = index - 1 if index > 0 else index
             expanded[target] += previous_value
+            compact_encoded = compact_encoded or (
+                isinstance(raw_value, str) and target != index
+            )
         if current_value:
             expanded[index] += current_value
+            compact_encoded = compact_encoded or isinstance(raw_value, str)
 
     expanded = [round(value, 5) for value in expanded]
+    if compact_encoded and expanded != raw_values:
+        return expanded
+
+    if direct_total is not None:
+        tolerance = max(0.05, abs(direct_total) * 0.005)
+        if abs(raw_sum - direct_total) <= tolerance:
+            return raw_values
 
     if direct_total is not None:
         expanded_sum = round(sum(expanded), 2)
@@ -3099,7 +3183,9 @@ def trend_series_has_value(
     )
 
 
-def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # payload value of unknown type by design
+def task_plan_value(
+    task_plan: dict[str, Any], *keys: str
+) -> Any:  # payload value of unknown type by design
     """Retrieve the first non-None value for any of the given keys from a task-plan payload.
 
     Searches in this order: the top-level of `task_plan`, the `TASK_PLAN_BODY` dictionary (if present), then each dictionary item in the `TASK_PLAN_TASKS` list (if present). Keys are checked in the order provided and the first non-`None` match is returned.
