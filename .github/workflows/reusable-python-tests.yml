@@ -221,7 +221,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          python -m pytest_homeassistant_custom_component \
+          python -m pytest
             --cov=custom_components/jackery_solarvault \
             --cov-branch \
             --cov-report=xml:"${{ env.COVERAGE_XML }}" \
