@@ -17,7 +17,11 @@ from typing import Any
 
 import pytest
 
-from custom_components.jackery_solarvault.client import JackeryApi, JackeryAuthError, JackeryError
+from custom_components.jackery_solarvault.client import (
+    JackeryApi,
+    JackeryAuthError,
+    JackeryError,
+)
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy (exported from the client sub-package)

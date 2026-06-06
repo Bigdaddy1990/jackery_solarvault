@@ -4,7 +4,10 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryAuthError, JackeryError
+from custom_components.jackery_solarvault.client.api import (
+    JackeryAuthError,
+    JackeryError,
+)
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
