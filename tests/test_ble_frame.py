@@ -408,36 +408,42 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     # (raw_hex, expected_cmd, expected_body_len, first_body_byte_marker)
     # Captured 2026-05-16 from SolarVault 3 Pro Max via ESPHome BLE proxy.
     (
-        ("32373731383339313431373738393000"
-        "e85350bc2bc69eb244252c5745eb0a619f341bfa5a92b34c3be3786db38a4ebf"
-        "2d578615198d49eea423bf07199c66b9118a57c33b027a71be688bd64d36917e"
-        "f39233a369ccd53a9eccbdf712a901961f8fd9b555f08dc75320909403a7c442"
-        "d63745bc549382cabc227ef031ed865645aeda679dbfc027bf1ac1c2dff827b3"
-        "3c9236e7baf89ccf97c910defa78e356d409dad3c9b5d3c1fdaaed8286334869"
-        "ed300b6b056b37b1866b1fea8196d65ce839a5f46f3c42d40f17e233ea7dfbdf"
-        "97b8efca02b6722050998354402ee58c70afcfdc33ee29b220b251828d46a4ab"
-        "f7b862ec34ef1473d2ba21c34564cb241470a85f3eef7a9f409c327fd8ac0e13"
-        "8f17f38446261f24974099a3e72dbe775395b21baede73017a3db60f519ac5a3"
-        "d41ab2aba9b013e754ed4a0d0a666442"),
+        (
+            "32373731383339313431373738393000"
+            "e85350bc2bc69eb244252c5745eb0a619f341bfa5a92b34c3be3786db38a4ebf"
+            "2d578615198d49eea423bf07199c66b9118a57c33b027a71be688bd64d36917e"
+            "f39233a369ccd53a9eccbdf712a901961f8fd9b555f08dc75320909403a7c442"
+            "d63745bc549382cabc227ef031ed865645aeda679dbfc027bf1ac1c2dff827b3"
+            "3c9236e7baf89ccf97c910defa78e356d409dad3c9b5d3c1fdaaed8286334869"
+            "ed300b6b056b37b1866b1fea8196d65ce839a5f46f3c42d40f17e233ea7dfbdf"
+            "97b8efca02b6722050998354402ee58c70afcfdc33ee29b220b251828d46a4ab"
+            "f7b862ec34ef1473d2ba21c34564cb241470a85f3eef7a9f409c327fd8ac0e13"
+            "8f17f38446261f24974099a3e72dbe775395b21baede73017a3db60f519ac5a3"
+            "d41ab2aba9b013e754ed4a0d0a666442"
+        ),
         107,  # DevicePropertyChange
         272,
         "{",
     ),
     (
-        ("3134373339363034343131373738390030b643e9f3747cb075dabffa3115ecb0"
-        "261ed615b0a5e0ec7c767ebca1b0b127a744947c40497e2d5f2e1e579d206147"
-        "320499d1e235be30e08251195d8a7d6167dbb5edc976f237ec80d1137ab31f25"
-        "d56acc46040630775e163c84f9b1cf1ae92ebad5f7fc2c68be73daca864a1c6c"
-        "6240f285a4b5782cba46870dcafb5f52c581dcc868b5541ddd221516b9363ae7"),
+        (
+            "3134373339363034343131373738390030b643e9f3747cb075dabffa3115ecb0"
+            "261ed615b0a5e0ec7c767ebca1b0b127a744947c40497e2d5f2e1e579d206147"
+            "320499d1e235be30e08251195d8a7d6167dbb5edc976f237ec80d1137ab31f25"
+            "d56acc46040630775e163c84f9b1cf1ae92ebad5f7fc2c68be73daca864a1c6c"
+            "6240f285a4b5782cba46870dcafb5f52c581dcc868b5541ddd221516b9363ae7"
+        ),
         111,  # ControlSubDevice (sub-device incremental property)
         118,
         "{",
     ),
     (
-        ("393936333539323634313737383930006852f3235ffc0dbd0586c39e2237a31a"
-        "c8d0d400d3286e94dca1adeb3de5db4c5f8d251fcfc16549af868bdd29e12c17"
-        "d682bd1c2e0eb6ea0fdd508c18d2c41880a737b5e554ad218db53182ec08ed59"
-        "d0e245afc3cffd959eb463a07a658fc25e83c7e0f45c444345b7d05be3bee98a"),
+        (
+            "393936333539323634313737383930006852f3235ffc0dbd0586c39e2237a31a"
+            "c8d0d400d3286e94dca1adeb3de5db4c5f8d251fcfc16549af868bdd29e12c17"
+            "d682bd1c2e0eb6ea0fdd508c18d2c41880a737b5e554ad218db53182ec08ed59"
+            "d0e245afc3cffd959eb463a07a658fc25e83c7e0f45c444345b7d05be3bee98a"
+        ),
         111,
         78,
         "{",

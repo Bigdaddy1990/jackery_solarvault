@@ -6565,7 +6565,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             for month in previous_months
                         ),
                     )
-                    months.update({month: source for month, source in zip(previous_months, sources, strict=False) if isinstance(source, dict)})
+                    months.update({
+                        month: source
+                        for month, source in zip(previous_months, sources, strict=False)
+                        if isinstance(source, dict)
+                    })
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(bundle, month_history)
@@ -6757,7 +6761,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 sources = await asyncio.gather(
                     *(_fetch_device_month(prefix, month) for month in previous_months),
                 )
-                months.update({month: source for month, source in zip(previous_months, sources, strict=False) if isinstance(source, dict)})
+                months.update({
+                    month: source
+                    for month, source in zip(previous_months, sources, strict=False)
+                    if isinstance(source, dict)
+                })
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(out, month_history)
