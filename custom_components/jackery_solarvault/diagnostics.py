@@ -144,65 +144,97 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029 - HA hook is async
             "dev_mode": dev_mode_redactions_disabled(),
             "redactions_disabled": redactions_disabled,
         },
-        "login_response": _cap_section(async_redact_data(
-            coordinator.api.last_login_response or {}, redact_keys
-        )),
-        "system_list_response": _cap_section(async_redact_data(
-            coordinator.api.last_system_list_response or {}, redact_keys
-        )),
-        "property_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_property_responses, "property_response", redact_keys
-        )),
-        "alarm_response": _cap_section(async_redact_data(
-            coordinator.api.last_alarm_response or {}, redact_keys
-        )),
-        "statistic_response": _cap_section(async_redact_data(
-            coordinator.api.last_statistic_response or {}, redact_keys
-        )),
-        "price_response": _cap_section(async_redact_data(
-            coordinator.api.last_price_response or {}, redact_keys
-        )),
-        "price_sources_response": _cap_section(async_redact_data(
-            coordinator.api.last_price_sources_response or {}, redact_keys
-        )),
-        "price_history_config_response": _cap_section(async_redact_data(
-            coordinator.api.last_price_history_config_response or {}, redact_keys
-        )),
-        "device_statistic_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_device_statistic_responses,
-            "device_statistic_response",
-            redact_keys,
-        )),
-        "device_period_stat_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_device_period_stat_responses,
-            "device_period_stat_response",
-            redact_keys,
-        )),
-        "battery_pack_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_battery_pack_responses,
-            "battery_pack_response",
-            redact_keys,
-        )),
-        "ota_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_ota_responses, "ota_response", redact_keys
-        )),
-        "location_responses": _cap_section(_redacted_payload_map(
-            coordinator.api.last_location_responses, "location_response", redact_keys
-        )),
-        "mqtt": _cap_section(async_redact_data(
-            coordinator.mqtt_diagnostics_snapshot(
-                redact_topics=not redactions_disabled
-            ),
-            redact_keys,
-        )),
-        "local_mqtt": _cap_section(_local_mqtt_diagnostics(hass, entry, redactions_disabled)),
-        "ble_transport": _cap_section(_redacted_payload_map(
-            coordinator.ble_observations(), "ble_device", redact_keys
-        )),
-        "statistics_backfill": _cap_section(async_redact_data(
-            coordinator.statistics_backfill_diagnostics,
-            redact_keys,
-        )),
+        "login_response": _cap_section(
+            async_redact_data(coordinator.api.last_login_response or {}, redact_keys)
+        ),
+        "system_list_response": _cap_section(
+            async_redact_data(
+                coordinator.api.last_system_list_response or {}, redact_keys
+            )
+        ),
+        "property_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_property_responses,
+                "property_response",
+                redact_keys,
+            )
+        ),
+        "alarm_response": _cap_section(
+            async_redact_data(coordinator.api.last_alarm_response or {}, redact_keys)
+        ),
+        "statistic_response": _cap_section(
+            async_redact_data(
+                coordinator.api.last_statistic_response or {}, redact_keys
+            )
+        ),
+        "price_response": _cap_section(
+            async_redact_data(coordinator.api.last_price_response or {}, redact_keys)
+        ),
+        "price_sources_response": _cap_section(
+            async_redact_data(
+                coordinator.api.last_price_sources_response or {}, redact_keys
+            )
+        ),
+        "price_history_config_response": _cap_section(
+            async_redact_data(
+                coordinator.api.last_price_history_config_response or {}, redact_keys
+            )
+        ),
+        "device_statistic_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_device_statistic_responses,
+                "device_statistic_response",
+                redact_keys,
+            )
+        ),
+        "device_period_stat_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_device_period_stat_responses,
+                "device_period_stat_response",
+                redact_keys,
+            )
+        ),
+        "battery_pack_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_battery_pack_responses,
+                "battery_pack_response",
+                redact_keys,
+            )
+        ),
+        "ota_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_ota_responses, "ota_response", redact_keys
+            )
+        ),
+        "location_responses": _cap_section(
+            _redacted_payload_map(
+                coordinator.api.last_location_responses,
+                "location_response",
+                redact_keys,
+            )
+        ),
+        "mqtt": _cap_section(
+            async_redact_data(
+                coordinator.mqtt_diagnostics_snapshot(
+                    redact_topics=not redactions_disabled
+                ),
+                redact_keys,
+            )
+        ),
+        "local_mqtt": _cap_section(
+            _local_mqtt_diagnostics(hass, entry, redactions_disabled)
+        ),
+        "ble_transport": _cap_section(
+            _redacted_payload_map(
+                coordinator.ble_observations(), "ble_device", redact_keys
+            )
+        ),
+        "statistics_backfill": _cap_section(
+            async_redact_data(
+                coordinator.statistics_backfill_diagnostics,
+                redact_keys,
+            )
+        ),
     }
 
     return {

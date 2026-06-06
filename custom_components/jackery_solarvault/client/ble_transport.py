@@ -291,7 +291,9 @@ class JackeryBleListener:
         if cmd != 106 or current_started_at is not None:
             return current_started_at
         started_at = datetime.now()
-        self._pending_property_query_starts.setdefault(device_id, deque(maxlen=4)).append(started_at)
+        self._pending_property_query_starts.setdefault(
+            device_id, deque(maxlen=4)
+        ).append(started_at)
         return started_at
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
@@ -755,10 +757,7 @@ class JackeryBleListener:
             asyncio.CancelledError: if the task is cancelled during shutdown.
         """  # noqa: E501, RUF100
         from bleak.exc import BleakError
-        from bleak_retry_connector import (
-            BLEAK_RETRY_EXCEPTIONS,
-            establish_connection,
-        )
+        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
         from homeassistant.components import bluetooth
 
@@ -774,7 +773,7 @@ class JackeryBleListener:
                     )
                     return
                 backoff = min(
-                    _RECONNECT_BACKOFF_SEC * (2 ** consecutive_failures),
+                    _RECONNECT_BACKOFF_SEC * (2**consecutive_failures),
                     _MAX_BACKOFF_SEC,
                 )
                 ble_device = bluetooth.async_ble_device_from_address(

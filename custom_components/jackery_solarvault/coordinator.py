@@ -1310,10 +1310,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             return
         try:
-            from .client.ble_transport import (
-                BleFrameObservation,
-                JackeryBleListener,
-            )
+            from .client.ble_transport import BleFrameObservation, JackeryBleListener
         except ImportError as err:
             _LOGGER.warning(
                 "Jackery BLE transport requested but module import failed: %s",
@@ -4310,9 +4307,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body_fields={"pageIndex": int(page_index)},
         )
 
-    async def async_bind_smart_part(
-        self, device_id: str, accessory_sn: str
-    ) -> None:
+    async def async_bind_smart_part(self, device_id: str, accessory_sn: str) -> None:
         """Bind a smart accessory to the device (actionId 3012, cmd 108)."""
         await self._async_publish_command(
             device_id,
@@ -4322,9 +4317,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body_fields={"sn": accessory_sn},
         )
 
-    async def async_unbind_smart_part(
-        self, device_id: str, accessory_sn: str
-    ) -> None:
+    async def async_unbind_smart_part(self, device_id: str, accessory_sn: str) -> None:
         """Unbind a smart accessory from the device (actionId 3013, cmd 109)."""
         await self._async_publish_command(
             device_id,
@@ -6337,7 +6330,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return last_value
             try:
                 value = await fetcher()
-            except (JackeryAuthError, JackeryApiError):
+            except JackeryAuthError, JackeryApiError:
                 raise
             except (
                 Exception

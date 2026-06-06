@@ -3293,9 +3293,7 @@ async def async_setup_entry(  # noqa: C901, RUF029
             if config_entry_bool_option(
                 entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT
             ):
-                _append_unique(
-                    entities, JackeryBleTransportSensor(coordinator, dev_id)
-                )
+                _append_unique(entities, JackeryBleTransportSensor(coordinator, dev_id))
 
             # Add-on battery packs come from the app's MQTT BatteryPackSub model.
             # Create the complete pack entity set once a pack exists or batNum
@@ -4746,7 +4744,9 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         )
         model = model_label or scan_name
         sn = ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_SN) or ct.get(FIELD_MAC)
-        mac_suffix = f" ({str(sn)[-4:].upper()})" if sn and scan_name == "Smart Meter" else ""
+        mac_suffix = (
+            f" ({str(sn)[-4:].upper()})" if sn and scan_name == "Smart Meter" else ""
+        )
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_smart_meter")},
             manufacturer=manufacturer,

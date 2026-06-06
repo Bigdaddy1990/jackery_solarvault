@@ -368,7 +368,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 self._messages_dropped += 1
                 parsed = None
             if isinstance(parsed, dict):

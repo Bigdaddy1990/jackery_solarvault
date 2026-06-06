@@ -381,7 +381,13 @@ class JackeryMqttPushClient:
                 )
                 for topic in self._topics:
                     try:
-                        qos = 0 if any(topic.endswith(f"/{s}") for s in _QOS0_TOPIC_SUFFIXES) else 1
+                        qos = (
+                            0
+                            if any(
+                                topic.endswith(f"/{s}") for s in _QOS0_TOPIC_SUFFIXES
+                            )
+                            else 1
+                        )
                         await client.subscribe(topic, qos=qos)
                         subscribed_count += 1
                     except _MqttError as err:
@@ -637,7 +643,9 @@ class JackeryMqttPushClient:
         coro: Awaitable[None],
         label: str,
         *,
-        tracked_tasks: set[asyncio.Task[None]] | deque[asyncio.Task[None]] | None = None,
+        tracked_tasks: set[asyncio.Task[None]]
+        | deque[asyncio.Task[None]]
+        | None = None,
     ) -> None:
         async def _runner() -> None:
             await coro

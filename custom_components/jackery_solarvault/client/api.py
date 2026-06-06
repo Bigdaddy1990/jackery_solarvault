@@ -813,7 +813,9 @@ class JackeryApi:
         return {}
 
     # --- generic GET with auto re-login ------------------------------------
-    async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _get_json(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1737,7 +1739,11 @@ class JackeryApi:
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
         """  # noqa: E501, RUF100
-        if not isinstance(max_power, int) or isinstance(max_power, bool) or max_power < 0:
+        if (
+            not isinstance(max_power, int)
+            or isinstance(max_power, bool)
+            or max_power < 0
+        ):
             raise JackeryApiError("max_power must be a non-negative integer")
         data = await self._post_form(
             MAX_POWER_SAVE_PATH,
