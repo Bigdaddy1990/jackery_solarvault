@@ -233,7 +233,7 @@ filterwarnings = [
 target-version = "py314"
 required-version = ">=0.15.15"
 line-length = 88
-src = ["custom_components"]
+src = ["custom_components","tests"]
 indent-width = 4
 show-fixes = true
 fix = true
