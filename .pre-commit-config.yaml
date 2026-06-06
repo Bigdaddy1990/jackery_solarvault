@@ -18,13 +18,24 @@ repos:
     hooks:
       - id: pyupgrade
         args:
+          - --exit-zero-even-if-changed
+          - --keep-percent-format
+          - --keep-mock
+          - --keep-runtime-typing
+          - --py3-plus
+          - --py38-plus-plus
+          - --py39-plus-plus
+          - --py310-plus
+          - --py311-plus
+          - --py312-plus
+          - --py313-plus
           - --py314-plus
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
       - id: mypy
         additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^testing/resources/
+        exclude: ^(/manifest.*|docs/|scripts/)
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:
@@ -59,7 +70,7 @@ repos:
         args:
           - --allow-multiple-documents
           - --unsafe
-        exclude: ^(docs/)
+        exclude: ^(docs/|scripts/)
       - id: check-json
       - id: check-toml
       - id: check-ast

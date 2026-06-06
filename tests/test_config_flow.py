@@ -3,17 +3,18 @@
 from unittest.mock import patch
 
 import pytest
-from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD
-from homeassistant.const import CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 
+from custom_components.jackery_solarvault.client.api import JackeryAuthError, JackeryError
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DOMAIN,
+    FLOW_ABORT_REAUTH_SUCCESSFUL,
 )
-from custom_components.jackery_solarvault.const import DOMAIN
-from custom_components.jackery_solarvault.const import FLOW_ABORT_REAUTH_SUCCESSFUL
+from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 pytestmark = pytest.mark.asyncio
 
@@ -51,10 +52,8 @@ async def test_user_flow_happy_path(
 
 async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
     """A login rejection must surface as an invalid_auth form error."""
-    from custom_components.jackery_solarvault.api import JackeryAuthError
-
     with patch(
-        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
         side_effect=JackeryAuthError("login rejected"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -74,10 +73,8 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
 
     Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
     """
-    from custom_components.jackery_solarvault.api import JackeryError
-
     with patch(
-        "custom_components.jackery_solarvault.api.JackeryApi.async_login",
+        "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
         side_effect=JackeryError("network down"),
     ):
         result = await hass.config_entries.flow.async_init(
@@ -125,8 +122,6 @@ async def test_reauth_flow_updates_password_and_reloads(
     mock_jackery_login: None,
 ) -> None:
     """A successful reauth must update the existing entry password."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
@@ -159,8 +154,6 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
     hass: HomeAssistant,
 ) -> None:
     """Options flow must persist the local MQTT topic-filter option and default it to empty."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
@@ -185,8 +178,6 @@ async def test_options_flow_accepts_local_mqtt_topic_filter_value(
     hass: HomeAssistant,
 ) -> None:
     """Options flow must store user-provided local MQTT topic filters."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",

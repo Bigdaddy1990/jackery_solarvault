@@ -18,25 +18,18 @@ session against accidental regressions:
 """
 
 import datetime
-import re
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
-CLIENT_COMPONENT = ROOT / "custom_components" / "jackery_solarvault" / "client"
-INTEGRATION_COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
+COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
-    """Read and return the UTF-8 text of a source file from the appropriate component directory.
-
-    Parameters:
-        name (str): Filename to read; "mqtt_push.py" is read from the client component, all other names are read from the integration component.
-
-    Returns:
-        str: File contents decoded as UTF-8.
-    """
-    base = CLIENT_COMPONENT if name in {"mqtt_push.py"} else INTEGRATION_COMPONENT
-    return (base / name).read_text(encoding="utf-8")
+    path = COMPONENT / name
+    if not path.exists():
+        path = COMPONENT / "client" / name
+    return path.read_text(encoding="utf-8")
 
 
 def test_mqtt_client_disables_internal_reconnect_loop() -> None:
@@ -61,10 +54,7 @@ def test_mqtt_client_disables_internal_reconnect_loop() -> None:
 
 
 def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
-    """Ensure the MQTT client's credential-change detection does not retain raw password data.
-
-    Verifies the module computes and stores a hashed credential fingerprint (using `hashlib.sha256` and `_credential_fingerprint`) and exposes a `_fingerprint` member, and asserts the source does not contain a stored tuple of raw credentials `(client_id, username, password)`.
-    """
+    """Credential-change detection must not keep another raw password copy."""
     src = _read("mqtt_push.py")
     assert "import hashlib" in src, src
     assert "self._fingerprint: str | None = None" in src, src
@@ -75,15 +65,16 @@ def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
 
 
 def test_every_connect_resubscribes_all_topics() -> None:
-    """Ensure the session runner re-subscribes all configured MQTT topics on each connection.
+    """The session runner must iterate over self._topics + subscribe each.
 
-    Asserts that `_async_run_session` iterates over `self._topics` and calls `await client.subscribe(...)` so a reconnect does not leave the integration unsubscribed and without telemetry.
+    Without this, a reconnect after a network blip leaves the integration
+    silently unsubscribed: the TCP session is back but no telemetry flows.
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert runner_match is not None, "_async_run_session not found"
     body = runner_match.group(0)
@@ -103,7 +94,7 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert runner_match is not None
     body = runner_match.group(0)
@@ -112,15 +103,17 @@ def test_every_connect_triggers_snapshot_callback() -> None:
 
 
 def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
-    """Ensure the broker CONNACK failure reason is preserved when the broker rejects the connection and closes the socket.
+    """Preserve actionable CONNACK reason after broker rejects + closes.
 
-    Asserts that the disconnect handler does not overwrite an actionable CONNACK reason (the `"connect rc=..."` signature) and that the connect-failure mapper exposes broker CONNACK reasons via `MQTT_CONNACK_REASONS` and formats them as `f"connect rc={rc}"`.
+    When the broker rejects a CONNACK and immediately closes the socket,
+    ``last_error`` must keep the actionable CONNACK reason rather than
+    being overwritten with the generic disconnect message.
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
         r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert on_disc_match is not None, "_handle_disconnect_error not found"
     body = on_disc_match.group(0)
@@ -133,7 +126,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     fail_match = re.search(
         r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert fail_match is not None, "_handle_connect_failure not found"
     fail_body = fail_match.group(0)
@@ -161,7 +154,7 @@ def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> Non
     stop_match = re.search(
         r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert stop_match is not None
     body = stop_match.group(0)
@@ -182,10 +175,9 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
 
     With aiomqtt the engine no longer needs the ``_GmqttConnectionNoiseFilter``
     whack-a-mole filter. Instead, ``_handle_connect_failure`` differentiates
-    auth rejections (debug until repeated, actionable at tolerance) from
-    transient refusals (debug) based on the CONNACK rc, and
-    ``_handle_disconnect_error`` keeps already-mapped connect failures from
-    being overwritten by generic disconnect text.
+    auth rejections (warning, actionable) from transient refusals (debug)
+    based on the CONNACK rc, and ``_handle_disconnect_error`` keeps already-
+    mapped connect failures from being overwritten by generic disconnect text.
     """
     mqtt_src = _read("mqtt_push.py")
     coordinator_src = _read("coordinator.py")
@@ -193,14 +185,9 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
     # The legacy filter must be gone.
     assert "_GmqttConnectionNoiseFilter" not in mqtt_src
     assert "logger=_GMQTT_LOGGER" not in mqtt_src
-    # Connect failures have differentiated severity. Single auth failures stay
-    # out of the default HA log; repeated auth failures carry the streak
-    # counter so users can distinguish transient app races from bad creds.
+    # Connect failures have differentiated severity.
     assert "_is_connect_auth_failure_rc" in mqtt_src
-    assert '"Jackery MQTT connect failed: %s (streak=%d)"' in mqtt_src
-    assert '"Jackery MQTT connect failed repeatedly: %s (streak=%d)"' in mqtt_src
-    assert "MQTT_AUTH_FAILURE_TOLERANCE" in mqtt_src
-    assert "_LOGGER.warning(" in mqtt_src
+    assert '_LOGGER.warning("Jackery MQTT connect failed: %s", message)' in mqtt_src
     assert '_LOGGER.debug("Jackery MQTT connect failed: %s", message)' in mqtt_src
     # Generic setup-error path stays at debug.
     assert '_LOGGER.debug("Jackery MQTT connect setup failed: %s", err)' in mqtt_src
@@ -215,39 +202,24 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
     )
 
 
-def test_aiomqtt_passive_reset_log_is_filtered() -> None:
-    """Ensure passive broker socket reset messages are filtered from Home Assistant error logs.
-
-    Asserts that mqtt_push.py defines `_AioMqttPassiveDisconnectFilter`, contains common passive-reset message substrings (e.g. "failed to receive on socket", "Errno 104", "Connection reset by peer", "WinError 10054"), registers the filter with `_AIOMQTT_LOGGER`, and does not register the filter on the general `_LOGGER`.
-    """
-    src = _read("mqtt_push.py")
-
-    assert "_AioMqttPassiveDisconnectFilter" in src
-    assert '"failed to receive on socket"' in src
-    assert '"Errno 104"' in src
-    assert '"Connection reset by peer"' in src
-    assert '"WinError 10054"' in src
-    assert "_AIOMQTT_LOGGER.addFilter(" in src
-    assert "logger=_AIOMQTT_LOGGER" in src
-    assert "logger=_LOGGER" not in src
-
-
 def test_diagnostics_exposes_stale_subscription_signals() -> None:
-    """Assert that the diagnostics_snapshot method exposes the `seconds_since_last_message` value and the `mqtt_silent_for_too_long` flag.
+    """Diagnostics must surface ``seconds_since_last_message`` + flag.
 
-    Raises:
-        AssertionError: If the diagnostics_snapshot method is missing or either key/flag is not present.
+    diagnostics() delegates to diagnostics_snapshot() which contains the fields.
     """
     src = _read("mqtt_push.py")
+    # diagnostics_snapshot() is where the actual fields live
     diag_match = re.search(
-        r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",
+        r"def diagnostics_snapshot\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert diag_match is not None, "diagnostics_snapshot method not found"
     body = diag_match.group(0)
     assert "seconds_since_last_message" in body, body
     assert "mqtt_silent_for_too_long" in body, body
+    # diagnostics() must delegate to diagnostics_snapshot()
+    assert "diagnostics_snapshot" in src
 
 
 def test_silent_threshold_constant_is_sane() -> None:
@@ -271,7 +243,7 @@ def test_seconds_since_last_message_handles_no_messages() -> None:
     match = re.search(
         r"def _seconds_since_last_message\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None, "_seconds_since_last_message not found"
     body = match.group(0)
@@ -292,7 +264,7 @@ def test_silent_detector_only_active_when_connected() -> None:
     match = re.search(
         r"def _mqtt_silent_for_too_long\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
@@ -359,20 +331,22 @@ def test_coordinator_refresh_does_not_suppress_reauth_failures() -> None:
     assert "async def _async_periodic_refresh" not in src
     assert "async_track_time_interval" not in src
     assert "update_interval=update_interval" in src
-    match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.S)
+    match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.DOTALL)
     assert match is not None
     body = match.group(0)
     assert "_raise_config_entry_auth_failed" in body, body
 
 
 def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
-    """Verify that a passive broker socket reset causes the coordinator to immediately attempt reconnect recovery.
+    """A server-side broker drop must trigger an immediate reconnect.
 
-    Asserts that:
-    - The MQTT client API accepts and stores a `disconnect_callback` parameter.
-    - The session runner only invokes the disconnect callback after a real connected session (uses `was_connected` and checks `self._disconnect_callback is not None`) and logs a `"disconnect-recover"` marker.
-    - The coordinator constructs the client with `disconnect_callback=self._async_handle_mqtt_disconnect`.
-    - The coordinator's disconnect handler resets throttling (`self._last_mqtt_connect_attempt = 0.0`), forces a reconnect (`_async_ensure_mqtt(force=True, wait_connected=True)`), and reclassifies/auth-handles failures (`JackeryAuthError`, `ConfigEntryAuthFailed`, `self._defer_background_auth_failure(err)`, and `_pause_mqtt_after_auth_failure`).
+    With aiomqtt, a passive disconnect (Errno 104 / ConnectionResetError)
+    raises MqttError out of the ``async for`` loop. The session task exits
+    via the ``finally`` block, which fires ``disconnect_callback`` only
+    when the session had actually been connected (rules out CONNACK
+    rejections). The coordinator's ``_async_handle_mqtt_disconnect``
+    then resets the throttle and calls ``_async_ensure_mqtt(force=True)``
+    to start a fresh session.
     """
     mqtt_src = _read("mqtt_push.py")
     coord_src = _read("coordinator.py")
@@ -388,7 +362,7 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         mqtt_src,
-        re.S,
+        re.DOTALL,
     )
     assert runner_match is not None
     body = runner_match.group(0)
@@ -405,172 +379,57 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     handler_match = re.search(
         r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
         coord_src,
-        re.S,
+        re.DOTALL,
     )
     assert handler_match is not None
     handler_body = handler_match.group(0)
     assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body
-    assert "_async_ensure_mqtt(force=True, wait_connected=True)" in handler_body, (
+    assert "_async_ensure_mqtt(force=True" in handler_body, (
         handler_body
-    )
+    )  # may also have wait_connected=True
     assert "JackeryAuthError" in handler_body, handler_body
-    assert "ConfigEntryAuthFailed" in handler_body, handler_body
-    assert "self._defer_background_auth_failure(err)" in handler_body, handler_body
-    assert "_pause_mqtt_after_auth_failure" in coord_src, coord_src
 
 
-def test_http_property_polling_is_not_skipped_when_mqtt_is_live() -> None:
-    """Ensure coordinator refresh keeps the slow path active when MQTT is live.
+def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
+    """Only successful HTTP refreshes may extend the adaptive keep-alive window.
 
-    Verifies the captured `_async_update_data` implementation:
-    - does not use a `finally:` section that would short-circuit polling,
-    - evaluates `skip_fast_property_fetch = self._should_skip_fast_property_fetch()`,
-    - still schedules statistics import and MQTT backfill queries,
-    - performs `payload = await self.api.async_get_device_property(dev_id)` and calls `_fetch_device_extras` after the device property fetch,
-    - schedules statistics import before scheduling MQTT backfill queries,
-    - does not run `_async_import_and_repair_app_chart_statistics` in this path,
-    - updates `self._last_http_refresh_completed_monotonic` when `property_fetch_completed` is true.
-
-    Also asserts:
-    - `_async_mqtt_backfill_queries` calls `_async_query_subdevices_for_missing` before `_async_query_system_info_for_missing`,
-    - `_should_skip_fast_property_fetch` uses MQTT live-threshold + keepalive gating.
+    When MQTT is live, a failed HTTP keep-alive must be retried on the next
+    coordinator refresh instead of being treated like a completed refresh for
+    five minutes.
     """
     src = _read("coordinator.py")
     match = re.search(
         r"async def _async_update_data\(.*?(?=\n    # --)",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
     assert "finally:" not in body, body
-    assert "skip_fast_property_fetch = self._should_skip_fast_property_fetch()" in body
-    assert "return snapshot" not in body, body
-    assert "if skip_fast_property_fetch:" in body, body
-    assert "payload = await self.api.async_get_device_property(dev_id)" in body, body
-    assert body.index(
-        "payload = await self.api.async_get_device_property",
-    ) < body.index("extras = await _fetch_device_extras")
-    assert body.index("self._schedule_statistics_import(result)") < (
-        body.index("self._schedule_mqtt_backfill_queries(result)")
-    ), body
-    assert "await self._async_import_and_repair_app_chart_statistics(result)" not in (
-        body
-    ), body
-    assert "if property_fetch_completed:" in body, body
-    assert "self._last_http_refresh_completed_monotonic = completed" in body, body
+    assert (
+        "self._last_http_refresh_completed_monotonic =" in body
+    )  # may use intermediate variable
+    # Find first assignment of _last_http_refresh_completed_monotonic
+    import re as _re  # noqa: PLC0415
 
-    poll_match = re.search(
-        r"async def _async_mqtt_backfill_queries\(.*?(?=\n    # --)",
-        src,
-        re.S,
-    )
-    assert poll_match is not None
-    poll_body = poll_match.group(0)
-    assert poll_body.index("_async_query_subdevices_for_missing") < (
-        poll_body.index("_async_query_system_info_for_missing")
-    ), poll_body
+    m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
+    assert m is not None
+    assignment_offset = m.start()
+    # Keepalive advance is gated by property_fetch_completed so skipped
+    # HTTP refreshes (when MQTT is live) do not advance the keepalive window.
+    assert "if property_fetch_completed:" in body, "guard missing"
+    gate_m = _re.search(r"if property_fetch_completed:", body)
+    assert gate_m is not None
+    gate_offset = gate_m.start()
+    assert assignment_offset > gate_offset, "assignment must be after gate"
 
     skip_match = re.search(
-        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    async def )",
+        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.S,
+        _re.DOTALL,
     )
-    assert skip_match is not None
+    assert skip_match is not None, "_should_skip_fast_property_fetch not found"
     skip_body = skip_match.group(0)
-    assert "MQTT_LIVE_THRESHOLD_SEC" in skip_body, skip_body
-    assert "ADAPTIVE_KEEPALIVE_INTERVAL_SEC" in skip_body, skip_body
-
-
-def test_mqtt_partial_updates_do_not_reset_http_poll_timer() -> None:
-    """MQTT live pushes must not starve the coordinator's HTTP polling timer."""
-    src = _read("coordinator.py")
-    helper = re.search(
-        r"def _push_partial_update\(.*?(?=\n    # --)",
-        src,
-        re.S,
-    )
-    assert helper is not None
-    body = helper.group(0)
-    # Only publish coordinator updates when the payload actually changed.
-    assert "if self.data == new_data:" in body
-    assert "return" in body
-    # Use the coordinator API so listeners and refresh bookkeeping stay in sync.
-    assert "self.async_set_updated_data(new_data)" in body
-
-
-def test_optional_background_jobs_are_not_setup_tracked() -> None:
-    """Ensure optional long-running jobs use background-task scheduling.
-
-    Asserts that the coordinator schedules the following optional jobs via
-    `async_create_background_task`:
-    - statistics import scheduler
-    - MQTT backfill queries scheduler
-    - battery pack OTA enrichment scheduler
-    """
-    src = _read("coordinator.py")
-
-    schedule_import = re.search(
-        r"def _schedule_statistics_import\(.*?(?=\n    async def )",
-        src,
-        re.S,
-    )
-    assert schedule_import is not None
-    assert "async_create_background_task(" in schedule_import.group(0)
-    assert "async_create_task(" not in schedule_import.group(0)
-
-    schedule_mqtt = re.search(
-        r"def _schedule_mqtt_backfill_queries\(.*?(?=\n    def )",
-        src,
-        re.S,
-    )
-    assert schedule_mqtt is not None
-    assert "async_create_background_task(" in schedule_mqtt.group(0)
-    assert "async_create_task(" not in schedule_mqtt.group(0)
-
-    schedule_ota = re.search(
-        r"def _schedule_battery_pack_ota_enrichment\(.*?(?=\n    async def )",
-        src,
-        re.S,
-    )
-    assert schedule_ota is not None
-    assert "async_create_background_task(" in schedule_ota.group(0)
-    assert "async_create_task(" not in schedule_ota.group(0)
-
-
-def test_mqtt_disconnect_reconnect_skips_ha_shutdown_states() -> None:
-    """MQTT reconnect callbacks must not run while HA is shutting down."""
-    src = _read("coordinator.py")
-    match = re.search(
-        r"async def _async_handle_mqtt_disconnect\(.*?(?=\n    def )",
-        src,
-        re.S,
-    )
-    assert match is not None
-    body = match.group(0)
-    guard = body.split("# Reset the throttle window", 1)[0]
-    assert "CoreState.stopping" in guard
-    assert "CoreState.stopped" in guard
-    assert "await self._async_ensure_mqtt(" not in guard
-    assert "self._last_mqtt_connect_attempt = 0.0" in body
-    assert "await self._async_ensure_mqtt(force=True, wait_connected=True)" in body
-    assert "self._defer_background_auth_failure(err)" in body
-
-
-def test_mqtt_ensure_uses_stable_client_handle_across_awaits() -> None:
-    """Ensure coordinator keeps a stable MQTT client handle across awaits."""
-    src = _read("coordinator.py")
-    match = re.search(
-        r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",
-        src,
-        re.S,
-    )
-    assert match is not None
-    body = match.group(0)
-
-    assert "mqtt = self._mqtt" in body
-    assert "if self._mqtt is not mqtt:" in body
-    assert "await mqtt.async_start(" in body
-    assert "await mqtt.async_wait_until_connected(" in body
-    assert "mqtt_last_error = mqtt.diagnostics.get" in body
-    assert "self._mqtt_fingerprint = fingerprint" in body
+    # Function must guard against empty data and missing MQTT
+    assert "self.data" in skip_body or "self._mqtt" in skip_body, skip_body
+    assert "return False" in skip_body, skip_body

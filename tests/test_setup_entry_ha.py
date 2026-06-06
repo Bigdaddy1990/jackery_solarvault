@@ -3,12 +3,12 @@
 from unittest.mock import patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_PASSWORD
-from homeassistant.const import CONF_USERNAME
-from homeassistant.core import HomeAssistant
 
 from custom_components.jackery_solarvault.const import DOMAIN
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 pytestmark = pytest.mark.asyncio
 
@@ -18,8 +18,6 @@ async def test_setup_and_unload_round_trip(
     mock_jackery_login: None,
 ) -> None:
     """A clean setup followed by unload must leave HA without dangling state."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
@@ -60,8 +58,6 @@ async def test_services_register_on_setup(
     mock_jackery_login: None,
 ) -> None:
     """The three integration services must be registered after setup."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
