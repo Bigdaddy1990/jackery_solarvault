@@ -50,7 +50,7 @@ jobs:
     uses: ./.github/workflows/reusable-python-tests.yml
     with:
       python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      home-assistant-spec: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '2026.6.1') }}
+      home-assistant-spec: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '2026.6.0') }}
       coverage-min: ${{ vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '5' }}
       coverage-xml-path: ./coverage/coverage.xml
       coverage-html-dir: ./coverage/html
