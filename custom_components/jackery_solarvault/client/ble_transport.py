@@ -33,7 +33,7 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-import asyncio
+import asyncio  # noqa: I001, RUF100
 import base64
 import binascii
 from collections import deque
@@ -44,7 +44,10 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from jackery_solarvault.const import DEFAULT_BLE_ACK_TIMEOUT_SEC
+from ..const import (  # noqa: TID252
+    DEFAULT_BLE_ACK_TIMEOUT_SEC,
+    MQTT_CMD_QUERY_DEVICE_PROPERTY,
+)  # noqa: E501, RUF100
 
 from . import ble
 
@@ -261,7 +264,7 @@ class JackeryBleListener:
         """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
-            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:
+            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
                 self._mtu[device_id] = value
                 _LOGGER.debug(
                     "Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)",
@@ -288,7 +291,7 @@ class JackeryBleListener:
         current_started_at: datetime | None,
     ) -> datetime | None:
         """Record the request timestamp for BLE property-query replies."""
-        if cmd != 106 or current_started_at is not None:
+        if cmd != 106 or current_started_at is not None:  # noqa: PLR2004
             return current_started_at
         started_at = datetime.now()
         self._pending_property_query_starts.setdefault(
@@ -318,9 +321,8 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
 
-        try:
+        try:  # noqa: PLW0717
             while not self._stop_event.is_set():
                 try:
                     await asyncio.wait_for(
@@ -353,7 +355,7 @@ class JackeryBleListener:
         except asyncio.CancelledError:  # noqa: TRY203
             raise
 
-    async def async_send_command(
+    async def async_send_command(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         device_id: str,
         *,
@@ -395,20 +397,20 @@ class JackeryBleListener:
             return False
         key = self._key_resolver(device_id)
         if key is None:
-            raise RuntimeError(f"no bluetoothKey available for device {device_id}")
+            raise RuntimeError(f"no bluetoothKey available for device {device_id}")  # noqa: TRY003
         # Resolve the effective MTU: explicit override wins (used by
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
             if isinstance(mtu_override, bool) or not isinstance(mtu_override, int):
-                raise TypeError("mtu_override must be an integer")
+                raise TypeError("mtu_override must be an integer")  # noqa: TRY003
             mtu = mtu_override
         else:
             mtu = self.mtu_for_device(device_id)
         try:
             chunks = ble.split_body_for_mtu(body, mtu)
         except ValueError as err:
-            raise RuntimeError(
+            raise RuntimeError(  # noqa: TRY003
                 f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
             ) from err
         chunk_count = len(chunks)
@@ -459,14 +461,14 @@ class JackeryBleListener:
             stats.writes_with_response_failed += 1
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(
+            raise RuntimeError(  # noqa: TRY003
                 f"BLE write to {device_id} timed out after {timeout_sec}s"
             ) from err
         except Exception as err:  # bleak surfaces BleakError + variants
             stats.writes_with_response_failed += 1
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err
+            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
         if pending is not None:
             try:
                 # ``shield`` keeps the future alive even if ``wait_for``
@@ -483,7 +485,7 @@ class JackeryBleListener:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
                 stats.last_error = f"ack timeout cmd={cmd}"
-                raise RuntimeError(
+                raise RuntimeError(  # noqa: TRY003
                     f"BLE ack timeout for cmd={cmd} on {device_id} after "
                     f"{ack_timeout_sec}s"
                 ) from err
@@ -515,7 +517,7 @@ class JackeryBleListener:
             parsed_cmds: set[int] = set()
             for ack_cmd in ack_cmds:
                 if isinstance(ack_cmd, bool) or not isinstance(ack_cmd, int):
-                    raise ValueError("ack_cmds must be an integer")  # noqa: TRY004
+                    raise ValueError("ack_cmds must be an integer")  # noqa: TRY003, TRY004
                 parsed_cmds.add(ack_cmd)
             expected_cmds = frozenset(parsed_cmds)
         pending = _PendingAck(
@@ -590,7 +592,7 @@ class JackeryBleListener:
         """  # noqa: E501, RUF100
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
-        from homeassistant.components import bluetooth
+        from homeassistant.components import bluetooth  # noqa: PLC0415
 
         self._stop_event.clear()
 
@@ -634,7 +636,7 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync
+            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -748,7 +750,7 @@ class JackeryBleListener:
             )
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:
+    async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0912, PLR0915
         """Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
 
         This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
@@ -756,14 +758,17 @@ class JackeryBleListener:
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
         """  # noqa: E501, RUF100
-        from bleak.exc import BleakError
-        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
+        from bleak.exc import BleakError  # noqa: PLC0415
+        from bleak_retry_connector import (  # noqa: PLC0415
+            BLEAK_RETRY_EXCEPTIONS,
+            establish_connection,
+        )
 
-        from homeassistant.components import bluetooth
+        from homeassistant.components import bluetooth  # noqa: PLC0415
 
         stats = self.stats_for(device_id)
         consecutive_failures = 0
-        try:
+        try:  # noqa: PLW0717
             while not self._stop_event.is_set() and not self._aborted:
                 if consecutive_failures >= _MAX_CONNECTION_RETRIES:
                     _LOGGER.warning(
@@ -865,7 +870,7 @@ class JackeryBleListener:
                     await self._handle_notification(device_id, bytes(data))
 
                 keep_alive_task: asyncio.Task[None] | None = None
-                try:
+                try:  # noqa: PLW0717
                     await client.start_notify(
                         ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
                     )
@@ -1023,7 +1028,7 @@ class JackeryBleListener:
             parsed=parsed,
             decode_error=decode_error,
         )
-        if parsed is not None and parsed.cmd == 107:
+        if parsed is not None and parsed.cmd == 107:  # noqa: PLR2004
             q = self._pending_property_query_starts.get(device_id)
             observation.source_started_at = q.popleft() if q else None
         stats.last_frame = observation
@@ -1046,7 +1051,7 @@ class JackeryBleListener:
                 stats.last_error = f"notify: {decode_error}"
         try:
             await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour
+        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
             _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
 
 

@@ -132,8 +132,8 @@ def hex16(value: int) -> str:
     if the value does not fit into 16 bits — the caller is responsible for
     range-checking inputs (e.g. ``CHUNK_LEN <= (MTU - 60)``).
     """
-    if not 0 <= value <= 0xFFFF:
-        raise ValueError(f"hex16: {value} does not fit into 16 bits")
+    if not 0 <= value <= 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"hex16: {value} does not fit into 16 bits")  # noqa: TRY003
     return f"{value:04X}"
 
 
@@ -150,13 +150,13 @@ def parse_hex16(text: str) -> int:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
     """  # noqa: E501, RUF100
     if len(text) != _HEX16_WIDTH:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         )
     try:
         return int(text, 16)
     except ValueError as err:
-        raise ValueError("parse_hex16: expected hex chars") from err
+        raise ValueError("parse_hex16: expected hex chars") from err  # noqa: TRY003
 
 
 def hex_encode(data: bytes) -> str:
@@ -211,7 +211,7 @@ def crc16_hex(data: bytes) -> str:
 def _validate_key_len(key: bytes, *, fn: str) -> None:
     """Reject keys whose length does not match AES-128 or AES-256."""
     if len(key) not in BLE_AES_KEY_LENGTHS:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"{fn}: key must be one of {BLE_AES_KEY_LENGTHS} bytes "
             f"(got {len(key)} bytes)"
         )
@@ -229,7 +229,7 @@ def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
     """
     _validate_key_len(key, fn="aes_encrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")
+        raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
@@ -245,7 +245,7 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
     """
     _validate_key_len(key, fn="aes_decrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")
+        raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
     decryptor = cipher.decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
@@ -342,7 +342,7 @@ class BleBinaryFrame:
 # from the captured request frames.
 
 
-def build_binary_frame(
+def build_binary_frame(  # noqa: PLR0913
     *,
     cmd: int,
     body: bytes,
@@ -357,18 +357,18 @@ def build_binary_frame(
     The default ``trailer`` of four zero bytes is a placeholder until the
     firmware-side checksum algorithm is identified.
     """
-    if not 0 <= cmd <= 0xFFFF:
-        raise ValueError(f"cmd {cmd} does not fit into 16 bits")
-    if not 0 <= flags <= 0xFFFF:
-        raise ValueError(f"flags {flags} does not fit into 16 bits")
-    if not 1 <= frame_index <= 0xFFFF:
-        raise ValueError(f"frame_index {frame_index} out of range")
-    if not 1 <= chunk_count <= 0xFFFF:
-        raise ValueError(f"chunk_count {chunk_count} out of range")
-    if len(body) > 0xFFFF:
-        raise ValueError(f"body too long: {len(body)} bytes")
+    if not 0 <= cmd <= 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"cmd {cmd} does not fit into 16 bits")  # noqa: TRY003
+    if not 0 <= flags <= 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"flags {flags} does not fit into 16 bits")  # noqa: TRY003
+    if not 1 <= frame_index <= 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"frame_index {frame_index} out of range")  # noqa: TRY003
+    if not 1 <= chunk_count <= 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"chunk_count {chunk_count} out of range")  # noqa: TRY003
+    if len(body) > 0xFFFF:  # noqa: PLR2004
+        raise ValueError(f"body too long: {len(body)} bytes")  # noqa: TRY003
     if len(trailer) != _BINARY_FRAME_TRAILER_LEN:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"trailer must be {_BINARY_FRAME_TRAILER_LEN} bytes, got {len(trailer)}"
         )
     header = (
@@ -382,7 +382,7 @@ def build_binary_frame(
         + len(body).to_bytes(2, "big")
     )
     if len(header) != _BINARY_FRAME_HEADER_LEN:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"binary frame header must be {_BINARY_FRAME_HEADER_LEN} bytes, "
             f"got {len(header)}"
         )
@@ -404,7 +404,7 @@ def encrypt_binary_notify(
     """
     actual_iv = random_iv() if iv is None else iv
     if len(actual_iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"iv must be {BLE_AES_IV_LEN} bytes")
+        raise ValueError(f"iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     ciphertext = aes_encrypt(plaintext_frame, key, actual_iv)
     return actual_iv + ciphertext
 
@@ -424,16 +424,16 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
     full raw bytes for offline analysis.
     """
     if len(raw) < BLE_AES_IV_LEN + _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
-        raise ValueError(f"notify too short: {len(raw)} bytes")
+        raise ValueError(f"notify too short: {len(raw)} bytes")  # noqa: TRY003
     iv = raw[:BLE_AES_IV_LEN]
     ciphertext = raw[BLE_AES_IV_LEN:]
     if len(ciphertext) % 16 != 0:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"ciphertext is not aligned to AES block size: {len(ciphertext)} bytes"
         )
     plaintext = aes_decrypt(ciphertext, key, iv)
     if not plaintext.startswith(_BINARY_FRAME_MAGIC_BE):
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
@@ -448,7 +448,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
                 count,
             )
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
-        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
+        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")  # noqa: TRY003
     frame_index = int.from_bytes(plaintext[4:6], "big")
     chunk_count = int.from_bytes(plaintext[6:8], "big")
     flags = int.from_bytes(plaintext[8:10], "big")
@@ -458,7 +458,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         len(plaintext)
         < _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
     ):
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"frame truncated: body_length={body_length} but plaintext is "
             f"{len(plaintext)} bytes"
         )
@@ -507,7 +507,7 @@ def build_plaintext_frame(frame: BleFrame) -> str:
     """
     chunk_hex = hex_encode(frame.chunk_payload)
     if len(chunk_hex) % 2 != 0:
-        raise ValueError("chunk_payload must serialise to an even hex length")
+        raise ValueError("chunk_payload must serialise to an even hex length")  # noqa: TRY003
     return (
         BLE_FRAME_MAGIC
         + BLE_FRAME_VERSION
@@ -534,13 +534,13 @@ def parse_plaintext_frame(text: str) -> BleFrame:
     not match the expected literals.
     """
     if len(text) < _HEADER_HEX_LEN:
-        raise ValueError("frame too short")
+        raise ValueError("frame too short")  # noqa: TRY003
     if not text.startswith(BLE_FRAME_MAGIC):
-        raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")
+        raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")  # noqa: TRY003
     cursor = len(BLE_FRAME_MAGIC)
     version = text[cursor : cursor + _HEX16_WIDTH]
     if version != BLE_FRAME_VERSION:
-        raise ValueError(f"unexpected protocol version {version!r}")
+        raise ValueError(f"unexpected protocol version {version!r}")  # noqa: TRY003
     cursor += _HEX16_WIDTH
     frame_index = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
@@ -552,14 +552,14 @@ def parse_plaintext_frame(text: str) -> BleFrame:
     cursor += _HEX16_WIDTH
     marker = text[cursor : cursor + _HEX16_WIDTH]
     if marker != BLE_FRAME_PAYLOAD_MARKER:
-        raise ValueError(f"unexpected payload marker {marker!r}")
+        raise ValueError(f"unexpected payload marker {marker!r}")  # noqa: TRY003
     cursor += _HEX16_WIDTH
     chunk_len = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
     expected_hex_len = chunk_len * 2
     chunk_hex = text[cursor : cursor + expected_hex_len]
     if len(chunk_hex) != expected_hex_len:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"chunk payload truncated: expected {expected_hex_len} hex chars, "
             f"have {len(chunk_hex)}"
         )
@@ -621,17 +621,17 @@ def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
     the CRC suffix, strips magic and returns the parsed :class:`BleFrame`.
     """
     if len(blob) < BLE_AES_IV_LEN + algorithms.AES.block_size // 8:
-        raise ValueError("ciphertext blob too short")
+        raise ValueError("ciphertext blob too short")  # noqa: TRY003
     iv = blob[:BLE_AES_IV_LEN]
     ciphertext = blob[BLE_AES_IV_LEN:]
     plaintext = aes_decrypt(ciphertext, key, iv).decode("utf-8")
     if len(plaintext) < _HEX16_WIDTH * 2:
-        raise ValueError("plaintext too short to carry random tag + CRC")
+        raise ValueError("plaintext too short to carry random tag + CRC")  # noqa: TRY003
     crc_received = plaintext[-_HEX16_WIDTH:]
     body = plaintext[:-_HEX16_WIDTH]
     crc_expected = crc16_hex(body.encode("utf-8"))
     if crc_received.upper() != crc_expected.upper():
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"CRC mismatch: payload says {crc_received!r}, computed {crc_expected!r}"
         )
     # Strip the trailing 16-bit random tag the app appends before the CRC.
@@ -670,7 +670,7 @@ def chunk_size_for_mtu(mtu: int) -> int:
     to at least 61 before frames can be sent at all.
     """
     if mtu <= _BLE_FRAME_OVERHEAD:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"BLE MTU {mtu} is below the {_BLE_FRAME_OVERHEAD}-byte frame overhead"
         )
     return mtu - _BLE_FRAME_OVERHEAD

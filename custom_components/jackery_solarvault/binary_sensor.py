@@ -1,9 +1,8 @@
 """Binary sensor platform for Jackery SolarVault."""
 
-from collections.abc import Callable
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -11,10 +10,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.core import callback
 
-from . import JackeryConfigEntry
 from .const import (
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
@@ -28,7 +25,6 @@ from .const import (
     FIELD_VERSION,
     PAYLOAD_SMART_PLUGS,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
     append_unique_entity,
@@ -38,6 +34,15 @@ from .util import (
     sorted_smart_plugs,
     stable_subdevice_key,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.

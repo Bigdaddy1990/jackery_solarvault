@@ -1,9 +1,9 @@
 """Shared helpers for Jackery SolarVault entities."""
 
 import calendar
-from collections.abc import Callable
 import contextlib
-from datetime import UTC, date, datetime, timedelta, tzinfo as TZInfo
+from datetime import UTC, date, datetime, timedelta
+import functools
 import json
 import logging
 import math
@@ -11,7 +11,7 @@ import operator
 import os
 from pathlib import Path
 import re
-from typing import Any, Final, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -129,13 +129,16 @@ from .const import (
     TASK_PLAN_TASKS,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from datetime import tzinfo as TZInfo  # noqa: N812
+
 _LOGGER = logging.getLogger(__name__)
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
 _SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
-_DEV_MODE_CACHED: bool | None = None
 
 
 def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
@@ -251,19 +254,19 @@ def parse_utc_datetime(
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
         timestamp = float(value)
-        if abs(timestamp) >= 100_000_000_000:
+        if abs(timestamp) >= 100_000_000_000:  # noqa: PLR2004
             timestamp /= 1000
         try:
             parsed = datetime.fromtimestamp(timestamp, UTC)
         except (OSError, OverflowError, ValueError) as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err  # noqa: TRY003
     elif isinstance(value, str):
         normalized = value.strip()
         if not normalized:
-            raise ValueError("timestamp must not be empty")
+            raise ValueError("timestamp must not be empty")  # noqa: TRY003
         with contextlib.suppress(ValueError, OSError, OverflowError):
             timestamp = float(normalized)
-            if abs(timestamp) >= 100_000_000_000:
+            if abs(timestamp) >= 100_000_000_000:  # noqa: PLR2004
                 timestamp /= 1000
             return datetime.fromtimestamp(timestamp, UTC)
         if normalized.endswith("Z"):
@@ -271,9 +274,9 @@ def parse_utc_datetime(
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err  # noqa: TRY003
     else:
-        raise ValueError(f"unsupported UTC timestamp: {value!r}")  # noqa: TRY004
+        raise ValueError(f"unsupported UTC timestamp: {value!r}")  # noqa: TRY003, TRY004
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -349,7 +352,7 @@ def append_unique_entity(
 def validate_app_period_date_type(date_type: str) -> str:
     """Return a supported Jackery app period type or raise ValueError."""
     if date_type not in APP_PERIOD_DATE_TYPES:
-        raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")
+        raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")  # noqa: TRY003
     return date_type
 
 
@@ -365,7 +368,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     """  # noqa: E501, RUF100
     date_type = validate_app_period_date_type(date_type)
     if today is None:
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
     if date_type == DATE_TYPE_DAY:
         return today, today
     if date_type == DATE_TYPE_WEEK:
@@ -386,11 +389,11 @@ def _app_period_bound_to_date(value: str | date | datetime, *, field_name: str) 
         return value
     normalized = str(value).strip()
     if not normalized:
-        raise ValueError(f"Jackery app period {field_name} must not be empty")
+        raise ValueError(f"Jackery app period {field_name} must not be empty")  # noqa: TRY003
     try:
         return date.fromisoformat(normalized)
     except ValueError as err:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"Jackery app period {field_name} must be an ISO date (YYYY-MM-DD): "
             f"{value!r}"
         ) from err
@@ -427,7 +430,7 @@ def app_period_date_bounds(
         field_name=APP_REQUEST_END_DATE,
     )
     if begin > end:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             "Jackery app period beginDate must be before or equal to endDate: "
             f"{begin.isoformat()} > {end.isoformat()}"
         )
@@ -448,8 +451,8 @@ def app_period_request_kwargs(
 
 def app_month_request_kwargs(year: int, month: int) -> dict[str, str]:
     """Return method kwargs for one explicit calendar-month app request."""
-    if month < 1 or month > 12:
-        raise ValueError(f"Unsupported Jackery app month: {month!r}")
+    if month < 1 or month > 12:  # noqa: PLR2004
+        raise ValueError(f"Unsupported Jackery app month: {month!r}")  # noqa: TRY003
     first = date(year, month, 1)
     last = first.replace(day=calendar.monthrange(year, month)[1])
     begin, end = app_period_date_bounds(
@@ -480,7 +483,7 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def safe_float(
+def safe_float(  # noqa: PLR0911
     value: Any,  # noqa: ANN401, RUF100
 ) -> float | None:  # arbitrary payload value, coerced at runtime
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
@@ -513,7 +516,7 @@ def safe_float(
         return None
 
 
-def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, RUF100
+def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
     """Convert a value to an integer when possible.
 
     Returns None for a None input or when the value cannot be converted to an integer.
@@ -568,6 +571,7 @@ def first_nonblank_int(value: object) -> int | None:
     return None
 
 
+@functools.cache
 def dev_mode_redactions_disabled() -> bool:
     """Indicates whether developer-mode redactions are disabled based on the JACKERY_DEV_MODE environment variable.
 
@@ -576,11 +580,8 @@ def dev_mode_redactions_disabled() -> bool:
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
     """  # noqa: E501, RUF100
-    global _DEV_MODE_CACHED
-    if _DEV_MODE_CACHED is None:
-        raw = os.environ.get(_DEV_MODE_ENV, "")
-        _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
-    return _DEV_MODE_CACHED
+    raw = os.environ.get(_DEV_MODE_ENV, "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
@@ -781,7 +782,7 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, RUF100
+def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -1063,7 +1064,7 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     return text
 
 
-def verify_and_backfill(
+def verify_and_backfill(  # noqa: PLR0911, PLR0912
     cloud_value: float | None,
     local_value: float | None,
     *,
@@ -1229,7 +1230,7 @@ def app_data_quality_warnings(
         source/reference values (5 decimal places) and optional request and chart-series metadata for diagnostics.
     """  # noqa: E501, RUF100
     if today is None:
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
     week_inside_current_month = (
         week_begin.year == today.year
@@ -1275,7 +1276,7 @@ def app_data_quality_warnings(
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
-    def _add_warning(
+    def _add_warning(  # noqa: PLR0913
         *,
         reason: str,
         metric_key: str,
@@ -1407,7 +1408,7 @@ def app_data_quality_warnings(
         # expected. When ``now`` is unknown the guard is skipped (legacy/tests).
         zero_confirm_ready = now is None or now.hour >= zero_confirm_min_hour
         if (
-            day is not None
+            day is not None  # noqa: PLR0916
             and zero_confirm_ready
             and math.isclose(day, 0.0)
             and (
@@ -1602,7 +1603,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
     return whole, fraction
 
 
-def expanded_year_series_values(
+def expanded_year_series_values(  # noqa: PLR0911
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -1734,7 +1735,7 @@ def _nonzero_months(values: list[float]) -> list[int]:
     return [
         index + 1
         for index, value in enumerate(values[:12])
-        if abs(safe_float(value) or 0.0) > 0.00001
+        if abs(safe_float(value) or 0.0) > 0.00001  # noqa: PLR2004
     ]
 
 
@@ -1821,12 +1822,12 @@ def _configured_or_derived_price(
     price_source = payload.get(PAYLOAD_PRICE)
     if isinstance(price_source, dict):
         configured = safe_float(price_source.get(FIELD_SINGLE_PRICE))
-        if configured is not None and 0 <= configured <= 10:
+        if configured is not None and 0 <= configured <= 10:  # noqa: PLR2004
             return configured, f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
 
     if year_generation is not None and year_generation > 0 and year_revenue is not None:
         derived = year_revenue / year_generation
-        if 0 <= derived <= 10:
+        if 0 <= derived <= 10:  # noqa: PLR2004
             return round(derived, 5), "pv_year_revenue_per_kwh"
     return None, None
 
@@ -1876,7 +1877,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(
+def _calculated_savings_from_year(  # noqa: PLR0914
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -2019,7 +2020,7 @@ def _calculated_savings_from_year(
     }
 
 
-def _savings_publish_decision(
+def _savings_publish_decision(  # noqa: PLR0911, PLR0913
     *,
     raw_revenue: float | None,
     calculated_revenue: float,
@@ -2094,7 +2095,7 @@ def _backfill_pv_revenue(
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
-        if month < 1 or month > 12:
+        if month < 1 or month > 12:  # noqa: PLR2004
             continue
         revenue = _pv_revenue_value(month_source)
         if revenue is None:
@@ -2125,7 +2126,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(
+def backfill_year_payload_from_months(  # noqa: PLR0912
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -2177,7 +2178,7 @@ def backfill_year_payload_from_months(
         monthly_values = [0.0 for _ in range(12)]
         found_months: list[int] = []
         for month, month_source in sorted(month_sources.items()):
-            if month < 1 or month > 12:
+            if month < 1 or month > 12:  # noqa: PLR2004
                 continue
             value = _month_value(month_source, month_section, stat_key)
             if value is None:
@@ -2199,7 +2200,7 @@ def backfill_year_payload_from_months(
         ):
             continue
 
-        partial_year = len(found_months) < 12
+        partial_year = len(found_months) < 12  # noqa: PLR2004
         corrected_total = (
             round(monthly_total * 12 / len(found_months), 2)
             if partial_year
@@ -2285,7 +2286,7 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(
+def guard_statistic_totals_from_year(  # noqa: PLR0914
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -2417,7 +2418,7 @@ def guard_statistic_totals_from_year(
     ):
         factor = raw_carbon / raw_generation
         corrected_carbon = round(year_generation * factor, 2)
-        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(
+        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(  # noqa: PLR2004
             raw_carbon, corrected_carbon
         ):
             out[APP_STAT_TOTAL_CARBON] = corrected_carbon
@@ -2443,7 +2444,7 @@ def compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def trend_series_points(
+def trend_series_points(  # noqa: PLR0912
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2470,7 +2471,7 @@ def trend_series_points(
     series = effective_trend_series_values(source, section, stat_key)
     if not isinstance(series, list) or not series:
         return []
-    series_values = cast(list[Any], series)
+    series_values = cast("list[Any]", series)
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -2488,7 +2489,7 @@ def trend_series_points(
     if begin is None:
         return []
     if today is None:
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
 
     points: list[TrendStatisticPoint] = []
     for index, value in enumerate(series_values):
@@ -2496,7 +2497,7 @@ def trend_series_points(
             continue
         if date_type == DATE_TYPE_YEAR:
             month = index + 1
-            if month < 1 or month > 12:
+            if month < 1 or month > 12:  # noqa: PLR2004
                 continue
             bucket_start = begin.replace(month=month, day=1)
         elif date_type in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
@@ -2529,9 +2530,9 @@ def _parse_day_chart_minute(value: object) -> int | None:
     if match is None:
         return None
     hour, minute = int(match.group(1)), int(match.group(2))
-    if hour == 24 and minute == 0:
+    if hour == 24 and minute == 0:  # noqa: PLR2004
         return None
-    if 0 <= hour <= 23 and 0 <= minute <= 59:
+    if 0 <= hour <= 23 and 0 <= minute <= 59:  # noqa: PLR2004
         return hour * 60 + minute
     return None
 
@@ -2609,7 +2610,7 @@ def _scalar_day_energy_points(
     return [TrendStatisticPoint(dt, round(scalar_total, 5))]
 
 
-def day_power_energy_points(
+def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2657,7 +2658,7 @@ def day_power_energy_points(
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
     if begin > today:
         return []
     if now is None:
@@ -2855,7 +2856,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(
+def calculated_smart_meter_power(  # noqa: PLR0911
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -3029,7 +3030,7 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
+def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:  # noqa: PLR0911, PLR0912
     """Map an app section and statistic key to the corresponding chart-series key.
 
     Parameters:
@@ -3136,7 +3137,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(
+def trend_series_total(  # noqa: PLR0911
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3195,7 +3196,7 @@ def trend_series_total(
     return round(sum(valid_values), 2)
 
 
-def trend_series_has_value(
+def trend_series_has_value(  # noqa: PLR0911
     source: dict[str, Any],
     section: str,
     stat_key: str,

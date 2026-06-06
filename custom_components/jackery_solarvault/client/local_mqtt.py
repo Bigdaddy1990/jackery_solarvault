@@ -20,10 +20,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-import aiomqtt
-from aiomqtt import Client as MQTTClient, ConnectError, NegativeAckError, ProtocolError
-
-from jackery_solarvault.const import (
+from ..const import (  # noqa: TID252
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_KEEPALIVE_SEC,
@@ -31,9 +28,9 @@ from jackery_solarvault.const import (
 )
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+    from aiomqtt import Client as MQTTClient
 
-_MqttError = (ConnectError, NegativeAckError, ProtocolError)
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -86,7 +83,7 @@ LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
 class JackeryLocalMqttClient:
     """Async-native subscriber for the user's local MQTT broker."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         hass: HomeAssistant,
         *,
@@ -186,7 +183,7 @@ class JackeryLocalMqttClient:
                 return
             if not task.done():
                 task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, *_MqttError, Exception):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
 
     # ------------------------------------------------------------------
@@ -198,49 +195,36 @@ class JackeryLocalMqttClient:
 
         On successful connection, update connection state and timestamps and begin dispatching received messages to the client's message handler. Record subscription, connect, and disconnect errors for diagnostics. Always set the internal connected event before exiting to ensure callers waiting in startup cannot deadlock.
         """  # noqa: E501, RUF100
+        try:
+            from aiomqtt import Client, MqttError  # noqa: PLC0415
+        except ImportError as err:
+            self._last_error = f"connect failed: {err}"
+            self._connected_event.set()
+            _LOGGER.debug("Jackery local MQTT import failed: %s", err)
+            return
+
         connected = False
         try:
-            async with aiomqtt.Client(
+            async with Client(
                 hostname=self._host,
                 port=self._port,
                 identifier=self._client_id,
                 username=self._username,
                 password=self._password,
                 keepalive=MQTT_KEEPALIVE_SEC,
-                clean_session=True,
                 logger=_AIOMQTT_LOGGER,
             ) as client:
-                self._client = client
-                self._connected = True
                 connected = True
-                self._last_connect_at = self._utc_now_iso()
-                self._last_error = None
-                self._connected_event.set()
-                _LOGGER.info(
-                    "Jackery local MQTT connected to %s:%s; subscribing %r",
-                    self._host,
-                    self._port,
-                    self._topic_filter,
-                )
-                try:
-                    await client.subscribe(self._topic_filter, qos=0)
-                except _MqttError as err:
-                    self._last_error = f"subscribe failed: {err}"
-                    _LOGGER.warning(
-                        "Jackery local MQTT subscribe failed for %r: %s",
-                        self._topic_filter,
-                        err,
-                    )
-                    return
-                async for message in client.messages:
-                    self._handle_message(str(message.topic), message.payload)
-        except NegativeAckError as err:
-            self._handle_connect_failure(self._extract_mqtt_code(err))
-        except _MqttError as err:
-            self._handle_disconnect_error(str(err), connected)
+                await self._async_consume_session(client, MqttError)
+        except MqttError as err:
+            rc = self._extract_mqtt_code(err)
+            if rc:
+                self._handle_connect_failure(rc)
+            else:
+                self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery local MQTT connect setup failed: %s", err)
@@ -250,9 +234,47 @@ class JackeryLocalMqttClient:
             self._connected = False
             if was_connected:
                 self._last_disconnect_at = self._utc_now_iso()
-            # Make sure waiters in ``async_start`` cannot deadlock on a session
-            # that exited before the broker accepted us.
             self._connected_event.set()
+
+    async def _async_consume_session(
+        self,
+        client: MQTTClient,
+        mqtt_error_cls: type[Exception],
+    ) -> None:
+        """Mark the session connected, subscribe, then dispatch incoming messages.
+
+        Split out of :meth:`_async_run_session` so the surrounding ``try`` stays
+        small. A subscribe failure records the error and returns, which unwinds
+        the caller's ``async with`` (disconnecting) and runs its ``finally``.
+
+        Parameters:
+            client: The connected aiomqtt client.
+            mqtt_error_cls: The lazily imported ``aiomqtt.MqttError`` class to
+                catch subscribe failures (passed in to avoid re-importing).
+        """
+        self._client = client
+        self._connected = True
+        self._last_connect_at = self._utc_now_iso()
+        self._last_error = None
+        self._connected_event.set()
+        _LOGGER.info(
+            "Jackery local MQTT connected to %s:%s; subscribing %r",
+            self._host,
+            self._port,
+            self._topic_filter,
+        )
+        try:
+            await client.subscribe(self._topic_filter, qos=0)
+        except mqtt_error_cls as err:
+            self._last_error = f"subscribe failed: {err}"
+            _LOGGER.warning(
+                "Jackery local MQTT subscribe failed for %r: %s",
+                self._topic_filter,
+                err,
+            )
+            return
+        async for message in client.messages:
+            self._handle_message(str(message.topic), message.payload)
 
     def _handle_connect_failure(self, rc: int) -> None:
         """Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
@@ -286,10 +308,9 @@ class JackeryLocalMqttClient:
             _LOGGER.debug("Jackery local MQTT connect setup failed: %s", error)
 
     @staticmethod
-    def _extract_mqtt_code(err: NegativeAckError) -> int:
-        """Extract the numeric MQTT return code from a NegativeAckError."""
-        packet = getattr(err, "packet", None)
-        rc = getattr(packet, "reason_code", None)
+    def _extract_mqtt_code(err: Exception) -> int:
+        """Extract the integer MQTT return code from an aiomqtt error."""
+        rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
         value = getattr(rc, "value", None)
@@ -301,7 +322,7 @@ class JackeryLocalMqttClient:
     # Message handling
     # ------------------------------------------------------------------
 
-    def _handle_message(
+    def _handle_message(  # noqa: PLR0912, PLR0915
         self,
         topic: str,
         payload: bytes | bytearray | str,
@@ -368,7 +389,10 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except json.JSONDecodeError:
+                self._messages_dropped += 1
+                parsed = None
+            except ValueError:
                 self._messages_dropped += 1
                 parsed = None
             if isinstance(parsed, dict):

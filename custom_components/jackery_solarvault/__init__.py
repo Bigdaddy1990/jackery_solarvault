@@ -1,16 +1,14 @@
 """Jackery SolarVault integration."""
 
 import asyncio
-from collections.abc import Iterable
 import contextlib
 from datetime import timedelta
 import logging
 import re
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -58,6 +56,11 @@ from .util import (
     config_entry_int_option,
     config_entry_str_option,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from homeassistant.core import HomeAssistant
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -182,11 +185,11 @@ async def _async_authenticate(  # noqa: RUF067
     try:
         await api.async_login()
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery login rejected the credentials: {err}"
         ) from err
     except JackeryError as err:
-        raise ConfigEntryNotReady(
+        raise ConfigEntryNotReady(  # noqa: TRY003
             f"Cannot reach Jackery cloud right now: {err}"
         ) from err
     return api
@@ -299,7 +302,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
-    try:
+    try:  # noqa: PLW0717
         # Discovery must run first (MQTT subscriptions and the first refresh
         # both rely on the device list it produces). The HTTP first refresh and
         # the MQTT connect afterwards are independent and run in parallel to
@@ -312,11 +315,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # type to ``T | BaseException``; the cast surfaces that contract for
         # mypy without changing runtime behaviour.
         refresh_result, mqtt_result, local_mqtt_result = cast(
-            tuple[
-                BaseException | None,
-                BaseException | None,
-                BaseException | None,
-            ],
+            "tuple[BaseException | None, BaseException | None, BaseException | None]",
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),

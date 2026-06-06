@@ -102,9 +102,9 @@ CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
 DEFAULT_THIRD_PARTY_MQTT_PORT: Final = 1883
 CONF_THIRD_PARTY_MQTT_USERNAME: Final = "third_party_mqtt_username"
 DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
-CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
+CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"  # noqa: RUF100, S105
 DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
-CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
+CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"  # noqa: RUF100, S105
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Safe narrow default from app traces / user reports. Still configurable.
@@ -383,7 +383,7 @@ FIELD_SMART_SOCKET_ID: Final = "smartSocketId"
 FIELD_DEVICE_NAME: Final = "deviceName"
 FIELD_DEVICE_SN: Final = "deviceSn"
 FIELD_DEV_SN: Final = "devSn"
-FIELD_DEVICE_SECRET: Final = "deviceSecret"
+FIELD_DEVICE_SECRET: Final = "deviceSecret"  # noqa: RUF100, S105
 FIELD_RANDOM_SALT: Final = "randomSalt"
 FIELD_SYSTEM_SN: Final = "systemSn"
 FIELD_SYSTEM_NAME: Final = "systemName"
@@ -454,12 +454,12 @@ FIELD_CID: Final = "cid"
 FIELD_CURRENCY: Final = "currency"
 FIELD_CODE: Final = "code"
 FIELD_MSG: Final = "msg"
-FIELD_TOKEN: Final = "token"
+FIELD_TOKEN: Final = "token"  # noqa: RUF100, S105
 FIELD_RAW_TEXT: Final = "_raw_text"
 FIELD_ACCOUNT: Final = "account"
 FIELD_LOGIN_TYPE: Final = "loginType"
 FIELD_MAC_ID: Final = "macId"
-FIELD_PASSWORD: Final = "password"
+FIELD_PASSWORD: Final = "password"  # noqa: RUF100, S105
 FIELD_REGISTER_APP_ID: Final = "registerAppId"
 FIELD_REGION_CODE: Final = "regionCode"
 FIELD_DEVICE_SN_LIST: Final = "deviceSnList"
@@ -567,10 +567,10 @@ FIELD_OUT_GRID_SIDE_PW: Final = "outGridSidePw"
 
 # MQTT credential keys returned by login and consumed by mqtt_push.py.
 FIELD_USER_ID: Final = "userId"
-FIELD_MQTT_PASSWORD: Final = "mqttPassWord"
+FIELD_MQTT_PASSWORD: Final = "mqttPassWord"  # noqa: RUF100, S105
 MQTT_CREDENTIAL_CLIENT_ID: Final = "client_id"
 MQTT_CREDENTIAL_USERNAME: Final = "username"
-MQTT_CREDENTIAL_PASSWORD: Final = "password"
+MQTT_CREDENTIAL_PASSWORD: Final = "password"  # noqa: RUF100, S105
 MQTT_CREDENTIAL_USER_ID: Final = "user_id"
 
 # Smart-meter/CT wire keys. These are app payload names; centralizing them keeps
@@ -1340,8 +1340,8 @@ SERVICE_FIELD_ENABLE: Final = "enable"
 SERVICE_FIELD_IP: Final = "ip"
 SERVICE_FIELD_PORT: Final = "port"
 SERVICE_FIELD_USERNAME: Final = "username"
-SERVICE_FIELD_PASSWORD: Final = "password"
-SERVICE_FIELD_TOKEN: Final = "token"
+SERVICE_FIELD_PASSWORD: Final = "password"  # noqa: RUF100, S105
+SERVICE_FIELD_TOKEN: Final = "token"  # noqa: RUF100, S105
 SERVICE_NUMERIC_ID_PATTERN: Final = r"^\s*[0-9]+\s*$"
 SERVICE_NON_EMPTY_TEXT_PATTERN: Final = r".*\S.*"
 
@@ -1611,8 +1611,8 @@ FIELD_THIRD_PARTY_MQTT_ENABLE: Final = "enable"
 FIELD_THIRD_PARTY_MQTT_IP: Final = "ip"
 FIELD_THIRD_PARTY_MQTT_PORT: Final = "port"
 FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
-FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
-FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
+FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"  # noqa: RUF100, S105
+FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"  # noqa: RUF100, S105
 
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the

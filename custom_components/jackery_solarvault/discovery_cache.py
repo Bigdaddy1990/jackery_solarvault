@@ -1,12 +1,14 @@
 """Persistent discovery cache for local offline startup."""
 
 import asyncio
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"

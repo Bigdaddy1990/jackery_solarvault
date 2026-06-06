@@ -60,12 +60,11 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """  # noqa: E501, RUF100
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, timedelta
 import logging
 import math
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -88,12 +87,10 @@ from homeassistant.const import (
     UnitOfReactivePower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import JackeryConfigEntry
 from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_METRIC_KEY_BY_SECTION_PREFIX,
@@ -324,10 +321,8 @@ from .const import (
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
-    HomeConsumptionPower,
     append_unique_entity,
     calculated_smart_meter_power,
     config_entry_bool_option,
@@ -356,6 +351,17 @@ from .util import (
     trend_series_total,
     verify_and_backfill,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from datetime import tzinfo
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
+    from .util import HomeConsumptionPower
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
@@ -1274,7 +1280,7 @@ def _chart_value_for_day(
     return safe_float(values[index])
 
 
-def _stat_description_has_value(
+def _stat_description_has_value(  # noqa: PLR0911
     payload: dict[str, Any],
     description: JackeryStatSensorDescription,
 ) -> bool:
@@ -3187,7 +3193,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(  # noqa: C901, RUF029
+async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -3228,7 +3234,7 @@ async def async_setup_entry(  # noqa: C901, RUF029
             entities, seen_unique_ids, entity, platform="sensor", logger=_LOGGER
         )
 
-    def _collect_entities() -> list[SensorEntity]:  # noqa: C901
+    def _collect_entities() -> list[SensorEntity]:  # noqa: C901, PLR0912, PLR0915
         """Collect and instantiate all sensor entities for each device payload present in the coordinator.
 
         Builds sensors from property-driven descriptions, app/statistic charts, battery packs, smart plugs,
@@ -3389,7 +3395,7 @@ async def async_setup_entry(  # noqa: C901, RUF029
             # Smart meter / CT values arrive through MQTT sub-device responses.
             # Create them when discovery confirms a meter accessory, or when a
             # CT payload was already received before entity setup.
-            if coordinator._has_smart_meter_accessory(payload) or payload.get(
+            if coordinator._has_smart_meter_accessory(payload) or payload.get(  # noqa: SLF001
                 PAYLOAD_CT_METER
             ):
                 for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
@@ -3652,7 +3658,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return False
         return data_begin > wall_clock_start.date()
 
-    def _source_for_section(self, section: str) -> dict[str, Any]:
+    def _source_for_section(self, section: str) -> dict[str, Any]:  # noqa: PLR0911
         """Return the coordinator source dictionary corresponding to a payload section name.
 
         Parameters:
@@ -3732,7 +3738,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 return value, candidate_section, candidate_source
         return None
 
-    def _resolve_period_value(
+    def _resolve_period_value(  # noqa: PLR6301
         self,
         source: dict[str, Any],
         section: str,
@@ -3760,7 +3766,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         server_total = effective_period_total_value(source, section, stat_key)
         return None, values, chart_series_sum, server_total
 
-    def _refresh_cache(self) -> None:  # noqa: C901
+    def _refresh_cache(self) -> None:  # noqa: C901, PLR0912, PLR0914, PLR0915
         """Recompute native_value and extra_state_attributes once per update."""
         section = self.entity_description.section
         stat_key = self.entity_description.stat_key
@@ -3854,7 +3860,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 "chart_series_sum": chart_series_sum,
                 "server_total": server_total,
             }
-            if isinstance(values, list) and len(values) <= 31:
+            if isinstance(values, list) and len(values) <= 31:  # noqa: PLR2004
                 attrs["period_values"] = values
             year_backfill = source.get(APP_YEAR_BACKFILL_META)
             if isinstance(year_backfill, dict):
@@ -4259,7 +4265,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackerySmartPlugSensorDescription
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -4389,7 +4395,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackeryMeterHeadSensorDescription
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -5156,7 +5162,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             ct = {}
 
         result = self._home_consumption_power(ct, props)
-        meter_net = JackerySmartMeterSensor._net_power(ct)
+        meter_net = JackerySmartMeterSensor._net_power(ct)  # noqa: SLF001
         input_available = self._grid_side_input_power(props) is not None
         output_available = self._grid_side_output_power(props) is not None
         reported_load_available = (
@@ -5189,7 +5195,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 result.jackery_output_power, 2
             )
 
-        phases = JackerySmartMeterSensor._signed_phase_values(ct)
+        phases = JackerySmartMeterSensor._signed_phase_values(ct)  # noqa: SLF001
         if phases is not None:
             attrs["phase_a_signed_power"] = round(phases[0], 2)
             attrs["phase_b_signed_power"] = round(phases[1], 2)

@@ -1,24 +1,24 @@
 """Config flow for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
-from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.components.dhcp import DhcpServiceInfo
-from homeassistant.components.mqtt import MqttServiceInfo
-from homeassistant.components.zeroconf import ZeroconfServiceInfo
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+
+    DhcpServiceInfo = Any
+    MqttServiceInfo = Any
+    ZeroconfServiceInfo = Any
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
@@ -215,6 +215,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> ConfigFlowResult:
         """Handle Bluetooth discovery."""
+        await self.async_set_unique_id(discovery_info.address)
+        self._abort_if_unique_id_configured()
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
         return await self.async_step_user()
@@ -442,7 +444,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 # a potentially stale AES-256 seed.
                 try:
                     await async_clear_mqtt_session(self.hass, entry.entry_id)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     _LOGGER.debug(
                         "Jackery reauth: failed to clear MQTT session; "
                         "proceeding with reload"

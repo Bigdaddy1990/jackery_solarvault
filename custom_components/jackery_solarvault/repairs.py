@@ -1,18 +1,20 @@
 """Repair flows for Jackery SolarVault."""
 
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .client import JackeryError
 from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
 from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,9 +47,9 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
-            return cast(data_entry_flow.FlowResult, self.async_create_entry(data={}))
+            return cast("data_entry_flow.FlowResult", self.async_create_entry(data={}))
         return cast(
-            data_entry_flow.FlowResult,
+            "data_entry_flow.FlowResult",
             self.async_show_form(
                 step_id="confirm",
                 data_schema=vol.Schema({}),
@@ -98,6 +100,6 @@ async def async_create_fix_flow(  # noqa: RUF029 - HA repairs hook is async.
             "examples": str(issue_data.get("examples", "unknown")),
         }
         return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
-    raise data_entry_flow.UnknownFlow(
+    raise data_entry_flow.UnknownFlow(  # noqa: TRY003
         f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
     )

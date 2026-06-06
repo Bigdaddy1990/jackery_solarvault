@@ -2,7 +2,6 @@
 
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import UTC, datetime
 import hashlib
@@ -13,9 +12,9 @@ import ssl
 from typing import TYPE_CHECKING, Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, ConnectError, NegativeAckError, ProtocolError
+from aiomqtt import MqttError
 
-from jackery_solarvault.const import (
+from ..const import (  # noqa: TID252
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,
@@ -31,13 +30,18 @@ from jackery_solarvault.const import (
     REDACTED_VALUE,
 )
 
+_MqttErrorTuple: tuple[type[Exception], ...] = (MqttError,)
+
 # Topics carrying propertyChange / devicePropertyChange and alert data need
 # at-least-once delivery. The notice topic carries high-rate diagnostic
 # frames that are not entity-backed, so QoS 0 avoids unnecessary ACK traffic.
 _QOS0_TOPIC_SUFFIXES: frozenset[str] = frozenset({MQTT_TOPIC_NOTICE})
-_MqttError = (ConnectError, NegativeAckError, ProtocolError)
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from aiomqtt import Client as MQTTClient
+
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,7 +56,7 @@ _MQTT_AVAILABILITY_TOPIC_SUFFIX = "status"
 class _AioMqttPassiveDisconnectFilter(logging.Filter):
     """Hide expected passive broker reset noise from aiomqtt internals."""
 
-    def filter(self, record: logging.LogRecord) -> bool:
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
         """Filter out common aiomqtt passive socket-reset log messages.
 
         Parameters:
@@ -255,19 +259,22 @@ class JackeryMqttPushClient:
             await self._async_wait_connected(timeout_sec=12.0)
         client = self._client
         if client is None:
-            raise RuntimeError("MQTT client is not running")
+            raise RuntimeError("MQTT client is not running")  # noqa: TRY003
+        payload_bytes = text.encode()
         try:
-            await client.publish(topic, text, qos=qos, retain=retain)
-        except _MqttError as err:
+            # JSON command frames (propertyChange) default to at-least-once
+            # delivery; aiomqtt 2.5.x takes a plain int QoS.
+            await client.publish(topic, payload_bytes, qos=qos, retain=retain)
+        except _MqttErrorTuple as err:
             self._connected = False
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
-            raise RuntimeError(f"MQTT publish failed: {err}") from err
+            raise RuntimeError(f"MQTT publish failed: {err}") from err  # noqa: TRY003
         except Exception as err:
             self._connected = False
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
-            raise RuntimeError(f"MQTT publish failed: {err}") from err
+            raise RuntimeError(f"MQTT publish failed: {err}") from err  # noqa: TRY003
         self._last_published_topic = topic
         self._last_publish_at = self._utc_now_iso()
 
@@ -281,7 +288,7 @@ class JackeryMqttPushClient:
             RuntimeError: If the MQTT client runner is not started, or if the client fails to connect within `timeout_sec`.
         """  # noqa: E501, RUF100
         if self._runner_task is None:
-            raise RuntimeError("MQTT client is not running")
+            raise RuntimeError("MQTT client is not running")  # noqa: TRY003
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
@@ -299,13 +306,13 @@ class JackeryMqttPushClient:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
         except TimeoutError as err:
             if self._last_error:
-                raise RuntimeError(
+                raise RuntimeError(  # noqa: TRY003
                     f"MQTT not connected yet ({self._last_error})"
                 ) from err
             self._last_error = "publish timeout waiting for MQTT connect"
-            raise RuntimeError("MQTT not connected yet") from err
+            raise RuntimeError("MQTT not connected yet") from err  # noqa: TRY003
         if not self._connected:
-            raise RuntimeError(f"MQTT not connected yet ({self._last_error})")
+            raise RuntimeError(f"MQTT not connected yet ({self._last_error})")  # noqa: TRY003
 
     async def _async_stop_locked(self) -> None:
         """Stop the current runner task and clear internal connection state.
@@ -328,10 +335,10 @@ class JackeryMqttPushClient:
         self._connected_event.clear()
         if not task.done():
             task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, *_MqttError, Exception):
+        with contextlib.suppress(asyncio.CancelledError, *_MqttErrorTuple, Exception):
             await task
 
-    async def _async_run_session(
+    async def _async_run_session(  # noqa: PLR0912, PLR0915
         self,
         *,
         client_id: str,
@@ -345,7 +352,7 @@ class JackeryMqttPushClient:
         On successful connection, sets internal connection flags and timestamps, subscribes to topics in self._topics, and forwards incoming messages to the internal message handler. If configured, schedules the connect callback once connected and schedules the disconnect callback when a previously established session ends. On errors, updates internal error state and sets or clears the connected event to reflect whether the termination was a connect failure.
         """  # noqa: E501, RUF100
         connected = False
-        try:
+        try:  # noqa: PLW0717
             async with aiomqtt.Client(
                 hostname=MQTT_HOST,
                 port=MQTT_PORT,
@@ -354,7 +361,6 @@ class JackeryMqttPushClient:
                 password=password,
                 tls_context=ssl_context,
                 keepalive=MQTT_KEEPALIVE_SEC,
-                clean_session=True,
                 will=aiomqtt.Will(
                     topic=availability_topic,
                     payload=_MQTT_AVAILABILITY_OFFLINE,
@@ -381,16 +387,21 @@ class JackeryMqttPushClient:
                 )
                 for topic in self._topics:
                     try:
-                        qos = (
-                            0
-                            if any(
-                                topic.endswith(f"/{s}") for s in _QOS0_TOPIC_SUFFIXES
+                        if any(
+                            topic.endswith(f"/{suffix}")
+                            for suffix in _QOS0_TOPIC_SUFFIXES
+                        ):
+                            await client.subscribe(
+                                topic,
+                                qos=0,
                             )
-                            else 1
-                        )
-                        await client.subscribe(topic, qos=qos)
+                        else:
+                            await client.subscribe(
+                                topic,
+                                qos=1,
+                            )
                         subscribed_count += 1
-                    except _MqttError as err:
+                    except _MqttErrorTuple as err:
                         _LOGGER.warning(
                             "Jackery MQTT subscribe failed for %s: %s", topic, err
                         )
@@ -423,13 +434,15 @@ class JackeryMqttPushClient:
                     )
                 async for message in client.messages:
                     self._handle_message(str(message.topic), message.payload)
-        except NegativeAckError as err:
-            self._handle_connect_failure(self._extract_mqtt_code(err))
-        except _MqttError as err:
-            self._handle_disconnect_error(str(err), connected)
+        except _MqttErrorTuple as err:
+            rc = self._extract_mqtt_code(err)
+            if rc:
+                self._handle_connect_failure(rc)
+            else:
+                self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._last_error = f"connect failed: {err}"
             self._connection_state = "disconnected"
             self._connected_event.set()
@@ -519,10 +532,9 @@ class JackeryMqttPushClient:
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", error)
 
     @staticmethod
-    def _extract_mqtt_code(err: NegativeAckError) -> int:
-        """Extract the integer MQTT return code from a NegativeAckError."""
-        packet = getattr(err, "packet", None)
-        rc = getattr(packet, "reason_code", None)
+    def _extract_mqtt_code(err: Exception) -> int:
+        """Extract the integer MQTT return code from an aiomqtt error."""
+        rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
         value = getattr(rc, "value", None)
@@ -616,7 +628,19 @@ class JackeryMqttPushClient:
             else:
                 text = bytes(payload).decode("utf-8")
             data = json.loads(text)
-        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as err:
+        except UnicodeDecodeError as err:
+            self._messages_dropped += 1
+            self._last_message_error = f"invalid UTF-8 payload: {err}"
+            return
+        except json.JSONDecodeError as err:
+            self._messages_dropped += 1
+            self._last_message_error = f"invalid JSON payload: {err}"
+            return
+        except TypeError as err:
+            self._messages_dropped += 1
+            self._last_message_error = f"invalid payload type: {err}"
+            return
+        except ValueError as err:
             self._messages_dropped += 1
             self._last_message_error = f"invalid JSON payload: {err}"
             return
@@ -652,7 +676,10 @@ class JackeryMqttPushClient:
 
         task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
         if tracked_tasks is not None:
-            tracked_tasks.append(task)
+            if isinstance(tracked_tasks, deque):
+                tracked_tasks.append(task)
+            else:
+                tracked_tasks.add(task)
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
             if tracked_tasks is not None:
@@ -691,7 +718,7 @@ class JackeryMqttPushClient:
         if topic is None:
             return None
         parts = topic.split("/")
-        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:
+        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:  # noqa: PLR2004
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 

@@ -2,6 +2,7 @@
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
   "after_dependencies": [
+    "aiousbwatcher",
     "bluetooth",
     "dhcp",
     "http",
@@ -40,40 +41,34 @@
     "custom_components.jackery_solarvault.client.ble_transport",
     "custom_components.jackery_solarvault.client.mqtt_push",
     "custom_components.jackery_solarvault.client.local_mqtt",
-    "custom_components.jackery_solarvault.client.third_party_mqtt_codec",
-    "aiomqtt",
-    "aiodns",
-    "aiohttp",
-    "bluetooth",
-    "http",
-    "zeroconf"
+    "custom_components.jackery_solarvault.client.third_party_mqtt_codec"
   ],
   "mqtt": [
-    "jackery/#",
+    "lwip/#",
     "hb/#"
   ],
   "quality_scale": "custom",
   "requirements": [
-    "aiomqtt>=2.5.0"
+    "aiomqtt>=2.5.0,<2.6.0"
   ],
   "version": "0.1.1",
   "zeroconf": [
     {
       "type": "_api._tcp.local.",
       "properties": {
-        "device": "SolarVault"
+        "device": "lwip"
       }
     },
     {
       "type": "_api._udp.local.",
       "properties": {
-        "device": "SolarVault"
+        "device": "lwip"
       }
     },
     {
       "type": "_http._tcp.local.",
       "properties": {
-        "device": "SolarVault"
+        "device": "lwip"
       }
     }
   ]

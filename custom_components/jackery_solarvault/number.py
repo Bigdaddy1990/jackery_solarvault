@@ -6,10 +6,9 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import (
     NumberDeviceClass,
@@ -18,11 +17,9 @@ from homeassistant.components.number import (
     NumberMode,
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .client import JackeryAuthError
 from .const import (
     DOMAIN,
@@ -51,7 +48,6 @@ from .const import (
     PAYLOAD_SYSTEM,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
     append_unique_entity,
@@ -59,6 +55,15 @@ from .util import (
     safe_float,
     safe_int,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -96,7 +101,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     allowed_values: (
         Callable[[dict[str, Any]], tuple[float, ...]] | tuple[float, ...] | None
     ) = None
-    value_transform: Callable[[float], Any] = lambda v: round(v)
+    value_transform: Callable[[float], Any] = round
     validate_range: bool = False
     raise_on_setter_error: bool = True
 
@@ -174,7 +179,7 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
-        if feed_limit is not None and feed_limit > 800:
+        if feed_limit is not None and feed_limit > 800:  # noqa: PLR2004
             return 2500.0
     for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
         meta = payload.get(section) or {}
@@ -183,12 +188,12 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     max_out_int = safe_int(props.get(FIELD_MAX_OUT_PW))
     if max_out_int is None:
         max_out_int = 2500
-    return 800.0 if max_out_int <= 800 else 2500.0
+    return 800.0 if max_out_int <= 800 else 2500.0  # noqa: PLR2004
 
 
 def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
     """Jackery's app exposes feed-in as a binary 800/2500W selection."""
-    if _max_feed_grid_dynamic_max(payload) <= 800:
+    if _max_feed_grid_dynamic_max(payload) <= 800:  # noqa: PLR2004
         return (800.0,)
     return (800.0, 2500.0)
 
@@ -297,7 +302,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_section=PAYLOAD_PRICE,
         setter=_set_single_price,
         dynamic_unit=_single_tariff_dynamic_unit,
-        value_transform=lambda v: float(v),
+        value_transform=float,
     ),
     JackeryNumberDescription(
         key="third_party_mqtt_port",
@@ -455,7 +460,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 self.entity_description.key,
                 err,
             )
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             if self.entity_description.raise_on_setter_error:
                 self._raise_action_error("entity_action_failed", error=err)
             _LOGGER.debug(

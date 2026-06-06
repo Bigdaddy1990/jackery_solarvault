@@ -1,15 +1,13 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .client import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
@@ -24,9 +22,15 @@ from .const import (
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_SYSTEM,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, coordinator_entity_signature
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -222,7 +226,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         try:
             ok = await self.coordinator.api.async_set_system_name(system_id, new_name)
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(
+            raise ConfigEntryAuthFailed(  # noqa: TRY003
                 "Jackery credentials were rejected while renaming a system. "
                 "Re-authentication is required."
             ) from err
@@ -330,7 +334,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
     _attr_native_min = 0
     _attr_native_max = 128
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -386,5 +390,5 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)

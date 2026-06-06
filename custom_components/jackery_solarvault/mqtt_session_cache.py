@@ -15,9 +15,8 @@ has succeeded.
 """
 
 import asyncio
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -27,6 +26,9 @@ from .const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
@@ -43,7 +45,7 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
-async def async_load_mqtt_session(
+async def async_load_mqtt_session(  # noqa: PLR0911
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
     """Return cached MQTT session fields for ``entry_id`` or ``None``.
@@ -82,7 +84,7 @@ async def async_load_mqtt_session(
     return result
 
 
-async def async_save_mqtt_session(
+async def async_save_mqtt_session(  # noqa: PLR0913
     hass: HomeAssistant,
     entry_id: str,
     *,

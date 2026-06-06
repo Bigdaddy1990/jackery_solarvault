@@ -2,7 +2,6 @@
 
 import asyncio
 import binascii
-from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass, field as dataclass_field
 from datetime import date, datetime, timedelta
@@ -12,14 +11,12 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import JackeryApi, JackeryApiError, JackeryAuthError, JackeryError
+from .client import JackeryApiError, JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_BIND_SMART_PART,
@@ -322,9 +319,14 @@ from .const import (
 from .ingest import merge_live_properties
 
 if TYPE_CHECKING:
-    from homeassistant.components.recorder.models import StatisticData
+    from collections.abc import Awaitable, Callable
 
-    from .client import JackeryMqttPushClient
+    from homeassistant.components.recorder.models import StatisticData
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .client import JackeryApi, JackeryMqttPushClient
+    from .client.ble_transport import BleFrameObservation
 
 import operator
 
@@ -534,10 +536,10 @@ def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
 
 def _raise_config_entry_auth_failed(message: str, err: JackeryAuthError) -> NoReturn:
     """Raise HA reauth trigger for rejected Jackery credentials."""
-    raise ConfigEntryAuthFailed(f"{message}. Re-authentication is required.") from err
+    raise ConfigEntryAuthFailed(f"{message}. Re-authentication is required.") from err  # noqa: TRY003
 
 
-class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
+class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # noqa: PLR0904
     """Polls all known Jackery devices.
 
     Architecture
@@ -837,7 +839,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             diagnostic_redactions_disabled(self.entry),
         )
 
-    async def async_discover(self) -> None:
+    async def async_discover(self) -> None:  # noqa: PLR0912
         """Populate _device_index from config or /v1/device/system/list."""
         new_index: dict[str, dict[str, Any]] = {}
 
@@ -845,12 +847,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             systems = await self.api.async_get_system_list()
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(
+            raise ConfigEntryAuthFailed(  # noqa: TRY003
                 "Jackery credentials were rejected during system discovery. "
                 "Re-authentication is required."
             ) from err
         except JackeryError as err:
-            raise UpdateFailed(f"system/list failed: {err}") from err
+            raise UpdateFailed(f"system/list failed: {err}") from err  # noqa: TRY003
 
         for sys_entry in systems:
             sys_id = sys_entry.get(FIELD_ID) or sys_entry.get(FIELD_SYSTEM_ID)
@@ -890,7 +892,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             legacy = await self.api.async_list_devices_legacy()
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(
+            raise ConfigEntryAuthFailed(  # noqa: TRY003
                 "Jackery credentials were rejected during legacy device discovery. "
                 "Re-authentication is required."
             ) from err
@@ -957,7 +959,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         bind_key = dev.get(FIELD_BIND_KEY)
         if bind_key in {0, "0"}:
             return False
-        if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):
+        if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):  # noqa: PLR2004
             return False
         return not (dev.get(FIELD_MODEL_CODE) is None and not dev.get(FIELD_DEV_MODEL))
 
@@ -979,7 +981,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def record_http_auth_rejection(self, status: int, data: object) -> None:
         """Record HTTP/API authentication rejection metrics."""
         reason = f"http_{status}"
-        if self.api._is_token_expired_response(status, data):
+        if self.api._is_token_expired_response(status, data):  # noqa: SLF001
             self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
             return
         self.rejection_metrics.increment("http_auth_rejections", reason)
@@ -1089,7 +1091,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._defer_background_auth_failure(err)
         except JackeryAuthError:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Jackery MQTT auto-reconnect after disconnect failed: %s", err
             )
@@ -1181,7 +1183,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self.entry, CONF_ENABLE_BLE_WRITES, DEFAULT_ENABLE_BLE_WRITES
         )
 
-    async def async_send_ble_command(
+    async def async_send_ble_command(  # noqa: PLR0913
         self,
         device_id: str,
         *,
@@ -1296,7 +1298,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             snapshot[device_id] = entry
         return snapshot
 
-    async def async_start_ble_transport(self) -> None:
+    async def async_start_ble_transport(self) -> None:  # noqa: PLR0915
         """Start the optional BLE listener if the config-entry option is set.
 
         Safe to call repeatedly; only the first call attaches a listener.
@@ -1310,7 +1312,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             return
         try:
-            from .client.ble_transport import BleFrameObservation, JackeryBleListener
+            from .client.ble_transport import JackeryBleListener  # noqa: PLC0415
         except ImportError as err:
             _LOGGER.warning(
                 "Jackery BLE transport requested but module import failed: %s",
@@ -1318,7 +1320,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             return
 
-        async def _sink(  # noqa: RUF029 - BLE listener callback contract is async.
+        async def _sink(  # noqa: PLR0911, PLR0912, RUF029
             device_id: str, observation: BleFrameObservation
         ) -> None:
             """Merge BLE-delivered JSON bodies into ``coordinator.data``.
@@ -1440,7 +1442,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # Previously every such frame was dropped into the unrouted
                 # counter, so live BLE telemetry was lost whenever MQTT went
                 # quiet (observed as 11k+ unrouted cmd=120 frames).
-                if self._is_subdevice_payload(payload, body):
+                if self._is_subdevice_payload(payload, payload):
                     touched = self._merge_subdevice_data(
                         updated, payload, device_id=device_id
                     )
@@ -1485,7 +1487,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         try:
             await listener.async_start(list(self._device_index.keys()))
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Jackery BLE listener failed to start: %s", err)
             return
         self._ble_listener = listener
@@ -1499,7 +1501,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # *also* disables redaction in the JSONL log and diagnostics
         # export; both surfaces are off by default.
         if dev_mode_redactions_disabled():
-            import base64 as _base64
+            import base64 as _base64  # noqa: PLC0415
 
             for device_id in self._device_index:
                 key = self.device_bluetooth_key(device_id)
@@ -1615,7 +1617,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Avoid reconnect churn when another app session keeps rotating the
         # token/seed frequently.
         if (
-            not force
+            not force  # noqa: PLR0916
             and self._mqtt.is_started
             and (
                 (
@@ -1705,7 +1707,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         await self._async_handle_mqtt_message(topic, payload)
 
-    async def _async_handle_mqtt_message(  # noqa: C901
+    async def _async_handle_mqtt_message(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self,
         topic: str,
         payload: dict[str, Any],
@@ -2048,7 +2050,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         decoded byte length picks the cipher mode in
         :mod:`.client.ble`. Returns ``None`` when no usable key exists.
         """
-        from .client.ble import BLE_AES_KEY_LENGTHS
+        from .client.ble import BLE_AES_KEY_LENGTHS  # noqa: PLC0415
 
         idx = self._device_index.get(device_id) or {}
         device_meta = idx.get(PAYLOAD_DEVICE_META) or {}
@@ -2067,7 +2069,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not raw:
             return None
         try:
-            import base64
+            import base64  # noqa: PLC0415
 
             key = base64.b64decode(str(raw))
         except ValueError, binascii.Error:
@@ -2370,7 +2372,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return True
         return bool(packs)
 
-    def _merge_subdevice_data(
+    def _merge_subdevice_data(  # noqa: PLR0912, PLR0914
         self,
         updated: dict[str, Any],
         source: dict[str, Any],
@@ -2690,7 +2692,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return 0
         # Local import keeps the registry stub-free for unit tests that
         # exercise the coordinator without HA helpers loaded.
-        from homeassistant.helpers import device_registry as dr
+        from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
 
         registry = dr.async_get(self.hass)
         removed = 0
@@ -2712,7 +2714,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         return removed
 
-    async def _async_enrich_battery_pack_ota(
+    async def _async_enrich_battery_pack_ota(  # noqa: PLR0912
         self,
         device_id: str,
         packs: list[Any],
@@ -2827,7 +2829,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_refresh_battery_pack_ota(self, device_id: str) -> None:
         """Fetch per-pack OTA metadata and push a partial coordinator update."""
-        try:
+        try:  # noqa: PLW0717
             payload = (self.data or {}).get(device_id) or {}
             packs = payload.get(PAYLOAD_BATTERY_PACKS)
             if not isinstance(packs, list) or not packs:
@@ -3410,7 +3412,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body[FIELD_CMD] = int(cmd)
         return body
 
-    async def _async_publish_command_ble_first(
+    async def _async_publish_command_ble_first(  # noqa: PLR0913
         self,
         device_id: str,
         *,
@@ -3466,7 +3468,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             ensure_mqtt=ensure_mqtt,
         )
 
-    async def _async_publish_command(
+    async def _async_publish_command(  # noqa: PLR0912, PLR0913
         self,
         device_id: str,
         *,
@@ -3477,7 +3479,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ensure_mqtt: bool = True,
     ) -> None:
         if self._mqtt is None:
-            raise HomeAssistantError("MQTT client not initialized")
+            raise HomeAssistantError("MQTT client not initialized")  # noqa: TRY003
 
         try:
             creds = await self.api.async_get_mqtt_credentials()
@@ -3486,7 +3488,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "Jackery credentials were rejected while preparing an MQTT command", err
             )
         except JackeryError as err:
-            raise HomeAssistantError(
+            raise HomeAssistantError(  # noqa: TRY003
                 f"Could not build Jackery MQTT credentials: {err}"
             ) from err
         user_id = creds[MQTT_CREDENTIAL_USER_ID]
@@ -3513,16 +3515,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         last_err: Exception | None = None
         attempts = 2 if ensure_mqtt else 1
         for attempt in range(attempts):
-            try:
+            try:  # noqa: PLW0717
                 if ensure_mqtt:
                     await self._async_ensure_mqtt(
                         force=not self._mqtt.is_connected,
                         wait_connected=True,
                     )
                 elif self._mqtt is None or not self._mqtt.is_connected:
-                    raise RuntimeError("MQTT client is not connected")  # noqa: TRY301
+                    raise RuntimeError("MQTT client is not connected")  # noqa: TRY003, TRY301
                 if self._mqtt is None:
-                    raise RuntimeError("MQTT client is not running")  # noqa: TRY301
+                    raise RuntimeError("MQTT client is not running")  # noqa: TRY003, TRY301
                 await self._mqtt.async_publish_json(topic, payload, qos=1, retain=False)
                 return  # noqa: TRY300
             except RuntimeError as err:
@@ -3587,7 +3589,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         state so the frame always carries the full pair the device expects.
         """
         if charge_limit is None and discharge_limit is None:
-            raise UpdateFailed(
+            raise UpdateFailed(  # noqa: TRY003
                 "Cannot set SOC limits without charge_limit or discharge_limit"
             )
         current = ((self.data or {}).get(device_id, {}) or {}).get(
@@ -3817,7 +3819,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Set single price."""
         system_id = self._resolve_system_id(device_id)
         if not system_id:
-            raise UpdateFailed(
+            raise UpdateFailed(  # noqa: TRY003
                 f"Cannot set single tariff for {device_id}: missing systemId"
             )
         current = ((self.data or {}).get(device_id, {}) or {}).get(PAYLOAD_PRICE) or {}
@@ -3854,7 +3856,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if single_price is None:
             system_id = self._resolve_system_id(device_id)
             if not system_id:
-                raise HomeAssistantError(
+                raise HomeAssistantError(  # noqa: TRY003
                     f"Cannot switch to single tariff for {device_id}: missing systemId"
                 )
             try:
@@ -3865,14 +3867,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     err,
                 )
             except JackeryError as err:
-                raise HomeAssistantError(
+                raise HomeAssistantError(  # noqa: TRY003
                     f"Cannot switch to single tariff for {device_id}: {err}"
                 ) from err
             if isinstance(latest, dict):
                 self._apply_local_price_patch(device_id, latest)
                 single_price = latest.get(FIELD_SINGLE_PRICE)
         if single_price is None:
-            raise HomeAssistantError(
+            raise HomeAssistantError(  # noqa: TRY003
                 f"Cannot switch to single tariff for {device_id}: missing singlePrice"
             )
         await self.async_set_single_price(device_id, float(single_price))
@@ -3996,14 +3998,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Select a dynamic-price provider via the app's saveDynamicMode API."""
         system_id = self._resolve_system_id(device_id)
         if not system_id:
-            raise HomeAssistantError(
+            raise HomeAssistantError(  # noqa: TRY003
                 f"Cannot set dynamic tariff for {device_id}: missing systemId"
             )
 
         company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
         region = self._source_region_for_device(device_id, source)
-        if company_id is None or company_id == "" or not region:
-            raise HomeAssistantError(
+        if company_id is None or company_id == "" or not region:  # noqa: PLC1901
+            raise HomeAssistantError(  # noqa: TRY003
                 "Cannot set dynamic tariff: selected provider is missing "
                 "platformCompanyId/country."
             )
@@ -4036,13 +4038,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Set price mode dynamic."""
         system_id = self._resolve_system_id(device_id)
         if not system_id:
-            raise HomeAssistantError(
+            raise HomeAssistantError(  # noqa: TRY003
                 f"Cannot set dynamic tariff for {device_id}: missing systemId"
             )
         current = ((self.data or {}).get(device_id, {}) or {}).get(PAYLOAD_PRICE) or {}
         company_id = current.get(FIELD_PLATFORM_COMPANY_ID)
         region = current.get(FIELD_SYSTEM_REGION)
-        if company_id is None or company_id == "" or not region:
+        if company_id is None or company_id == "" or not region:  # noqa: PLC1901
             sources = await self._async_price_sources_for_device(device_id)
             source = self._find_matching_price_source(device_id, sources, current)
             if source is not None:
@@ -4051,7 +4053,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if len(sources) == 1:
                 await self.async_set_price_source(device_id, sources[0])
                 return
-            raise HomeAssistantError(
+            raise HomeAssistantError(  # noqa: TRY003
                 "Dynamic tariff requires provider selection. Use the "
                 "'Electricity price provider' select entity first."
             )
@@ -4156,7 +4158,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         if not any(body.get(field) for field in secret_fields):
             return body
-        from .client.ble import BLE_AES_IV_LEN
+        from .client.ble import BLE_AES_IV_LEN  # noqa: PLC0415
 
         key = self.device_bluetooth_key(device_id)
         if key is None or len(key) != BLE_AES_IV_LEN:
@@ -4166,7 +4168,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 device_id,
             )
             return body
-        from .client.third_party_mqtt_codec import encode_third_party_mqtt_field
+        from .client.third_party_mqtt_codec import encode_third_party_mqtt_field  # noqa: I001, PLC0415
 
         encoded = dict(body)
         for field in secret_fields:
@@ -4175,7 +4177,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 encoded[field] = encode_third_party_mqtt_field(value, key)
         return encoded
 
-    async def async_set_third_party_mqtt_config(
+    async def async_set_third_party_mqtt_config(  # noqa: PLR0913
         self,
         device_id: str,
         *,
@@ -4298,7 +4300,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     async def async_device_get_ota_page_data(
         self, device_id: str, page_index: int
     ) -> None:
-        """Request a specific OTA firmware page from the device (actionId 3009, cmd 103)."""
+        """Request a specific OTA firmware page from the device (actionId 3009, cmd 103)."""  # noqa: E501
         await self._async_publish_command(
             device_id,
             message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -4630,7 +4632,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         phase_int = int(phase)
         if phase_int not in {1, 2, 3, 4}:
-            raise HomeAssistantError(f"CT phase must be 1..4 (got {phase_int})")
+            raise HomeAssistantError(f"CT phase must be 1..4 (got {phase_int})")  # noqa: TRY003
         await self._async_publish_command_ble_first(
             device_id,
             message_type=MQTT_MESSAGE_CONTROL_SUB_DEVICE,
@@ -4643,7 +4645,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             },
         )
 
-    async def _async_query_subdevices_for_missing(
+    async def _async_query_subdevices_for_missing(  # noqa: PLR0912, PLR0915
         self,
         *,
         force: bool = False,
@@ -4846,8 +4848,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts or not states:
             return 0.0
         try:
-            from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 statistics_during_period,
             )
         except ImportError, RuntimeError:
@@ -4875,7 +4877,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 None,
                 {"start", "sum"},
             )
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Could not read previous statistics for %s: %s",
                 statistic_id,
@@ -4908,12 +4910,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> tuple[float, float]:
         """Return previous ``sum`` and same-period ``state`` for an entity."""
         try:
-            from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.db_schema import (
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.db_schema import (  # noqa: PLC0415
                 Statistics,
                 StatisticsMeta,
             )
-            from homeassistant.helpers.recorder import session_scope
+            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
         except ImportError, RuntimeError:
             _LOGGER.exception("Recorder entity-statistic offset unavailable")
             return 0.0, 0.0
@@ -4962,7 +4964,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             return await recorder.async_add_executor_job(_load_offsets)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Could not read previous entity statistics for %s: %s",
                 statistic_id,
@@ -4978,9 +4980,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts:
             return set()
         try:
-            from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.db_schema import StatisticsRuns
-            from homeassistant.helpers.recorder import session_scope
+            from homeassistant.components.recorder import get_instance  # noqa: I001, PLC0415
+            from homeassistant.components.recorder.db_schema import StatisticsRuns  # noqa: PLC0415
+            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
         except ImportError, RuntimeError:
             _LOGGER.exception("Recorder run markers unavailable")
             return set()
@@ -5005,7 +5007,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         StatisticsRuns.start < range_end + timedelta(hours=1),
                     )
                     .all()
-                    if item[0] is not None and item[0].minute == 55
+                    if item[0] is not None and item[0].minute == 55  # noqa: PLR2004
                 }
 
         try:
@@ -5017,8 +5019,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _entity_statistic_ids_by_key(self, device_id: str) -> dict[str, str]:
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
-            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-            from homeassistant.helpers import entity_registry as er
+            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # noqa: I001, PLC0415
+            from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
         except ImportError, RuntimeError:
             _LOGGER.exception("Entity registry unavailable for entity repair")
             return {}
@@ -5079,7 +5081,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return tuple(targets)
         return ()
 
-    def _completed_entity_app_points(
+    def _completed_entity_app_points(  # noqa: PLR6301
         self,
         points: list[Any],
         *,
@@ -5146,7 +5148,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             })
         return statistics
 
-    async def _async_import_app_chart_entity_statistics_for_device(
+    async def _async_import_app_chart_entity_statistics_for_device(  # noqa: PLR0912, PLR0914, PLR0915
         self,
         *,
         device_id: str,
@@ -5158,15 +5160,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not entity_ids:
             return 0, 0
         try:
-            from homeassistant.components.recorder.models import (
+            from homeassistant.components.recorder.models import (  # noqa: I001, PLC0415
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 async_import_statistics,
             )
-            from homeassistant.const import UnitOfEnergy
-            from homeassistant.util.unit_conversion import EnergyConverter
+            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
+            from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
         except ImportError, RuntimeError:
             _LOGGER.exception("Recorder entity statistics import unavailable")
             return 0, 1
@@ -5286,7 +5288,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             try:
                 async_import_statistics(self.hass, metadata, statistics)
-            except Exception as err:  # statistics import must not abort the whole cycle
+            except Exception as err:  # statistics import must not abort the whole cycle  # noqa: BLE001
                 failed_rows += len(statistics)
                 _LOGGER.debug(
                     "Could not import Jackery entity statistics for %s: %s",
@@ -5297,7 +5299,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             imported_rows += len(statistics)
         return imported_rows, failed_rows
 
-    def _current_app_chart_entity_source_batches(
+    def _current_app_chart_entity_source_batches(  # noqa: PLR6301
         self,
         payload: dict[str, Any],
     ) -> list[tuple[str, dict[str, dict[str, Any]]]]:
@@ -5361,7 +5363,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         warnings = normalized_data_quality_warnings(warnings)
 
         try:
-            from homeassistant.helpers import issue_registry as ir
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
         except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
@@ -5447,7 +5449,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             devices = {}
         redacted_devices: dict[str, Any] = {}
         for index, device_id in enumerate(
-            sorted(devices, key=lambda value: str(value)),
+            sorted(devices, key=str),
             start=1,
         ):
             state = devices.get(device_id)
@@ -5538,7 +5540,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         months: list[date] = []
         while cursor <= end_month:
             months.append(cursor)
-            if cursor.month == 12:
+            if cursor.month == 12:  # noqa: PLR2004
                 cursor = cursor.replace(year=cursor.year + 1, month=1)
             else:
                 cursor = cursor.replace(month=cursor.month + 1)
@@ -5600,7 +5602,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             deduped.append(candidate)
         return deduped
 
-    def _day_chart_points_for_metric(
+    def _day_chart_points_for_metric(  # noqa: PLR0913
         self,
         payload: dict[str, Any],
         section_prefix: str,
@@ -5631,7 +5633,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return points
         return []
 
-    async def _async_add_app_chart_statistics(
+    async def _async_add_app_chart_statistics(  # noqa: PLR0913
         self,
         *,
         device_id: str,
@@ -5651,16 +5653,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not points:
             return True, 0
         try:
-            from homeassistant.components.recorder.models import (
+            from homeassistant.components.recorder.models import (  # noqa: I001, PLC0415
                 StatisticData,
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 async_add_external_statistics,
             )
-            from homeassistant.const import UnitOfEnergy
-            from homeassistant.util.unit_conversion import EnergyConverter
+            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
+            from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
         except ImportError, RuntimeError:
             _LOGGER.exception("Recorder statistics import unavailable")
             return False, 0
@@ -5710,7 +5712,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 metadata,
                 statistics,
             )
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Could not import %d app chart statistics for %s: %s",
                 len(statistics),
@@ -5809,7 +5811,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         successful_devices.add(device_id)
         return successful_devices
 
-    async def _async_fetch_historical_app_chart_source(
+    async def _async_fetch_historical_app_chart_source(  # noqa: PLR0911
         self,
         *,
         device_id: str,
@@ -5860,7 +5862,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         return {}
 
-    async def _async_repair_missing_app_chart_statistics(
+    async def _async_repair_missing_app_chart_statistics(  # noqa: PLR0912, PLR0914
         self,
         device_id: str,
         payload: dict[str, Any],
@@ -5987,7 +5989,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         return repaired_buckets, failed_buckets
 
-    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:
+    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:  # noqa: PLR0911
         """Return the recovery start date for one device, if needed.
 
         On first run (``last_success`` not persisted yet) the method seeds
@@ -6144,7 +6146,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         for dev_id in invalid_device_ids:
             prior_count = self._invalid_device_id_counts.get(dev_id, 0) + 1
             self._invalid_device_id_counts[dev_id] = prior_count
-            if prior_count >= 2:
+            if prior_count >= 2:  # noqa: PLR2004
                 newly_persistent.append(dev_id)
         if not newly_persistent:
             recovered = set(self._invalid_device_id_counts) - set(invalid_device_ids)
@@ -6168,7 +6170,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # Coordinator update cycle (merge of HTTP + MQTT + caches)
     # ------------------------------------------------------------------
 
-    async def _async_update_data(  # noqa: C901
+    async def _async_update_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self, _retry_discovery_once: bool = True
     ) -> dict[str, dict[str, Any]]:
         # Background HTTP/auth tasks cannot raise into HA's setup flow. When
@@ -6193,7 +6195,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not self._device_index:
             await self.async_discover()
             if not self._device_index:
-                raise UpdateFailed("No Jackery devices found.")
+                raise UpdateFailed("No Jackery devices found.")  # noqa: TRY003
 
         await self._async_refresh_discovery_if_due()
 
@@ -6359,7 +6361,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 default,
             )
 
-        async def _fetch_system(sys_id: str) -> dict[str, Any]:
+        async def _fetch_system(sys_id: str) -> dict[str, Any]:  # noqa: PLR0914
             if sys_id in system_cache:
                 return system_cache[sys_id]
             (
@@ -6634,7 +6636,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             system_cache[sys_id] = bundle
             return bundle
 
-        async def _fetch_device_extras(
+        async def _fetch_device_extras(  # noqa: PLR0914, PLR0915
             dev_id: str,
             dev_sn: str | None,
             sys_id: str | None,

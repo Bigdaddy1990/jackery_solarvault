@@ -1,14 +1,11 @@
 """Diagnostics support for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.core import HomeAssistant
 
-from . import JackeryConfigEntry
 from .const import (
     DIAGNOSTICS_SCHEMA_VERSION,
     DOMAIN,
@@ -21,6 +18,13 @@ from .util import (
     diagnostic_redactions_disabled,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.core import HomeAssistant
+
+    from . import JackeryConfigEntry
+
 _LOGGER = logging.getLogger(__name__)
 
 # Kept as an import alias so tests / external callers can still reference the
@@ -32,7 +36,7 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 _SECTION_SIZE_CAP = 4096
 
 
-def _cap_section(value: Any) -> Any:
+def _cap_section(value: Any) -> Any:  # noqa: ANN401
     """Cap a diagnostics section at _SECTION_SIZE_CAP bytes of JSON.
 
     Sections that exceed the cap are replaced with a sentinel so the overall
@@ -40,7 +44,7 @@ def _cap_section(value: Any) -> Any:
     """
     try:
         encoded = json.dumps(value, default=str)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {"truncated": True, "size_bytes": -1}
     size = len(encoded.encode())
     if size > _SECTION_SIZE_CAP:
@@ -65,9 +69,7 @@ def _redacted_payload_map(
     local integration development.
     """
     redacted: dict[str, Any] = {}
-    for index, key in enumerate(
-        sorted(payloads, key=lambda value: str(value)), start=1
-    ):
+    for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
         label = f"{prefix}_{index}"
         if isinstance(payload, dict):
@@ -115,7 +117,7 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029 - HA hook is async
 
     entry_data = async_redact_data(dict(entry.data), redact_keys)
     options = async_redact_data(dict(entry.options), redact_keys)
-    coordinator = entry.runtime_data
+    coordinator = getattr(entry, "runtime_data", None)
     if not isinstance(coordinator, JackerySolarVaultCoordinator):
         return {
             "entry_data": entry_data,

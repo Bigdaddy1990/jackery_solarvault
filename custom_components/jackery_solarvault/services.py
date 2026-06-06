@@ -20,12 +20,11 @@ The actions follow the same routing contract:
 import json
 import logging
 import re
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
@@ -74,6 +73,10 @@ from .const import (
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
 )
 from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant, ServiceCall
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -294,7 +297,7 @@ def _service_validation_error(
     )
 
 
-def _text_field(
+def _text_field(  # noqa: PLR0913
     call: ServiceCall,
     field: str,
     *,
@@ -350,7 +353,7 @@ def _optional_text(call: ServiceCall, field: str, label: str) -> str:
     if raw is None:
         return ""
     if not isinstance(raw, str):
-        raise ValueError(f"{label} must be text")  # noqa: TRY004
+        raise ValueError(f"{label} must be text")  # noqa: TRY003, TRY004
     return raw
 
 
@@ -364,7 +367,7 @@ def _service_bool(call: ServiceCall, field: str, label: str) -> bool:
             return True
         if value in {"false", "0", "no", "off", "disable", "disabled"}:
             return False
-    raise ValueError(f"{label} must be a boolean")
+    raise ValueError(f"{label} must be a boolean")  # noqa: TRY003
 
 
 def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
@@ -429,7 +432,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
         new_name = raw_name.strip()
         if not new_name:
             name_error = "new_name must not be empty"
-        elif len(new_name) > 64:
+        elif len(new_name) > 64:  # noqa: PLR2004
             name_error = "new_name must be at most 64 characters"
         else:
             name_error = ""
@@ -455,7 +458,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
     try:
         renamed = await coordinator.api.async_set_system_name(system_id, new_name)
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery rename rejected authentication: {err}"
         ) from err
     except JackeryError as err:
@@ -498,7 +501,7 @@ async def _async_handle_refresh_weather_plan(
     try:
         await coordinator.async_query_weather_plan(device_id)
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery weather-plan refresh rejected authentication: {err}"
         ) from err
     except (JackeryError, LookupError, HomeAssistantError) as err:
@@ -553,7 +556,7 @@ async def _async_handle_delete_storm_alert(
     try:
         await coordinator.async_delete_storm_alert(device_id, alert_id)
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery storm-alert delete rejected authentication: {err}"
         ) from err
     except (JackeryError, LookupError) as err:
@@ -629,7 +632,7 @@ async def _async_handle_set_third_party_mqtt_config(
                 },
             )
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery MQTT config update rejected authentication: {err}"
         ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
@@ -671,7 +674,7 @@ async def _async_handle_query_third_party_mqtt_config(
     try:
         await coordinator.async_query_third_party_mqtt_config(device_id)
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery MQTT config query rejected authentication: {err}"
         ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
@@ -771,7 +774,7 @@ async def _async_handle_send_device_schedule(
             body=body,
         )
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery schedule send rejected authentication: {err}"
         ) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:

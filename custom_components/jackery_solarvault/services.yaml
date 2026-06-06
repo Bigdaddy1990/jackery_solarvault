@@ -35,16 +35,9 @@ delete_storm_alert:
       selector:
         text:
 
-# Experimental: configure the device's third-party MQTT bridge. Sends
+# configure the device's third-party MQTT bridge. Sends
 # actionId 3046 (SET_THIRD_PARTY_MQTT_CONFIG) over the existing cloud MQTT
-# command topic with PLAINTEXT credentials. PROTOCOL.md §15 marks the cloud
-# REST relay as blocked for SolarVault; the publish path has not yet been
-# observed to be filtered. If the device responds, the bridge starts pushing
-# telemetry to your broker. If nothing arrives in the configured Mosquitto,
-# the device firmware probably requires AES-256-CBC-encrypted credentials —
-# the integration will need to capture the per-device ``bluetoothKey`` and
-# encrypt before sending. Use ``query_third_party_mqtt_config`` to read the
-# config back.
+# command topic with PLAINTEXT credentials. 
 set_third_party_mqtt_config:
   fields:
     device_id:
@@ -93,7 +86,7 @@ query_third_party_mqtt_config:
         device:
           integration: jackery_solarvault
 
-# Experimental: send one raw BLE binary command frame to the SolarVault.
+# send one raw BLE binary command frame to the SolarVault.
 # The body must be a JSON object (YAML mapping or JSON string). Include the
 # firmware-level ``cmd`` field in the body when the target command expects it.
 # Requires both ``enable_ble_transport`` and ``enable_ble_writes`` to be on
@@ -145,7 +138,7 @@ send_ble_command:
           unit_of_measurement: s
           mode: box
 
-# Experimental: publish a DownloadDeviceSchedule frame (TIMER_TASK_ADD=3015,
+# publish a DownloadDeviceSchedule frame (TIMER_TASK_ADD=3015,
 # DELETE=3016, UPDATE=3017, READ=3018). Body shape is the Frida-PCAP layout
 # documented in docs/Markdown/MQTT_PROTOCOL.md §DownloadDeviceSchedule:
 # {actionType, taskType, mode, pw, sysSwitch, end, loops, start, tid}.

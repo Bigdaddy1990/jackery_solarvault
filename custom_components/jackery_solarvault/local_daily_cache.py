@@ -22,13 +22,16 @@ and is stored under HA's standard :class:`Store`.
 """
 
 import asyncio
-from datetime import date
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from datetime import date
+
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
@@ -135,7 +138,7 @@ async def async_save_daily_cache(
         await store.async_save(data)
 
 
-def daily_delta(
+def daily_delta(  # noqa: PLR0911
     snapshot: dict[str, Any] | None,
     metric_key: str,
     current_lifetime_wh: float | None,
@@ -154,7 +157,7 @@ def daily_delta(
         return None
     try:
         current = int(current_lifetime_wh)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not isinstance(snapshot, dict):
         return None
@@ -169,7 +172,7 @@ def daily_delta(
         return None
     try:
         anchor_int = int(anchor)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if current < anchor_int:
         diff = anchor_int - current
