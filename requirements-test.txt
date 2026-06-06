@@ -13,7 +13,7 @@ pylint
 pytest
 pytest-asyncio
 pytest-cov
-pytest-github-actions-annotate-failures>=0.3.0
+pytest-github-actions-annotate-failures>=0.4.0
 pytest-homeassistant-custom-component  # follows daily HA version
 pyyaml
 ruff>=0.15.16
