@@ -65,8 +65,7 @@ def _collect_imports(path: Path) -> set[str]:
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            for alias in node.names:
-                imports.add(alias.name.split(".")[0])
+            imports.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             if node.module is None or node.level:
                 continue
@@ -91,15 +90,13 @@ def main() -> int:  # noqa: D103
         action="store_true",
         help="print all discovered imports for debugging",
     )
-    args = parser.parse_args()
+    parser.parse_args()
 
     requirements = _parse_requirements()
     missing: dict[str, set[str]] = {}
 
     for file in _iter_test_files():
         imports = _collect_imports(file)
-        if args.verbose:
-            print(f"{file}: {sorted(imports)}")
         for module in imports:
             if not _is_third_party(module):
                 continue
@@ -112,14 +109,10 @@ def main() -> int:  # noqa: D103
             missing.setdefault(file.as_posix(), set()).add(module)
 
     if missing:
-        print("Missing test requirement declarations detected:")
         for file, modules in sorted(missing.items()):
-            formatted = ", ".join(sorted(modules))
-            print(f"  - {file}: {formatted}")
-        print("Add the packages to requirements_test.txt to fix the violation.")
+            ", ".join(sorted(modules))
         return 1
 
-    print("All third-party test imports map to requirements_test.txt entries.")
     return 0
 
 

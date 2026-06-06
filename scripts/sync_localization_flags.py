@@ -31,7 +31,7 @@ def _read_allowlist(path: Path) -> set[str]:
         return set()
 
 
-def _load_json(path: Path) -> Any:  # noqa: ANN401
+def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -45,11 +45,7 @@ def _translation_languages(translations_dir: Path) -> list[str]:
 def _setup_flag_keys(strings_path: Path) -> list[str]:
     strings = _load_json(strings_path)
     common = strings.get("common", {})
-    return [
-        key
-        for key in common
-        if key.startswith(_FLAG_PREFIX) or key.startswith(_SOURCE_PREFIX)
-    ]
+    return [key for key in common if key.startswith((_FLAG_PREFIX, _SOURCE_PREFIX))]
 
 
 def _update_markdown_table(

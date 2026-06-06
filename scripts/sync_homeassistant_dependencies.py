@@ -15,7 +15,6 @@ from packaging.specifiers import Specifier
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 from pip._vendor import requests
-
 from scripts import check_vendor_pyyaml as vendor_monitor
 
 # Paths relative to the Home Assistant core repository root.
@@ -296,7 +295,7 @@ def update_requirement_file(
     changed = False
     for line in lines:
         stripped = line.strip()
-        if not stripped or stripped.startswith("#") or stripped.startswith("-r"):
+        if not stripped or stripped.startswith(("#", "-r")):
             new_lines.append(line)
             continue
         requirement_part, comment = split_comment(line)
@@ -336,8 +335,7 @@ def download_pyyaml_source(version: Version) -> Path:
         suffix = ".tar.gz" if not url.endswith(".zip") else ".zip"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
             handle.write(response.content)
-            archive_path = Path(handle.name)
-        return archive_path
+            return Path(handle.name)
     raise RuntimeError(f"Unable to locate PyYAML {version} source distribution")
 
 

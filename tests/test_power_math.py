@@ -825,13 +825,11 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         reference_value=126.97,
     ).as_dict()
 
-    normalized = util.normalized_data_quality_warnings(
-        [
-            warning_b,
-            warning_c,
-            warning_a,
-        ]
-    )
+    normalized = util.normalized_data_quality_warnings([
+        warning_b,
+        warning_c,
+        warning_a,
+    ])
 
     assert normalized == [warning_c, warning_a]
     assert util.format_data_quality_warning(normalized[0]) == (

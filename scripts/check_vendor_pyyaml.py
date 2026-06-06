@@ -246,7 +246,7 @@ def select_latest_release(
 
 
 def _convert_version(raw: str | None) -> Version | None:
-    if raw in (None, "0"):
+    if raw in {None, "0"}:
         return Version("0") if raw == "0" else None
     try:
         return Version(raw)
@@ -453,8 +453,10 @@ def build_summary(result: MonitoringResult) -> str:
                 f"`{profile_label}` yet; keep the vendor directory in place."
             )
     if result.vulnerabilities:
-        summary_lines.append("*")
-        summary_lines.append("* ⚠️ Vulnerabilities affecting the vendored release:")
+        summary_lines.extend((
+            "*",
+            "* ⚠️ Vulnerabilities affecting the vendored release:",
+        ))
         for vuln in result.vulnerabilities:
             severity = vuln.severity or "UNKNOWN"
             range_hint = (
@@ -543,52 +545,14 @@ def evaluate(
         )
         threshold_value = SEVERITY_ORDER.get(fail_severity.upper(), 3)
         if highest_severity_value >= threshold_value:
-            print(
-                "::error ::Vendored PyYAML is affected by at least one OSV advisory "
-                f"with severity >= {fail_severity}."
-            )
             exit_code = 1
-        else:
-            print(
-                "::warning ::Vendored PyYAML is affected by OSV advisories, but the "
-                f"severity stays below {fail_severity}."
-            )
-    else:
-        print("::notice ::No OSV advisories currently affect the vendored PyYAML.")
 
     if latest_release is not None and latest_release > vendor_version:
-        message = (
-            "::warning ::Vendored PyYAML is older than the latest PyPI release "
-            f"({vendor_version} < {latest_release})."
-        )
         if fail_on_outdated:
-            print(message.replace("::warning ::", "::error ::"))
             exit_code = 1
-        else:
-            print(message)
-    else:
-        print("::notice ::Vendored PyYAML matches the latest available release.")
 
-    for match in wheel_matches:
-        profile_label = (
-            f"{match.profile.python_tag} ({match.profile.platform_fragment})"
-        )
-        if match.release is not None:
-            release_url = f"https://pypi.org/project/PyYAML/{match.release}/"
-            filename_hint = match.filename or "<unknown wheel>"
-            print(
-                "::notice ::Compatible PyYAML wheel discovered for "
-                f"{profile_label} in release {match.release}: {filename_hint} - "
-                "prepare vendor removal."
-            )
-            print(f"::notice ::Release notes: {release_url}")
-            if match.url:
-                print(f"::notice ::Download URL: {match.url}")
-        else:
-            print(
-                "::notice ::No matching PyYAML wheel for the configured Home "
-                f"Assistant runtime profile {profile_label} has been published yet."
-            )
+    for _match in wheel_matches:
+        pass
     return result, exit_code
 
 
@@ -602,8 +566,7 @@ def main() -> int:
             fail_severity=args.fail_severity,
             wheel_profiles=wheel_profiles,
         )
-    except MonitoringError as exc:
-        print(f"::error ::{exc}")
+    except MonitoringError:
         return 2
 
     summary = build_summary(result)
@@ -613,8 +576,6 @@ def main() -> int:
             handle.write(summary)
             if not summary.endswith("\n"):
                 handle.write("\n")
-    else:
-        print(summary)
     if args.metadata_path:
         metadata = build_metadata_document(result)
         metadata_path = Path(args.metadata_path)

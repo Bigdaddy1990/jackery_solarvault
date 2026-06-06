@@ -83,14 +83,12 @@ def test_service_integer_parser_rejects_oversized_digit_strings() -> None:
     sys.set_int_max_str_digits(640)
     try:
         with pytest.raises(vol.Invalid):
-            services.SET_THIRD_PARTY_MQTT_SCHEMA(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: True,
-                    SERVICE_FIELD_IP: "192.168.2.212",
-                    SERVICE_FIELD_PORT: "9" * 700,
-                }
-            )
+            services.SET_THIRD_PARTY_MQTT_SCHEMA({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: True,
+                SERVICE_FIELD_IP: "192.168.2.212",
+                SERVICE_FIELD_PORT: "9" * 700,
+            })
     finally:
         sys.set_int_max_str_digits(old_limit)
 
@@ -147,15 +145,13 @@ def test_resolve_jackery_device_id_follows_subdevice_parent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Device-picker accessory selections resolve to the parent SolarVault."""
-    registry = _Registry(
-        {
-            "solarvault-ha-id": _Device({(DOMAIN, "573702884982521856")}),
-            "smart-plug-ha-id": _Device(
-                {(DOMAIN, "573702884982521856_smart_plug_1")},
-                via_device_id="solarvault-ha-id",
-            ),
-        }
-    )
+    registry = _Registry({
+        "solarvault-ha-id": _Device({(DOMAIN, "573702884982521856")}),
+        "smart-plug-ha-id": _Device(
+            {(DOMAIN, "573702884982521856_smart_plug_1")},
+            via_device_id="solarvault-ha-id",
+        ),
+    })
 
     monkeypatch.setattr(services.dr, "async_get", lambda _hass: registry)
 
@@ -187,12 +183,10 @@ async def test_rename_service_rejects_false_api_result(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_rename(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_SYSTEM_ID: "123",
-                    SERVICE_FIELD_NEW_NAME: "SolarVault",
-                }
-            ),
+            _call({
+                SERVICE_FIELD_SYSTEM_ID: "123",
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
+            }),
         )
 
     assert err.value.translation_key == "rename_system_failed"
@@ -213,12 +207,10 @@ async def test_rename_service_reauth_on_auth_error(
     with pytest.raises(ConfigEntryAuthFailed):
         await services._async_handle_rename(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_SYSTEM_ID: "123",
-                    SERVICE_FIELD_NEW_NAME: "SolarVault",
-                }
-            ),
+            _call({
+                SERVICE_FIELD_SYSTEM_ID: "123",
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
+            }),
         )
 
 
@@ -334,12 +326,10 @@ async def test_rename_service_rejects_direct_invalid_system_id(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_rename(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_SYSTEM_ID: system_id,
-                    SERVICE_FIELD_NEW_NAME: "SolarVault",
-                }
-            ),
+            _call({
+                SERVICE_FIELD_SYSTEM_ID: system_id,
+                SERVICE_FIELD_NEW_NAME: "SolarVault",
+            }),
         )
 
     assert err.value.translation_key == "rename_system_failed"
@@ -372,12 +362,10 @@ async def test_rename_service_rejects_direct_invalid_new_name(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_rename(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_SYSTEM_ID: "123",
-                    SERVICE_FIELD_NEW_NAME: new_name,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_SYSTEM_ID: "123",
+                SERVICE_FIELD_NEW_NAME: new_name,
+            }),
         )
 
     assert err.value.translation_key == "rename_system_failed"
@@ -494,12 +482,10 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_delete_storm_alert(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ALERT_ID: "  ",
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ALERT_ID: "  ",
+            }),
         )
 
     assert err.value.translation_key == "delete_storm_alert_failed"
@@ -534,17 +520,15 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
             """
-            self.calls.append(
-                {
-                    "device_id": device_id,
-                    "enable": enable,
-                    "ip": ip,
-                    "port": port,
-                    "username": username,
-                    "password": password,
-                    "token": token,
-                }
-            )
+            self.calls.append({
+                "device_id": device_id,
+                "enable": enable,
+                "ip": ip,
+                "port": port,
+                "username": username,
+                "password": password,
+                "token": token,
+            })
 
     coordinator = _ThirdPartyCoordinator()
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -554,17 +538,15 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
 
     await services._async_handle_set_third_party_mqtt_config(
         _hass(),
-        _call(
-            {
-                SERVICE_FIELD_DEVICE_ID: "dev1",
-                SERVICE_FIELD_ENABLE: "false",
-                SERVICE_FIELD_IP: " 192.0.2.10 ",
-                SERVICE_FIELD_PORT: "1883",
-                SERVICE_FIELD_USERNAME: "user",
-                SERVICE_FIELD_PASSWORD: "pass",
-                SERVICE_FIELD_TOKEN: "token",
-            }
-        ),
+        _call({
+            SERVICE_FIELD_DEVICE_ID: "dev1",
+            SERVICE_FIELD_ENABLE: "false",
+            SERVICE_FIELD_IP: " 192.0.2.10 ",
+            SERVICE_FIELD_PORT: "1883",
+            SERVICE_FIELD_USERNAME: "user",
+            SERVICE_FIELD_PASSWORD: "pass",
+            SERVICE_FIELD_TOKEN: "token",
+        }),
     )
 
     assert coordinator.calls == [
@@ -604,17 +586,15 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
             """
-            self.calls.append(
-                {
-                    "device_id": device_id,
-                    "enable": enable,
-                    "ip": ip,
-                    "port": port,
-                    "username": username,
-                    "password": password,
-                    "token": token,
-                }
-            )
+            self.calls.append({
+                "device_id": device_id,
+                "enable": enable,
+                "ip": ip,
+                "port": port,
+                "username": username,
+                "password": password,
+                "token": token,
+            })
 
     coordinator = _ThirdPartyCoordinator()
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -624,17 +604,15 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
 
     await services._async_handle_set_third_party_mqtt_config(
         _hass(),
-        _call(
-            {
-                SERVICE_FIELD_DEVICE_ID: "dev1",
-                SERVICE_FIELD_ENABLE: True,
-                SERVICE_FIELD_IP: "192.0.2.10",
-                SERVICE_FIELD_PORT: 1883,
-                SERVICE_FIELD_USERNAME: None,
-                SERVICE_FIELD_PASSWORD: None,
-                SERVICE_FIELD_TOKEN: None,
-            }
-        ),
+        _call({
+            SERVICE_FIELD_DEVICE_ID: "dev1",
+            SERVICE_FIELD_ENABLE: True,
+            SERVICE_FIELD_IP: "192.0.2.10",
+            SERVICE_FIELD_PORT: 1883,
+            SERVICE_FIELD_USERNAME: None,
+            SERVICE_FIELD_PASSWORD: None,
+            SERVICE_FIELD_TOKEN: None,
+        }),
     )
 
     assert coordinator.calls == [
@@ -679,15 +657,13 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_set_third_party_mqtt_config(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: True,
-                    SERVICE_FIELD_IP: "192.0.2.10",
-                    SERVICE_FIELD_PORT: 1883,
-                    SERVICE_FIELD_USERNAME: {"name": "user"},
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: True,
+                SERVICE_FIELD_IP: "192.0.2.10",
+                SERVICE_FIELD_PORT: 1883,
+                SERVICE_FIELD_USERNAME: {"name": "user"},
+            }),
         )
 
     assert err.value.translation_key == "set_third_party_mqtt_config_failed"
@@ -720,14 +696,12 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_set_third_party_mqtt_config(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: "maybe",
-                    SERVICE_FIELD_IP: "192.0.2.10",
-                    SERVICE_FIELD_PORT: 1883,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: "maybe",
+                SERVICE_FIELD_IP: "192.0.2.10",
+                SERVICE_FIELD_PORT: 1883,
+            }),
         )
 
     assert err.value.translation_key == "set_third_party_mqtt_config_failed"
@@ -772,14 +746,12 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_set_third_party_mqtt_config(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: True,
-                    SERVICE_FIELD_IP: "192.0.2.10",
-                    SERVICE_FIELD_PORT: port,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: True,
+                SERVICE_FIELD_IP: "192.0.2.10",
+                SERVICE_FIELD_PORT: port,
+            }),
         )
 
     assert err.value.translation_key == "set_third_party_mqtt_config_failed"
@@ -818,12 +790,10 @@ def test_device_id_service_schemas_reject_whitespace_only_values(
 ) -> None:
     """Device-id service schemas must reject values the handlers trim to empty."""
     with pytest.raises(vol.Invalid):
-        schema(
-            {
-                SERVICE_FIELD_DEVICE_ID: "  ",
-                **extra_data,
-            }
-        )
+        schema({
+            SERVICE_FIELD_DEVICE_ID: "  ",
+            **extra_data,
+        })
 
 
 async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
@@ -854,14 +824,12 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_set_third_party_mqtt_config(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: True,
-                    SERVICE_FIELD_IP: "  ",
-                    SERVICE_FIELD_PORT: 1883,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: True,
+                SERVICE_FIELD_IP: "  ",
+                SERVICE_FIELD_PORT: 1883,
+            }),
         )
 
     assert err.value.translation_key == "set_third_party_mqtt_config_failed"
@@ -890,15 +858,13 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_set_third_party_mqtt_config(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_ENABLE: True,
-                    SERVICE_FIELD_IP: "192.0.2.10",
-                    SERVICE_FIELD_PORT: 1883,
-                    SERVICE_FIELD_TOKEN: "x" * 513,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_ENABLE: True,
+                SERVICE_FIELD_IP: "192.0.2.10",
+                SERVICE_FIELD_PORT: 1883,
+                SERVICE_FIELD_TOKEN: "x" * 513,
+            }),
         )
 
     assert err.value.translation_key == "set_third_party_mqtt_config_failed"
@@ -942,17 +908,15 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
             Returns:
                 bool: `True` if the command was accepted, `False` otherwise.
             """
-            self.calls.append(
-                {
-                    "device_id": device_id,
-                    "cmd": cmd,
-                    "body": body,
-                    "flags": flags,
-                    "wait_for_ack": wait_for_ack,
-                    "ack_timeout_sec": ack_timeout_sec,
-                    "connect_timeout_sec": connect_timeout_sec,
-                }
-            )
+            self.calls.append({
+                "device_id": device_id,
+                "cmd": cmd,
+                "body": body,
+                "flags": flags,
+                "wait_for_ack": wait_for_ack,
+                "ack_timeout_sec": ack_timeout_sec,
+                "connect_timeout_sec": connect_timeout_sec,
+            })
             return True
 
     coordinator = _BleCoordinator()
@@ -963,14 +927,12 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
 
     await services._async_handle_send_ble_command(
         _hass(),
-        _call(
-            {
-                SERVICE_FIELD_DEVICE_ID: "dev1",
-                SERVICE_FIELD_CMD: "107",
-                SERVICE_FIELD_BODY: {"cmd": 107},
-                SERVICE_FIELD_WAIT_FOR_ACK: "false",
-            }
-        ),
+        _call({
+            SERVICE_FIELD_DEVICE_ID: "dev1",
+            SERVICE_FIELD_CMD: "107",
+            SERVICE_FIELD_BODY: {"cmd": 107},
+            SERVICE_FIELD_WAIT_FOR_ACK: "false",
+        }),
     )
 
     assert coordinator.calls[0]["wait_for_ack"] is False
@@ -1001,14 +963,12 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_CMD: 107,
-                    SERVICE_FIELD_BODY: {"cmd": 107},
-                    SERVICE_FIELD_WAIT_FOR_ACK: "maybe",
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_CMD: 107,
+                SERVICE_FIELD_BODY: {"cmd": 107},
+                SERVICE_FIELD_WAIT_FOR_ACK: "maybe",
+            }),
         )
 
     assert err.value.translation_key == "send_ble_command_failed"
@@ -1063,13 +1023,11 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_CMD: 107,
-                    SERVICE_FIELD_BODY: body,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_CMD: 107,
+                SERVICE_FIELD_BODY: body,
+            }),
         )
 
     assert err.value.translation_key == "send_ble_command_failed"
@@ -1164,14 +1122,12 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     with pytest.raises(ServiceValidationError) as err:
         await services._async_handle_send_ble_command(
             _hass(),
-            _call(
-                {
-                    SERVICE_FIELD_DEVICE_ID: "dev1",
-                    SERVICE_FIELD_CMD: 107,
-                    SERVICE_FIELD_BODY: {"cmd": 107},
-                    SERVICE_FIELD_ACK_TIMEOUT: ack_timeout,
-                }
-            ),
+            _call({
+                SERVICE_FIELD_DEVICE_ID: "dev1",
+                SERVICE_FIELD_CMD: 107,
+                SERVICE_FIELD_BODY: {"cmd": 107},
+                SERVICE_FIELD_ACK_TIMEOUT: ack_timeout,
+            }),
         )
 
     assert err.value.translation_key == "send_ble_command_failed"

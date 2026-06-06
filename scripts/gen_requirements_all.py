@@ -283,7 +283,7 @@ def explore_module(package: str, explore_children: bool) -> list[str]:
 
 def core_requirements() -> list[str]:
     """Gather core requirements out of pyproject.toml."""
-    data = tomllib.loads(Path("pyproject.toml").read_text())
+    data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
     dependencies: list[str] = data["project"]["dependencies"]
     return dependencies
 
@@ -357,8 +357,6 @@ def gather_modules() -> dict[str, list[str]] | None:
         value = sorted(value, key=lambda name: (len(name.split(".")), name))
 
     if errors:
-        print("******* ERROR")
-        print("Errors while importing: ", ", ".join(errors))
         return None
 
     return reqs
@@ -409,8 +407,7 @@ def gather_requirements_from_modules(
     ):
         try:
             module = importlib.import_module(package)
-        except ImportError as err:
-            print(f"{package.replace('.', '/')}.py: {err}")
+        except ImportError:
             errors.append(package)
             continue
 
@@ -469,8 +466,7 @@ def requirements_output() -> str:
     requirements.update(core_requirements())
     requirements.update(gather_entity_platform_requirements())
 
-    output.append("\n".join(sorted(requirements, key=lambda key: key.lower())))
-    output.append("\n")
+    output.extend(("\n".join(sorted(requirements, key=lambda key: key.lower())), "\n"))
 
     return "".join(output)
 
@@ -514,8 +510,10 @@ def requirements_pre_commit_output() -> str:
                 reqs.append(f"{pkg}=={rev.lstrip('v')}")
                 reqs.extend(x for x in hook.get("additional_dependencies", ()))
     output = [
-        f"# Automatically generated "
-        f"from {source} by {Path(__file__).name}, do not edit",
+        (
+            f"# Automatically generated "
+            f"from {source} by {Path(__file__).name}, do not edit"
+        ),
         "",
     ]
     output.extend(sorted(reqs))
@@ -545,7 +543,10 @@ def diff_file(filename: str, content: str) -> list[str]:
     """Diff a file."""
     return list(
         difflib.context_diff(
-            [f"{line}\n" for line in Path(filename).read_text().split("\n")],
+            [
+                f"{line}\n"
+                for line in Path(filename).read_text(encoding="utf-8").split("\n")
+            ],
             [f"{line}\n" for line in content.split("\n")],
             filename,
             "generated",
@@ -556,7 +557,6 @@ def diff_file(filename: str, content: str) -> list[str]:
 def main(validate: bool, ci: bool) -> int:
     """Run the script."""
     if not Path("requirements_all.txt").is_file():
-        print("Run this from HA root dir")
         return 1
 
     data = gather_modules()
@@ -596,18 +596,12 @@ def main(validate: bool, ci: bool) -> int:
                 errors.append("".join(diff))
 
         if errors:
-            print("ERROR - FOUND THE FOLLOWING DIFFERENCES")
-            print()
-            print()
-            print("\n\n".join(errors))
-            print()
-            print("Please run python3 -m script.gen_requirements_all")
             return 1
 
         return 0
 
     for filename, content in files:
-        Path(filename).write_text(content)
+        Path(filename).write_text(content, encoding="utf-8")
 
     return 0
 

@@ -225,13 +225,11 @@ def scan_imports(files: list[pathlib.Path]) -> set[str]:  # noqa: D103
     for f in files:
         try:
             tree = ast.parse(f.read_text(encoding="utf-8"))
-        except Exception as exc:
-            print(f"  SKIP {f}: {exc}", file=sys.stderr)
+        except Exception:
             continue
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports.add(alias.name.split(".")[0])
+                imports.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 imports.add(node.module.split(".")[0])
     return imports
@@ -272,14 +270,13 @@ def show_diff(label: str, current: list[str], proposed: list[str]) -> bool:  # n
     added = pro - cur
     removed = cur - pro
     if not added and not removed:
-        print(f"  {label}: keine Änderungen")
         return False
     if added:
-        for a in sorted(added):
-            print(f"  + {label}: {a}")
+        for _a in sorted(added):
+            pass
     if removed:
-        for r in sorted(removed):
-            print(f"  - {label}: {r}")
+        for _r in sorted(removed):
+            pass
     return True
 
 
@@ -301,13 +298,9 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
     test_files = list((ROOT / "tests").rglob("*.py"))
     script_files = list((ROOT / "scripts").rglob("*.py"))
 
-    int_tp = third_party(scan_imports(int_files))
-    tst_tp = third_party(scan_imports(test_files))
+    third_party(scan_imports(int_files))
+    third_party(scan_imports(test_files))
     scr_tp = third_party(scan_imports(script_files))
-
-    print(f"  Integration drittanbieter-Imports: {sorted(int_tp)}")
-    print(f"  Test drittanbieter-Imports:        {sorted(tst_tp)}")
-    print(f"  Script drittanbieter-Imports:      {sorted(scr_tp)}")
 
     # -- requirements.txt (aus manifest.json) --------------------------------
     manifest_reqs = manifest_requirements()
@@ -316,7 +309,6 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         req_path.read_text(encoding="utf-8").splitlines() if req_path.exists() else []
     )
 
-    print("\n[requirements.txt]")
     changed_req = show_diff("requirements.txt", current_req, manifest_reqs)
 
     # -- requirements_test.txt / requirements-test.txt ------------------------
@@ -337,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         for requirement in ALWAYS_TEST
         if requirement.split("#")[0].strip()
     }
-    unknown = (
+    (
         {
             Requirement(IMPORT_TO_PYPI.get(module, module).split("#")[0].strip())
             .name.lower()
@@ -347,10 +339,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         - declared_test_requirements
         - {"astroid"}
     )
-    if unknown:
-        print(f"\n  WARN Undeklarierte Script-Imports: {sorted(unknown)}")
 
-    print("\n[requirements_test.txt]")
     changed_test = show_diff("requirements_test.txt", current_test, ALWAYS_TEST)
     for mirror_path in req_test_paths[1:]:
         mirror_current = (
@@ -368,23 +357,17 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         # requirements.txt
         content = "\n".join(manifest_reqs) + "\n" if manifest_reqs else ""
         req_path.write_text(content, encoding="utf-8")
-        print(f"\n  OK {req_path} geschrieben ({len(manifest_reqs)} Eintraege)")
 
         # requirements_test.txt / requirements-test.txt
         test_content = "\n".join(ALWAYS_TEST) + "\n"
         for path in req_test_paths:
             path.write_text(test_content, encoding="utf-8")
-            print(f"  OK {path} geschrieben ({len(ALWAYS_TEST)} Eintraege)")
 
     elif args.check and any_changed:
         # Use ASCII-only punctuation here: Windows consoles default to cp1252
         # and crash on U+2717 / U+2014 unless stdout is reconfigured. The
         # gate script captures stdout for diagnostics, so an encode error
         # would mask the actual drift report.
-        print(
-            "\n  [DRIFT] requirements sind nicht synchron -- "
-            "bitte `python -m scripts.sync_requirements --write` ausfuehren"
-        )
         return 1
 
     return 0
