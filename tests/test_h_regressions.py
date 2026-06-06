@@ -32,7 +32,7 @@ def test_local_mqtt_diagnostics_uses_live_client_snapshot() -> None:
 
 
 def test_diagnostics_export_includes_rejection_metrics_and_schema_version() -> None:
-    """Diagnostics payload must include Platinum-mandated rejection_metrics + schema_version."""
+    """Diagnostics payload must include Platinum-mandated rejection_metrics + schema_version."""  # noqa: E501
     source = _source("custom_components/jackery_solarvault/diagnostics.py")
     const_source = _source("custom_components/jackery_solarvault/const.py")
 

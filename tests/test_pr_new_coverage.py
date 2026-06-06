@@ -194,7 +194,7 @@ def test_legacy_suffix_matches_current_entity_not_matched() -> None:
 
 
 def test_legacy_suffix_matches_head_cannot_have_trailing_underscore() -> None:
-    """A digits head with a trailing underscore before the suffix is fine if suffix starts with underscore."""
+    """A digits head with a trailing underscore before the suffix is fine if suffix starts with underscore."""  # noqa: E501
     # "12345_battery_soc": head="12345", suffix="_battery_soc" → head matches \d+
     assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True
     # But "12345__double_underscore": head="12345_", does NOT match \d+ (has trailing _)
@@ -214,7 +214,7 @@ def test_legacy_suffix_matches_head_cannot_have_trailing_underscore() -> None:
 
 
 def test_local_mqtt_result_warning_condition_fires_for_runtime_error() -> None:
-    """The isinstance(local_mqtt_result, BaseException) condition must be True for RuntimeError."""
+    """The isinstance(local_mqtt_result, BaseException) condition must be True for RuntimeError."""  # noqa: E501
     result: Any = RuntimeError("broker refused connection")
     assert isinstance(result, BaseException)
 

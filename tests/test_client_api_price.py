@@ -190,7 +190,7 @@ async def test_get_json_rejects_unparseable_success_body() -> None:
             return None
 
         async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
-            raise ValueError("not json")
+            raise ValueError("not json")  # noqa: TRY003
 
         async def text(self) -> str:  # noqa: PLR6301
             return "<html>maintenance</html>"

@@ -72,7 +72,7 @@ def test_every_connect_resubscribes_all_topics() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",  # noqa: E501
         src,
         re.DOTALL,
     )
@@ -92,7 +92,7 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",  # noqa: E501
         src,
         re.DOTALL,
     )
@@ -111,7 +111,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # noqa: E501
         src,
         re.DOTALL,
     )
@@ -124,7 +124,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     # And the connect-failure mapper itself must produce the rc=… signature
     # so ``_is_connect_failure_error`` can detect it.
     fail_match = re.search(
-        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # noqa: E501
         src,
         re.DOTALL,
     )
@@ -152,7 +152,7 @@ def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> Non
     """
     src = _read("mqtt_push.py")
     stop_match = re.search(
-        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
+        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",  # noqa: E501
         src,
         re.DOTALL,
     )
@@ -230,7 +230,7 @@ def test_silent_threshold_constant_is_sane() -> None:
     threshold = int(match.group(1))
     # Real Jackery heartbeats every ~30 s; we want to flag silence
     # well after that but before users complain about stale data.
-    assert 60 <= threshold <= 1800, threshold
+    assert 60 <= threshold <= 1800, threshold  # noqa: PLR2004
 
 
 def test_seconds_since_last_message_handles_no_messages() -> None:
@@ -360,7 +360,7 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     # The session runner routes through the callback only after a real
     # session — not after a CONNACK rejection.
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",  # noqa: E501
         mqtt_src,
         re.DOTALL,
     )
@@ -377,7 +377,7 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
 
     # Recovery handler resets the throttle and force-reconnects.
     handler_match = re.search(
-        r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
+        r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",  # noqa: E501
         coord_src,
         re.DOTALL,
     )
@@ -424,7 +424,7 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     assert assignment_offset > gate_offset, "assignment must be after gate"
 
     skip_match = re.search(
-        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
+        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",  # noqa: E501
         src,
         _re.DOTALL,
     )

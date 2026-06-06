@@ -74,7 +74,7 @@ SHELLY_SNAPSHOT = {
 def test_smart_meter_net_power_prefers_total() -> None:
     """tPhasePw/tnPhasePw wins over per-phase sum when both are present."""
     result = util.smart_meter_net_power(SHELLY_SNAPSHOT)
-    assert result == 10, f"expected 10 W (tPhasePw net), got {result}"
+    assert result == 10, f"expected 10 W (tPhasePw net), got {result}"  # noqa: PLR2004
 
 
 def test_smart_meter_net_power_falls_back_to_phases() -> None:
@@ -84,7 +84,7 @@ def test_smart_meter_net_power_falls_back_to_phases() -> None:
     }
     result = util.smart_meter_net_power(ct)
     # (2-0) + (0-254) + (235-0) = -17
-    assert result == -17, f"expected -17 W (phase sum fallback), got {result}"
+    assert result == -17, f"expected -17 W (phase sum fallback), got {result}"  # noqa: PLR2004
 
 
 def test_smart_meter_net_power_all_zero_returns_zero_not_none() -> None:
@@ -114,7 +114,7 @@ def test_smart_meter_net_power_missing_one_phase_uses_total() -> None:
     ct = {k: v for k, v in SHELLY_SNAPSHOT.items() if k != "aPhasePw"}
     # total pair still present → should return total
     result = util.smart_meter_net_power(ct)
-    assert result == 10, f"expected 10 W from total pair, got {result}"
+    assert result == 10, f"expected 10 W from total pair, got {result}"  # noqa: PLR2004
 
 
 def test_smart_meter_net_power_missing_full_phase_no_total_returns_none() -> None:

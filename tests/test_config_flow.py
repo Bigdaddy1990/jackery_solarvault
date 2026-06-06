@@ -78,7 +78,7 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
     """Show a "cannot_connect" form error when the API raises a network error during the user config flow.
 
     Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
-    """
+    """  # noqa: E501
     with patch(
         "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
         side_effect=JackeryError("network down"),
@@ -159,7 +159,7 @@ async def test_reauth_flow_updates_password_and_reloads(
 async def test_options_flow_persists_local_mqtt_topic_filter_default(
     hass: HomeAssistant,
 ) -> None:
-    """Options flow must persist the local MQTT topic-filter option and default it to empty."""
+    """Options flow must persist the local MQTT topic-filter option and default it to empty."""  # noqa: E501
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
@@ -177,7 +177,7 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
 
     result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""
+    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""  # noqa: PLC1901
 
 
 async def test_options_flow_accepts_local_mqtt_topic_filter_value(

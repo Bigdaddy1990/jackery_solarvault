@@ -83,7 +83,7 @@ def _string_tuple_pairs_keyword(
             return ()
         pairs: list[tuple[str, str]] = []
         for item in value.elts:
-            if isinstance(item, ast.Tuple) and len(item.elts) == 2:
+            if isinstance(item, ast.Tuple) and len(item.elts) == 2:  # noqa: PLR2004
                 constants = _const_string_assignments(CONST_PATH)
                 left = _eval_static_string(item.elts[0], constants)
                 right = _eval_static_string(item.elts[1], constants)
@@ -322,7 +322,7 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement
+    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement  # noqa: E501
     assert "requires explicit app ranges" in coordinator_source
     # coordinator uses _local_today() which wraps dt_util.now() with timezone
     assert (

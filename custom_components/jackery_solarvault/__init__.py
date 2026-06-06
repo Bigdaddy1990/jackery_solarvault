@@ -68,20 +68,20 @@ if TYPE_CHECKING:
 # concrete coordinator type without sprinkling cast/getattr around
 # the integration. PEP 695 syntax requires Python 3.12+; HA 2025.x
 # already requires Python 3.14.
-type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]  # noqa: RUF067
+type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]  # noqa: RUF067, RUF100
 
-_LOGGER = logging.getLogger(__name__)  # noqa: RUF067
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})  # noqa: RUF067
+_LOGGER = logging.getLogger(__name__)  # noqa: RUF067, RUF100
+_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})  # noqa: RUF067, RUF100
 
 
 # This integration is config-entry-only — there is no YAML configuration
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
 # accident.
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)  # noqa: RUF067
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)  # noqa: RUF067, RUF100
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029, RUF067
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029, RUF067, RUF100
     """Set up global Jackery SolarVault services.
 
     Declared ``async`` because Home Assistant awaits the integration's
@@ -93,7 +93,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF02
     return True
 
 
-async def _async_clean_legacy_entities(  # noqa: RUF067
+async def _async_clean_legacy_entities(  # noqa: RUF067, RUF100
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """Drop entity-registry entries from older releases or disabled options.
@@ -162,7 +162,7 @@ async def _async_clean_legacy_entities(  # noqa: RUF067
     )
 
 
-async def _async_authenticate(  # noqa: RUF067
+async def _async_authenticate(  # noqa: RUF067, RUF100
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
     """Authenticate to the Jackery cloud using credentials from the config entry and return an authenticated API client.
@@ -195,10 +195,10 @@ async def _async_authenticate(  # noqa: RUF067
     return api
 
 
-_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # noqa: RUF067
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # noqa: RUF067, RUF100
 
 
-async def _async_start_local_mqtt(  # noqa: RUF067
+async def _async_start_local_mqtt(  # noqa: RUF067, RUF100
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -285,7 +285,7 @@ async def _async_start_local_mqtt(  # noqa: RUF067
     await client.async_start()
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF100
     """Set up the Jackery SolarVault config entry, start its coordinator and optional transports, and forward platform setup.
 
     Performs authentication, constructs the coordinator, runs discovery and the initial refresh, and starts cloud MQTT plus an optional local MQTT listener and BLE transport. Transport startup failures that indicate invalid credentials will surface re-auth; other transport failures are logged and do not block setup. On successful setup the coordinator is stored on the entry's runtime state and platform setups and listeners are registered. If setup fails after the coordinator is created, the coordinator is shut down and the entry's runtime state is cleared before the error is re-raised.
@@ -373,7 +373,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 # -----------------------------------------------------------------------------
 
 
-async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF029, RUF067
+async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF029, RUF067, RUF100
     """Remove stale Energy helper entities that were created without a unit of measurement.
 
     Scans the entity registry for entities whose entity_id starts with the configured
@@ -411,10 +411,10 @@ async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # no
         registry.async_remove(entity_id)
 
 
-_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")  # noqa: RUF067
+_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")  # noqa: RUF067, RUF100
 
 
-def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067
+def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067, RUF100
     """Determine whether `uid` consists of a legacy device head immediately followed by `key_suffix`.
 
     A legacy device head has the form `<digits>` or `<digits>_battery_pack_<digits>`. This function returns `True` only when `uid` ends with `key_suffix` and the substring before that suffix exactly matches the legacy head pattern.
@@ -428,7 +428,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067
     return _LEGACY_UID_HEAD_RE.fullmatch(head) is not None
 
 
-async def _async_remove_entities_with_suffixes(  # noqa: RUF029, RUF067
+async def _async_remove_entities_with_suffixes(  # noqa: RUF029, RUF067, RUF100
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     *,
@@ -463,7 +463,7 @@ async def _async_remove_entities_with_suffixes(  # noqa: RUF029, RUF067
             registry.async_remove(ent.entity_id)
 
 
-async def _async_update_listener(  # noqa: RUF067
+async def _async_update_listener(  # noqa: RUF067, RUF100
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
     """Reload the entry when the user toggles options.
@@ -475,7 +475,7 @@ async def _async_update_listener(  # noqa: RUF067
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067
+async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF100
     """Unload the config entry and tear down its runtime resources.
 
     If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime data to avoid retaining the coordinator. Teardown is performed only when platforms are successfully unloaded.
