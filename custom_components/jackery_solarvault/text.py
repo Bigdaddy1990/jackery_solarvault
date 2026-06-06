@@ -6,23 +6,22 @@ from typing import Any
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import JackeryConfigEntry
-from .api import JackeryAuthError
-from .api import JackeryError
-from .const import DOMAIN
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_ID
-from .const import FIELD_SYSTEM_ID
-from .const import FIELD_SYSTEM_NAME
-from .const import PAYLOAD_SYSTEM
+from .api import JackeryAuthError, JackeryError
+from .const import (
+    DOMAIN,
+    FIELD_DEVICE_NAME,
+    FIELD_ID,
+    FIELD_SYSTEM_ID,
+    FIELD_SYSTEM_NAME,
+    PAYLOAD_SYSTEM,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
-from .util import append_unique_entity
-from .util import coordinator_entity_signature
+from .util import append_unique_entity, coordinator_entity_signature
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on

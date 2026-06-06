@@ -2,297 +2,292 @@
 
 import asyncio
 import binascii
+from collections.abc import Awaitable, Callable
 import contextlib
+from datetime import date, datetime, timedelta
 import importlib
 import json
 import logging
 import time
-from collections.abc import Awaitable
-from collections.abc import Callable
-from datetime import date
-from datetime import datetime
-from datetime import timedelta
-from typing import Any
-from typing import NoReturn
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi
-from .api import JackeryAuthError
-from .api import JackeryError
-from .const import ACTION_ID_AUTO_STANDBY
-from .const import ACTION_ID_CONTROL_SOCKET_PRIORITY
-from .const import ACTION_ID_CONTROL_SOCKET_SWITCH
-from .const import ACTION_ID_CT_PHASE
-from .const import ACTION_ID_DEFAULT_PW
-from .const import ACTION_ID_DELETE_STORM_ALERT
-from .const import ACTION_ID_EPS_ENABLED
-from .const import ACTION_ID_FOLLOW_METER_PW
-from .const import ACTION_ID_MAX_FEED_GRID
-from .const import ACTION_ID_MAX_OUT_PW
-from .const import ACTION_ID_OFF_GRID_DOWN
-from .const import ACTION_ID_OFF_GRID_TIME
-from .const import ACTION_ID_QUERY_COMBINE_DATA
-from .const import ACTION_ID_QUERY_DEVICE_PROPERTY
-from .const import ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG
-from .const import ACTION_ID_QUERY_WEATHER_PLAN
-from .const import ACTION_ID_REBOOT_DEVICE
-from .const import ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG
-from .const import ACTION_ID_SOC_LIMITS
-from .const import ACTION_ID_STANDBY
-from .const import ACTION_ID_STORM_MINUTES
-from .const import ACTION_ID_STORM_WARNING
-from .const import ACTION_ID_SUBDEVICE_3014
-from .const import ACTION_ID_SUBDEVICE_3031
-from .const import ACTION_ID_SUBDEVICE_3032
-from .const import ACTION_ID_SUBDEVICE_3033
-from .const import ACTION_ID_SUBDEVICE_3037
-from .const import ACTION_ID_TEMP_UNIT
-from .const import ACTION_ID_WORK_MODEL
-from .const import ADAPTIVE_KEEPALIVE_INTERVAL_SEC
-from .const import APP_CHART_STAT_METRICS
-from .const import APP_CHART_STAT_PERIODS
-from .const import APP_DAY_CHART_BUCKET_LABEL
-from .const import APP_PERIOD_DATE_TYPES
-from .const import APP_SECTION_BATTERY_STAT
-from .const import APP_SECTION_BATTERY_TRENDS
-from .const import APP_SECTION_HOME_STAT
-from .const import APP_SECTION_HOME_TRENDS
-from .const import APP_SECTION_PV_STAT
-from .const import APP_SECTION_PV_TRENDS
-from .const import APP_STAT_PV1_ENERGY
-from .const import APP_STAT_PV2_ENERGY
-from .const import APP_STAT_PV3_ENERGY
-from .const import APP_STAT_PV4_ENERGY
-from .const import APP_STAT_TOTAL_CHARGE
-from .const import APP_STAT_TOTAL_DISCHARGE
-from .const import APP_STAT_TOTAL_HOME_ENERGY
-from .const import APP_STAT_TOTAL_IN_GRID_ENERGY
-from .const import APP_STAT_TOTAL_OUT_GRID_ENERGY
-from .const import APP_STAT_TOTAL_SOLAR_ENERGY
-from .const import APP_STAT_TOTAL_TREND_CHARGE_ENERGY
-from .const import APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY
-from .const import BATTERY_PACK_HINT_KEYS
-from .const import BATTERY_PACK_STALE_THRESHOLD_SEC
-from .const import CONF_ENABLE_BLE_TRANSPORT
-from .const import CONF_ENABLE_BLE_WRITES
-from .const import CT_METER_KEYS
-from .const import DATA_QUALITY_KEY_LABEL
-from .const import DATA_QUALITY_KEY_METRIC_KEY
-from .const import DATA_QUALITY_REPAIR_EXAMPLE_LIMIT
-from .const import DATE_TYPE_DAY
-from .const import DATE_TYPE_MONTH
-from .const import DATE_TYPE_WEEK
-from .const import DATE_TYPE_YEAR
-from .const import DEFAULT_ENABLE_BLE_TRANSPORT
-from .const import DEFAULT_ENABLE_BLE_WRITES
-from .const import DOMAIN
-from .const import EXTERNAL_STAT_BUCKET_DAY_HOURLY
-from .const import FIELD_ACCESSORIES
-from .const import FIELD_ACTION_ID
-from .const import FIELD_AUTO_STANDBY
-from .const import FIELD_BAT_NUM
-from .const import FIELD_BAT_SOC
-from .const import FIELD_BATTERIES
-from .const import FIELD_BATTERY_PACK
-from .const import FIELD_BATTERY_PACK_LIST
-from .const import FIELD_BATTERY_PACKS
-from .const import FIELD_BIND_KEY
-from .const import FIELD_BLUETOOTH_KEY
-from .const import FIELD_BODY
-from .const import FIELD_CELL_TEMP
-from .const import FIELD_CHARGING_ENERGY
-from .const import FIELD_CID
-from .const import FIELD_CMD
-from .const import FIELD_COLLECTORS
-from .const import FIELD_COMM_STATE
-from .const import FIELD_COMPANY_NAME
-from .const import FIELD_COUNTRY
-from .const import FIELD_COUNTRY_CODE
-from .const import FIELD_CURRENCY
-from .const import FIELD_CURRENCY_CODE
-from .const import FIELD_CURRENT_VERSION
-from .const import FIELD_DATA
-from .const import FIELD_DEFAULT_PW
-from .const import FIELD_DEV_ID
-from .const import FIELD_DEV_MODEL
-from .const import FIELD_DEV_SN
-from .const import FIELD_DEV_TYPE
-from .const import FIELD_DEVICE_ID
-from .const import FIELD_DEVICE_NAME
-from .const import FIELD_DEVICE_SN
-from .const import FIELD_DEVICE_TYPE
-from .const import FIELD_DEVICES
-from .const import FIELD_DISCHARGING_ENERGY
-from .const import FIELD_DYNAMIC_OR_SINGLE
-from .const import FIELD_ID
-from .const import FIELD_IN_EGY
-from .const import FIELD_IN_PW
-from .const import FIELD_IP
-from .const import FIELD_IS_AUTO_STANDBY
-from .const import FIELD_IS_CLOUD
-from .const import FIELD_IS_FIRMWARE_UPGRADE
-from .const import FIELD_IS_FOLLOW_METER_PW
-from .const import FIELD_LOGIN_ALLOWED
-from .const import FIELD_MAX_FEED_GRID
-from .const import FIELD_MAX_GRID_STD_PW
-from .const import FIELD_MAX_OUT_PW
-from .const import FIELD_MESSAGE_TYPE
-from .const import FIELD_MINS_INTERVAL
-from .const import FIELD_MODEL_CODE
-from .const import FIELD_NAME
-from .const import FIELD_OFF_GRID_DOWN
-from .const import FIELD_OFF_GRID_TIME
-from .const import FIELD_OP
-from .const import FIELD_OUT_EGY
-from .const import FIELD_OUT_PW
-from .const import FIELD_PACK_LIST
-from .const import FIELD_PLATFORM_COMPANY_ID
-from .const import FIELD_PLUGS
-from .const import FIELD_POWER_PRICE_RESOURCE
-from .const import FIELD_PRODUCT_MODEL
-from .const import FIELD_RB
-from .const import FIELD_REBOOT
-from .const import FIELD_SCAN_NAME
-from .const import FIELD_SCHE_PHASE
-from .const import FIELD_SINGLE_CURRENCY
-from .const import FIELD_SINGLE_CURRENCY_CODE
-from .const import FIELD_SINGLE_PRICE
-from .const import FIELD_SN
-from .const import FIELD_SOC_CHARGE_LIMIT
-from .const import FIELD_SOC_CHG_LIMIT
-from .const import FIELD_SOC_DISCHARGE_LIMIT
-from .const import FIELD_SOC_DISCHG_LIMIT
-from .const import FIELD_SOCKET_PRIORITY
-from .const import FIELD_SUB_TYPE
-from .const import FIELD_SW_EPS
-from .const import FIELD_SWITCH_STATE
-from .const import FIELD_SYS_SWITCH
-from .const import FIELD_SYSTEM_ID
-from .const import FIELD_SYSTEM_REGION
-from .const import FIELD_TARGET_MODULE_VERSION
-from .const import FIELD_TARGET_VERSION
-from .const import FIELD_TEMP_UNIT
-from .const import FIELD_THIRD_PARTY_MQTT_ENABLE
-from .const import FIELD_THIRD_PARTY_MQTT_IP
-from .const import FIELD_THIRD_PARTY_MQTT_PASSWORD
-from .const import FIELD_THIRD_PARTY_MQTT_PORT
-from .const import FIELD_THIRD_PARTY_MQTT_TOKEN
-from .const import FIELD_THIRD_PARTY_MQTT_USERNAME
-from .const import FIELD_TIMESTAMP
-from .const import FIELD_TODAY_ENERGY
-from .const import FIELD_TOTAL_ENERGY
-from .const import FIELD_TYPE_NAME
-from .const import FIELD_UPDATE_CONTENT
-from .const import FIELD_UPDATE_STATUS
-from .const import FIELD_UPDATES
-from .const import FIELD_UPGRADE_TYPE
-from .const import FIELD_VERSION
-from .const import FIELD_WNAME
-from .const import FIELD_WORK_MODEL
-from .const import FIELD_WPC
-from .const import FIELD_WPS
-from .const import MAIN_PROPERTY_ALIAS_PAIRS
-from .const import MQTT_ACTION_IDS_ALARM
-from .const import MQTT_ACTION_IDS_COMBINE
-from .const import MQTT_ACTION_IDS_DEVICE_PROPERTY
-from .const import MQTT_ACTION_IDS_SCHEDULE
-from .const import MQTT_ACTION_IDS_SUBDEVICE
-from .const import MQTT_APP_CONFLICT_PAUSE_SEC
-from .const import MQTT_CMD_CONTROL_COMBINE
-from .const import MQTT_CMD_CONTROL_SUB_DEVICE
-from .const import MQTT_CMD_DEVICE_PROPERTY_CHANGE
-from .const import MQTT_CMD_NONE
-from .const import MQTT_CMD_QUERY_COMBINE_DATA
-from .const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-from .const import MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY
-from .const import MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG
-from .const import MQTT_CMD_QUERY_WEATHER_PLAN
-from .const import MQTT_CMD_THIRD_PARTY_MQTT_CONFIG
-from .const import MQTT_CMD_UPLOAD_DEVICE_ALERT
-from .const import MQTT_CREDENTIAL_CLIENT_ID
-from .const import MQTT_CREDENTIAL_PASSWORD
-from .const import MQTT_CREDENTIAL_USER_ID
-from .const import MQTT_CREDENTIAL_USERNAME
-from .const import MQTT_LIVE_THRESHOLD_SEC
-from .const import MQTT_MESSAGE_CANCEL_WEATHER_ALERT
-from .const import MQTT_MESSAGE_CONTROL_COMBINE
-from .const import MQTT_MESSAGE_CONTROL_SUB_DEVICE
-from .const import MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE
-from .const import MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE
-from .const import MQTT_MESSAGE_QUERY_COMBINE_DATA
-from .const import MQTT_MESSAGE_QUERY_DEVICE_PROPERTY
-from .const import MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY
-from .const import MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG
-from .const import MQTT_MESSAGE_QUERY_WEATHER_PLAN
-from .const import MQTT_MESSAGE_SEND_WEATHER_ALERT
-from .const import MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG
-from .const import MQTT_MESSAGE_UPLOAD_COMBINE_DATA
-from .const import MQTT_MESSAGE_UPLOAD_DEVICE_ALERT
-from .const import MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA
-from .const import MQTT_MESSAGE_UPLOAD_WEATHER_PLAN
-from .const import MQTT_RECONNECT_THROTTLE_SEC
-from .const import MQTT_TOPIC_COMMAND
-from .const import MQTT_TOPIC_PREFIX
-from .const import NON_BATTERY_SUBDEVICE_TYPES
-from .const import PACK_FIELD_LAST_SEEN_AT
-from .const import PAYLOAD_ALARM
-from .const import PAYLOAD_BATTERY_PACKS
-from .const import PAYLOAD_BATTERY_TRENDS
-from .const import PAYLOAD_CT_METER
-from .const import PAYLOAD_DATA_QUALITY
-from .const import PAYLOAD_DEBUG_LOG_FILENAME
-from .const import PAYLOAD_DEBUG_LOGGER_NAME
-from .const import PAYLOAD_DEBUG_THROTTLE_SEC
-from .const import PAYLOAD_DEVICE
-from .const import PAYLOAD_DEVICE_META
-from .const import PAYLOAD_DEVICE_STATISTIC
-from .const import PAYLOAD_DISCOVERY
-from .const import PAYLOAD_HOME_TRENDS
-from .const import PAYLOAD_HTTP_PROPERTIES
-from .const import PAYLOAD_LOCATION
-from .const import PAYLOAD_METER_HEADS
-from .const import PAYLOAD_MQTT_LAST
-from .const import PAYLOAD_NOTICE
-from .const import PAYLOAD_OTA
-from .const import PAYLOAD_PRICE
-from .const import PAYLOAD_PRICE_HISTORY_CONFIG
-from .const import PAYLOAD_PRICE_SOURCES
-from .const import PAYLOAD_PROPERTIES
-from .const import PAYLOAD_PV_TRENDS
-from .const import PAYLOAD_SMART_PLUGS
-from .const import PAYLOAD_STATISTIC
-from .const import PAYLOAD_SYSTEM
-from .const import PAYLOAD_SYSTEM_META
-from .const import PAYLOAD_TASK_PLAN
-from .const import PAYLOAD_WEATHER_PLAN
-from .const import PRESERVED_FAST_PAYLOAD_KEYS
-from .const import PRICE_CONFIG_INTERVAL_SEC
-from .const import REPAIR_ISSUE_APP_DATA_INCONSISTENCY
-from .const import REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY
-from .const import SLOW_METRICS_INTERVAL_SEC
-from .const import SMART_METER_SUBTYPE
-from .const import SUBDEVICE_DEV_TYPE_BATTERY_PACK
-from .const import SUBDEVICE_DEV_TYPE_COMBO
-from .const import SUBDEVICE_DEV_TYPE_CT
-from .const import SUBDEVICE_DEV_TYPE_METER_HEAD
-from .const import SUBDEVICE_DEV_TYPE_SOCKET
-from .const import SUBDEVICE_HINT_KEYS
-from .const import SUBDEVICE_MAIN_MIRROR_KEYS
-from .const import SUBDEVICE_ONLY_PROPERTY_KEYS
-from .const import SUBDEVICE_TYPE_SMART_METER
-from .const import SYSTEM_INFO_KEYS
+from .api import JackeryApi, JackeryAuthError, JackeryError
+from .const import (
+    ACTION_ID_AUTO_STANDBY,
+    ACTION_ID_CONTROL_SOCKET_PRIORITY,
+    ACTION_ID_CONTROL_SOCKET_SWITCH,
+    ACTION_ID_CT_PHASE,
+    ACTION_ID_DEFAULT_PW,
+    ACTION_ID_DELETE_STORM_ALERT,
+    ACTION_ID_EPS_ENABLED,
+    ACTION_ID_FOLLOW_METER_PW,
+    ACTION_ID_MAX_FEED_GRID,
+    ACTION_ID_MAX_OUT_PW,
+    ACTION_ID_OFF_GRID_DOWN,
+    ACTION_ID_OFF_GRID_TIME,
+    ACTION_ID_QUERY_COMBINE_DATA,
+    ACTION_ID_QUERY_DEVICE_PROPERTY,
+    ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    ACTION_ID_QUERY_WEATHER_PLAN,
+    ACTION_ID_REBOOT_DEVICE,
+    ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG,
+    ACTION_ID_SOC_LIMITS,
+    ACTION_ID_STANDBY,
+    ACTION_ID_STORM_MINUTES,
+    ACTION_ID_STORM_WARNING,
+    ACTION_ID_SUBDEVICE_3014,
+    ACTION_ID_SUBDEVICE_3031,
+    ACTION_ID_SUBDEVICE_3032,
+    ACTION_ID_SUBDEVICE_3033,
+    ACTION_ID_SUBDEVICE_3037,
+    ACTION_ID_TEMP_UNIT,
+    ACTION_ID_WORK_MODEL,
+    ADAPTIVE_KEEPALIVE_INTERVAL_SEC,
+    APP_CHART_STAT_METRICS,
+    APP_CHART_STAT_PERIODS,
+    APP_DAY_CHART_BUCKET_LABEL,
+    APP_PERIOD_DATE_TYPES,
+    APP_SECTION_BATTERY_STAT,
+    APP_SECTION_BATTERY_TRENDS,
+    APP_SECTION_HOME_STAT,
+    APP_SECTION_HOME_TRENDS,
+    APP_SECTION_PV_STAT,
+    APP_SECTION_PV_TRENDS,
+    APP_STAT_PV1_ENERGY,
+    APP_STAT_PV2_ENERGY,
+    APP_STAT_PV3_ENERGY,
+    APP_STAT_PV4_ENERGY,
+    APP_STAT_TOTAL_CHARGE,
+    APP_STAT_TOTAL_DISCHARGE,
+    APP_STAT_TOTAL_HOME_ENERGY,
+    APP_STAT_TOTAL_IN_GRID_ENERGY,
+    APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+    APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+    BATTERY_PACK_HINT_KEYS,
+    BATTERY_PACK_STALE_THRESHOLD_SEC,
+    CONF_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_BLE_WRITES,
+    CT_METER_KEYS,
+    DATA_QUALITY_KEY_LABEL,
+    DATA_QUALITY_KEY_METRIC_KEY,
+    DATA_QUALITY_REPAIR_EXAMPLE_LIMIT,
+    DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
+    DEFAULT_ENABLE_BLE_TRANSPORT,
+    DEFAULT_ENABLE_BLE_WRITES,
+    DOMAIN,
+    EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+    FIELD_ACCESSORIES,
+    FIELD_ACTION_ID,
+    FIELD_AUTO_STANDBY,
+    FIELD_BATTERIES,
+    FIELD_BATTERY_PACK,
+    FIELD_BATTERY_PACKS,
+    FIELD_BATTERY_PACK_LIST,
+    FIELD_BAT_NUM,
+    FIELD_BAT_SOC,
+    FIELD_BIND_KEY,
+    FIELD_BLUETOOTH_KEY,
+    FIELD_BODY,
+    FIELD_CELL_TEMP,
+    FIELD_CHARGING_ENERGY,
+    FIELD_CID,
+    FIELD_CMD,
+    FIELD_COLLECTORS,
+    FIELD_COMM_STATE,
+    FIELD_COMPANY_NAME,
+    FIELD_COUNTRY,
+    FIELD_COUNTRY_CODE,
+    FIELD_CURRENCY,
+    FIELD_CURRENCY_CODE,
+    FIELD_CURRENT_VERSION,
+    FIELD_DATA,
+    FIELD_DEFAULT_PW,
+    FIELD_DEVICES,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEVICE_TYPE,
+    FIELD_DEV_ID,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
+    FIELD_DEV_TYPE,
+    FIELD_DISCHARGING_ENERGY,
+    FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_ID,
+    FIELD_IN_EGY,
+    FIELD_IN_PW,
+    FIELD_IP,
+    FIELD_IS_AUTO_STANDBY,
+    FIELD_IS_CLOUD,
+    FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_IS_FOLLOW_METER_PW,
+    FIELD_LOGIN_ALLOWED,
+    FIELD_MAX_FEED_GRID,
+    FIELD_MAX_GRID_STD_PW,
+    FIELD_MAX_OUT_PW,
+    FIELD_MESSAGE_TYPE,
+    FIELD_MINS_INTERVAL,
+    FIELD_MODEL_CODE,
+    FIELD_NAME,
+    FIELD_OFF_GRID_DOWN,
+    FIELD_OFF_GRID_TIME,
+    FIELD_OP,
+    FIELD_OUT_EGY,
+    FIELD_OUT_PW,
+    FIELD_PACK_LIST,
+    FIELD_PLATFORM_COMPANY_ID,
+    FIELD_PLUGS,
+    FIELD_POWER_PRICE_RESOURCE,
+    FIELD_PRODUCT_MODEL,
+    FIELD_RB,
+    FIELD_REBOOT,
+    FIELD_SCAN_NAME,
+    FIELD_SCHE_PHASE,
+    FIELD_SINGLE_CURRENCY,
+    FIELD_SINGLE_CURRENCY_CODE,
+    FIELD_SINGLE_PRICE,
+    FIELD_SN,
+    FIELD_SOCKET_PRIORITY,
+    FIELD_SOC_CHARGE_LIMIT,
+    FIELD_SOC_CHG_LIMIT,
+    FIELD_SOC_DISCHARGE_LIMIT,
+    FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SUB_TYPE,
+    FIELD_SWITCH_STATE,
+    FIELD_SW_EPS,
+    FIELD_SYSTEM_ID,
+    FIELD_SYSTEM_REGION,
+    FIELD_SYS_SWITCH,
+    FIELD_TARGET_MODULE_VERSION,
+    FIELD_TARGET_VERSION,
+    FIELD_TEMP_UNIT,
+    FIELD_THIRD_PARTY_MQTT_ENABLE,
+    FIELD_THIRD_PARTY_MQTT_IP,
+    FIELD_THIRD_PARTY_MQTT_PASSWORD,
+    FIELD_THIRD_PARTY_MQTT_PORT,
+    FIELD_THIRD_PARTY_MQTT_TOKEN,
+    FIELD_THIRD_PARTY_MQTT_USERNAME,
+    FIELD_TIMESTAMP,
+    FIELD_TODAY_ENERGY,
+    FIELD_TOTAL_ENERGY,
+    FIELD_TYPE_NAME,
+    FIELD_UPDATES,
+    FIELD_UPDATE_CONTENT,
+    FIELD_UPDATE_STATUS,
+    FIELD_UPGRADE_TYPE,
+    FIELD_VERSION,
+    FIELD_WNAME,
+    FIELD_WORK_MODEL,
+    FIELD_WPC,
+    FIELD_WPS,
+    MAIN_PROPERTY_ALIAS_PAIRS,
+    MQTT_ACTION_IDS_ALARM,
+    MQTT_ACTION_IDS_COMBINE,
+    MQTT_ACTION_IDS_DEVICE_PROPERTY,
+    MQTT_ACTION_IDS_SCHEDULE,
+    MQTT_ACTION_IDS_SUBDEVICE,
+    MQTT_APP_CONFLICT_PAUSE_SEC,
+    MQTT_CMD_CONTROL_COMBINE,
+    MQTT_CMD_CONTROL_SUB_DEVICE,
+    MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+    MQTT_CMD_NONE,
+    MQTT_CMD_QUERY_COMBINE_DATA,
+    MQTT_CMD_QUERY_DEVICE_PROPERTY,
+    MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_CMD_QUERY_WEATHER_PLAN,
+    MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_CMD_UPLOAD_DEVICE_ALERT,
+    MQTT_CREDENTIAL_CLIENT_ID,
+    MQTT_CREDENTIAL_PASSWORD,
+    MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
+    MQTT_LIVE_THRESHOLD_SEC,
+    MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
+    MQTT_MESSAGE_CONTROL_COMBINE,
+    MQTT_MESSAGE_CONTROL_SUB_DEVICE,
+    MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+    MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE,
+    MQTT_MESSAGE_QUERY_COMBINE_DATA,
+    MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
+    MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+    MQTT_MESSAGE_SEND_WEATHER_ALERT,
+    MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_MESSAGE_UPLOAD_COMBINE_DATA,
+    MQTT_MESSAGE_UPLOAD_DEVICE_ALERT,
+    MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA,
+    MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
+    MQTT_RECONNECT_THROTTLE_SEC,
+    MQTT_TOPIC_COMMAND,
+    MQTT_TOPIC_PREFIX,
+    NON_BATTERY_SUBDEVICE_TYPES,
+    PACK_FIELD_LAST_SEEN_AT,
+    PAYLOAD_ALARM,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_CT_METER,
+    PAYLOAD_DATA_QUALITY,
+    PAYLOAD_DEBUG_LOGGER_NAME,
+    PAYLOAD_DEBUG_LOG_FILENAME,
+    PAYLOAD_DEBUG_THROTTLE_SEC,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DEVICE_META,
+    PAYLOAD_DEVICE_STATISTIC,
+    PAYLOAD_DISCOVERY,
+    PAYLOAD_HOME_TRENDS,
+    PAYLOAD_HTTP_PROPERTIES,
+    PAYLOAD_LOCATION,
+    PAYLOAD_METER_HEADS,
+    PAYLOAD_MQTT_LAST,
+    PAYLOAD_NOTICE,
+    PAYLOAD_OTA,
+    PAYLOAD_PRICE,
+    PAYLOAD_PRICE_HISTORY_CONFIG,
+    PAYLOAD_PRICE_SOURCES,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_PV_TRENDS,
+    PAYLOAD_SMART_PLUGS,
+    PAYLOAD_STATISTIC,
+    PAYLOAD_SYSTEM,
+    PAYLOAD_SYSTEM_META,
+    PAYLOAD_TASK_PLAN,
+    PAYLOAD_WEATHER_PLAN,
+    PRESERVED_FAST_PAYLOAD_KEYS,
+    PRICE_CONFIG_INTERVAL_SEC,
+    REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
+    REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY,
+    SLOW_METRICS_INTERVAL_SEC,
+    SMART_METER_SUBTYPE,
+    SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+    SUBDEVICE_DEV_TYPE_COMBO,
+    SUBDEVICE_DEV_TYPE_CT,
+    SUBDEVICE_DEV_TYPE_METER_HEAD,
+    SUBDEVICE_DEV_TYPE_SOCKET,
+    SUBDEVICE_HINT_KEYS,
+    SUBDEVICE_MAIN_MIRROR_KEYS,
+    SUBDEVICE_ONLY_PROPERTY_KEYS,
+    SUBDEVICE_TYPE_SMART_METER,
+    SYSTEM_INFO_KEYS,
+)
 
 if TYPE_CHECKING:
     from .mqtt_push import JackeryMqttPushClient
+
+import operator
 
 from .util import (
     app_data_quality_warnings,
@@ -901,7 +896,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Observed for third-party accessories (e.g., Shelly): bindKey=0 and
         # no Jackery model metadata. Those IDs return API code=20000.
         bind_key = dev.get(FIELD_BIND_KEY)
-        if bind_key in (0, "0", False):
+        if bind_key in {0, "0"}:
             return False
         if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):
             return False
@@ -1332,7 +1327,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             updated = dict(current_device)
             touched = False
 
-            if cmd in (MQTT_CMD_DEVICE_PROPERTY_CHANGE, MQTT_CMD_CONTROL_COMBINE):
+            if cmd in {MQTT_CMD_DEVICE_PROPERTY_CHANGE, MQTT_CMD_CONTROL_COMBINE}:
                 props = self._merge_main_properties_for_device(
                     device_id,
                     current_device.get(PAYLOAD_PROPERTIES) or {},
@@ -1361,16 +1356,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # stay "not routed" until firmware semantics are docs-
                 # confirmed.
                 touched = self._merge_battery_pack_lifetime_from_ble(updated, payload)
-            else:
-                # Track unrouted frames in the listener stats so they
-                # show up in diagnostics without spamming DEBUG once per
-                # frame (cmd=120 system/per-device/CT variants arrive
-                # multiple times per minute over BLE).
-                if self._ble_listener is not None:
-                    stats = self._ble_listener.stats_for(device_id)
-                    stats.unrouted_frames_by_cmd[cmd] = (
-                        stats.unrouted_frames_by_cmd.get(cmd, 0) + 1
-                    )
+            # Track unrouted frames in the listener stats so they
+            # show up in diagnostics without spamming DEBUG once per
+            # frame (cmd=120 system/per-device/CT variants arrive
+            # multiple times per minute over BLE).
+            elif self._ble_listener is not None:
+                stats = self._ble_listener.stats_for(device_id)
+                stats.unrouted_frames_by_cmd[cmd] = (
+                    stats.unrouted_frames_by_cmd.get(cmd, 0) + 1
+                )
 
             if not touched:
                 return
@@ -1669,7 +1663,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             or body.get(FIELD_CMD) == MQTT_CMD_UPLOAD_DEVICE_ALERT
         )
 
-        if topic.endswith("/device") or topic.endswith("/config"):
+        if topic.endswith(("/device", "/config")):
             if body:
                 if is_subdevice:
                     touched = (
@@ -1694,7 +1688,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     touched = True
 
         elif topic.endswith("/alert"):
-            updated[PAYLOAD_ALARM] = body if body else payload
+            updated[PAYLOAD_ALARM] = body or payload
             touched = True
 
         elif topic.endswith("/notice"):
@@ -1703,7 +1697,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             touched = True
 
         if is_alarm:
-            updated[PAYLOAD_ALARM] = body if body else payload
+            updated[PAYLOAD_ALARM] = body or payload
             touched = True
 
         # Weather-plan and weather-alert related messages.
@@ -1719,16 +1713,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         if (
             msg_type
-            in (
+            in {
                 MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
                 MQTT_MESSAGE_QUERY_WEATHER_PLAN,
                 MQTT_MESSAGE_SEND_WEATHER_ALERT,
                 MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
-            )
+            }
             or body.get(FIELD_CMD) == MQTT_CMD_QUERY_WEATHER_PLAN
             or action_id in weather_action_ids
         ):
-            updated[PAYLOAD_WEATHER_PLAN] = body if body else payload
+            updated[PAYLOAD_WEATHER_PLAN] = body or payload
             touched = True
 
         # User-configurable schedule payloads (custom mode / tariff mode /
@@ -1737,7 +1731,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             msg_type == MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE
             or action_id in MQTT_ACTION_IDS_SCHEDULE
         ):
-            updated[PAYLOAD_TASK_PLAN] = body if body else payload
+            updated[PAYLOAD_TASK_PLAN] = body or payload
             touched = True
 
         # Device-property snapshots are the MQTT equivalent of the
@@ -1747,16 +1741,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             not is_subdevice
             and (
                 msg_type
-                in (
+                in {
                     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
                     MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
-                )
+                }
                 or action_id in MQTT_ACTION_IDS_DEVICE_PROPERTY
                 or body.get(FIELD_CMD)
-                in (
+                in {
                     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
                     MQTT_CMD_QUERY_DEVICE_PROPERTY,
-                )
+                }
             )
             and body
         ):
@@ -1775,15 +1769,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             not is_subdevice
             and (
                 msg_type
-                in (
+                in {
                     MQTT_MESSAGE_QUERY_COMBINE_DATA,
                     MQTT_MESSAGE_UPLOAD_COMBINE_DATA,
                     MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA,
                     MQTT_MESSAGE_CONTROL_COMBINE,
-                )
+                }
                 or action_id in MQTT_ACTION_IDS_COMBINE
                 or body.get(FIELD_CMD)
-                in (MQTT_CMD_QUERY_COMBINE_DATA, MQTT_CMD_CONTROL_COMBINE)
+                in {MQTT_CMD_QUERY_COMBINE_DATA, MQTT_CMD_CONTROL_COMBINE}
             )
             and body
         ):
@@ -1802,7 +1796,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             or msg_type == MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY
             or action_id in MQTT_ACTION_IDS_SUBDEVICE
         ):
-            source = body if body else payload
+            source = body or payload
             if isinstance(source, dict):
                 touched = (
                     self._merge_subdevice_data(updated, source, device_id=device_id)
@@ -3844,7 +3838,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             company_id = item.get(FIELD_PLATFORM_COMPANY_ID)
             region = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
-            if company_id in (None, "") or not region:
+            if company_id in {None, ""} or not region:
                 continue
             valid.append(item)
         return valid
@@ -3905,7 +3899,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             trimming whitespace and omitting empty entries. Returns an empty list if no region value is present.
         """
         raw = source.get(FIELD_SYSTEM_REGION) or source.get(FIELD_COUNTRY)
-        if raw in (None, ""):
+        if raw in {None, ""}:
             return []
         return [part.strip() for part in str(raw).split(",") if part.strip()]
 
@@ -3930,7 +3924,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 or section.get(FIELD_COUNTRY)
                 or section.get(FIELD_SYSTEM_REGION)
             )
-            if raw not in (None, ""):
+            if raw not in {None, ""}:
                 return str(raw).strip().upper()
         return None
 
@@ -3968,7 +3962,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             dict | None: The selected source dict when a clear match is found, or `None` when no suitable single match exists.
         """
         company_id = current.get(FIELD_PLATFORM_COMPANY_ID)
-        if company_id in (None, ""):
+        if company_id in {None, ""}:
             return None
         region = current.get(FIELD_SYSTEM_REGION)
         country = self._device_country_code(device_id)
@@ -3979,7 +3973,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ]
         if not matches:
             return None
-        if region not in (None, ""):
+        if region not in {None, ""}:
             for source in matches:
                 if str(region) in self._source_regions(source):
                     return source
@@ -4014,7 +4008,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
         region = self._source_region_for_device(device_id, source)
-        if company_id in (None, "") or not region:
+        if company_id in {None, ""} or not region:
             raise HomeAssistantError(
                 "Cannot set dynamic tariff: selected provider is missing "
                 "platformCompanyId/country.",
@@ -4058,7 +4052,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         current = ((self.data or {}).get(device_id, {}) or {}).get(PAYLOAD_PRICE) or {}
         company_id = current.get(FIELD_PLATFORM_COMPANY_ID)
         region = current.get(FIELD_SYSTEM_REGION)
-        if company_id in (None, "") or not region:
+        if company_id in {None, ""} or not region:
             sources = await self._async_price_sources_for_device(device_id)
             source = self._find_matching_price_source(device_id, sources, current)
             if source is not None:
@@ -4458,7 +4452,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 translation_placeholders={"device_id": str(device_id)},
             )
         phase_int = int(phase)
-        if phase_int not in (1, 2, 3, 4):
+        if phase_int not in {1, 2, 3, 4}:
             raise HomeAssistantError(f"CT phase must be 1..4 (got {phase_int})")
         await self._async_publish_command_ble_first(
             device_id,
@@ -5053,7 +5047,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         running_state = 0.0
         for start, value, reset_period, cumulative_state in sorted(
             contributions,
-            key=lambda item: item[0],
+            key=operator.itemgetter(0),
         ):
             hour_start = round(start.timestamp())
             if hour_start not in compiled_hour_starts:
@@ -5197,7 +5191,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         for statistic_id, entity_contributions in sorted(contributions.items()):
             filtered = [
                 item
-                for item in sorted(entity_contributions, key=lambda row: row[0])
+                for item in sorted(entity_contributions, key=operator.itemgetter(0))
                 if round(item[0].timestamp()) in compiled_hour_starts
             ]
             if not filtered:
@@ -6571,9 +6565,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             for month in previous_months
                         ),
                     )
-                    for month, source in zip(previous_months, sources, strict=False):
-                        if isinstance(source, dict):
-                            months[month] = source
+                    months.update({month: source for month, source in zip(previous_months, sources, strict=False) if isinstance(source, dict)})
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(bundle, month_history)
@@ -6765,9 +6757,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 sources = await asyncio.gather(
                     *(_fetch_device_month(prefix, month) for month in previous_months),
                 )
-                for month, source in zip(previous_months, sources, strict=False):
-                    if isinstance(source, dict):
-                        months[month] = source
+                months.update({month: source for month, source in zip(previous_months, sources, strict=False) if isinstance(source, dict)})
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(out, month_history)

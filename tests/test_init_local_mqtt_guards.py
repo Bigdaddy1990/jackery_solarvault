@@ -13,13 +13,9 @@ Also covers:
 """
 
 import logging
-from typing import Any
-from unittest.mock import AsyncMock
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
@@ -82,7 +78,6 @@ class TestLocalMqttClient:
     def test_returns_none_when_domain_not_in_hass_data(self) -> None:
         """When the DOMAIN key is absent from hass.data, must return None."""
         from custom_components.jackery_solarvault import _local_mqtt_client
-        from custom_components.jackery_solarvault.const import DOMAIN
 
         hass = MagicMock()
         hass.data = {}
@@ -516,8 +511,7 @@ class TestLocalMqttSink:
         ):
             nonlocal captured_sink
             captured_sink = sink
-            client = AsyncMock(spec=JackeryLocalMqttClient)
-            return client
+            return AsyncMock(spec=JackeryLocalMqttClient)
 
         with patch(
             "custom_components.jackery_solarvault.JackeryLocalMqttClient",
@@ -561,8 +555,7 @@ class TestLocalMqttSink:
         ):
             nonlocal captured_sink
             captured_sink = sink
-            client = AsyncMock(spec=JackeryLocalMqttClient)
-            return client
+            return AsyncMock(spec=JackeryLocalMqttClient)
 
         with patch(
             "custom_components.jackery_solarvault.JackeryLocalMqttClient",
@@ -587,10 +580,7 @@ class TestRsaPkcs1V15Encrypt:
         import base64
 
         from cryptography.hazmat.primitives.asymmetric import ec
-        from cryptography.hazmat.primitives.serialization import (
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -612,10 +602,7 @@ class TestRsaPkcs1V15Encrypt:
         import base64
 
         from cryptography.hazmat.primitives.asymmetric import rsa
-        from cryptography.hazmat.primitives.serialization import (
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -645,10 +632,7 @@ class TestRsaPkcs1V15Encrypt:
         import base64
 
         from cryptography.hazmat.primitives.asymmetric import ec
-        from cryptography.hazmat.primitives.serialization import (
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
             from custom_components.jackery_solarvault.client.api import (

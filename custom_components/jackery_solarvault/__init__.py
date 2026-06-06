@@ -1,63 +1,62 @@
 """Jackery SolarVault integration."""
 
 import asyncio
+from collections.abc import Iterable
 import contextlib
+from datetime import timedelta
 import logging
 import re
-from collections.abc import Iterable
-from datetime import timedelta
 from typing import cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD
-from homeassistant.const import CONF_USERNAME
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_registry as er
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import JackeryApi
-from .api import JackeryAuthError
-from .api import JackeryError
-from .const import CALCULATED_POWER_SENSOR_SUFFIXES
-from .const import CONF_CREATE_CALCULATED_POWER_SENSORS
-from .const import CONF_CREATE_SAVINGS_DETAIL_SENSORS
-from .const import CONF_CREATE_SMART_METER_DERIVED_SENSORS
-from .const import CONF_MQTT_MAC_ID
-from .const import CONF_REGION_CODE
-from .const import CONF_THIRD_PARTY_MQTT_ENABLE
-from .const import CONF_THIRD_PARTY_MQTT_IP
-from .const import CONF_THIRD_PARTY_MQTT_PASSWORD
-from .const import CONF_THIRD_PARTY_MQTT_PORT
-from .const import CONF_THIRD_PARTY_MQTT_TOKEN
-from .const import CONF_THIRD_PARTY_MQTT_USERNAME
-from .const import CT_PERIOD_SENSOR_SUFFIXES
-from .const import DEFAULT_CREATE_CALCULATED_POWER_SENSORS
-from .const import DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS
-from .const import DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS
-from .const import DEFAULT_SCAN_INTERVAL_SEC
-from .const import DEFAULT_THIRD_PARTY_MQTT_ENABLE
-from .const import DEFAULT_THIRD_PARTY_MQTT_IP
-from .const import DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-from .const import DEFAULT_THIRD_PARTY_MQTT_PORT
-from .const import DEFAULT_THIRD_PARTY_MQTT_TOKEN
-from .const import DEFAULT_THIRD_PARTY_MQTT_USERNAME
-from .const import DOMAIN
-from .const import DUPLICATE_BINARY_SENSOR_SUFFIXES
-from .const import PLATFORMS
-from .const import REMOVED_SENSOR_SUFFIXES
-from .const import SAVINGS_DETAIL_SENSOR_SUFFIXES
-from .const import SMART_METER_DERIVED_SENSOR_SUFFIXES
-from .const import STALE_ENERGY_HELPER_PREFIX
-from .const import STALE_HELPER_VENDOR_TOKENS
-from .const import STALE_NET_POWER_SUFFIX
+from .api import JackeryApi, JackeryAuthError, JackeryError
+from .const import (
+    CALCULATED_POWER_SENSOR_SUFFIXES,
+    CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_MQTT_MAC_ID,
+    CONF_REGION_CODE,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
+    CT_PERIOD_SENSOR_SUFFIXES,
+    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_SCAN_INTERVAL_SEC,
+    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+    DEFAULT_THIRD_PARTY_MQTT_IP,
+    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
+    DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
+    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
+    DOMAIN,
+    DUPLICATE_BINARY_SENSOR_SUFFIXES,
+    PLATFORMS,
+    REMOVED_SENSOR_SUFFIXES,
+    SAVINGS_DETAIL_SENSOR_SUFFIXES,
+    SMART_METER_DERIVED_SENSOR_SUFFIXES,
+    STALE_ENERGY_HELPER_PREFIX,
+    STALE_HELPER_VENDOR_TOKENS,
+    STALE_NET_POWER_SUFFIX,
+)
 from .coordinator import JackerySolarVaultCoordinator
 from .services import async_setup_services
-from .util import config_entry_bool_option
-from .util import config_entry_int_option
-from .util import config_entry_str_option
+from .util import (
+    config_entry_bool_option,
+    config_entry_int_option,
+    config_entry_str_option,
+)
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -290,7 +289,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # type to ``T | BaseException``; the cast surfaces that contract for
         # mypy without changing runtime behaviour.
         refresh_result, mqtt_result = cast(
-            tuple[None | BaseException, None | BaseException],
+            tuple[BaseException | None, BaseException | None],
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
@@ -355,7 +354,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
         lowered = entity_id.lower()
         state = hass.states.get(entity_id)
         unit = None if state is None else state.attributes.get("unit_of_measurement")
-        if unit not in (None, ""):
+        if unit not in {None, ""}:
             continue
 
         # Only stale helpers that explicitly reference this integration should

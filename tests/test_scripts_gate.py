@@ -8,8 +8,8 @@ project scripts being on disk.
 """
 
 import importlib.util
-import sys
 from pathlib import Path
+import sys
 from types import ModuleType
 
 import pytest
