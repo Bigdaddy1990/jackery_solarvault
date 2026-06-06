@@ -75,14 +75,14 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryAuthError  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client import JackeryAuthError
 
     assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryError  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client import JackeryError
 
     assert JackeryError is not None
 

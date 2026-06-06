@@ -77,7 +77,7 @@ def test_accessory_id_none_without_smart_meter() -> None:
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
-    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER
     from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
         JackerySolarVaultCoordinator,
     )

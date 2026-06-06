@@ -50,7 +50,7 @@ async def test_user_flow_happy_path(
 
 async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
     """A login rejection must surface as an invalid_auth form error."""
-    from custom_components.jackery_solarvault.client.api import JackeryAuthError  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.api import JackeryAuthError
 
     with patch(
         "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
@@ -73,7 +73,7 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
 
     Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
     """
-    from custom_components.jackery_solarvault.client.api import JackeryError  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.api import JackeryError
 
     with patch(
         "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
@@ -124,7 +124,7 @@ async def test_reauth_flow_updates_password_and_reloads(
     mock_jackery_login: None,
 ) -> None:
     """A successful reauth must update the existing entry password."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: PLC0415
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -158,7 +158,7 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
     hass: HomeAssistant,
 ) -> None:
     """Options flow must persist the local MQTT topic-filter option and default it to empty."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: PLC0415
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -184,7 +184,7 @@ async def test_options_flow_accepts_local_mqtt_topic_filter_value(
     hass: HomeAssistant,
 ) -> None:
     """Options flow must store user-provided local MQTT topic filters."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: PLC0415
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
