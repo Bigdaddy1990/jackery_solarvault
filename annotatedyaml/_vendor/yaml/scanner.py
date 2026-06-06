@@ -722,12 +722,12 @@ class Scanner:  # noqa: D101, PLR0904
                 return True
         return None
 
-    def check_block_entry(self):  # noqa: ANN201, D102
+    def check_block_entry(self) -> bool:  # noqa: ANN201, D102
 
         # BLOCK-ENTRY:      '-' (' '|'\n')
         return self.peek(1) in "\0 \t\r\n\x85\u2028\u2029"
 
-    def check_key(self):  # noqa: ANN201, D102
+    def check_key(self) -> bool:  # noqa: ANN201, D102
 
         # KEY(flow context):    '?'
         if self.flow_level:
@@ -736,7 +736,7 @@ class Scanner:  # noqa: D101, PLR0904
         # KEY(block context):   '?' (' '|'\n')
         return self.peek(1) in "\0 \t\r\n\x85\u2028\u2029"
 
-    def check_value(self):  # noqa: ANN201, D102
+    def check_value(self) -> bool:  # noqa: ANN201, D102
 
         # VALUE(flow context):  ':'
         if self.flow_level:
