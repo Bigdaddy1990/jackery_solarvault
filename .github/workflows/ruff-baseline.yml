@@ -30,9 +30,19 @@ jobs:
           ruff check . --show-fixes
           ruff check . --add-noqa
           ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501","PLC0415"
-          ruff check . --preview
           ruff check . --output-format=github
           ruff format .
+          ruff check .tests --fix
+          ruff check .tests --fix --unsafe-fixes
+          ruff check .tests --unsafe-fixes 
+          ruff check .tests --target-version py314 
+          ruff check .tests --preview
+          ruff check .tests --line-length 88
+          ruff check .tests --show-fixes
+          ruff check .tests --add-noqa
+          ruff check .tests --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501","PLC0415"
+          ruff check .tests --output-format=github
+          ruff format .tests
           pre-commit run --all-files
           pre-commit run --hook-stage manual python-typing-update --check --ruff
 
