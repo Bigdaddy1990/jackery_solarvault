@@ -9,7 +9,7 @@
     "NL",
     "FR"
   ],
-  "homeassistant": "2025.8.0",
+  "homeassistant": "2026.6.0",
   "name": "Jackery SolarVault",
   "zip_release": false
 }
