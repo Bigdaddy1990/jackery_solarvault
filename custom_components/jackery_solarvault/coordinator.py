@@ -16,7 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import JackeryApiError, JackeryAuthError, JackeryError
+from .client import JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_BIND_SMART_PART,
@@ -1172,7 +1172,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._ble_listener = None
 
     # ------------------------------------------------------------------
-    # BLE transport (experimental, Phase 3a)
+    # BLE transport
     # ------------------------------------------------------------------
 
     def _ble_writes_enabled(self) -> bool:
@@ -6332,11 +6332,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return last_value
             try:
                 value = await fetcher()
-            except JackeryAuthError, JackeryApiError:
+            except JackeryAuthError:
+                # Credential rejection must propagate so HA can trigger reauth.
                 raise
             except (
                 Exception
             ):  # broad catch so one endpoint never kills sibling tasks in a gather
+                # Transient request failures (JackeryApiError: timeouts, 5xx,
+                # malformed payloads) fall back to the cached value or default
+                # instead of failing the whole refresh / config-entry setup.
                 _LOGGER.exception("%s failed", cache_key)
                 if entry is not None:
                     return entry[1]
@@ -7189,7 +7193,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         diag["coordinator_polling_seconds"] = int(
             self._configured_update_interval.total_seconds()
         )
-        diag["tls_certificate_verification"] = "enabled"
+        # Reflect the real TLS posture (see docs/STRICT_WORK_INSTRUCTIONS.md §2):
+        # chain + hostname verification always on; VERIFY_X509_STRICT is cleared
+        # because Jackery's broker cert lacks the Authority Key Identifier.
+        if diag.get("tls_x509_strict_disabled"):
+            diag["tls_certificate_verification"] = (
+                "chain_hostname_enabled_x509_strict_disabled"
+            )
+        else:
+            diag["tls_certificate_verification"] = "chain_hostname_enabled"
         diag["tls_insecure_warning"] = None
         diag["skipped_refresh_ticks"] = self._skipped_refresh_ticks
         diag["stale_battery_packs_dropped"] = self._stale_battery_packs_dropped

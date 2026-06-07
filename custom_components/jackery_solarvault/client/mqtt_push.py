@@ -128,6 +128,7 @@ class JackeryMqttPushClient:
         self._consecutive_auth_failures = 0
         self._consecutive_connect_failures = 0
         self._tls_custom_ca_loaded = False
+        self._tls_x509_strict_disabled = False
         self._tls_certificate_source = "not_built"
         self._stopping = False
         self._message_tasks: deque[asyncio.Task[None]] = deque(
@@ -577,7 +578,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and `verify_mode = ssl.CERT_REQUIRED`.
         """  # noqa: E501, RUF100
-        ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+        ctx = ssl.create_default_context()
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
 
@@ -601,6 +602,24 @@ class JackeryMqttPushClient:
 
         ctx.check_hostname = True
         ctx.verify_mode = ssl.CERT_REQUIRED
+
+        # Jackery's broker certificate is missing the Authority Key Identifier
+        # extension that strict X.509 validation (default in OpenSSL 3.x /
+        # Python >=3.10) enforces, so the handshake fails with
+        # "[SSL: CERTIFICATE_VERIFY_FAILED] Missing Authority Key Identifier".
+        # Clear ONLY VERIFY_X509_STRICT — chain verification, hostname
+        # verification (check_hostname) and signature verification
+        # (CERT_REQUIRED) all stay enforced. No CERT_NONE / insecure fallback.
+        # See docs/STRICT_WORK_INSTRUCTIONS.md §2.
+        self._tls_x509_strict_disabled = False
+        strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
+        if strict_flag is not None and ctx.verify_flags & strict_flag:
+            ctx.verify_flags &= ~strict_flag
+            self._tls_x509_strict_disabled = True
+            _LOGGER.info(
+                "Jackery MQTT TLS: cleared VERIFY_X509_STRICT (broker cert lacks "
+                "Authority Key Identifier); chain + hostname verification stay on"
+            )
 
         if hasattr(ssl, "TLSVersion"):
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -785,6 +804,7 @@ class JackeryMqttPushClient:
             "consecutive_connect_failures": self._consecutive_connect_failures,
             "last_connect_failure_signature": self._last_connect_failure_signature,
             "tls_insecure": False,
+            "tls_x509_strict_disabled": self._tls_x509_strict_disabled,
             "tls_custom_ca_loaded": self._tls_custom_ca_loaded,
             "tls_certificate_source": self._tls_certificate_source,
             "library": MQTT_CLIENT_LIBRARY,

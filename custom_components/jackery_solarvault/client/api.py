@@ -1,9 +1,9 @@
 """Async API client for the Jackery SolarVault cloud (iot.jackeryapp.com).
 
-Endpoint paths and polling rules are mirrored from PROTOCOL.md §2.
-MQTT command details are documented separately in PROTOCOL.md §3.
+Endpoint paths and polling rules below.
+MQTT API BLE commands and details are documented separately.
 
-Auth:     /v1/auth/login              (AES-128-ECB + RSA-1024 hybrid)
+Auth:     /v1/auth/login              (AES-128-ECB + RSA-1024 hybrid) 
 Systems:  /v1/device/system/list      (no params)
 Device:   /v1/device/property         (?deviceId=<long>)
 Alarms:   /v1/api/alarm               (?systemId=<long>)
@@ -1026,7 +1026,10 @@ class JackeryApi:  # noqa: PLR0904
     async def async_get_device_statistic(self, device_id: str | int) -> dict[str, Any]:
         """Retrieve current-day energy flow statistics for the specified device.
 
-        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. Keys present may vary by device and backend response.
+        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). 
+        Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, 
+        `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. 
+        Keys present may vary by device and backend response.
 
         Returns:
             dict: Mapping of statistic keys to their values as strings in kWh.
@@ -1049,7 +1052,9 @@ class JackeryApi:  # noqa: PLR0904
     ) -> dict[str, Any]:
         """Fetch period-based chart data for a specific device and date range.
 
-        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
+        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. 
+        An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, 
+        excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
 
         Parameters:
             path (str): Endpoint path to query.
@@ -1620,7 +1625,7 @@ class JackeryApi:  # noqa: PLR0904
         return bool(data.get(FIELD_DATA))
 
     # ------------------------------------------------------------------
-    # Experimental app-captured writers
+    # app-captured writers
     # ------------------------------------------------------------------
     # These endpoints were discovered via PCAPdroid captures but only failed
     # responses have been seen so far. They're kept as best-effort helpers;
