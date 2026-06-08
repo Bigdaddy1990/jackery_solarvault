@@ -14,9 +14,11 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-import asyncio
-from typing import TYPE_CHECKING, Any, Final
+from __future__ import annotations
 
+from typing import Any, Final
+
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -27,33 +29,29 @@ from .const import (
     MQTT_SESSION_USER_ID,
 )
 
-if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
 _KEY_ENTRIES: Final = "entries"
 _KEY_CACHED_AT: Final = "cached_at"
 
-# Serializes concurrent save/clear calls so a resurrected entry
-# never silently overwrites a just-cleared one.
-_CACHE_LOCK = asyncio.Lock()
-
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Return the HA Store backing the MQTT-session cache."""
+    """Get the Store configured for persisting the MQTT session cache.
+
+    Returns:
+        A Store[dict[str, Any]] configured with the module's storage key and storage version.
+    """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
-async def async_load_mqtt_session(  # noqa: PLR0911
+async def async_load_mqtt_session(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """Return cached MQTT session fields for ``entry_id`` or ``None``.
+    """Load cached MQTT session credentials for the given config entry from persistent storage.
 
-    The returned dict contains string-typed values for ``user_id``, ``seed_b64``
-    and ``mac_id`` plus optional ``mac_id_source``. Returns ``None`` when any
-    of the three mandatory fields is missing — partial cache rows are not
-    useful because the AES password derivation needs all three.
+    Returns:
+        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` if present.
+        None: If storage is missing or malformed, or any required field is missing or empty.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -84,7 +82,7 @@ async def async_load_mqtt_session(  # noqa: PLR0911
     return result
 
 
-async def async_save_mqtt_session(  # noqa: PLR0913
+async def async_save_mqtt_session(
     hass: HomeAssistant,
     entry_id: str,
     *,
@@ -94,49 +92,53 @@ async def async_save_mqtt_session(  # noqa: PLR0913
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """Persist the MQTT session fields for ``entry_id``.
+    """Persist MQTT session fields for a config entry.
 
-    A subsequent successful login that returns different credentials overwrites
-    the row; this is the same shape the in-memory ``JackeryApi`` fields take.
+    Stores the `userId`, base64 `mqttPassWord` seed, and `macId` for `entry_id` in the integration's Home Assistant storage, overwriting any existing row.
+
+    Parameters:
+        entry_id (str): The config entry identifier to associate the cached session with.
+        user_id (str): `userId` returned by the Jackery cloud (used for MQTT clientId/username).
+        seed_b64 (str): Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
+        mac_id (str): `macId` broker session identifier.
+        mac_id_source (str | None): Optional human-readable source or provenance of `mac_id`.
+        cached_at (float | None): Optional UNIX timestamp (seconds) when the session was cached.
     """
-    async with _CACHE_LOCK:
-        store = _store(hass)
-        data = await store.async_load()
-        if not isinstance(data, dict):
-            data = {}
-        entries = data.get(_KEY_ENTRIES)
-        if not isinstance(entries, dict):
-            entries = {}
-        row: dict[str, Any] = {
-            MQTT_SESSION_USER_ID: user_id,
-            MQTT_SESSION_SEED_B64: seed_b64,
-            MQTT_SESSION_MAC_ID: mac_id,
-        }
-        if mac_id_source:
-            row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
-        if cached_at is not None:
-            row[_KEY_CACHED_AT] = cached_at
-        entries[entry_id] = row
-        data[_KEY_ENTRIES] = entries
-        await store.async_save(data)
+    store = _store(hass)
+    data = await store.async_load()
+    if not isinstance(data, dict):
+        data = {}
+    entries = data.get(_KEY_ENTRIES)
+    if not isinstance(entries, dict):
+        entries = {}
+    row: dict[str, Any] = {
+        MQTT_SESSION_USER_ID: user_id,
+        MQTT_SESSION_SEED_B64: seed_b64,
+        MQTT_SESSION_MAC_ID: mac_id,
+    }
+    if mac_id_source:
+        row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
+    if cached_at is not None:
+        row[_KEY_CACHED_AT] = cached_at
+    entries[entry_id] = row
+    data[_KEY_ENTRIES] = entries
+    await store.async_save(data)
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the cached MQTT session for ``entry_id``.
+    """Remove the cached MQTT session row for the given config entry.
 
-    Called after the broker explicitly rejects cached credentials so the next
-    setup pass forces a fresh login instead of replaying stale values.
+    Performs no action if the storage layout or the entry's row does not exist.
     """
-    async with _CACHE_LOCK:
-        store = _store(hass)
-        data = await store.async_load()
-        if not isinstance(data, dict):
-            return
-        entries = data.get(_KEY_ENTRIES)
-        if not isinstance(entries, dict):
-            return
-        if entry_id not in entries:
-            return
-        entries.pop(entry_id, None)
-        data[_KEY_ENTRIES] = entries
-        await store.async_save(data)
+    store = _store(hass)
+    data = await store.async_load()
+    if not isinstance(data, dict):
+        return
+    entries = data.get(_KEY_ENTRIES)
+    if not isinstance(entries, dict):
+        return
+    if entry_id not in entries:
+        return
+    entries.pop(entry_id, None)
+    data[_KEY_ENTRIES] = entries
+    await store.async_save(data)

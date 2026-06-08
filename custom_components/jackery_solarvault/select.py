@@ -10,6 +10,8 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
+from __future__ import annotations  # noqa: TID251
+
 from dataclasses import dataclass, field
 import logging
 import re
@@ -17,7 +19,6 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .const import (
@@ -138,7 +139,7 @@ def _storm_minutes_value(  # noqa: PLR0912
 
     Returns:
         int | None: The storm lead time in minutes when a valid value is found, or `None` if no valid value is present.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
         raw = properties.get(key)
@@ -184,7 +185,7 @@ def _storm_minutes_fallback(
 
     Returns:
         int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     raw = properties.get(FIELD_WPS)
     if raw is None:
         raw = weather_plan.get(FIELD_WPS)
@@ -279,7 +280,7 @@ def _price_mode_current_int(entity: JackerySelect) -> int | None:
         raw = task_plan_value(
             entity._task_plan,  # noqa: SLF001
             FIELD_DYNAMIC_OR_SINGLE,
-            FIELD_PRICE_MODE,
+            FIELD_PRICE_MODE,  # noqa: RUF100, SLF001
         )
     if raw is None:
         work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))  # noqa: SLF001
@@ -431,7 +432,7 @@ async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
         entity._device_id,  # noqa: SLF001
-        _OPTION_TO_TEMP_UNIT[option],
+        _OPTION_TO_TEMP_UNIT[option],  # noqa: RUF100, SLF001
     )
 
 
@@ -529,8 +530,6 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
         await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)  # noqa: SLF001
     elif mode == 2:  # noqa: PLR2004
         await entity.coordinator.async_set_price_mode_single(entity._device_id)  # noqa: SLF001
-    else:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 def _price_provider_options(entity: JackerySelect) -> list[str]:
@@ -588,7 +587,9 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
             "entity_action_failed",
             error="ct meter payload missing",
         )
-    ct_sn = str(ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or "").strip()
+    ct_sn = str(
+        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ct.get("deviceSn") or ""
+    ).strip()
     if not ct_sn:
         _raise_select_action_error(
             entity,
@@ -682,7 +683,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         hass (HomeAssistant): Home Assistant core instance.
         entry (JackeryConfigEntry): Config entry whose runtime_data provides the coordinator and device payloads.
         async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -705,7 +706,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -747,7 +748,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[SelectEntity]: Created JackerySelect instances for eligible devices.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             supports_advanced = coordinator.device_supports_advanced(dev_id)
@@ -760,12 +761,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
-    @callback
     def _add_new_entities() -> None:
         """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
 
         When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature; if the signature is unchanged, take no action.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

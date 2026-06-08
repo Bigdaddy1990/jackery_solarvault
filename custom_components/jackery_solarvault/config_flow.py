@@ -10,40 +10,35 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
-
-    DhcpServiceInfo = Any
-    MqttServiceInfo = Any
-    ZeroconfServiceInfo = Any
-
-from .client import JackeryApi, JackeryAuthError, JackeryError
+from .client.api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_BLE_WRITES,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     CONF_ENABLE_MONTH_STATISTICS,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_HOST,
+    CONF_LOCAL_MQTT_PASSWORD,
+    CONF_LOCAL_MQTT_PORT,
+    CONF_LOCAL_MQTT_USERNAME,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
-    DEFAULT_ENABLE_BLE_WRITES,
     DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     DEFAULT_ENABLE_MONTH_STATISTICS,
-    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
     DEFAULT_ENABLE_WEEK_STATISTICS,
     DEFAULT_ENABLE_YEAR_STATISTICS,
+    DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_LOCAL_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
@@ -59,28 +54,42 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_USER,
 )
-from .mqtt_session_cache import async_clear_mqtt_session
 from .util import config_entry_bool_option
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 
 _LOGGER = logging.getLogger(__name__)
 
+# Options surface in the UI flow. Debug-only toggles
+# (``CONF_ENABLE_UNREDACTED_DIAGNOSTICS`` and ``CONF_ENABLE_PAYLOAD_DEBUG_LOG``)
+# are deliberately NOT listed here — sensitive logging is gated by the
+# ``JACKERY_DEV_MODE=1`` environment variable so it cannot be toggled
+# accidentally by users sharing diagnostics screenshots. See
+# ``util.dev_mode_redactions_disabled``.
 _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
     CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
-    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,  # noqa: E501, RUF100
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,  # noqa: E501
 }
 
 
-def _normalize_account(value: str) -> str:
+def _normalize_account(value: Any) -> str:  # noqa: ANN401
     """Normalize user-facing account identifiers before auth and unique IDs."""
-    return value.strip()
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _entry_text(entry: ConfigEntry, key: str) -> str:
+    """Return stored config-entry text without stringifying missing values."""
+    value = entry.data.get(key)
+    return value if isinstance(value, str) else ""
 
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
@@ -101,6 +110,72 @@ def _flow_options(
         key: user_input.get(key, current.get(key, default))
         for key, default in _OPTION_DEFAULTS.items()
     }
+
+
+def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
+    """Return current local-MQTT options with safe defaults."""
+    options: Mapping[str, Any] = entry.options
+    return {
+        CONF_LOCAL_MQTT_ENABLE: bool(
+            options.get(CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE)
+        ),
+        CONF_LOCAL_MQTT_HOST: str(options.get(CONF_LOCAL_MQTT_HOST, "") or ""),
+        CONF_LOCAL_MQTT_PORT: int(
+            options.get(CONF_LOCAL_MQTT_PORT, DEFAULT_LOCAL_MQTT_PORT)
+        ),
+        CONF_LOCAL_MQTT_USERNAME: str(options.get(CONF_LOCAL_MQTT_USERNAME, "") or ""),
+        CONF_LOCAL_MQTT_PASSWORD: str(options.get(CONF_LOCAL_MQTT_PASSWORD, "") or ""),
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
+            options.get(
+                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+            )
+            or ""
+        ).strip(),
+    }
+
+
+def _merge_local_mqtt_options(
+    user_input: dict[str, Any], current: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge user input with current local-MQTT options, preserving missing keys."""
+    return {
+        CONF_LOCAL_MQTT_ENABLE: bool(
+            user_input.get(CONF_LOCAL_MQTT_ENABLE, current[CONF_LOCAL_MQTT_ENABLE])
+        ),
+        CONF_LOCAL_MQTT_HOST: str(
+            user_input.get(CONF_LOCAL_MQTT_HOST, current[CONF_LOCAL_MQTT_HOST]) or ""
+        ).strip(),
+        CONF_LOCAL_MQTT_PORT: int(
+            user_input.get(CONF_LOCAL_MQTT_PORT, current[CONF_LOCAL_MQTT_PORT])
+        ),
+        CONF_LOCAL_MQTT_USERNAME: str(
+            user_input.get(CONF_LOCAL_MQTT_USERNAME, current[CONF_LOCAL_MQTT_USERNAME])
+            or ""
+        ),
+        CONF_LOCAL_MQTT_PASSWORD: str(
+            user_input.get(CONF_LOCAL_MQTT_PASSWORD, current[CONF_LOCAL_MQTT_PASSWORD])
+            or ""
+        ),
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
+            user_input.get(
+                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+            )
+            or ""
+        ).strip(),
+    }
+
+
+def _reconfigure_options(
+    entry: ConfigEntry,
+    user_input: dict[str, Any],
+) -> dict[str, Any]:
+    """Preserve non-form options during reconfigure updates."""
+    merged = dict(entry.options)
+    merged.update(_flow_options(user_input, _current_option_values(entry)))
+    merged.update(_current_local_mqtt_options(entry))
+    return merged
 
 
 USER_SCHEMA = vol.Schema({
@@ -135,11 +210,11 @@ class JackeryOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Step init."""
         current_options = _current_option_values(self.config_entry)
+        current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
-            return self.async_create_entry(
-                title="",
-                data=_flow_options(user_input, current_options),
-            )
+            merged = _flow_options(user_input, current_options)
+            merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
+            return self.async_create_entry(title="", data=merged)
 
         current_create_derived = current_options[
             CONF_CREATE_SMART_METER_DERIVED_SENSORS
@@ -151,10 +226,6 @@ class JackeryOptionsFlow(OptionsFlow):
             CONF_CREATE_SAVINGS_DETAIL_SENSORS
         ]
         current_enable_ble_transport = current_options[CONF_ENABLE_BLE_TRANSPORT]
-        current_enable_ble_writes = current_options[CONF_ENABLE_BLE_WRITES]
-        current_enable_unredacted_diagnostics = current_options[
-            CONF_ENABLE_UNREDACTED_DIAGNOSTICS
-        ]
         current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
         current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
         current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
@@ -179,14 +250,6 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_enable_ble_transport,
             ): bool,
             vol.Optional(
-                CONF_ENABLE_BLE_WRITES,
-                default=current_enable_ble_writes,
-            ): bool,
-            vol.Optional(
-                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
-                default=current_enable_unredacted_diagnostics,
-            ): bool,
-            vol.Optional(
                 CONF_ENABLE_WEEK_STATISTICS,
                 default=current_enable_week_statistics,
             ): bool,
@@ -202,6 +265,30 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
                 default=current_enable_derived_home_fallback,
             ): bool,
+            vol.Optional(
+                CONF_LOCAL_MQTT_ENABLE,
+                default=current_local_mqtt[CONF_LOCAL_MQTT_ENABLE],
+            ): bool,
+            vol.Optional(
+                CONF_LOCAL_MQTT_HOST,
+                default=current_local_mqtt[CONF_LOCAL_MQTT_HOST],
+            ): str,
+            vol.Optional(
+                CONF_LOCAL_MQTT_PORT,
+                default=current_local_mqtt[CONF_LOCAL_MQTT_PORT],
+            ): vol.All(int, vol.Range(min=1, max=65535)),
+            vol.Optional(
+                CONF_LOCAL_MQTT_USERNAME,
+                default=current_local_mqtt[CONF_LOCAL_MQTT_USERNAME],
+            ): str,
+            vol.Optional(
+                CONF_LOCAL_MQTT_PASSWORD,
+                default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+            ): str,
+            vol.Optional(
+                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+            ): str,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
@@ -211,38 +298,40 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_bluetooth(
-        self, discovery_info: BluetoothServiceInfoBleak
-    ) -> ConfigFlowResult:
+    @callback
+    def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
+        """Abort redundant discovery/re-discovery flows before prompting."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        if any(
+            progress.get("flow_id") != self.flow_id
+            for progress in self._async_in_progress()
+        ):
+            return self.async_abort(reason="already_in_progress")
+        return None
+
+    async def async_step_bluetooth(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
         """Handle Bluetooth discovery."""
-        await self.async_set_unique_id(discovery_info.address)
-        self._abort_if_unique_id_configured()
-        if self._async_current_entries():
-            return self.async_abort(reason="already_configured")
+        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
+            return abort_result
         return await self.async_step_user()
 
-    async def async_step_dhcp(
-        self, discovery_info: DhcpServiceInfo
-    ) -> ConfigFlowResult:
+    async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
         """Handle DHCP discovery."""
-        if self._async_current_entries():
-            return self.async_abort(reason="already_configured")
+        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
+            return abort_result
         return await self.async_step_user()
 
-    async def async_step_mqtt(
-        self, discovery_info: MqttServiceInfo
-    ) -> ConfigFlowResult:
+    async def async_step_mqtt(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
         """Handle MQTT discovery."""
-        if self._async_current_entries():
-            return self.async_abort(reason="already_configured")
+        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
+            return abort_result
         return await self.async_step_user()
 
-    async def async_step_zeroconf(
-        self, discovery_info: ZeroconfServiceInfo
-    ) -> ConfigFlowResult:
+    async def async_step_zeroconf(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
         """Handle Zeroconf discovery."""
-        if self._async_current_entries():
-            return self.async_abort(reason="already_configured")
+        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
+            return abort_result
         return await self.async_step_user()
 
     async def async_step_user(
@@ -252,7 +341,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            account = _normalize_account(user_input[CONF_USERNAME])
+            account = _normalize_account(user_input.get(CONF_USERNAME))
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
                 return self.async_show_form(
@@ -311,7 +400,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            account = _normalize_account(user_input[CONF_USERNAME])
+            account = _normalize_account(user_input.get(CONF_USERNAME))
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
             elif account.lower() != str(entry.unique_id or "").lower():
@@ -343,17 +432,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_USERNAME: account,
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
-                        options=_flow_options(
-                            user_input, _current_option_values(entry)
-                        ),
+                        options=_reconfigure_options(entry, user_input),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
 
         current_options = _current_option_values(entry)
+        stored_username = _entry_text(entry, CONF_USERNAME)
         schema = vol.Schema({
-            vol.Required(
-                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
-            ): vol.All(str, vol.Length(min=1)),
+            vol.Required(CONF_USERNAME, default=stored_username): vol.All(
+                str, vol.Length(min=1)
+            ),
             vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
             vol.Optional(
                 CONF_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -372,10 +460,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 default=current_options[CONF_ENABLE_BLE_TRANSPORT],
             ): bool,
             vol.Optional(
-                CONF_ENABLE_BLE_WRITES,
-                default=current_options[CONF_ENABLE_BLE_WRITES],
-            ): bool,
-            vol.Optional(
                 CONF_ENABLE_WEEK_STATISTICS,
                 default=current_options[CONF_ENABLE_WEEK_STATISTICS],
             ): bool,
@@ -391,16 +475,12 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
                 default=current_options[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK],
             ): bool,
-            vol.Optional(
-                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
-                default=current_options[CONF_ENABLE_UNREDACTED_DIAGNOSTICS],
-            ): bool,
         })
         return self.async_show_form(
             step_id=FLOW_STEP_RECONFIGURE,
             data_schema=schema,
             description_placeholders={
-                "username": str(entry.data.get(CONF_USERNAME, "")),
+                "username": stored_username,
             },
             errors=errors,
         )
@@ -420,12 +500,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
+        stored_username = _entry_text(entry, CONF_USERNAME)
+        if not stored_username:
+            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         if user_input is not None:
             session = async_get_clientsession(self.hass)
             api = JackeryApi(
                 session=session,
-                account=entry.data[CONF_USERNAME],
+                account=stored_username,
                 password=user_input[CONF_PASSWORD],
                 mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
                 region_code=entry.data.get(CONF_REGION_CODE),
@@ -438,17 +521,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
-                # The cloud may have rotated the MQTT seed on password change.
-                # Clear the cached session so the next setup derives fresh
-                # MQTT credentials from the new login instead of replaying
-                # a potentially stale AES-256 seed.
-                try:
-                    await async_clear_mqtt_session(self.hass, entry.entry_id)
-                except Exception:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "Jackery reauth: failed to clear MQTT session; "
-                        "proceeding with reload"
-                    )
                 return self.async_update_reload_and_abort(
                     entry,
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
@@ -461,7 +533,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
             }),
             description_placeholders={
-                "username": entry.data.get(CONF_USERNAME, ""),
+                "username": stored_username,
             },
             errors=errors,
         )

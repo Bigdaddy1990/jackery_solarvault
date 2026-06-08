@@ -3,15 +3,13 @@
 import calendar
 import contextlib
 from datetime import UTC, date, datetime, timedelta
-import functools
 import json
-import logging
 import math
 import operator
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -45,7 +43,6 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
-    APP_STAT_PV_PROFIT,
     APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
@@ -59,7 +56,6 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
-    APP_STAT_TOTAL_SOLAR_REVENUE,
     APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
     APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
     APP_STAT_UNIT,
@@ -73,7 +69,6 @@ from .const import (
     DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
-    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
@@ -131,14 +126,16 @@ from .const import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from datetime import tzinfo as TZInfo  # noqa: N812
-
-_LOGGER = logging.getLogger(__name__)
+    import logging
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
 _SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
+_DEV_MODE_CACHED: bool | None = None
+
+
+_WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
 
 
 def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
@@ -151,7 +148,7 @@ def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
 
     Returns:
         bool: The resolved boolean value (`true` or `false`), or `default` if the value is missing or not parseable.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -173,7 +170,7 @@ def config_entry_str_option(entry: object, key: str, default: str) -> str:
 
     Returns:
         str: The resolved option value coerced to `str`, or `default` when unset.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -194,7 +191,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
 
     Returns:
         int: The resolved integer option or `default` if not present or not convertible.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -236,9 +233,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(
-    value: Any,  # noqa: ANN401, RUF100
-) -> datetime:  # arbitrary payload timestamp, coerced at runtime
+def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401  # arbitrary payload timestamp, coerced at runtime
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
 
     Parameters:
@@ -249,7 +244,7 @@ def parse_utc_datetime(
 
     Raises:
         ValueError: If the input is an empty string, an unsupported type, or an invalid timestamp/ISO string.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -295,7 +290,7 @@ def coordinator_entity_signature(
         tuple[tuple[Any, ...], ...]: A tuple of per-device signature tuples. Each entry preserves the device ID and includes,
         in order: a tuple of smart-plug serials, battery pack count, a tuple of meter-head serials, a boolean indicating presence of an
         alarm payload, a boolean indicating presence of an OTA current version, and a boolean indicating presence of a CT meter.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not coordinator_data:
         return ()
     sig: list[Any] = []
@@ -338,7 +333,7 @@ def append_unique_entity(
 
     Returns:
         `True` if the entity was appended, `False` if it was skipped due to a duplicate `unique_id`.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         logger.debug("Skip duplicate %s unique_id=%s", platform, uid)
@@ -365,10 +360,10 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
 
     Returns:
         tuple[date, date]: (begin_date, end_date) for the requested period, inclusive.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     date_type = validate_app_period_date_type(date_type)
     if today is None:
-        today = datetime.now(tz=UTC).date()
+        today = date.today()  # noqa: DTZ011
     if date_type == DATE_TYPE_DAY:
         return today, today
     if date_type == DATE_TYPE_WEEK:
@@ -381,7 +376,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     return today.replace(month=1, day=1), today.replace(month=12, day=31)
 
 
-def _app_period_bound_to_date(value: str | date | datetime, *, field_name: str) -> date:
+def _app_period_bound_to_date(value: str | date, *, field_name: str) -> date:
     """Return a validated ISO date bound for a Jackery app period request."""
     if isinstance(value, datetime):
         return value.date()
@@ -419,7 +414,7 @@ def app_period_date_bounds(
 
     Raises:
         ValueError: If inputs are invalid for a date bound or if the resolved begin date is after the resolved end date.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -483,9 +478,7 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def safe_float(  # noqa: PLR0911
-    value: Any,  # noqa: ANN401, RUF100
-) -> float | None:  # arbitrary payload value, coerced at runtime
+def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
 
     Parameters:
@@ -495,7 +488,7 @@ def safe_float(  # noqa: PLR0911
 
     Returns:
         float_value (float | None): The parsed float on success, or `None` if `value` is `None` or cannot be converted.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if value is None:
         return None
     if isinstance(value, str):
@@ -516,7 +509,7 @@ def safe_float(  # noqa: PLR0911
         return None
 
 
-def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
+def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
     """Convert a value to an integer when possible.
 
     Returns None for a None input or when the value cannot be converted to an integer.
@@ -524,54 +517,17 @@ def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at r
     Returns:
         int: The converted integer if successful, `None` otherwise.
     """
-    if value is None or isinstance(value, bool):
+    if value is None:
         return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value) if value.is_integer() else None
-    if isinstance(value, str):
-        candidate = value.strip()
-        if not candidate:
-            return None
-        signless = candidate.removeprefix("-").removeprefix("+")
-        if not signless.isdigit():
-            return None
-        try:
-            return int(candidate)
-        except ValueError:
-            return None
     try:
         return int(value)
     except TypeError, ValueError:
-        return None
+        try:
+            return int(float(value))
+        except TypeError, ValueError:
+            return None
 
 
-def first_nonblank_int(value: object) -> int | None:
-    """Return the first integer-parseable, non-blank token of ``value``.
-
-    Accepts a scalar or a whitespace/comma-separated string and returns the
-    first token that parses as an integer, or None when the value is
-    None/blank/unparseable. Used by the cloud client to coerce loosely typed
-    id/code fields that may arrive as zero-padded or whitespace-wrapped strings.
-    """
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    text = str(value).strip()
-    if not text:
-        return None
-    for token in text.replace(",", " ").split():
-        parsed = safe_int(token)
-        if parsed is not None:
-            return parsed
-    return None
-
-
-@functools.cache
 def dev_mode_redactions_disabled() -> bool:
     """Indicates whether developer-mode redactions are disabled based on the JACKERY_DEV_MODE environment variable.
 
@@ -579,9 +535,12 @@ def dev_mode_redactions_disabled() -> bool:
 
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
-    """  # noqa: E501, RUF100
-    raw = os.environ.get(_DEV_MODE_ENV, "")
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    """  # noqa: E501
+    global _DEV_MODE_CACHED  # noqa: PLW0603
+    if _DEV_MODE_CACHED is None:
+        raw = os.environ.get(_DEV_MODE_ENV, "")
+        _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
+    return _DEV_MODE_CACHED
 
 
 def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
@@ -592,7 +551,7 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
 
     Returns:
         bool: `True` if redactions are disabled, `False` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if dev_mode_redactions_disabled():
         return True
     if entry is None:
@@ -604,10 +563,7 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
     )
 
 
-def _payload_debug_redacted(
-    value: Any,  # noqa: ANN401, RUF100
-    redactions_disabled: bool | None = None,
-) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401, RUF100
+def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Create a JSON-serializable copy of `value` with sensitive fields redacted.
 
     When `redactions_disabled` is True (or when omitted and diagnostics redactions are disabled), returns a normalized passthrough of `value`. Otherwise, recursively replaces values for keys listed in `REDACT_KEYS` with `REDACTED_VALUE`, preserves overall structure, and converts tuples to lists so the result is JSON-serializable.
@@ -619,7 +575,7 @@ def _payload_debug_redacted(
 
     Returns:
         Any: A redacted, JSON-serializable representation of `value` (or a normalized passthrough when redactions are disabled).
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if redactions_disabled is None:
         redactions_disabled = diagnostic_redactions_disabled()
     if redactions_disabled:
@@ -645,9 +601,7 @@ def _payload_debug_redacted(
     return value
 
 
-def _payload_debug_passthrough(
-    value: Any,  # noqa: ANN401, RUF100
-) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401, RUF100
+def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Normalize a nested structure into JSON-serializable types.
 
     Converts mapping keys to strings and converts tuples to lists while recursively
@@ -673,17 +627,17 @@ def _payload_debug_passthrough(
     return value
 
 
-def redacted_json_safe_payload(
-    value: Any,  # noqa: ANN401, RUF100
-) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401, RUF100
+def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
     The redaction is applied recursively to nested dicts/lists/tuples while preserving the overall structure and types that are JSON-serializable.
 
     Returns:
         Any: The input value converted into a JSON-safe structure with sensitive fields replaced by the module's redaction marker.
-    """  # noqa: E501, RUF100
-    return _payload_debug_redacted(value, redactions_disabled=False)
+    """  # noqa: E501
+    return _payload_debug_redacted(
+        value, redactions_disabled=diagnostic_redactions_disabled()
+    )
 
 
 def active_redact_keys(entry: object | None = None) -> frozenset[str]:
@@ -694,7 +648,7 @@ def active_redact_keys(entry: object | None = None) -> frozenset[str]:
 
     Returns:
         frozenset[str]: An empty set when redactions are disabled, otherwise a frozenset containing the keys that must be redacted (`REDACT_KEYS`).
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if diagnostic_redactions_disabled(entry):
         return frozenset()
     return frozenset(REDACT_KEYS)
@@ -712,7 +666,7 @@ def chart_series_debug(source: object) -> dict[str, Any]:
         dict[str, Any]: Mapping of chart-series keys to diagnostics objects as described above.
         When present in the source, includes top-level `labels` (from `APP_CHART_LABELS`) and `request`
         (from `APP_REQUEST_META`) entries.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not isinstance(source, dict):
         return {}
     result: dict[str, Any] = {}
@@ -765,7 +719,7 @@ def append_payload_debug_line(
         path (str | Path): Path to the JSONL file to append. Parent directories will be created if missing.
         event (dict[str, Any]): Event payload to serialize and write (will be redacted unless redactions are disabled).
         redactions_disabled (bool | None): When `True`, write the event without redaction; when `False`, enforce redaction; when `None`, use the module's default redaction behavior.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
@@ -782,12 +736,12 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
+def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
     """Interpret a payload value as a boolean.
 
     Returns:
         `True` if the value represents a true state, `False` if it represents a false state, `None` if the value is `None` or cannot be interpreted.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if value is None:
         return None
     if isinstance(value, bool):
@@ -814,7 +768,7 @@ def smart_plug_serial(plug: object) -> str | None:
 
     Returns:
         serial (str | None): The trimmed value from serial fields, falling back to cloud id fields for Shelly Cloud sockets.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not isinstance(plug, dict):
         return None
     raw = (
@@ -839,7 +793,7 @@ def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
 
     Returns:
         list[dict[str, Any]]: The input entries that contain a stable identity (as determined by `smart_plug_serial`), sorted ascending by that identity. Entries without an identity are omitted.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not isinstance(plugs, list):
         return []
     entries: list[tuple[str, dict[str, Any]]] = []
@@ -898,7 +852,7 @@ def jackery_online_state(value: object) -> bool | None:
 
     Returns:
         True if the marker indicates online, False if it indicates offline, None when the value cannot be interpreted.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"online", "connected", "available"}:
@@ -956,7 +910,7 @@ class AppDataQualityWarning(NamedTuple):
 
         Returns:
             dict[str, object]: Diagnostic dictionary containing required fields and any available optional fields.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         payload: dict[str, object] = {
             DATA_QUALITY_KEY_LEVEL: self.level,
             DATA_QUALITY_KEY_REASON: self.reason,
@@ -975,13 +929,26 @@ class AppDataQualityWarning(NamedTuple):
             payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
                 self.source_chart_series_key
             )
-        if self.reference_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
-                self.reference_chart_series_key
-            )
         if self.total_method is not None:
             payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
         return payload
+
+    # --- restored from 24.05\24.05\custom_components\jackery_solarvault\util.py ---
+    def _stat_source_shape(self: Any) -> tuple[tuple[str, str], ...]:
+        """Return keys that can change the statistic entity set."""
+        if not isinstance(self, dict):
+            return ()
+        shape: list[tuple[str, str]] = []
+        for key, value in self.items():
+            key_text = str(key)
+            if key_text.startswith("_") or value is None:
+                continue
+            if isinstance(value, list):
+                if any(safe_float(item) is not None for item in value):
+                    shape.append((key_text, "list"))
+                continue
+            shape.append((key_text, "value"))
+        return tuple(sorted(shape))
 
 
 def normalized_data_quality_warnings(
@@ -1053,14 +1020,14 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     source_text = "unknown" if source_value is None else str(source_value)
     reference_text = "unknown" if reference_value is None else str(reference_value)
 
-    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E501, RUF100
+    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E501
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
     reference_request = _format_request_range(
         warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST)
     )
 
     if source_request or reference_request:
-        text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"  # noqa: E501, RUF100
+        text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"  # noqa: E501
     return text
 
 
@@ -1081,14 +1048,7 @@ def verify_and_backfill(  # noqa: PLR0911, PLR0912
     - |cloud - local| > tolerance_fraction * cloud → min(cloud, local) with warning
       (implausible divergence; conservative choice avoids Energy Dashboard spikes).
     - Otherwise → cloud.
-
-    Parameters:
-        cloud_value: Value from the authoritative HTTP cloud endpoint.
-        local_value: Value from a local/fallback source (BLE, MQTT, or secondary endpoint).
-        label: Human-readable metric name for log messages.
-        tolerance_fraction: Relative divergence threshold (default 10 %).
-        on_rejection: Optional callback for diagnostics rejection counters.
-    """  # noqa: E501, RUF100
+    """
 
     def _record(reason: str) -> None:
         if on_rejection is not None:
@@ -1101,113 +1061,47 @@ def verify_and_backfill(  # noqa: PLR0911, PLR0912
             return None
         if math.isnan(local_value) or math.isinf(local_value) or local_value < 0:
             _record("invalid_local")
-            _LOGGER.debug(
-                "verify_and_backfill %s: rejecting invalid local value %.4f",
-                label,
-                local_value,
-            )
             return None
         return local_value
     if math.isinf(cloud_value):
         _record("invalid_cloud")
-        _LOGGER.debug(
-            "verify_and_backfill %s: rejecting infinite cloud value %.4f",
-            label,
-            cloud_value,
-        )
         return None
     if math.isnan(cloud_value) or cloud_value < 0:
         if local_value is None:
             _record("invalid_cloud")
-            _LOGGER.debug(
-                "verify_and_backfill %s: rejecting invalid cloud value %.4f",
-                label,
-                cloud_value,
-            )
             return None
         if math.isnan(local_value) or math.isinf(local_value) or local_value < 0:
             _record("invalid_cloud_and_local")
-            _LOGGER.debug(
-                "verify_and_backfill %s: rejecting invalid cloud=%.4f local=%.4f",
-                label,
-                cloud_value,
-                local_value,
-            )
             return None
-        _LOGGER.debug(
-            "verify_and_backfill %s: cloud=%.4f invalid; using local=%.4f",
-            label,
-            cloud_value,
-            local_value,
-        )
         return local_value
     if local_value is None:
         return cloud_value
     if math.isinf(local_value):
         _record("invalid_local")
-        _LOGGER.debug(
-            "verify_and_backfill %s: rejecting infinite local value %.4f",
-            label,
-            local_value,
-        )
         return None
     if math.isnan(local_value) or local_value < 0:
         _record("invalid_local")
-        _LOGGER.debug(
-            "verify_and_backfill %s: ignoring invalid local value %.4f",
-            label,
-            local_value,
-        )
         return cloud_value
     if math.isclose(cloud_value, 0.0) and math.isclose(local_value, 0.0):
         _record("zero_unconfirmed")
-        _LOGGER.debug(
-            "verify_and_backfill %s: rejecting unconfirmed zero values",
-            label,
-        )
         return None
     if math.isclose(cloud_value, 0.0) and local_value > 0:
         _record("cloud_zero_local_positive")
-        _LOGGER.debug(
-            "verify_and_backfill %s: cloud=0 but local=%.4f — "
-            "using local (cloud likely in boundary-reset window)",
-            label,
-            local_value,
-        )
         return local_value
     if cloud_value > 0:
         divergence = abs(cloud_value - local_value) / cloud_value
         if divergence > tolerance_fraction:
             chosen = min(cloud_value, local_value)
             _record("divergence")
-            _LOGGER.debug(
-                "verify_and_backfill %s: cloud=%.4f local=%.4f diverge %.0f%% > %.0f%% — "  # noqa: E501, RUF100
-                "using conservative min=%.4f",
-                label,
-                cloud_value,
-                local_value,
-                divergence * 100,
-                tolerance_fraction * 100,
-                chosen,
-            )
             return chosen
     return cloud_value
-
-
-# Earliest local hour at which a zero day-total is considered suspicious.
-# Before this, a 0 for "today" is normal (PV makes nothing overnight, little
-# has charged since local midnight), so the §2.2 §5 zero-confirmation rule must
-# not raise a repair issue — otherwise it fires a false positive every night.
-ZERO_CONFIRM_MIN_LOCAL_HOUR: Final = 20
 
 
 def app_data_quality_warnings(
     payload: dict[str, Any],
     *,
     today: date | None = None,
-    now: datetime | None = None,
     tolerance: float = 0.05,
-    zero_confirm_min_hour: int = ZERO_CONFIRM_MIN_LOCAL_HOUR,
 ) -> list[AppDataQualityWarning]:
     """Detect contradictory statistics in an app payload and produce structured warnings.
 
@@ -1219,18 +1113,15 @@ def app_data_quality_warnings(
     Parameters:
         payload (dict[str, Any]): App payload containing trend and statistic sections to inspect.
         today (date | None): Reference date used to determine "current" week/month/year boundaries; defaults to today.
-        now (datetime | None): Local wall-clock time used to gate the zero-confirm check on `now.hour`. Must be in the
-            HA local timezone (tz-aware) or naive local time — passing a UTC datetime causes the hour comparison to
-            use UTC hours instead of local hours, firing the gate at the wrong wall-clock time.
         tolerance (float): Absolute tolerance added to the smaller value when comparing totals; a warning is emitted only when
             left_value + tolerance < right_value.
 
     Returns:
         list[AppDataQualityWarning]: A list of deterministic warnings (possibly empty). Each warning includes rounded
         source/reference values (5 decimal places) and optional request and chart-series metadata for diagnostics.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if today is None:
-        today = datetime.now(tz=UTC).date()
+        today = date.today()  # noqa: DTZ011
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
     week_inside_current_month = (
         week_begin.year == today.year
@@ -1272,7 +1163,7 @@ def app_data_quality_warnings(
 
         Returns:
             str | None: The chart-series key for the given section and statistic when the section exists and contains a mapping; `None` otherwise.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
@@ -1301,7 +1192,7 @@ def app_data_quality_warnings(
 
         Side effects:
                 Appends a populated AppDataQualityWarning to the module-level `warnings` list. The warning includes chart-series key hints (derived from `stat_key`) and, when the source is not the overall statistic section, marks the total method as `"chart_series_sum"`.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -1325,8 +1216,6 @@ def app_data_quality_warnings(
                 else None,
             )
         )
-
-    day_in_current_week = True  # today is always within the current week
 
     for prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
         day = _period_total(prefix, DATE_TYPE_DAY, stat_key)
@@ -1379,13 +1268,7 @@ def app_data_quality_warnings(
             )
 
         # §2.2: day ≤ week — today's value cannot exceed the current week total.
-        if (
-            day_in_current_week
-            and week_inside_current_year
-            and week is not None
-            and day is not None
-            and week + tolerance < day
-        ):
+        if week is not None and day is not None and week + tolerance < day:
             _add_warning(
                 reason=DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY,
                 metric_key=metric_key,
@@ -1400,16 +1283,8 @@ def app_data_quality_warnings(
         # §2.2 §5: 0-value confirmation — flag when day=0 but week/month are
         # meaningfully non-zero, indicating a probable cloud boundary-reset zero
         # that has not been confirmed by an adjacent period.
-        #
-        # Gate on local time: overnight/early-morning a 0 day-total is normal
-        # (no PV yet, little charged since midnight), so the cloud returning an
-        # empty day-stat then is NOT an inconsistency. Only treat a zero day as
-        # suspicious once the local day is advanced enough that real data is
-        # expected. When ``now`` is unknown the guard is skipped (legacy/tests).
-        zero_confirm_ready = now is None or now.hour >= zero_confirm_min_hour
         if (
             day is not None  # noqa: PLR0916
-            and zero_confirm_ready
             and math.isclose(day, 0.0)
             and (
                 (week is not None and week > tolerance)
@@ -1431,7 +1306,7 @@ def app_data_quality_warnings(
                 ),
                 reference_value=week
                 if week is not None and week > tolerance
-                else (month or 0.0),
+                else month,  # type: ignore[arg-type]  # noqa: E501, RUF100
             )
 
     statistic = payload.get(PAYLOAD_STATISTIC)
@@ -1483,7 +1358,7 @@ def external_trend_statistic_id(
 
     Returns:
         str: A statistic id string in the form "<domain>:<device>_<metric>_<bucket>" where each part is normalized by `statistic_id_part`.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     return (
         f"{domain}:"
         f"{statistic_id_part(device_id)}_"
@@ -1510,7 +1385,7 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
 
     Returns:
         str | None: One of the `DATE_TYPE_*` suffix values when found, `None` if no date type can be determined.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
         date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
@@ -1535,7 +1410,7 @@ def _is_day_period_payload(source: dict[str, Any], section: str) -> bool:
 
     Returns:
         bool: `True` if the section/request date type is day, `False` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if section.endswith(f"_{DATE_TYPE_DAY}"):
         return True
     if section.endswith((
@@ -1551,15 +1426,12 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
     """Determine whether a section represents a device-level "year" period statistic.
 
     Returns:
-        `true` if the section's request dateType is year and the section name starts with a device statistic or trends prefix, `false` otherwise.
-    """  # noqa: E501, RUF100
+        `true` if the section's request dateType is year and the section name starts with a device statistic prefix (PV, home, battery, or CT), `false` otherwise.
+    """  # noqa: E501
     return _trend_date_type(section, source) == DATE_TYPE_YEAR and section.startswith((
         APP_SECTION_PV_STAT,
-        APP_SECTION_PV_TRENDS,
         APP_SECTION_HOME_STAT,
-        APP_SECTION_HOME_TRENDS,
         APP_SECTION_BATTERY_STAT,
-        APP_SECTION_BATTERY_TRENDS,
         APP_SECTION_CT_STAT,
     ))
 
@@ -1574,7 +1446,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
     Returns:
         tuple[float, float] | None: `(previous_part, current_part)` when the value can be
         interpreted, or `None` when the input is missing or invalid.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if value is None or isinstance(value, bool):
         return None
     text = str(value).strip().replace(",", ".")
@@ -1585,7 +1457,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
     unsigned = text.removeprefix("-")
     if "." not in unsigned:
         parsed = safe_float(value)
-        return None if parsed is None else (parsed, 0.0)
+        return None if parsed is None else (0.0, parsed)
 
     whole_text, fraction_text = unsigned.split(".", 1)
     if not whole_text:
@@ -1595,15 +1467,15 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
         return None if parsed is None else (0.0, parsed)
 
     whole = sign * float(int(whole_text))
-    fraction_int = int(fraction_text)
-    fraction = sign * (fraction_int / (10 ** len(fraction_text)))
+    fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
 
     if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
-        return whole, 0.0
+        parsed = safe_float(value)
+        return None if parsed is None else (0.0, parsed)
     return whole, fraction
 
 
-def expanded_year_series_values(  # noqa: PLR0911
+def expanded_year_series_values(
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -1620,7 +1492,7 @@ def expanded_year_series_values(  # noqa: PLR0911
             - If a documented scalar total (`stat_key`) is present, returns the expanded list only when its sum matches
               the documented total within a small tolerance; otherwise returns the raw series values.
             - If the series key is missing or the series is not a list, returns `None`.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1632,8 +1504,12 @@ def expanded_year_series_values(  # noqa: PLR0911
     raw_sum = round(sum(raw_values), 2)
     direct_total = safe_float(source.get(stat_key))
 
+    if direct_total is not None:
+        tolerance = max(0.05, abs(direct_total) * 0.005)
+        if abs(raw_sum - direct_total) <= tolerance:
+            return raw_values
+
     expanded = [0.0 for _ in series]
-    compact_encoded = False
     for index, raw_value in enumerate(series):
         parts = _compact_year_parts(raw_value)
         if parts is None:
@@ -1642,21 +1518,10 @@ def expanded_year_series_values(  # noqa: PLR0911
         if previous_value:
             target = index - 1 if index > 0 else index
             expanded[target] += previous_value
-            compact_encoded = compact_encoded or (
-                isinstance(raw_value, str) and target != index
-            )
         if current_value:
             expanded[index] += current_value
-            compact_encoded = compact_encoded or isinstance(raw_value, str)
 
     expanded = [round(value, 5) for value in expanded]
-    if compact_encoded and expanded != raw_values:
-        return expanded
-
-    if direct_total is not None:
-        tolerance = max(0.05, abs(direct_total) * 0.005)
-        if abs(raw_sum - direct_total) <= tolerance:
-            return raw_values
 
     if direct_total is not None:
         expanded_sum = round(sum(expanded), 2)
@@ -1684,7 +1549,7 @@ def effective_trend_series_values(
 
     Returns:
         list[float] | None: Normalized list of floats rounded to 5 decimals, or `None` if the chart series key is not applicable or the series value is not a list.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1710,12 +1575,10 @@ def effective_period_total_value(
 
     Returns:
         float: The period total rounded to 2 decimals when available, `None` if no value can be determined.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
-            if not values:
-                return None
             return round(sum(values), 2)
     return safe_float(source.get(stat_key))
 
@@ -1758,7 +1621,7 @@ def year_payload_appears_current_month_only(
 
     Returns:
         bool: `True` if any inspected series has non-zero values only for `current_month`, `False` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1769,7 +1632,7 @@ def year_payload_appears_current_month_only(
         if not isinstance(values, list) or len(values) < current_month:
             continue
         nonzero = _nonzero_months(values)
-        if nonzero and set(nonzero).issubset({current_month}):
+        if not nonzero or set(nonzero).issubset({current_month}):
             return True
     return False
 
@@ -1786,10 +1649,10 @@ def _month_value(
 
 
 def _pv_revenue_value(source: dict[str, Any]) -> float | None:
-    revenue = safe_float(source.get(APP_STAT_TOTAL_SOLAR_REVENUE))
+    revenue = safe_float(source.get("totalSolarRevenue"))
     if revenue is not None:
         return revenue
-    profit = safe_float(source.get(APP_STAT_PV_PROFIT))
+    profit = safe_float(source.get("pvProfit"))
     if profit is None:
         return None
     return round(profit / 10_000_000, 5)
@@ -1849,7 +1712,7 @@ def _pv_revenue_candidates(
     if isinstance(backfill, dict):
         corrected = backfill.get("corrected")
         if isinstance(corrected, dict):
-            revenue_meta = corrected.get(APP_STAT_TOTAL_SOLAR_REVENUE)
+            revenue_meta = corrected.get("totalSolarRevenue")
             if isinstance(revenue_meta, dict):
                 for key in ("raw_total", "corrected_total"):
                     value = safe_float(revenue_meta.get(key))
@@ -1899,7 +1762,7 @@ def _calculated_savings_from_year(  # noqa: PLR0914
             - `price_source` (str): Source label for the price (configured or derived).
             - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
         None: If required inputs are missing (no usable device/home/CT totals or no configured/derivable price).
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -2020,13 +1883,12 @@ def _calculated_savings_from_year(  # noqa: PLR0914
     }
 
 
-def _savings_publish_decision(  # noqa: PLR0911, PLR0913
+def _savings_publish_decision(
     *,
     raw_revenue: float | None,
     calculated_revenue: float,
     raw_generation: float | None,
     year_generation: float | None,
-    year_revenue: float | None,
     pv_revenue_candidates: list[float],
 ) -> tuple[bool, str]:
     if raw_revenue is None:
@@ -2044,29 +1906,9 @@ def _savings_publish_decision(  # noqa: PLR0911, PLR0913
         and raw_generation
         > year_generation + _tolerance_for_values(raw_generation, year_generation)
     )
-    # Shape-match: only check raw_revenue against year_revenue (the YTD
-    # PV-revenue from pv_stat_year.totalSolarRevenue). If they match, the
-    # cloud is reporting the current-year PV income instead of cumulative
-    # savings, so the calculated savings figure is more accurate.
-    # Do NOT match against the derived raw_generation * price candidate —
-    # that coincides with the cloud value whenever the cloud correctly
-    # aggregates lifetime revenue at the current tariff.
-    ytd_only_candidates = [year_revenue] if year_revenue is not None else []
-    if ytd_only_candidates and _matches_pv_revenue_shape(
-        raw_revenue, ytd_only_candidates
+    if not has_prior_lifetime_generation and _matches_pv_revenue_shape(
+        raw_revenue, pv_revenue_candidates
     ):
-        if has_prior_lifetime_generation:
-            return (
-                True,
-                "cloud_total_matches_pv_revenue_shape_despite_lifetime_generation",
-            )
-        return True, "cloud_total_matches_pv_revenue_not_savings"
-
-    if has_prior_lifetime_generation:
-        return False, "cloud_total_is_lifetime_higher_than_ytd_calculated"
-
-    # Full-candidate shape-match for non-lifetime cloud totals
-    if _matches_pv_revenue_shape(raw_revenue, pv_revenue_candidates):
         return True, "cloud_total_matches_pv_revenue_not_savings"
 
     return False, "cloud_total_higher_than_current_year_savings"
@@ -2089,9 +1931,9 @@ def _backfill_pv_revenue(
         meta (dict[str, Any]): Mutable metadata dictionary; when a correction is applied, `meta["corrected"]["totalSolarRevenue"]` is set with keys `raw_total`, `corrected_total`, and `months`.
 
     Side effects:
-        - May set `out[APP_STAT_TOTAL_SOLAR_REVENUE]`, `out[APP_STAT_PV_PROFIT]`, and `out[APP_CHART_SERIES_Y6]`.
+        - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -2112,14 +1954,12 @@ def _backfill_pv_revenue(
     ):
         return
 
-    out[APP_STAT_TOTAL_SOLAR_REVENUE] = monthly_total
-    out[APP_STAT_PV_PROFIT] = round(monthly_total * 10_000_000, 1)
-    # y6 stores per-month revenue in the payload's declared currency unit (EUR/USD).
-    # pvProfit keeps the 1e7-scaled wire value for protocol compatibility, but y6
-    # must match the kWh/W convention of sibling series so external consumers
-    # (apexcharts-card, energy templates) can read it without a divisor.
-    out[APP_CHART_SERIES_Y6] = [round(value, 5) for value in revenue_values]
-    meta.setdefault("corrected", {})[APP_STAT_TOTAL_SOLAR_REVENUE] = {
+    out["totalSolarRevenue"] = monthly_total
+    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
+    out[APP_CHART_SERIES_Y6] = [
+        round(value * 10_000_000, 1) for value in revenue_values
+    ]
+    meta.setdefault("corrected", {})["totalSolarRevenue"] = {
         "raw_total": raw_total,
         "corrected_total": monthly_total,
         "months": found_months,
@@ -2152,7 +1992,7 @@ def backfill_year_payload_from_months(  # noqa: PLR0912
 
     Returns:
         A dictionary payload: either the unchanged `year_source` or a modified copy with corrected series/stat fields and `APP_YEAR_BACKFILL_META` when corrections were applied.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -2200,31 +2040,22 @@ def backfill_year_payload_from_months(  # noqa: PLR0912
         ):
             continue
 
-        partial_year = len(found_months) < 12  # noqa: PLR2004
-        corrected_total = (
-            round(monthly_total * 12 / len(found_months), 2)
-            if partial_year
-            else monthly_total
-        )
-
         out[series_key] = monthly_values
-        out[stat_key] = corrected_total
+        out[stat_key] = monthly_total
         if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
-            out["pvEgy"] = corrected_total
+            out["pvEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
-            out["inOngridEgy"] = corrected_total
+            out["inOngridEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
-            out["outOngridEgy"] = corrected_total
+            out["outOngridEgy"] = monthly_total
         elif stat_key == APP_STAT_TOTAL_DISCHARGE:
-            out["batOtGridEgy"] = corrected_total
+            out["batOtGridEgy"] = monthly_total
 
         meta.setdefault("corrected", {})[stat_key] = {
             "raw_total": raw_total,
-            "monthly_total": monthly_total,
-            "corrected_total": corrected_total,
+            "corrected_total": monthly_total,
             "series_key": series_key,
             "months": found_months,
-            "partial_year": partial_year,
         }
 
     if section_prefix in {APP_SECTION_PV_STAT, APP_SECTION_PV_TRENDS}:
@@ -2247,7 +2078,7 @@ def apply_year_month_backfill(
     Parameters:
         payload (dict[str, Any]): The full app payload to update; year-section keys (e.g. "<prefix>_year") may be replaced.
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section prefix to a mapping of 1-based month index -> month payload dict used to reconstruct year-series values.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             APP_SECTION_PV_STAT,
@@ -2303,7 +2134,7 @@ def guard_statistic_totals_from_year(  # noqa: PLR0914
     Parameters:
         payload (dict[str, Any]): App payload containing `PAYLOAD_STATISTIC` and period sections (e.g., PV year section).
         previous_statistic (dict[str, Any] | None): Optional prior statistic mapping whose `APP_STAT_TOTAL_GENERATION` may be used as a lower bound when the PV year section is absent.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     statistic = payload.get(PAYLOAD_STATISTIC)
     if not isinstance(statistic, dict):
         return
@@ -2391,22 +2222,16 @@ def guard_statistic_totals_from_year(  # noqa: PLR0914
                 calculated_revenue=calculated_revenue,
                 raw_generation=raw_generation,
                 year_generation=year_generation,
-                year_revenue=year_revenue,
                 pv_revenue_candidates=candidates,
             )
-            published_value = calculated_revenue if publish_calculated else raw_revenue
             savings.update({
                 "raw_cloud_total": raw_revenue,
                 "pv_revenue_candidates": candidates,
                 "decision": reason,
                 "would_replace_cloud_total": publish_calculated,
-                "published_value": published_value,
-                "published_value_source": (
-                    "calculated_savings" if publish_calculated else "cloud_total"
-                ),
+                "published_value": raw_revenue,
+                "published_value_source": "cloud_total",
             })
-            if publish_calculated:
-                out[APP_STAT_TOTAL_REVENUE] = published_value
             out[APP_SAVINGS_CALC_META] = savings
 
     raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
@@ -2440,7 +2265,7 @@ def compact_json(value: object) -> str:
 
     Returns:
         compact (str): JSON string with non-ASCII characters preserved and without unnecessary whitespace.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -2461,7 +2286,7 @@ def trend_series_points(  # noqa: PLR0912
 
     Returns:
         list[TrendStatisticPoint]: Points for each valid series bucket with the bucket start date and the value rounded to 5 decimals. Empty list when the series is missing, not kWh, out of range, or cannot be mapped to dates.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
@@ -2489,7 +2314,7 @@ def trend_series_points(  # noqa: PLR0912
     if begin is None:
         return []
     if today is None:
-        today = datetime.now(tz=UTC).date()
+        today = date.today()  # noqa: DTZ011
 
     points: list[TrendStatisticPoint] = []
     for index, value in enumerate(series_values):
@@ -2523,7 +2348,7 @@ def _parse_day_chart_minute(value: object) -> int | None:
     Returns:
         int: Minutes after local midnight for a valid label (0-1439).
         None: If the input is not a valid H:MM label or represents the disallowed `24:00` end marker.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not isinstance(value, str):
         return None
     match = _DAY_CHART_MINUTE_RE.fullmatch(value)
@@ -2549,7 +2374,7 @@ def _day_power_sample_minute(
 
     Returns:
         minute_of_day (int | None): Minutes after local midnight (0-1439) for the sample, or `None` if the computed minute is outside the day range or no valid label/index mapping exists.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
         if minute is not None:
@@ -2587,7 +2412,6 @@ def _scalar_day_energy_points(
     scalar_total: float | None,
     current_day_limit_minute: int,
     bucket_minutes: int,
-    local_tzinfo: TZInfo | None = None,
 ) -> list[TrendStatisticPoint]:
     """Represent a scalar-only app day total as one safe Recorder bucket."""
     if scalar_total is None or scalar_total < 0:
@@ -2596,18 +2420,18 @@ def _scalar_day_energy_points(
     bucket_minute = min(bucket_minute, 24 * 60 - bucket_minutes)
     if bucket_minute < 0:
         return []
-    naive_dt = datetime(
-        begin.year,
-        begin.month,
-        begin.day,
-        bucket_minute // 60,
-        bucket_minute % 60,
-    )
-    if local_tzinfo is not None:
-        dt: datetime = naive_dt.replace(tzinfo=local_tzinfo).astimezone(UTC)
-    else:
-        dt = naive_dt
-    return [TrendStatisticPoint(dt, round(scalar_total, 5))]
+    return [
+        TrendStatisticPoint(
+            datetime(
+                begin.year,
+                begin.month,
+                begin.day,
+                bucket_minute // 60,
+                bucket_minute % 60,
+            ),
+            round(scalar_total, 5),
+        )
+    ]
 
 
 def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
@@ -2633,7 +2457,7 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR091
 
     Returns:
         list[TrendStatisticPoint]: Ordered list of points where `start_date` is the bucket start (local date/time for the request day) and `value` is the bucket kWh (rounded to 5 decimal places). Returns an empty list for invalid inputs, unsupported units, out-of-range request dates, or when scaling rules prevent producing buckets.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
         return []
     series_key = day_power_series_key(source, section, stat_key)
@@ -2658,7 +2482,7 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR091
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
-        today = datetime.now(tz=UTC).date()
+        today = date.today()  # noqa: DTZ011
     if begin > today:
         return []
     if now is None:
@@ -2678,7 +2502,6 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR091
                 scalar_total=scalar_total,
                 current_day_limit_minute=current_day_limit_minute,
                 bucket_minutes=bucket_minutes,
-                local_tzinfo=now.tzinfo if now is not None else None,
             )
         zero_fill_max_bucket_minute = (current_day_limit_minute // bucket_minutes) * (
             bucket_minutes
@@ -2718,7 +2541,6 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR091
             scalar_total=scalar_total,
             current_day_limit_minute=current_day_limit_minute,
             bucket_minutes=bucket_minutes,
-            local_tzinfo=now.tzinfo if now is not None else None,
         )
 
     for minute in range(0, last_bucket_minute + 1, bucket_minutes):
@@ -2737,7 +2559,6 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR091
                 scalar_total=scalar_total,
                 current_day_limit_minute=current_day_limit_minute,
                 bucket_minutes=bucket_minutes,
-                local_tzinfo=now.tzinfo if now is not None else None,
             )
 
     bucket_items = sorted(buckets.items())
@@ -2786,7 +2607,7 @@ def directional_power_value(
 
     Returns:
         float | None: The net power (sum of positive keys minus sum of negative keys) if at least one numeric value is present, `None` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     positive = 0.0
     negative = 0.0
     found = False
@@ -2816,7 +2637,7 @@ def signed_phase_power_values(ct: dict[str, Any]) -> list[float] | None:
 
     Returns:
         list[float] | None: A list of signed per-phase power values in the same order as CT_PHASE_POWER_PAIRS, or `None` if any phase value is missing or cannot be computed.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     values: list[float] = []
     for pos_key, neg_key in CT_PHASE_POWER_PAIRS:
         value = directional_power_value(ct, (pos_key,), (neg_key,))
@@ -2836,23 +2657,9 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     total = directional_power_value(
         ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],)
     )
-    phases = signed_phase_power_values(ct)
     if total is not None:
-        if phases is not None:
-            phase_sum = sum(phases)
-            drift = abs(phase_sum - total)
-            threshold = max(50.0, abs(total) * 0.05)
-            if drift > threshold:
-                _LOGGER.debug(
-                    "CT meter per-phase sum (%.1f W) deviates from tPhasePw "
-                    "(%.1f W) by %.1f W (%.1f%%). Shelly 3EM ADC sampling "
-                    "jitter; using tPhasePw as authoritative.",
-                    phase_sum,
-                    total,
-                    drift,
-                    100 * drift / abs(total) if total else 0,
-                )
         return total
+    phases = signed_phase_power_values(ct)
     return sum(phases) if phases is not None else None
 
 
@@ -2873,7 +2680,7 @@ def calculated_smart_meter_power(  # noqa: PLR0911
 
     Returns:
         float | None: Calculated power in the same units as the input values, or `None` when required inputs are missing or the calculation mode is unrecognized.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -2913,7 +2720,7 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
 
     Returns:
         float | None: The first value successfully coerced to a number, or `None` if no numeric value is found.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     for key in keys:
         if key in source and source.get(key) is not None:
             value = safe_float(source.get(key))
@@ -2948,7 +2755,7 @@ def jackery_reported_home_load_power(props: dict[str, Any]) -> float | None:
 
     Returns:
         float | None: The reported power in watts if present and parseable, `None` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     return first_power_value(
         props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW
     )
@@ -2973,7 +2780,7 @@ def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
 
     Returns:
         float: Power in watts if a known output field contains a numeric value, `None` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     return first_nonzero_power_value(
         props, FIELD_GRID_OUT_PW, FIELD_OUT_ONGRID_PW, FIELD_OUT_GRID_SIDE_PW
     )
@@ -2999,7 +2806,7 @@ def jackery_corrected_home_consumption_power(
             - `jackery_output_power`: Jackery grid-side output power,
             - `source`: string indicating which data was used (`FIELD_OTHER_LOAD_PW` when reported, otherwise `"smart_meter_net_minus_input_plus_output"`).
         Returns `None` when insufficient inputs are available to compute a corrected consumption.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -3039,7 +2846,7 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:  # no
 
     Returns:
         str | None: The chart-series key (e.g., `APP_CHART_SERIES_Y`, `APP_CHART_SERIES_Y1`, ...) associated with the given section/stat pair, or `None` if no mapping exists.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
 
@@ -3095,15 +2902,14 @@ def _series_contains_negative_samples(source: dict[str, Any], series_key: str) -
 
 
 def trend_series_key(section: str, stat_key: str) -> str | None:
-    """Map a section and statistic key to the corresponding chart-series key for day/week/month/year payloads.
+    """Map a section and statistic key to the corresponding chart-series key for week/month/year payloads.
 
-    Only returns a chart-series key when `section` denotes a day, week, month, or year payload; otherwise returns `None`.
+    Only returns a chart-series key when `section` denotes a week, month, or year payload; otherwise returns `None`.
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a week/month/year payload or no mapping exists.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not section.endswith((
-        f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
         f"_{DATE_TYPE_MONTH}",
         f"_{DATE_TYPE_YEAR}",
@@ -3121,7 +2927,7 @@ def day_power_series_key(
 
     Returns:
         The chart-series key string for the given `section`/`stat_key` when `source` is a day-period payload, `None` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if not _is_day_period_payload(source, section):
         return None
     if (
@@ -3152,7 +2958,7 @@ def trend_series_total(  # noqa: PLR0911
 
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total cannot be determined.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if _is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -3207,7 +3013,7 @@ def trend_series_has_value(  # noqa: PLR0911
 
     Returns:
         `true` if a numeric value can be derived from the payload for the section and stat_key, `false` otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if _is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
@@ -3242,9 +3048,7 @@ def trend_series_has_value(  # noqa: PLR0911
     )
 
 
-def task_plan_value(
-    task_plan: dict[str, Any], *keys: str
-) -> Any:  # payload value of unknown type by design  # noqa: ANN401, RUF100
+def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # payload value of unknown type by design
     """Retrieve the first non-None value for any of the given keys from a task-plan payload.
 
     Searches in this order: the top-level of `task_plan`, the `TASK_PLAN_BODY` dictionary (if present), then each dictionary item in the `TASK_PLAN_TASKS` list (if present). Keys are checked in the order provided and the first non-`None` match is returned.
@@ -3255,7 +3059,7 @@ def task_plan_value(
 
     Returns:
         Any: The first non-`None` value found for the provided keys, or `None` if none are present.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:
             return task_plan.get(key)
@@ -3287,7 +3091,73 @@ def trend_payload_has_value(
 
     Returns:
         True if a usable period value exists, False otherwise.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None
+
+
+def first_nonblank(*values: Any) -> str | None:
+    """Return the first value that still has content after stripping."""
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: PLR0911
+    """Return the first nonblank value parsed as an integer."""
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value) if value.is_integer() else None
+        text = str(value).strip()
+        if not text:
+            continue
+        if not _WHOLE_INT_TEXT_RE.fullmatch(text):
+            return None
+        whole, _dot, _fraction = text.partition(".")
+        try:
+            return int(whole)
+        except ValueError:
+            return None
+    return None
+
+
+def _is_signed_battery_energy_curve(section: str, stat_key: str) -> bool:
+    """Return whether a day curve is a signed battery charge/discharge curve."""
+    return section.startswith((
+        APP_SECTION_BATTERY_STAT,
+        APP_SECTION_BATTERY_TRENDS,
+    )) and stat_key in {
+        APP_STAT_TOTAL_CHARGE,
+        APP_STAT_TOTAL_DISCHARGE,
+        APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+        APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+    }
+
+
+def _can_distribute_scalar_day_total(section: str, stat_key: str) -> bool:
+    """Return whether an explicit zero day curve may be filled from its total."""
+    return section.startswith(APP_SECTION_HOME_STAT) and stat_key in {
+        APP_STAT_TOTAL_IN_GRID_ENERGY,
+        APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    }
+
+
+def normalize_account(value: str) -> str:
+    """Normalize user-facing account identifiers before auth and unique IDs."""
+    return value.strip()
+
+
+def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: ANN401
+    """Return a config-entry boolean option with safe legacy value parsing."""
+    return config_entry_bool_option(entry, key, default)

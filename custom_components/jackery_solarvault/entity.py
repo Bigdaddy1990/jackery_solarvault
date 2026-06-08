@@ -1,6 +1,5 @@
 """Shared entity base class."""
 
-import logging
 from typing import Any
 
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -45,8 +44,6 @@ from .util import (
     stable_subdevice_key,
     subdevice_branding,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -141,7 +138,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -177,7 +174,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: Device registry metadata for the smart-plug including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
@@ -222,7 +219,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             True if the entity is available, False otherwise.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)
@@ -231,11 +228,10 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         if online is not None:
             parsed_online = jackery_online_state(online)
             if parsed_online is not None:
+                if (
+                    not parsed_online
+                    and self.coordinator.is_device_locally_reachable(self._device_id)
+                ):
+                    return True
                 return parsed_online
-            _LOGGER.debug(
-                "Device %s: unrecognized online state %r; falling back to data membership",  # noqa: E501, RUF100
-                self._device_id,
-                online,
-            )
-            return self._device_id in (self.coordinator.data or {})
         return self._device_id in (self.coordinator.data or {})

@@ -3,20 +3,17 @@
     "delete_storm_alert": {
       "service": "mdi:weather-lightning-rainy"
     },
-    "query_third_party_mqtt_config": {
-      "service": "mdi:message-text-clock"
-    },
     "refresh_weather_plan": {
       "service": "mdi:cloud-refresh"
     },
     "rename_system": {
       "service": "mdi:rename"
     },
+    "query_third_party_mqtt_config": {
+      "service": "mdi:message-text-clock"
+    },
     "send_ble_command": {
       "service": "mdi:bluetooth-transfer"
-    },
-    "send_device_schedule": {
-      "service": "mdi:calendar-clock"
     },
     "set_third_party_mqtt_config": {
       "service": "mdi:message-cog"

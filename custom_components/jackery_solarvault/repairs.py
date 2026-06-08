@@ -1,16 +1,19 @@
 """Repair flows for Jackery SolarVault."""
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
-from .client import JackeryError
-from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
+from .const import (
+    DOMAIN,
+    REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
+    REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
+)
 from .coordinator import JackerySolarVaultCoordinator
 
 if TYPE_CHECKING:
@@ -47,30 +50,22 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
-            return cast("data_entry_flow.FlowResult", self.async_create_entry(data={}))
-        return cast(
-            "data_entry_flow.FlowResult",
-            self.async_show_form(
-                step_id="confirm",
-                data_schema=vol.Schema({}),
-                description_placeholders=self._description_placeholders,
-            ),
+            return self.async_create_entry(data={})  # type: ignore[no-any-return]
+        return self.async_show_form(  # type: ignore[no-any-return]
+            step_id="confirm",
+            data_schema=vol.Schema({}),
+            description_placeholders=self._description_placeholders,
         )
 
     async def _async_force_refresh(self) -> None:
         coordinator = self._coordinator()
         if coordinator is None:
-            _LOGGER.warning(
-                "Jackery repair flow: coordinator not found for entry %s; "
-                "repair action had no effect",
-                self._entry_id,
-            )
             return
         try:
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except (HomeAssistantError, TimeoutError, OSError, JackeryError) as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
@@ -85,7 +80,64 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(  # noqa: RUF029 - HA repairs hook is async.
+class DeviceNotActivatedRepairFlow(RepairsFlow):
+    """Confirmation-only fix flow for the device not activated issue.
+
+    The device reports activated=0 in the cloud system, meaning it has not
+    been fully activated via the Jackery mobile app. The fix flow forces a
+    refresh so the integration can re-check the activation status.
+    """
+
+    def __init__(
+        self, entry_id: str | None, description_placeholders: dict[str, str]
+    ) -> None:
+        """Initialize the repair flow for one config entry."""
+        self._entry_id = entry_id
+        self._description_placeholders = description_placeholders
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> data_entry_flow.FlowResult:
+        """Route the initial repair step to the confirmation form."""
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> data_entry_flow.FlowResult:
+        """Show the confirmation form and refresh cloud data after submit."""
+        if user_input is not None:
+            await self._async_force_refresh()
+            return self.async_create_entry(data={})  # type: ignore[no-any-return]
+        return self.async_show_form(  # type: ignore[no-any-return]
+            step_id="confirm",
+            data_schema=vol.Schema({}),
+            description_placeholders=self._description_placeholders,
+        )
+
+    async def _async_force_refresh(self) -> None:
+        coordinator = self._coordinator()
+        if coordinator is None:
+            return
+        try:
+            await coordinator.async_request_refresh()
+        except ConfigEntryAuthFailed:
+            raise
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Force refresh from repair flow failed: %s", err)
+
+    def _coordinator(self) -> JackerySolarVaultCoordinator | None:
+        if not self._entry_id:
+            return None
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if entry is None:
+            return None
+        coordinator = getattr(entry, "runtime_data", None)
+        if isinstance(coordinator, JackerySolarVaultCoordinator):
+            return coordinator
+        return None
+
+
+async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,
@@ -100,6 +152,14 @@ async def async_create_fix_flow(  # noqa: RUF029 - HA repairs hook is async.
             "examples": str(issue_data.get("examples", "unknown")),
         }
         return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
+    if issue_id.endswith(f"_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"):
+        issue_data = data or {}
+        entry_id = issue_data.get("entry_id")
+        device_id = issue_data.get("device_id", "unknown")
+        description_placeholders = {
+            "device_id": device_id,
+        }
+        return DeviceNotActivatedRepairFlow(entry_id, description_placeholders)
     raise data_entry_flow.UnknownFlow(  # noqa: TRY003
         f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
     )

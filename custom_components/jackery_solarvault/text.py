@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.const import EntityCategory
-from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .client import JackeryAuthError, JackeryError
@@ -82,7 +81,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     """Set up text entities for renaming Jackery system devices from a config entry.
 
     Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -94,7 +93,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
             entity (TextEntity): Candidate text entity to append.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="text", logger=_LOGGER
         )
@@ -106,20 +105,18 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[TextEntity]: TextEntity instances created for devices that support renaming their system.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
-            if (
-                isinstance(system, dict)
-                and FIELD_GRID_STANDARD in system
-                and coordinator.device_supports_advanced(dev_id)
-            ):
+            if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
                 _append_unique(entities, JackeryGridStandardText(coordinator, dev_id))
-            if coordinator.device_supports_third_party_mqtt(dev_id):
+            if coordinator.device_supports_advanced(
+                dev_id
+            ) or coordinator.device_bluetooth_key(dev_id):
                 for (
                     key_suffix,
                     translation_key,
@@ -143,12 +140,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
-    @callback
     def _add_new_entities() -> None:
         """Add newly discovered text entities when the coordinator's data changes.
 
         Checks the current signature of the coordinator data against the last seen signature; if different, collect entities and register them with `async_add_entities`, and update the stored signature.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -186,7 +182,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -202,7 +198,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is empty, or the remote API reports a failure.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .const import (
@@ -368,7 +367,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     Parameters:
         entry (JackeryConfigEntry): Config entry whose runtime_data contains the integration coordinator.
         async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity instances with Home Assistant.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -378,7 +377,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[ButtonEntity]): Target list to append the entity to when it is unique.
             entity (ButtonEntity): Button entity to append if its unique identifier has not been seen.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
         )
@@ -390,7 +389,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[ButtonEntity]: Unique `ButtonEntity` instances representing reboot actions for matching devices.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -460,12 +459,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
-    @callback
     def _add_new_entities() -> None:
         """Register newly discovered reboot button entities when the coordinator's device signature changes.
 
         If the coordinator-derived signature differs from the last cached signature, update the cache, collect new entities, and add them via `async_add_entities`.
-        """  # noqa: E501, RUF100
+        """  # noqa: E501
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -524,8 +522,6 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Send the documented getter over BLE-first MQTT transport."""
-        if not self.available:
-            self._raise_action_error("device is offline")
         try:
             await self._query_description.action(self.coordinator, self._device_id)
         except ConfigEntryAuthFailed:
@@ -565,8 +561,6 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Forward a button press to the device."""
-        if not self.available:
-            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_reboot_device(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -607,8 +601,6 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Refresh the weather/storm plan from the device."""
-        if not self.available:
-            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -667,13 +659,11 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Read this schedule bucket through the documented app command."""
-        if not self.available:
-            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_read_device_schedule(
                 self._device_id,
                 task_type=self._task_type,
-                smart_plug_sn=self._plug_sn or None,
+                plug_sn=self._plug_sn,
             )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
@@ -741,8 +731,6 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Delete this storm alert through the documented app command."""
-        if not self.available:
-            self._raise_action_error("storm alert is no longer active")
         try:
             await self.coordinator.async_delete_storm_alert(
                 self._device_id,
