@@ -51,7 +51,7 @@ length picks the cipher mode — observed in the wild: a SolarVault 3 Pro
 Max returned a 16-byte key (AES-128). The crypto helpers below accept
 both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
-"""  # noqa: E501, RUF100
+"""  # noqa: E501
 
 from dataclasses import dataclass
 import logging
@@ -148,7 +148,7 @@ def parse_hex16(text: str) -> int:
 
     Raises:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     if len(text) != _HEX16_WIDTH:
         raise ValueError(  # noqa: TRY003
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
@@ -164,7 +164,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # noqa: E501, RUF100
+    """  # noqa: E501
     return data.hex().upper()
 
 
@@ -293,7 +293,6 @@ _BINARY_FRAME_HEADER_LEN: int = 16
 _BINARY_FRAME_TRAILER_LEN: int = 4
 _BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
 _BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
-_unrecognised_version_count: list[int] = [0]
 _BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 
 
@@ -381,11 +380,7 @@ def build_binary_frame(  # noqa: PLR0913
         + _BINARY_FRAME_PAYLOAD_MARKER_BE
         + len(body).to_bytes(2, "big")
     )
-    if len(header) != _BINARY_FRAME_HEADER_LEN:
-        raise ValueError(  # noqa: TRY003
-            f"binary frame header must be {_BINARY_FRAME_HEADER_LEN} bytes, "
-            f"got {len(header)}"
-        )
+    assert len(header) == _BINARY_FRAME_HEADER_LEN
     return header + body + trailer
 
 
@@ -437,16 +432,10 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
-        _unrecognised_version_count[0] += 1
-        count = _unrecognised_version_count[0]
-        if count == 1 or count % 100 == 0:
-            _LOGGER.warning(
-                "BLE frame has unexpected version 0x%s (expected 0x%s); "
-                "parsing continues (occurrence #%d)",
-                plaintext[2:4].hex(),
-                _BINARY_FRAME_VERSION_BE.hex(),
-                count,
-            )
+        # Soft assertion — every frame seen so far carries 0x0064 here.
+        # We do not refuse parsing on mismatch, but the caller's debug
+        # log will surface unexpected values for analysis.
+        pass
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
         raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")  # noqa: TRY003
     frame_index = int.from_bytes(plaintext[4:6], "big")

@@ -23,11 +23,9 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # noqa: ANN401, RUF100
+def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
     if name == "JackeryMqttPushClient":
-        from .mqtt_push import (  # noqa: PLC0415
-            JackeryMqttPushClient as _JackeryMqttPushClient,
-        )
+        from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 
         return _JackeryMqttPushClient
     raise AttributeError(name)

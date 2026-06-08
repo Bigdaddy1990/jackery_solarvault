@@ -28,15 +28,16 @@ scope here. Once Phase 3a has shown the listener decodes real frames
 correctly, the same chunking/encrypt path from :mod:`.ble` will be
 plumbed into :meth:`async_write_frames`.
 
-Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
+Crypto assumptions follow implementation notes §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-import asyncio  # noqa: I001, RUF100
+from __future__ import annotations  # noqa: TID251
+
+import asyncio
 import base64
 import binascii
-from collections import deque
 from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass, field
@@ -44,19 +45,12 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..const import (  # noqa: TID252
-    DEFAULT_BLE_ACK_TIMEOUT_SEC,
-    MQTT_CMD_QUERY_DEVICE_PROPERTY,
-)  # noqa: E501, RUF100
-
+from ..util import first_nonblank_int
 from . import ble
 
 if TYPE_CHECKING:
-    from bleak import BleakClient
-
     from homeassistant.components.bluetooth import (
         BluetoothCallbackMatcher,
-        BluetoothChange,
         BluetoothServiceInfoBleak,
     )
     from homeassistant.core import HomeAssistant
@@ -69,17 +63,8 @@ _LOGGER = logging.getLogger(__name__)
 #: Default timeout for the GATT connect + notify-subscribe handshake.
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 
-#: Backoff after a failed connect *attempt* (device unreachable / GATT
-#: connect raised). Long, so we don't hammer a device that is off or out of
-#: range.
+#: Minimum time between (re)connect attempts when the device drops the link.
 _RECONNECT_BACKOFF_SEC: float = 30.0
-
-#: Backoff after a *clean* lost link (we were connected and the peripheral
-#: recycled its idle GATT session — normal for SolarVault every ~17 s). The
-#: device is present and advertising, so reconnect quickly instead of leaving
-#: BLE dark for 30 s. Using the long backoff here was capping BLE uptime at
-#: ~36 % (≈17 s up per ≈47 s cycle); a short retry roughly doubles it.
-_LOST_LINK_BACKOFF_SEC: float = 8.0
 
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
 #: runners to honour cancellation. HA's shutdown sequence reports tasks
@@ -97,12 +82,13 @@ _STOP_TIMEOUT_SEC: float = 5.0
 #: ``coordinator.data`` via the existing cmd=107 path.
 _KEEPALIVE_INTERVAL_SEC: float = 15.0
 
-#: Maximum consecutive connection failures before the runner gives up and
-#: exits rather than spinning forever against an out-of-range device.
-_MAX_CONNECTION_RETRIES: int = 50
 
-#: Exponential-backoff ceiling — retries never wait longer than this.
-_MAX_BACKOFF_SEC: float = 300.0
+def _coerce_ble_int(value: Any, field_name: str) -> int:  # noqa: ANN401
+    """Parse an integer BLE transport option without bool/non-finite leakage."""
+    parsed = first_nonblank_int(value)
+    if parsed is None:
+        raise ValueError(f"{field_name} must be an integer")  # noqa: TRY003
+    return parsed
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +111,6 @@ class BleFrameObservation:
     base64_encoded: str
     parsed: ble.BleBinaryFrame | None
     decode_error: str | None = None
-    source_started_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -140,7 +125,6 @@ class BleListenerStats:
     frames_decode_failed: int = 0
     acks_received: int = 0
     acks_timed_out: int = 0
-    writes_with_response_failed: int = 0
     last_error: str | None = None
     last_connect_at: datetime | None = None
     last_disconnect_at: datetime | None = None
@@ -151,6 +135,10 @@ class BleListenerStats:
     # how much BLE telemetry is still unconsumed (cmd=120 system /
     # per-device / CT variants currently — see coordinator sink).
     unrouted_frames_by_cmd: dict[int, int] = field(default_factory=dict)
+    # Per-cmd counters for frames the sink recognized. This keeps
+    # unchanged-but-routed frames (for example battery-pack lifetime
+    # snapshots) separate from genuinely unsupported BLE payloads.
+    routed_frames_by_cmd: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -202,15 +190,21 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """Construct a Jackery BLE listener that observes notifications and forwards parsed frames to a sink.
+        """Build the listener.
 
-        Parameters:
-            hass (HomeAssistant): Home Assistant instance used for bluetooth callbacks and background tasks.
-            sink (FrameSink): Async callable invoked with (device_id, BleFrameObservation) for each observed frame.
-            key_resolver (Callable[[str], bytes | None]): Returns the 16- or 32-byte AES key for a given device_id, or None if unavailable.
-            ble_address_resolver (Callable[[str], str | None]): Returns the BLE MAC for a given device_id, or None; the listener also caches discovered addresses and exposes them via address_for_device_id.
-            serial_resolver (Callable[[str], str | None] | None): Maps a BLE-broadcast serial string to a Jackery device_id; when omitted incoming advertisements with unmapped serials are logged but not associated.
-        """  # noqa: E501, RUF100
+        :param key_resolver: returns the 16-or-32-byte AES key for a device
+            id, or None when the integration has not seen the device's
+            HTTP entry yet. Read from the coordinator via
+            ``coordinator.device_bluetooth_key``.
+        :param ble_address_resolver: returns the BLE MAC for a Jackery
+            device id, or None. The listener feeds its own MAC cache back
+            via :meth:`address_for_device_id`.
+        :param serial_resolver: maps a BLE-broadcast serial (typically the
+            HTTP serial without its leading model-letter) back to the
+            Jackery device id. Provided by
+            ``coordinator.device_id_for_ble_serial``. When omitted the
+            listener can only log unmapped advertisements.
+        """
         self._hass = hass
         self._sink = sink
         self._key_resolver = key_resolver
@@ -220,7 +214,6 @@ class JackeryBleListener:
         self._unregister_callbacks: list[Callable[[], None]] = []
         self._connections: dict[str, asyncio.Task[None]] = {}
         self._stop_event = asyncio.Event()
-        self._aborted = False
         # Cache of (device_id -> BLE MAC) populated on first matching
         # advertisement. The coordinator's ``_ble_address_for_device``
         # reads back through :meth:`address_for_device_id`.
@@ -239,21 +232,61 @@ class JackeryBleListener:
         # back to :data:`ble.DEFAULT_BLE_MTU` (matches the Android app)
         # when bleak hasn't exposed a value yet.
         self._mtu: dict[str, int] = {}
-        self._pending_property_query_starts: dict[str, deque[datetime]] = {}
+        # One-shot diagnostic flags so a stale discovery_cache during a
+        # cloud outage shows up at INFO level once per stable failure mode
+        # — not on every advertisement / notify. Cleared the first time
+        # the same device successfully resolves / decodes again.
+        self._unmapped_serials_logged: set[str] = set()
+        self._missing_key_logged: set[str] = set()
 
     def address_for_device_id(self, device_id: str) -> str | None:
-        """Get the cached BLE MAC address for the given device id.
-
-        Returns:
-            The MAC address string for the device, or `None` if no cached address exists.
-        """  # noqa: E501, RUF100
+        """Return the cached BLE MAC for a device id, or None."""
         return self._device_addresses.get(device_id)
+
+    async def async_ensure_connected(
+        self,
+        device_id: str,
+        *,
+        timeout_sec: float,
+    ) -> bool:
+        """Wait until a BLE client is available for ``device_id``.
+
+        The listener reconnects in the background after disconnects. A
+        user-triggered service call may land during that reconnect window;
+        waiting here keeps the service action from failing immediately while
+        preserving the fast MQTT fallback path for normal setters.
+        """
+        if device_id in self._clients:
+            return True
+        address = self._device_addresses.get(device_id) or self._ble_address_resolver(
+            device_id
+        )
+        if address is None:
+            return False
+        self._device_addresses.setdefault(device_id, address)
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(0.0, timeout_sec)
+        while not self._stop_event.is_set():
+            if device_id in self._clients:
+                return True
+            task = self._connections.get(device_id)
+            if task is None or task.done():
+                self._connections[device_id] = self._hass.async_create_background_task(
+                    self._async_run_connection(device_id, address),
+                    name=f"jackery_ble_{device_id}",
+                )
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(0.2, remaining))
+        return device_id in self._clients
 
     # ------------------------------------------------------------------
     # Phase 3b: write path — send a command frame to the device
     # ------------------------------------------------------------------
 
-    def _record_negotiated_mtu(self, device_id: str, client: BleakClient) -> None:
+    def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:  # noqa: ANN401
         """Cache the negotiated GATT MTU after ``start_notify`` returns.
 
         Different bleak backends expose the MTU under different attribute
@@ -284,21 +317,6 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    def _mark_property_query_started(
-        self,
-        device_id: str,
-        cmd: int,
-        current_started_at: datetime | None,
-    ) -> datetime | None:
-        """Record the request timestamp for BLE property-query replies."""
-        if cmd != 106 or current_started_at is not None:  # noqa: PLR2004
-            return current_started_at
-        started_at = datetime.now()
-        self._pending_property_query_starts.setdefault(
-            device_id, deque(maxlen=4)
-        ).append(started_at)
-        return started_at
-
     async def _async_keep_alive_loop(self, device_id: str) -> None:
         """Periodically write a no-op query frame to keep the GATT session warm.
 
@@ -321,6 +339,7 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
+        from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
 
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
@@ -355,7 +374,7 @@ class JackeryBleListener:
         except asyncio.CancelledError:  # noqa: TRY203
             raise
 
-    async def async_send_command(  # noqa: PLR0912, PLR0913, PLR0915
+    async def async_send_command(  # noqa: PLR0912, PLR0913
         self,
         device_id: str,
         *,
@@ -364,29 +383,36 @@ class JackeryBleListener:
         flags: int = 0,
         timeout_sec: float = 10.0,
         wait_for_ack: bool = False,
-        ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
+        ack_timeout_sec: float = 5.0,
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """Send a logical command frame to the device over BLE and optionally wait for a matching acknowledgement.
+        """Build, encrypt and write a single command frame to char 0xEE01.
 
-        Parameters:
-            device_id (str): Target device identifier.
-            cmd (int): Logical command identifier to send.
-            body (bytes): Command payload bytes.
-            flags (int): Frame flags included in the sent binary frame.
-            timeout_sec (float): Per-GATT-write timeout in seconds.
-            wait_for_ack (bool): If True, wait for a matching decoded notify frame before returning.
-            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is True.
-            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify as the ACK; when omitted, any decoded frame from the same device within the window qualifies.
-            mtu_override (int | None): Optional MTU to use instead of the negotiated or default MTU (used for tests/diagnostics).
+        Returns ``True`` when the GATT write completed (and, if
+        ``wait_for_ack`` is set, the device echoed a decoded frame on the
+        notify channel within ``ack_timeout_sec``). Returns ``False`` when
+        no active client is available for the device — callers (e.g. the
+        coordinator's BLE-first setter helper) use that to fall back to
+        the cloud-MQTT pipeline.
 
-        Returns:
-            bool: `True` if the GATT write completed (and, when requested, a matching ACK was received); `False` if no active BLE client exists for the device.
+        Raises ``ValueError`` for malformed inputs, ``RuntimeError`` for
+        GATT-layer failures *or* for an ACK timeout when ``wait_for_ack``
+        is enabled. The router catches the RuntimeError and falls back to
+        MQTT; for SolarVault setters the duplicated write is idempotent.
 
-        Raises:
-            RuntimeError: When the payload cannot be chunked for the selected MTU, on GATT-layer failures (including write timeouts), or when an ACK wait times out.
-        """  # noqa: E501, RUF100
+        ``ack_cmds`` filters which notify frames count as the ACK. When
+        omitted, any decoded frame on the same device within the window
+        counts. The device typically echoes the same ``cmd`` back as a
+        ``DevicePropertyChange``, but we have no firmware contract for
+        that mapping yet, so the default stays permissive.
+
+        The trailer field is left as four NUL bytes — see
+        :class:`.ble.BleBinaryFrame` for the open question on its
+        algorithm. If the device firmware rejects the write (no echo on
+        the notify stream within a reasonable window), the trailer
+        likely needs to be a real checksum derived from a Frida capture.
+        """
         client = self._clients.get(device_id)
         if client is None:
             _LOGGER.debug(
@@ -402,9 +428,7 @@ class JackeryBleListener:
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
-            if isinstance(mtu_override, bool) or not isinstance(mtu_override, int):
-                raise TypeError("mtu_override must be an integer")  # noqa: TRY003
-            mtu = mtu_override
+            mtu = _coerce_ble_int(mtu_override, "mtu_override")
         else:
             mtu = self.mtu_for_device(device_id)
         try:
@@ -430,15 +454,8 @@ class JackeryBleListener:
         pending: _PendingAck | None = None
         if wait_for_ack:
             pending = self._register_pending_ack(device_id, ack_cmds)
-        stats = self.stats_for(device_id)
-        property_query_started_at: datetime | None = None
         try:
             for idx, chunk in enumerate(chunks, start=1):
-                property_query_started_at = self._mark_property_query_started(
-                    device_id,
-                    cmd,
-                    property_query_started_at,
-                )
                 plain = ble.build_binary_frame(
                     cmd=cmd,
                     body=chunk,
@@ -449,27 +466,22 @@ class JackeryBleListener:
                 blob = ble.encrypt_binary_notify(plain, key)
                 await asyncio.wait_for(
                     client.write_gatt_char(
-                        ble.BLE_WRITE_CHAR_UUID, blob, response=True
+                        ble.BLE_WRITE_CHAR_UUID, blob, response=False
                     ),
                     timeout=timeout_sec,
                 )
-        except asyncio.CancelledError:
-            if pending is not None:
-                self._discard_pending_ack(device_id, pending)
-            raise
         except TimeoutError as err:
-            stats.writes_with_response_failed += 1
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
             raise RuntimeError(  # noqa: TRY003
                 f"BLE write to {device_id} timed out after {timeout_sec}s"
             ) from err
         except Exception as err:  # bleak surfaces BleakError + variants
-            stats.writes_with_response_failed += 1
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
             raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
         if pending is not None:
+            stats = self.stats_for(device_id)
             try:
                 # ``shield`` keeps the future alive even if ``wait_for``
                 # cancels the inner wait on timeout — we want to discard
@@ -478,9 +490,6 @@ class JackeryBleListener:
                 await asyncio.wait_for(
                     asyncio.shield(pending.future), timeout=ack_timeout_sec
                 )
-            except asyncio.CancelledError:
-                self._discard_pending_ack(device_id, pending)
-                raise
             except TimeoutError as err:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
@@ -500,28 +509,14 @@ class JackeryBleListener:
     def _register_pending_ack(
         self, device_id: str, ack_cmds: tuple[int, ...] | None
     ) -> _PendingAck:
-        """Register a pending ACK wait record for the given device.
-
-        Parameters:
-            device_id (str): Identifier of the device the ACK is expected from.
-            ack_cmds (tuple[int, ...] | None): Optional sequence of acceptable command IDs that will satisfy the ACK.
-                If `None`, any decoded frame will satisfy the pending ACK.
-
-        Returns:
-            _PendingAck: A record containing `expected_cmds` (a `frozenset` of the provided command IDs or `None`)
-                and `future`, an `asyncio.Future` that will be resolved with the matching `ble.BleBinaryFrame`.
-        """  # noqa: E501, RUF100
+        """Create and register a pending-ACK record for ``device_id``."""
         loop = asyncio.get_running_loop()
-        expected_cmds: frozenset[int] | None = None
-        if ack_cmds:
-            parsed_cmds: set[int] = set()
-            for ack_cmd in ack_cmds:
-                if isinstance(ack_cmd, bool) or not isinstance(ack_cmd, int):
-                    raise ValueError("ack_cmds must be an integer")  # noqa: TRY003, TRY004
-                parsed_cmds.add(ack_cmd)
-            expected_cmds = frozenset(parsed_cmds)
         pending = _PendingAck(
-            expected_cmds=expected_cmds,
+            expected_cmds=(
+                frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
+                if ack_cmds
+                else None
+            ),
             future=loop.create_future(),
         )
         self._pending_acks.setdefault(device_id, []).append(pending)
@@ -585,14 +580,15 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def async_start(self, device_ids: list[str]) -> None:
-        """Start BLE advertisement monitoring and register callbacks that spawn per-device connection runners when a matching advertisement is observed.
+        """Begin watching for advertisements and connecting on match.
 
-        Parameters:
-            device_ids (list[str]): Device IDs to monitor; a background connection task will be created lazily for a device the first time an advertisement matching the listener's BLE matcher is seen.
-        """  # noqa: E501, RUF100
+        Connect tasks are spawned lazily when the first matching
+        advertisement for a device arrives. This avoids blocking
+        integration setup on a BLE radio that is out of range.
+        """
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
-        from homeassistant.components import bluetooth  # noqa: PLC0415
+        from homeassistant.components import bluetooth
 
         self._stop_event.clear()
 
@@ -613,25 +609,15 @@ class JackeryBleListener:
             len(device_ids),
             ble.BLE_SERVICE_UUID,
         )
-        # Surface the exact matcher tuple so the user can cross-check it
-        # against ``bluetooth.async_scanner_devices_by_address`` /
-        # ``bluetooth.async_discovered_service_info`` output in the
-        # logbook. Without this line a silent listener (zero further
-        # callbacks) is indistinguishable from a misconfigured matcher.
-        _LOGGER.info(
-            "Jackery BLE: matcher registered (service_uuid=%s, "
-            "manufacturer_id=%#x) for %d device(s); awaiting advertisements",
-            ble.BLE_SERVICE_UUID,
-            ble.BLE_MANUFACTURER_ID,
-            len(device_ids),
-        )
 
     async def async_stop(self) -> None:
-        """Stop the BLE listener and release its resources.
+        """Shut the listener down. Safe to call from coordinator unload.
 
-        Signals the listener to stop, unregisters Bluetooth advertisement callbacks, cancels active connection runner tasks and waits up to _STOP_TIMEOUT_SEC for them to exit, clears connection state, and cancels any pending ACK futures so callers waiting for acknowledgements do not hang. Logs the listener shutdown.
-        """  # noqa: E501, RUF100
-        self._aborted = True
+        Uses a hard timeout on the gather so a stuck GATT disconnect or
+        radio hang cannot block HA shutdown beyond ``_STOP_TIMEOUT_SEC``.
+        Any task that misses the timeout is left to be reaped by the
+        event-loop during interpreter teardown.
+        """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
             try:
@@ -676,7 +662,7 @@ class JackeryBleListener:
     def _on_advertisement(
         self,
         service_info: BluetoothServiceInfoBleak,
-        change: BluetoothChange,
+        change: Any,  # noqa: ANN401
     ) -> None:
         """HA bluetooth-callback. Triggers a connect task on first match.
 
@@ -705,13 +691,24 @@ class JackeryBleListener:
         self,
         service_info: BluetoothServiceInfoBleak,
     ) -> str | None:
-        """Resolve a BLE advertisement to a known Jackery device id and cache the device's BLE MAC address.
+        """Match an advertisement to a Jackery device id and cache the MAC.
 
-        If the advertisement corresponds to a device the integration knows about, the function records device_id -> address in the internal cache on first match so future advertisements skip resolution. It returns the mapped device id when found, or `None` if no mapping could be determined.
+        Resolution order:
 
-        Returns:
-            `device_id` if the advertisement maps to a known device, `None` otherwise.
-        """  # noqa: E501, RUF100
+        1. If we already cached a ``device_id → MAC`` mapping for this
+           address, reuse it.
+        2. Decode the ASCII serial from the manufacturer-data block under
+           company id 0x4802 (verified against
+           :data:`.ble.BLE_MANUFACTURER_ID`).
+        3. Hand the serial to the coordinator-supplied
+           ``serial_resolver`` which maps the BLE serial back to the
+           Jackery numeric device id (the BLE serial is typically the
+           HTTP serial without its leading model letter, e.g.
+           ``HR2C04000280HH3`` → ``R2C04000280HH3``).
+        4. On match, cache ``device_id → MAC`` so future advertisements
+           skip steps 2-3 and the coordinator's
+           ``_ble_address_for_device`` lookup returns the right value.
+        """
         address = service_info.address
         # Step 1: address cache hit.
         for cached_id, cached_mac in self._device_addresses.items():
@@ -732,12 +729,23 @@ class JackeryBleListener:
         if self._serial_resolver is not None:
             device_id = self._serial_resolver(serial)
         if device_id is None:
-            _LOGGER.debug(
-                "Jackery BLE: advertisement for serial %s @ %s — no device "
-                "id mapping yet",
-                serial,
-                address,
-            )
+            if serial not in self._unmapped_serials_logged:
+                self._unmapped_serials_logged.add(serial)
+                _LOGGER.info(
+                    "Jackery BLE: advertisement for serial %s @ %s has no "
+                    "device-id mapping. Discovery_cache likely stale — a "
+                    "successful cloud refresh (or a re-added device) is "
+                    "needed to learn the serial-to-device-id mapping.",
+                    serial,
+                    address,
+                )
+            else:
+                _LOGGER.debug(
+                    "Jackery BLE: advertisement for serial %s @ %s — still "
+                    "no device id mapping",
+                    serial,
+                    address,
+                )
             return None
         # Step 4: cache + log on first match for this device id.
         if device_id not in self._device_addresses:
@@ -748,73 +756,31 @@ class JackeryBleListener:
                 address,
                 device_id,
             )
+        # Clear the one-shot diagnostic flag now that this serial resolves.
+        self._unmapped_serials_logged.discard(serial)
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0912, PLR0915
-        """Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
+    async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0915
+        """Maintain a GATT session for one device, reconnecting on drop."""
+        from bleak.exc import BleakError
+        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-        This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
-
-        Raises:
-            asyncio.CancelledError: if the task is cancelled during shutdown.
-        """  # noqa: E501, RUF100
-        from bleak.exc import BleakError  # noqa: PLC0415
-        from bleak_retry_connector import (  # noqa: PLC0415
-            BLEAK_RETRY_EXCEPTIONS,
-            establish_connection,
-        )
-
-        from homeassistant.components import bluetooth  # noqa: PLC0415
+        from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)
-        consecutive_failures = 0
         try:  # noqa: PLW0717
-            while not self._stop_event.is_set() and not self._aborted:
-                if consecutive_failures >= _MAX_CONNECTION_RETRIES:
-                    _LOGGER.warning(
-                        "Jackery BLE %s: giving up after %d consecutive failures",
-                        device_id,
-                        consecutive_failures,
-                    )
-                    return
-                backoff = min(
-                    _RECONNECT_BACKOFF_SEC * (2**consecutive_failures),
-                    _MAX_BACKOFF_SEC,
-                )
+            while not self._stop_event.is_set():
                 ble_device = bluetooth.async_ble_device_from_address(
                     self._hass, address, connectable=True
                 )
                 if ble_device is None:
-                    # PROTOCOL.md §4: the SolarVault peripheral typically
-                    # stops advertising once a central is connected. After
-                    # a drop, the HA bluetooth manager may therefore not
-                    # hold a fresh ``BLEDevice`` for the cached MAC for a
-                    # while — yet a new advertisement is what would
-                    # otherwise be needed to spawn a new connection task.
-                    # Returning here would kill the runner and require an
-                    # external trigger (new advertisement) to reconnect,
-                    # which can take minutes or never happen. Instead we
-                    # wait one backoff window and look the address up again.
-                    # ``async_ble_device_from_address`` is cheap and
-                    # idempotent; the matcher callback in parallel still
-                    # works, and ``_stop_event`` aborts the wait cleanly on
-                    # integration unload.
-                    _LOGGER.info(
-                        "Jackery BLE %s: address %s not connectable right "
-                        "now; retrying in %.0fs",
+                    _LOGGER.debug(
+                        "Jackery BLE %s: address %s not connectable right now, "
+                        "waiting for next advertisement",
                         device_id,
                         address,
-                        backoff,
                     )
-                    consecutive_failures += 1
-                    try:
-                        await asyncio.wait_for(
-                            self._stop_event.wait(),
-                            timeout=backoff,
-                        )
-                        return  # stop_event fired during the wait  # noqa: TRY300
-                    except TimeoutError:
-                        continue
+                    return
                 stats.connect_attempts += 1
                 try:
                     client = await establish_connection(
@@ -829,29 +795,13 @@ class JackeryBleListener:
                 except BLEAK_RETRY_EXCEPTIONS as err:
                     stats.connect_failures += 1
                     stats.last_error = f"connect: {err}"
-                    # PROTOCOL.md §4: the peripheral may stop advertising
-                    # while paired with another central, so a one-shot
-                    # ``return`` here would leave the runner dead until a
-                    # fresh advertisement arrived. Back off and try again;
-                    # ``establish_connection`` already retries internally
-                    # ``max_attempts=3`` times, so the outer retry only
-                    # kicks in on hard failures (radio gone, peripheral
-                    # power-cycled).
-                    consecutive_failures += 1
-                    _LOGGER.info(
-                        "Jackery BLE %s connect failed: %s; retrying in %.0fs",
+                    _LOGGER.debug(
+                        "Jackery BLE %s connect failed: %s; will retry on next "
+                        "advertisement",
                         device_id,
                         err,
-                        backoff,
                     )
-                    try:
-                        await asyncio.wait_for(
-                            self._stop_event.wait(),
-                            timeout=backoff,
-                        )
-                        return  # stop_event fired during the wait  # noqa: TRY300
-                    except TimeoutError:
-                        continue
+                    return
 
                 stats.last_connect_at = datetime.now()
                 # Publish the live client so async_send_command can use
@@ -865,7 +815,8 @@ class JackeryBleListener:
                 )
 
                 async def _notify_callback(
-                    _characteristic: object, data: bytearray
+                    _characteristic: Any,  # noqa: ANN401
+                    data: bytearray,  # noqa: ANN401, RUF100
                 ) -> None:
                     await self._handle_notification(device_id, bytes(data))
 
@@ -874,7 +825,7 @@ class JackeryBleListener:
                     await client.start_notify(
                         ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
                     )
-                    consecutive_failures = 0
+                    stats.last_error = None
                     # Cache the negotiated MTU so ``async_send_command``
                     # can size per-frame bodies correctly. Different
                     # bleak backends expose this via ``mtu_size`` (int)
@@ -889,14 +840,10 @@ class JackeryBleListener:
                         self._async_keep_alive_loop(device_id),
                         name=f"jackery_ble_keepalive_{device_id}",
                     )
-                    # Park the connection until the device drops it or we are
-                    # asked to stop. We poll ``client.is_connected`` (a bleak
-                    # property with no awaitable) alongside the stop event: the
-                    # disconnect callback only records stats, and bleak backends
-                    # do not all fire it reliably, so the 1s poll is a deliberate
-                    # robustness net that a single ``Event.wait()`` cannot replace
-                    # (hence ASYNC110 is suppressed below).
-                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110, RUF100
+                    # Park the connection until the device drops it or we
+                    # are asked to stop. ``client.is_connected`` is polled
+                    # via the disconnect callback above.
+                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"
@@ -925,19 +872,14 @@ class JackeryBleListener:
 
                 if self._stop_event.is_set():
                     return
-                # PROTOCOL.md §4: BLE peripherals routinely drop idle
-                # sessions; the surrounding ``while not self._stop_event``
-                # loop reconnects after this backoff. Logged at INFO so
-                # the user sees the reconnect cadence in default logs
-                # (previously DEBUG, which made the silence invisible).
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Jackery BLE %s: lost link, backoff %ss before retry",
                     device_id,
-                    _LOST_LINK_BACKOFF_SEC,
+                    _RECONNECT_BACKOFF_SEC,
                 )
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(), timeout=_LOST_LINK_BACKOFF_SEC
+                        self._stop_event.wait(), timeout=_RECONNECT_BACKOFF_SEC
                     )
                 except TimeoutError:
                     continue
@@ -957,46 +899,25 @@ class JackeryBleListener:
             _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
         finally:
             self._connections.pop(device_id, None)
-            # PROTOCOL.md §4: the runner is the only thing keeping the
-            # device's GATT session alive. Any exit path (stop event,
-            # cancel, unhandled exception) means no further notifies will
-            # arrive until a new advertisement spawns a new task via
-            # ``_on_advertisement``. Log at INFO so a silent integration
-            # has a discoverable cause in the default log level — without
-            # this line the user reproduces the "BLE doesn't reconnect"
-            # symptom with no trace of the runner ever having existed.
-            _LOGGER.info(
-                "Jackery BLE %s: connection runner exited "
-                "(stop_event=%s); awaiting next advertisement to respawn",
-                device_id,
-                self._stop_event.is_set(),
-            )
 
     def _on_disconnect(self, device_id: str) -> None:
-        """Handle a peripheral disconnect for the given device.
-
-        Updates the device's `BleListenerStats.last_disconnect_at` to the current time and emits an info-level log indicating the device disconnected.
-
-        Parameters:
-            device_id (str): Identifier of the device whose disconnect is being recorded.
-        """  # noqa: E501, RUF100
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
-        # Promoted from DEBUG to INFO: peripheral disconnects are the
-        # primary symptom of BLE silence and must be visible in default
-        # HA logs so the user can correlate them with the keep-alive /
-        # reconnect-backoff timing in PROTOCOL.md §4.
-        _LOGGER.info("Jackery BLE %s: peripheral disconnected", device_id)
+        _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)
 
     # ------------------------------------------------------------------
     # Notification handler
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """Process a BLE notification: decode into a BleFrameObservation, update per-device statistics, resolve any pending ACK waiters for a successfully parsed frame, and forward the observation to the configured async sink.
+        """Decrypt + parse a 0xEE02 notify frame and forward it to the sink.
 
-        If a per-device AES key is available the method attempts to decrypt the raw payload and, on decryption failure, performs a single fallback try after base64-decoding the payload. A BleFrameObservation (containing the original bytes, base64 encoding, the parsed frame when decoding succeeds, or a human-readable decode error) is always created and forwarded to the sink. When a frame is parsed successfully this method resolves matching pending ACK futures and increments decode-related counters; when parsing fails it increments the decode-failure counter.
-        """  # noqa: E501, RUF100
+        The wire format is the live-captured binary layout documented in
+        :func:`.ble.decrypt_binary_notify` (``iv || ciphertext`` containing
+        a DFED-prefixed binary header + body + 4-byte trailer). Both the
+        raw bytes and the decoded :class:`.ble.BleBinaryFrame` are emitted
+        so the diagnostics surface can still help if decode fails.
+        """
         stats = self.stats_for(device_id)
         stats.frames_received += 1
         b64 = base64.b64encode(raw).decode("ascii")
@@ -1008,6 +929,16 @@ class JackeryBleListener:
         key = self._key_resolver(device_id)
         if key is None:
             decode_error = "no bluetoothKey for device"
+            if device_id not in self._missing_key_logged:
+                self._missing_key_logged.add(device_id)
+                _LOGGER.info(
+                    "Jackery BLE %s: notify frame received but no "
+                    "bluetoothKey is cached. The integration needs one "
+                    "successful /v1/device/system/list call to capture "
+                    "the per-device AES key — local BLE alone cannot "
+                    "decrypt frames until that lands.",
+                    device_id,
+                )
         else:
             try:
                 parsed = ble.decrypt_binary_notify(raw, key)
@@ -1020,6 +951,10 @@ class JackeryBleListener:
                     decoded = base64.b64decode(raw, validate=False)
                     parsed = ble.decrypt_binary_notify(decoded, key)
                     decode_error = None
+            if parsed is not None:
+                # Successful decode — clear the one-shot diagnostic flag so
+                # a future key-loss can surface again at INFO.
+                self._missing_key_logged.discard(device_id)
 
         observation = BleFrameObservation(
             received_at=datetime.now(),
@@ -1028,9 +963,6 @@ class JackeryBleListener:
             parsed=parsed,
             decode_error=decode_error,
         )
-        if parsed is not None and parsed.cmd == 107:  # noqa: PLR2004
-            q = self._pending_property_query_starts.get(device_id)
-            observation.source_started_at = q.popleft() if q else None
         stats.last_frame = observation
         if parsed is not None:
             stats.frames_decoded += 1
@@ -1047,8 +979,6 @@ class JackeryBleListener:
             self._resolve_pending_acks(device_id, parsed)
         else:
             stats.frames_decode_failed += 1
-            if decode_error is not None:
-                stats.last_error = f"notify: {decode_error}"
         try:
             await self._sink(device_id, observation)
         except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
