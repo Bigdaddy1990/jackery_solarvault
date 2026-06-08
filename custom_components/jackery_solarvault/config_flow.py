@@ -21,6 +21,7 @@ from .const import (
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
     CONF_LOCAL_MQTT_ENABLE,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
@@ -110,6 +111,39 @@ def _flow_options(
         key: user_input.get(key, current.get(key, default))
         for key, default in _OPTION_DEFAULTS.items()
     }
+
+
+def _entry_data_from_api_login(
+    account: str,
+    password: str,
+    api: JackeryApi,
+    existing_entry: ConfigEntry | None = None,
+) -> dict[str, Any]:
+    """Build config-entry data enriched with login-derived bootstrap fields."""
+    data: dict[str, Any] = {
+        CONF_USERNAME: account,
+        CONF_PASSWORD: password,
+    }
+    mqtt_mac_id = api.mqtt_mac_id
+    if mqtt_mac_id:
+        data[CONF_MQTT_MAC_ID] = mqtt_mac_id
+    elif existing_entry is not None and isinstance(
+        existing_entry.data.get(CONF_MQTT_MAC_ID), str
+    ):
+        data[CONF_MQTT_MAC_ID] = existing_entry.data[CONF_MQTT_MAC_ID]
+
+    region_code = api.region_code
+    if region_code:
+        data[CONF_REGION_CODE] = region_code
+    elif existing_entry is not None and isinstance(
+        existing_entry.data.get(CONF_REGION_CODE), str
+    ):
+        data[CONF_REGION_CODE] = existing_entry.data[CONF_REGION_CODE]
+
+    snapshot = api.mqtt_session_snapshot()
+    if snapshot is not None:
+        data[ENTRY_BOOTSTRAP_MQTT_SESSION] = dict(snapshot)
+    return data
 
 
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
@@ -368,10 +402,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_create_entry(
                     title=account,
-                    data={
-                        CONF_USERNAME: account,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                    },
+                    data=_entry_data_from_api_login(
+                        account,
+                        user_input[CONF_PASSWORD],
+                        api,
+                    ),
                     options=_flow_options(user_input),
                 )
 
@@ -428,10 +463,12 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     return self.async_update_reload_and_abort(
                         entry,
-                        data_updates={
-                            CONF_USERNAME: account,
-                            CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        },
+                        data_updates=_entry_data_from_api_login(
+                            account,
+                            user_input[CONF_PASSWORD],
+                            api,
+                            entry,
+                        ),
                         options=_reconfigure_options(entry, user_input),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
@@ -523,7 +560,12 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     entry,
-                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    data_updates=_entry_data_from_api_login(
+                        stored_username,
+                        user_input[CONF_PASSWORD],
+                        api,
+                        entry,
+                    ),
                     reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
                 )
 

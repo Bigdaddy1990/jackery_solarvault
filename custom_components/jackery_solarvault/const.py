@@ -192,6 +192,7 @@ CODE_TOKEN_EXPIRED: Final = 10402
 # --- Config / Options --------------------------------------------------------
 CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
 CONF_REGION_CODE: Final = "region_code"
+ENTRY_BOOTSTRAP_MQTT_SESSION: Final = "bootstrap_mqtt_session"
 CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
 CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
 CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
@@ -1180,6 +1181,11 @@ REDACT_KEYS: Final = {
     "bssid",
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
+    MQTT_SESSION_USER_ID,
+    MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_MAC_ID,
+    MQTT_SESSION_MAC_ID_SOURCE,
     FIELD_MAC_ID,
     FIELD_TOKEN,
     FIELD_MQTT_PASSWORD,

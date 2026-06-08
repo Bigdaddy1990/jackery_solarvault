@@ -1143,6 +1143,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if new_index:
             self._device_index = new_index
             self._last_discovery_refresh_monotonic = time.monotonic()
+            await self._async_save_discovery_cache()
             _LOGGER.info(
                 "Jackery: discovered %d device(s) from /v1/device/system/list",
                 len(new_index),
@@ -1174,6 +1175,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         self._device_index = new_index
         self._last_discovery_refresh_monotonic = time.monotonic()
+        if new_index:
+            await self._async_save_discovery_cache()
         if not new_index:
             _LOGGER.error(
                 "Jackery: no devices found on either /v1/device/system/list "
@@ -8939,6 +8942,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 elapsed,
                 interval_sec,
             )
+        await self._async_persist_mqtt_session_if_changed()
+        await self._async_persist_local_daily_snapshots_if_changed()
         return result
 
     # ------------------------------------------------------------------

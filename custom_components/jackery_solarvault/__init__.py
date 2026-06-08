@@ -175,6 +175,44 @@ def _async_clean_legacy_entities(
     )
 
 
+def _entry_bootstrap_mqtt_session(entry: JackeryConfigEntry) -> dict[str, str] | None:
+    """Return a validated bootstrap MQTT session snapshot stored on the entry."""
+    raw = entry.data.get(ENTRY_BOOTSTRAP_MQTT_SESSION)
+    if not isinstance(raw, dict):
+        return None
+    user_id = raw.get(MQTT_SESSION_USER_ID)
+    seed_b64 = raw.get(MQTT_SESSION_SEED_B64)
+    mac_id = raw.get(MQTT_SESSION_MAC_ID)
+    if not all(isinstance(value, str) and value for value in (user_id, seed_b64, mac_id)):
+        return None
+    snapshot: dict[str, str] = {
+        MQTT_SESSION_USER_ID: user_id,
+        MQTT_SESSION_SEED_B64: seed_b64,
+        MQTT_SESSION_MAC_ID: mac_id,
+    }
+    source = raw.get(MQTT_SESSION_MAC_ID_SOURCE)
+    if isinstance(source, str) and source:
+        snapshot[MQTT_SESSION_MAC_ID_SOURCE] = source
+    return snapshot
+
+
+async def _async_prime_entry_bootstrap_mqtt_session(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> dict[str, str] | None:
+    """Persist a setup-flow bootstrap MQTT session into the cache store once."""
+    snapshot = _entry_bootstrap_mqtt_session(entry)
+    if snapshot is None:
+        return None
+    cached = await async_load_mqtt_session(hass, entry.entry_id)
+    if cached != snapshot:
+        await async_save_mqtt_session(hass, entry.entry_id, **snapshot)  # type: ignore[arg-type]
+    cleaned = dict(entry.data)
+    if ENTRY_BOOTSTRAP_MQTT_SESSION in cleaned:
+        cleaned.pop(ENTRY_BOOTSTRAP_MQTT_SESSION, None)
+        hass.config_entries.async_update_entry(entry, data=cleaned)
+    return snapshot
+
+
 async def _async_authenticate(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
@@ -210,8 +248,11 @@ async def _async_authenticate(
     # Hydrate the MQTT session from the persistent cache BEFORE attempting
     # the cloud login. The MQTT password derivation is local, so a cached
     # ``userId/macId/seed`` triple lets the coordinator (re-)open the broker
-    # session even while ``/v1/user/login`` is unreachable.
-    cached = await async_load_mqtt_session(hass, entry.entry_id)
+    # session even while ``/v1/user/login`` is unreachable. The config flow
+    # can seed the very first cache row via ``ENTRY_BOOTSTRAP_MQTT_SESSION``
+    # so the initial coordinator setup does not depend on a second login.
+    bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry)
+    cached = await async_load_mqtt_session(hass, entry.entry_id) or bootstrap
     if cached:
         api.hydrate_mqtt_session(
             user_id=cached[MQTT_SESSION_USER_ID],
@@ -389,11 +430,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # asyncio.gather(return_exceptions=True) widens the result element
         # type to ``T | BaseException``; the cast surfaces that contract for
         # mypy without changing runtime behaviour.
-        refresh_result, mqtt_result = cast(
-            "tuple[BaseException | None, BaseException | None]",
+        entry.runtime_data = coordinator
+
+        async def _async_start_direct_local_mqtt_if_needed() -> None:
+            """Start the direct local-MQTT client when no runtime instance exists yet."""
+            if _local_mqtt_client(hass, entry) is not None:
+                return
+            await _async_start_local_mqtt(hass, entry, coordinator)
+
+        (
+            refresh_result,
+            mqtt_result,
+            local_listener_result,
+            direct_local_mqtt_result,
+            ble_result,
+        ) = cast(
+            "tuple[BaseException | None, BaseException | None, BaseException | None, BaseException | None, BaseException | None]",
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
+                coordinator.async_start_local_mqtt_listener(),
+                _async_start_direct_local_mqtt_if_needed(),
+                coordinator.async_start_ble_transport(),
                 return_exceptions=True,
             ),
         )
@@ -421,26 +479,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             _LOGGER.warning(
                 "Jackery MQTT push could not start during setup: %s", mqtt_result
             )
-        entry.runtime_data = coordinator
+        if isinstance(local_listener_result, BaseException):
+            _LOGGER.warning(
+                "Jackery HA-MQTT listener could not start during setup: %s",
+                local_listener_result,
+            )
+        if isinstance(direct_local_mqtt_result, BaseException):
+            _LOGGER.warning(
+                "Jackery direct local MQTT client could not start during setup: %s",
+                direct_local_mqtt_result,
+            )
+        if isinstance(ble_result, BaseException):
+            _LOGGER.warning(
+                "Jackery BLE transport could not start during setup: %s",
+                ble_result,
+            )
         # Do not prune optional runtime sensors here: app/MQTT/Combine backed
         # properties can arrive after the first refresh and would otherwise be
         # removed incorrectly.
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         coordinator.async_start_statistics_imports()
-        await coordinator.async_start_local_mqtt_listener()
-        if _local_mqtt_client(hass, entry) is None:
-            try:
-                await _async_start_local_mqtt(hass, entry, coordinator)
-            except BaseException as err:  # noqa: BLE001
-                _LOGGER.warning(
-                    "Jackery direct local MQTT client could not start during setup: %s",
-                    err,
-                )
-        # Optional BLE listener (Phase 3a). Failures are absorbed inside
-        # the coordinator: BLE is an opt-in diagnostic extra, never a
-        # hard dependency of integration setup.
-        await coordinator.async_start_ble_transport()
         # Push the local third-party MQTT bridge config to every device when the
         # user has enabled it in the options flow. This sends cmd=113 via BLE
         # first (so it works during a cloud outage) and lets the device push
