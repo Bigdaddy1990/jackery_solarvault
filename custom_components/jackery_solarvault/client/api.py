@@ -542,6 +542,11 @@ class JackeryApi:  # noqa: PLR0904
         """Return the MAC ID assigned to this MQTT session by login."""
         return self._mqtt_mac_id
 
+    @property
+    def region_code(self) -> str | None:
+        """Return the region code currently pinned for HTTP login calls."""
+        return self._region_code
+
     async def _ensure_token(self) -> str:
         if self._token is None:
             async with self._lock:
