@@ -296,7 +296,6 @@ skip-magic-trailing-comma = false
 preview = true
 select = [
   "ANN",
-  "A001",   # Variable {name} is shadowing a Python builtin
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
   "BLE",    # ble?
@@ -316,7 +315,6 @@ select = [
   "I",      # isort
   "INP",    # flake8-no-pep420
   "ISC",    # flake8-implicit-str-concat
-  "ICN001", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
   "N",
   "N804",   # First argument of a class method should be named cls
@@ -360,7 +358,6 @@ select = [
   "T100",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
-  "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
   "UP031",  # Use format specifiers instead of percent format
@@ -383,7 +380,7 @@ hass = "homeassistant.__main__:main"
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402","RUF067"]
+"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
