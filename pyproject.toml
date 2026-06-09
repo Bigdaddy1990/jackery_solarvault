@@ -372,12 +372,9 @@ select = [
 ignore = ["TID252","PLC0415"]
 fixable = ["ALL"]
 unfixable = []
-future-annotations = false
+future-annotations = true
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
-"*/scripts/**" = ["E901"]
-"*/*annotetedyaml/**" = ["E901","E501"]
-"*/*tests/**" = ["E901"]
 
 [project.scripts]
 hass = "homeassistant.__main__:main"
@@ -501,7 +498,6 @@ exclude_lines = [
   "raise NotImplementedError",
   # TYPE_CHECKING and @overload blocks are never executed during pytest run
   "if TYPE_CHECKING:",
-  "@overload",
 ]
 
 [tool.coverage.html]
