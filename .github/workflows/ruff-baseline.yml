@@ -9,6 +9,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' && (
+          (vars.RUFF_BASELINE_ALLOWLIST == '' && github.actor == github.repository_owner) ||
           (vars.RUFF_BASELINE_ALLOWLIST != '' && contains(format(',{0},', vars.RUFF_BASELINE_ALLOWLIST), format(',{0},', github.actor)))
         )
       }}
