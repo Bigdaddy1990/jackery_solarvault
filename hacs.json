@@ -11,5 +11,5 @@
   ],
   "homeassistant": "2026.6.0",
   "name": "Jackery SolarVault",
-  "zip_release": false
+  "zip_release": true
 }
