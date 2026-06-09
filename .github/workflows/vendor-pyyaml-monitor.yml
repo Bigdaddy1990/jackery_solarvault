@@ -1,20 +1,12 @@
 name: Monitor vendored PyYAML
 
 on:
+  push:
   schedule:
     # Run every Wednesday at 02:30 UTC to validate PyYAML releases after the
     # upstream Tuesday release cadence.
     - cron: "30 2 * * 3"
   workflow_dispatch:
-    inputs:
-      fail_on_outdated:
-        description: "Fail the run when PyPI ships a newer stable release?"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
