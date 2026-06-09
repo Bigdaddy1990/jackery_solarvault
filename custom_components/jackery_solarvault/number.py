@@ -6,10 +6,9 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import (
     NumberDeviceClass,
@@ -18,11 +17,8 @@ from homeassistant.components.number import (
     NumberMode,
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .api import JackeryAuthError
 from .const import (
     DOMAIN,
@@ -49,7 +45,6 @@ from .const import (
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
     append_unique_entity,
@@ -57,6 +52,15 @@ from .util import (
     safe_float,
     safe_int,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -94,7 +98,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     allowed_values: (
         Callable[[dict[str, Any]], tuple[float, ...]] | tuple[float, ...] | None
     ) = None
-    value_transform: Callable[[float], Any] = lambda v: round(v)
+    value_transform: Callable[[float], Any] = round
     validate_range: bool = False
     raise_on_setter_error: bool = True
 
@@ -300,7 +304,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_section=PAYLOAD_PRICE,
         setter=_set_single_price,
         dynamic_unit=_single_tariff_dynamic_unit,
-        value_transform=lambda v: float(v),
+        value_transform=float,
     ),
 )
 
