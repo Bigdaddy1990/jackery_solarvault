@@ -695,7 +695,7 @@ class Emitter:  # noqa: D101, PLR0904
                 )
         return anchor
 
-    def analyze_scalar(self, scalar):  # noqa: ANN001, ANN201, C901, D102, PLR0912, PLR0914, PLR0915
+    def analyze_scalar(self, scalar):  # noqa: ANN001, ANN201, D102, PLR0912, PLR0914, PLR0915
 
         # Empty scalar is a special case.
         if not scalar:
