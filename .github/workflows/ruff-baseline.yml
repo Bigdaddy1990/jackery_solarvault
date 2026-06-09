@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install --upgrade pip ruff pre-commit homeassitstant
+      - run: python -m pip install pip ruff pre-commit homeassitstant --upgrade 
       - run: |
           ruff check . --fix
           ruff check . --fix --unsafe-fixes
