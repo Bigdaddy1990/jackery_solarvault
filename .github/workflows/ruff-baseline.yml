@@ -21,6 +21,28 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
+          ruff check . --fix .\custom_components\jackery_solarvault\ || true
+          ruff check . --unsafe-fixes .\custom_components\jackery_solarvault\ || true
+          ruff check . --target-version py314 .\custom_components\jackery_solarvault\|| true
+          ruff check . --preview .\custom_components\jackery_solarvault\ || true
+          ruff check . --line-length 88 .\custom_components\jackery_solarvault\ || true
+          ruff check . --show-fixes .\custom_components\jackery_solarvault\ || true
+          ruff check . --add-noqa .\custom_components\jackery_solarvault\ || true
+          ruff check . --extend-select "E","F","I","B","UP","ASYNC","D","W","RUF100","INP","F541","ANN","Q","SIM","NPY","N","E501" .\custom_components\jackery_solarvault\ || true
+          ruff format .\custom_components\jackery_solarvault\ || true
+          ruff check . --fix .\custom_components\jackery_solarvault\ || true
+          ruff check . --output-format=github .\custom_components\jackery_solarvault\ || true
+          ruff check . --fix .\tests\ || true
+          ruff check . --unsafe-fixes .\tests\ || true
+          ruff check . --target-version py314 .\tests\ || true
+          ruff check . --preview .\tests\ || true
+          ruff check . --line-length 88 .\tests\ || true
+          ruff check . --show-fixes .\tests\ || true
+          ruff check . --add-noqa .\tests\ || true
+          ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" .\tests\ || true
+          ruff check . --fix .\tests\ || true
+          ruff check . --output-format=github .\tests\ || true
+          ruff format .\tests\
           ruff check . --fix || true
           ruff check . --unsafe-fixes || true
           ruff check . --target-version py314 || true
@@ -32,6 +54,7 @@ jobs:
           ruff check . --fix || true
           ruff check . --output-format=github || true
           ruff format .
+
 
       - name: Commit baseline changes
         run: |
