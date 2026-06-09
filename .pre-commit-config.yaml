@@ -89,3 +89,9 @@ repos:
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
+      
+  - repo: https://github.com/cheickmec/smellcheck
+    rev: v0.3.1
+    hooks:
+      - id: smellcheck
+        args: ['--fail-on', 'warning']
