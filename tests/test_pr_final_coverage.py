@@ -21,7 +21,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers shared across tests
 # ---------------------------------------------------------------------------
@@ -50,7 +49,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_false_when_alert_absent_from_payload(  # noqa: PLR6301
         self,
     ) -> None:
-        """available must be False when the alert_id is not in the coordinator data."""
+        """Available must be False when the alert_id is not in the coordinator data."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -63,7 +62,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_false_when_weather_plan_is_empty(  # noqa: PLR6301
         self,
     ) -> None:
-        """available must be False when weather_plan has no matching storm alert."""
+        """Available must be False when weather_plan has no matching storm alert."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -78,7 +77,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_false_when_alert_id_not_in_storm_list(  # noqa: PLR6301
         self,
     ) -> None:
-        """available must be False when storm list contains a different alert_id."""
+        """Available must be False when storm list contains a different alert_id."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -97,7 +96,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_true_when_alert_exists_and_coordinator_healthy(  # noqa: PLR6301
         self,
     ) -> None:
-        """available must be True when the alert is present and coordinator is healthy."""
+        """Available must be True when the alert is present and coordinator is healthy."""  # noqa: E501
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -130,9 +129,7 @@ class TestDeleteStormAlertButtonAvailable:
             },
         }
         coordinator = _make_mock_coordinator("dev1", payload)
-        btn = JackeryDeleteStormAlertButton(
-            coordinator, "dev1", alert_id="temp-alert"
-        )
+        btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="temp-alert")
         # Alert is present → _alert is non-empty
         assert btn._alert != {}  # noqa: SLF001
 
@@ -148,15 +145,14 @@ class TestDeleteStormAlertButtonAvailable:
 
 
 class TestTranslatedHomeAssistantErrorReRaise:
-    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""
+    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""  # noqa: E501
 
     async def test_reboot_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""
-        from homeassistant.exceptions import HomeAssistantError
-
+        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
         from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -178,11 +174,10 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -202,11 +197,10 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -233,11 +227,10 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -256,21 +249,20 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_query_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""
-        from homeassistant.exceptions import HomeAssistantError
-
+        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButton,
             JackeryQueryButtonDescription,
         )
+        from homeassistant.exceptions import HomeAssistantError
 
         translated_err = HomeAssistantError(
             translation_domain="jackery_solarvault",
             translation_key="mqtt_send_failed",
         )
 
-        async def _fail(coord: Any, dev_id: str) -> None:  # noqa: RUF029
-            raise translated_err  # noqa: TRY301
+        async def _fail(coord: Any, dev_id: str) -> None:  # noqa: ANN401, RUF029
+            raise translated_err
 
         desc = JackeryQueryButtonDescription(
             key="test_q",
@@ -292,9 +284,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped, not re-raised."""
-        from homeassistant.exceptions import HomeAssistantError
-
         from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         untranslated_err = HomeAssistantError("plain HA error, no translation_key")
@@ -341,7 +332,7 @@ class TestAsyncSetup:
         calls: list[Any] = []
         with patch(
             "custom_components.jackery_solarvault.async_setup_services",
-            side_effect=lambda h: calls.append(h),
+            side_effect=calls.append,
         ):
             await async_setup(hass, {})
         assert len(calls) == 1
@@ -391,12 +382,11 @@ def test_query_button_descriptions_unique_cmds() -> None:
 
 def test_query_button_has_config_entity_category() -> None:
     """JackeryQueryButton must have EntityCategory.CONFIG."""
-    from homeassistant.const import EntityCategory
-
     from custom_components.jackery_solarvault.button import (
         JackeryQueryButton,
         JackeryQueryButtonDescription,
     )
+    from homeassistant.const import EntityCategory
 
     desc = JackeryQueryButtonDescription(
         key="some_cmd",
@@ -460,7 +450,10 @@ def test_legacy_suffix_matches_digits_only_head_with_underscore_prefix_suffix() 
     )
 
     # head = "99999", suffix = "_today_battery_charge" → must match
-    assert _legacy_suffix_matches("99999_today_battery_charge", "_today_battery_charge") is True
+    assert (
+        _legacy_suffix_matches("99999_today_battery_charge", "_today_battery_charge")
+        is True
+    )  # noqa: E501
 
 
 def test_legacy_suffix_matches_rejects_head_with_leading_letter() -> None:
@@ -505,9 +498,7 @@ def test_legacy_suffix_matches_prevents_current_entity_deletion_regression() -> 
 
 
 async def test_async_unload_entry_returns_false_when_unload_platforms_fails() -> None:
-    """async_unload_entry must return False when async_unload_platforms returns False."""
-    from unittest.mock import patch
-
+    """async_unload_entry must return False when async_unload_platforms returns False."""  # noqa: E501
     from custom_components.jackery_solarvault import async_unload_entry
 
     hass = MagicMock()
@@ -551,7 +542,7 @@ async def test_async_unload_entry_returns_true_when_platforms_unloaded() -> None
 
 
 def test_delete_storm_alert_button_available_with_integer_zero_alert_id() -> None:
-    """available must be True when the matching alert has alertId=0 (edge case)."""
+    """Available must be True when the matching alert has alertId=0 (edge case)."""
     from custom_components.jackery_solarvault.button import (
         JackeryDeleteStormAlertButton,
     )
@@ -607,10 +598,9 @@ def test_blocked_topic_filters_scoped_topic_not_blocked() -> None:
 
 
 async def test_read_schedule_button_wraps_untranslated_ha_error() -> None:
-    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""
-    from homeassistant.exceptions import HomeAssistantError
-
+    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""  # noqa: E501
     from custom_components.jackery_solarvault.button import JackeryReadScheduleButton
+    from homeassistant.exceptions import HomeAssistantError
 
     coordinator = _make_mock_coordinator("12345")
     plain_err = HomeAssistantError("raw error without translation_key")

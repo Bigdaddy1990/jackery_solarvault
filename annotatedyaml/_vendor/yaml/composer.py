@@ -10,55 +10,51 @@ class ComposerError(MarkedYAMLError):  # noqa: D101
 
 
 class Composer:  # noqa: D101
-    def __init__(self) -> None:  # noqa: D107
-        """
-        Initialize the composer and its anchor registry.
-        
+    def __init__(self) -> None:
+        """Initialize the composer and its anchor registry.
+
         Creates self.anchors, a dictionary that maps anchor names (strings) to composed node objects used to resolve aliases during document composition.
-        """
+        """  # noqa: E501
         self.anchors = {}
 
-    def check_node(self) -> bool:  # noqa: D102
+    def check_node(self) -> bool:
         # Drop the STREAM-START event.
-        """
-        Indicates whether another document is available in the event stream.
-        
-        If a leading `StreamStartEvent` is present, it is consumed. 
-        
+        """Indicates whether another document is available in the event stream.
+
+        If a leading `StreamStartEvent` is present, it is consumed.
+
         Returns:
             `true` if the stream has not reached a `StreamEndEvent` (another document is available), `false` otherwise.
-        """
+        """  # noqa: E501
         if self.check_event(StreamStartEvent):  # noqa: F405
             self.get_event()
 
         # If there are more documents available?
         return not self.check_event(StreamEndEvent)  # noqa: F405
 
-    def get_node(self):  # noqa: ANN201, D102
+    def get_node(self):  # noqa: ANN201
         # Get the root node of the next document.
-        """
-        Retrieve the root node of the next YAML document or None if the stream has been exhausted.
-        
+        """Retrieve the root node of the next YAML document or None if the stream has been exhausted.
+
         Returns:
             node (Node | None): The composed document root node, or None when no further documents are available.
-        """
+        """  # noqa: E501
         if not self.check_event(StreamEndEvent):  # noqa: F405
             return self.compose_document()
         return None
 
-    def get_single_node(self):  # noqa: ANN201, D102
+    def get_single_node(self):  # noqa: ANN201
         # Drop the STREAM-START event.
-        """
-        Compose and return the single document from the current YAML stream, or None if the stream is empty.
-        
+        """Compose and return the single document from the current YAML stream, or None if the stream is empty.
+
         This consumes the initial STREAM-START and final STREAM-END events. If a document is present, it is composed and returned; if the stream is empty, returns `None`.
-        
+
         Returns:
             The document root node, or `None` if the stream contains no documents.
-        
+
         Raises:
             ComposerError: If more than one document is found in the stream.
-        """
+        """  # noqa: E501
         self.get_event()
 
         # Compose a document if the stream is not empty.
@@ -81,16 +77,15 @@ class Composer:  # noqa: D101
 
         return document
 
-    def compose_document(self):  # noqa: ANN201, D102
+    def compose_document(self):  # noqa: ANN201
         # Drop the DOCUMENT-START event.
-        """
-        Compose a single YAML document from the event stream and return its root node.
-        
+        """Compose a single YAML document from the event stream and return its root node.
+
         This consumes the document start and end events from the stream and resets the composer's anchor registry for the next document.
-        
+
         Returns:
             The root node of the composed document.
-        """
+        """  # noqa: E501
         self.get_event()
 
         # Compose the root node.
@@ -102,20 +97,19 @@ class Composer:  # noqa: D101
         self.anchors = {}
         return node
 
-    def compose_node(self, parent, index):  # noqa: ANN001, ANN201, D102
-        """
-        Compose and return a node for the next events in the stream, resolving anchors and aliases.
-        
+    def compose_node(self, parent, index):  # noqa: ANN001, ANN201
+        """Compose and return a node for the next events in the stream, resolving anchors and aliases.
+
         Parameters:
             parent: The parent node used to inform resolver context, or `None` if there is no parent.
             index: The index (position) within the parent used to inform resolver context, or `None` when not applicable.
-        
+
         Returns:
             node: The composed node (a `ScalarNode`, `SequenceNode`, or `MappingNode`), or an existing node referenced by an alias.
-        
+
         Raises:
             ComposerError: If an alias refers to an undefined anchor or if an anchor is defined more than once.
-        """
+        """  # noqa: E501
         if self.check_event(AliasEvent):  # noqa: F405
             event = self.get_event()
             anchor = event.anchor
@@ -143,16 +137,15 @@ class Composer:  # noqa: D101
         self.ascend_resolver()
         return node
 
-    def compose_scalar_node(self, anchor):  # noqa: ANN001, ANN201, D102
-        """
-        Compose and return a ScalarNode for the next scalar event, registering it under `anchor` if provided.
-        
+    def compose_scalar_node(self, anchor):  # noqa: ANN001, ANN201
+        """Compose and return a ScalarNode for the next scalar event, registering it under `anchor` if provided.
+
         Parameters:
             anchor (str | None): Anchor name to register the created node under, or `None` to skip registration.
-        
+
         Returns:
             ScalarNode: The composed scalar node with its tag resolved when the event tag is `None` or `"!"`.
-        """
+        """  # noqa: E501
         event = self.get_event()
         tag = event.tag
         if tag is None or tag == "!":
@@ -164,18 +157,17 @@ class Composer:  # noqa: D101
             self.anchors[anchor] = node
         return node
 
-    def compose_sequence_node(self, anchor):  # noqa: ANN001, ANN201, D102
-        """
-        Compose a YAML sequence node from the event stream.
-        
+    def compose_sequence_node(self, anchor):  # noqa: ANN001, ANN201
+        """Compose a YAML sequence node from the event stream.
+
         Creates a SequenceNode for the upcoming sequence start event, resolves its tag when unspecified, registers the node under `anchor` if provided, composes child nodes until the sequence end event, sets the node's end mark, and returns the composed node.
-        
+
         Parameters:
             anchor (str | None): Anchor name to associate with the created node, or `None` if no anchor.
-        
+
         Returns:
             SequenceNode: The composed sequence node with its children and end mark set.
-        """
+        """  # noqa: E501
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":
@@ -193,18 +185,17 @@ class Composer:  # noqa: D101
         node.end_mark = end_event.end_mark
         return node
 
-    def compose_mapping_node(self, anchor):  # noqa: ANN001, ANN201, D102
-        """
-        Compose a mapping node from the upcoming events in the stream.
-        
+    def compose_mapping_node(self, anchor):  # noqa: ANN001, ANN201
+        """Compose a mapping node from the upcoming events in the stream.
+
         Resolves the node tag if unspecified, creates a MappingNode, registers it under `anchor` if provided, then composes key/value node pairs until the mapping end event and sets the node's end mark.
-        
+
         Parameters:
             anchor (str | None): Optional anchor name to register the composed node under.
-        
+
         Returns:
             MappingNode: The composed mapping node whose `value` is a list of (key_node, value_node) pairs.
-        """
+        """  # noqa: E501
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":

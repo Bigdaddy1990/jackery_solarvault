@@ -71,7 +71,7 @@ try:
     )
 
     _INIT_OK = True
-except (SyntaxError, ImportError):
+except SyntaxError, ImportError:
     _INIT_OK = False
     _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # type: ignore[assignment]
     _async_start_local_mqtt = None  # type: ignore[assignment]

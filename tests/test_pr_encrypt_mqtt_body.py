@@ -16,7 +16,6 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body
 
-
 # ---------------------------------------------------------------------------
 # Basic contract
 # ---------------------------------------------------------------------------
@@ -77,7 +76,7 @@ def test_encrypt_mqtt_body_rejects_32_byte_key() -> None:
 def test_encrypt_mqtt_body_error_message_includes_actual_length() -> None:
     """ValueError message must state the actual key length received."""
     bad_key = b"too_short"  # 9 bytes
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:  # noqa: PT011
         encrypt_mqtt_body({"cmd": 1}, bad_key)
     assert str(len(bad_key)) in str(exc_info.value)
 

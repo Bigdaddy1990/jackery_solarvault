@@ -79,12 +79,11 @@ class Parser:  # noqa: D101, PLR0904
         "!!": "tag:yaml.org,2002:",
     }
 
-    def __init__(self) -> None:  # noqa: D107
-        """
-        Initialize parser internal state and prepare for parsing.
-        
+    def __init__(self) -> None:
+        """Initialize parser internal state and prepare for parsing.
+
         Sets up lookahead cache, directive-derived YAML version and tag handle storage, parser continuation stacks, collection mark stack, and assigns the initial parsing state to begin stream parsing.
-        """
+        """  # noqa: E501
         self.current_event = None
         self.yaml_version = None
         self.tag_handles = {}
@@ -92,27 +91,25 @@ class Parser:  # noqa: D101, PLR0904
         self.marks = []
         self.state = self.parse_stream_start
 
-    def dispose(self) -> None:  # noqa: D102
+    def dispose(self) -> None:
         # Reset the state attributes (to clear self-references)
-        """
-        Clear parser state to break reference cycles and free resources.
-        
+        """Clear parser state to break reference cycles and free resources.
+
         This resets the internal state stack and clears the current state function so the parser no longer holds references to its continuations or other objects.
-        """
+        """  # noqa: E501
         self.states = []
         self.state = None
 
-    def check_event(self, *choices) -> bool:  # noqa: ANN002, D102
+    def check_event(self, *choices) -> bool:  # noqa: ANN002
         # Check the type of the next event.
-        """
-        Check whether the next parse event matches any of the provided event classes.
-        
+        """Check whether the next parse event matches any of the provided event classes.
+
         Parameters:
             *choices (type): Zero or more event classes to test the next event against. If omitted, the method only checks whether a next event is available.
-        
+
         Returns:
             True if the next event is an instance of any of the provided classes, or (when no classes are given) if any next event is available; False otherwise.
-        """
+        """  # noqa: E501
         if self.current_event is None and self.state:
             self.current_event = self.state()
         if self.current_event is not None:
@@ -123,30 +120,28 @@ class Parser:  # noqa: D101, PLR0904
                     return True
         return False
 
-    def peek_event(self):  # noqa: ANN201, D102
+    def peek_event(self):  # noqa: ANN201
         # Get the next event.
-        """
-        Peek at the next parser event without advancing the parser.
-        
+        """Peek at the next parser event without advancing the parser.
+
         Subsequent calls return the same event until `get_event()` is called to consume it.
-        
+
         Returns:
             Event or None: The next parsing event, or `None` when the parser has no further events.
-        """
+        """  # noqa: E501
         if self.current_event is None and self.state:
             self.current_event = self.state()
         return self.current_event
 
-    def get_event(self):  # noqa: ANN201, D102
+    def get_event(self):  # noqa: ANN201
         # Get the next event and proceed further.
-        """
-        Retrieve and consume the next parser event.
-        
+        """Retrieve and consume the next parser event.
+
         If no event is currently cached, compute it using the parser's current state function. The returned event is removed from the lookahead cache so subsequent calls will advance the parser.
-        
+
         Returns:
             The next Event object, or `None` if no more events are available.
-        """
+        """  # noqa: E501
         if self.current_event is None and self.state:
             self.current_event = self.state()
         value = self.current_event
@@ -157,15 +152,13 @@ class Parser:  # noqa: D101, PLR0904
     # implicit_document ::= block_node DOCUMENT-END*
     # explicit_document ::= DIRECTIVE* DOCUMENT-START block_node? DOCUMENT-END*
 
-    def parse_stream_start(self):  # noqa: ANN201, D102
-
+    def parse_stream_start(self):  # noqa: ANN201
         # Parse the stream start.
-        """
-        Emit a StreamStartEvent for the next token and transition the parser to parse an implicit document start.
-        
+        """Emit a StreamStartEvent for the next token and transition the parser to parse an implicit document start.
+
         Returns:
             StreamStartEvent: Event constructed from the consumed StreamStartToken's start and end marks and its encoding.
-        """
+        """  # noqa: E501
         token = self.get_token()
         event = StreamStartEvent(  # noqa: F405
             token.start_mark, token.end_mark, encoding=token.encoding
@@ -176,17 +169,15 @@ class Parser:  # noqa: D101, PLR0904
 
         return event
 
-    def parse_implicit_document_start(self):  # noqa: ANN201, D102
-
+    def parse_implicit_document_start(self):  # noqa: ANN201
         # Parse an implicit document.
-        """
-        Initiate parsing of an implicit YAML document when the next token does not start a directive, an explicit document, or the stream end.
-        
+        """Initiate parsing of an implicit YAML document when the next token does not start a directive, an explicit document, or the stream end.
+
         When an implicit document is started, records the default tag handles, emits a DocumentStartEvent with explicit=False, and updates the parser state to parse the document content and its end. If the stream begins with a directive, an explicit document start, or stream end, delegates to the explicit document-start handling and returns that resulting event.
-        
+
         Returns:
             DocumentStartEvent: for an implicit document, or the event produced when handling an explicit document start or stream end.
-        """
+        """  # noqa: E501
         if not self.check_token(DirectiveToken, DocumentStartToken, StreamEndToken):  # noqa: F405
             self.tag_handles = self.DEFAULT_TAGS
             token = self.peek_token()
@@ -201,20 +192,18 @@ class Parser:  # noqa: D101, PLR0904
 
         return self.parse_document_start()
 
-    def parse_document_start(self):  # noqa: ANN201, D102
-
+    def parse_document_start(self):  # noqa: ANN201
         # Parse any extra document end indicators.
-        """
-        Begin parsing an explicit YAML document or the end of the stream and produce the corresponding start or end event.
-        
+        """Begin parsing an explicit YAML document or the end of the stream and produce the corresponding start or end event.
+
         If a document is present, processes any leading directives and returns a DocumentStartEvent for an explicit document; the parser state is advanced to parse the document content and the document-end handler is pushed onto the internal state stack. If the stream has ended, returns a StreamEndEvent and clears the parser state.
-        
+
         Raises:
             ParserError: If directives were processed but a `<document start>` token is not found.
-        
+
         Returns:
             DocumentStartEvent or StreamEndEvent: A `DocumentStartEvent` for an explicit document, or a `StreamEndEvent` when the stream end is encountered.
-        """
+        """  # noqa: D420, E501
         while self.check_token(DocumentEndToken):  # noqa: F405
             self.get_token()
 
@@ -246,15 +235,13 @@ class Parser:  # noqa: D101, PLR0904
             self.state = None
         return event
 
-    def parse_document_end(self):  # noqa: ANN201, D102
-
+    def parse_document_end(self):  # noqa: ANN201
         # Parse the document end.
-        """
-        Create a DocumentEndEvent for the current document, consuming a DocumentEndToken if one is present.
-        
+        """Create a DocumentEndEvent for the current document, consuming a DocumentEndToken if one is present.
+
         Returns:
             DocumentEndEvent: Event representing the end of the document. The `explicit` attribute is `True` if a `DocumentEndToken` was consumed; `start_mark` and `end_mark` reflect the token marks used.
-        """
+        """  # noqa: E501
         token = self.peek_token()
         start_mark = end_mark = token.start_mark
         explicit = False
@@ -269,15 +256,14 @@ class Parser:  # noqa: D101, PLR0904
 
         return event
 
-    def parse_document_content(self):  # noqa: ANN201, D102
-        """
-        Parse the content of a YAML document.
-        
+    def parse_document_content(self):  # noqa: ANN201
+        """Parse the content of a YAML document.
+
         If the next token marks an empty document boundary, produce an empty scalar event at that token's start mark and restore the previous parser state; otherwise produce an event representing the first node of the document.
-        
+
         Returns:
             event (Event): An empty `ScalarEvent` if the document is empty, otherwise an event representing the document's first node.
-        """
+        """  # noqa: E501
         if self.check_token(
             DirectiveToken,  # noqa: F405
             DocumentStartToken,  # noqa: F405
@@ -289,18 +275,17 @@ class Parser:  # noqa: D101, PLR0904
             return event
         return self.parse_block_node()
 
-    def process_directives(self):  # noqa: ANN201, D102
-        """
-        Process YAML directive tokens from the input and update the parser's version and tag-handle state.
-        
+    def process_directives(self):  # noqa: ANN201
+        """Process YAML directive tokens from the input and update the parser's version and tag-handle state.
+
         Reads successive `DirectiveToken`s and handles the `YAML` directive (setting `self.yaml_version`, rejecting duplicates and incompatible major versions) and the `TAG` directive (recording tag handle → prefix mappings and rejecting duplicate handles). After processing directives, ensures default tag handles from `DEFAULT_TAGS` exist in `self.tag_handles`.
-        
+
         Returns:
             tuple: `(version, tags)` where `version` is the parsed YAML version tuple (e.g., `(1, 2)`) or `None` if no YAML directive was provided, and `tags` is a copy of the tag-handle mapping if any explicit tag directives were present, or `None` if no tag directives were provided.
-        
+
         Raises:
             ParserError: if a duplicate YAML directive is found, if a YAML directive specifies a major version other than `1`, or if a duplicate tag handle is encountered.
-        """
+        """  # noqa: E501
         self.yaml_version = None
         self.tag_handles = {}
         while self.check_token(DirectiveToken):  # noqa: F405
@@ -351,49 +336,45 @@ class Parser:  # noqa: D101, PLR0904
     # block_collection  ::= block_sequence | block_mapping
     # flow_collection   ::= flow_sequence | flow_mapping
 
-    def parse_block_node(self):  # noqa: ANN201, D102
-        """
-        Parse a single block-style YAML node.
-        
+    def parse_block_node(self):  # noqa: ANN201
+        """Parse a single block-style YAML node.
+
         Parses the next node using block-specific grammar rules and produces the corresponding parsing event for that node.
-        
+
         Returns:
             event: The parsing event for the node (for example `ScalarEvent`, `SequenceStartEvent`, `MappingStartEvent`, or `AliasEvent`).
-        """
+        """  # noqa: E501
         return self.parse_node(block=True)
 
-    def parse_flow_node(self):  # noqa: ANN201, D102
-        """
-        Parse a flow-style YAML node.
-        
+    def parse_flow_node(self):  # noqa: ANN201
+        """Parse a flow-style YAML node.
+
         Returns:
             event: A YAML event representing the next flow node (scalar, sequence, mapping, alias, or an empty scalar).
-        """
+        """  # noqa: E501
         return self.parse_node()
 
-    def parse_block_node_or_indentless_sequence(self):  # noqa: ANN201, D102
-        """
-        Parse either a block node or an indentless sequence.
-        
+    def parse_block_node_or_indentless_sequence(self):  # noqa: ANN201
+        """Parse either a block node or an indentless sequence.
+
         Returns:
             Event: The next parsing event representing the parsed node (e.g., a `ScalarEvent`,
             `SequenceStartEvent`, `MappingStartEvent`, or `AliasEvent`).
-        """
+        """  # noqa: E501
         return self.parse_node(block=True, indentless_sequence=True)
 
-    def parse_node(self, block=False, indentless_sequence=False):  # noqa: ANN001, ANN201, D102, PLR0912, PLR0915
-        """
-        Parse a single YAML node and produce the corresponding parsing event.
-        
+    def parse_node(self, block=False, indentless_sequence=False):  # noqa: ANN001, ANN201, PLR0912, PLR0915
+        """Parse a single YAML node and produce the corresponding parsing event.
+
         This method consumes tokens for one node (alias, scalar, sequence, or mapping), resolves optional anchor and tag properties (raising ParserError for undefined tag handles), and may change the parser's state to continue parsing the node's contents. If an anchor or tag is present but no node content follows, an empty scalar event is produced. If no valid node form is found, a ParserError is raised.
-        
+
         Parameters:
             block (bool): If True, allow block-style collections (block sequence/mapping) as valid node forms.
             indentless_sequence (bool): If True, treat a leading block entry as the start of an indentless sequence.
-        
+
         Returns:
             event: The created event instance representing the parsed node (e.g., AliasEvent, ScalarEvent, SequenceStartEvent, MappingStartEvent).
-        """
+        """  # noqa: E501
         if self.check_token(AliasToken):  # noqa: F405
             token = self.get_token()
             event = AliasEvent(token.value, token.start_mark, token.end_mark)  # noqa: F405
@@ -509,29 +490,27 @@ class Parser:  # noqa: D101, PLR0904
 
     # block_sequence ::= BLOCK-SEQUENCE-START (BLOCK-ENTRY block_node?)* BLOCK-END
 
-    def parse_block_sequence_first_entry(self):  # noqa: ANN201, D102
-        """
-        Begin parsing a block sequence by consuming its start token and proceed to the first entry.
-        
+    def parse_block_sequence_first_entry(self):  # noqa: ANN201
+        """Begin parsing a block sequence by consuming its start token and proceed to the first entry.
+
         Returns:
             The parser event produced for the first entry of the block sequence (e.g., a `SequenceStartEvent` or the event resulting from parsing the first entry).
-        """
+        """  # noqa: E501
         token = self.get_token()
         self.marks.append(token.start_mark)
         return self.parse_block_sequence_entry()
 
-    def parse_block_sequence_entry(self):  # noqa: ANN201, D102
-        """
-        Parse a single entry or the end of a block sequence.
-        
+    def parse_block_sequence_entry(self):  # noqa: ANN201
+        """Parse a single entry or the end of a block sequence.
+
         If a block entry token is present, parse its content as a block node; if the entry is immediately followed by another entry or the end of the block, emit an empty scalar for that entry. If a block end token is present, emit a SequenceEndEvent and restore the previous parser state. If neither an entry nor a block end is found, raise a ParserError describing the unexpected token.
-        
+
         Returns:
             SequenceEndEvent when the block sequence is closed, a ScalarEvent representing an empty entry when an empty entry is encountered, or the event produced by parsing a non-empty block node.
-        
+
         Raises:
             ParserError: when the next token is not a block entry or a block end.
-        """
+        """  # noqa: E501
         if self.check_token(BlockEntryToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(BlockEntryToken, BlockEndToken):  # noqa: F405
@@ -555,19 +534,18 @@ class Parser:  # noqa: D101, PLR0904
 
     # indentless_sequence ::= (BLOCK-ENTRY block_node?)+
 
-    def parse_indentless_sequence_entry(self):  # noqa: ANN201, D102
-        """
-        Parse a single entry of an indentless block sequence or emit the sequence end.
-        
+    def parse_indentless_sequence_entry(self):  # noqa: ANN201
+        """Parse a single entry of an indentless block sequence or emit the sequence end.
+
         Parses one indentless sequence entry when a block entry token is present:
         - If the entry is followed by node content, pushes the current continuation and parses the node.
         - If the entry is immediately empty, produces an empty scalar event for that entry.
-        
+
         If no block entry token is present, emits a SequenceEndEvent and restores the previous parser state.
-        
+
         Returns:
             event: A YAML event representing either the parsed node/empty scalar for the current entry or a `SequenceEndEvent` marking the end of the indentless sequence.
-        """
+        """  # noqa: E501
         if self.check_token(BlockEntryToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(
@@ -590,36 +568,34 @@ class Parser:  # noqa: D101, PLR0904
     #                       (VALUE block_node_or_indentless_sequence?)?)*
     #                       BLOCK-END
 
-    def parse_block_mapping_first_key(self):  # noqa: ANN201, D102
-        """
-        Begin parsing a block mapping by consuming the block mapping start token and parse its first key.
-        
+    def parse_block_mapping_first_key(self):  # noqa: ANN201
+        """Begin parsing a block mapping by consuming the block mapping start token and parse its first key.
+
         Records the start mark of the block mapping for later use and then delegates to parsing the mapping's first key.
-        
+
         Returns:
             The parser event produced by parsing the first key of the block mapping.
-        """
+        """  # noqa: E501
         token = self.get_token()
         self.marks.append(token.start_mark)
         return self.parse_block_mapping_key()
 
-    def parse_block_mapping_key(self):  # noqa: ANN201, D102
-        """
-        Parse the next key of a block mapping or emit the mapping end event.
-        
+    def parse_block_mapping_key(self):  # noqa: ANN201
+        """Parse the next key of a block mapping or emit the mapping end event.
+
         Parses a mapping key when a `KeyToken` is present (parsing either an explicit key node
         or emitting an empty scalar for an empty key). If the block mapping is closed,
         consumes the `BlockEndToken` and returns a `MappingEndEvent`. If an unexpected token
         is found where the block end was expected, raises a `ParserError`.
-        
+
         Returns:
             MappingEndEvent when the block mapping is closed; otherwise the event produced
             for the parsed key (a `ScalarEvent` for an empty key or the first event of the
             parsed node).
-        
+
         Raises:
             ParserError: If neither a `KeyToken` nor `BlockEndToken` is found where expected.
-        """
+        """  # noqa: E501
         if self.check_token(KeyToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(KeyToken, ValueToken, BlockEndToken):  # noqa: F405
@@ -641,19 +617,18 @@ class Parser:  # noqa: D101, PLR0904
         self.marks.pop()
         return event
 
-    def parse_block_mapping_value(self):  # noqa: ANN201, D102
-        """
-        Parse the value part of a block mapping entry.
-        
+    def parse_block_mapping_value(self):  # noqa: ANN201
+        """Parse the value part of a block mapping entry.
+
         If a `ValueToken` is present, consume it and:
         - if the following token begins a node, push `parse_block_mapping_key` as the continuation and parse that node;
         - otherwise set the parser state to `parse_block_mapping_key` and produce an empty scalar at the value token's end mark.
-        
+
         If no `ValueToken` is present, set the parser state to `parse_block_mapping_key` and produce an empty scalar at the next token's start mark.
-        
+
         Returns:
             An event representing the parsed node or an empty `ScalarEvent` when the mapping value is absent.
-        """
+        """  # noqa: E501
         if self.check_token(ValueToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(KeyToken, ValueToken, BlockEndToken):  # noqa: F405
@@ -676,35 +651,33 @@ class Parser:  # noqa: D101, PLR0904
     # For `flow_sequence_entry`, the part `KEY flow_node? (VALUE flow_node?)?`
     # generate an inline mapping (set syntax).
 
-    def parse_flow_sequence_first_entry(self):  # noqa: ANN201, D102
-        """
-        Begin parsing a flow sequence and parse its first entry.
-        
+    def parse_flow_sequence_first_entry(self):  # noqa: ANN201
+        """Begin parsing a flow sequence and parse its first entry.
+
         Pushes the flow sequence's start mark onto the parser's mark stack, then continues
         parsing by delegating to parse_flow_sequence_entry(first=True).
-        
+
         Returns:
             The parsing event produced for the first entry of the flow sequence.
-        """
+        """  # noqa: E501
         token = self.get_token()
         self.marks.append(token.start_mark)
         return self.parse_flow_sequence_entry(first=True)
 
-    def parse_flow_sequence_entry(self, first=False):  # noqa: ANN001, ANN201, D102
-        """
-        Parse the next entry in a flow sequence.
-        
+    def parse_flow_sequence_entry(self, first=False):  # noqa: ANN001, ANN201
+        """Parse the next entry in a flow sequence.
+
         When called, this either:
         - returns a MappingStartEvent if an inline mapping (a key) begins at the current position,
         - defers to and returns the event produced by parsing a flow node for a sequence entry,
         - or returns a SequenceEndEvent when the flow sequence is closed.
-        
+
         Parameters:
             first (bool): True if parsing the first entry of the sequence (no leading comma expected); False if subsequent entries (a leading comma is required).
-        
+
         Returns:
             Event: The YAML parsing event produced for the sequence entry (MappingStartEvent, a node event from parse_flow_node, or SequenceEndEvent).
-        """
+        """  # noqa: E501
         if not self.check_token(FlowSequenceEndToken):  # noqa: F405
             if not first:
                 if self.check_token(FlowEntryToken):  # noqa: F405
@@ -734,15 +707,14 @@ class Parser:  # noqa: D101, PLR0904
         self.marks.pop()
         return event
 
-    def parse_flow_sequence_entry_mapping_key(self):  # noqa: ANN201, D102
-        """
-        Parse a mapping key appearing as an entry inside a flow sequence.
-        
+    def parse_flow_sequence_entry_mapping_key(self):  # noqa: ANN201
+        """Parse a mapping key appearing as an entry inside a flow sequence.
+
         If a non-empty key is present, push the mapping-value continuation and parse the key as a flow node; otherwise set the next state to parse the mapping value and emit an empty scalar for the key.
-        
+
         Returns:
             Event: The parsed key node event, or an empty scalar event when the key is omitted.
-        """
+        """  # noqa: E501
         token = self.get_token()
         if not self.check_token(ValueToken, FlowEntryToken, FlowSequenceEndToken):  # noqa: F405
             self.states.append(self.parse_flow_sequence_entry_mapping_value)
@@ -750,15 +722,14 @@ class Parser:  # noqa: D101, PLR0904
         self.state = self.parse_flow_sequence_entry_mapping_value
         return self.process_empty_scalar(token.end_mark)
 
-    def parse_flow_sequence_entry_mapping_value(self):  # noqa: ANN201, D102
-        """
-        Parse the value for a mapping entry that appears inside a flow sequence.
-        
+    def parse_flow_sequence_entry_mapping_value(self):  # noqa: ANN201
+        """Parse the value for a mapping entry that appears inside a flow sequence.
+
         Sets the parser state to resume at the mapping-entry end and either parses a following flow node as the value or produces an empty scalar event when the value is omitted. The parser may push a continuation so the mapping-entry end is handled after the value node is parsed.
-        
+
         Returns:
             An event representing the mapping value: the parsed flow-node event if a value node is present, or an empty `ScalarEvent` when the value is absent.
-        """
+        """  # noqa: E501
         if self.check_token(ValueToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(FlowEntryToken, FlowSequenceEndToken):  # noqa: F405
@@ -770,15 +741,14 @@ class Parser:  # noqa: D101, PLR0904
         token = self.peek_token()
         return self.process_empty_scalar(token.start_mark)
 
-    def parse_flow_sequence_entry_mapping_end(self):  # noqa: ANN201, D102
-        """
-        Emit the MappingEndEvent for an inline mapping nested in a flow sequence and restore the parser state.
-        
+    def parse_flow_sequence_entry_mapping_end(self):  # noqa: ANN201
+        """Emit the MappingEndEvent for an inline mapping nested in a flow sequence and restore the parser state.
+
         This sets the parser's state back to parse_flow_sequence_entry and returns a MappingEndEvent whose start and end marks are taken from the current token's start mark.
-        
+
         Returns:
             MappingEndEvent: Event representing the end of the inline mapping, using the current token's start mark for both start and end.
-        """
+        """  # noqa: E501
         self.state = self.parse_flow_sequence_entry
         token = self.peek_token()
         return MappingEndEvent(token.start_mark, token.start_mark)  # noqa: F405
@@ -789,32 +759,30 @@ class Parser:  # noqa: D101, PLR0904
     #                   FLOW-MAPPING-END
     # flow_mapping_entry    ::= flow_node | KEY flow_node? (VALUE flow_node?)?
 
-    def parse_flow_mapping_first_key(self):  # noqa: ANN201, D102
-        """
-        Begin parsing a flow mapping and parse its first key.
-        
+    def parse_flow_mapping_first_key(self):  # noqa: ANN201
+        """Begin parsing a flow mapping and parse its first key.
+
         Returns:
             Event: The parsing event representing the mapping's first key (or a mapping-end event if the mapping is empty).
-        """
+        """  # noqa: E501
         token = self.get_token()
         self.marks.append(token.start_mark)
         return self.parse_flow_mapping_key(first=True)
 
-    def parse_flow_mapping_key(self, first=False):  # noqa: ANN001, ANN201, D102
-        """
-        Parse the next key (or an empty key/value) or the end of a flow mapping and return the corresponding parsing event.
-        
+    def parse_flow_mapping_key(self, first=False):  # noqa: ANN001, ANN201
+        """Parse the next key (or an empty key/value) or the end of a flow mapping and return the corresponding parsing event.
+
         This handles commas between entries, explicit `Key` tokens (including empty keys), and the `}` terminator for a flow mapping. When a key or value node is required, the method delegates to the flow-node parser and returns its event.
-        
+
         Parameters:
-        	first (bool): If True, this is the first key in the mapping and a leading comma is not required.
-        
+                first (bool): If True, this is the first key in the mapping and a leading comma is not required.
+
         Returns:
-        	A YAML parsing event: either a `MappingEndEvent` when the flow mapping is closed, a `ScalarEvent` for an empty key or value, or whatever event results from parsing a flow node used as a key or value.
-        
+                A YAML parsing event: either a `MappingEndEvent` when the flow mapping is closed, a `ScalarEvent` for an empty key or value, or whatever event results from parsing a flow node used as a key or value.
+
         Raises:
-        	ParserError: If a separator is required but an unexpected token is encountered (neither `,` nor `}`).
-        """
+                ParserError: If a separator is required but an unexpected token is encountered (neither `,` nor `}`).
+        """  # noqa: D206, E101, E501
         if not self.check_token(FlowMappingEndToken):  # noqa: F405
             if not first:
                 if self.check_token(FlowEntryToken):  # noqa: F405
@@ -847,15 +815,14 @@ class Parser:  # noqa: D101, PLR0904
         self.marks.pop()
         return event
 
-    def parse_flow_mapping_value(self):  # noqa: ANN201, D102
-        """
-        Parse the value portion of a flow mapping entry and produce the corresponding event.
-        
+    def parse_flow_mapping_value(self):  # noqa: ANN201
+        """Parse the value portion of a flow mapping entry and produce the corresponding event.
+
         If a `ValueToken` is present and followed by a node, parse that node and push the continuation to resume parsing remaining mapping pairs. If the `ValueToken` is present but the value is omitted, or if no `ValueToken` is present, produce an empty scalar event. In all cases set the parser state to continue with parsing the next mapping key.
-        
+
         Returns:
             yaml.events.Event: An event representing the parsed value — either the parsed node's event or an empty `ScalarEvent`.
-        """
+        """  # noqa: E501
         if self.check_token(ValueToken):  # noqa: F405
             token = self.get_token()
             if not self.check_token(FlowEntryToken, FlowMappingEndToken):  # noqa: F405
@@ -867,26 +834,24 @@ class Parser:  # noqa: D101, PLR0904
         token = self.peek_token()
         return self.process_empty_scalar(token.start_mark)
 
-    def parse_flow_mapping_empty_value(self):  # noqa: ANN201, D102
-        """
-        Handle an empty value position inside a flow mapping by emitting an empty scalar and preparing to parse the next key.
-        
+    def parse_flow_mapping_empty_value(self):  # noqa: ANN201
+        """Handle an empty value position inside a flow mapping by emitting an empty scalar and preparing to parse the next key.
+
         Sets the parser state to `parse_flow_mapping_key` and produces a `ScalarEvent` representing an empty scalar at the current token's start mark.
-        
+
         Returns:
             ScalarEvent: An empty scalar event at the current token's start mark.
-        """
+        """  # noqa: E501
         self.state = self.parse_flow_mapping_key
         return self.process_empty_scalar(self.peek_token().start_mark)
 
-    def process_empty_scalar(self, mark):  # noqa: ANN001, ANN201, D102, PLR6301
-        """
-        Create a ScalarEvent representing an empty YAML scalar at the given mark.
-        
+    def process_empty_scalar(self, mark):  # noqa: ANN001, ANN201, PLR6301
+        """Create a ScalarEvent representing an empty YAML scalar at the given mark.
+
         Parameters:
-        	mark: The mark to use for both the start and end positions of the empty scalar.
-        
+                mark: The mark to use for both the start and end positions of the empty scalar.
+
         Returns:
-        	ScalarEvent: An event for an empty scalar (value ""), with no anchor or explicit tag and implicit flags (True, False), located at `mark`.
-        """
+                ScalarEvent: An event for an empty scalar (value ""), with no anchor or explicit tag and implicit flags (True, False), located at `mark`.
+        """  # noqa: D206, E101, E501
         return ScalarEvent(None, None, (True, False), "", mark, mark)  # noqa: F405

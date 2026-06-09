@@ -66,8 +66,8 @@ except ImportError:  # pragma: no cover - optional test dependency
 
 
 from homeassistant.components import bluetooth
-from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-from ..util import first_nonblank_int
+from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+from jackery_solarvault.util import first_nonblank_int
 
 from . import ble
 
@@ -107,19 +107,18 @@ _KEEPALIVE_INTERVAL_SEC: float = 15.0
 
 
 def _coerce_ble_int(value: Any, field_name: str) -> int:  # noqa: ANN401
-    """
-    Parse and validate an integer BLE transport option.
-    
+    """Parse and validate an integer BLE transport option.
+
     Parameters:
         value (Any): The input to parse as an integer.
         field_name (str): Field name included in the ValueError message when parsing fails.
-    
+
     Returns:
         int: The parsed integer.
-    
+
     Raises:
         ValueError: If `value` cannot be parsed as an integer.
-    """
+    """  # noqa: E501
     parsed = first_nonblank_int(value)
     if parsed is None:
         raise ValueError(f"{field_name} must be an integer")  # noqa: TRY003
@@ -225,16 +224,15 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """
-        Initialize the Jackery BLE diagnostic listener.
-        
+        """Initialize the Jackery BLE diagnostic listener.
+
         Parameters:
             hass (HomeAssistant): Home Assistant instance used for Bluetooth callbacks.
             sink (FrameSink): Async consumer called for each observed notification.
             key_resolver (Callable[[str], bytes | None]): Given a device_id, return the device's 16- or 32-byte AES key, or `None` if unknown.
             ble_address_resolver (Callable[[str], str | None]): Given a device_id, return the device's BLE MAC address, or `None` if unknown. Resolved addresses are cached and exposed via `address_for_device_id`.
             serial_resolver (Callable[[str], str | None] | None): Optional callable mapping a BLE advertisement serial to a device_id; if omitted, advertisements with unmapped serials cannot be resolved to device IDs.
-        """
+        """  # noqa: E501
         self._hass = hass
         self._sink = sink
         self._key_resolver = key_resolver
@@ -270,12 +268,11 @@ class JackeryBleListener:
         self._missing_key_logged: set[str] = set()
 
     def address_for_device_id(self, device_id: str) -> str | None:
-        """
-        Get the cached BLE MAC address for the given device.
-        
+        """Get the cached BLE MAC address for the given device.
+
         Returns:
             The cached BLE MAC address as a string for the specified device_id, or `None` if no address is known.
-        """
+        """  # noqa: E501
         return self._device_addresses.get(device_id)
 
     async def async_ensure_connected(
@@ -284,18 +281,17 @@ class JackeryBleListener:
         *,
         timeout_sec: float,
     ) -> bool:
-        """
-        Waits until a BLE client becomes available for the given device ID or the timeout elapses.
-        
+        """Waits until a BLE client becomes available for the given device ID or the timeout elapses.
+
         If the listener knows or can resolve the device's BLE address, this method will ensure a background connection runner is started and poll until a client appears or the provided timeout passes.
-        
+
         Parameters:
             device_id (str): Identifier of the target device.
             timeout_sec (float): Maximum number of seconds to wait for a client to become available.
-        
+
         Returns:
             bool: `True` if a BLE client is available for the device, `False` otherwise.
-        """
+        """  # noqa: E501
         if device_id in self._clients:
             return True
         address = self._device_addresses.get(device_id) or self._ble_address_resolver(
@@ -331,15 +327,14 @@ class JackeryBleListener:
         device_id: str,
         client: Any,  # noqa: ANN401
     ) -> None:
-        """
-        Cache the negotiated GATT MTU for the given device after notification subscription.
-        
+        """Cache the negotiated GATT MTU for the given device after notification subscription.
+
         Checks common bleak client attributes (`mtu_size`, then `mtu`) and stores the first integer value greater than the BLE frame overhead into the listener's MTU cache for `device_id`. If no usable MTU is exposed, leaves the cache unset so writers will fall back to `ble.DEFAULT_BLE_MTU`.
-        
+
         Parameters:
             device_id (str): Identifier of the Jackery device.
             client (Any): Bleak client-like object expected to expose `mtu_size` or `mtu` attributes.
-        """
+        """  # noqa: E501
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
             if (
@@ -361,20 +356,18 @@ class JackeryBleListener:
         )
 
     def mtu_for_device(self, device_id: str) -> int:
-        """
-        Get the negotiated BLE MTU for a device.
-        
+        """Get the negotiated BLE MTU for a device.
+
         Returns:
             int: Cached MTU for the given `device_id`, or `ble.DEFAULT_BLE_MTU` if no negotiated MTU is available.
-        """
+        """  # noqa: E501
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
-        """
-        Send periodic no-op query frames to keep a device's GATT session active.
-        
+        """Send periodic no-op query frames to keep a device's GATT session active.
+
         This background loop sends a minimal query (the module's query-device-property command) at the module's keep-alive interval to prevent the peripheral from closing idle BLE connections. The task is cancellable: Cancellation is propagated (CancelledError) while transient write errors are caught and logged so the loop continues.
-        """
+        """  # noqa: E501
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
                 try:
@@ -547,18 +540,17 @@ class JackeryBleListener:
     def _register_pending_ack(
         self, device_id: str, ack_cmds: tuple[int, ...] | None
     ) -> _PendingAck:
-        """
-        Register a pending ACK watcher for the given device.
-        
+        """Register a pending ACK watcher for the given device.
+
         If `ack_cmds` is provided, only frames whose `cmd` matches one of those values will satisfy the ACK; if `ack_cmds` is `None`, any decoded frame for the device can satisfy the ACK. The returned `_PendingAck` contains a `future` that will be completed with the matching decoded frame when it arrives.
-        
+
         Parameters:
             device_id (str): Identifier of the device to watch for an ACK.
             ack_cmds (tuple[int, ...] | None): Sequence of command codes that qualify as an ACK, or `None` to accept any command.
-        
+
         Returns:
             _PendingAck: The registered pending-ACK record whose `future` will be completed when a matching frame is received.
-        """
+        """  # noqa: E501
         loop = asyncio.get_running_loop()
         pending = _PendingAck(
             expected_cmds=(
@@ -629,14 +621,13 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def async_start(self, device_ids: list[str]) -> None:
-        """
-        Start the BLE advertisement listener and register a callback for matching Jackery devices.
-        
+        """Start the BLE advertisement listener and register a callback for matching Jackery devices.
+
         Registers a Home Assistant Bluetooth advertisement callback that watches for the Jackery service UUID and manufacturer ID; connection tasks are created lazily when matching advertisements arrive. The provided device_ids list is used for startup logging and does not eagerly open connections.
-         
+
         Parameters:
             device_ids (list[str]): Device identifiers for startup logging (no eager connection attempts are performed).
-        """
+        """  # noqa: E501
         self._stop_event.clear()
 
         matcher: BluetoothCallbackMatcher = {
@@ -712,11 +703,10 @@ class JackeryBleListener:
         service_info: BluetoothServiceInfoBleak,
         change: Any,  # noqa: ANN401
     ) -> None:
-        """
-        Handle a Home Assistant Bluetooth advertisement by resolving the device and scheduling a connection task.
-        
+        """Handle a Home Assistant Bluetooth advertisement by resolving the device and scheduling a connection task.
+
         This synchronous HA callback resolves the incoming advertisement to a Jackery device_id; if resolution succeeds it increments the device's advertisement counter and schedules a background connection runner for that device unless one is already active. The callback does not await any async work and returns immediately.
-        """
+        """  # noqa: E501
         device_id = self._device_id_from_service_info(service_info)
         if device_id is None:
             return
@@ -738,14 +728,13 @@ class JackeryBleListener:
         self,
         service_info: BluetoothServiceInfoBleak,
     ) -> str | None:
-        """
-        Resolve a BLE advertisement to a Jackery device id and cache the device's MAC address.
-        
+        """Resolve a BLE advertisement to a Jackery device id and cache the device's MAC address.
+
         Attempts resolution by (1) checking the cached device_id→MAC mapping, (2) extracting an ASCII serial from the manufacturer-data block for the Jackery company ID, and (3) using the injected serial resolver to map that serial to a device id. On first successful resolution for a device id, the function caches the device_id→MAC mapping. If no mapping is found for a discovered serial, a one-time informational log entry is emitted for that serial.
-        
+
         Returns:
             str | None: The resolved `device_id` when found, `None` otherwise.
-        """
+        """  # noqa: E501
         address = service_info.address
         # Step 1: address cache hit.
         for cached_id, cached_mac in self._device_addresses.items():
@@ -852,12 +841,11 @@ class JackeryBleListener:
                     _characteristic: Any,  # noqa: ANN401
                     data: bytearray,  # noqa: ANN401, RUF100
                 ) -> None:
-                    """
-                    Handle a BLE notification and forward its payload to the listener's notification processor.
-                    
+                    """Handle a BLE notification and forward its payload to the listener's notification processor.
+
                     Parameters:
                         data (bytearray): Raw notification payload received from the BLE characteristic; converted to bytes before processing.
-                    """
+                    """  # noqa: E501
                     await self._handle_notification(device_id, bytes(data))
 
                 keep_alive_task: asyncio.Task[None] | None = None
@@ -943,13 +931,12 @@ class JackeryBleListener:
             self._connections.pop(device_id, None)
 
     def _on_disconnect(self, device_id: str) -> None:
-        """
-        Record a disconnect event for the given device.
-        
+        """Record a disconnect event for the given device.
+
         Updates the device's statistics with the current disconnect timestamp and emits a debug log.
         Parameters:
-        	device_id (str): Identifier of the Jackery device whose disconnect is being recorded.
-        """
+                device_id (str): Identifier of the Jackery device whose disconnect is being recorded.
+        """  # noqa: D206, E101, E501
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)

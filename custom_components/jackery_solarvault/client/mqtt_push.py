@@ -14,7 +14,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,
@@ -53,7 +53,7 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
 
         Returns:
             bool: `True` if the record should be logged, `False` if suppressed.
-        """
+        """  # noqa: E501
         message = record.getMessage()
         if "failed to receive on socket" not in message:
             return True
@@ -614,7 +614,8 @@ class JackeryMqttPushClient:
         Notes:
             - The task is created via Home Assistant's `async_create_task`.
             - If the task is cancelled, the cancellation is ignored; any other exception raised by the task is logged.
-        """
+        """  # noqa: E501
+
         async def _runner() -> None:
             await coro
 
@@ -625,7 +626,7 @@ class JackeryMqttPushClient:
 
             Parameters:
                 done (asyncio.Task[None]): Completed task whose exception (if any) will be retrieved and logged. Cancellation is ignored.
-            """
+            """  # noqa: E501
             try:
                 done.result()
             except asyncio.CancelledError:
@@ -641,7 +642,7 @@ class JackeryMqttPushClient:
 
         Returns:
             str: ISO 8601 representation of now in UTC (includes timezone designator).
-        """
+        """  # noqa: E501
         return datetime.now(UTC).isoformat()
 
     @staticmethod
@@ -694,11 +695,11 @@ class JackeryMqttPushClient:
             """Return the topic with the user-specific segment redacted when applicable.
 
             Parameters:
-            	topic (str | None): MQTT topic to process; may be None.
+                topic (str | None): MQTT topic to process; may be None.
 
             Returns:
-            	None if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic.
-            """  # noqa: E501
+                None if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic.
+            """  # noqa: D206, E101, E501
             return self._redact_topic(topic) if redact_topics else topic
 
         return {

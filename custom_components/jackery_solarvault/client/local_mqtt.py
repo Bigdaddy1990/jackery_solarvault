@@ -12,7 +12,7 @@ we do NOT touch the coordinator from here so the cloud parsing pipeline
 stays the single source of truth.
 """
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: TID251
 
 import asyncio
 from collections.abc import Awaitable, Callable
@@ -26,7 +26,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     DOMAIN,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
@@ -374,7 +374,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
@@ -400,7 +400,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             True if the topic is a known high-volume non-device topic (starts with "$SYS/"), or if the configured topic filter is globally broad and the topic starts with "homeassistant/"; False otherwise.
-        """
+        """  # noqa: E501
         if topic.startswith("$SYS/"):
             return True
         if not self._is_broad_topic_filter():
@@ -415,7 +415,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             `true` if the payload prefix contains `event_type`, `state_changed`, `event_data`, `old_state`, and `new_state`, `false` otherwise.
-        """
+        """  # noqa: E501
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
             b'"event_type"' in head
@@ -438,7 +438,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             dict | None: The extracted Jackery payload dict when found, the original `payload` if it is not an HA event wrapper, or `None` if a wrapper is present but no Jackery payload can be extracted.
-        """
+        """  # noqa: E501
         if "event_type" not in payload or "event_data" not in payload:
             return payload
         event_data = payload.get("event_data")
@@ -471,7 +471,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             `true` if the topic matches the filter, `false` otherwise.
-        """
+        """  # noqa: E501
         if not topic_filter:
             return False
         if topic_filter == "#":
@@ -500,7 +500,7 @@ class JackeryLocalMqttClient:
             """Await the provided coroutine and allow any exception it raises to propagate.
 
             This helper awaits the closure-captured coroutine `coro`. It does not swallow exceptions so that callers or task completion callbacks can observe and handle errors.
-            """
+            """  # noqa: E501
             await coro
 
         task = self._hass.async_create_task(
@@ -628,7 +628,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             True if both `"event_type"` and `"event_data"` appear in the payload head, False otherwise.
-        """
+        """  # noqa: E501
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return b'"event_type"' in head and b'"event_data"' in head
 
@@ -637,7 +637,8 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant, entry: Any
+    hass: HomeAssistant,
+    entry: Any,  # noqa: ANN401
 ) -> JackeryLocalMqttClient | None:
     """Return the per-entry local MQTT client stored in ``hass.data``."""
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)

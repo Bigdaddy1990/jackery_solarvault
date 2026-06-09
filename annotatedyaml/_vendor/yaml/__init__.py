@@ -1,4 +1,4 @@
-from . import loader as _loader
+from . import loader as _loader  # noqa: D104
 from .dumper import *
 from .error import *
 from .events import *
@@ -29,7 +29,7 @@ def warnings(settings=None):  # noqa: ANN001, ANN201
 
     Returns:
         dict: The current warning settings (an empty dict) when `settings` is None, `None` otherwise.
-    """
+    """  # noqa: E501
     if settings is None:
         return {}
     return None
@@ -76,7 +76,7 @@ def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
     Returns:
         The root node of the first YAML document.
-    """
+    """  # noqa: E501
     loader = Loader(stream)
     try:
         return loader.get_single_node()
@@ -93,7 +93,7 @@ def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
     Yields:
         nodes.Node: The root node of the representation tree for each parsed document.
-    """
+    """  # noqa: E501
     loader = Loader(stream)
     try:
         while loader.check_node():
@@ -111,7 +111,7 @@ def load(stream, Loader):  # noqa: ANN001, ANN201, N803
 
     Returns:
         data: The Python object produced from the first YAML document.
-    """
+    """  # noqa: E501
     loader = Loader(stream)
     try:
         return loader.get_single_data()
@@ -147,7 +147,7 @@ def full_load(stream):  # noqa: ANN001, ANN201
 
     Returns:
         The Python object represented by the first YAML document in the stream.
-    """
+    """  # noqa: E501
     return load(stream, FullLoader)  # noqa: F405
 
 
@@ -158,7 +158,7 @@ def full_load_all(stream):  # noqa: ANN001, ANN201
 
     Returns:
         generator: An iterator that yields the Python object produced for each document in the stream.
-    """
+    """  # noqa: E501
     return load_all(stream, FullLoader)  # noqa: F405
 
 
@@ -169,7 +169,7 @@ def safe_load(stream):  # noqa: ANN001, ANN201
 
     Returns:
         The Python object constructed from the first YAML document in `stream`.
-    """
+    """  # noqa: E501
     return load(stream, SafeLoader)  # noqa: F405
 
 
@@ -190,7 +190,7 @@ def unsafe_load(stream):  # noqa: ANN001, ANN201
 
     Returns:
         The Python object represented by the first document.
-    """
+    """  # noqa: E501
     return load(stream, UnsafeLoader)  # noqa: F405
 
 
@@ -227,7 +227,7 @@ def emit(  # noqa: ANN201, PLR0913, PLR0917
 
     Returns:
         str | None: The produced YAML string if `stream` was `None`, otherwise `None`.
-    """
+    """  # noqa: E501
     getvalue = None
     if stream is None:
         stream = io.StringIO()
@@ -286,7 +286,7 @@ def serialize_all(  # noqa: ANN201, PLR0913, PLR0917
 
     Returns:
         `str` if `stream` is None and `encoding` is None, `bytes` if `stream` is None and `encoding` is provided, `None` if a `stream` was supplied.
-    """
+    """  # noqa: E501
     getvalue = None
     if stream is None:
         stream = io.StringIO() if encoding is None else io.BytesIO()
@@ -355,7 +355,7 @@ def dump_all(  # noqa: ANN201, PLR0913, PLR0917
 
     Returns:
         `str` if `stream` is None and `encoding` is None, `bytes` if `stream` is None and `encoding` is provided, or `None` when writing to a provided stream.
-    """
+    """  # noqa: E501
     getvalue = None
     if stream is None:
         stream = io.StringIO() if encoding is None else io.BytesIO()
@@ -400,7 +400,7 @@ def dump(data, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN
 
     Returns:
         str or None: The YAML string when `stream` is `None`, otherwise `None`.
-    """
+    """  # noqa: E501
     return dump_all([data], stream, Dumper=Dumper, **kwds)
 
 
@@ -414,7 +414,7 @@ def safe_dump_all(documents, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN2
 
     Returns:
         str|None: The YAML string when `stream` is `None`, otherwise `None`.
-    """
+    """  # noqa: E501
     return dump_all(documents, stream, Dumper=SafeDumper, **kwds)  # noqa: F405
 
 
@@ -426,7 +426,7 @@ def safe_dump(data, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201
 
     Returns:
         str: The YAML document when `stream` is `None`; `None` otherwise.
-    """
+    """  # noqa: E501
     return dump_all([data], stream, Dumper=SafeDumper, **kwds)  # noqa: F405
 
 
@@ -441,7 +441,7 @@ def add_implicit_resolver(tag, regexp, first=None, Loader=None, Dumper=Dumper) -
         first (iterable[str] or None): Optional sequence of possible initial characters to pre-filter candidates, or `None` to disable this optimization.
         Loader (type or None): Loader class to register the resolver on; if `None`, registers on the module's default loaders.
         Dumper (type): Dumper class to register the resolver on (defaults to the module-level `Dumper`).
-    """
+    """  # noqa: E501
     if Loader is None:
         _loader.Loader.add_implicit_resolver(tag, regexp, first)
         _loader.FullLoader.add_implicit_resolver(tag, regexp, first)
@@ -462,7 +462,7 @@ def add_path_resolver(tag, path, kind=None, Loader=None, Dumper=Dumper) -> None:
         kind (optional): Node kind to restrict the resolver (e.g., mapping, sequence, scalar).
         Loader (optional): Loader class to register the resolver on; if `None`, the resolver is registered on the module's default loaders.
         Dumper (optional): Dumper class to register the resolver on (defaults to the module's `Dumper`).
-    """
+    """  # noqa: E501
     if Loader is None:
         _loader.Loader.add_path_resolver(tag, path, kind)
         _loader.FullLoader.add_path_resolver(tag, path, kind)
@@ -481,7 +481,7 @@ def add_constructor(tag, constructor, Loader=None) -> None:  # noqa: ANN001, N80
         tag (str): YAML tag to associate with the constructor.
         constructor (callable): Function that accepts a Loader instance and a node, and returns the constructed Python object.
         Loader (type | object, optional): Specific loader class or loader instance to register the constructor on. Omit to register on the default loaders.
-    """
+    """  # noqa: E501
     if Loader is None:
         _loader.Loader.add_constructor(tag, constructor)
         _loader.FullLoader.add_constructor(tag, constructor)
@@ -520,7 +520,7 @@ def add_representer(data_type, representer, Dumper=Dumper) -> None:  # noqa: ANN
         data_type (type): The Python type to register the representer for.
         representer (callable): Function taking a Dumper instance and an object of `data_type`, returning a representation node.
         Dumper (type): Dumper class to register the representer on (defaults to the module-level `Dumper`).
-    """
+    """  # noqa: E501
     Dumper.add_representer(data_type, representer)
 
 
@@ -533,7 +533,7 @@ def add_multi_representer(data_type, multi_representer, Dumper=Dumper) -> None: 
         data_type (type or tuple[type, ...]): The Python type (or tuple of types) to register the multi-representer for.
         multi_representer (callable): A function with signature `(dumper, data)` that returns a node representing `data`.
         Dumper (type): The Dumper class on which to register the multi-representer.
-    """
+    """  # noqa: E501
     Dumper.add_multi_representer(data_type, multi_representer)
 
 
@@ -549,7 +549,7 @@ class YAMLObjectMetaclass(type):
             name: The class name being created.
             bases: The base classes of the class being created.
             kwds: Keyword arguments passed to the metaclass; may include `yaml_tag` to enable automatic YAML registration.
-        """
+        """  # noqa: E501
         super().__init__(name, bases, kwds)
         if "yaml_tag" in kwds and kwds["yaml_tag"] is not None:
             if isinstance(cls.yaml_loader, list):
@@ -597,7 +597,7 @@ class YAMLObject(metaclass=YAMLObjectMetaclass):
 
         Returns:
             A YAML node representing `data`, using `cls.yaml_tag` and `cls.yaml_flow_style`.
-        """
+        """  # noqa: E501
         return dumper.represent_yaml_object(
             cls.yaml_tag, data, cls, flow_style=cls.yaml_flow_style
         )

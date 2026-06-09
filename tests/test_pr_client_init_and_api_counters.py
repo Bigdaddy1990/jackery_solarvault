@@ -12,15 +12,12 @@ Covers:
   - _auth_retries starts at 0
 """
 
-import importlib
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 import custom_components.jackery_solarvault.client as client_pkg
 from custom_components.jackery_solarvault.client.api import JackeryApi
-
 
 # ---------------------------------------------------------------------------
 # client/__init__.py __getattr__ — lazy import via import_module
@@ -30,15 +27,15 @@ from custom_components.jackery_solarvault.client.api import JackeryApi
 class TestClientPackageGetattr:
     """Tests for the PEP 562 __getattr__ in client/__init__.py."""
 
-    def test_jackery_mqtt_push_client_is_accessible(self) -> None:
-        """JackeryMqttPushClient must be retrievable via the client package namespace."""
+    def test_jackery_mqtt_push_client_is_accessible(self) -> None:  # noqa: PLR6301
+        """JackeryMqttPushClient must be retrievable via the client package namespace."""  # noqa: E501
         # This exercises the __getattr__ path in client/__init__.py
-        cls = getattr(client_pkg, "JackeryMqttPushClient")
+        cls = client_pkg.JackeryMqttPushClient
         # Must be a class, not None or a sentinel
         assert cls is not None
         assert isinstance(cls, type)
 
-    def test_jackery_mqtt_push_client_is_same_class_as_direct_import(
+    def test_jackery_mqtt_push_client_is_same_class_as_direct_import(  # noqa: PLR6301
         self,
     ) -> None:
         """The lazily loaded class must be identical to the directly imported one."""
@@ -46,22 +43,22 @@ class TestClientPackageGetattr:
             JackeryMqttPushClient,
         )
 
-        lazy_cls = getattr(client_pkg, "JackeryMqttPushClient")
+        lazy_cls = client_pkg.JackeryMqttPushClient
         assert lazy_cls is JackeryMqttPushClient
 
-    def test_unknown_attribute_raises_attribute_error(self) -> None:
+    def test_unknown_attribute_raises_attribute_error(self) -> None:  # noqa: PLR6301
         """Accessing an unknown attribute must raise AttributeError."""
         with pytest.raises(AttributeError):
             _ = client_pkg.NonExistentClass  # type: ignore[attr-defined]
 
-    def test_attribute_error_message_contains_attribute_name(self) -> None:
+    def test_attribute_error_message_contains_attribute_name(self) -> None:  # noqa: PLR6301
         """AttributeError message should include the requested attribute name."""
         attr_name = "CompletelyMadeUpAttribute"
         with pytest.raises(AttributeError) as exc_info:
             getattr(client_pkg, attr_name)
         assert attr_name in str(exc_info.value)
 
-    def test_direct_exports_still_accessible(self) -> None:
+    def test_direct_exports_still_accessible(self) -> None:  # noqa: PLR6301
         """The statically exported names must be importable without __getattr__."""
         from custom_components.jackery_solarvault.client import (
             JackeryApi,
@@ -75,10 +72,10 @@ class TestClientPackageGetattr:
         assert JackeryAuthError is not None
         assert JackeryError is not None
 
-    def test_getattr_called_multiple_times_returns_same_class(self) -> None:
-        """Multiple calls for JackeryMqttPushClient must return the same class object."""
-        cls1 = getattr(client_pkg, "JackeryMqttPushClient")
-        cls2 = getattr(client_pkg, "JackeryMqttPushClient")
+    def test_getattr_called_multiple_times_returns_same_class(self) -> None:  # noqa: PLR6301
+        """Multiple calls for JackeryMqttPushClient must return the same class object."""  # noqa: E501
+        cls1 = client_pkg.JackeryMqttPushClient
+        cls2 = client_pkg.JackeryMqttPushClient
         assert cls1 is cls2
 
 
@@ -89,7 +86,7 @@ class TestClientPackageGetattr:
 
 def _make_api(
     account: str = "user@example.com",
-    password: str = "pw",
+    password: str = "pw",  # noqa: S107
     mqtt_mac_id: str | None = None,
     region_code: str | None = None,
 ) -> JackeryApi:
@@ -105,29 +102,29 @@ def _make_api(
 
 
 class TestJackeryApiTransportCounters:
-    """Tests for the transport diagnostic counter attributes added to JackeryApi.__init__."""
+    """Tests for the transport diagnostic counter attributes added to JackeryApi.__init__."""  # noqa: E501
 
-    def test_requests_total_initialises_to_zero(self) -> None:
+    def test_requests_total_initialises_to_zero(self) -> None:  # noqa: PLR6301
         """_requests_total must start at 0 after construction."""
         api = _make_api()
         assert api._requests_total == 0  # noqa: SLF001
 
-    def test_requests_failed_initialises_to_zero(self) -> None:
+    def test_requests_failed_initialises_to_zero(self) -> None:  # noqa: PLR6301
         """_requests_failed must start at 0 after construction."""
         api = _make_api()
         assert api._requests_failed == 0  # noqa: SLF001
 
-    def test_timeouts_total_initialises_to_zero(self) -> None:
+    def test_timeouts_total_initialises_to_zero(self) -> None:  # noqa: PLR6301
         """_timeouts_total must start at 0 after construction."""
         api = _make_api()
         assert api._timeouts_total == 0  # noqa: SLF001
 
-    def test_auth_retries_initialises_to_zero(self) -> None:
+    def test_auth_retries_initialises_to_zero(self) -> None:  # noqa: PLR6301
         """_auth_retries must start at 0 after construction."""
         api = _make_api()
         assert api._auth_retries == 0  # noqa: SLF001
 
-    def test_counters_are_independent_across_instances(self) -> None:
+    def test_counters_are_independent_across_instances(self) -> None:  # noqa: PLR6301
         """Transport counters on one instance must not affect another instance."""
         api1 = _make_api(account="user1@example.com")
         api2 = _make_api(account="user2@example.com")
@@ -139,53 +136,53 @@ class TestJackeryApiTransportCounters:
         assert api2._requests_total == 0  # noqa: SLF001
         assert api2._requests_failed == 0  # noqa: SLF001
 
-    def test_region_code_is_uppercased(self) -> None:
+    def test_region_code_is_uppercased(self) -> None:  # noqa: PLR6301
         """region_code is stored as uppercase."""
         api = _make_api(region_code="de")
         assert api._region_code == "DE"  # noqa: SLF001
 
-    def test_region_code_none_stays_none(self) -> None:
+    def test_region_code_none_stays_none(self) -> None:  # noqa: PLR6301
         """Empty/None region_code normalises to None, not empty string."""
         api = _make_api(region_code=None)
         assert api._region_code is None  # noqa: SLF001
 
-    def test_empty_region_code_normalises_to_none(self) -> None:
+    def test_empty_region_code_normalises_to_none(self) -> None:  # noqa: PLR6301
         """An empty string region_code is treated as None."""
         api = _make_api(region_code="")
         assert api._region_code is None  # noqa: SLF001
 
-    def test_whitespace_region_code_normalises_to_none(self) -> None:
+    def test_whitespace_region_code_normalises_to_none(self) -> None:  # noqa: PLR6301
         """A whitespace region_code is stripped to empty and then converted to None."""
         api = _make_api(region_code="  ")
         assert api._region_code is None  # noqa: SLF001
 
-    def test_token_starts_as_none(self) -> None:
+    def test_token_starts_as_none(self) -> None:  # noqa: PLR6301
         """The authentication token must be None before any login call."""
         api = _make_api()
         assert api._token is None  # noqa: SLF001
 
-    def test_mqtt_user_id_starts_as_none(self) -> None:
+    def test_mqtt_user_id_starts_as_none(self) -> None:  # noqa: PLR6301
         """_mqtt_user_id must be None until populated by login."""
         api = _make_api()
         assert api._mqtt_user_id is None  # noqa: SLF001
 
-    def test_mqtt_seed_b64_starts_as_none(self) -> None:
+    def test_mqtt_seed_b64_starts_as_none(self) -> None:  # noqa: PLR6301
         """_mqtt_seed_b64 must be None until populated by login."""
         api = _make_api()
         assert api._mqtt_seed_b64 is None  # noqa: SLF001
 
-    def test_mqtt_mac_id_starts_as_none(self) -> None:
+    def test_mqtt_mac_id_starts_as_none(self) -> None:  # noqa: PLR6301
         """_mqtt_mac_id must be None until populated by login."""
         api = _make_api()
         assert api._mqtt_mac_id is None  # noqa: SLF001
 
-    def test_configured_mqtt_mac_id_stored(self) -> None:
-        """An explicitly provided mqtt_mac_id must be stored as _mqtt_mac_id_configured."""
+    def test_configured_mqtt_mac_id_stored(self) -> None:  # noqa: PLR6301
+        """An explicitly provided mqtt_mac_id must be stored as _mqtt_mac_id_configured."""  # noqa: E501
         api = _make_api(mqtt_mac_id="2abcdef1234567890")
         assert api._mqtt_mac_id_configured == "2abcdef1234567890"  # noqa: SLF001
 
-    def test_all_required_diagnostics_buffers_initialised(self) -> None:
-        """All documented diagnostics buffer attributes must be present after __init__."""
+    def test_all_required_diagnostics_buffers_initialised(self) -> None:  # noqa: PLR6301
+        """All documented diagnostics buffer attributes must be present after __init__."""  # noqa: E501
         api = _make_api()
         assert api.last_login_response is None
         assert api.last_system_list_response is None
@@ -198,7 +195,7 @@ class TestJackeryApiTransportCounters:
         assert isinstance(api.last_battery_pack_responses, dict)
         assert isinstance(api.last_ota_responses, dict)
 
-    def test_payload_debug_callback_starts_as_none(self) -> None:
+    def test_payload_debug_callback_starts_as_none(self) -> None:  # noqa: PLR6301
         """payload_debug_callback must be None by default."""
         api = _make_api()
         assert api.payload_debug_callback is None

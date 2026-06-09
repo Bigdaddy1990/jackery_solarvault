@@ -32,7 +32,6 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -120,13 +119,13 @@ def test_unique_id_stable_across_index_changes() -> None:
         plug_sn=plug_sn, plug_index=2, dev_id=dev_id, plug_key=plug_key_b
     )
 
-    # Because same SN drives both keys, both unique_ids contain the same SN-derived part.
-    # The stable key for the same SN must be identical (index falls back only if SN is empty).
+    # Because same SN drives both keys, both unique_ids contain the same SN-derived part.  # noqa: E501
+    # The stable key for the same SN must be identical (index falls back only if SN is empty).  # noqa: E501
     assert plug_key_a == plug_key_b  # both use serial "STABLE-SN"
     assert sensor_a.unique_id == sensor_b.unique_id
 
 
-def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: ANN001
+def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
     """The plug_key must be stored as _plug_key on the instance."""
     plug_sn = "SN-KEY-TEST"
     plug_key = stable_subdevice_key("smart_plug", plug_sn, 1)
@@ -141,25 +140,19 @@ def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: ANN001
 
 def test_is_on_returns_true_when_switch_state_is_1() -> None:
     """is_on is True when FIELD_SWITCH_STATE is 1."""
-    sensor = _plug_sensor(
-        smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 1}]
-    )
+    sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 1}])
     assert sensor.is_on is True
 
 
 def test_is_on_returns_false_when_switch_state_is_0() -> None:
     """is_on is False when FIELD_SWITCH_STATE is 0."""
-    sensor = _plug_sensor(
-        smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 0}]
-    )
+    sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 0}])
     assert sensor.is_on is False
 
 
 def test_is_on_falls_back_to_sys_switch_when_switch_state_absent() -> None:
     """is_on uses FIELD_SYS_SWITCH when FIELD_SWITCH_STATE is absent."""
-    sensor = _plug_sensor(
-        smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}]
-    )
+    sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}])
     assert sensor.is_on is True
 
 
@@ -293,7 +286,7 @@ def test_stable_subdevice_key_uses_fallback_index_for_none_identity() -> None:
 
 
 def test_stable_subdevice_key_uses_fallback_index_for_empty_identity() -> None:
-    """When identity is an empty string, stable_subdevice_key falls back to the index."""
+    """When identity is an empty string, stable_subdevice_key falls back to the index."""  # noqa: E501
     key = stable_subdevice_key("smart_plug", "", 5)
     assert "5" in key
 

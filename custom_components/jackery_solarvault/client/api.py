@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
+from jackery_solarvault.const import (
     AES_KEY,
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
@@ -150,7 +150,11 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import app_period_date_bounds, chart_series_debug, safe_bool
+from jackery_solarvault.util import (
+    app_period_date_bounds,
+    chart_series_debug,
+    safe_bool,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -213,7 +217,7 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` is not exactly 16 bytes.
-    """
+    """  # noqa: E501
     if len(bluetooth_key) != 16:  # noqa: PLR2004
         raise ValueError(  # noqa: TRY003
             f"encrypt_mqtt_body: bluetoothKey must be 16 bytes, got {len(bluetooth_key)}"  # noqa: E501
@@ -257,7 +261,7 @@ def _generate_udid(seed: str) -> str:
 
     Returns:
         str: MQTT UDID string comprising `MQTT_MAC_ID_PREFIX` followed by 32 lowercase hex characters (no dashes).
-    """
+    """  # noqa: E501
     md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
@@ -285,7 +289,7 @@ class JackeryApi:  # noqa: PLR0904
             password (str): Account password used for login.
             mqtt_mac_id (str | None): Optional preconfigured MQTT MAC identifier (kept for later validation/selection).
             region_code (str | None): Optional region/country code; stored uppercased or None if empty.
-        """
+        """  # noqa: E501
         self._session = session
         self._account = account
         self._password = password
@@ -329,7 +333,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Parameters:
             systems (list[dict]): List of system metadata dictionaries returned by the system list API.
-        """
+        """  # noqa: E501
         if self._region_code:
             return
         for item in systems:
@@ -605,7 +609,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Raises:
             JackeryAuthError: If a login attempt completes without providing a token.
-        """
+        """  # noqa: E501
         if self._token is None:
             async with self._lock:
                 if self._token is None:
@@ -663,7 +667,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             bool: `True` if the response includes authentication/authorization-related markers (e.g., "token expired", "unauthorized", "login"), `False` otherwise.
-        """
+        """  # noqa: E501
         if not isinstance(data, dict):
             return False
         parts = [
@@ -703,7 +707,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             True if the response represents an auth/authz failure (HTTP 401/403, a token-expired response, a non-200 response containing auth-failure markers, or a 200 response with a non-OK application `code` and auth-failure markers); `False` otherwise.
-        """
+        """  # noqa: E501
         if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
@@ -720,7 +724,7 @@ class JackeryApi:  # noqa: PLR0904
         """Create a concise authorization-failure message for an HTTP request.
 
         @returns str: Compact message containing the HTTP method and path, the response status, backend code, and the backend message (suitable for logs without exposing secrets).
-        """
+        """  # noqa: E501
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
@@ -784,7 +788,7 @@ class JackeryApi:  # noqa: PLR0904
         Returns:
             dict[str, Any]: A dictionary representing the debug event, containing request/response
             fields and any chart-series debug data when available.
-        """
+        """  # noqa: E501
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -815,7 +819,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: The normalized dict payload or an empty dict when no suitable dict exists.
-        """
+        """  # noqa: E501
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
             return payload
@@ -892,7 +896,7 @@ class JackeryApi:  # noqa: PLR0904
         Raises:
             JackeryAuthError: When the response indicates an authentication/authorization failure (token expiry triggers an automatic re-login attempt before this error is raised).
             JackeryApiError: For network/timeout errors, non-200 HTTP responses, or when the backend `code` is neither `CODE_OK` nor `None`.
-        """
+        """  # noqa: E501
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -900,7 +904,7 @@ class JackeryApi:  # noqa: PLR0904
             """Perform an HTTP GET to the resolved URL and return the response status and parsed body.
 
             The body is the parsed JSON response when JSON decoding succeeds; otherwise the body is a dict containing `FIELD_RAW_TEXT` with the response text truncated to `HTTP_RAW_TEXT_LIMIT`. The returned tuple is `(status_code, body_dict)`.
-            """
+            """  # noqa: E501
             async with self._session.get(
                 url,
                 params=params,
@@ -998,7 +1002,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: The device properties dictionary extracted from the response. Returns an empty dict if the response `data` field is missing or is not a dict.
-        """
+        """  # noqa: E501
         data = await self._get_json(
             DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -1010,7 +1014,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             The response 'data' field (typically a list of alarm dictionaries) or `None` if the field is absent.
-        """
+        """  # noqa: E501
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
         )
@@ -1364,7 +1368,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             List[dict[str, Any]]: A list of Shelly device objects; empty list if none are present.
-        """
+        """  # noqa: E501
         data = await self._get_json(SHELLY_DEVICES_PATH)
         raw = data.get(FIELD_DATA)
         if isinstance(raw, list):
@@ -1391,7 +1395,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: The response `data` object parsed as a dictionary (empty dict if the payload is missing or not a dict).
-        """
+        """  # noqa: E501
         data = await self._get_json(
             SHELLY_REALTIME_POWER_PATH,
             params={FIELD_DEVICE_ID: str(device_id)},
@@ -1419,7 +1423,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Raises:
             JackeryApiError: If `control_allowed` is `False` or the API reports an authentication/authorization error.
-        """
+        """  # noqa: E501
         if not control_allowed:
             raise JackeryApiError("Shelly control is not allowed for this device")  # noqa: TRY003
         data = await self._post_form(
@@ -1437,7 +1441,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: Contains `authUrl` (str) and `state` (str) for the Shelly OAuth redirect flow.
-        """
+        """  # noqa: E501
         data = await self._post_form(SHELLY_AUTH_URL_PATH, {})
         return self._payload_dict(data, SHELLY_AUTH_URL_PATH)
 
@@ -1454,7 +1458,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             bool: `True` if the unbind operation was accepted by the backend, `False` otherwise.
-        """
+        """  # noqa: E501
         data = await self._post_form(
             SHELLY_UNBIND_DEVICE_PATH,
             {
@@ -1484,7 +1488,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: Response payload containing `bindCount` (int), `failedDeviceSns` (list[str]), and `successDeviceSns` (list[str]).
-        """
+        """  # noqa: E501
         params: dict[str, str] = {}
         if state:
             params["state"] = state
@@ -1698,7 +1702,7 @@ class JackeryApi:  # noqa: PLR0904
 
             Returns:
                 tuple[int, dict]: `(status, body)` where `status` is the HTTP status code and `body` is the parsed response dict or a dict with `FIELD_RAW_TEXT` on parse failure.
-            """
+            """  # noqa: E501
             async with self._session.put(
                 url,
                 json=payload,
@@ -1828,7 +1832,7 @@ class JackeryApi:  # noqa: PLR0904
 
             Returns:
                 tuple[int, dict]: A tuple of `(status_code, data)` where `status_code` is the HTTP status integer and `data` is the parsed JSON response. If the response cannot be parsed as JSON, `data` will be a dict containing `FIELD_RAW_TEXT` with the truncated raw response text.
-            """
+            """  # noqa: E501
             async with self._session.post(
                 url,
                 data=body,
@@ -2040,7 +2044,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             A dict with keys `userId`, `seed_b64`, `mac_id`, and `mac_id_source` when a complete session exists; `None` until the required `userId`, `seed_b64`, and `mac_id` fields are all populated.
-        """
+        """  # noqa: E501
         if not (self._mqtt_user_id and self._mqtt_seed_b64 and self._mqtt_mac_id):
             return None
         return {
@@ -2061,7 +2065,7 @@ class JackeryApi:  # noqa: PLR0904
                 - "requests_failed": total requests that failed
                 - "timeouts_total": total request timeouts
                 - "auth_retries": total authentication retry attempts
-        """
+        """  # noqa: E501
         return {
             "requests_total": self._requests_total,
             "requests_failed": self._requests_failed,
@@ -2089,7 +2093,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict[str, Any]: A response dictionary mirroring `data` with ensured `APP_REQUEST_META` at the top level and, when applicable, inside `FIELD_DATA`.
-        """
+        """  # noqa: E501
         response = dict(data)
         response.setdefault(APP_REQUEST_META, {"path": path, "params": dict(params)})
         payload = response.get(FIELD_DATA)
@@ -2108,5 +2112,5 @@ def _write_accepted(data: dict[str, Any]) -> bool:
 
     Returns:
         `true` if the response `data` field evaluates to a truthy value and is not explicitly `False`, `false` otherwise.
-    """
+    """  # noqa: E501
     return safe_bool(data.get(FIELD_DATA)) is not False

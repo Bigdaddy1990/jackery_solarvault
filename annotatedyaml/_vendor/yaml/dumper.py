@@ -7,7 +7,7 @@ from .serializer import *  # noqa: F403
 
 
 class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -24,9 +24,8 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
-        
+        """Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style: Preferred scalar style or None to use node-specific styles.
@@ -42,7 +41,7 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
             version: YAML version tuple to include in the document (e.g., (1, 2)).
             tags: Mapping of tag handles to tag prefixes for the serializer.
             sort_keys: Sort mapping keys before emitting when True.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -70,7 +69,7 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
 
 
 class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -87,9 +86,8 @@ class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101,
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper with emitter, serializer, representer, and resolver configuration.
-        
+        """Initialize the dumper with emitter, serializer, representer, and resolver configuration.
+
         Parameters:
             stream: Output stream or file-like object where YAML will be written.
             default_style: Default scalar style to use when representing values (e.g., '|', '>' or None).
@@ -105,7 +103,7 @@ class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101,
             version: YAML version tuple to include in the document header (e.g., (1, 2)) or None.
             tags: Mapping of tag handles to tag prefixes to include in the document.
             sort_keys: If True, sort mapping keys when representing mappings.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -133,7 +131,7 @@ class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101,
 
 
 class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -150,9 +148,8 @@ class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
-        
+        """Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style: Preferred scalar style or None to use node-specific styles.
@@ -168,7 +165,7 @@ class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
             version: YAML version tuple to include in the document (e.g., (1, 2)).
             tags: Mapping of tag handles to tag prefixes for the serializer.
             sort_keys: Sort mapping keys before emitting when True.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,

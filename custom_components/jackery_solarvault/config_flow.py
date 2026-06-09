@@ -83,43 +83,40 @@ _OPTION_DEFAULTS: dict[str, bool] = {
 
 
 def _normalize_account(value: Any) -> str:  # noqa: ANN401
-    """
-    Normalize user-facing account identifiers before authentication and unique-id generation.
-    
+    """Normalize user-facing account identifiers before authentication and unique-id generation.
+
     Parameters:
         value (Any): The raw account identifier input.
-    
+
     Returns:
         str: The trimmed account string if `value` is a `str`, otherwise an empty string.
-    """
+    """  # noqa: E501
     return value.strip() if isinstance(value, str) else ""
 
 
 def _entry_text(entry: ConfigEntry, key: str) -> str:
-    """
-    Get the string value for `key` from a config entry.
-    
+    """Get the string value for `key` from a config entry.
+
     Parameters:
         entry (ConfigEntry): The configuration entry to read from.
         key (str): The data key to retrieve.
-    
+
     Returns:
         str: The stored string value for `key`, or an empty string if the key is missing or its value is not a string.
-    """
+    """  # noqa: E501
     value = entry.data.get(key)
     return value if isinstance(value, str) else ""
 
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
-    """
-    Retrieve current option values for the given config entry, using legacy defaults when an option is not set.
-    
+    """Retrieve current option values for the given config entry, using legacy defaults when an option is not set.
+
     Parameters:
         entry (ConfigEntry): The configuration entry to read options from.
-    
+
     Returns:
         dict[str, bool]: Mapping of option keys to their boolean values; stored option values are used when present, otherwise legacy defaults are applied.
-    """
+    """  # noqa: E501
     return {
         key: config_entry_bool_option(entry, key, default)
         for key, default in _OPTION_DEFAULTS.items()
@@ -130,18 +127,17 @@ def _flow_options(
     user_input: dict[str, Any],
     current_options: dict[str, bool] | None = None,
 ) -> dict[str, bool]:
-    """
-    Produce a complete mapping of all boolean option keys to their selected values.
-    
+    """Produce a complete mapping of all boolean option keys to their selected values.
+
     For each known option key, use the value from `user_input` when present; otherwise use the value from `current_options` if provided; if neither is present, use the configured default.
-    
+
     Parameters:
         user_input (dict[str, Any]): Form-submitted option values keyed by option name.
         current_options (dict[str, bool] | None): Existing option values to preserve when a key is omitted.
-    
+
     Returns:
         dict[str, bool]: A dictionary containing every option key with its resolved boolean value.
-    """
+    """  # noqa: E501
     current = current_options or {}
     return {
         key: user_input.get(key, current.get(key, default))
@@ -155,21 +151,20 @@ def _entry_data_from_api_login(
     api: JackeryApi,
     existing_entry: ConfigEntry | None = None,
 ) -> dict[str, Any]:
-    """
-    Create config entry data populated from credentials and values retrieved from a successful JackeryApi login.
-    
+    """Create config entry data populated from credentials and values retrieved from a successful JackeryApi login.
+
     Parameters:
         account (str): Account username to store under `CONF_USERNAME`.
         password (str): Account password to store under `CONF_PASSWORD`.
         api (JackeryApi): Authenticated API client providing optional bootstrap values (`mqtt_mac_id`, `region_code`, and an MQTT session snapshot).
         existing_entry (ConfigEntry | None): Optional existing config entry whose string fields are used as fallbacks when the API does not provide them.
-    
+
     Returns:
         dict[str, Any]: A dictionary containing at minimum `CONF_USERNAME` and `CONF_PASSWORD`. May also include:
           - `CONF_MQTT_MAC_ID` (str): MQTT MAC ID from the API or the existing entry.
           - `CONF_REGION_CODE` (str): Region code from the API or the existing entry.
           - `ENTRY_BOOTSTRAP_MQTT_SESSION` (dict): A copy of the MQTT session snapshot returned by the API, if present.
-    """
+    """  # noqa: E501
     data: dict[str, Any] = {
         CONF_USERNAME: account,
         CONF_PASSWORD: password,
@@ -197,9 +192,8 @@ def _entry_data_from_api_login(
 
 
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
-    """
-    Return a dictionary of local MQTT option values normalized with safe defaults.
-    
+    """Return a dictionary of local MQTT option values normalized with safe defaults.
+
     The returned mapping contains the following keys with normalized types and fallbacks:
     - CONF_LOCAL_MQTT_ENABLE: bool — whether local MQTT is enabled (defaults to DEFAULT_LOCAL_MQTT_ENABLE).
     - CONF_LOCAL_MQTT_HOST: str — MQTT host (empty string when not set).
@@ -207,10 +201,10 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     - CONF_LOCAL_MQTT_USERNAME: str — MQTT username (empty string when not set).
     - CONF_LOCAL_MQTT_PASSWORD: str — MQTT password (empty string when not set).
     - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — topic filter string trimmed of surrounding whitespace (empty string when not set).
-    
+
     Returns:
         dict[str, Any]: Normalized local-MQTT option values suitable for storing in entry options or using in configuration logic.
-    """
+    """  # noqa: E501
     options: Mapping[str, Any] = entry.options
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(
@@ -235,15 +229,14 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
 def _merge_local_mqtt_options(
     user_input: dict[str, Any], current: dict[str, Any]
 ) -> dict[str, Any]:
-    """
-    Builds a merged local-MQTT options dictionary using user-provided values with fallbacks to the current settings.
-    
+    """Builds a merged local-MQTT options dictionary using user-provided values with fallbacks to the current settings.
+
     For each expected local-MQTT field, the value from `user_input` is used when present; otherwise the value from `current` is used. Returned values are coerced: enable is converted to `bool`; host, username, password, and topic filter are converted to `str` (host and topic are trimmed and empty defaults are `""`); port is converted to `int`.
-    
+
     Parameters:
         user_input (dict[str, Any]): Partial form input containing any local-MQTT fields to update.
         current (dict[str, Any]): Current stored local-MQTT settings used as defaults for omitted fields.
-    
+
     Returns:
         dict[str, Any]: Merged local-MQTT options with keys
             - CONF_LOCAL_MQTT_ENABLE (bool)
@@ -252,7 +245,7 @@ def _merge_local_mqtt_options(
             - CONF_LOCAL_MQTT_USERNAME (str)
             - CONF_LOCAL_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
-    """
+    """  # noqa: E501
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(
             user_input.get(CONF_LOCAL_MQTT_ENABLE, current[CONF_LOCAL_MQTT_ENABLE])
@@ -285,18 +278,17 @@ def _reconfigure_options(
     entry: ConfigEntry,
     user_input: dict[str, Any],
 ) -> dict[str, Any]:
-    """
-    Build the options payload for a reconfigure operation, preserving non-form options and existing local-MQTT settings.
-    
+    """Build the options payload for a reconfigure operation, preserving non-form options and existing local-MQTT settings.
+
     Merges the current entry's options with boolean option values supplied in `user_input`, preserving any keys not present in the form, and then ensures local-MQTT fields are taken from the existing entry rather than from the form.
-    
+
     Parameters:
         entry (ConfigEntry): The config entry being reconfigured; its existing options are used as the base.
         user_input (dict[str, Any]): Submitted form values for option toggles and local-MQTT fields.
-    
+
     Returns:
         dict[str, Any]: The merged options dictionary ready to be saved on the config entry.
-    """
+    """  # noqa: E501
     merged = dict(entry.options)
     merged.update(_flow_options(user_input, _current_option_values(entry)))
     merged.update(_current_local_mqtt_options(entry))
@@ -333,17 +325,16 @@ class JackeryOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Handle the initial options step for the integration.
-        
+        """Handle the initial options step for the integration.
+
         If form input is provided, merge the submitted boolean option toggles and local MQTT fields with the current entry values and create the options entry. If no input is provided, present the options form populated with the current boolean option defaults and current local MQTT settings.
-        
+
         Parameters:
             user_input (dict[str, Any] | None): Submitted form values for option toggles and local MQTT fields; may be None when rendering the form.
-        
+
         Returns:
             ConfigFlowResult: A config flow result that either creates the updated options entry or displays the options form.
-        """
+        """  # noqa: E501
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
@@ -435,14 +426,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @callback
     def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
-        """
-        Abort redundant discovery/re-discovery flows before prompting.
-        
+        """Abort redundant discovery/re-discovery flows before prompting.
+
         Checks for an existing configured entry and for other in-progress flows. If a configured entry exists, aborts with reason "already_configured". If another flow is in progress, aborts with reason "already_in_progress". Returns the abort result when a duplicate is found, otherwise None.
-        
+
         Returns:
             ConfigFlowResult | None: An abort result when a duplicate discovery or in-progress flow is detected, `None` otherwise.
-        """
+        """  # noqa: E501
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
         if any(
@@ -453,53 +443,49 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return None
 
     async def async_step_bluetooth(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Route a Bluetooth discovery into the user configuration flow, aborting if the integration is already configured or another discovery flow is in progress.
-        
+        """Route a Bluetooth discovery into the user configuration flow, aborting if the integration is already configured or another discovery flow is in progress.
+
         Returns:
             ConfigFlowResult: An abort result when the discovery is ignored, otherwise the result from the user step.
-        """
+        """  # noqa: E501
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
 
     async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Handle DHCP discovery by delegating to the user step or aborting duplicate discovery.
-        
+        """Handle DHCP discovery by delegating to the user step or aborting duplicate discovery.
+
         Parameters:
             discovery_info (Any): DHCP discovery information provided by Home Assistant.
-        
+
         Returns:
             ConfigFlowResult: Either an abort result when the discovery is duplicate or the result of proceeding to the user step.
-        """
+        """  # noqa: E501
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
 
     async def async_step_mqtt(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Handle a discovered MQTT device by aborting duplicate discovery flows or continuing to the user step.
-        
+        """Handle a discovered MQTT device by aborting duplicate discovery flows or continuing to the user step.
+
         Aborts if there is an existing configured entry or another in-progress flow for this integration; otherwise delegates to the user configuration step.
-        
+
         Returns:
             ConfigFlowResult: An abort result when the discovery is a duplicate, or the result produced by the user step.
-        """
+        """  # noqa: E501
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
 
     async def async_step_zeroconf(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Handle a Zeroconf discovery event by aborting redundant flows or continuing to the user setup step.
-        
+        """Handle a Zeroconf discovery event by aborting redundant flows or continuing to the user setup step.
+
         Parameters:
             discovery_info (Any): Discovery payload provided by Zeroconf; unused by this step except for protocol compatibility.
-        
+
         Returns:
             ConfigFlowResult: An abort result if the discovery is duplicate or already in progress, otherwise the result of the user setup step.
-        """
+        """  # noqa: E501
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
@@ -507,17 +493,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Handle the initial user-driven configuration step for the integration.
-        
+        """Handle the initial user-driven configuration step for the integration.
+
         Validates and normalizes the provided username, prevents duplicate configuration, attempts to authenticate against the Jackery API, and on success creates a new config entry populated with credentials and API-derived bootstrap data and default options. If validation or authentication fails, returns the user form populated with appropriate error messages.
-        
+
         Parameters:
-        	user_input (dict[str, Any] | None): Form data submitted by the user; expected keys include `CONF_USERNAME` and `CONF_PASSWORD`.
-        
+                user_input (dict[str, Any] | None): Form data submitted by the user; expected keys include `CONF_USERNAME` and `CONF_PASSWORD`.
+
         Returns:
-        	ConfigFlowResult: A form to display (possibly with errors) or a created config entry on successful authentication.
-        """
+                ConfigFlowResult: A form to display (possibly with errors) or a created config entry on successful authentication.
+        """  # noqa: D206, E101, E501
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -565,20 +550,19 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Handle reconfiguration of an existing config entry by validating credentials and updating stored entry data and options.
-        
+        """Handle reconfiguration of an existing config entry by validating credentials and updating stored entry data and options.
+
         Validates that the normalized account in `user_input` matches the entry that triggered the reconfigure flow, attempts to authenticate with the Jackery API using the provided password (preserving existing MQTT/bootstrap metadata from the entry when constructing the API client), and on successful authentication updates the entry data and options and aborts the flow with a success reason. If authentication or connection fails, the form is re-displayed with appropriate errors; if the account does not match the entry, the flow is aborted.
-        
+
         Parameters:
             user_input (dict[str, Any] | None): Form data submitted by the user; when `None` the reconfigure form is shown.
-        
+
         Returns:
             ConfigFlowResult: The next result for the config flow (form, abort, or update-and-abort on success).
-        """
+        """  # noqa: E501
         try:
             entry = self._get_reconfigure_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -680,17 +664,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Prompt for the account's current password and validate it with Jackery's API.
-        
+        """Prompt for the account's current password and validate it with Jackery's API.
+
         Aborts with FLOW_ABORT_REAUTH_ENTRY_MISSING if the reauthentication target entry or its stored username cannot be retrieved. On successful authentication, updates the entry data with API-derived bootstrap fields and aborts with FLOW_ABORT_REAUTH_SUCCESSFUL. If authentication fails, re-displays the password form with appropriate error messages.
-        
+
         Returns:
             ConfigFlowResult: a form to collect a password, an abort result, or an update-and-abort result after successful reauthentication.
-        """
+        """  # noqa: E501
         try:
             entry = self._get_reauth_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)

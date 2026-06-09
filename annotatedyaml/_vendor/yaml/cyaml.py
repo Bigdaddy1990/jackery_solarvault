@@ -18,72 +18,67 @@ from .serializer import *  # noqa: F403
 
 
 class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
-    def __init__(self, stream) -> None:  # noqa: ANN001, D107
-        """
-        Initialize the C-backed base YAML loader.
-        
+    def __init__(self, stream) -> None:  # noqa: ANN001
+        """Initialize the C-backed base YAML loader.
+
         Parameters:
             stream: YAML input — a text string, bytes, or a file-like object providing YAML content.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         BaseConstructor.__init__(self)  # noqa: F405
         BaseResolver.__init__(self)  # noqa: F405
 
 
 class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
-    def __init__(self, stream) -> None:  # noqa: ANN001, D107
-        """
-        Initialize a safe C-based YAML loader for the given input stream.
-        
+    def __init__(self, stream) -> None:  # noqa: ANN001
+        """Initialize a safe C-based YAML loader for the given input stream.
+
         Parameters:
             stream: YAML input to parse — typically a file-like object, string, or bytes containing YAML content.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         SafeConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
 
 
 class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
-    def __init__(self, stream) -> None:  # noqa: ANN001, D107
-        """
-        Initialize a C-accelerated "full" YAML loader configured for the given input stream.
-        
+    def __init__(self, stream) -> None:  # noqa: ANN001
+        """Initialize a C-accelerated "full" YAML loader configured for the given input stream.
+
         Parameters:
             stream: The YAML input source (e.g., a text/byte string or a file-like object) to be parsed.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         FullConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
 
 
 class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
-    def __init__(self, stream) -> None:  # noqa: ANN001, D107
-        """
-        Initialize a YAML loader that parses `stream` and constructs Python objects using unsafe construction rules.
-        
+    def __init__(self, stream) -> None:  # noqa: ANN001
+        """Initialize a YAML loader that parses `stream` and constructs Python objects using unsafe construction rules.
+
         Parameters:
             stream: A text or binary file-like object or string containing YAML content to be loaded.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         UnsafeConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
 
 
 class CLoader(CParser, Constructor, Resolver):  # noqa: D101, F405
-    def __init__(self, stream) -> None:  # noqa: ANN001, D107
-        """
-        Initialize the default C-backed YAML loader with parsing, construction, and resolution components.
-        
+    def __init__(self, stream) -> None:  # noqa: ANN001
+        """Initialize the default C-backed YAML loader with parsing, construction, and resolution components.
+
         Parameters:
             stream: Input source for YAML content; a text or binary stream or path-like object accepted by the underlying C parser.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         Constructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
 
 
 class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -100,9 +95,8 @@ class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper with C-based emitter behavior and representer/resolver configuration.
-        
+        r"""Initialize the dumper with C-based emitter behavior and representer/resolver configuration.
+
         Parameters:
             stream: IO-like target to write the emitted YAML to.
             default_style: Default scalar style (e.g., '|', '>', '"', "'") or None to use no explicit style.
@@ -118,7 +112,7 @@ class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
             version: YAML version tuple (major, minor) to emit, or None to omit version directive.
             tags: Mapping of tag prefixes to URIs for tag resolution, or None to use defaults.
             sort_keys: If True, sort mapping keys when representing mappings; if False, preserve insertion order.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,
@@ -143,7 +137,7 @@ class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
 
 
 class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -160,9 +154,8 @@ class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a safe C-backed YAML dumper with configurable emitter and representer options.
-        
+        r"""Initialize a safe C-backed YAML dumper with configurable emitter and representer options.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style (str | None): Default scalar style (e.g., '|', '>', '"') or None to use no default.
@@ -178,7 +171,7 @@ class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
             version (tuple | None): YAML version tuple to emit (major, minor), or None to omit version.
             tags (dict | None): Tag handles mapping to tag URIs for the emitter.
             sort_keys (bool): Whether to sort mapping keys when representing mappings.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,
@@ -203,7 +196,7 @@ class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
 
 
 class CDumper(CEmitter, Serializer, Representer, Resolver):  # noqa: D101, F405
-    def __init__(  # noqa: D107, PLR0913, PLR0917
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         stream,  # noqa: ANN001
         default_style=None,  # noqa: ANN001
@@ -220,9 +213,8 @@ class CDumper(CEmitter, Serializer, Representer, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper with C-based emitter behavior and representer/resolver configuration.
-        
+        r"""Initialize the dumper with C-based emitter behavior and representer/resolver configuration.
+
         Parameters:
             stream: IO-like target to write the emitted YAML to.
             default_style: Default scalar style (e.g., '|', '>', '"', "'") or None to use no explicit style.
@@ -238,7 +230,7 @@ class CDumper(CEmitter, Serializer, Representer, Resolver):  # noqa: D101, F405
             version: YAML version tuple (major, minor) to emit, or None to omit version directive.
             tags: Mapping of tag prefixes to URIs for tag resolution, or None to use defaults.
             sort_keys: If True, sort mapping keys when representing mappings; if False, preserve insertion order.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,

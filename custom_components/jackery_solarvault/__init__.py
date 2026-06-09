@@ -188,7 +188,7 @@ def _entry_bootstrap_mqtt_session(
 
     Returns:
         A dict with keys 'user_id', 'seed_b64', and 'mac_id', and optionally 'mac_id_source', each mapped to their string value; `None` if the snapshot is missing or invalid.
-    """
+    """  # noqa: E501
     raw = entry.data.get(ENTRY_BOOTSTRAP_MQTT_SESSION)
     if not isinstance(raw, dict):
         return None
@@ -219,7 +219,7 @@ async def _async_prime_entry_bootstrap_mqtt_session(
 
     Returns:
         The validated bootstrap snapshot as a dict of session fields (e.g., user id, seed, mac id, and optionally mac id source), or `None` if no valid bootstrap snapshot is present.
-    """
+    """  # noqa: E501
     snapshot = _entry_bootstrap_mqtt_session(entry)
     if snapshot is None:
         return None
@@ -261,7 +261,7 @@ def _entry_startup_task(
 
     Returns:
         The `asyncio.Task[None]` stored under the entry's runtime bucket if present and a Task, `None` otherwise.
-    """
+    """  # noqa: E501
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None
@@ -275,7 +275,7 @@ def _build_api(hass: HomeAssistant, entry: JackeryConfigEntry) -> JackeryApi:
     Returns:
         JackeryApi: API client initialized with the integration's aiohttp session and the entry's
         account, password, and optional `mqtt_mac_id` and `region_code`.
-    """
+    """  # noqa: E501
     session = async_get_clientsession(hass)
     return JackeryApi(
         session=session,
@@ -296,7 +296,7 @@ async def _async_restore_cached_mqtt_session(
     Returns:
         dict[str, str] | None: The restored MQTT session snapshot containing `user_id`, `seed_b64`, `mac_id`
         and optionally `mac_id_source`, or `None` if no snapshot is available.
-    """
+    """  # noqa: E501
     bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry)
     cached = await async_load_mqtt_session(hass, entry.entry_id) or bootstrap
     if cached:
@@ -320,7 +320,7 @@ async def _async_authenticate_api_layer(
 
     Raises:
         ConfigEntryAuthFailed: If the configured account credentials are rejected by the Jackery API.
-    """
+    """  # noqa: E501
     cached = await _async_restore_cached_mqtt_session(hass, entry, api)
     try:
         await api.async_login()
@@ -401,9 +401,9 @@ async def _async_start_local_mqtt(
         Ignores messages where `data` is None; otherwise forwards `data` with its `topic` to the coordinator.
 
         Parameters:
-        	topic (str): MQTT topic of the received message.
-        	data (dict[str, Any] | None): Parsed JSON payload from the MQTT message, or `None` if no payload.
-        """
+                topic (str): MQTT topic of the received message.
+                data (dict[str, Any] | None): Parsed JSON payload from the MQTT message, or `None` if no payload.
+        """  # noqa: D206, E101, E501
         if data is None or coordinator is None:
             return
         await coordinator.async_handle_local_mqtt_message(topic, data)
@@ -425,7 +425,7 @@ async def _async_start_local_mqtt(
         """Stop the stored per-entry local MQTT client and remove its runtime reference.
 
         Stops the client, suppressing any exceptions raised during shutdown. If the per-entry runtime bucket still holds the same client instance, removes that reference.
-        """
+        """  # noqa: E501
         with contextlib.suppress(Exception):
             await client.async_stop()
         stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
@@ -460,7 +460,7 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
     """Complete background startup for a config entry by authenticating, running discovery, starting transports, and applying local MQTT configuration.
 
     Performs API authentication and cloud discovery, attempts an initial HTTP refresh, starts cloud MQTT push, the integration's local MQTT listener (and a direct local-MQTT client if none is present), and BLE transport concurrently. On authentication failures it records a coordinator-facing auth-failure message (so reauth is reported on the next refresh) and defers reporting for MQTT auth failures to the coordinator; on refresh failures it will load a cached discovery snapshot when available. All transport/startup errors are logged; the function always removes the per-entry background startup task marker from runtime storage before returning.
-    """
+    """  # noqa: E501
     try:
         try:
             await _async_authenticate_api_layer(hass, entry, coordinator.api)
@@ -502,7 +502,7 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
             """Start a direct local MQTT client for the current entry if no local MQTT client is present.
 
             Does nothing if a local MQTT client is already stored for the entry.
-            """
+            """  # noqa: E501
             if _local_mqtt_client(hass, entry) is not None:
                 return
             await _async_start_local_mqtt(hass, entry, coordinator)
@@ -588,7 +588,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     Returns:
         True if setup completed successfully.
-    """
+    """  # noqa: E501
     _async_clean_legacy_entities(hass, entry)
     api = _build_api(hass, entry)
     await _async_restore_cached_mqtt_session(hass, entry, api)
