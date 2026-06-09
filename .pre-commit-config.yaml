@@ -18,13 +18,6 @@ repos:
     hooks:
       - id: pyupgrade
         args:
-          - --py3-plus
-          - --py38-plus
-          - --py39-plus
-          - --py310-plus
-          - --py311-plus
-          - --py312-plus
-          - --py313-plus
           - --py314-plus
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
@@ -50,7 +43,7 @@ repos:
           - --unsafe-fixes
           - --preview
           - --target-version py314
-          - --extend-select
+          - --extend-select RUF100
           - --output-format=github
         types_or:
           - python
@@ -89,7 +82,7 @@ repos:
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
-      
+
   - repo: https://github.com/cheickmec/smellcheck
     rev: v0.3.1
     hooks:
