@@ -1,4 +1,4 @@
-    steps:
+steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v8.1.0
 
@@ -34,7 +34,7 @@
           ruff check ./custom_components/ --extend-select RUF100 || true
           ruff check ./custom_components/ --preview || true
           ruff check ./custom_components/ --output-format=github || true
-          ruff check ./custom_components/--exit-non-zero-on-fix || true
+          ruff check ./custom_components/ --exit-non-zero-on-fix || true
           ruff format
           python -m scripts.sync_contributor_guides || true
           pre-commit run --all-files || true
