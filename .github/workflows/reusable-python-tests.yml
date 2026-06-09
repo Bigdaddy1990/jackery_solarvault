@@ -120,7 +120,7 @@ jobs:
       coverage-threshold: ${{ env.COVERAGE_MIN }}
     env:
       PYTHON_VERSION: ${{ inputs.python-version != '' && inputs.python-version || (vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14') }}
-      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '') }}
+      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('>={0}', vars.HA_VERSION) || '') }}
       COVERAGE_MIN: ${{ inputs.coverage-min != '' && inputs.coverage-min || (vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '85') }}
       CRITICAL_MODULE_COVERAGE_MIN: ${{ inputs.critical-module-coverage-min != '' && inputs.critical-module-coverage-min || (vars.CI_CRITICAL_MODULE_COVERAGE_MIN != '' && vars.CI_CRITICAL_MODULE_COVERAGE_MIN || '90') }}
       COVERAGE_XML: ${{ inputs.coverage-xml-path != '' && inputs.coverage-xml-path || 'coverage.xml' }}
@@ -303,7 +303,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.COVERAGE_XML) != ''
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -318,7 +318,7 @@ jobs:
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           (steps.codecov_coverage_upload.outcome == 'failure' ||
           steps.codecov_coverage_upload.outcome == 'skipped')
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -332,7 +332,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.JUNIT_PATH) != ''
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -365,18 +365,41 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python -m scripts.publish_coverage \
-            --coverage-xml "${{ env.COVERAGE_XML }}" \
-            --coverage-html-index "${{ env.COVERAGE_HTML_DIR }}/index.html" \
-            --artifact-directory "${{ env.PAGES_ARTIFACT_DIR }}" \
-            --mode pages \
-            --pages-branch "${{ env.PAGES_BRANCH }}" \
-            --pages-prefix "${{ env.PAGES_PREFIX }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}" \
-            --commit-sha "${{ github.sha }}" \
-            --ref "${{ github.ref }}"
+          python - <<'PY'
+          from __future__ import annotations
 
+          import json
+          from pathlib import Path
+          import shutil
+
+          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
+          coverage_html_index = Path(r"${{ env.COVERAGE_HTML_DIR }}/index.html")
+          artifact_directory = Path(r"${{ env.PAGES_ARTIFACT_DIR }}")
+          artifact_directory.mkdir(parents=True, exist_ok=True)
+
+          def copy_if_exists(source: Path, destination: Path) -> None:
+              if source.is_file():
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, destination)
+
+          copy_if_exists(coverage_xml, artifact_directory / "coverage.xml")
+          copy_if_exists(coverage_html_index, artifact_directory / "index.html")
+          metadata = {
+              "mode": "pages",
+              "pages_branch": r"${{ env.PAGES_BRANCH }}",
+              "pages_prefix": r"${{ env.PAGES_PREFIX }}",
+              "run_id": r"${{ github.run_id }}",
+              "run_attempt": r"${{ github.run_attempt }}",
+              "commit_sha": r"${{ github.sha }}",
+              "ref": r"${{ github.ref }}",
+              "coverage_xml": str(coverage_xml),
+              "coverage_html_index": str(coverage_html_index),
+          }
+          (artifact_directory / "metadata.json").write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
       - name: Upload GitHub Pages bundle
         if: inputs.publish-pages == true && steps.pytest.outcome == 'success'
         uses: actions/upload-artifact@v7
@@ -388,11 +411,93 @@ jobs:
       - name: Enforce module and total coverage gates
         if: always() && !cancelled() && steps.pytest.outcome == 'success'
         run: |
-          python -m scripts.enforce_coverage_gates \
-            --coverage-xml "${{ env.COVERAGE_XML }}" \
-            --total-minimum-percent "${{ env.COVERAGE_MIN }}" \
-            --critical-module-minimum-percent "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
+          python - <<'PY'
+          from __future__ import annotations
 
+          from decimal import Decimal, InvalidOperation
+          from pathlib import Path
+          import sys
+          import xml.etree.ElementTree as ET
+
+          critical_modules = frozenset({
+              "custom_components/jackery_solarvault/__init__.py",
+              "custom_components/jackery_solarvault/coordinator.py",
+              "custom_components/jackery_solarvault/sensor.py",
+              "custom_components/jackery_solarvault/util.py",
+              "custom_components/jackery_solarvault/client/api.py",
+              "custom_components/jackery_solarvault/client/mqtt_push.py",
+              "custom_components/jackery_solarvault/client/ble_transport.py",
+          })
+
+          def decimal_percent(raw: str, *, label: str) -> Decimal:
+              try:
+                  value = Decimal(raw)
+              except InvalidOperation as err:
+                  raise ValueError(f"invalid {label}: {raw!r}") from err
+              if value < 0 or value > 100:
+                  raise ValueError(f"{label} must be between 0 and 100: {raw!r}")
+              return value
+
+          def rate_to_percent(raw: str | None, *, label: str) -> Decimal:
+              if raw is None:
+                  raise ValueError(f"coverage XML missing {label} line-rate")
+              try:
+                  rate = Decimal(raw)
+              except InvalidOperation as err:
+                  raise ValueError(f"invalid {label} line-rate: {raw!r}") from err
+              return rate * Decimal(100)
+
+          def normalized_filename(raw: str | None) -> str | None:
+              if not raw:
+                  return None
+              return raw.replace("\\", "/").lstrip("./")
+
+          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
+          if not coverage_xml.is_file():
+              raise SystemExit(f"coverage xml not found: {coverage_xml}")
+          root = ET.parse(coverage_xml).getroot()
+          total = rate_to_percent(root.get("line-rate"), label="total")
+          total_minimum = decimal_percent(
+              r"${{ env.COVERAGE_MIN }}",
+              label="total minimum percent",
+          )
+          critical_minimum = decimal_percent(
+              r"${{ env.CRITICAL_MODULE_COVERAGE_MIN }}",
+              label="critical module minimum percent",
+          )
+          failures: list[str] = []
+          if total < total_minimum:
+              failures.append(f"total coverage {total:.2f}% < {total_minimum:.2f}%")
+
+          rates: dict[str, Decimal] = {}
+          for class_node in root.findall('.//class'):
+              filename = normalized_filename(class_node.get('filename'))
+              if filename is None:
+                  continue
+              rates[filename] = rate_to_percent(
+                  class_node.get('line-rate'),
+                  label=filename,
+              )
+
+          for module in sorted(critical_modules):
+              coverage = rates.get(module)
+              if coverage is None:
+                  failures.append(f"critical module missing from coverage XML: {module}")
+              elif coverage < critical_minimum:
+                  failures.append(
+                      f"{module} coverage {coverage:.2f}% < {critical_minimum:.2f}%"
+                  )
+
+          if failures:
+              print("\n".join(failures), file=sys.stderr)
+              raise SystemExit(1)
+
+          print(
+              "coverage gates passed: "
+              f"total={total:.2f}% >= {total_minimum:.2f}%, "
+              f"critical_modules>={critical_minimum:.2f}%"
+          )
+          PY
       - name: Enforce pytest and coverage gates
         if: always() && !cancelled()
         env:

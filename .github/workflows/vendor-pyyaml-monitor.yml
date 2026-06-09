@@ -1,6 +1,7 @@
 name: Monitor vendored PyYAML
 
 on:
+  push:
   schedule:
     # Run every Wednesday at 02:30 UTC to validate PyYAML releases after the
     # upstream Tuesday release cadence.
@@ -8,13 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       fail_on_outdated:
-        description: "Fail the run when PyPI ships a newer stable release?"
+        description: Fail the workflow when vendored PyYAML is outdated
         required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
+        default: 'false'
 
 permissions:
   contents: write

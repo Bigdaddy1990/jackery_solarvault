@@ -5,16 +5,6 @@ on:
     # Run twice per week during the early-morning UTC window to avoid CI contention
     - cron: "0 3 * * 2,5"
   workflow_dispatch:
-    inputs:
-      override_ci_window:
-        description: "Bestätige, dass du das reservierte Testfenster mit dem Team abgestimmt hast."
-        required: true
-        type: boolean
-      run_reason:
-        description: "Kurzbeschreibung oder Link zum Issue/Incident für den manuellen Vollsuite-Lauf."
-        required: true
-        default: maintenance-window
-        type: string
 
 permissions:
   contents: read
@@ -50,7 +40,7 @@ jobs:
     uses: ./.github/workflows/reusable-python-tests.yml
     with:
       python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      home-assistant-spec: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '') }}
+      home-assistant-spec: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '==2026.6.1' }}
       coverage-min: ${{ vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '5' }}
       coverage-xml-path: ./coverage/coverage.xml
       coverage-html-dir: ./coverage/html
