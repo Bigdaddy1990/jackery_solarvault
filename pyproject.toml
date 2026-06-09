@@ -369,7 +369,7 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415","TID252","E901"]
+ignore = ["PLC0415","TID252","C901"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
