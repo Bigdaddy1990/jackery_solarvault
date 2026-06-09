@@ -48,7 +48,8 @@ repos:
           - --fix
           - --show-fixes
           - --unsafe-fixes
-          - --target-version
+          - --preview
+          - --target-version py314
           - --extend-select
           - --output-format=github
         types_or:
