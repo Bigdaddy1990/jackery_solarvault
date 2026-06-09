@@ -18,13 +18,9 @@ repos:
     hooks:
       - id: pyupgrade
         args:
-          - --exit-zero-even-if-changed
-          - --keep-percent-format
-          - --keep-mock
-          - --keep-runtime-typing
           - --py3-plus
-          - --py38-plus-plus
-          - --py39-plus-plus
+          - --py38-plus
+          - --py39-plus
           - --py310-plus
           - --py311-plus
           - --py312-plus
@@ -52,8 +48,8 @@ repos:
           - --fix
           - --show-fixes
           - --unsafe-fixes
-          - --target-version py314
-          - --extend-select RUF100
+          - --target-version
+          - --extend-select
           - --output-format=github
         types_or:
           - python

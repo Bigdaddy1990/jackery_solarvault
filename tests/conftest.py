@@ -6,10 +6,13 @@ configures pytest-asyncio and provides a couple of helpers shared
 across config-flow and entry-setup tests.
 """
 
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture(autouse=True)
