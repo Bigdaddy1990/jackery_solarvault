@@ -1,6 +1,8 @@
 aiohttp>=3.13.3
 aiomqtt
 annotatedyaml>=1.0.2
+codecov
+codefactor
 coverage
 coverage[toml]
 homeassistant-stubs
