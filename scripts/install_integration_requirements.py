@@ -54,6 +54,7 @@ def main() -> int | None:
         subprocess.run(
             cmd,
             check=True,
+            timeout=300,  # 5-minute timeout for package installation
         )
     else:
         print("No requirements to install.")
