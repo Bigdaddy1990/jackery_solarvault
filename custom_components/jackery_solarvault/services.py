@@ -19,11 +19,11 @@ The actions follow the same routing contract:
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
@@ -58,6 +58,9 @@ from .const import (
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
 )
 from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant, ServiceCall
 
 _LOGGER = logging.getLogger(__name__)
 
