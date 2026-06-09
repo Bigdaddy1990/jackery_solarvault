@@ -34,24 +34,24 @@ def enforce_repository_compliance(repo_directory: Path) -> int:
     print(f"{TerminalColors.OKBLUE}[*] Starte statische Code-Analyse im Verzeichnis: {repo_directory}{TerminalColors.ENDC}")
     python_files = list(repo_directory.rglob("*.py"))
     yaml_files = list(repo_directory.rglob("*.yaml"))
-    
+
     violation_count = 0
 
     print(f"\n{TerminalColors.BOLD}--- Überprüfung der Python-Integrationen ---{TerminalColors.ENDC}")
     for script_file in python_files:
         if "venv" in str(script_file) or ".tox" in str(script_file):
             continue
-        
+
         deprecation_issues = analyze_file_content(script_file, RESTRICTED_PATTERNS, require_match=False)
         mandatory_issues = analyze_file_content(script_file, MANDATORY_PATTERNS, require_match=True)
-        
+
         combined_issues = deprecation_issues + mandatory_issues
         if combined_issues:
             print(f"{TerminalColors.FAIL} In Datei: {script_file.name}{TerminalColors.ENDC}")
             for issue in combined_issues:
                 print(f"    -> {issue}")
                 violation_count += 1
-                
+
     print(f"\n{TerminalColors.BOLD}--- Überprüfung der YAML-Konfigurationen ---{TerminalColors.ENDC}")
     for config_file in yaml_files:
         yaml_issues = analyze_file_content(config_file, {"Legacy Template": r"platform:\s*template"}, require_match=False)
@@ -90,18 +90,18 @@ def execute_matrix(repo_path: Path, log_path: Path):
 
     repo_errors = enforce_repository_compliance(repo_path)
     log_errors = parse_runtime_logs(log_path)
-    
+
     total_violations = repo_errors + log_errors
-    
+
     print(f"\n{TerminalColors.BOLD}{'='*70}{TerminalColors.ENDC}")
     print(f"{TerminalColors.BOLD} ERGEBNISSE DER WORKFLOW-MATRIX {TerminalColors.ENDC}")
     print(f"{TerminalColors.BOLD}{'='*70}{TerminalColors.ENDC}")
-    
+
     execution_duration = time.time() - start_timestamp
     print(f" Ausführungsdauer     : {execution_duration:.2f} Sekunden")
     print(f" Statische Verstöße   : {repo_errors}")
     print(f" Laufzeit-Fehler      : {log_errors}")
-    
+
     if total_violations > 0:
         print(f"\n{TerminalColors.FAIL} Die Codebasis verletzt die Home Assistant Matrix für 2025/2026.{TerminalColors.ENDC}")
         print("Konsultieren Sie zwingend TOFIX.html und FAHRPLAN.html für die erforderlichen Sanierungsschritte.")
