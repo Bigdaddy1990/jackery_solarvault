@@ -194,14 +194,14 @@ def _local_mqtt_diagnostics(
     coordinator: JackerySolarVaultCoordinator,
     redactions_disabled: bool,
 ) -> dict[str, Any]:
-    """Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
-
+    """
+    Builds a diagnostics block for the integration's local MQTT client or returns an indicator that local MQTT is unavailable.
+    
     Parameters:
-        redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
-
+        redactions_disabled (bool): When True, request the client's diagnostics without redaction; when False, request a redacted snapshot.
+    
     Returns:
-        dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
-        MQTT client is available, otherwise the client's diagnostics snapshot.
+        dict: If a client diagnostics snapshot is available, returns that snapshot (with redaction controlled by `redactions_disabled`). Otherwise returns a block of the form `{"enabled": False, "disabled_reason": <reason>, "configured_local_mqtt": {...}}` describing why the client is unavailable and the configured connection parameters.
     """  # noqa: E501
     enabled = config_entry_bool_option(
         entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE

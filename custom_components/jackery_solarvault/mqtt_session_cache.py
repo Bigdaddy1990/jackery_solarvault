@@ -47,11 +47,11 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_mqtt_session(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """Load cached MQTT session credentials for the given config entry from persistent storage.
-
+    """
+    Load cached MQTT session credentials for the specified config entry from persistent storage.
+    
     Returns:
-        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` if present.
-        None: If storage is missing or malformed, or any required field is missing or empty.
+        dict[str, str] | None: A mapping containing the keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present. Returns `None` if the stored data is missing, malformed, or any required field is missing or empty.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -92,17 +92,16 @@ async def async_save_mqtt_session(
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """Persist MQTT session fields for a config entry.
-
-    Stores the `userId`, base64 `mqttPassWord` seed, and `macId` for `entry_id` in the integration's Home Assistant storage, overwriting any existing row.
-
+    """
+    Persist MQTT session fields for a config entry, overwriting any existing cached row.
+    
     Parameters:
-        entry_id (str): The config entry identifier to associate the cached session with.
-        user_id (str): `userId` returned by the Jackery cloud (used for MQTT clientId/username).
-        seed_b64 (str): Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
-        mac_id (str): `macId` broker session identifier.
-        mac_id_source (str | None): Optional human-readable source or provenance of `mac_id`.
-        cached_at (float | None): Optional UNIX timestamp (seconds) when the session was cached.
+        entry_id: Config entry identifier to associate with the cached session.
+        user_id: `userId` returned by the Jackery cloud used as the MQTT client identifier/username.
+        seed_b64: Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
+        mac_id: `macId` broker session identifier.
+        mac_id_source: Optional human-readable source or provenance of `mac_id`.
+        cached_at: Optional UNIX timestamp (seconds) when the session was cached.
     """
     store = _store(hass)
     data = await store.async_load()

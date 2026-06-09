@@ -24,6 +24,25 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
+        """
+        Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
+        
+        Parameters:
+            stream: Output stream or file-like object to write YAML to.
+            default_style: Preferred scalar style or None to use node-specific styles.
+            default_flow_style: Use flow style for collections when True.
+            canonical: Emit YAML in canonical form when True.
+            indent: Number of spaces to use for indentation.
+            width: Preferred line width for wrapping.
+            allow_unicode: Allow non-ASCII characters in output when True.
+            line_break: Line break style to use.
+            encoding: Character encoding for the output.
+            explicit_start: Emit an explicit start marker (`---`) when True.
+            explicit_end: Emit an explicit end marker (`...`) when True.
+            version: YAML version tuple to include in the document (e.g., (1, 2)).
+            tags: Mapping of tag handles to tag prefixes for the serializer.
+            sort_keys: Sort mapping keys before emitting when True.
+        """
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -68,6 +87,25 @@ class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101,
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
+        """
+        Initialize the dumper with emitter, serializer, representer, and resolver configuration.
+        
+        Parameters:
+            stream: Output stream or file-like object where YAML will be written.
+            default_style: Default scalar style to use when representing values (e.g., '|', '>' or None).
+            default_flow_style: If True, use flow style for collections by default; otherwise use block style.
+            canonical: If True, produce the canonical YAML form.
+            indent: Number of spaces to use for indentation.
+            width: Preferred line width for folding long lines.
+            allow_unicode: If True, allow non-ASCII characters in output.
+            line_break: Line break sequence to use in output.
+            encoding: Encoding name for the serialized output (if applicable).
+            explicit_start: If True, emit an explicit document start marker.
+            explicit_end: If True, emit an explicit document end marker.
+            version: YAML version tuple to include in the document header (e.g., (1, 2)) or None.
+            tags: Mapping of tag handles to tag prefixes to include in the document.
+            sort_keys: If True, sort mapping keys when representing mappings.
+        """
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -112,6 +150,25 @@ class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
+        """
+        Initialize the dumper by configuring the emitter, serializer, representer, and resolver components.
+        
+        Parameters:
+            stream: Output stream or file-like object to write YAML to.
+            default_style: Preferred scalar style or None to use node-specific styles.
+            default_flow_style: Use flow style for collections when True.
+            canonical: Emit YAML in canonical form when True.
+            indent: Number of spaces to use for indentation.
+            width: Preferred line width for wrapping.
+            allow_unicode: Allow non-ASCII characters in output when True.
+            line_break: Line break style to use.
+            encoding: Character encoding for the output.
+            explicit_start: Emit an explicit start marker (`---`) when True.
+            explicit_end: Emit an explicit end marker (`...`) when True.
+            version: YAML version tuple to include in the document (e.g., (1, 2)).
+            tags: Mapping of tag handles to tag prefixes for the serializer.
+            sort_keys: Sort mapping keys before emitting when True.
+        """
         Emitter.__init__(  # noqa: F405
             self,
             stream,

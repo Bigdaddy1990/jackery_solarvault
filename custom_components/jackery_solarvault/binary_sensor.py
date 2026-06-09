@@ -181,10 +181,11 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Determine whether the binary sensor is currently active.
-
+        """
+        Return whether the binary sensor is currently active.
+        
         Returns:
-            bool | None: `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
+            `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
         """  # noqa: E501
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
@@ -207,14 +208,16 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         plug_sn: str,
         plug_key: str,
     ) -> None:
-        """Create a binary sensor entity representing a specific smart plug's switch state.
-
+        """
+        Represent a binary sensor that reports a specific smart plug's switch state.
+        
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator providing device payloads and updates.
             device_id (str): Identifier of the parent device this plug belongs to.
             plug_index (int): 1-based index of the plug within the device's sorted smart-plug list.
             plug_sn (str): Serial number of the smart plug used to locate the plug in payloads.
-
+            plug_key (str): Stable subdevice key used to form the entity's internal unique key.
+        
         Notes:
             Builds and stores the plug's device_info at construction so the device registry can use it when the entity is added.
         """  # noqa: E501
@@ -233,10 +236,11 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     def _plug(self) -> dict[str, Any]:
         # Look the plug up by its captured serial so cloud-side re-ordering of
         # the plug array cannot reassign this entity to a different device.
-        """Finds the smart-plug payload matching this entity's captured serial to keep the entity bound to the same physical plug if the cloud-side plug list is reordered.
-
+        """
+        Find the smart-plug payload that matches this entity's captured serial so the entity remains bound to the same physical plug if the cloud-side plug list is reordered.
+        
         Returns:
-            dict[str, Any]: The matching smart-plug dictionary from the current payload, or an empty dict if no match is found.
+            dict[str, Any]: The matching smart-plug payload dictionary, or an empty dict if no matching plug is found.
         """  # noqa: E501
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
@@ -245,12 +249,13 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Determine whether the smart plug's power output is active.
-
-        Checks the plug payload for switch state fields and coerces the value to a boolean.
-
+        """
+        Determine whether the smart plug's power output is active.
+        
+        Queries the plug payload's switch state fields and converts the result to a boolean.
+        
         Returns:
-            `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
+            True if the plug reports an active output, False if it reports an inactive output, None if the state is unavailable.
         """  # noqa: E501
         raw = self._plug.get(FIELD_SWITCH_STATE)
         if raw is None:
@@ -259,10 +264,11 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the smart plug, always including its 1-based `plug_index`.
-
-        Includes any of the following fields from the matched plug payload when present: `FIELD_DEVICE_NAME`, `FIELD_SCAN_NAME`, `FIELD_COMM_STATE`, `FIELD_COMM_MODE`, `FIELD_SWITCH_STATE`, `FIELD_SYS_SWITCH`, `FIELD_VERSION`.
-
+        """
+        Provide diagnostic state attributes for the smart plug, always including its 1-based `plug_index`.
+        
+        Includes any of these keys from the matched plug payload when present: `FIELD_DEVICE_NAME`, `FIELD_SCAN_NAME`, `FIELD_COMM_STATE`, `FIELD_COMM_MODE`, `FIELD_SWITCH_STATE`, `FIELD_SYS_SWITCH`, `FIELD_VERSION`.
+        
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
         """  # noqa: E501

@@ -186,6 +186,17 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
 
 
 def _aes_cbc_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
+    """
+    Encrypts plaintext using AES in CBC mode with PKCS7 padding.
+    
+    Parameters:
+        plaintext (bytes): Data to be encrypted.
+        key (bytes): AES key (16, 24, or 32 bytes).
+        iv (bytes): Initialization vector (16 bytes).
+    
+    Returns:
+        bytes: Ciphertext produced by AES-CBC encryption of the padded plaintext.
+    """
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
@@ -194,20 +205,20 @@ def _aes_cbc_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
 
 
 def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
-    """Encrypt an MQTT command body per Crypto Layer C (PROTOCOL.md §14).
-
-    Algorithm: AES-128-CBC/PKCS7 with key = bluetoothKey (16 bytes),
-    IV = key (same as key). Output: Base64-encoded ciphertext.
-
+    """
+    Encrypt an MQTT command body using AES-128-CBC with PKCS7 padding and return the ciphertext as Base64.
+    
+    Encrypts the compact JSON serialization of `body` using AES-128-CBC where the encryption key and IV are both the provided Bluetooth key, then Base64-encodes the ciphertext.
+    
     Parameters:
-        body: The command body dict to encrypt.
-        bluetooth_key: Decoded bluetoothKey (must be 16 bytes for AES-128).
-
+        body (dict[str, Any]): Command body to serialize and encrypt.
+        bluetooth_key (bytes): 16-byte Bluetooth key used as both AES key and IV.
+    
     Returns:
-        Base64-encoded ciphertext string.
-
+        str: Base64-encoded ciphertext.
+    
     Raises:
-        ValueError: If bluetooth_key is not 16 bytes.
+        ValueError: If `bluetooth_key` is not exactly 16 bytes.
     """
     if len(bluetooth_key) != 16:  # noqa: PLR2004
         raise ValueError(  # noqa: TRY003
@@ -243,6 +254,17 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 
 
 def _generate_udid(seed: str) -> str:
+    """
+    Generate a deterministic MQTT UDID from a seed string.
+    
+    The result is the module's MQTT MAC ID prefix concatenated with a 32-character hexadecimal UUID (no dashes), produced deterministically from the provided seed so the same seed always yields the same UDID.
+    
+    Parameters:
+        seed (str): Input seed used to deterministically derive the UDID.
+    
+    Returns:
+        str: MQTT UDID string comprising `MQTT_MAC_ID_PREFIX` followed by 32 lowercase hex characters (no dashes).
+    """
     md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
@@ -262,7 +284,16 @@ class JackeryApi:  # noqa: PLR0904
         mqtt_mac_id: str | None = None,
         region_code: str | None = None,
     ) -> None:
-        """Initialise the entity from the coordinator and description."""
+        """
+        Create a JackeryApi client instance and initialize internal state, MQTT session placeholders, and diagnostic counters.
+        
+        Parameters:
+            session (aiohttp.ClientSession): HTTP session used for API requests.
+            account (str): Account identifier used for login.
+            password (str): Account password used for login.
+            mqtt_mac_id (str | None): Optional preconfigured MQTT MAC identifier (kept for later validation/selection).
+            region_code (str | None): Optional region/country code; stored uppercased or None if empty.
+        """
         self._session = session
         self._account = account
         self._password = password
@@ -300,7 +331,14 @@ class JackeryApi:  # noqa: PLR0904
         self._auth_retries = 0
 
     def _maybe_learn_region_code(self, systems: list[dict[str, Any]]) -> None:
-        """Learn region code from system metadata when not configured manually."""
+        """
+        Set the API client's region code from the first system entry that provides a country code when no region is configured.
+        
+        If the client already has a region code set, this is a no-op. Otherwise, the method iterates the provided system dictionaries and, for the first item whose `FIELD_COUNTRY_CODE` yields a non-empty value, stores the trimmed uppercase country code on `self._region_code` and logs the inference.
+        
+        Parameters:
+            systems (list[dict]): List of system metadata dictionaries returned by the system list API.
+        """
         if self._region_code:
             return
         for item in systems:
@@ -365,17 +403,19 @@ class JackeryApi:  # noqa: PLR0904
         return mac_id
 
     def _resolve_login_mac_id(self) -> str:
-        """Resolve and return the MAC identifier used for login and MQTT username derivation.
-
-        If a configured MQTT MAC ID is present and valid, that value is returned and
-        `self._mqtt_mac_id_source` is set to `"configured"`. If the configured value is
-        invalid, a deterministic MAC ID derived from the account is returned and
-        `self._mqtt_mac_id_source` is set to `"generated_fallback_invalid_config"`.
-        If no configured value is provided, a deterministic MAC ID derived from the
-        account is returned and `self._mqtt_mac_id_source` is set to `"generated"`.
-
+        """
+        Resolve the MAC identifier used for login and MQTT username derivation.
+        
+        If a configured `mqtt_mac_id` is present and valid, that value is used and
+        `self._mqtt_mac_id_source` is set to `"configured"`. If a configured value is
+        present but invalid, a deterministic MAC ID derived from the account is returned
+        and `self._mqtt_mac_id_source` is set to
+        `"generated_fallback_invalid_config"`. If no configured value is provided, a
+        deterministic MAC ID derived from the account is returned and
+        `self._mqtt_mac_id_source` is set to `"generated"`.
+        
         Returns:
-            str: The resolved MAC ID string.
+            The resolved MQTT MAC ID string.
         """  # noqa: E501
         configured = self._mqtt_mac_id_configured
         if configured:
@@ -396,12 +436,17 @@ class JackeryApi:  # noqa: PLR0904
         return _generate_udid(self._account)
 
     async def async_login(self) -> str:
-        """Perform the encrypted login flow and store session and MQTT credentials.
-
-        This sends the encrypted login form to the backend, validates the response code, and stores the returned JWT token and MQTT-related fields on the client instance.
-
+        """
+        Perform the encrypted login flow and persist the returned session and MQTT credentials.
+        
+        Constructs an encrypted login payload, POSTs it to the login endpoint, validates the backend response code and JSON shape, and stores the JWT token and MQTT fields on the client instance.
+        
         Returns:
             token (str): The JWT session token returned by the server.
+        
+        Raises:
+            JackeryAuthError: If the backend rejects credentials, reports a non-OK code, or returns no token.
+            JackeryApiError: For network errors, non-200 HTTP responses, or invalid/non-parsable JSON responses.
         """  # noqa: E501
         mac_id = self._resolve_login_mac_id()
         login_bean = {
@@ -538,20 +583,44 @@ class JackeryApi:  # noqa: PLR0904
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""  # noqa: E501
+        """
+        Return which source provided the current MQTT MAC ID.
+        
+        Returns:
+            str: Source identifier — "configured" if set from configuration, "generated" if derived from the account seed, or "generated_fallback_invalid_config" if a configured value existed but was invalid.
+        """  # noqa: E501
         return self._mqtt_mac_id_source
 
     @property
     def mqtt_mac_id(self) -> str | None:
-        """Return the MAC ID assigned to this MQTT session by login."""
+        """
+        MAC ID assigned to the MQTT session, if available.
+        
+        Returns:
+            str: MQTT MAC ID (33 lowercase hex characters) if known, `None` otherwise.
+        """
         return self._mqtt_mac_id
 
     @property
     def region_code(self) -> str | None:
-        """Return the region code currently pinned for HTTP login calls."""
+        """
+        Get the region code pinned for HTTP login calls.
+        
+        Returns:
+            `str` region code if set, `None` otherwise.
+        """
         return self._region_code
 
     async def _ensure_token(self) -> str:
+        """
+        Ensure the client holds a valid authentication token, triggering login if necessary.
+        
+        Returns:
+            str: The current authentication token.
+        
+        Raises:
+            JackeryAuthError: If a login attempt completes without providing a token.
+        """
         if self._token is None:
             async with self._lock:
                 if self._token is None:
@@ -588,12 +657,13 @@ class JackeryApi:  # noqa: PLR0904
         return None
 
     def _is_token_expired_response(self, status: int, data: object) -> bool:
-        """Determine whether the parsed API response signals that the authentication token has expired.
-
-        Only dict-shaped responses are inspected; non-dict responses always return False.
-
+        """
+        Determine whether a parsed API response indicates the authentication token has expired.
+        
+        Only dict-shaped responses are inspected; the function checks for a numeric backend code equal to the token-expired code or for common token-expiry phrases in the message text.
+        
         Returns:
-            True if the response indicates token expiration, False otherwise.
+            `true` if the response indicates token expiration, `false` otherwise.
         """  # noqa: E501
         if not isinstance(data, dict):
             return False
@@ -605,7 +675,12 @@ class JackeryApi:  # noqa: PLR0904
 
     @staticmethod
     def _response_has_auth_failure_text(data: object) -> bool:
-        """Return True when a backend error payload looks authorization-related."""
+        """
+        Determine if a backend response payload contains text that suggests an authentication or authorization failure.
+        
+        Returns:
+            bool: `True` if the response includes authentication/authorization-related markers (e.g., "token expired", "unauthorized", "login"), `False` otherwise.
+        """
         if not isinstance(data, dict):
             return False
         parts = [
@@ -641,7 +716,12 @@ class JackeryApi:  # noqa: PLR0904
         )
 
     def _is_auth_failure_response(self, status: int, data: object) -> bool:
-        """Classify HTTP/API authorization failures for HA reauth handling."""
+        """
+        Determine whether an HTTP response indicates an authentication or authorization failure that should trigger re-authentication.
+        
+        Returns:
+            True if the response represents an auth/authz failure (HTTP 401/403, a token-expired response, a non-200 response containing auth-failure markers, or a 200 response with a non-OK application `code` and auth-failure markers); `False` otherwise.
+        """
         if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
@@ -655,7 +735,11 @@ class JackeryApi:  # noqa: PLR0904
 
     @staticmethod
     def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
-        """Build a compact auth-failure message without exposing secrets."""
+        """
+        Create a concise authorization-failure message for an HTTP request.
+        
+        @returns str: Compact message containing the HTTP method and path, the response status, backend code, and the backend message (suitable for logs without exposing secrets).
+        """
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
@@ -666,13 +750,19 @@ class JackeryApi:  # noqa: PLR0904
         self,
         event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
     ) -> None:
-        """Forward one raw/parsed payload debug event to the coordinator.
-
-        Accepts either a pre-built event dict or a zero-arg callable that
-        returns one. The callable form is forwarded as-is to the
-        coordinator, which itself only invokes it when the dedicated
-        ``payload_debug`` logger is at DEBUG level — saving the
-        ``redacted`` walk on hot paths when DEBUG is disabled.
+        """
+        Forward a payload-debug event to the configured payload debug callback.
+        
+        If no callback is configured this is a no-op. Accepts either a ready-made
+        event dict or a zero-argument callable that returns an event dict; the
+        callable form is forwarded untouched so the callback can defer expensive
+        construction (for example, redaction) until it actually needs the event.
+        The callback may return an awaitable, which will be awaited.
+        
+        Parameters:
+            event_or_factory (dict[str, Any] | Callable[[], dict[str, Any]]):
+                Either a prepared event dictionary or a zero-argument factory that
+                produces the event dictionary when invoked.
         """
         callback = self.payload_debug_callback
         if callback is None:
@@ -697,7 +787,28 @@ class JackeryApi:  # noqa: PLR0904
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Build a redacted-later HTTP payload debug event."""
+        """
+        Constructs a structured HTTP debug event suitable for later redaction.
+        
+        The returned event includes these keys: "kind", "method", "path", "params", "request_body",
+        "status", "response", and "response_data_type". If the response payload (extracted as
+        response[FIELD_DATA] when `response` is a dict) produces chart-series debug via
+        chart_series_debug(payload), the event will also include "chart_series_debug".
+        
+        Parameters:
+            method (str): HTTP method name used for the request.
+            path (str): Request path (API endpoint).
+            params (dict | None): Query or path parameters sent with the request.
+            body (dict | None): Request body that was sent.
+            status (int | None): HTTP response status code, if available.
+            response (dict[str, Any] | None): Parsed response object; when a dict, the function
+                extracts payload = response[FIELD_DATA] to determine response_data_type and to
+                produce optional chart_series_debug.
+        
+        Returns:
+            dict[str, Any]: A dictionary representing the debug event, containing request/response
+            fields and any chart-series debug data when available.
+        """
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -716,11 +827,19 @@ class JackeryApi:  # noqa: PLR0904
 
     @staticmethod
     def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
-        """Return a dict payload or an empty dict with one diagnostic warning.
-
-        Several Jackery endpoints return `{code,msg,data}` but backend variants
-        sometimes change `data` to null, list or string. Returning those shapes
-        to the coordinator would break payload merging and sensor creation.
+        """
+        Normalize an API response `data` value into a dict payload.
+        
+        If `data[FIELD_DATA]` is a dict, that dict is returned. If it is null, an empty
+        dict is returned. For any other shape a warning is emitted and an empty dict
+        is returned to avoid breaking downstream payload merging.
+        
+        Parameters:
+            data (dict): Full parsed response object potentially containing `FIELD_DATA`.
+            path (str): Request path used for diagnostic logging.
+        
+        Returns:
+            dict: The normalized dict payload or an empty dict when no suitable dict exists.
         """
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
@@ -786,10 +905,29 @@ class JackeryApi:  # noqa: PLR0904
 
     # --- generic GET with auto re-login ------------------------------------
     async def _get_json(self, path: str, params: dict | None = None) -> dict:
+        """
+        Perform an authenticated GET request to the API path and return the parsed response body.
+        
+        Parameters:
+            path (str): API path (appended to the base URL).
+            params (dict | None): Optional query parameters to include in the request.
+        
+        Returns:
+            dict: Parsed JSON response body. If the response could not be parsed as JSON, returns a dict containing `FIELD_RAW_TEXT` with the truncated raw response text.
+        
+        Raises:
+            JackeryAuthError: When the response indicates an authentication/authorization failure (token expiry triggers an automatic re-login attempt before this error is raised).
+            JackeryApiError: For network/timeout errors, non-200 HTTP responses, or when the backend `code` is neither `CODE_OK` nor `None`.
+        """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
         async def _do() -> tuple[int, dict]:
+            """
+            Perform an HTTP GET to the resolved URL and return the response status and parsed body.
+            
+            The body is the parsed JSON response when JSON decoding succeeds; otherwise the body is a dict containing `FIELD_RAW_TEXT` with the response text truncated to `HTTP_RAW_TEXT_LIMIT`. The returned tuple is `(status_code, body_dict)`.
+            """
             async with self._session.get(
                 url,
                 params=params,
@@ -880,7 +1018,15 @@ class JackeryApi:  # noqa: PLR0904
         return systems
 
     async def async_get_device_property(self, device_id: str | int) -> dict:
-        """GET /v1/device/property — device + properties dict."""
+        """
+        Fetches the device properties for the given device identifier.
+        
+        Parameters:
+            device_id (str | int): Device identifier; will be stringified for the request.
+        
+        Returns:
+            dict: The device properties dictionary extracted from the response. Returns an empty dict if the response `data` field is missing or is not a dict.
+        """
         data = await self._get_json(
             DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -888,7 +1034,12 @@ class JackeryApi:  # noqa: PLR0904
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
 
     async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
-        """GET /v1/api/alarm — alarm list for a system."""
+        """
+        Fetches the alarm list for the specified system.
+        
+        Returns:
+            The response 'data' field (typically a list of alarm dictionaries) or `None` if the field is absent.
+        """
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
         )
@@ -977,12 +1128,13 @@ class JackeryApi:  # noqa: PLR0904
 
     # --- Additional app-statistic endpoints from PROTOCOL.md §2 ----------
     async def async_get_device_statistic(self, device_id: str | int) -> dict:
-        """Retrieve current-day energy flow statistics for the specified device.
-
-        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. Keys present may vary by device and backend response.
-
+        """
+        Retrieve current-day energy flow statistics for the specified device.
+        
+        The returned dictionary maps metric keys to their values as numeric strings representing kilowatt-hours (kWh); available keys vary by device and backend response (examples: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, `batChgEgy`).
+        
         Returns:
-            dict: Mapping of statistic keys to their values as strings in kWh.
+            dict: Mapping of metric key (str) to its value as a string in kWh.
         """  # noqa: E501
         data = await self._get_json(
             DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -1096,10 +1248,11 @@ class JackeryApi:  # noqa: PLR0904
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """Fetches on-grid (home) statistics for the given device over the specified date range.
-
+        """
+        Fetch on-grid (home) statistics for the specified device and period.
+        
         Returns:
-            payload (dict): Normalized response payload containing chart/statistics data. When available, includes `APP_REQUEST_META` with request metadata (excluding `deviceId`).
+            Normalized response payload dict containing chart/statistics data. When present, `APP_REQUEST_META` contains the request metadata for the query (excluding `deviceId`).
         """  # noqa: E501
         return await self._async_get_device_period_stat(
             DEVICE_HOME_STAT_PATH,
@@ -1117,16 +1270,17 @@ class JackeryApi:  # noqa: PLR0904
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """Retrieve CT (smart-meter) statistics for a device.
-
+        """
+        Retrieve CT (smart-meter) statistics for the specified device and period.
+        
         Parameters:
-                device_id (str | int): Device identifier passed as `deviceId` to the API.
-                date_type (str): Period type for the chart (e.g., day, month); defaults to DATE_TYPE_DAY.
-                begin_date (str | None): Optional start date for the period (ISO-like string).
-                end_date (str | None): Optional end date for the period (ISO-like string).
-
+            device_id: Device identifier sent as the `deviceId` query parameter.
+            date_type: Period type for the chart (for example, day or month).
+            begin_date: Optional start date for the period (ISO-like string).
+            end_date: Optional end date for the period (ISO-like string).
+        
         Returns:
-                dict[str, Any]: Parsed payload dictionary containing CT/smart-meter statistics. The payload may include request metadata (APP_REQUEST_META) when a date range was provided.
+            A dictionary containing the parsed CT/smart-meter statistics payload. When a date range is supplied, the payload may include `APP_REQUEST_META` with the request parameters.
         """  # noqa: E501
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
@@ -1175,13 +1329,14 @@ class JackeryApi:  # noqa: PLR0904
         self,
         device_id: str | int,
     ) -> dict[str, Any]:
-        """Retrieve the Smart-Meter (CT accessory) panel totals for the given device.
-
+        """
+        Get smart-meter (CT accessory) panel totals for the specified device.
+        
         Parameters:
-            device_id: Smart-Meter / CT accessory deviceId (not the SolarVault main deviceId).
-
+            device_id (str | int): Smart-Meter / CT accessory `deviceId` (not the SolarVault main deviceId).
+        
         Returns:
-            A dictionary containing the parsed payload with the meter panel totals from the device meter statistics endpoint.
+            dict: Parsed payload containing the meter panel totals returned by the device meter statistics endpoint.
         """  # noqa: E501
         data = await self._get_json(
             DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -1195,13 +1350,11 @@ class JackeryApi:  # noqa: PLR0904
         self,
         smart_socket_id: str | int,
     ) -> dict[str, Any]:
-        """Fetches socket panel totals for the given smart socket.
-
-        Parameters:
-            smart_socket_id (str | int): Smart-socket accessory identifier passed to the API.
-
+        """
+        Get socket panel totals for the specified smart socket.
+        
         Returns:
-            dict[str, Any]: The response `data` payload as a dictionary (empty if missing or not a dict).
+            The response `data` payload as a dict; an empty dict if the payload is missing or not a dict.
         """  # noqa: E501
         data = await self._get_json(
             DEVICE_SOCKET_STATISTIC_PATH,
@@ -1236,7 +1389,16 @@ class JackeryApi:  # noqa: PLR0904
         )
 
     async def async_get_shelly_devices(self) -> list[dict[str, Any]]:
-        """GET device/shelly/devices and return app-linked Shelly accessories."""
+        """
+        Fetches Shelly devices linked to the account and returns them as a normalized list.
+        
+        Normalizes several backend response shapes: `data` may be a list of device dicts, a dict containing
+        `boundDevices` or `devices` lists, or a single device dict (identified by `deviceId`). Filters out
+        non-dict entries and returns an empty list when no device objects are found.
+        
+        Returns:
+            List[dict[str, Any]]: A list of Shelly device objects; empty list if none are present.
+        """
         data = await self._get_json(SHELLY_DEVICES_PATH)
         raw = data.get(FIELD_DATA)
         if isinstance(raw, list):
@@ -1256,7 +1418,15 @@ class JackeryApi:  # noqa: PLR0904
         self,
         device_id: str | int,
     ) -> dict[str, Any]:
-        """GET Shelly realtime-power for one app-linked accessory."""
+        """
+        Fetches realtime power metrics for a Shelly accessory linked to the account.
+        
+        Parameters:
+            device_id (str | int): The Shelly device identifier.
+        
+        Returns:
+            dict: The response `data` object parsed as a dictionary (empty dict if the payload is missing or not a dict).
+        """
         data = await self._get_json(
             SHELLY_REALTIME_POWER_PATH,
             params={FIELD_DEVICE_ID: str(device_id)},
@@ -1271,7 +1441,21 @@ class JackeryApi:  # noqa: PLR0904
         function: str,
         control_allowed: bool = True,
     ) -> bool:
-        """POST Shelly control using app-derived action/function values."""
+        """
+        Send a Shelly control command for the specified device.
+        
+        Parameters:
+            device_id (str | int): Identifier of the Shelly device to control.
+            action (str): Action name to perform (as provided by the app).
+            function (str): Function name associated with the action (as provided by the app).
+            control_allowed (bool): If `False`, the call will raise a `JackeryApiError` and no command will be sent.
+        
+        Returns:
+            bool: `true` if the backend indicates the control request was accepted, `false` otherwise.
+        
+        Raises:
+            JackeryApiError: If `control_allowed` is `False` or the API reports an authentication/authorization error.
+        """
         if not control_allowed:
             raise JackeryApiError("Shelly control is not allowed for this device")  # noqa: TRY003
         data = await self._post_form(
@@ -1285,11 +1469,11 @@ class JackeryApi:  # noqa: PLR0904
         return bool(data.get(FIELD_DATA, True))
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
-        """POST wss-cloud/device/shelly/auth-url — get Shelly OAuth URL.
-
+        """
+        Retrieve the Shelly OAuth authorization URL and accompanying state for the redirect flow.
+        
         Returns:
-            dict: Contains ``authUrl`` (str) and ``state`` (str) for the
-            Shelly OAuth redirect flow.
+            dict: Contains `authUrl` (str) and `state` (str) for the Shelly OAuth redirect flow.
         """
         data = await self._post_form(SHELLY_AUTH_URL_PATH, {})
         return self._payload_dict(data, SHELLY_AUTH_URL_PATH)
@@ -1299,14 +1483,15 @@ class JackeryApi:  # noqa: PLR0904
         binding_id: int | str,
         device_id: str | int,
     ) -> bool:
-        """POST wss-cloud/device/shelly/unbind/device — unbind a Shelly device.
-
-        Args:
-            binding_id: The binding ID from the Shelly devices list.
-            device_id: The Shelly device ID to unbind.
-
+        """
+        Unbinds a Shelly device from the user's Shelly binding list.
+        
+        Parameters:
+            binding_id (int | str): The binding ID as returned in the Shelly devices list.
+            device_id (str | int): The Shelly device identifier to unbind.
+        
         Returns:
-            bool: True if the unbind succeeded.
+            bool: `True` if the unbind operation was accepted by the backend, `False` otherwise.
         """
         data = await self._post_form(
             SHELLY_UNBIND_DEVICE_PATH,
@@ -1318,10 +1503,11 @@ class JackeryApi:  # noqa: PLR0904
         return bool(data.get(FIELD_DATA, True))
 
     async def async_unbind_shelly_account(self) -> bool:
-        """POST wss-cloud/device/shelly/unbind/account — unbind Shelly account.
-
+        """
+        Unbinds the Shelly account associated with the current user.
+        
         Returns:
-            bool: True if the account unbind succeeded.
+            True if the account unbind succeeded, False otherwise.
         """
         data = await self._post_form(SHELLY_UNBIND_ACCOUNT_PATH, {})
         return bool(data.get(FIELD_DATA, True))
@@ -1330,14 +1516,14 @@ class JackeryApi:  # noqa: PLR0904
         self,
         state: str = "",
     ) -> dict[str, Any]:
-        """GET device/shelly/binding/failures — check Shelly binding status.
-
-        Args:
-            state: Optional state filter for the binding failures query.
-
+        """
+        Retrieve a summary of Shelly binding failures.
+        
+        Parameters:
+            state (str): Optional state filter to narrow the binding failures query.
+        
         Returns:
-            dict: Contains ``bindCount`` (int), ``failedDeviceSns`` (list),
-            and ``successDeviceSns`` (list).
+            dict: Response payload containing `bindCount` (int), `failedDeviceSns` (list[str]), and `successDeviceSns` (list[str]).
         """
         params: dict[str, str] = {}
         if state:
@@ -1546,6 +1732,14 @@ class JackeryApi:  # noqa: PLR0904
             return headers
 
         async def _do() -> tuple[int, dict]:
+            """
+            Perform an HTTP PUT request to the enclosing `url` with `payload` and return the response status and body.
+            
+            The body is the parsed JSON response when JSON decoding succeeds. If JSON parsing or decoding fails, `body` will be a dict containing `{FIELD_RAW_TEXT: <truncated response text>}` where the text is limited to `HTTP_RAW_TEXT_LIMIT` characters.
+            
+            Returns:
+                tuple[int, dict]: `(status, body)` where `status` is the HTTP status code and `body` is the parsed response dict or a dict with `FIELD_RAW_TEXT` on parse failure.
+            """
             async with self._session.put(
                 url,
                 json=payload,
@@ -1671,6 +1865,12 @@ class JackeryApi:  # noqa: PLR0904
         body = {k: str(v) for k, v in fields.items()}
 
         async def _do() -> tuple[int, dict]:
+            """
+            Perform an HTTP POST and return the response status and parsed body.
+            
+            Returns:
+                tuple[int, dict]: A tuple of `(status_code, data)` where `status_code` is the HTTP status integer and `data` is the parsed JSON response. If the response cannot be parsed as JSON, `data` will be a dict containing `FIELD_RAW_TEXT` with the truncated raw response text.
+            """
             async with self._session.post(
                 url,
                 data=body,
@@ -1772,17 +1972,19 @@ class JackeryApi:  # noqa: PLR0904
         single_price: float | str,
         currency: str,
     ) -> bool:
-        """Set the system's fixed electricity price for dynamic pricing mode.
-
+        """
+        Set the system's fixed electricity price used when the system is configured for single (fixed) pricing.
+        
         Parameters:
-            single_price (float | str): Price value that must be greater than or equal to 0; will be formatted to at most four decimal places before sending.
+            system_id (str | int): Identifier of the system to configure.
+            single_price (float | str): Price value greater than or equal to 0; will be formatted to at most four decimal places before sending.
             currency (str): Non-empty currency code or label.
-
+        
         Returns:
             `true` if the backend indicates the change was accepted, `false` otherwise.
-
+        
         Raises:
-            JackeryApiError: If `single_price` is negative or `currency` is empty.
+            JackeryApiError: If `single_price` is negative or `currency` is empty, or when the API call fails.
         """  # noqa: E501
         price = float(single_price)
         if price < 0:
@@ -1877,11 +2079,11 @@ class JackeryApi:  # noqa: PLR0904
             self._mqtt_mac_id_source = mac_id_source
 
     def mqtt_session_snapshot(self) -> dict[str, str] | None:
-        """Return the current MQTT session fields for persistence, or ``None``.
-
-        Returns ``None`` until a successful login has populated all three
-        mandatory fields. The returned dict mirrors
-        :func:`mqtt_session_cache.async_save_mqtt_session` keyword arguments.
+        """
+        Provide a snapshot of the current MQTT session suitable for persistence.
+        
+        Returns:
+            A dict with keys `userId`, `seed_b64`, `mac_id`, and `mac_id_source` when a complete session exists; `None` until the required `userId`, `seed_b64`, and `mac_id` fields are all populated.
         """
         if not (self._mqtt_user_id and self._mqtt_seed_b64 and self._mqtt_mac_id):
             return None
@@ -1893,10 +2095,17 @@ class JackeryApi:  # noqa: PLR0904
         }
 
     def diagnostics_snapshot(self) -> dict[str, Any]:
-        """Return transport counters for the HTTP API diagnostic sensor.
-
-        Counters are in-memory and reset on HA restart (same contract as
-        the BLE transport sensor).
+        """
+        Provide in-memory transport counters for the HTTP API diagnostic sensor.
+        
+        Counters are stored in memory and are reset when Home Assistant restarts (same lifecycle as the BLE transport sensor).
+        
+        Returns:
+            dict[str, int]: Mapping with keys:
+                - "requests_total": total requests attempted
+                - "requests_failed": total requests that failed
+                - "timeouts_total": total request timeouts
+                - "auth_retries": total authentication retry attempts
         """
         return {
             "requests_total": self._requests_total,
@@ -1913,7 +2122,20 @@ class JackeryApi:  # noqa: PLR0904
         params: dict[str, str],
         payload_request: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Copy a raw response and keep enough request context for diagnostics."""
+        """
+        Ensure the response contains request context metadata for diagnostics.
+        
+        If the top-level response lacks APP_REQUEST_META, this function sets it to a dict with `path` and a copy of `params`. If `FIELD_DATA` is a dict and `payload_request` is provided, the function ensures `FIELD_DATA[APP_REQUEST_META]` exists and contains a copy of `payload_request`.
+        
+        Parameters:
+            data (dict[str, Any]): The raw response object (not modified).
+            path (str): API request path to record.
+            params (dict[str, str]): Query or form parameters to record.
+            payload_request (dict[str, str] | None): Optional per-payload request metadata to embed inside `FIELD_DATA`.
+        
+        Returns:
+            dict[str, Any]: A response dictionary mirroring `data` with ensured `APP_REQUEST_META` at the top level and, when applicable, inside `FIELD_DATA`.
+        """
         response = dict(data)
         response.setdefault(APP_REQUEST_META, {"path": path, "params": dict(params)})
         payload = response.get(FIELD_DATA)
@@ -1925,5 +2147,13 @@ class JackeryApi:  # noqa: PLR0904
 
 
 def _write_accepted(data: dict[str, Any]) -> bool:
-    """Return whether a write endpoint accepted the request."""
+    """
+    Determine whether a write API response indicates the request was accepted.
+    
+    Parameters:
+        data (dict): Parsed JSON response returned by the API.
+    
+    Returns:
+        `true` if the response `data` field evaluates to a truthy value and is not explicitly `False`, `false` otherwise.
+    """
     return safe_bool(data.get(FIELD_DATA)) is not False

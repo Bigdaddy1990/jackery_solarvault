@@ -16,12 +16,11 @@ _KEY_DEVICE_INDEX: Final = "device_index"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Create a Store configured for this integration's discovery cache.
-
-    The Store is initialized with the module's storage key and storage version.
-
+    """
+    Create a Store instance for this integration's persistent discovery cache.
+    
     Returns:
-        Store: A Store configured with the integration's storage key and storage version.
+        Store[dict[str, Any]]: A Store configured with the integration's storage key and storage schema version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 

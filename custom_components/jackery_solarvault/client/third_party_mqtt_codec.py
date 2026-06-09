@@ -6,13 +6,20 @@ from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 
 
 def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
-    """Encode one ThirdPartMQTTConfig secret like ``bb/e.d(String)``.
-
-    Smali source:
-    ``HomeDeviceController.g1`` runs ``userName``, ``password`` and ``token``
-    through ``Lbb/c;->d(String)``. For SolarVault home devices ``bb/e.d``
-    performs AES/CBC/PKCS7 with the decoded ``bluetoothKey`` as AES key and IV,
-    then Base64-encodes the ciphertext without line wrapping.
+    """
+    Encrypt a plaintext secret into the app-compatible Base64 ciphertext used by ThirdPartMQTTConfig.
+    
+    The value is encrypted with AES/CBC/PKCS7 using `bluetooth_key` as both AES key and IV, then Base64-encoded without line wrapping.
+    
+    Parameters:
+        value (str): Plaintext secret to encode (e.g., username, password, token).
+        bluetooth_key (bytes): Decoded Bluetooth key used as AES key and IV; must be 16 bytes (BLE_AES_IV_LEN).
+    
+    Returns:
+        str: ASCII Base64 string of the ciphertext.
+    
+    Raises:
+        ValueError: If `bluetooth_key` length is not 16 bytes.
     """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(  # noqa: TRY003
@@ -24,7 +31,19 @@ def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
 
 def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
-    """Decode one ThirdPartMQTTConfig secret like ``bb/e.c(String)``."""
+    """
+    Decode an app-encoded ThirdPartMQTTConfig secret into its UTF-8 plaintext.
+    
+    Parameters:
+        value (str): Base64-encoded ciphertext produced by the app for a credential field.
+        bluetooth_key (bytes): Raw 16-byte decoded bluetoothKey used as both AES key and IV.
+    
+    Returns:
+        str: The decrypted plaintext decoded as UTF-8.
+    
+    Raises:
+        ValueError: If `bluetooth_key` does not have length 16, or if `value` is not a valid app-encoded field (invalid Base64 or decryption/UTF-8 decoding failure).
+    """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(  # noqa: TRY003
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "

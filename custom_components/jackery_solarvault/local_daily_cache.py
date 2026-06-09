@@ -262,13 +262,14 @@ def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
 
 
 def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
-    """Return the stored ISO day string from a snapshot.
-
+    """
+    Extracts the ISO day string from a snapshot.
+    
     Parameters:
-        snapshot (dict | None): Snapshot object expected to contain a string value under the key `_KEY_DAY`.
-
+        snapshot (dict[str, Any] | None): Snapshot expected to contain the day value under the module's day key.
+    
     Returns:
-        str | None: The ISO day string (`YYYY-MM-DD`) if present and a string, otherwise `None`.
+        str | None: The ISO day string (`YYYY-MM-DD`) if present and a `str`, otherwise `None`.
     """
     if not isinstance(snapshot, dict):
         return None

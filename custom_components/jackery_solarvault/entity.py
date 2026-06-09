@@ -96,10 +96,22 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _pv_trends(self) -> dict[str, Any]:
+        """
+        Return the photovoltaic (PV) trends payload for this device.
+        
+        Returns:
+            dict[str, Any]: The PV trends data from the device payload, or an empty dict if not present.
+        """
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
     def _alarm(self) -> object:
+        """
+        Retrieve the alarm payload for the device.
+        
+        Returns:
+            alarm (object | None): The alarm payload from the device payload, or `None` if no alarm data is present.
+        """
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -132,12 +144,13 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Constructs the DeviceInfo for the parent SolarVault device.
-
-        The returned DeviceInfo includes identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version. The display name is chosen from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". The model is chosen from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Serial number and software version are included when present in device metadata/discovery and OTA data, respectively.
-
+        """
+        Builds metadata for the parent SolarVault device.
+        
+        Chooses the device display name from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". Chooses the model from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Includes serial number from device metadata or discovery when present, and software version from OTA data when present.
+        
         Returns:
-            DeviceInfo: DeviceInfo populated for the parent SolarVault device.
+            DeviceInfo: Identifiers, manufacturer, name, model, and optional `serial_number` and `sw_version`.
         """  # noqa: E501
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
@@ -213,12 +226,13 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def available(self) -> bool:
-        """Determine whether the entity is available.
-
-        First verifies the parent coordinator's availability. If present, uses the device metadata `online_status` or the system `online_state` (parsed with `jackery_online_state`) to determine availability; if no explicit state is available, falls back to whether the device ID exists in the coordinator data.
-
+        """
+        Determine entity availability based on coordinator state, device online indicators, and local reachability.
+        
+        Checks that the parent coordinator reports availability, then prefers an explicit device online indicator (from device metadata or system state) when present. If an explicit parsed online state exists, that value is used except that a parsed `false` will be treated as available when the coordinator reports the device is locally reachable. If no explicit online state is available, availability falls back to whether the device ID is present in the coordinator data.
+        
         Returns:
-            True if the entity is available, False otherwise.
+            `true` if the entity is considered available, `false` otherwise.
         """  # noqa: E501
         if not super().available:
             return False
