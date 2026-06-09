@@ -47,9 +47,9 @@ jobs:
 
       - name: Install deps (uv)
         run: |
-          uv pip install --system -r requirements.txt
-          uv pip install --system -r requirements-test.txt --prerelease=allow
-          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
+          uv pip install --system --upgrade -r requirements.txt 
+          uv pip install --system --upgrade -r requirements-test.txt
+          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports codecov codefactor
 
       - uses: astral-sh/ruff-action@v3
         with:
