@@ -451,6 +451,7 @@ from .const import (
     TIMER_TASK_TYPE_TIME_ELEC,
 )
 from .discovery_cache import async_load_discovery_cache, async_save_discovery_cache
+from .ingest import merge_live_properties
 from .local_daily_cache import (
     async_load_daily_cache,
     async_save_daily_cache,
@@ -458,8 +459,6 @@ from .local_daily_cache import (
     refresh_snapshot,
 )
 from .mqtt_session_cache import async_clear_mqtt_session, async_save_mqtt_session
-from .ingest import merge_live_properties
-
 from .util import (
     config_entry_bool_option,
     dev_mode_redactions_disabled,
@@ -1947,7 +1946,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # *also* disables redaction in the JSONL log and diagnostics
         # export; both surfaces are off by default.
         if dev_mode_redactions_disabled():
-
             for device_id in self._device_index:
                 key = self.device_bluetooth_key(device_id)
                 if key is None:
@@ -4307,7 +4305,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_flush_ble_partial_update(self, device_id: str) -> None:
         """Flush the latest pending BLE payload for one device."""
-        try:  # noqa: PLW0717
+        try:
             await asyncio.sleep(_BLE_PARTIAL_UPDATE_COALESCE_SEC)
             pending = self._ble_pending_updates.pop(device_id, None)
             if not isinstance(pending, dict):
@@ -6326,8 +6324,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts or not states:
             return 0.0
         try:
-            from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 statistics_during_period,
             )
         except (ImportError, RuntimeError) as err:
@@ -6386,12 +6384,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> tuple[float, float]:
         """Return previous ``sum`` and same-period ``state`` for an entity."""
         try:
-            from homeassistant.components.recorder import get_instance
-            from homeassistant.components.recorder.db_schema import (
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.db_schema import (  # noqa: PLC0415
                 Statistics,
                 StatisticsMeta,
             )
-            from homeassistant.helpers.recorder import session_scope
+            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity-statistic offset unavailable: %s", err)
             return 0.0, 0.0
@@ -6456,9 +6454,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts:
             return set()
         try:
-            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
             from homeassistant.components.recorder.db_schema import StatisticsRuns
-            from homeassistant.helpers.recorder import session_scope
+            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder run markers unavailable: %s", err)
             return set()
@@ -6496,7 +6494,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
             from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-            from homeassistant.helpers import entity_registry as er
+            from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Entity registry unavailable for entity repair: %s", err)
             return {}
@@ -6637,14 +6635,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not entity_ids:
             return 0, 0
         try:
-            from homeassistant.components.recorder.models import (
+            from homeassistant.components.recorder.models import (  # noqa: PLC0415
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 async_import_statistics,
             )
-            from homeassistant.const import UnitOfEnergy
+            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
             from homeassistant.util.unit_conversion import EnergyConverter
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity statistics import unavailable: %s", err)
@@ -6731,7 +6729,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 all_starts
             )
             if not compiled_hour_starts:
-                compiled_hour_starts = {round(start.timestamp()) for start in all_starts}
+                compiled_hour_starts = {
+                    round(start.timestamp()) for start in all_starts
+                }  # noqa: E501
 
         imported_rows = 0
         failed_rows = 0
@@ -6851,7 +6851,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         warnings = normalized_data_quality_warnings(warnings)
 
         try:
-            from homeassistant.helpers import issue_registry as ir
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
         except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
@@ -7141,15 +7141,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not points:
             return True, 0
         try:
-            from homeassistant.components.recorder.models import (
+            from homeassistant.components.recorder.models import (  # noqa: PLC0415
                 StatisticData,
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (
+            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
                 async_add_external_statistics,
             )
-            from homeassistant.const import UnitOfEnergy
+            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
             from homeassistant.util.unit_conversion import EnergyConverter
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder statistics import unavailable: %s", err)
@@ -7783,18 +7783,25 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 cache_keys_to_clear.update({
                     self._app_period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_WEEK),
-                    self._app_period_section(APP_SECTION_BATTERY_TRENDS, DATE_TYPE_WEEK),
+                    self._app_period_section(
+                        APP_SECTION_BATTERY_TRENDS, DATE_TYPE_WEEK
+                    ),  # noqa: E501
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_CT_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_EPS_STAT, DATE_TYPE_WEEK),
                 })
-            if (self._cached_date.year, self._cached_date.month) != (today.year, today.month):
+            if (self._cached_date.year, self._cached_date.month) != (
+                today.year,
+                today.month,
+            ):  # noqa: E501
                 cache_keys_to_clear.update({
                     self._app_period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_MONTH),
-                    self._app_period_section(APP_SECTION_BATTERY_TRENDS, DATE_TYPE_MONTH),
+                    self._app_period_section(
+                        APP_SECTION_BATTERY_TRENDS, DATE_TYPE_MONTH
+                    ),  # noqa: E501
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_MONTH),
@@ -7805,7 +7812,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 cache_keys_to_clear.update({
                     self._app_period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR),
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_YEAR),
-                    self._app_period_section(APP_SECTION_BATTERY_TRENDS, DATE_TYPE_YEAR),
+                    self._app_period_section(
+                        APP_SECTION_BATTERY_TRENDS, DATE_TYPE_YEAR
+                    ),  # noqa: E501
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_YEAR),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_YEAR),
@@ -9305,7 +9314,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _raise_device_not_activated(self, dev_id: str) -> None:
         """Create a repair issue for device not activated."""
         try:
-            from homeassistant.helpers import issue_registry as ir
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
         except ImportError, RuntimeError:
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
@@ -9328,7 +9337,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _dismiss_device_not_activated(self, dev_id: str) -> None:
         """Delete the repair issue for device not activated."""
         try:
-            from homeassistant.helpers import issue_registry as ir
+            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
         except ImportError, RuntimeError:
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"

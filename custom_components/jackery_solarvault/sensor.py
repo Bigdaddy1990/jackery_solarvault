@@ -4977,17 +4977,13 @@ class JackeryDeviceActivationSensor(JackeryEntity, SensorEntity):
     @property
     def native_value(self) -> int:
         """Return the cloud-activation state (0 = not activated, 1 = active)."""
-        device = self.coordinator.data.get(
-            self._device_id, {}
-        ).get(PAYLOAD_DEVICE, {})
+        device = self.coordinator.data.get(self._device_id, {}).get(PAYLOAD_DEVICE, {})
         return int(device.get("activated", -1))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Provide isCloud and raw device payload for diagnostics."""
-        device = self.coordinator.data.get(
-            self._device_id, {}
-        ).get(PAYLOAD_DEVICE, {})
+        device = self.coordinator.data.get(self._device_id, {}).get(PAYLOAD_DEVICE, {})
         return {
             "is_cloud": device.get("isCloud"),
             "activated": device.get("activated"),

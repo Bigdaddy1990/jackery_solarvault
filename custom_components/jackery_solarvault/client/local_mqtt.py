@@ -24,7 +24,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_KEEPALIVE_SEC,

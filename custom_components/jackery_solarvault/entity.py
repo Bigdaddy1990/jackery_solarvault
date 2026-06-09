@@ -228,9 +228,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         if online is not None:
             parsed_online = jackery_online_state(online)
             if parsed_online is not None:
-                if (
-                    not parsed_online
-                    and self.coordinator.is_device_locally_reachable(self._device_id)
+                if not parsed_online and self.coordinator.is_device_locally_reachable(
+                    self._device_id
                 ):
                     return True
                 return parsed_online

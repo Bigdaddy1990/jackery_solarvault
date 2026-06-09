@@ -48,29 +48,27 @@ from typing import TYPE_CHECKING, Any
 try:
     from bleak.exc import BleakError
 except ImportError:  # pragma: no cover - optional test dependency
+
     class BleakError(Exception):
         """Fallback used when bleak is unavailable during import-time tests."""
 
 
 try:
-    from bleak_retry_connector import (
-        BLEAK_RETRY_EXCEPTIONS,
-        establish_connection,
-    )
+    from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 except ImportError:  # pragma: no cover - optional test dependency
     BLEAK_RETRY_EXCEPTIONS = (BleakError,)
 
-    async def establish_connection(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+    async def establish_connection(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401, RUF029
         """Raise a clear error when bleak-retry-connector is unavailable."""
-        raise RuntimeError(
+        raise RuntimeError(  # noqa: TRY003
             "bleak-retry-connector is required for Jackery BLE transport"
         )
 
 
 from homeassistant.components import bluetooth
+from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+from jackery_solarvault.util import first_nonblank_int
 
-from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-from ..util import first_nonblank_int
 from . import ble
 
 if TYPE_CHECKING:
@@ -312,8 +310,10 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     def _record_negotiated_mtu(
-        self, device_id: str, client: Any
-    ) -> None:  # noqa: ANN401
+        self,
+        device_id: str,
+        client: Any,  # noqa: ANN401
+    ) -> None:
         """Cache the negotiated GATT MTU after ``start_notify`` returns.
 
         Different bleak backends expose the MTU under different attribute
@@ -325,8 +325,7 @@ class JackeryBleListener:
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
             if (
-                isinstance(value, int)
-                and value > ble._BLE_FRAME_OVERHEAD  # noqa: SLF001
+                isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD  # noqa: SLF001
             ):
                 self._mtu[device_id] = value
                 _LOGGER.debug(
@@ -785,9 +784,9 @@ class JackeryBleListener:
         self._unmapped_serials_logged.discard(serial)
         return device_id
 
-    async def _async_run_connection(
+    async def _async_run_connection(  # noqa: PLR0915
         self, device_id: str, address: str
-    ) -> None:  # noqa: PLR0915
+    ) -> None:
         """Maintain a GATT session for one device, reconnecting on drop."""
         stats = self.stats_for(device_id)
         try:  # noqa: PLW0717
@@ -865,10 +864,9 @@ class JackeryBleListener:
                     # Park the connection until the device drops it or we
                     # are asked to stop. ``client.is_connected`` is polled
                     # via the disconnect callback above.
-                    while (
-                        not self._stop_event.is_set()
-                        and client.is_connected
-                    ):  # noqa: ASYNC110
+                    while (  # noqa: ASYNC110
+                        not self._stop_event.is_set() and client.is_connected
+                    ):
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"

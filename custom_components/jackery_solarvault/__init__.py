@@ -89,7 +89,6 @@ _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 _STARTUP_TASK_RUNTIME_KEY = "startup_task"
 
 
-
 # This integration is config-entry-only — there is no YAML configuration
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
@@ -189,8 +188,7 @@ def _entry_bootstrap_mqtt_session(
     seed_b64 = raw.get(MQTT_SESSION_SEED_B64)
     mac_id = raw.get(MQTT_SESSION_MAC_ID)
     if not all(
-        isinstance(value, str) and value
-        for value in (user_id, seed_b64, mac_id)
+        isinstance(value, str) and value for value in (user_id, seed_b64, mac_id)
     ):
         return None
     snapshot: dict[str, str] = {
@@ -432,7 +430,7 @@ async def _async_cancel_startup_task(
         bucket.pop(_STARTUP_TASK_RUNTIME_KEY, None)
 
 
-async def _async_finish_entry_startup(
+async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -460,7 +458,9 @@ async def _async_finish_entry_startup(
             return
         except UpdateFailed as err:
             if await coordinator._async_load_cached_discovery(str(err)):  # noqa: SLF001
-                coordinator.async_set_updated_data(coordinator.cached_discovery_snapshot())
+                coordinator.async_set_updated_data(
+                    coordinator.cached_discovery_snapshot()
+                )
             else:
                 _LOGGER.warning(
                     "Jackery discovery unavailable during background startup and "
@@ -524,7 +524,7 @@ async def _async_finish_entry_startup(
             )
         if isinstance(local_listener_result, BaseException):
             _LOGGER.warning(
-                "Jackery HA-MQTT listener could not start during background startup: %s",
+                "Jackery HA-MQTT listener could not start during background startup: %s",  # noqa: E501
                 local_listener_result,
             )
         if isinstance(direct_local_mqtt_result, BaseException):
@@ -553,9 +553,7 @@ async def _async_finish_entry_startup(
             bucket.pop(_STARTUP_TASK_RUNTIME_KEY, None)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: JackeryConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up the config entry without blocking Home Assistant startup.
 
     The config entry returns as soon as the coordinator, cached local state and
@@ -621,7 +619,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     current state has no `unit_of_measurement` (missing or empty) and its entity_id
     contains any token from STALE_HELPER_VENDOR_TOKENS, the entity is removed from
     the registry and an informational log entry is emitted.
-    """  # noqa: E501
+    """
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
@@ -675,7 +673,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     Returns:
         ``True`` if ``uid`` is a legacy head concatenated with ``key_suffix``,
         ``False`` otherwise.
-    """  # noqa: E501
+    """
     if not uid.endswith(key_suffix):
         return False
     head = uid[: -len(key_suffix)]
@@ -707,7 +705,7 @@ def _async_remove_entities_with_suffixes(
         suffixes (Iterable[str]): Iterable of legacy unique-id suffix strings;
             an entity is removed if its unique ID matches any suffix.
         log_label (str): Human-readable label included in removal log messages.
-    """  # noqa: E501
+    """
     suffix_tuple = tuple(suffixes)
     if not suffix_tuple:
         return
