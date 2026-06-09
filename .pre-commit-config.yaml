@@ -52,9 +52,12 @@ repos:
         types_or:
           - python
           - pyi
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+          
+  - repo: https://github.com/cheickmec/smellcheck
+    rev: v0.3.1
+    hooks:
+      - id: smellcheck
+        args: ['--fail-on', 'warning']
     hooks:
       - id: check-yaml
         args:
@@ -82,3 +85,5 @@ repos:
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
+  - name: smellcheck
+    uses: cheickmec/smellcheck@v0.3.10
