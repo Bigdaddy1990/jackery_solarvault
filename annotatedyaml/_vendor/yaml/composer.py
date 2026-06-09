@@ -79,10 +79,11 @@ class Composer:  # noqa: D101
 
     def compose_document(self):  # noqa: ANN201
         # Drop the DOCUMENT-START event.
-        """Compose a single YAML document from the event stream and return its root node.
-
-        This consumes the document start and end events from the stream and resets the composer's anchor registry for the next document.
-
+        """
+        Compose a single YAML document from the event stream.
+        
+        Consumes the document start and end events and resets the composer's anchor registry for the next document.
+        
         Returns:
             The root node of the composed document.
         """  # noqa: E501
@@ -158,15 +159,16 @@ class Composer:  # noqa: D101
         return node
 
     def compose_sequence_node(self, anchor):  # noqa: ANN001, ANN201
-        """Compose a YAML sequence node from the event stream.
-
-        Creates a SequenceNode for the upcoming sequence start event, resolves its tag when unspecified, registers the node under `anchor` if provided, composes child nodes until the sequence end event, sets the node's end mark, and returns the composed node.
-
+        """
+        Compose a sequence node representing the next YAML sequence in the event stream.
+        
+        Creates a SequenceNode for the upcoming sequence start event, resolves the node tag when unspecified, registers the node under `anchor` if provided, composes and appends child nodes until the sequence end event, sets the node's end mark, and returns the completed SequenceNode.
+        
         Parameters:
-            anchor (str | None): Anchor name to associate with the created node, or `None` if no anchor.
-
+            anchor (str | None): Anchor name to associate with the created node, or None if no anchor.
+        
         Returns:
-            SequenceNode: The composed sequence node with its children and end mark set.
+            SequenceNode: The composed sequence node containing its children and end mark.
         """  # noqa: E501
         start_event = self.get_event()
         tag = start_event.tag

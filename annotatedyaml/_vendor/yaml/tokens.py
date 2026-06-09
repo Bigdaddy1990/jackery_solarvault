@@ -1,10 +1,11 @@
 class Token:  # noqa: D100, D101
     def __init__(self, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the token with its source location marks.
-
+        """
+        Create a token and record its source start and end marks.
+        
         Parameters:
-            start_mark: The mark indicating where the token begins in the source (or None).
-            end_mark: The mark indicating where the token ends in the source (or None).
+            start_mark: Mark locating where the token begins in the source, or None if unknown.
+            end_mark: Mark locating where the token ends in the source, or None if unknown.
         """  # noqa: E501
         self.start_mark = start_mark
         self.end_mark = end_mark
@@ -31,13 +32,14 @@ class DirectiveToken(Token):  # noqa: D101
     id = "<directive>"
 
     def __init__(self, name, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the directive token with its name, value, and source location marks.
-
+        """
+        Initialize a DirectiveToken with its directive name, value, and source location marks.
+        
         Parameters:
-            name (str): The directive name (e.g., "YAML", "TAG").
-            value (str): The directive value as found in the source.
-            start_mark: The start location mark for the directive in the source (may be None).
-            end_mark: The end location mark for the directive in the source (may be None).
+            name (str): Directive name, e.g. "YAML" or "TAG".
+            value (str): Directive value as it appears in the source.
+            start_mark: Start location mark for the directive in the source; may be None.
+            end_mark: End location mark for the directive in the source; may be None.
         """  # noqa: E501
         self.name = name
         self.value = value
@@ -57,12 +59,13 @@ class StreamStartToken(Token):  # noqa: D101
     id = "<stream start>"
 
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """Initialize a StreamStartToken with optional source location marks and encoding.
-
+        """
+        Create a StreamStartToken with optional source location marks and encoding.
+        
         Parameters:
-            start_mark: Start location mark for the token.
-            end_mark: End location mark for the token.
-            encoding (str | None): Character encoding of the stream, if provided.
+            start_mark: Start location mark for the token, or None.
+            end_mark: End location mark for the token, or None.
+            encoding (str | None): Character encoding of the stream, or None if unspecified.
         """  # noqa: E501
         self.start_mark = start_mark
         self.end_mark = end_mark
@@ -121,12 +124,13 @@ class AliasToken(Token):  # noqa: D101
     id = "<alias>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the token with its value and source location marks.
-
+        """
+        Create a token carrying a payload and its source location marks.
+        
         Parameters:
-            value: The token's payload (for example, an alias, anchor, or tag string).
-            start_mark: Source mark object indicating where the token begins (may be None).
-            end_mark: Source mark object indicating where the token ends (may be None).
+            value: The token's payload (e.g., alias, anchor, or tag string).
+            start_mark: Source mark where the token begins; may be None.
+            end_mark: Source mark where the token ends; may be None.
         """  # noqa: E501
         self.value = value
         self.start_mark = start_mark
@@ -137,12 +141,13 @@ class AnchorToken(Token):  # noqa: D101
     id = "<anchor>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the token with its value and source location marks.
-
+        """
+        Create a token carrying a payload and its source location marks.
+        
         Parameters:
-            value: The token's payload (for example, an alias, anchor, or tag string).
-            start_mark: Source mark object indicating where the token begins (may be None).
-            end_mark: Source mark object indicating where the token ends (may be None).
+            value: The token's payload (e.g., alias, anchor, or tag string).
+            start_mark: Source mark where the token begins; may be None.
+            end_mark: Source mark where the token ends; may be None.
         """  # noqa: E501
         self.value = value
         self.start_mark = start_mark
@@ -153,12 +158,13 @@ class TagToken(Token):  # noqa: D101
     id = "<tag>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the token with its value and source location marks.
-
+        """
+        Create a token carrying a payload and its source location marks.
+        
         Parameters:
-            value: The token's payload (for example, an alias, anchor, or tag string).
-            start_mark: Source mark object indicating where the token begins (may be None).
-            end_mark: Source mark object indicating where the token ends (may be None).
+            value: The token's payload (e.g., alias, anchor, or tag string).
+            start_mark: Source mark where the token begins; may be None.
+            end_mark: Source mark where the token ends; may be None.
         """  # noqa: E501
         self.value = value
         self.start_mark = start_mark
@@ -169,8 +175,9 @@ class ScalarToken(Token):  # noqa: D101
     id = "<scalar>"
 
     def __init__(self, value, plain, start_mark, end_mark, style=None) -> None:  # noqa: ANN001
-        """Initialize a scalar token with its value and parsing metadata.
-
+        """
+        Create a scalar token containing its textual value, plain-flag, source marks, and optional style.
+        
         Parameters:
             value: The scalar content.
             plain: True if the scalar is plain (unquoted), False otherwise.

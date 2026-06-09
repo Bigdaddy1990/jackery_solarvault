@@ -21,16 +21,15 @@ class Mark:  # noqa: D101
         self.pointer = pointer
 
     def get_snippet(self, indent=4, max_length=75):  # noqa: ANN001, ANN201
-        """Return a formatted snippet of the source buffer with a caret pointing at the marker's pointer.
-
-        Produces a single-line excerpt around the marker's pointer (trimmed with " ... " when longer than max_length), prefixed by indent spaces, followed by a newline and a caret '^' aligned under the pointer. If the mark has no buffer, returns None.
-
+        """
+        Produce a single-line excerpt of the source buffer with a caret pointing at the marker's pointer.
+        
         Parameters:
-            indent (int): Number of leading spaces before the snippet.
-            max_length (int): Maximum length of the snippet; longer lines are truncated with " ... ".
-
+        	indent (int): Number of leading spaces before the snippet.
+        	max_length (int): Maximum length of the excerpt; longer content is truncated and indicated with " ... ".
+        
         Returns:
-            str or None: The formatted snippet with a caret, or None when no buffer is available.
+        	str or None: The formatted snippet followed by a newline and a caret aligned under the pointer, or `None` if the mark has no buffer.
         """  # noqa: E501
         if self.buffer is None:
             return None
@@ -64,10 +63,11 @@ class Mark:  # noqa: D101
         )
 
     def __str__(self) -> str:
-        """Produce a human-readable description of this mark's location and an optional source snippet.
-
+        """
+        Return a human-readable description of this mark's location and an optional source snippet.
+        
         Returns:
-            str: Description containing the mark's name and 1-based line and column numbers; if a buffer is available, the description is followed by a formatted snippet showing the pointer position.
+            str: Description containing the mark's name and 1-based line and column numbers; if a buffer is available, the description is followed by a one-line source excerpt with a caret (`^`) indicating the marker position.
         """  # noqa: E501
         snippet = self.get_snippet()
         where = '  in "%s", line %d, column %d' % (  # noqa: UP031
@@ -109,12 +109,10 @@ class MarkedYAMLError(YAMLError):  # noqa: D101
         self.note = note
 
     def __str__(self) -> str:
-        """Compose a human-readable error message combining context, marks, problem, and note.
-
-        Includes the `context` (if provided), then the `context_mark` when present and either the `problem` or `problem_mark` is missing or when `context_mark` and `problem_mark` refer to different locations (different name, line, or column). After that it includes the `problem` (if provided), the `problem_mark` (if provided), and finally the `note` (if provided), each separated by a newline.
-
-        Returns:
-            str: The assembled message string with included parts joined by newline characters.
+        """
+        Return a formatted error message that includes optional context, source marks, a problem description, and a note.
+        
+        Assembles lines in the following order, joining them with newline characters: context (if present); the context mark only when the problem or problem mark is missing or when the context and problem marks refer to different locations (name, line, or column); problem (if present); problem mark (if present); note (if present).
         """  # noqa: E501
         lines = []
         if self.context is not None:

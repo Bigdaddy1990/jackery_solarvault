@@ -113,11 +113,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF02
 def _async_clean_legacy_entities(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
-    """Drop entity-registry entries from older releases or disabled options.
-
-    Keep entity-registry cleanup explicit and setup-local. This avoids hidden
-    entry-version side effects while still removing entities that are no
-    longer part of the documented app/HTTP/MQTT data model.
+    """
+    Remove legacy and option-disabled entity-registry entries for the given config entry.
+    
+    Performs targeted cleanup: removes stale energy helper entities and prunes sensor and binary_sensor entries whose unique IDs match known legacy suffixes or correspond to sensor groups disabled by the entry options.
     """
     _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
@@ -213,12 +212,13 @@ def _entry_bootstrap_mqtt_session(
 async def _async_prime_entry_bootstrap_mqtt_session(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, str] | None:
-    """Persist a validated setup-flow bootstrap MQTT session to the integration's persistent cache and remove the bootstrap data from the config entry.
-
-    If a validated bootstrap snapshot exists and differs from the cached session, the snapshot is saved to the persistent MQTT session store. The function also removes the bootstrap snapshot from the config entry data after caching.
-
+    """
+    Persist a validated setup-flow bootstrap MQTT session to the integration's persistent cache and remove it from the config entry.
+    
+    If a validated bootstrap snapshot exists and differs from the cached session, saves the snapshot to persistent MQTT session storage and removes the bootstrap snapshot from the config entry's data.
+    
     Returns:
-        The validated bootstrap snapshot as a dict of session fields (e.g., user id, seed, mac id, and optionally mac id source), or `None` if no valid bootstrap snapshot is present.
+        The validated bootstrap snapshot as a dict with keys such as `user_id`, `seed_b64`, `mac_id`, and optionally `mac_id_source`, or `None` if no valid bootstrap snapshot is present.
     """  # noqa: E501
     snapshot = _entry_bootstrap_mqtt_session(entry)
     if snapshot is None:
@@ -396,13 +396,15 @@ async def _async_start_local_mqtt(
         data: dict[str, Any] | None,
         _raw_bytes: bytes,
     ) -> None:
-        """Forward parsed LAN MQTT JSON payloads to the coordinator's local-MQTT message handler.
-
-        Ignores messages where `data` is None; otherwise forwards `data` with its `topic` to the coordinator.
-
+        """
+        Forward parsed LAN MQTT JSON payloads to the coordinator's local MQTT message handler.
+        
+        Ignores the message if `data` is `None` or if the enclosing `coordinator` is not available; otherwise forwards `topic` and `data` to the coordinator.
+        
         Parameters:
-                topic (str): MQTT topic of the received message.
-                data (dict[str, Any] | None): Parsed JSON payload from the MQTT message, or `None` if no payload.
+            topic (str): MQTT topic of the received message.
+            data (dict[str, Any] | None): Parsed JSON payload, or `None` when no payload is present.
+            _raw_bytes (bytes): Raw MQTT payload bytes (unused).
         """  # noqa: D206, E101, E501
         if data is None or coordinator is None:
             return
@@ -422,9 +424,10 @@ async def _async_start_local_mqtt(
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
 
     async def _async_stop_local_mqtt() -> None:
-        """Stop the stored per-entry local MQTT client and remove its runtime reference.
-
-        Stops the client, suppressing any exceptions raised during shutdown. If the per-entry runtime bucket still holds the same client instance, removes that reference.
+        """
+        Stop the per-entry local MQTT client and remove its runtime reference.
+        
+        Suppresses exceptions raised during client shutdown. If the per-entry runtime bucket still holds the same client instance, removes that reference.
         """  # noqa: E501
         with contextlib.suppress(Exception):
             await client.async_stop()
@@ -499,9 +502,10 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
             )
 
         async def _async_start_direct_local_mqtt_if_needed() -> None:
-            """Start a direct local MQTT client for the current entry if no local MQTT client is present.
-
-            Does nothing if a local MQTT client is already stored for the entry.
+            """
+            Start a direct local MQTT client for the entry when no per-entry local client exists.
+            
+            Does nothing if a local MQTT client is already present for the entry.
             """  # noqa: E501
             if _local_mqtt_client(hass, entry) is not None:
                 return
@@ -582,10 +586,11 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Set up the config entry without blocking Home Assistant startup.
-
-    Schedules network- and transport-dependent initialization (login, discovery, first refresh, and transports) to run in a background task after the coordinator, cached local state, and entity platforms are ready.
-
+    """
+    Set up the config entry and schedule non-blocking background initialization.
+    
+    Initializes the per-entry coordinator, restores any cached or bootstrapped MQTT session, forwards platform setups, and schedules a background task to perform network- and transport-dependent startup (authentication, discovery, first refresh, and transports). The background startup task is recorded in the entry runtime bucket so it can be cancelled during unload or reload.
+    
     Returns:
         True if setup completed successfully.
     """  # noqa: E501
@@ -773,9 +778,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
 async def async_remove_config_entry_device(  # noqa: RUF029
     hass: HomeAssistant, entry: JackeryConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:
-    """Allow the user to remove a device associated with this config entry.
-
+    """
+    Indicate whether a device associated with this config entry may be removed from the UI.
+    
     Returns:
-        True if the device may be removed from the UI, False otherwise.
+        True if the device may be removed from the UI, False otherwise. This implementation always returns True.
     """
     return True

@@ -259,10 +259,11 @@ class JackeryLocalMqttClient:
             self._connected_event.set()
 
     def _handle_connect_failure(self, rc: int) -> None:
-        """Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
-
+        """
+        Mark the client as disconnected after a broker CONNACK refusal and record the refusal reason for diagnostics.
+        
         Parameters:
-            rc (int): MQTT CONNACK return code provided by the broker indicating the reason for refusal.
+            rc (int): MQTT CONNACK return code indicating the broker's refusal reason.
         """  # noqa: E501
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
@@ -396,10 +397,11 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
-        """Determine whether a topic should be suppressed as broad high-volume noise.
-
+        """
+        Determine whether the topic should be suppressed as broad, high-volume noise.
+        
         Returns:
-            True if the topic is a known high-volume non-device topic (starts with "$SYS/"), or if the configured topic filter is globally broad and the topic starts with "homeassistant/"; False otherwise.
+            True if the topic starts with "$SYS/", or if the configured topic filter is globally broad and the topic starts with "homeassistant/"; False otherwise.
         """  # noqa: E501
         if topic.startswith("$SYS/"):
             return True
@@ -409,12 +411,13 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
-        """Detect whether the payload appears to be a Home Assistant `state_changed` event wrapper.
-
-        Checks the payload prefix for the presence of HA event markers typically found in state-changed events.
-
+        """
+        Detect whether a payload appears to be a Home Assistant `state_changed` event wrapper.
+        
+        Scans the first bytes of the payload for Home Assistant event markers commonly present in `state_changed` events.
+        
         Returns:
-            `true` if the payload prefix contains `event_type`, `state_changed`, `event_data`, `old_state`, and `new_state`, `false` otherwise.
+            True if the payload prefix contains the markers "event_type", "state_changed", "event_data", "old_state", and "new_state", False otherwise.
         """  # noqa: E501
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
@@ -458,17 +461,19 @@ class JackeryLocalMqttClient:
         return None
 
     def _is_broad_topic_filter(self) -> bool:
-        """Determine whether the configured topic filter is a global wildcard.
-
-        @returns
+        """
+        Check whether the configured topic filter is the global MQTT wildcard.
+        
+        Returns:
             `true` if the topic filter is exactly "#" or "+/#", `false` otherwise.
         """
         return self._topic_filter in {"#", "+/#"}
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
-        """Determine whether an MQTT topic matches a topic filter that may include the `+` and `#` wildcards.
-
+        """
+        Check whether an MQTT topic matches a topic filter using the MQTT `+` and `#` wildcards.
+        
         Returns:
             `true` if the topic matches the filter, `false` otherwise.
         """  # noqa: E501
@@ -508,12 +513,13 @@ class JackeryLocalMqttClient:
         )
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """Log non-cancellation exceptions raised by a completed asyncio Task.
-
-            Retrieves the task result to surface any exception raised by the task; ignores CancelledError and logs other exceptions at error level so they are not silently swallowed.
-
+            """
+            Log any non-cancellation exception raised by a completed asyncio Task.
+            
+            Retrieves the task's result to surface exceptions raised during its execution; ignores CancelledError and logs other exceptions at error level.
+            
             Parameters:
-                done (asyncio.Task[None]): Completed task to check for exceptions.
+                done (asyncio.Task[None]): Completed task to inspect for exceptions.
             """  # noqa: E501
             try:
                 done.result()
@@ -640,7 +646,16 @@ def _local_mqtt_client(
     hass: HomeAssistant,
     entry: Any,  # noqa: ANN401
 ) -> JackeryLocalMqttClient | None:
-    """Return the per-entry local MQTT client stored in ``hass.data``."""
+    """
+    Get the JackeryLocalMqttClient instance associated with the given config entry from hass.data.
+    
+    Parameters:
+        hass (HomeAssistant): Home Assistant instance containing integration runtime data.
+        entry: Config entry-like object with an `entry_id` attribute used as the lookup key.
+    
+    Returns:
+        The per-entry JackeryLocalMqttClient if present, `None` otherwise.
+    """
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None

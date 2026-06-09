@@ -20,11 +20,12 @@ class BaseResolver:  # noqa: D101
     yaml_path_resolvers = {}  # noqa: RUF012
 
     def __init__(self) -> None:
-        """Initialize resolver path stacks used for experimental path-based tag resolution.
-
+        """
+        Initialize resolver path stacks for experimental path-based tag resolution.
+        
         Creates two empty stacks:
-        - `resolver_exact_paths`: list of dictionaries holding exact path-to-tag matches for each traversal depth.
-        - `resolver_prefix_paths`: list of lists holding prefix candidate paths for each traversal depth.
+        - resolver_exact_paths: per-depth dicts mapping (path, kind) to resolved tag for exact matches.
+        - resolver_prefix_paths: per-depth lists of (path, kind) candidate entries used while traversing.
         """  # noqa: E501
         self.resolver_exact_paths = []
         self.resolver_prefix_paths = []

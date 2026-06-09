@@ -1,12 +1,13 @@
 class Node:  # noqa: D100, D101
     def __init__(self, tag, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize the node with its tag, value, and source-location marks.
-
+        """
+        Initialize a Node with its tag, value, and optional source-location marks.
+        
         Parameters:
-            tag: The node's tag (e.g., a YAML tag identifier).
-            value: The node's associated value (any Python object representing the node content).
-            start_mark: The mark indicating the node's start position in the source (or None).
-            end_mark: The mark indicating the node's end position in the source (or None).
+            tag: YAML tag identifier for the node.
+            value: Python object representing the node content.
+            start_mark: Source-location mark for the node's start position, or None.
+            end_mark: Source-location mark for the node's end position, or None.
         """  # noqa: E501
         self.tag = tag
         self.value = value
@@ -14,12 +15,13 @@ class Node:  # noqa: D100, D101
         self.end_mark = end_mark
 
     def __repr__(self) -> str:
-        """Return a concise string representation of the node showing its class name, tag, and value.
-
-        The node's value is rendered using its `repr()` form.
-
+        """
+        Concise string representation of the node that includes its runtime class name, tag, and value.
+        
+        The node's value is rendered with `repr()`.
+        
         Returns:
-            A string in the format `ClassName(tag=<tag_repr>, value=<value_repr>)`.
+            A string formatted as ClassName(tag=<tag_repr>, value=<value_repr>).
         """  # noqa: E501
         value = self.value
         # if isinstance(value, list):
@@ -42,14 +44,15 @@ class ScalarNode(Node):  # noqa: D101
     id = "scalar"
 
     def __init__(self, tag, value, start_mark=None, end_mark=None, style=None) -> None:  # noqa: ANN001
-        """Create a YAML scalar node that stores its tag, value, optional start/end location marks, and display style.
-
+        """
+        Initialize a YAML scalar node with a tag, value, optional start/end location marks, and an optional display style.
+        
         Parameters:
-            tag: The YAML tag associated with the scalar (e.g., "tag:yaml.org,2002:str").
-            value: The scalar value.
-            start_mark: Optional parse location for the start of the scalar (mark object) or None.
-            end_mark: Optional parse location for the end of the scalar (mark object) or None.
-            style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
+        	tag: The YAML tag for the scalar (e.g., "tag:yaml.org,2002:str").
+        	value: The scalar value.
+        	start_mark: Optional parse location for the start of the scalar or None.
+        	end_mark: Optional parse location for the end of the scalar or None.
+        	style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
         """  # noqa: E501
         self.tag = tag
         self.value = value
@@ -67,14 +70,15 @@ class CollectionNode(Node):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         flow_style=None,  # noqa: ANN001
     ) -> None:
-        """Initialize a collection-style YAML node with its tag, contained value, optional source marks, and flow style.
-
+        """
+        Initialize a collection-style YAML node with its tag, contained value, optional source marks, and flow style.
+        
         Parameters:
-            tag: The YAML tag identifying the node.
-            value: The node's content — for sequences, a list of child nodes; for mappings, a list of key/value node pairs.
+            tag: YAML tag that identifies the node.
+            value: Node content — for SequenceNode, a list of child nodes; for MappingNode, a list of (key_node, value_node) pairs.
             start_mark: Optional source location marking the start of the node.
             end_mark: Optional source location marking the end of the node.
-            flow_style: Optional flag controlling flow style: `True` for flow form, `False` for block form, or `None` to preserve the original/unspecified style.
+            flow_style: Optional flow-style indicator: `True` for flow form, `False` for block form, or `None` to keep the original/unspecified style.
         """  # noqa: E501
         self.tag = tag
         self.value = value

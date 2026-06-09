@@ -37,13 +37,14 @@ def warnings(settings=None):  # noqa: ANN001, ANN201
 
 # ------------------------------------------------------------------------------
 def scan(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
-    """Produce scanning tokens from a YAML input stream.
-
+    """
+    Produce scanning tokens from a YAML input stream.
+    
     Parameters:
-        stream: A YAML input source (string or file-like object) to be scanned.
-
+        stream: The YAML input source (string or file-like object) to scan.
+    
     Yields:
-        Token objects representing lexical tokens from the input stream.
+        Token: Lexical token objects parsed from the input stream.
     """
     loader = Loader(stream)
     try:
@@ -54,10 +55,15 @@ def scan(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
 
 def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
-    """Parse a YAML stream and produce parsing events.
-
+    """
+    Produce parsing events from a YAML stream.
+    
+    Parameters:
+        stream: A text or byte stream containing YAML documents.
+        Loader (class): Loader class to use for parsing (defaults to the module's Loader).
+    
     Returns:
-        Event: `Event` instances parsed from the stream, yielded one at a time.
+        Event: Event instances parsed from the stream, yielded one at a time.
     """
     loader = Loader(stream)
     try:
@@ -68,14 +74,15 @@ def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
 
 def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
-    """Parse the first YAML document from a stream and return its representation tree root node.
-
+    """
+    Obtain the representation-tree root node for the first YAML document in the provided stream.
+    
     Parameters:
-        stream: A text or binary stream (or stream-like object) containing YAML content.
-        Loader: Loader class to use for parsing; the class will be instantiated with `stream`.
-
+        stream: Text or binary stream (or stream-like object) containing YAML content.
+        Loader: Loader class to use for parsing; instantiated with `stream`.
+    
     Returns:
-        The root node of the first YAML document.
+        The root node of the first YAML document's representation tree.
     """  # noqa: E501
     loader = Loader(stream)
     try:
@@ -103,12 +110,13 @@ def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
 
 def load(stream, Loader):  # noqa: ANN001, ANN201, N803
-    """Parse the first YAML document from the given stream and return its Python representation.
-
+    """
+    Parse the first YAML document from the given stream into a Python object.
+    
     Parameters:
-        stream: The input source containing YAML (stream or string).
+        stream: A YAML input source (string or file-like object).
         Loader: The loader class to instantiate for parsing.
-
+    
     Returns:
         data: The Python object produced from the first YAML document.
     """  # noqa: E501
@@ -138,26 +146,26 @@ def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803
 
 
 def full_load(stream):  # noqa: ANN001, ANN201
-    """Parse the first YAML document in a stream and produce the corresponding Python object.
-
-    Resolve all YAML tags except those considered unsafe for untrusted input.
-
+    """
+    Parse the first YAML document in a stream and construct its corresponding Python object, resolving all YAML tags except those considered unsafe for untrusted input.
+    
     Parameters:
-        stream: A text or binary stream containing YAML documents.
-
+        stream: A text or binary stream containing one or more YAML documents.
+    
     Returns:
-        The Python object represented by the first YAML document in the stream.
+        The Python object produced from the first YAML document in the stream.
     """  # noqa: E501
     return load(stream, FullLoader)  # noqa: F405
 
 
 def full_load_all(stream):  # noqa: ANN001, ANN201
-    """Produce Python objects for each YAML document in a stream using the FullLoader.
-
-    Resolve YAML tags while avoiding tag handlers that are unsafe for untrusted input.
-
+    """
+    Yield Python objects for each YAML document in a stream using the FullLoader.
+    
+    The FullLoader resolves YAML tags while avoiding tag handlers that are unsafe for untrusted input.
+    
     Returns:
-        generator: An iterator that yields the Python object produced for each document in the stream.
+        iterator: Yields the Python object produced for each document in the stream.
     """  # noqa: E501
     return load_all(stream, FullLoader)  # noqa: F405
 
@@ -174,11 +182,13 @@ def safe_load(stream):  # noqa: ANN001, ANN201
 
 
 def safe_load_all(stream):  # noqa: ANN001, ANN201
-    """Parse all YAML documents in a stream
-    and produce corresponding Python objects.
-
-    Resolve only basic YAML tags. This is known
-    to be safe for untrusted input.
+    """
+    Parse all YAML documents in a stream and produce corresponding Python objects.
+    
+    Only basic YAML tags are resolved; safe for untrusted input.
+    
+    Returns:
+        iterator: An iterator that yields the Python object for each document in the stream.
     """  # noqa: D205
     return load_all(stream, SafeLoader)  # noqa: F405
 
@@ -195,10 +205,11 @@ def unsafe_load(stream):  # noqa: ANN001, ANN201
 
 
 def unsafe_load_all(stream):  # noqa: ANN001, ANN201
-    """Parse all YAML documents in a stream using the unsafe loader.
-
+    """
+    Parse all YAML documents from `stream` using the unsafe loader.
+    
     Returns:
-        iterator: An iterator that yields the Python object produced for each document.
+        An iterator that yields the Python object produced for each document.
     """
     return load_all(stream, UnsafeLoader)  # noqa: F405
 
@@ -317,10 +328,10 @@ def serialize_all(  # noqa: ANN201, PLR0913, PLR0917
 
 
 def serialize(node, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN201, F405, N803
-    """Serialize a representation tree into a YAML stream.
-
-    Returns:
-        str: The produced YAML string if `stream` is None, `None` otherwise.
+    """
+    Serialize a single representation node to a YAML stream.
+    
+    @returns The YAML string when `stream` is None, `None` otherwise.
     """
     return serialize_all([node], stream, Dumper=Dumper, **kwds)
 
@@ -514,11 +525,12 @@ def add_multi_constructor(tag_prefix, multi_constructor, Loader=None) -> None:  
 
 
 def add_representer(data_type, representer, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803
-    """Register a representer function to convert objects of a type into a YAML node.
-
+    """
+    Register a representer for a Python type on a Dumper class.
+    
     Parameters:
-        data_type (type): The Python type to register the representer for.
-        representer (callable): Function taking a Dumper instance and an object of `data_type`, returning a representation node.
+        data_type (type): Python type to register the representer for.
+        representer (callable): Function that accepts a Dumper instance and an object of `data_type` and returns a YAML representation node.
         Dumper (type): Dumper class to register the representer on (defaults to the module-level `Dumper`).
     """  # noqa: E501
     Dumper.add_representer(data_type, representer)
@@ -541,14 +553,10 @@ class YAMLObjectMetaclass(type):
     """The metaclass for YAMLObject."""
 
     def __init__(cls, name, bases, kwds) -> None:  # noqa: ANN001
-        """Initialize the metaclass and, if a `yaml_tag` is provided, register the class with the YAML loaders and dumper.
-
-        If `kwds` contains a non-None `yaml_tag`, registers `cls.from_yaml` as the constructor for that tag on each loader listed in `cls.yaml_loader` (or on the single loader object), and registers `cls.to_yaml` as the representer for `cls` on `cls.yaml_dumper`.
-
-        Parameters:
-            name: The class name being created.
-            bases: The base classes of the class being created.
-            kwds: Keyword arguments passed to the metaclass; may include `yaml_tag` to enable automatic YAML registration.
+        """
+        Initialize the metaclass and, if the class defines a non-None `yaml_tag`, register its YAML constructor and representer.
+        
+        If `kwds` contains a non-None `yaml_tag`, registers `cls.from_yaml` as the constructor for that tag on each loader in `cls.yaml_loader` (or on the single loader object), and registers `cls.to_yaml` as the representer for `cls` on `cls.yaml_dumper`.
         """  # noqa: E501
         super().__init__(name, bases, kwds)
         if "yaml_tag" in kwds and kwds["yaml_tag"] is not None:
@@ -576,12 +584,13 @@ class YAMLObject(metaclass=YAMLObjectMetaclass):
 
     @classmethod
     def from_yaml(cls, loader, node):  # noqa: ANN001, ANN206
-        """Construct an instance of the class from a YAML representation node.
-
+        """
+        Create an instance of the class from a YAML representation node.
+        
         Parameters:
-            loader: The loader instance used to construct Python objects from nodes.
-            node: The representation node describing the object.
-
+            loader: The loader responsible for constructing Python objects from representation nodes.
+            node: The YAML representation node describing the object.
+        
         Returns:
             An instance of `cls` constructed from `node`.
         """

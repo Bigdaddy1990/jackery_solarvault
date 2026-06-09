@@ -59,7 +59,12 @@ except ImportError:  # pragma: no cover - optional test dependency
     BLEAK_RETRY_EXCEPTIONS = (BleakError,)
 
     async def establish_connection(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401, RUF029
-        """Raise a clear error when bleak-retry-connector is unavailable."""
+        """
+        Stub used when bleak-retry-connector is not installed that signals the missing dependency.
+        
+        Raises:
+            RuntimeError: Always raised with a message indicating that bleak-retry-connector is required.
+        """
         raise RuntimeError(  # noqa: TRY003
             "bleak-retry-connector is required for Jackery BLE transport"
         )
@@ -224,14 +229,15 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """Initialize the Jackery BLE diagnostic listener.
-
+        """
+        Create a Jackery BLE diagnostic listener tied to Home Assistant and a frame sink.
+        
         Parameters:
-            hass (HomeAssistant): Home Assistant instance used for Bluetooth callbacks.
-            sink (FrameSink): Async consumer called for each observed notification.
-            key_resolver (Callable[[str], bytes | None]): Given a device_id, return the device's 16- or 32-byte AES key, or `None` if unknown.
-            ble_address_resolver (Callable[[str], str | None]): Given a device_id, return the device's BLE MAC address, or `None` if unknown. Resolved addresses are cached and exposed via `address_for_device_id`.
-            serial_resolver (Callable[[str], str | None] | None): Optional callable mapping a BLE advertisement serial to a device_id; if omitted, advertisements with unmapped serials cannot be resolved to device IDs.
+            hass (HomeAssistant): Home Assistant instance used for Bluetooth callbacks and advertisement registration.
+            sink (FrameSink): Async consumer invoked for each observed notification with (device_id, observation).
+            key_resolver (Callable[[str], bytes | None]): Return the device's 16- or 32-byte AES key for a given device_id, or `None` if unknown.
+            ble_address_resolver (Callable[[str], str | None]): Return the device's BLE MAC address for a given device_id, or `None` if unknown. Resolved addresses are cached and available via `address_for_device_id`.
+            serial_resolver (Callable[[str], str | None] | None): Optional callable mapping a BLE advertisement serial string to a device_id; if omitted, advertisements with unmapped serials cannot be resolved.
         """  # noqa: E501
         self._hass = hass
         self._sink = sink
@@ -281,14 +287,15 @@ class JackeryBleListener:
         *,
         timeout_sec: float,
     ) -> bool:
-        """Waits until a BLE client becomes available for the given device ID or the timeout elapses.
-
-        If the listener knows or can resolve the device's BLE address, this method will ensure a background connection runner is started and poll until a client appears or the provided timeout passes.
-
+        """
+        Ensure a background connection runner is started for the device and wait until a BLE client is available or the timeout elapses.
+        
+        If the listener cannot resolve a BLE address for the device, the method returns immediately. Otherwise it schedules the connection runner (if not already running) and polls until a client appears, the provided timeout expires, or the listener is stopped.
+        
         Parameters:
-            device_id (str): Identifier of the target device.
-            timeout_sec (float): Maximum number of seconds to wait for a client to become available.
-
+            device_id (str): Identifier of the target device whose BLE client is required.
+            timeout_sec (float): Maximum seconds to wait for a client to become available.
+        
         Returns:
             bool: `True` if a BLE client is available for the device, `False` otherwise.
         """  # noqa: E501
@@ -414,31 +421,21 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """Build, encrypt and write a single command frame to char 0xEE01.
-
-        Returns ``True`` when the GATT write completed (and, if
-        ``wait_for_ack`` is set, the device echoed a decoded frame on the
-        notify channel within ``ack_timeout_sec``). Returns ``False`` when
-        no active client is available for the device — callers (e.g. the
-        coordinator's BLE-first setter helper) use that to fall back to
-        the cloud-MQTT pipeline.
-
-        Raises ``ValueError`` for malformed inputs, ``RuntimeError`` for
-        GATT-layer failures *or* for an ACK timeout when ``wait_for_ack``
-        is enabled. The router catches the RuntimeError and falls back to
-        MQTT; for SolarVault setters the duplicated write is idempotent.
-
-        ``ack_cmds`` filters which notify frames count as the ACK. When
-        omitted, any decoded frame on the same device within the window
-        counts. The device typically echoes the same ``cmd`` back as a
-        ``DevicePropertyChange``, but we have no firmware contract for
-        that mapping yet, so the default stays permissive.
-
-        The trailer field is left as four NUL bytes — see
-        :class:`.ble.BleBinaryFrame` for the open question on its
-        algorithm. If the device firmware rejects the write (no echo on
-        the notify stream within a reasonable window), the trailer
-        likely needs to be a real checksum derived from a Frida capture.
+        """
+        Send a single encrypted command frame to the device over BLE.
+        
+        Writes the command (possibly split across MTU-sized chunks) to the device's write characteristic and optionally waits for a matching notify frame to be observed as an ACK.
+        
+        Returns:
+            `True` if the write completed (and, when `wait_for_ack` is enabled, a matching notify frame was observed within `ack_timeout_sec`); `False` if there is no active BLE client for `device_id`.
+        
+        Raises:
+            ValueError: for malformed inputs such as an invalid `mtu_override`.
+            RuntimeError: when a required device AES key is missing, when the GATT write fails or times out, or when ACK waiting times out.
+        
+        Parameters of note:
+            ack_cmds: optional sequence of `cmd` integers that are accepted as the ACK; when omitted, any decoded frame for the same device counts as the ACK.
+            mtu_override: optional explicit MTU to use for chunking; otherwise the negotiated per-device MTU or a default is used.
         """
         client = self._clients.get(device_id)
         if client is None:
@@ -841,10 +838,11 @@ class JackeryBleListener:
                     _characteristic: Any,  # noqa: ANN401
                     data: bytearray,  # noqa: ANN401, RUF100
                 ) -> None:
-                    """Handle a BLE notification and forward its payload to the listener's notification processor.
-
+                    """
+                    Handle a BLE notification by forwarding the notification payload to the listener's notification processor.
+                    
                     Parameters:
-                        data (bytearray): Raw notification payload received from the BLE characteristic; converted to bytes before processing.
+                        data (bytearray): Raw payload from the BLE characteristic; converted to bytes before processing.
                     """  # noqa: E501
                     await self._handle_notification(device_id, bytes(data))
 

@@ -25,13 +25,14 @@ from .error import Mark, YAMLError
 
 class ReaderError(YAMLError):  # noqa: D101
     def __init__(self, name, position, character, encoding, reason) -> None:  # noqa: ANN001
-        """Initialize a ReaderError containing contextual information about a decoding or character error.
-
+        """
+        Create a ReaderError holding context about a decoding or character validation failure.
+        
         Parameters:
             name (str): Source name or identifier where the error occurred.
-            position (int): Byte or character index in the source where the problematic value was observed.
+            position (int): Byte or character index in the source where the offending value was observed.
             character (int | bytes | str): The offending value — an integer code point, a single-character string, or a raw byte.
-            encoding (str): The encoding associated with the error (e.g., "utf-8", "utf-16-le").
+            encoding (str): The encoding associated with the error (for example, "utf-8" or "utf-16-le").
             reason (str): Human-readable explanation of why the value is invalid or could not be decoded.
         """  # noqa: E501
         self.name = name
@@ -85,15 +86,14 @@ class Reader:  # noqa: D101
     # Yeah, it's ugly and slow.
 
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Initialize the Reader with a text source, byte source, or file-like stream and prepare internal decoding and buffering state.
-
+        """
+        Initialize the Reader for a Unicode string, a bytes object, or a file-like stream and prepare decoding, buffering, and position-tracking state.
+        
         Parameters:
-            stream (str | bytes | file-like): Input to read from. If a `str`, the reader treats it as a complete Unicode string and validates printable characters. If `bytes`, the reader stores raw bytes and determines an appropriate encoding. Otherwise the value is treated as a file-like object (expected to support `read`) and the reader will read raw bytes from it and determine encoding.
-
+            stream (str | bytes | file-like): Source to read from. If a `str`, the content is validated for allowed characters and stored as the internal Unicode buffer with a terminating NUL. If `bytes`, the raw byte buffer is stored and encoding detection is performed. Otherwise `stream` is treated as a file-like object (expected to support `read`) and the reader will read raw bytes from it and detect/initialize decoding.
+        
         Notes:
-            - Sets reader metadata (name), position counters (index, line, column), and internal buffers.
-            - For `str` inputs the Unicode content is placed into the internal buffer with a terminating NUL character.
-            - For `bytes` or file-like inputs the raw byte buffer and decoding routine are initialized and encoding detection is performed.
+            The initializer sets reader metadata (`name`), cursor/position counters (`index`, `line`, `column`, `pointer`, `stream_pointer`), buffer fields (`buffer`, `raw_buffer`), decoding routine (`raw_decode`) and `encoding`, and the `eof` flag as appropriate for the provided input.
         """  # noqa: E501
         self.name = None
         self.stream = None
@@ -123,15 +123,16 @@ class Reader:  # noqa: D101
             self.determine_encoding()
 
     def peek(self, index=0):  # noqa: ANN001, ANN201
-        """Return the character at the current buffer position plus an optional offset.
-
-        Attempts to ensure the requested position is available in the internal buffer by reading more input if necessary.
-
+        """
+        Get the character at the current pointer plus an optional offset.
+        
+        Ensures the requested position is available in the internal buffer before accessing it.
+        
         Parameters:
-            index (int): Offset from the current position (0 returns the current character).
-
+            index (int): Offset from the current pointer (0 returns the current character).
+        
         Returns:
-            str: The character located at buffer[pointer + index].
+            str: The character at buffer[pointer + index].
         """  # noqa: E501
         try:
             return self.buffer[self.pointer + index]
@@ -140,15 +141,14 @@ class Reader:  # noqa: D101
             return self.buffer[self.pointer + index]
 
     def prefix(self, length=1):  # noqa: ANN001, ANN201
-        """Return the next substring from the unread buffer of the specified length.
-
-        Ensures the reader has at least `length` characters available and returns the slice starting at the current pointer without advancing the reader.
-
+        """
+        Return the next substring from the unread buffer without advancing the reader.
+        
         Parameters:
-            length (int): Number of characters to include in the returned substring.
-
+            length (int): Number of characters to include; ensures at least this many characters are available before slicing.
+        
         Returns:
-            str: The substring of length `length` from the current unread buffer position.
+            str: The substring of length `length` starting at the current unread buffer position.
         """  # noqa: E501
         if self.pointer + length >= len(self.buffer):
             self.update(length)
@@ -178,12 +178,13 @@ class Reader:  # noqa: D101
             length -= 1
 
     def get_mark(self):  # noqa: ANN201
-        """Return a Mark representing the reader's current position for error reporting.
-
-        If the reader was created from an in-memory buffer (no underlying stream), the mark includes the current Unicode buffer and the buffer pointer; otherwise the buffer and pointer fields are set to None.
-
+        """
+        Create a Mark for the reader's current position for error reporting.
+        
+        If the reader was created from an in-memory buffer (no underlying stream), the mark includes the current Unicode buffer and buffer pointer; otherwise the buffer and pointer fields are None.
+        
         Returns:
-            Mark: A mark containing name, index, line, column, and buffer/pointer when available.
+            Mark: Contains `name`, `index`, `line`, `column`, and `buffer`/`pointer` (buffer and pointer are `None` for stream-backed readers).
         """  # noqa: E501
         if self.stream is None:
             return Mark(
