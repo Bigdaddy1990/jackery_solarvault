@@ -21,7 +21,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
-          ruff check . --fix | true
+          ruff check . --fix all | true
           ruff check . --fix --unsafe-fixes | true
           ruff check . --unsafe-fixes  | true
           ruff check . --target-version py314  | true
@@ -30,9 +30,9 @@ jobs:
           ruff check . --show-fixes | true
           ruff check . --add-noqa | true
           ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501","PLC0415" | true
+          ruff check . --fix all | true
           ruff check . --output-format=github | true
-          ruff format . | true
-          pre-commit run --all-files | true
+          ruff format .
 
       - name: Commit baseline changes
         run: |
