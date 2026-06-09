@@ -1,5 +1,6 @@
 """HA fixture tests for setup/unload of a Jackery SolarVault config entry."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -8,7 +9,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.jackery_solarvault.const import DOMAIN
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 pytestmark = pytest.mark.asyncio
 

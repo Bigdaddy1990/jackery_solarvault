@@ -1,17 +1,19 @@
 """Unit tests for Jackery BLE transport edge cases."""
 
 import asyncio
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from custom_components.jackery_solarvault.client.ble_transport import JackeryBleListener
-from homeassistant.core import HomeAssistant
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 def _hass() -> HomeAssistant:
     """Return a lightweight object typed as HomeAssistant for transport unit tests."""
-    return cast(HomeAssistant, object())
+    return cast("HomeAssistant", object())
 
 
 @pytest.mark.asyncio()
