@@ -48,6 +48,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
@@ -85,6 +86,8 @@ type JackeryConfigEntry = ConfigEntry[JackerySolarVaultCoordinator]
 
 _LOGGER = logging.getLogger(__name__)
 _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
+_STARTUP_TASK_RUNTIME_KEY = "startup_task"
+
 
 
 # This integration is config-entry-only — there is no YAML configuration
@@ -175,7 +178,9 @@ def _async_clean_legacy_entities(
     )
 
 
-def _entry_bootstrap_mqtt_session(entry: JackeryConfigEntry) -> dict[str, str] | None:
+def _entry_bootstrap_mqtt_session(
+    entry: JackeryConfigEntry,
+) -> dict[str, str] | None:
     """Return a validated bootstrap MQTT session snapshot stored on the entry."""
     raw = entry.data.get(ENTRY_BOOTSTRAP_MQTT_SESSION)
     if not isinstance(raw, dict):
@@ -183,7 +188,10 @@ def _entry_bootstrap_mqtt_session(entry: JackeryConfigEntry) -> dict[str, str] |
     user_id = raw.get(MQTT_SESSION_USER_ID)
     seed_b64 = raw.get(MQTT_SESSION_SEED_B64)
     mac_id = raw.get(MQTT_SESSION_MAC_ID)
-    if not all(isinstance(value, str) and value for value in (user_id, seed_b64, mac_id)):
+    if not all(
+        isinstance(value, str) and value
+        for value in (user_id, seed_b64, mac_id)
+    ):
         return None
     snapshot: dict[str, str] = {
         MQTT_SESSION_USER_ID: user_id,
@@ -205,7 +213,11 @@ async def _async_prime_entry_bootstrap_mqtt_session(
         return None
     cached = await async_load_mqtt_session(hass, entry.entry_id)
     if cached != snapshot:
-        await async_save_mqtt_session(hass, entry.entry_id, **snapshot)  # type: ignore[arg-type]
+        await async_save_mqtt_session(
+            hass,
+            entry.entry_id,
+            **snapshot,  # type: ignore[arg-type]
+        )
     cleaned = dict(entry.data)
     if ENTRY_BOOTSTRAP_MQTT_SESSION in cleaned:
         cleaned.pop(ENTRY_BOOTSTRAP_MQTT_SESSION, None)
@@ -213,31 +225,28 @@ async def _async_prime_entry_bootstrap_mqtt_session(
     return snapshot
 
 
-async def _async_authenticate(
+def _entry_runtime_bucket(
     hass: HomeAssistant, entry: JackeryConfigEntry
-) -> JackeryApi:
-    """Authenticate to the Jackery cloud and return the API client.
+) -> dict[str, Any]:
+    """Return the mutable per-entry runtime bucket stored in hass.data."""
+    return hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
 
-    Cloud HTTP login is the documented entry point (AGENTS.md §1.2): it is the
-    highest-priority source for live data, backfill, trends and statistics. The
-    MQTT session is hydrated from the persistent cache BEFORE the login so the
-    coordinator can (re-)open the broker session even while ``/v1/user/login``
-    is unreachable (local > cloud for live values).
 
-    Bad credentials raise ``ConfigEntryAuthFailed`` so HA routes the entry into
-    the re-auth flow without removing it. Transient cloud errors do NOT break
-    setup (AGENTS.md §3.3): they are logged and setup keeps moving so cached
-    discovery and a cached MQTT session can start the local transports without
-    a successful cloud round-trip.
+def _entry_startup_task(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> asyncio.Task[None] | None:
+    """Return the per-entry background startup task, if one is registered."""
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not isinstance(bucket, dict):
+        return None
+    task = bucket.get(_STARTUP_TASK_RUNTIME_KEY)
+    return task if isinstance(task, asyncio.Task) else None
 
-    Returns:
-        JackeryApi: The API client (authenticated when the cloud was reachable).
 
-    Raises:
-        ConfigEntryAuthFailed: If the provided credentials are rejected.
-    """
+def _build_api(hass: HomeAssistant, entry: JackeryConfigEntry) -> JackeryApi:
+    """Construct the API client from persisted config-entry credentials."""
     session = async_get_clientsession(hass)
-    api = JackeryApi(
+    return JackeryApi(
         session=session,
         account=entry.data[CONF_USERNAME],
         password=entry.data[CONF_PASSWORD],
@@ -245,12 +254,13 @@ async def _async_authenticate(
         region_code=entry.data.get(CONF_REGION_CODE),
     )
 
-    # Hydrate the MQTT session from the persistent cache BEFORE attempting
-    # the cloud login. The MQTT password derivation is local, so a cached
-    # ``userId/macId/seed`` triple lets the coordinator (re-)open the broker
-    # session even while ``/v1/user/login`` is unreachable. The config flow
-    # can seed the very first cache row via ``ENTRY_BOOTSTRAP_MQTT_SESSION``
-    # so the initial coordinator setup does not depend on a second login.
+
+async def _async_restore_cached_mqtt_session(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    api: JackeryApi,
+) -> dict[str, str] | None:
+    """Hydrate the API client from cached/bootstrap MQTT session data."""
     bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry)
     cached = await async_load_mqtt_session(hass, entry.entry_id) or bootstrap
     if cached:
@@ -260,7 +270,25 @@ async def _async_authenticate(
             mac_id=cached[MQTT_SESSION_MAC_ID],
             mac_id_source=cached.get(MQTT_SESSION_MAC_ID_SOURCE),
         )
+    return cached
 
+
+async def _async_authenticate_api_layer(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    api: JackeryApi,
+) -> None:
+    """Authenticate the shared API client and persist a refreshed MQTT session.
+
+    The setup path itself must stay fast and return before long-running network
+    handshakes block Home Assistant startup. Therefore this login/auth step is
+    executed by the background startup orchestration after the config entry has
+    already been created and platform forwarding has completed.
+
+    Raises:
+        ConfigEntryAuthFailed: If the configured account credentials are invalid.
+    """
+    cached = await _async_restore_cached_mqtt_session(hass, entry, api)
     try:
         await api.async_login()
     except JackeryAuthError as err:
@@ -268,25 +296,23 @@ async def _async_authenticate(
             f"Jackery login rejected the credentials: {err}"
         ) from err
     except JackeryError as err:
-        # Cloud failure must not break setup (AGENTS.md §3.3): fall back to
-        # cached discovery and local transports; cloud reconnect is retried.
         _LOGGER.warning(
-            "Jackery cloud login is unavailable during setup; trying cached "
-            "discovery and local transports: %s",
+            "Jackery cloud login is unavailable during background startup; "
+            "trying cached discovery and local transports: %s",
             err,
         )
-    else:
-        snapshot = api.mqtt_session_snapshot()
-        if snapshot is not None and snapshot != cached:
-            await async_save_mqtt_session(
-                hass,
-                entry.entry_id,
-                user_id=snapshot[MQTT_SESSION_USER_ID],
-                seed_b64=snapshot[MQTT_SESSION_SEED_B64],
-                mac_id=snapshot[MQTT_SESSION_MAC_ID],
-                mac_id_source=snapshot.get(MQTT_SESSION_MAC_ID_SOURCE),
-            )
-    return api
+        return
+
+    snapshot = api.mqtt_session_snapshot()
+    if snapshot is not None and snapshot != cached:
+        await async_save_mqtt_session(
+            hass,
+            entry.entry_id,
+            user_id=snapshot[MQTT_SESSION_USER_ID],
+            seed_b64=snapshot[MQTT_SESSION_SEED_B64],
+            mac_id=snapshot[MQTT_SESSION_MAC_ID],
+            mac_id_source=snapshot.get(MQTT_SESSION_MAC_ID_SOURCE),
+        )
 
 
 _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
@@ -371,14 +397,15 @@ async def _async_start_local_mqtt(
         sink=_sink,
         topic_filter=topic_filter,
     )
-    bucket = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
+    bucket = _entry_runtime_bucket(hass, entry)
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
 
     async def _async_stop_local_mqtt() -> None:
-        """Stop the stored per-entry local MQTT client and remove its hass.data reference if it matches the stored instance.
+        """Stop the stored per-entry local MQTT client.
 
-        Exceptions raised while stopping the client are suppressed.
-        """  # noqa: E501
+        Remove its hass.data reference when it still points at the same
+        instance. Exceptions raised while stopping the client are suppressed.
+        """
         with contextlib.suppress(Exception):
             await client.async_stop()
         stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
@@ -389,51 +416,65 @@ async def _async_start_local_mqtt(
     await client.async_start()
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """Set up the Jackery SolarVault config entry, start its coordinator and optional transports, and forward platform setup.
+async def _async_cancel_startup_task(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> None:
+    """Cancel the per-entry background startup task, if still running."""
+    task = _entry_startup_task(hass, entry)
+    if task is None:
+        return
+    if not task.done():
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if isinstance(bucket, dict):
+        bucket.pop(_STARTUP_TASK_RUNTIME_KEY, None)
 
-    Performs authentication, constructs the coordinator, runs discovery and the
-    initial refresh, and starts cloud MQTT plus an optional local MQTT listener
-    and BLE transport. Cloud/transport failures do not block setup (AGENTS.md
-    §3.3): cached discovery is used when the first HTTP refresh fails, and MQTT
-    auth failures are deferred so local transports keep running. On successful
-    setup the coordinator is stored on the entry's runtime state and platform
-    setups and listeners are registered. If setup fails after the coordinator is
-    created, the coordinator is shut down and the entry's runtime state is
-    cleared before the error is re-raised.
 
-    Returns:
-        True if setup completed successfully.
-    """  # noqa: E501
-    _async_clean_legacy_entities(hass, entry)
-    api = await _async_authenticate(hass, entry)
+async def _async_finish_entry_startup(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Complete cloud discovery and transport startup after setup returned."""
+    try:
+        try:
+            await _async_authenticate_api_layer(hass, entry, coordinator.api)
+        except ConfigEntryAuthFailed as err:
+            coordinator._mqtt_auth_failure_message = str(err)  # noqa: SLF001
+            _LOGGER.warning(
+                "Jackery HTTP/API credentials were rejected during background "
+                "startup; reauth will be triggered on the next refresh"
+            )
+            return
 
-    interval_sec = DEFAULT_SCAN_INTERVAL_SEC
-    coordinator = JackerySolarVaultCoordinator(
-        hass, entry, api, timedelta(seconds=interval_sec)
-    )
-    _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
-
-    try:  # noqa: PLW0717
-        # Discovery must run first (MQTT subscriptions and the first refresh
-        # both rely on the device list it produces). The HTTP first refresh and
-        # the MQTT connect afterwards are independent and run in parallel to
-        # cut the observed config-entry setup time roughly in half on slow
-        # cloud connections. If any mandatory setup step fails, shut down the
-        # partially initialized coordinator so MQTT and timer tasks cannot leak.
-        await coordinator.async_load_statistics_backfill_state()
-        await coordinator.async_discover()
-        # Restore midnight-anchor snapshots for the local "today" deltas
-        # before the first refresh so the very first update cycle can already
-        # produce ``PAYLOAD_LOCAL_DAILY_ENERGY`` entries.
-        await coordinator.async_load_local_daily_snapshots()
-        # asyncio.gather(return_exceptions=True) widens the result element
-        # type to ``T | BaseException``; the cast surfaces that contract for
-        # mypy without changing runtime behaviour.
-        entry.runtime_data = coordinator
+        try:
+            await coordinator.async_discover()
+        except ConfigEntryAuthFailed as err:
+            coordinator._mqtt_auth_failure_message = str(err)  # noqa: SLF001
+            _LOGGER.warning(
+                "Jackery discovery rejected the stored credentials during "
+                "background startup; reauth will be triggered on the next refresh"
+            )
+            return
+        except UpdateFailed as err:
+            if await coordinator._async_load_cached_discovery(str(err)):  # noqa: SLF001
+                coordinator.async_set_updated_data(coordinator.cached_discovery_snapshot())
+            else:
+                _LOGGER.warning(
+                    "Jackery discovery unavailable during background startup and "
+                    "no cache was available: %s",
+                    err,
+                )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "Jackery discovery failed during background startup: %s",
+                err,
+            )
 
         async def _async_start_direct_local_mqtt_if_needed() -> None:
-            """Start the direct local-MQTT client when no runtime instance exists yet."""
+            """Start the direct local-MQTT client when absent."""
             if _local_mqtt_client(hass, entry) is not None:
                 return
             await _async_start_local_mqtt(hass, entry, coordinator)
@@ -445,7 +486,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             direct_local_mqtt_result,
             ble_result,
         ) = cast(
-            "tuple[BaseException | None, BaseException | None, BaseException | None, BaseException | None, BaseException | None]",
+            (
+                "tuple[BaseException | None, BaseException | None, "
+                "BaseException | None, BaseException | None, "
+                "BaseException | None]"
+            ),
             await asyncio.gather(
                 coordinator.async_config_entry_first_refresh(),
                 coordinator.async_start_mqtt(),
@@ -456,55 +501,95 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             ),
         )
         if isinstance(refresh_result, BaseException):
-            # Cloud first refresh failed: fall back to cached discovery so the
-            # local MQTT/BLE transports can still start (AGENTS.md §3.3).
             cached_snapshot = coordinator.cached_discovery_snapshot()
             if isinstance(refresh_result, UpdateFailed) and cached_snapshot:
                 _LOGGER.warning(
-                    "Jackery first HTTP refresh failed; loading cached discovery "
-                    "payload so local MQTT/BLE transports can start: %s",
+                    "Jackery first HTTP refresh failed during background startup; "
+                    "loading cached discovery payload so local MQTT/BLE can stay "
+                    "active: %s",
                     refresh_result,
                 )
                 coordinator.async_set_updated_data(cached_snapshot)
             else:
-                raise refresh_result  # noqa: TRY301
+                _LOGGER.warning(
+                    "Jackery first HTTP refresh failed during background startup: %s",
+                    refresh_result,
+                )
         if isinstance(mqtt_result, ConfigEntryAuthFailed):
-            # Broker-side MQTT credential/session conflicts must not block
-            # cached discovery, local MQTT or BLE. HTTP auth failures are
-            # surfaced earlier in _async_authenticate.
             coordinator._defer_background_auth_failure(mqtt_result)  # noqa: SLF001
-        if isinstance(mqtt_result, BaseException):
-            # Other MQTT failures (network, TLS handshake, broker outage) must
-            # not block setup — push is an optional channel on top of polling.
+        elif isinstance(mqtt_result, BaseException):
             _LOGGER.warning(
-                "Jackery MQTT push could not start during setup: %s", mqtt_result
+                "Jackery MQTT push could not start during background startup: %s",
+                mqtt_result,
             )
         if isinstance(local_listener_result, BaseException):
             _LOGGER.warning(
-                "Jackery HA-MQTT listener could not start during setup: %s",
+                "Jackery HA-MQTT listener could not start during background startup: %s",
                 local_listener_result,
             )
         if isinstance(direct_local_mqtt_result, BaseException):
             _LOGGER.warning(
-                "Jackery direct local MQTT client could not start during setup: %s",
+                "Jackery direct local MQTT client could not start during "
+                "background startup: %s",
                 direct_local_mqtt_result,
             )
         if isinstance(ble_result, BaseException):
             _LOGGER.warning(
-                "Jackery BLE transport could not start during setup: %s",
+                "Jackery BLE transport could not start during background startup: %s",
                 ble_result,
             )
-        # Do not prune optional runtime sensors here: app/MQTT/Combine backed
-        # properties can arrive after the first refresh and would otherwise be
-        # removed incorrectly.
 
+        try:
+            await coordinator.async_apply_local_mqtt_config_to_devices()
+        except BaseException as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "Jackery local third-party MQTT bridge configuration could not be "
+                "applied during background startup: %s",
+                err,
+            )
+    finally:
+        bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        if isinstance(bucket, dict):
+            bucket.pop(_STARTUP_TASK_RUNTIME_KEY, None)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant, entry: JackeryConfigEntry
+) -> bool:
+    """Set up the config entry without blocking Home Assistant startup.
+
+    The config entry returns as soon as the coordinator, cached local state and
+    entity platforms are ready. Network-dependent login, discovery, first HTTP
+    refresh and transport bring-up continue in a dedicated background task so a
+    slow or unavailable Jackery cloud cannot stall Home Assistant boot or trip
+    the integration setup timeout.
+    """
+    _async_clean_legacy_entities(hass, entry)
+    api = _build_api(hass, entry)
+    await _async_restore_cached_mqtt_session(hass, entry, api)
+
+    interval_sec = DEFAULT_SCAN_INTERVAL_SEC
+    coordinator = JackerySolarVaultCoordinator(
+        hass, entry, api, timedelta(seconds=interval_sec)
+    )
+    _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
+
+    try:  # noqa: PLW0717
+        await coordinator.async_load_statistics_backfill_state()
+        await coordinator.async_load_local_daily_snapshots()
+        if await coordinator._async_load_cached_discovery("startup bootstrap"):  # noqa: SLF001
+            coordinator.async_set_updated_data(coordinator.cached_discovery_snapshot())
+
+        entry.runtime_data = coordinator
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         coordinator.async_start_statistics_imports()
-        # Push the local third-party MQTT bridge config to every device when the
-        # user has enabled it in the options flow. This sends cmd=113 via BLE
-        # first (so it works during a cloud outage) and lets the device push
-        # live telemetry to the user's broker instead of emqx.jackeryapp.com.
-        await coordinator.async_apply_local_mqtt_config_to_devices()
+
+        await _async_cancel_startup_task(hass, entry)
+        startup_task = hass.async_create_background_task(
+            _async_finish_entry_startup(hass, entry, coordinator),
+            name=f"{DOMAIN}_startup_{entry.entry_id[:8]}",
+        )
+        _entry_runtime_bucket(hass, entry)[_STARTUP_TASK_RUNTIME_KEY] = startup_task
         # NOTE: add_update_listener is intentionally NOT used here.
         # It triggers async_reload which stops BLE + MQTT on every
         # options change, causing data loss and BLE/MQTT cycling.
@@ -512,15 +597,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # poll cycle instead.
     except Exception as err:
         with contextlib.suppress(Exception):
+            await _async_cancel_startup_task(hass, entry)
+        with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
-        # HA convention: clear runtime_data on setup failure so the next retry
-        # sees a clean slate. The typed alias narrows the attribute to
-        # ``JackerySolarVaultCoordinator``; the None assignment is the
-        # documented cleanup path and matches HA core integrations.
         if getattr(entry, "runtime_data", None) is coordinator:
             entry.runtime_data = cast("Any", None)
-        # UpdateFailed surfaced from a mandatory step becomes ConfigEntryNotReady
-        # so HA retries setup with backoff (60s cloud reconnect, AGENTS.md §1.2).
         if isinstance(err, UpdateFailed):
             raise ConfigEntryNotReady(str(err)) from err
         raise
@@ -533,7 +614,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
 
 def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
-    """Remove stale Energy helper entities that were created without a unit of measurement.
+    """Remove stale Energy helper entities lacking a unit of measurement.
 
     Scans the entity registry for entities whose entity_id starts with the configured
     STALE_ENERGY_HELPER_PREFIX and ends with STALE_NET_POWER_SUFFIX. If an entity's
@@ -574,7 +655,7 @@ _LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
-    """Determine whether ``uid`` is a legacy device head immediately followed by ``key_suffix``.
+    """Check whether ``uid`` ends with ``key_suffix`` after a legacy head.
 
     A legacy device head has the form ``<digits>`` or
     ``<digits>_battery_pack_<digits>``. This returns ``True`` only when ``uid``
@@ -609,7 +690,7 @@ def _async_remove_entities_with_suffixes(
     suffixes: Iterable[str],
     log_label: str,
 ) -> None:
-    """Remove entity-registry entries for the given config entry and domain whose legacy unique IDs end with any of the provided legacy suffixes.
+    """Remove matching legacy entity-registry entries for one domain.
 
     Matching only applies when the unique ID conforms to the legacy unique-id
     shape to avoid accidental removal of current entities. Unique IDs for this
@@ -648,9 +729,9 @@ def _async_remove_entities_with_suffixes(
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload the config entry and tear down its runtime resources.
 
-    If platform unload succeeds, shuts down the coordinator (if present) and
-    clears the entry's runtime data to avoid retaining the coordinator. Teardown
-    is performed only when platforms are successfully unloaded.
+    If platform unload succeeds, shuts down the coordinator (if present),
+    cancels any deferred background startup task and clears the entry's runtime
+    data to avoid retaining the coordinator.
 
     Returns:
         True if platforms were unloaded and runtime teardown completed, False
@@ -658,15 +739,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     """
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    # Keep the successful teardown explicitly gated by unload_ok so future
-    # changes cannot stop the coordinator while HA still has loaded platforms.
     if not unload_ok:
         return False
+    await _async_cancel_startup_task(hass, entry)
     if isinstance(coordinator, JackerySolarVaultCoordinator):
         await coordinator.async_shutdown()
-    # HA convention on unload: drop the runtime_data reference so any
-    # stragglers cannot keep the coordinator alive. Same narrowing caveat
-    # as the setup-failure path above.
     entry.runtime_data = cast("Any", None)
     return True
 

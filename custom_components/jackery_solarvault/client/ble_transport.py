@@ -45,6 +45,31 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
+try:
+    from bleak.exc import BleakError
+except ImportError:  # pragma: no cover - optional test dependency
+    class BleakError(Exception):
+        """Fallback used when bleak is unavailable during import-time tests."""
+
+
+try:
+    from bleak_retry_connector import (
+        BLEAK_RETRY_EXCEPTIONS,
+        establish_connection,
+    )
+except ImportError:  # pragma: no cover - optional test dependency
+    BLEAK_RETRY_EXCEPTIONS = (BleakError,)
+
+    async def establish_connection(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        """Raise a clear error when bleak-retry-connector is unavailable."""
+        raise RuntimeError(
+            "bleak-retry-connector is required for Jackery BLE transport"
+        )
+
+
+from homeassistant.components import bluetooth
+
+from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
 from ..util import first_nonblank_int
 from . import ble
 
@@ -286,7 +311,9 @@ class JackeryBleListener:
     # Phase 3b: write path — send a command frame to the device
     # ------------------------------------------------------------------
 
-    def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:  # noqa: ANN401
+    def _record_negotiated_mtu(
+        self, device_id: str, client: Any
+    ) -> None:  # noqa: ANN401
         """Cache the negotiated GATT MTU after ``start_notify`` returns.
 
         Different bleak backends expose the MTU under different attribute
@@ -297,7 +324,10 @@ class JackeryBleListener:
         """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
-            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
+            if (
+                isinstance(value, int)
+                and value > ble._BLE_FRAME_OVERHEAD  # noqa: SLF001
+            ):
                 self._mtu[device_id] = value
                 _LOGGER.debug(
                     "Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)",
@@ -335,12 +365,6 @@ class JackeryBleListener:
         write errors are caught and DEBUG-logged so a single missed
         keep-alive does not abort the loop.
         """
-        # Avoid an import cycle by deferring the ``MQTT_CMD_QUERY_DEVICE_PROPERTY``
-        # lookup — ``ble_transport`` is imported during
-        # ``async_start_ble_transport`` from the coordinator, but the
-        # const module is already loaded at that point.
-        from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
                 try:
@@ -423,7 +447,9 @@ class JackeryBleListener:
             return False
         key = self._key_resolver(device_id)
         if key is None:
-            raise RuntimeError(f"no bluetoothKey available for device {device_id}")  # noqa: TRY003
+            raise RuntimeError(  # noqa: TRY003
+                f"no bluetoothKey available for device {device_id}"
+            )
         # Resolve the effective MTU: explicit override wins (used by
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
@@ -479,7 +505,9 @@ class JackeryBleListener:
         except Exception as err:  # bleak surfaces BleakError + variants
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
+            raise RuntimeError(  # noqa: TRY003
+                f"BLE write to {device_id} failed: {err}"
+            ) from err
         if pending is not None:
             stats = self.stats_for(device_id)
             try:
@@ -586,10 +614,6 @@ class JackeryBleListener:
         advertisement for a device arrives. This avoids blocking
         integration setup on a BLE radio that is out of range.
         """
-        # Deferred imports keep this module importable in unit-test
-        # environments without BlueZ / bleak.
-        from homeassistant.components import bluetooth
-
         self._stop_event.clear()
 
         matcher: BluetoothCallbackMatcher = {
@@ -622,7 +646,8 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
+            except Exception as err:  # noqa: BLE001
+                # pragma: no cover - HA callback contract is sync
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -760,13 +785,10 @@ class JackeryBleListener:
         self._unmapped_serials_logged.discard(serial)
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0915
+    async def _async_run_connection(
+        self, device_id: str, address: str
+    ) -> None:  # noqa: PLR0915
         """Maintain a GATT session for one device, reconnecting on drop."""
-        from bleak.exc import BleakError
-        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
-
-        from homeassistant.components import bluetooth
-
         stats = self.stats_for(device_id)
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
@@ -843,7 +865,10 @@ class JackeryBleListener:
                     # Park the connection until the device drops it or we
                     # are asked to stop. ``client.is_connected`` is polled
                     # via the disconnect callback above.
-                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110
+                    while (
+                        not self._stop_event.is_set()
+                        and client.is_connected
+                    ):  # noqa: ASYNC110
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"

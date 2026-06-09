@@ -5,6 +5,7 @@ constants live one level up in ``..util`` and ``..const`` so the integration
 maintains a single source of truth — there is no separate, standalone copy.
 """
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from .api import JackeryApi, JackeryApiError, JackeryAuthError, JackeryError
@@ -25,7 +26,6 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
     if name == "JackeryMqttPushClient":
-        from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
-
-        return _JackeryMqttPushClient
+        module = import_module(f"{__name__}.mqtt_push")
+        return module.JackeryMqttPushClient
     raise AttributeError(name)
