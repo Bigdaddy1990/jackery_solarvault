@@ -1,0 +1,64 @@
+    timeout-minutes: 30
+    env:
+      PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements_test.txt
+            pyproject.toml
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deps (uv)
+        run: |
+          uv pip install --system -r requirements.txt
+          uv pip install --system -r requirements_test.txt --prerelease=allow
+          uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+
+      - uses: astral-sh/ruff-action@v3
+        with:
+         version: ">=0.4.0"
+      - run: ruff check --fix
+      - run: ruff format
+      - uses: pre-commit-ci/lite-action@v1.1.0
+        if: always()
+      - name: Run pre-commit with fixes
+        run: |
+          ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes || true
+          ruff check . --target-version py314 || true
+          ruff check . --extend-select RUF100 || true
+          ruff check . --preview || true
+          ruff check . --output-format=github || true
+          ruff check . --exit-non-zero-on-fix || true
+          ruff format
+          python scripts/enforce_docstring_baseline.py --update || true
+          python -m scripts.sync_contributor_guides || true
+          pre-commit run --all-files || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+
+      - name: Verify contributor guides
+        run: |
+          python -m scripts.sync_contributor_guides --check || true
+
+      - name: Run test requirements and localization sync
+        run: |
+          python -m scripts.enforce_test_requirements || true
+          python -m scripts.sync_localization_flags \
+            --allowlist scripts/sync_localization_flags.allowlist \
+            --check || true
