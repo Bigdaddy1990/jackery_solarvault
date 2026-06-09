@@ -303,7 +303,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.COVERAGE_XML) != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -318,7 +318,7 @@ jobs:
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           (steps.codecov_coverage_upload.outcome == 'failure' ||
           steps.codecov_coverage_upload.outcome == 'skipped')
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -332,7 +332,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.JUNIT_PATH) != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
