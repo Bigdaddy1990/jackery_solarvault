@@ -1,4 +1,4 @@
-aiomqtt>=2.5.0,<2.6.0
+aiomqtt>=2.5.1,<2.6.0
 aiousbwatcher>=1.1.2
 bleak-retry-connector>=3.5.0
 cryptography
