@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from jackery_solarvault.const import (
+from ..const import (
     AES_KEY,
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
@@ -150,7 +150,7 @@ from jackery_solarvault.const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from jackery_solarvault.util import (
+from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     safe_bool,
