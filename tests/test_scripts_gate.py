@@ -10,9 +10,12 @@ project scripts being on disk.
 import importlib.util
 from pathlib import Path
 import sys
-from types import ModuleType
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,7 +24,8 @@ def _load_gate_module() -> ModuleType:
     """Import ``scripts/gate.py`` as a module without a ``scripts`` package."""
     gate_path = _REPO_ROOT / "scripts" / "gate.py"
     spec = importlib.util.spec_from_file_location("scripts_gate", gate_path)
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["scripts_gate"] = module
     spec.loader.exec_module(module)

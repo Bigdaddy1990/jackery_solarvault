@@ -1,15 +1,12 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .api import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
@@ -19,9 +16,15 @@ from .const import (
     FIELD_SYSTEM_NAME,
     PAYLOAD_SYSTEM,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, coordinator_entity_signature
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
