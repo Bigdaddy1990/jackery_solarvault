@@ -410,7 +410,7 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
         "self._last_http_refresh_completed_monotonic =" in body
     )  # may use intermediate variable
     # Find first assignment of _last_http_refresh_completed_monotonic
-    import re as _re  # noqa: PLC0415
+    import re as _re
 
     m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
     assert m is not None

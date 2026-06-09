@@ -609,7 +609,7 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
 def test_parse_hex16_accepts_lowercase_hex_string() -> None:
     """parse_hex16 must accept lowercase hex strings (case-insensitive)."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001
 
     assert parse_hex16("00ff") == 0x00FF  # noqa: PLR2004
     assert parse_hex16("beef") == 0xBEEF  # noqa: PLR2004
@@ -618,7 +618,7 @@ def test_parse_hex16_accepts_lowercase_hex_string() -> None:
 
 def test_parse_hex16_accepts_mixed_case_hex_string() -> None:
     """parse_hex16 must accept mixed-case hex strings."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001
 
     assert parse_hex16("BeEF") == 0xBEEF  # noqa: PLR2004
     assert parse_hex16("Ff0A") == 0xFF0A  # noqa: PLR2004
@@ -626,7 +626,7 @@ def test_parse_hex16_accepts_mixed_case_hex_string() -> None:
 
 def test_parse_hex16_boundary_values() -> None:
     """parse_hex16 must correctly handle min and max 16-bit values."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import parse_hex16  # noqa: I001
 
     assert parse_hex16("0000") == 0
     assert parse_hex16("FFFF") == 0xFFFF  # noqa: PLR2004

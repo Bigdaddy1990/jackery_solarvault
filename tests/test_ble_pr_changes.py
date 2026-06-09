@@ -129,9 +129,9 @@ def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
 
     Pins the symmetry that the PR did not break despite the assert change.
     """  # noqa: E501
-    import base64  # noqa: PLC0415
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         BLE_AES_IV_LEN,
         decrypt_binary_notify,
         encrypt_binary_notify,

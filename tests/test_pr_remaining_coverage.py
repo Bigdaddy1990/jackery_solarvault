@@ -255,7 +255,7 @@ def test_decrypt_binary_notify_version_mismatch_empty_body() -> None:
 
 def test_client_init_getattr_raises_attribute_error_for_unknown_name() -> None:
     """Accessing an unknown attribute on the client package must raise AttributeError."""  # noqa: E501
-    import custom_components.jackery_solarvault.client as client_pkg  # noqa: PLC0415
+    import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError):
         _ = client_pkg.NonExistentClass  # type: ignore[attr-defined]
@@ -263,7 +263,7 @@ def test_client_init_getattr_raises_attribute_error_for_unknown_name() -> None:
 
 def test_client_init_getattr_raises_for_private_unknown_name() -> None:
     """Private names that are not registered must also raise AttributeError."""
-    import custom_components.jackery_solarvault.client as client_pkg  # noqa: PLC0415
+    import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError):
         _ = client_pkg._SomethingPrivate  # type: ignore[attr-defined]  # noqa: SLF001
@@ -271,7 +271,7 @@ def test_client_init_getattr_raises_for_private_unknown_name() -> None:
 
 def test_client_init_getattr_attribute_error_message_contains_name() -> None:
     """The AttributeError raised for an unknown name must include the name."""
-    import custom_components.jackery_solarvault.client as client_pkg  # noqa: PLC0415
+    import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError) as exc_info:
         _ = client_pkg.DoesNotExist  # type: ignore[attr-defined]
@@ -280,7 +280,7 @@ def test_client_init_getattr_attribute_error_message_contains_name() -> None:
 
 def test_client_init_direct_imports_work_without_getattr() -> None:
     """Public symbols must be importable directly without going through __getattr__."""
-    from custom_components.jackery_solarvault.client import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client import (
         JackeryApi,
         JackeryApiError,
         JackeryAuthError,
@@ -300,7 +300,7 @@ def test_client_init_jackery_mqtt_push_client_via_getattr() -> None:
     skipped rather than failed, since the lazy-import guard is the behaviour
     under test.
     """
-    import custom_components.jackery_solarvault.client as client_pkg  # noqa: PLC0415
+    import custom_components.jackery_solarvault.client as client_pkg
 
     try:
         cls = client_pkg.JackeryMqttPushClient

@@ -26,7 +26,7 @@ import pytest
 
 
 def _get_storm_alert_id():  # noqa: ANN202
-    from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.button import (
         _storm_alert_id,  # noqa: PLC2701
     )
 
@@ -34,7 +34,7 @@ def _get_storm_alert_id():  # noqa: ANN202
 
 
 def _get_storm_alerts():  # noqa: ANN202
-    from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.button import (
         _storm_alerts,  # noqa: PLC2701
     )
 
@@ -42,7 +42,7 @@ def _get_storm_alerts():  # noqa: ANN202
 
 
 def _get_smart_plug_device_sn():  # noqa: ANN202
-    from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.button import (
         _smart_plug_device_sn,  # noqa: PLC2701
     )
 
@@ -283,7 +283,7 @@ class TestJackeryQueryButtonDescription:
 
     def test_is_frozen_dataclass(self) -> None:  # noqa: PLR6301
         """JackeryQueryButtonDescription must be immutable (frozen dataclass)."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -301,7 +301,7 @@ class TestJackeryQueryButtonDescription:
 
     def test_dev_type_defaults_to_none(self) -> None:  # noqa: PLR6301
         """dev_type defaults to None when not specified."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -318,7 +318,7 @@ class TestJackeryQueryButtonDescription:
 
     def test_dev_type_can_be_set(self) -> None:  # noqa: PLR6301
         """dev_type can be set to an integer value."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -345,7 +345,7 @@ class TestQueryButtonDescriptions:
 
     def test_is_a_tuple(self) -> None:  # noqa: PLR6301
         """QUERY_BUTTON_DESCRIPTIONS must be a tuple."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -353,7 +353,7 @@ class TestQueryButtonDescriptions:
 
     def test_has_expected_count(self) -> None:  # noqa: PLR6301
         """Must have exactly 14 descriptions as implemented."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -361,7 +361,7 @@ class TestQueryButtonDescriptions:
 
     def test_all_entries_are_query_button_descriptions(self) -> None:  # noqa: PLR6301
         """All entries must be JackeryQueryButtonDescription instances."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
             JackeryQueryButtonDescription,
         )
@@ -371,7 +371,7 @@ class TestQueryButtonDescriptions:
 
     def test_subdevice_entries_have_dev_type(self) -> None:  # noqa: PLR6301
         """All subdevice query descriptions must have a non-None dev_type."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -388,7 +388,7 @@ class TestQueryButtonDescriptions:
 
     def test_non_subdevice_entries_have_no_dev_type(self) -> None:  # noqa: PLR6301
         """Non-subdevice query descriptions must have dev_type=None."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -409,7 +409,7 @@ class TestQueryButtonDescriptions:
 
     def test_all_entries_have_unique_keys(self) -> None:  # noqa: PLR6301
         """All description keys must be unique."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -418,7 +418,7 @@ class TestQueryButtonDescriptions:
 
     def test_all_entries_have_mdi_icons(self) -> None:  # noqa: PLR6301
         """All descriptions must have an mdi: icon."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
@@ -449,7 +449,7 @@ def _make_query_button(  # noqa: ANN202
     coordinator=None,  # noqa: ANN001
 ):
     """Construct a JackeryQueryButton for testing."""
-    from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.button import (
         JackeryQueryButton,
         JackeryQueryButtonDescription,
     )
@@ -475,10 +475,10 @@ class TestJackeryQueryButton:
 
     def test_extra_state_attributes_has_message_type(self) -> None:  # noqa: PLR6301
         """extra_state_attributes must contain messageType."""
-        from custom_components.jackery_solarvault.button import (  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from custom_components.jackery_solarvault.const import FIELD_MESSAGE_TYPE  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_MESSAGE_TYPE
 
         desc = JackeryQueryButtonDescription(
             key="test",
@@ -496,7 +496,7 @@ class TestJackeryQueryButton:
 
     def test_extra_state_attributes_has_action_id(self) -> None:  # noqa: PLR6301
         """extra_state_attributes must contain actionId."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -515,10 +515,10 @@ class TestJackeryQueryButton:
 
     def test_extra_state_attributes_has_cmd(self) -> None:  # noqa: PLR6301
         """extra_state_attributes must contain cmd."""
-        from custom_components.jackery_solarvault.button import (  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from custom_components.jackery_solarvault.const import FIELD_CMD  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_CMD
 
         desc = JackeryQueryButtonDescription(
             key="test",
@@ -536,10 +536,10 @@ class TestJackeryQueryButton:
 
     def test_extra_state_attributes_excludes_dev_type_when_none(self) -> None:  # noqa: PLR6301
         """When dev_type is None, devType must not appear in extra_state_attributes."""
-        from custom_components.jackery_solarvault.button import (  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
 
         desc = JackeryQueryButtonDescription(
             key="test",
@@ -557,10 +557,10 @@ class TestJackeryQueryButton:
 
     def test_extra_state_attributes_includes_dev_type_when_set(self) -> None:  # noqa: PLR6301
         """When dev_type is set, devType must appear in extra_state_attributes."""
-        from custom_components.jackery_solarvault.button import (  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
 
         desc = JackeryQueryButtonDescription(
             key="test",
@@ -579,7 +579,7 @@ class TestJackeryQueryButton:
 
     def test_translation_key_matches_description(self) -> None:  # noqa: PLR6301
         """translation_key must be set from the description."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -597,7 +597,7 @@ class TestJackeryQueryButton:
 
     def test_icon_matches_description(self) -> None:  # noqa: PLR6301
         """Icon must be set from the description."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -615,7 +615,7 @@ class TestJackeryQueryButton:
 
     def test_raise_action_error_raises_homeassistant_error(self) -> None:  # noqa: PLR6301
         """_raise_action_error must raise HomeAssistantError with entity_action_failed."""  # noqa: E501
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_query_button()
         with pytest.raises(HomeAssistantError) as exc_info:
@@ -624,7 +624,7 @@ class TestJackeryQueryButton:
 
     def test_raise_action_error_includes_error_in_placeholders(self) -> None:  # noqa: PLR6301
         """_raise_action_error must include the error string in translation_placeholders."""  # noqa: E501
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_query_button()
         with pytest.raises(HomeAssistantError) as exc_info:
@@ -634,7 +634,7 @@ class TestJackeryQueryButton:
 
     async def test_async_press_calls_action(self) -> None:  # noqa: PLR6301
         """async_press must call the description's action."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
 
@@ -654,10 +654,10 @@ class TestJackeryQueryButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate unchanged from async_press."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from homeassistant.exceptions import ConfigEntryAuthFailed  # noqa: PLC0415
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         async def _auth_fail(coord, dev_id):  # noqa: ANN001, ANN202, RUF029
             raise ConfigEntryAuthFailed("bad creds")  # noqa: TRY003
@@ -677,10 +677,10 @@ class TestJackeryQueryButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:  # noqa: PLR6301
         """Generic exceptions must be wrapped into HomeAssistantError."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         async def _fail(coord, dev_id):  # noqa: ANN001, ANN202, RUF029
             raise RuntimeError("unexpected")
@@ -711,7 +711,7 @@ def _make_delete_storm_alert_button(  # noqa: ANN202
     coordinator_data: dict | None = None,
 ):
     """Construct a JackeryDeleteStormAlertButton with a mock coordinator."""
-    from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.button import (
         JackeryDeleteStormAlertButton,
     )
 
@@ -776,7 +776,7 @@ class TestJackeryDeleteStormAlertButton:
 
     def test_extra_state_attributes_always_has_alert_id(self) -> None:  # noqa: PLR6301
         """extra_state_attributes must always include alertId."""
-        from custom_components.jackery_solarvault.const import FIELD_ALERT_ID  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_ALERT_ID  # noqa: I001
 
         btn = _make_delete_storm_alert_button("my-alert-id")
         attrs = btn.extra_state_attributes
@@ -785,7 +785,7 @@ class TestJackeryDeleteStormAlertButton:
 
     def test_extra_state_attributes_includes_optional_fields_when_present(self) -> None:  # noqa: PLR6301
         """Optional fields (startTs, endTs, status, manual) must appear when in alert."""  # noqa: E501
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             FIELD_END_TS,
             FIELD_MANUAL,
             FIELD_START_TS,
@@ -814,7 +814,7 @@ class TestJackeryDeleteStormAlertButton:
 
     def test_extra_state_attributes_omits_optional_fields_when_absent(self) -> None:  # noqa: PLR6301
         """Optional fields must be absent from extra_state_attributes when not in alert."""  # noqa: E501
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             FIELD_END_TS,
             FIELD_MANUAL,
             FIELD_START_TS,
@@ -831,7 +831,7 @@ class TestJackeryDeleteStormAlertButton:
 
     def test_raise_action_error_raises_homeassistant_error(self) -> None:  # noqa: PLR6301
         """_raise_action_error must raise HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_delete_storm_alert_button()
         with pytest.raises(HomeAssistantError) as exc_info:
@@ -840,7 +840,7 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_calls_delete_and_refresh(self) -> None:  # noqa: PLR6301
         """async_press must call async_delete_storm_alert and async_request_refresh."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
 
@@ -855,10 +855,10 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate from async_press."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
-        from homeassistant.exceptions import ConfigEntryAuthFailed  # noqa: PLC0415
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
@@ -872,10 +872,10 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_wraps_runtime_error(self) -> None:  # noqa: PLR6301
         """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""  # noqa: E501
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_delete_storm_alert = AsyncMock(
@@ -901,7 +901,7 @@ def _make_read_schedule_button(  # noqa: ANN202
     device_id: str = "12345",
 ):
     """Construct a JackeryReadScheduleButton for testing."""
-    from custom_components.jackery_solarvault.button import JackeryReadScheduleButton  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.button import JackeryReadScheduleButton  # noqa: I001
 
     coordinator = _make_mock_coordinator(device_id)
     return JackeryReadScheduleButton(
@@ -927,7 +927,7 @@ class TestJackeryReadScheduleButton:
 
     def test_extra_state_attributes_omits_device_sn_when_empty(self) -> None:  # noqa: PLR6301
         """DeviceSn must be absent from extra_state_attributes when plug_sn is empty."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN  # noqa: I001
 
         btn = _make_read_schedule_button(plug_sn="")
         attrs = btn.extra_state_attributes
@@ -935,7 +935,7 @@ class TestJackeryReadScheduleButton:
 
     def test_extra_state_attributes_includes_device_sn_when_set(self) -> None:  # noqa: PLR6301
         """DeviceSn must appear in extra_state_attributes when plug_sn is set."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_SN  # noqa: I001
 
         btn = _make_read_schedule_button(plug_sn="PLUG-SN-001")
         attrs = btn.extra_state_attributes
@@ -959,7 +959,7 @@ class TestJackeryReadScheduleButton:
 
     def test_custom_mode_task_type(self) -> None:  # noqa: PLR6301
         """TIMER_TASK_TYPE_CUSTOM_MODE should be task type 2."""
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             TIMER_TASK_TYPE_CUSTOM_MODE,
         )
 
@@ -969,7 +969,7 @@ class TestJackeryReadScheduleButton:
 
     def test_smart_plug_task_type(self) -> None:  # noqa: PLR6301
         """TIMER_TASK_TYPE_SMART_PLUG should be task type 1."""
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             TIMER_TASK_TYPE_SMART_PLUG,
         )
 
@@ -979,7 +979,7 @@ class TestJackeryReadScheduleButton:
 
     def test_time_elec_task_type(self) -> None:  # noqa: PLR6301
         """TIMER_TASK_TYPE_TIME_ELEC should be task type 3."""
-        from custom_components.jackery_solarvault.const import TIMER_TASK_TYPE_TIME_ELEC  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.const import TIMER_TASK_TYPE_TIME_ELEC  # noqa: I001
 
         assert TIMER_TASK_TYPE_TIME_ELEC == 3  # noqa: PLR2004
         btn = _make_read_schedule_button(task_type=TIMER_TASK_TYPE_TIME_ELEC)
@@ -987,7 +987,7 @@ class TestJackeryReadScheduleButton:
 
     def test_raise_action_error_raises_homeassistant_error(self) -> None:  # noqa: PLR6301
         """_raise_action_error must raise HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_read_schedule_button()
         with pytest.raises(HomeAssistantError) as exc_info:
@@ -996,7 +996,7 @@ class TestJackeryReadScheduleButton:
 
     async def test_async_press_calls_read_schedule_and_refresh(self) -> None:  # noqa: PLR6301
         """async_press must call async_read_device_schedule and async_request_refresh."""  # noqa: E501
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
 
@@ -1022,7 +1022,7 @@ class TestJackeryReadScheduleButton:
 
     async def test_async_press_with_plug_sn(self) -> None:  # noqa: PLR6301
         """async_press with a plug_sn must pass it to async_read_device_schedule."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
 
@@ -1057,7 +1057,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_translation_key_is_refresh_weather_plan(self) -> None:  # noqa: PLR6301
         """translation_key must be 'refresh_weather_plan'."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
 
@@ -1067,7 +1067,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_icon_is_weather_cloudy_clock(self) -> None:  # noqa: PLR6301
         """Icon must be 'mdi:weather-cloudy-clock'."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
 
@@ -1077,7 +1077,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_unique_id_includes_refresh_weather_plan(self) -> None:  # noqa: PLR6301
         """unique_id must include 'refresh_weather_plan'."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
 
@@ -1087,7 +1087,7 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_calls_query_weather_plan_and_refresh(self) -> None:  # noqa: PLR6301
         """async_press must call async_query_weather_plan and async_request_refresh."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
 
@@ -1102,10 +1102,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate from async_press."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import ConfigEntryAuthFailed  # noqa: PLC0415
+        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1119,10 +1119,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:  # noqa: PLR6301
         """Generic exception from async_press must be wrapped into HomeAssistantError."""  # noqa: E501
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1137,10 +1137,10 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_raise_action_error_has_entity_in_placeholders(self) -> None:  # noqa: PLR6301
         """The error placeholder must include the entity key 'refresh_weather_plan'."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRefreshWeatherPlanButton(coordinator, "12345")
@@ -1160,7 +1160,7 @@ class TestJackeryRebootButton:
 
     def test_translation_key_is_reboot_device(self) -> None:  # noqa: PLR6301
         """translation_key must be 'reboot_device'."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRebootButton(coordinator, "12345")
@@ -1168,7 +1168,7 @@ class TestJackeryRebootButton:
 
     def test_unique_id_includes_reboot_device(self) -> None:  # noqa: PLR6301
         """unique_id must include 'reboot_device'."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRebootButton(coordinator, "12345")
@@ -1176,8 +1176,8 @@ class TestJackeryRebootButton:
 
     def test_raise_action_error_has_reboot_device_entity(self) -> None:  # noqa: PLR6301
         """The error placeholder must include 'reboot_device' as entity."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001, PLC0415
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
+        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRebootButton(coordinator, "12345")
@@ -1188,7 +1188,7 @@ class TestJackeryRebootButton:
 
     async def test_async_press_calls_reboot_and_refresh(self) -> None:  # noqa: PLR6301
         """async_press must call async_reboot_device and async_request_refresh."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001, PLC0415
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_reboot_device = AsyncMock()

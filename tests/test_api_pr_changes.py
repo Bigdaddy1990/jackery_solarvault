@@ -101,7 +101,7 @@ def test_rsa_pkcs1v15_encrypt_rejects_invalid_base64() -> None:
     helper does not wrap it, so the test pins that specific exception type
     rather than the blind ``Exception`` (which Ruff B017 forbids).
     """
-    import binascii  # noqa: PLC0415
+    import binascii
 
     with pytest.raises(binascii.Error):
         _rsa_pkcs1v15_encrypt(b"data", "not-valid-base64!!!")

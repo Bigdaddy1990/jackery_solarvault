@@ -6324,8 +6324,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts or not states:
             return 0.0
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.statistics import (
                 statistics_during_period,
             )
         except (ImportError, RuntimeError) as err:
@@ -6384,12 +6384,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> tuple[float, float]:
         """Return previous ``sum`` and same-period ``state`` for an entity."""
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-            from homeassistant.components.recorder.db_schema import (  # noqa: PLC0415
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.components.recorder.db_schema import (
                 Statistics,
                 StatisticsMeta,
             )
-            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
+            from homeassistant.helpers.recorder import session_scope
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity-statistic offset unavailable: %s", err)
             return 0.0, 0.0
@@ -6454,9 +6454,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts:
             return set()
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder import get_instance
             from homeassistant.components.recorder.db_schema import StatisticsRuns
-            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
+            from homeassistant.helpers.recorder import session_scope
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder run markers unavailable: %s", err)
             return set()
@@ -6494,7 +6494,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
             from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-            from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+            from homeassistant.helpers import entity_registry as er
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Entity registry unavailable for entity repair: %s", err)
             return {}
@@ -6635,14 +6635,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not entity_ids:
             return 0, 0
         try:
-            from homeassistant.components.recorder.models import (  # noqa: PLC0415
+            from homeassistant.components.recorder.models import (
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (
                 async_import_statistics,
             )
-            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
+            from homeassistant.const import UnitOfEnergy
             from homeassistant.util.unit_conversion import EnergyConverter
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity statistics import unavailable: %s", err)
@@ -6851,7 +6851,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         warnings = normalized_data_quality_warnings(warnings)
 
         try:
-            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+            from homeassistant.helpers import issue_registry as ir
         except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
@@ -7141,15 +7141,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not points:
             return True, 0
         try:
-            from homeassistant.components.recorder.models import (  # noqa: PLC0415
+            from homeassistant.components.recorder.models import (
                 StatisticData,
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (
                 async_add_external_statistics,
             )
-            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
+            from homeassistant.const import UnitOfEnergy
             from homeassistant.util.unit_conversion import EnergyConverter
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder statistics import unavailable: %s", err)
@@ -9314,7 +9314,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _raise_device_not_activated(self, dev_id: str) -> None:
         """Create a repair issue for device not activated."""
         try:
-            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+            from homeassistant.helpers import issue_registry as ir
         except ImportError, RuntimeError:
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
@@ -9337,7 +9337,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _dismiss_device_not_activated(self, dev_id: str) -> None:
         """Delete the repair issue for device not activated."""
         try:
-            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+            from homeassistant.helpers import issue_registry as ir
         except ImportError, RuntimeError:
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"

@@ -404,7 +404,7 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     assert "enabled_default=pack_desc.entity_category" in sensor_source
     assert "_attr_entity_registry_enabled_default = False" in sensor_source
 
-    import re  # noqa: PLC0415
+    import re
 
     pattern = re.compile(
         r"Jackery(?:Stat)?SensorDescription\(\s*\n"
@@ -613,7 +613,7 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
     )
     # The stale path explicitly publishes 0 for day sensors and None for
     # longer periods.
-    import re  # noqa: PLC0415
+    import re
 
     flat = re.sub(r"\s+", " ", sensor_source)
     # Three-part fix: day/week stale sensors use server_total (not 0) to avoid

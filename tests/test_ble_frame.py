@@ -162,7 +162,7 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     This is the regression that motivated
     accepting both key lengths.
     """  # noqa: D205
-    import base64  # noqa: PLC0415
+    import base64
 
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
     assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # noqa: PLR2004
@@ -303,7 +303,7 @@ def test_encrypt_decrypt_round_trip_recovers_frame_aes256() -> None:
 
 def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
     """End-to-end frame round-trip with the captured 16-byte device key."""
-    import base64  # noqa: PLC0415
+    import base64
 
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
     frame = BleFrame(
@@ -459,8 +459,8 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     Decoding them recovers the JSON telemetry that the integration would otherwise have to wait for from
     the cloud.
     """  # noqa: D205, E501
-    import base64  # noqa: PLC0415
-    import json as _json  # noqa: PLC0415
+    import base64
+    import json as _json
 
     key = base64.b64decode(_LIVE_KEY_B64)
     assert len(key) == BLE_AES_KEY_LEN_AES128
@@ -486,9 +486,9 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
-    import base64  # noqa: PLC0415
+    import base64
 
-    import pytest  # noqa: PLC0415
+    import pytest
 
     key = base64.b64decode(_LIVE_KEY_B64)
     with pytest.raises(ValueError):  # noqa: PT011
@@ -504,9 +504,9 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     :class:`.ble.BleBinaryFrame` docstring); the round-trip test uses
     explicit zero bytes that the decoder simply passes through.
     """
-    import base64  # noqa: PLC0415
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -531,9 +531,9 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
     decide whether to fall back to the cloud-MQTT pipeline when the BLE
     proxy hasn't (re-)connected yet.
     """
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.client.ble_transport import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble_transport import (
         JackeryBleListener,
     )
 
@@ -565,14 +565,14 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
     blob with the same key to confirm it round-trips through the live
     binary decoder.
     """
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         BLE_WRITE_CHAR_UUID,
         decrypt_binary_notify,
     )
-    from custom_components.jackery_solarvault.client.ble_transport import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble_transport import (
         JackeryBleListener,
     )
 
@@ -633,9 +633,9 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
 def test_build_binary_frame_rejects_oversized_fields() -> None:
     """Every header field is range-checked before encryption."""
-    import pytest  # noqa: I001, PLC0415
+    import pytest
 
-    from custom_components.jackery_solarvault.client.ble import build_binary_frame  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import build_binary_frame
 
     with pytest.raises(ValueError):  # noqa: PT011
         build_binary_frame(cmd=107, body=b"x", frame_index=0)
@@ -661,8 +661,8 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
     Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
     """  # noqa: E501
-    import json  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
+    import json
+    from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads(
@@ -686,7 +686,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
 def test_const_exposes_ble_option_and_field() -> None:
     """Config option + bluetoothKey field constants exist in const.py."""
-    from custom_components.jackery_solarvault import const  # noqa: PLC0415
+    from custom_components.jackery_solarvault import const
 
     assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
     assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
@@ -697,7 +697,7 @@ def test_const_exposes_ble_option_and_field() -> None:
 
 def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
     """Coordinator class exposes the BLE listener / diagnostics helpers."""
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -712,7 +712,7 @@ def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
 
 def test_ble_write_option_is_options_only() -> None:
     """BLE writes default off and are not shown in the initial login form."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     source = (
@@ -736,7 +736,7 @@ def test_ble_write_option_is_options_only() -> None:
 
 def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
     """BLE option lookup must use the entry attribute stored by the coordinator."""
-    from pathlib import Path  # noqa: PLC0415
+    from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
     coordinator_source = (
@@ -755,7 +755,7 @@ def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
 
 def test_ble_transport_module_exports_listener() -> None:
     """``client.ble_transport`` exports the listener + observation classes."""
-    from custom_components.jackery_solarvault.client import ble_transport  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client import ble_transport
 
     for symbol in (
         "JackeryBleListener",
@@ -775,9 +775,9 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
     well within the listener's own ``_STOP_TIMEOUT_SEC`` budget after
     ``async_stop()`` is awaited.
     """
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.client.ble_transport import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble_transport import (
         JackeryBleListener,
     )
 
@@ -815,13 +815,13 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
 def test_coordinator_send_ble_command_requires_write_option() -> None:
     """The public BLE sender is inert until both BLE options are enabled."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         CONF_ENABLE_BLE_TRANSPORT,
         CONF_ENABLE_BLE_WRITES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -862,11 +862,11 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
 def test_ble_observations_include_known_devices_without_frames() -> None:
     """BLE diagnostics should not be empty before the first advertisement."""
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         CONF_ENABLE_BLE_TRANSPORT,
         CONF_ENABLE_BLE_WRITES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -919,13 +919,13 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     """Dict service bodies are compact-JSON encoded before GATT write."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         CONF_ENABLE_BLE_TRANSPORT,
         CONF_ENABLE_BLE_WRITES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1011,10 +1011,10 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
 
     Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
     """  # noqa: E501
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import FIELD_SW_EPS  # noqa: PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_SW_EPS
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1097,10 +1097,10 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
 
 def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
     """No active BLE session falls through to the existing MQTT command path."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import FIELD_SW_EPS  # noqa: PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_SW_EPS
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1169,11 +1169,11 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """BLE ACK failure must not warn when the MQTT fallback succeeds."""
-    import asyncio  # noqa: PLC0415
-    import logging  # noqa: PLC0415
+    import asyncio
+    import logging
 
-    from custom_components.jackery_solarvault.const import FIELD_SW_EPS  # noqa: PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_SW_EPS
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1248,11 +1248,11 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Failed BLE plus failed MQTT logs both transport errors."""
-    import asyncio  # noqa: PLC0415
-    import logging  # noqa: PLC0415
+    import asyncio
+    import logging
 
-    from custom_components.jackery_solarvault.const import FIELD_SW_EPS  # noqa: PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_SW_EPS
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1325,9 +1325,9 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
 def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
     """cmd=0 actions are not sent through the experimental BLE writer."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1394,8 +1394,8 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
 def test_command_body_for_transport_parses_cmd_defensively() -> None:
     """Transport command bodies accept integral text and reject bad values."""
-    from custom_components.jackery_solarvault.const import FIELD_CMD  # noqa: PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_CMD
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1418,8 +1418,8 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    from custom_components.jackery_solarvault import services  # noqa: PLC0415
-    from homeassistant.exceptions import ServiceValidationError  # noqa: PLC0415
+    from custom_components.jackery_solarvault import services
+    from homeassistant.exceptions import ServiceValidationError
 
     assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # noqa: SLF001
     assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # noqa: SLF001
@@ -1443,12 +1443,12 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
     notify frames with ``decode_error="no bluetoothKey for device"`` —
     visible in the BLE-transport diagnostics export from that capture.
     """
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         FIELD_BLUETOOTH_KEY,
         PAYLOAD_DEVICE_META,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1477,14 +1477,14 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
     lookup picks the most specific value so the integration stays
     forwards-compatible.
     """
-    import base64  # noqa: PLC0415
+    import base64
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         FIELD_BLUETOOTH_KEY,
         PAYLOAD_DEVICE_META,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1510,11 +1510,11 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
     H). The coordinator's ``device_id_for_ble_serial`` must accept the
     BLE form as a suffix of the HTTP form.
     """
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         FIELD_DEVICE_SN,
         PAYLOAD_DEVICE_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1556,9 +1556,9 @@ def _build_bare_listener() -> object:
     (bluetooth callbacks, async_create_background_task) that the static
     test harness can't load on Windows.
     """
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.client.ble_transport import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble_transport import (
         JackeryBleListener,
     )
 
@@ -1579,10 +1579,10 @@ def _build_bare_listener() -> object:
 
 def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
     """A decoded notify with the same cmd completes the pending ack future."""
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         BleBinaryFrame,
         build_binary_frame,
         encrypt_binary_notify,
@@ -1661,8 +1661,8 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
     """  # noqa: D205, E501
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
     class _FakeClient:
         async def write_gatt_char(  # noqa: PLR6301
@@ -1706,10 +1706,10 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
 def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
     """A notify with a non-listed cmd does not satisfy a cmd-filtered ack."""
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -1774,7 +1774,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
 
 def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
     """Invalid ACK filters fail before registering a pending future."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     async def _run() -> None:  # noqa: RUF029
         listener = _build_bare_listener()
@@ -1790,7 +1790,7 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
 
 def test_listener_async_stop_cancels_pending_acks() -> None:
     """Pending ack futures are cancelled on shutdown, never left dangling."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
     async def _run() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
@@ -1813,8 +1813,8 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
 
 def test_listener_send_command_write_failure_releases_pending_ack() -> None:
     """A failed GATT write must not leave a pending ack behind."""
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
     class _ExplodingClient:
         async def write_gatt_char(  # noqa: PLR6301
@@ -1864,13 +1864,13 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
 
 def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     """``async_send_ble_command`` threads the ack knobs through to the listener."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         CONF_ENABLE_BLE_TRANSPORT,
         CONF_ENABLE_BLE_WRITES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -1951,7 +1951,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
 
 def test_split_body_for_mtu_matches_smali_budget() -> None:
     """Body chunks honour the smali ``mtu - 60`` per-frame budget."""
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         DEFAULT_BLE_MTU,
         chunk_size_for_mtu,
         split_body_for_mtu,
@@ -1980,7 +1980,7 @@ def test_split_body_for_mtu_matches_smali_budget() -> None:
 
 def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
     """``chunk_size_for_mtu`` refuses values below the 60-byte overhead."""
-    from custom_components.jackery_solarvault.client.ble import split_body_for_mtu  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import split_body_for_mtu  # noqa: I001
 
     with pytest.raises(ValueError, match="below"):
         split_body_for_mtu(b"x", 23)
@@ -1990,10 +1990,10 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
     """  # noqa: D205, E501
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         BLE_WRITE_CHAR_UUID,
         decrypt_binary_notify,
     )
@@ -2053,10 +2053,10 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
 def test_listener_mtu_override_forces_smaller_chunks() -> None:
     """``mtu_override`` overrides the cached/default value for chunk sizing."""
-    import asyncio  # noqa: I001, PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify
 
     writes: list[bytes] = []
 
@@ -2102,8 +2102,8 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
 def test_listener_mtu_override_rejects_non_integer_value() -> None:
     """``mtu_override`` validation catches non-integer diagnostic input early."""
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
     class _FakeClient:
         async def write_gatt_char(  # noqa: PLR6301
@@ -2149,7 +2149,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
 def test_listener_mtu_for_device_falls_back_to_default() -> None:
     """An un-learnt device id surfaces the Android-app default MTU."""
-    from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU  # noqa: I001
 
     listener = _build_bare_listener()
     # type: ignore[attr-defined]
@@ -2172,7 +2172,7 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     """Non-int / out-of-range MTU values leave the cache empty."""
-    from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client.ble import DEFAULT_BLE_MTU  # noqa: I001
 
     listener = _build_bare_listener()
 
@@ -2195,10 +2195,10 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
     """  # noqa: D205, E501
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -2225,10 +2225,10 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
 
 def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
     """Chunked writes register one pending ack covering all frames combined."""
-    import asyncio  # noqa: PLC0415
-    import base64  # noqa: PLC0415
+    import asyncio
+    import base64
 
-    from custom_components.jackery_solarvault.client.ble import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.ble import (
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -2300,7 +2300,7 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
     has already populated the pack via ``deviceSn`` match. The helper
     enriches the matching pack with the BLE-only lifetime counters.
     """
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -2346,7 +2346,7 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
     counters stay unrouted forever and the opt-in pack energy entities
     never receive data.
     """
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -2382,7 +2382,7 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
 
 def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None:
     """A cmd=120 BLE body without inEgy/outEgy must not touch the pack."""
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 

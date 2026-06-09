@@ -168,9 +168,9 @@ def test_third_party_mqtt_bridge_setter_uses_smali_protocol() -> None:
 
 def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
     """Third-party MQTT config responses belong in their own payload bucket."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
         FIELD_ACTION_ID,
         FIELD_BODY,
@@ -186,7 +186,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         PAYLOAD_PROPERTIES,
         PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -430,15 +430,15 @@ def test_mqtt_action_id_routing_uses_shared_integer_parser() -> None:
 
 def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
     """MQTT command routing tolerates text cmd IDs from payloads."""
-    import asyncio  # noqa: PLC0415
+    import asyncio
 
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         FIELD_BODY,
         FIELD_CMD,
         MQTT_CMD_QUERY_DEVICE_PROPERTY,
         PAYLOAD_PROPERTIES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -496,8 +496,8 @@ def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> No
 
     Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice action IDs, while `True` and `float('nan')` are rejected.
     """  # noqa: E501
-    from custom_components.jackery_solarvault.const import FIELD_ACTION_ID  # noqa: I001, PLC0415
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import FIELD_ACTION_ID
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -533,7 +533,7 @@ def test_mqtt_payload_buckets_survive_http_refresh() -> None:
 
 def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
     """Stale HTTP property snapshots must not create SOC spikes."""
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.const import (
         FIELD_BAT_OUT_PW,
         FIELD_BAT_SOC,
         FIELD_SOC,
@@ -541,7 +541,7 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
         PAYLOAD_MQTT_LAST,
         PAYLOAD_PROPERTIES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 

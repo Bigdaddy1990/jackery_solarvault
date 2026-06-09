@@ -27,7 +27,7 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_contains_hash(self) -> None:  # noqa: PLR6301
         """The blocked set must contain '#'."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
 
@@ -35,7 +35,7 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_contains_plus_hash(self) -> None:  # noqa: PLR6301
         """The blocked set must contain '+/#'."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
 
@@ -43,7 +43,7 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_is_frozenset(self) -> None:  # noqa: PLR6301
         """_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS must be a frozenset."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
 
@@ -51,7 +51,7 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_scoped_filter_is_not_blocked(self) -> None:  # noqa: PLR6301
         """A scoped topic filter like 'jackery/#' must NOT be in the blocked set."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
 
@@ -60,7 +60,7 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_empty_string_is_not_in_blocked_set(self) -> None:  # noqa: PLR6301
         """Empty string must not be blocked (it is handled separately by emptiness check)."""  # noqa: E501
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
 
@@ -77,7 +77,7 @@ class TestLocalMqttClient:
 
     def test_returns_none_when_domain_not_in_hass_data(self) -> None:  # noqa: PLR6301
         """When the DOMAIN key is absent from hass.data, must return None."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
 
@@ -91,10 +91,10 @@ class TestLocalMqttClient:
 
     def test_returns_none_when_entry_id_not_in_hass_data(self) -> None:  # noqa: PLR6301
         """When the entry_id key is absent from hass.data[DOMAIN], must return None."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import DOMAIN
 
         hass = MagicMock()
         hass.data = {DOMAIN: {}}
@@ -106,10 +106,10 @@ class TestLocalMqttClient:
 
     def test_returns_none_when_bucket_is_not_dict(self) -> None:  # noqa: PLR6301
         """When the bucket is not a dict (e.g. a string), must return None."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import DOMAIN
 
         hass = MagicMock()
         hass.data = {DOMAIN: {"entry-abc": "not-a-dict"}}
@@ -121,10 +121,10 @@ class TestLocalMqttClient:
 
     def test_returns_none_when_local_mqtt_key_absent(self) -> None:  # noqa: PLR6301
         """When the bucket dict has no 'local_mqtt_client' key, must return None."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import DOMAIN
 
         hass = MagicMock()
         hass.data = {DOMAIN: {"entry-abc": {"other_key": "value"}}}
@@ -136,10 +136,10 @@ class TestLocalMqttClient:
 
     def test_returns_none_when_stored_value_is_wrong_type(self) -> None:  # noqa: PLR6301
         """When the stored value is not a JackeryLocalMqttClient, must return None."""
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import DOMAIN
 
         hass = MagicMock()
         hass.data = {
@@ -154,16 +154,16 @@ class TestLocalMqttClient:
     def test_returns_client_when_stored_correctly(self) -> None:  # noqa: PLR6301
         """When a JackeryLocalMqttClient is stored, must return it."""
         try:
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
         except ImportError, SyntaxError:
             pytest.skip("JackeryLocalMqttClient not importable")
 
-        from custom_components.jackery_solarvault import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import DOMAIN
 
         mock_client = MagicMock(spec=JackeryLocalMqttClient)
         hass = MagicMock()
@@ -217,10 +217,10 @@ class TestAsyncStartLocalMqttGuards:
     async def test_skips_when_third_party_mqtt_disabled(self) -> None:  # noqa: PLR6301
         """When CONF_THIRD_PARTY_MQTT_ENABLE is False, no client is created."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,  # noqa: F401
             )
         except ImportError, SyntaxError:
@@ -241,7 +241,7 @@ class TestAsyncStartLocalMqttGuards:
     async def test_skips_when_host_is_empty(self) -> None:  # noqa: PLR6301
         """When the host is empty, no client is created."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -262,7 +262,7 @@ class TestAsyncStartLocalMqttGuards:
     async def test_skips_when_host_is_whitespace_only(self) -> None:  # noqa: PLR6301
         """When the host is only whitespace, no client is created (strip check)."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -283,7 +283,7 @@ class TestAsyncStartLocalMqttGuards:
     async def test_skips_when_topic_filter_is_empty(self) -> None:  # noqa: PLR6301
         """When the topic filter is empty, no client is created."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -304,7 +304,7 @@ class TestAsyncStartLocalMqttGuards:
     async def test_skips_when_topic_filter_is_whitespace_only(self) -> None:  # noqa: PLR6301
         """When the topic filter is whitespace-only after strip, no client is created."""  # noqa: E501
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -332,7 +332,7 @@ class TestAsyncStartLocalMqttGuards:
     ) -> None:
         """When topic filter is '#', no client is created and a warning is logged."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -365,7 +365,7 @@ class TestAsyncStartLocalMqttGuards:
     ) -> None:
         """When topic filter is '+/#', no client is created and a warning is logged."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -395,10 +395,10 @@ class TestAsyncStartLocalMqttGuards:
     async def test_starts_client_when_all_conditions_met(self) -> None:  # noqa: PLR6301
         """When all conditions are met with a scoped topic filter, the client is started."""  # noqa: E501
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
         except ImportError, SyntaxError:
@@ -427,14 +427,14 @@ class TestAsyncStartLocalMqttGuards:
     async def test_client_registered_in_hass_data(self) -> None:  # noqa: PLR6301
         """After a successful start, the client is stored in hass.data."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: I001, PLC0415
+            from custom_components.jackery_solarvault import (
                 _LOCAL_MQTT_RUNTIME_KEY,  # noqa: PLC2701
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-            from custom_components.jackery_solarvault.const import DOMAIN  # noqa: PLC0415
+            from custom_components.jackery_solarvault.const import DOMAIN
         except ImportError, SyntaxError:
             pytest.skip("Required modules not importable")
 
@@ -473,10 +473,10 @@ class TestAsyncStartLocalMqttGuards:
     async def test_unload_callback_registered(self) -> None:  # noqa: PLR6301
         """entry.async_on_unload must be called to register the stop callback."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
         except ImportError, SyntaxError:
@@ -514,10 +514,10 @@ class TestLocalMqttSink:
     async def test_sink_routes_data_to_coordinator(self) -> None:  # noqa: PLR6301
         """The _sink must forward non-None data to coordinator.async_handle_local_mqtt_message."""  # noqa: E501
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
         except ImportError, SyntaxError:
@@ -568,10 +568,10 @@ class TestLocalMqttSink:
     async def test_sink_skips_none_data(self) -> None:  # noqa: PLR6301
         """The _sink must skip forwarding when data is None."""
         try:
-            from custom_components.jackery_solarvault import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
         except ImportError, SyntaxError:
@@ -627,16 +627,13 @@ class TestRsaPkcs1V15Encrypt:
 
     def test_raises_type_error_for_non_rsa_key(self) -> None:  # noqa: PLR6301
         """When the DER-encoded key is not an RSA key, must raise TypeError."""
-        import base64  # noqa: PLC0415
+        import base64
 
-        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: PLC0415
-        from cryptography.hazmat.primitives.serialization import (  # noqa: PLC0415
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -652,16 +649,13 @@ class TestRsaPkcs1V15Encrypt:
 
     def test_accepts_valid_rsa_key(self) -> None:  # noqa: PLR6301
         """A valid RSA public key must produce encrypted output without raising."""
-        import base64  # noqa: PLC0415
+        import base64
 
-        from cryptography.hazmat.primitives.asymmetric import rsa  # noqa: PLC0415
-        from cryptography.hazmat.primitives.serialization import (  # noqa: PLC0415
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -685,16 +679,13 @@ class TestRsaPkcs1V15Encrypt:
 
     def test_error_message_includes_actual_key_type(self) -> None:  # noqa: PLR6301
         """TypeError message must mention the actual key type found."""
-        import base64  # noqa: PLC0415
+        import base64
 
-        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: PLC0415
-        from cryptography.hazmat.primitives.serialization import (  # noqa: PLC0415
-            Encoding,
-            PublicFormat,
-        )
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -725,10 +716,10 @@ class TestGenerateUdid:
     def test_output_starts_with_mqtt_mac_id_prefix(self) -> None:  # noqa: PLR6301
         """The generated UDID must start with MQTT_MAC_ID_PREFIX."""
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: I001, PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX  # noqa: PLC0415
+            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
         except ImportError, SyntaxError:
             pytest.skip("api module not importable")
 
@@ -738,7 +729,7 @@ class TestGenerateUdid:
     def test_output_is_deterministic(self) -> None:  # noqa: PLR6301
         """Same seed must produce the same UDID."""
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -751,7 +742,7 @@ class TestGenerateUdid:
     def test_different_seeds_produce_different_udids(self) -> None:  # noqa: PLR6301
         """Different seeds must produce different UDIDs."""
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
         except ImportError, SyntaxError:
@@ -764,10 +755,10 @@ class TestGenerateUdid:
     def test_output_has_expected_length(self) -> None:  # noqa: PLR6301
         """MQTT_MAC_ID_PREFIX (1 char) + 32 hex chars UUID = 33 chars total."""
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: I001, PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX  # noqa: PLC0415
+            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
         except ImportError, SyntaxError:
             pytest.skip("api module not importable")
 
@@ -779,10 +770,10 @@ class TestGenerateUdid:
     def test_output_contains_no_dashes(self) -> None:  # noqa: PLR6301
         """The UUID portion must have no dashes."""
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: I001, PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX  # noqa: PLC0415
+            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
         except ImportError, SyntaxError:
             pytest.skip("api module not importable")
 
@@ -792,13 +783,13 @@ class TestGenerateUdid:
 
     def test_output_is_lowercase_hex_after_prefix(self) -> None:  # noqa: PLR6301
         """The UUID portion (after prefix) must be lowercase hexadecimal."""
-        import re  # noqa: PLC0415
+        import re
 
         try:
-            from custom_components.jackery_solarvault.client.api import (  # noqa: I001, PLC0415
+            from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX  # noqa: PLC0415
+            from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
         except ImportError, SyntaxError:
             pytest.skip("api module not importable")
 
@@ -816,7 +807,7 @@ class TestGenerateUdid:
 
 def test_blocked_filters_does_not_block_scoped_mqtt_topic() -> None:
     """A deep scoped topic like 'jackery/SV3/12345/+/state' must not be blocked."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault import (
         _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
     )
 
@@ -825,7 +816,7 @@ def test_blocked_filters_does_not_block_scoped_mqtt_topic() -> None:
 
 def test_blocked_filters_are_exactly_two_entries() -> None:
     """The blocked filters set must have exactly 2 entries: '#' and '+/#'."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault import (
         _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
     )
 
@@ -834,7 +825,7 @@ def test_blocked_filters_are_exactly_two_entries() -> None:
 
 def test_local_mqtt_runtime_key_is_expected_string() -> None:
     """_LOCAL_MQTT_RUNTIME_KEY must equal 'local_mqtt_client'."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault import (
         _LOCAL_MQTT_RUNTIME_KEY,  # noqa: PLC2701
     )
 

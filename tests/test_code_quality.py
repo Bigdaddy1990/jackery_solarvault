@@ -2765,8 +2765,8 @@ def test_system_ttl_gather_calls_use_exact_helper_shape() -> None:
 
 def test_component_modules_have_no_unresolved_global_names() -> None:
     """Catch NameError-class bugs caused by missing imports or renamed locals."""
-    import builtins  # noqa: PLC0415
-    import symtable  # noqa: PLC0415
+    import builtins
+    import symtable
 
     builtins_names = set(dir(builtins))
     # Python's symtable surfaces compiler-generated module dunders as
@@ -3556,7 +3556,7 @@ def test_ble_cmd_120_battery_pack_routing_is_narrow() -> None:
     )
     # The sink must gate the cmd=120 branch on devType=BATTERY_PACK and
     # presence of deviceSn — never blindly merge any cmd=120 frame.
-    import re  # noqa: PLC0415
+    import re
 
     sink_match = re.search(
         r"async def _sink\(device_id: str.*?(?=\n {0,8}listener = JackeryBleListener)",

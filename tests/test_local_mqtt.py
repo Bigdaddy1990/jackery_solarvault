@@ -176,7 +176,7 @@ def test_construction_custom_topic_filter_is_stored() -> None:
 
 def _make_mqtt_code_error(rc: Any) -> Any:  # noqa: ANN401
     """Return a MqttCodeError-shaped stub with the given rc attribute."""
-    from aiomqtt.exceptions import MqttCodeError  # noqa: PLC0415
+    from aiomqtt.exceptions import MqttCodeError
 
     err = MqttCodeError.__new__(MqttCodeError)
     err.rc = rc
@@ -592,7 +592,7 @@ def test_utc_now_iso_two_calls_are_close_or_equal() -> None:
 
 def test_aiomqtt_transport_logger_is_kept_at_warning() -> None:
     """Per-packet aiomqtt DEBUG logs must stay disabled by default."""
-    from custom_components.jackery_solarvault.client import local_mqtt as module  # noqa: I001, PLC0415
+    from custom_components.jackery_solarvault.client import local_mqtt as module  # noqa: I001
 
     assert module._AIOMQTT_LOGGER.level == logging.WARNING  # noqa: SLF001
 
