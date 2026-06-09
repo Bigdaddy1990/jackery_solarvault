@@ -96,7 +96,7 @@ async def async_load_daily_cache(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         result[str(device_id)] = {
             _KEY_DAY: day,
