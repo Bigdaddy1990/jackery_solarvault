@@ -10,6 +10,7 @@ from .hassfest.serializer import format_python_namespace
 req = requests.get(
     "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
     timeout=30,
+)
 soup = BeautifulSoup(req.content, "xml")
 active_currencies = {
     x.Ccy.contents[0]
