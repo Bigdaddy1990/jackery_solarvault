@@ -434,6 +434,8 @@ parametrize-values-row-type = "list"
 parametrize-values-type = "list"
 
 [tool.ruff.lint.flake8-tidy-imports]
+# Require lazy imports for specific modules.
+require-lazy = ["typing", "foo"]
 # Require lazy imports by default, except for modules with import-time side effects.
 require-lazy = { include = "all", exclude = ["sitecustomize"] }
 
