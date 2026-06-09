@@ -7,7 +7,7 @@ homeassistant-stubs
 hypothesis
 jinja2>=3.1.6
 mypy>=2.1.0
-packaging>=26.0
+packaging>=26.2
 pip>=26.0
 pre-commit
 pylint
