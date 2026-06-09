@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import sys
-from typing import ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pytest
 import voluptuous as vol
@@ -28,12 +28,14 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_USERNAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
 )
-from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
     ServiceValidationError,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant, ServiceCall
 
 
 @dataclass(slots=True)
@@ -57,12 +59,12 @@ class _Call:
 
 def _hass() -> HomeAssistant:
     """Return a lightweight object typed as HomeAssistant for service unit tests."""
-    return cast(HomeAssistant, object())
+    return cast("HomeAssistant", object())
 
 
 def _call(data: dict[str, object]) -> ServiceCall:
     """Return a lightweight service-call object for direct handler tests."""
-    return cast(ServiceCall, _Call(data))
+    return cast("ServiceCall", _Call(data))
 
 
 class _OverflowFloat:
