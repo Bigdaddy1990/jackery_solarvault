@@ -3422,5 +3422,3 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
     )
-
-

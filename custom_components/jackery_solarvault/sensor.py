@@ -3196,7 +3196,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(  # noqa: PLR0915, RUF029
+async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -3237,7 +3237,7 @@ async def async_setup_entry(  # noqa: PLR0915, RUF029
             entities, seen_unique_ids, entity, platform="sensor", logger=_LOGGER
         )
 
-    def _collect_entities() -> list[SensorEntity]:  # noqa: PLR0912, PLR0915
+    def _collect_entities() -> list[SensorEntity]:  # noqa: C901, PLR0912, PLR0915
         """Collect and instantiate all sensor entities for each device payload present in the coordinator.
 
         Builds sensors from property-driven descriptions, app/statistic charts, battery packs, smart plugs,
@@ -3774,7 +3774,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         server_total = effective_period_total_value(source, section, stat_key)
         return None, values, chart_series_sum, server_total
 
-    def _refresh_cache(self) -> None:  # noqa: PLR0912, PLR0914, PLR0915
+    def _refresh_cache(self) -> None:  # noqa: C901, PLR0912, PLR0914, PLR0915
         """Recompute native_value and extra_state_attributes once per update."""
         section = self.entity_description.section
         stat_key = self.entity_description.stat_key

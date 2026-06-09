@@ -993,7 +993,7 @@ class Emitter:  # noqa: D101, PLR0904
                 )
         return anchor
 
-    def analyze_scalar(self, scalar):  # noqa: ANN001, ANN201, PLR0912, PLR0914, PLR0915
+    def analyze_scalar(self, scalar):  # noqa: ANN001, ANN201, C901, PLR0912, PLR0914, PLR0915
         # Empty scalar is a special case.
         """Analyze a scalar string and determine which YAML scalar styles and features are allowed.
 
