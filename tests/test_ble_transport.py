@@ -48,7 +48,6 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
         )
     )
     await asyncio.sleep(0)
-    await asyncio.sleep(0)
 
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
