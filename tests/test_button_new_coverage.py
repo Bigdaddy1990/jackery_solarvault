@@ -16,6 +16,7 @@ Covers:
 """
 
 import math
+from typing import Never
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -654,7 +655,7 @@ class TestJackeryQueryButton:
         )
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
-        async def _auth_fail(coord, dev_id):
+        async def _auth_fail(coord, dev_id) -> Never:
             raise ConfigEntryAuthFailed("bad creds")
 
         desc = JackeryQueryButtonDescription(
@@ -677,7 +678,7 @@ class TestJackeryQueryButton:
         )
         from homeassistant.exceptions import HomeAssistantError
 
-        async def _fail(coord, dev_id):
+        async def _fail(coord, dev_id) -> Never:
             raise RuntimeError("unexpected")
 
         desc = JackeryQueryButtonDescription(
