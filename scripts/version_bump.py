@@ -126,7 +126,7 @@ def bump_version(  # noqa: PLR0912, PLR0915
     return replace(version, **to_change)
 
 
-def write_version(version):  # noqa: ANN001, ANN201
+def write_version(version) -> None:  # noqa: ANN001, ANN201
     """Update Home Assistant constant file with new version."""
     content = Path("homeassistant/const.py").read_text(encoding="utf-8")
 
