@@ -24,8 +24,6 @@ reviews:
   related_issues: true
   related_prs: true
   poem: true
-  review_status: true
-  review_details: true
   auto_review:
     enabled: true
     auto_incremental_review: true
