@@ -6731,7 +6731,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if not compiled_hour_starts:
                 compiled_hour_starts = {
                     round(start.timestamp()) for start in all_starts
-                }  # noqa: E501
+                }
 
         imported_rows = 0
         failed_rows = 0
@@ -7785,7 +7785,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_WEEK),
                     self._app_period_section(
                         APP_SECTION_BATTERY_TRENDS, DATE_TYPE_WEEK
-                    ),  # noqa: E501
+                    ),
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_WEEK),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_WEEK),
@@ -7795,13 +7795,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if (self._cached_date.year, self._cached_date.month) != (
                 today.year,
                 today.month,
-            ):  # noqa: E501
+            ):
                 cache_keys_to_clear.update({
                     self._app_period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_MONTH),
                     self._app_period_section(
                         APP_SECTION_BATTERY_TRENDS, DATE_TYPE_MONTH
-                    ),  # noqa: E501
+                    ),
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_MONTH),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_MONTH),
@@ -7814,7 +7814,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     self._app_period_section(APP_SECTION_HOME_TRENDS, DATE_TYPE_YEAR),
                     self._app_period_section(
                         APP_SECTION_BATTERY_TRENDS, DATE_TYPE_YEAR
-                    ),  # noqa: E501
+                    ),
                     self._app_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
                     self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_YEAR),
                     self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_YEAR),
