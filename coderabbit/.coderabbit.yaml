@@ -3,7 +3,6 @@ language: "en-US"
 early_access: true
 enable_prompt_for_ai_agents: true
 slop_detection: true
-review_status: true
 commit_status: true
 fail_commit_status: true
 enable_free_tier: true
