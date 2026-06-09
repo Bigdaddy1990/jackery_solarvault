@@ -29,7 +29,7 @@ class FullLoader(Reader, Scanner, Parser, Composer, FullConstructor, Resolver): 
 
         Parameters:
                 stream (str | io.TextIOBase | io.BufferedIOBase): Input YAML as a string or a text/binary file-like object.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405

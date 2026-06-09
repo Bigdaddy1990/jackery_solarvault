@@ -50,7 +50,7 @@ class ScalarNode(Node):  # noqa: D101
                 start_mark: Optional parse location for the start of the scalar or None.
                 end_mark: Optional parse location for the end of the scalar or None.
                 style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         self.tag = tag
         self.value = value
         self.start_mark = start_mark

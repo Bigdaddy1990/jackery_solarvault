@@ -87,9 +87,9 @@ class TestAddConstructor:
         result = yaml.load(f"{tag} value", Loader=_loader.Loader)
         assert result is sentinel
 
-    def test_add_constructor_specific_loader_registers_only_on_that_loader(
+    def test_add_constructor_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """add_constructor(tag, fn, Loader=X) must register only on X, not on the other defaults."""  # noqa: E501
         tag = "!test_add_constructor_specific_loader_unique_8b2c"
         called_with = []
@@ -154,9 +154,9 @@ class TestAddMultiConstructor:
         assert prefix in _loader.FullLoader.yaml_multi_constructors
         assert prefix in _loader.UnsafeLoader.yaml_multi_constructors
 
-    def test_add_multi_constructor_specific_loader_only_registers_on_that_loader(
+    def test_add_multi_constructor_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """add_multi_constructor with Loader=X only registers on X."""
         prefix = "!testmulti_specific_unique_3e9b/"
 
@@ -212,9 +212,9 @@ class TestAddImplicitResolver:
         dumper_resolvers = yaml.Dumper.yaml_implicit_resolvers.get("_", [])
         assert tag in [t for t, _ in dumper_resolvers]
 
-    def test_add_implicit_resolver_with_specific_loader_only_registers_on_that_loader(
+    def test_add_implicit_resolver_with_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """add_implicit_resolver with a specific Loader registers only on that loader (plus Dumper)."""  # noqa: E501
         tag = "tag:example.com,2024:test_implicit_specific_unique_9a3c"
         regexp = re.compile(r"^__UNIQUE_9A3C__")
@@ -232,9 +232,9 @@ class TestAddImplicitResolver:
         loader_wildcard = _loader.Loader.yaml_implicit_resolvers.get(None, [])
         assert tag not in [t for t, _ in loader_wildcard]
 
-    def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(
+    def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """When first=None, the resolver is registered under the None key in yaml_implicit_resolvers."""  # noqa: E501
         tag = "tag:example.com,2024:test_implicit_wildcard_unique_2d7f"
         regexp = re.compile(r"^__UNIQUE_2D7F__")
@@ -268,7 +268,7 @@ class TestAddRepresenter:
         yaml.add_representer(MyCustomType, representer_fn, Dumper=dumper_mock)
         dumper_mock.add_representer.assert_called_once_with(
             MyCustomType, representer_fn
-        )  # noqa: E501
+        )
 
     def test_add_representer_default_dumper_round_trip(self) -> None:  # noqa: PLR6301
         """add_representer functional test: custom type is serialized with the registered representer."""  # noqa: E501
@@ -376,7 +376,7 @@ class TestConstructYamlBinary:
 
         with pytest.raises(
             ConstructorError, match="failed to convert base64 data into ascii"
-        ):  # noqa: E501
+        ):
             sc.construct_yaml_binary(node)
 
     def test_invalid_base64_raises_constructor_error(self) -> None:
@@ -448,7 +448,7 @@ class TestConstructPythonBytes:
 
         with pytest.raises(
             ConstructorError, match="failed to convert base64 data into ascii"
-        ):  # noqa: E501
+        ):
             fc.construct_python_bytes(node)
 
     def test_invalid_base64_raises_constructor_error(self) -> None:
@@ -508,7 +508,7 @@ class TestYAMLObjectMetaclass:
         assert (
             "!test_metaclass_registration_unique_3c1a"
             in IsolatedLoader.yaml_constructors
-        )  # noqa: E501
+        )
 
         # Representer should be registered on IsolatedDumper
         assert MyYAMLObj in IsolatedDumper.yaml_representers
@@ -582,9 +582,9 @@ class TestYAMLObjectMetaclass:
 class TestAddPathResolver:
     """Tests for add_path_resolver() registering on loaders and dumper."""
 
-    def test_add_path_resolver_loader_none_registers_on_all_default_loaders(
+    def test_add_path_resolver_loader_none_registers_on_all_default_loaders(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """add_path_resolver with Loader=None registers on Loader, FullLoader, UnsafeLoader, and Dumper.
 
         yaml_path_resolvers maps (path_pattern, kind) -> tag, so we check values.
@@ -604,9 +604,9 @@ class TestAddPathResolver:
         # Also check Dumper
         assert tag in yaml.Dumper.yaml_path_resolvers.values()
 
-    def test_add_path_resolver_specific_loader_registers_only_on_that_loader(
+    def test_add_path_resolver_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
         self,
-    ) -> None:  # noqa: E501, PLR6301
+    ) -> None:
         """add_path_resolver with a specific Loader registers only on that class."""
         tag = "tag:example.com,2024:test_path_resolver_specific_unique_4a8d"
         path = [None]

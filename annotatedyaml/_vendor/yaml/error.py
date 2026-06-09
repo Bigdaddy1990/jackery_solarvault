@@ -29,7 +29,7 @@ class Mark:  # noqa: D101
 
         Returns:
                 str or None: The formatted snippet followed by a newline and a caret aligned under the pointer, or `None` if the mark has no buffer.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         if self.buffer is None:
             return None
         head = ""
