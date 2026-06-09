@@ -3,11 +3,13 @@ aiomqtt
 annotatedyaml>=1.0.2
 coverage>=7.10.6
 coverage[toml]>=7.5.4
+homeassistant-stubs
 hypothesis
 jinja2>=3.1.6
 mypy>=1.19.1
 packaging>=26.0
-pip>=26.1.2
+pip>=26.0
+pre-commit
 pylint
 pytest
 pytest-asyncio

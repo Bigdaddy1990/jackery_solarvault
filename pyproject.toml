@@ -328,7 +328,6 @@ select = [
   "PGH",    # pygrep-hooks
   "PIE",    # flake8-pie
   "PL",     # pylint
-  "PLC0415",
   "PT",     # flake8-pytest-style
   "PTH",    # flake8-pathlib
   "PYI",    # flake8-pyi
@@ -369,10 +368,10 @@ select = [
   "Q"
 ]
 
-ignore = []
+ignore = ["PLC0415","TID252"]
 fixable = ["ALL"]
 unfixable = []
-future-annotations = false
+future-annotations = true
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
 
@@ -380,7 +379,7 @@ logger-objects = ["logging_setup.logger"]
 hass = "homeassistant.__main__:main"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 25
+max-complexity = 15
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403", "E402","RUF067"]
