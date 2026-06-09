@@ -1,6 +1,5 @@
 # Codecov configuration for jackery_solarvault Integration
 # Reference: https://docs.codecov.com/docs/codecovyml-reference
-# Validate: curl -X POST --data-binary @.codecov.yml https://api.codecov.io/validate
 
 codecov:
   bot: Bigdaddy1990
@@ -15,14 +14,14 @@ comment:
   require_base: false
   require_changes: 0
   require_head: true
-  show_carryforward_flags: false
+  show_carryforward_flags: true
 
 coverage:
   precision: 2
   round: down
   range: [70.0, 100.0]
   status:
-    changes: false
+    changes: true
     default_rules:
       flag_coverage_not_uploaded_behavior: include
     patch:
@@ -30,6 +29,7 @@ coverage:
         base: auto
         branches:
           - main
+          - test
         flags:
           - unittests
         informational: true
@@ -48,6 +48,7 @@ coverage:
         base: auto
         branches:
           - main
+          - test
         flags:
           - unittests
         informational: true
@@ -59,14 +60,13 @@ coverage:
 
 flags:
   unittests:
-    carryforward: false
+    carryforward: true
     paths:
       - "custom_components/jackery_solarvault/"
 
 github_checks:
-  annotations: false
+  annotations: true
 
 ignore:
-  - "tests/**"
   - "docs/**"
   - "scripts/**"
