@@ -24,7 +24,7 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^(/manifest.*|docs/|scripts/)
+        exclude: ^(manifest.*|docs/|scripts/)
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:
