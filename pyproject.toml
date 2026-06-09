@@ -334,6 +334,7 @@ select = [
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules (see `ignore` for exclusions)
+  "RUF100",
   "S107",   # Possible hardcoded password assigned to function default
   "S102",   # Use of exec detected
   "S103",   # bad-file-permissions
