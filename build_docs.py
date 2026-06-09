@@ -11,7 +11,7 @@ import re
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent
 DOCS_DIR = ROOT / "docs"
 OUTPUT_DIR = DOCS_DIR / "html"
 _TITLE_RE = re.compile(r"^#\s+(.+?)\s*$")
