@@ -47,13 +47,16 @@ def main() -> int:  # noqa: D103
         original, updated = _apply_sync_block(target, block)
         if updated != original:
             if args.check:
-                pass
+                print(f"{target} is out of date with {CANONICAL_SOURCE}")
             else:
                 target.write_text(updated, encoding="utf-8")
+                print(f"Synced {target} with {CANONICAL_SOURCE}")
             had_changes = True
 
     if args.check and had_changes:
         return 1
+    if not had_changes:
+        print("Contributor guides already match the canonical instructions.")
     return 0
 
 

@@ -22,15 +22,15 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _load_json(path: Path) -> Any:
+def _load_json(path: Path) -> Any:  # noqa: ANN401
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _dump_json(data: Any) -> str:
+def _dump_json(data: Any) -> str:  # noqa: ANN401
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
 
-def _sync_tree(source: Any, existing: Any) -> Any:
+def _sync_tree(source: Any, existing: Any) -> Any:  # noqa: ANN401
     """Recursively merge *source* structure into *existing*.
 
     Preserve existing translations and back-fill missing keys with English
@@ -74,6 +74,7 @@ def _sync_translation(
             return False
         # Seed: write full English strings as placeholder.
         language_file.write_text(_dump_json(strings_data), encoding="utf-8")
+        print(f"  SEEDED  {language_file.name}")
         return True
 
     synced = _sync_tree(strings_data, existing_data)
@@ -83,6 +84,7 @@ def _sync_translation(
         if check_only:
             raise SystemExit(f"Translation file out of date: {language_file}")
         language_file.write_text(new_content, encoding="utf-8")
+        print(f"  UPDATED {language_file.name}")
         return True
 
     return False
@@ -170,8 +172,11 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
     if args.list_missing:
         missing = _list_missing(translations_dir)
         if missing:
-            for _lang in missing:
-                pass
+            print(f"{len(missing)} languages missing:")
+            for lang in missing:
+                print(f"  {lang}")
+        else:
+            print("All HA languages present.")
         return 0
 
     strings_data = _load_json(strings_path)
@@ -195,7 +200,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         ):
             changed += 1
 
-    len(language_files)
+    total = len(language_files)
+    print(f"Synced {total} language(s), {changed} updated/created.")
     return 0
 
 

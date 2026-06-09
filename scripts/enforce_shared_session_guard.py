@@ -64,10 +64,15 @@ def main() -> int:  # noqa: D103
         violations.extend(_find_violations(path))
 
     if violations:
-        for _violation in violations:
-            pass
+        print(
+            "Detected aiohttp.ClientSession instantiations. "
+            "Use hass.helpers.aiohttp_client.async_get_clientsession instead:",
+        )
+        for violation in violations:
+            print(f"  - {violation}")
         return 1
 
+    print("Shared session guard passed; no ClientSession constructors detected.")
     return 0
 
 

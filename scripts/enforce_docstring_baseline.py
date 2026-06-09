@@ -77,14 +77,31 @@ def main() -> int:  # noqa: D103
 
     if args.update or baseline is None:
         _write_baseline(stats)
+        print(
+            "Updated docstring baseline to",
+            f"{stats.documented_defs}/{stats.total_defs} definitions",
+        )
         return 0
 
     coverage = stats.coverage
     baseline_coverage = float(baseline.get("coverage", 0.0))
 
     if coverage + 1e-9 < baseline_coverage:
+        print(
+            "Docstring coverage regressed:",
+            f"current={coverage:.4f}",
+            f"baseline={baseline_coverage:.4f}",
+        )
+        print(
+            "Run 'python scripts/enforce_docstring_baseline.py --update' after adding docstrings.",
+        )
         return 1
 
+    print(
+        "Docstring coverage OK:",
+        f"{stats.documented_defs}/{stats.total_defs} definitions",
+        f"(baseline {baseline_coverage:.4f})",
+    )
     return 0
 
 

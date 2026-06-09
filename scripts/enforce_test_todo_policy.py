@@ -40,10 +40,12 @@ def main() -> int:  # noqa: D103
             violations.append(f"{test_file}:{line_number}: {line}")
 
     if violations:
-        for _violation in violations:
-            pass
+        print("Found forbidden TODO markers in test files:")
+        for violation in violations:
+            print(f"- {violation}")
         return 1
 
+    print(f"No TODO markers found in test files under {args.tests_dir}.")
     return 0
 
 
