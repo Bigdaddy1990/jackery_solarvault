@@ -2169,7 +2169,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._mqtt_clear_connect_backoff()
         self._mqtt_fingerprint = fingerprint
 
-    async def _async_handle_mqtt_message(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    async def _async_handle_mqtt_message(  # noqa: PLR0912, PLR0914, PLR0915
         self,
         topic: str,
         payload: dict[str, Any],
@@ -7648,7 +7648,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # Coordinator update cycle (merge of HTTP + MQTT + caches)
     # ------------------------------------------------------------------
 
-    async def _async_update_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    async def _async_update_data(  # noqa: PLR0912, PLR0914, PLR0915
         self, _retry_discovery_once: bool = True
     ) -> dict[str, dict[str, Any]]:
         # Background HTTP/auth tasks cannot raise into HA's setup flow. When

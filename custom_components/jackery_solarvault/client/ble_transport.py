@@ -70,8 +70,8 @@ except ImportError:  # pragma: no cover - optional test dependency
 
 
 from homeassistant.components import bluetooth
-from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-from ..util import first_nonblank_int
+from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+from jackery_solarvault.util import first_nonblank_int
 
 from . import ble
 
