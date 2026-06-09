@@ -231,7 +231,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.15"
+required-version = ">=0.15.16"
 line-length = 88
 src = ["custom_components","tests"]
 indent-width = 4
@@ -369,10 +369,10 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415","TID252","C901"]
+ignore = ["PLC0415", "TID252"]
 fixable = ["ALL"]
 unfixable = []
-future-annotations = true
+future-annotations = false
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
 
@@ -383,7 +383,7 @@ hass = "homeassistant.__main__:main"
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402","RUF067"]
+"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -536,7 +536,7 @@ overgeneral-exceptions = [
 ]
 
 [tool.pylint.TYPING]
-runtime-typing = false
+runtime-typing = true
 
 [tool.pylint.CODE_STYLE]
 max-line-length-suggestions = 72
@@ -838,11 +838,11 @@ per-file-ignores = [
 [tool.bandit]
 exclude_dirs = ["tests", "scripts"]
 tests = []
-skips = ["B101","B102","B110","B112","B307","B324","B410","B603","B608","B612","B703"]
+skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608", "B612", "B703"]
 
 [tool.cfduplication]
 # Minimum duplicated line threshold
 MinLineCount= 50
 # Paths to ignore for duplication checking
-IgnorePatterns = ["docs/**","tests/**"]
+IgnorePatterns = ["docs/**", "tests/**"]
 
