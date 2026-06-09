@@ -59,17 +59,17 @@ reviews:
       enabled_categories:
       disabled_categories:
       level: "default"
-     opengrep:
+    opengrep:
       enabled: true
-     pylint:
+    pylint:
       enabled: true
-     ruff:
+    ruff:
       enabled: true
-     shellcheck:
+    shellcheck:
       enabled: true
-     smartyLint:
+    smartyLint:
       enabled: true
-     yamllint:
+    yamllint:
       enabled: true
 pre_merge_checks:
     docstrings:
