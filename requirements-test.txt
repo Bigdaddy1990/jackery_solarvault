@@ -35,4 +35,4 @@ types-PyYAML>=6.0.12.20250915
 types-requests>=2.32.4.20260107
 types-xmltodict>=1.0.1.20260113
 typing-extensions>=4.15.0,<5.0
-voluptuous>=0.15.2
+voluptuous>=0.16.0
