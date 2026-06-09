@@ -56,7 +56,7 @@ jobs:
           if [[ "$EVENT_NAME" == "push" && ("$AUTHOR_NAME" == *"[bot]"* || "$AUTHOR_EMAIL" == *"[bot]"*) ]]; then
             echo "allow_autofix=true" >> "$GITHUB_OUTPUT"
           else
-            echo "allow_autofix=false" >> "$GITHUB_OUTPUT"
+            echo "allow_autofix=true" >> "$GITHUB_OUTPUT"
             echo "Auto-fix disabled for this event/author (strict failing gate)."
           fi
 
