@@ -1,5 +1,6 @@
 """HA fixture tests for the Jackery SolarVault config flow."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -16,8 +17,10 @@ from custom_components.jackery_solarvault.const import (
 )
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 pytestmark = pytest.mark.asyncio
 

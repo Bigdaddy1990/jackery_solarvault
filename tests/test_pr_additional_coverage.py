@@ -663,8 +663,10 @@ def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
     c2 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
     # Probabilistically different due to random padding.
     # (Extremely unlikely to match; test provides regression guard.)
-    assert isinstance(c1, bytes) and isinstance(c2, bytes)
-    assert len(c1) == 128 and len(c2) == 128
+    assert isinstance(c1, bytes)
+    assert isinstance(c2, bytes)
+    assert len(c1) == 128
+    assert len(c2) == 128
 
 
 # ===========================================================================

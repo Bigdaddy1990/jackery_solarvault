@@ -10,19 +10,15 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 import logging
 import re
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .const import (
     AUTO_OFF_HOURS,
     DEFAULT_STORM_WARNING_MINUTES,
@@ -56,7 +52,6 @@ from .const import (
     WORK_MODE_READ_ALIASES,
     WORK_MODE_TO_OPTION,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
     append_unique_entity,
@@ -64,6 +59,15 @@ from .util import (
     safe_int,
     task_plan_value,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
