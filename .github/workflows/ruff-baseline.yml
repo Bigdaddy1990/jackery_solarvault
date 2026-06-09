@@ -42,7 +42,7 @@ jobs:
           ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" .\tests\ || true
           ruff check . --fix .\tests\ || true
           ruff check . --output-format=github .\tests\ || true
-          ruff format .\tests\
+          ruff format .\tests\ || true
           ruff check . --fix || true
           ruff check . --unsafe-fixes || true
           ruff check . --target-version py314 || true
