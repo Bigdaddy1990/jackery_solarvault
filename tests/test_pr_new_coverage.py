@@ -30,7 +30,7 @@ from custom_components.jackery_solarvault.client import (
 
 def test_auth_error_is_subclass_of_error() -> None:
     """JackeryAuthError must be a subclass of JackeryError (hierarchy check)."""
-    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.api import (
         JackeryAuthError,
         JackeryError,
     )
@@ -40,7 +40,7 @@ def test_auth_error_is_subclass_of_error() -> None:
 
 def test_api_error_is_subclass_of_error() -> None:
     """JackeryApiError must be a subclass of JackeryError."""
-    from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault.client.api import (
         JackeryApiError,
         JackeryError,
     )
@@ -60,7 +60,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
     __init__.py. This test verifies the import works without error.
     """
     try:
-        from custom_components.jackery_solarvault.client.local_mqtt import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.client.local_mqtt import (
             JackeryLocalMqttClient,
         )
 
@@ -97,7 +97,7 @@ def test_client_init_imports_jackery_error() -> None:
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     """Thin wrapper that imports and calls the production function."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415
+    from custom_components.jackery_solarvault import (
         _legacy_suffix_matches as _fn,  # noqa: PLC2701
     )
 
