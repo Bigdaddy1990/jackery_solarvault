@@ -2663,7 +2663,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             key = base64.b64decode(str(raw))
-        except ValueError, binascii.Error:
+        except (ValueError, binascii.Error):
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -3019,7 +3019,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -4331,7 +4331,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return int(match.group(1))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     def _endpoint_backoff_active(self, key: str, now_monotonic: float) -> bool:
@@ -6852,7 +6852,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -9315,7 +9315,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Create a repair issue for device not activated."""
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
         ir.async_create_issue(
@@ -9338,7 +9338,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Delete the repair issue for device not activated."""
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             return
         issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
         ir.async_delete_issue(self.hass, DOMAIN, issue_id)
@@ -9763,7 +9763,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return round(float(value) / 1000.0, 5)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:

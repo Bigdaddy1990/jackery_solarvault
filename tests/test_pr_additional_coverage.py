@@ -60,29 +60,29 @@ try:
         _async_start_local_mqtt,
     )
     from custom_components.jackery_solarvault.const import (
-        CONF_THIRD_PARTY_MQTT_ENABLE,
-        CONF_THIRD_PARTY_MQTT_IP,
-        CONF_THIRD_PARTY_MQTT_PASSWORD,
-        CONF_THIRD_PARTY_MQTT_PORT,
+        CONF_LOCAL_MQTT_ENABLE,
+        CONF_LOCAL_MQTT_HOST,
+        CONF_LOCAL_MQTT_PASSWORD,
+        CONF_LOCAL_MQTT_PORT,
+        CONF_LOCAL_MQTT_USERNAME,
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-        CONF_THIRD_PARTY_MQTT_USERNAME,
-        DEFAULT_THIRD_PARTY_MQTT_PORT,
+        DEFAULT_LOCAL_MQTT_PORT,
         DOMAIN,
     )
 
     _INIT_OK = True
-except SyntaxError, ImportError:
+except (SyntaxError, ImportError):
     _INIT_OK = False
     _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # type: ignore[assignment]
     _async_start_local_mqtt = None  # type: ignore[assignment]
     DOMAIN = "jackery_solarvault"
-    CONF_THIRD_PARTY_MQTT_ENABLE = "third_party_mqtt_enable"
-    CONF_THIRD_PARTY_MQTT_IP = "third_party_mqtt_ip"
-    CONF_THIRD_PARTY_MQTT_PORT = "third_party_mqtt_port"
+    CONF_LOCAL_MQTT_ENABLE = "local_mqtt_enable"
+    CONF_LOCAL_MQTT_HOST = "local_mqtt_host"
+    CONF_LOCAL_MQTT_PORT = "local_mqtt_port"
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER = "third_party_mqtt_topic_filter"
-    CONF_THIRD_PARTY_MQTT_USERNAME = "third_party_mqtt_username"
-    CONF_THIRD_PARTY_MQTT_PASSWORD = "third_party_mqtt_password"
-    DEFAULT_THIRD_PARTY_MQTT_PORT = 1883
+    CONF_LOCAL_MQTT_USERNAME = "local_mqtt_username"
+    CONF_LOCAL_MQTT_PASSWORD = "local_mqtt_password"
+    DEFAULT_LOCAL_MQTT_PORT = 1883
 
 _skip_init = pytest.mark.skipif(
     not _INIT_OK,
@@ -184,12 +184,12 @@ def _make_local_mqtt_entry(  # noqa: PLR0913
     return _FakeEntry(
         entry_id=entry_id,
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: enable,
-            CONF_THIRD_PARTY_MQTT_IP: host,
-            CONF_THIRD_PARTY_MQTT_PORT: port,
+            CONF_LOCAL_MQTT_ENABLE: enable,
+            CONF_LOCAL_MQTT_HOST: host,
+            CONF_LOCAL_MQTT_PORT: port,
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: topic_filter,
-            CONF_THIRD_PARTY_MQTT_USERNAME: username,
-            CONF_THIRD_PARTY_MQTT_PASSWORD: password,
+            CONF_LOCAL_MQTT_USERNAME: username,
+            CONF_LOCAL_MQTT_PASSWORD: password,
         },
     )
 

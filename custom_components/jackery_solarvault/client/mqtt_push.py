@@ -14,7 +14,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ..const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,
@@ -49,9 +49,8 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
     """Hide expected passive broker reset noise from aiomqtt internals."""
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
-        """
-        Suppress aiomqtt passive socket-reset log messages that are expected and noisy.
-        
+        """Suppress aiomqtt passive socket-reset log messages that are expected and noisy.
+
         Returns:
             bool: `True` if the record should be logged, `False` if suppressed.
         """
@@ -80,10 +79,11 @@ class JackeryMqttPushClient:
         message_callback: Callable[[str, dict[str, Any]], Awaitable[None]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
         disconnect_callback: Callable[[], Awaitable[None]] | None = None,
+        *,
+        enable_tls_x509_relaxation: bool = False,
     ) -> None:
-        """
-        Create a Jackery MQTT push client and initialize its internal state and lifecycle callbacks.
-        
+        """Create a Jackery MQTT push client and initialize its internal state and lifecycle callbacks.
+
         Parameters:
             hass (HomeAssistant): Home Assistant instance used for scheduling background tasks and running blocking calls in the executor.
             message_callback (Callable[[str, dict[str, Any]], Awaitable[None]]): Coroutine called for each received MQTT message with signature (topic, parsed JSON object).
@@ -94,6 +94,7 @@ class JackeryMqttPushClient:
         self._message_callback = message_callback
         self._connect_callback = connect_callback
         self._disconnect_callback = disconnect_callback
+        self._enable_tls_x509_relaxation = enable_tls_x509_relaxation
         self._lock = asyncio.Lock()
         self._client: MQTTClient | None = None
         self._runner_task: asyncio.Task[None] | None = None
@@ -267,11 +268,10 @@ class JackeryMqttPushClient:
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
-        """
-        Wait until the client is marked connected or raise a RuntimeError if it does not become connected within the given timeout.
-        
+        """Wait until the client is marked connected or raise a RuntimeError if it does not become connected within the given timeout.
+
         If the wait times out and no prior `_last_error` exists, sets `_last_error` to "publish timeout waiting for MQTT connect" and raises `RuntimeError("MQTT not connected yet")`. If a prior `_last_error` exists, or the wait completes but the client is not marked connected, raises `RuntimeError` including the current `_last_error`.
-        
+
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
         """  # noqa: E501
@@ -410,11 +410,10 @@ class JackeryMqttPushClient:
                 )
 
     def _handle_connect_failure(self, rc: int) -> None:
-        """
-        Record an MQTT CONNACK failure and update client connection and authentication state.
-        
+        """Record an MQTT CONNACK failure and update client connection and authentication state.
+
         Sets the client's connected flag to False, stores a human-readable `_last_error` describing the CONNACK return code, notifies waiters by setting `_connected_event`, and updates the consecutive authentication-failure counter and the last-connect-failure signature. Emits a log message for new or repeated failure signatures; when an authentication failure repeatedly reaches the configured tolerance, a warning is logged.
-        
+
         Parameters:
             rc (int): MQTT CONNACK return code received from the broker.
         """  # noqa: E501
@@ -553,15 +552,16 @@ class JackeryMqttPushClient:
         if hasattr(ssl, "TLSVersion"):
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
 
-        strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
-        if (
-            isinstance(strict_flag, int)
-            and hasattr(ctx, "verify_flags")
-            and ctx.verify_flags & strict_flag
-        ):
-            ctx.verify_flags &= ~strict_flag
-            self._tls_x509_strict_disabled = True
-            source_parts.append("x509_strict_disabled")
+        if self._enable_tls_x509_relaxation:
+            strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
+            if (
+                isinstance(strict_flag, int)
+                and hasattr(ctx, "verify_flags")
+                and ctx.verify_flags & strict_flag
+            ):
+                ctx.verify_flags &= ~strict_flag
+                self._tls_x509_strict_disabled = True
+                source_parts.append("x509_strict_disabled")
 
         self._tls_certificate_source = "+".join(source_parts)
         return ctx
@@ -605,13 +605,12 @@ class JackeryMqttPushClient:
         self._schedule_coroutine(self._message_callback(topic, data), "message")
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        """
-        Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions.
-        
+        """Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions.
+
         Parameters:
             coro (Awaitable[None]): The awaitable to run in the background.
             label (str): Short label used to name the task (`jackery_mqtt_<label>`) and included in error logs.
-        
+
         Notes:
             - The task is created via Home Assistant's `async_create_task`.
             - If the task is cancelled, the cancellation is ignored; any other exception raised by the task is logged.
@@ -622,9 +621,8 @@ class JackeryMqttPushClient:
         task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """
-            Log any non-cancellation exception raised by a completed asyncio Task.
-            
+            """Log any non-cancellation exception raised by a completed asyncio Task.
+
             Parameters:
                 done (asyncio.Task[None]): Completed task whose exception (if any) will be retrieved and logged. Cancellation is ignored.
             """
@@ -639,9 +637,8 @@ class JackeryMqttPushClient:
 
     @staticmethod
     def _utc_now_iso() -> str:
-        """
-        Return the current UTC time as an ISO 8601-formatted string including timezone information.
-        
+        """Return the current UTC time as an ISO 8601-formatted string including timezone information.
+
         Returns:
             str: ISO 8601 representation of now in UTC (includes timezone designator).
         """
@@ -694,12 +691,11 @@ class JackeryMqttPushClient:
         """  # noqa: E501
 
         def topic_value(topic: str | None) -> str | None:
-            """
-            Return the topic with the user-specific segment redacted when applicable.
-            
+            """Return the topic with the user-specific segment redacted when applicable.
+
             Parameters:
             	topic (str | None): MQTT topic to process; may be None.
-            
+
             Returns:
             	None if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic.
             """  # noqa: E501
@@ -746,11 +742,10 @@ class JackeryMqttPushClient:
         return self.diagnostics_snapshot()
 
     def _seconds_since_last_message(self) -> float | None:
-        """
-        Compute seconds elapsed since the last received message.
-        
+        """Compute seconds elapsed since the last received message.
+
         Parses the ISO-8601 timestamp stored in `self._last_message_at` and returns the non-negative number of seconds between that timestamp and the current time. If `_last_message_at` is `None` or cannot be parsed, returns `None`.
-        
+
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
         """  # noqa: E501
@@ -782,12 +777,11 @@ class JackeryMqttPushClient:
         return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
-        """
-        Determine if the MQTT connection has been silent longer than the configured threshold.
-        
+        """Determine if the MQTT connection has been silent longer than the configured threshold.
+
         Uses the time of the most recent received message when available; otherwise falls back to the last connect time.
         If the client is not connected or no usable timestamp is available, this returns False.
-        
+
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
         """  # noqa: E501
@@ -816,9 +810,8 @@ class JackeryMqttPushClient:
 
     @property
     def is_connected(self) -> bool:
-        """
-        Whether the client currently has an active MQTT connection.
-        
+        """Whether the client currently has an active MQTT connection.
+
         Returns:
             `True` if the client is connected to the MQTT broker, `False` otherwise.
         """

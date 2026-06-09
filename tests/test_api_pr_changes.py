@@ -272,8 +272,7 @@ async def test_async_get_today_energy_calls_correct_path_with_device_sn() -> Non
 
     assert captured["path"] == DEVICE_TODAY_ENERGY_PATH
     assert captured["params"][FIELD_DEVICE_SN] == "SN123456"
-    # The raw JSON response is returned as-is (no _payload_dict wrapping).
-    assert result == expected_response
+    assert result == expected_response[FIELD_DATA]
 
 
 async def test_async_get_today_energy_device_sn_is_stringified() -> None:
@@ -292,8 +291,8 @@ async def test_async_get_today_energy_device_sn_is_stringified() -> None:
     assert captured["params"][FIELD_DEVICE_SN] == "98765"
 
 
-async def test_async_get_today_energy_returns_raw_response() -> None:
-    """today_energy returns the full _get_json response, not just data field."""
+async def test_async_get_today_energy_returns_payload_dict() -> None:
+    """today_energy returns the inner data payload, not the API envelope."""
     api = JackeryApi.__new__(JackeryApi)
     full_response = {
         FIELD_CODE: 0,
@@ -306,12 +305,11 @@ async def test_async_get_today_energy_returns_raw_response() -> None:
     api._get_json = _get_json  # noqa: SLF001
 
     result = await api.async_get_today_energy("HR2C12345")
-    # Unlike _async_get_device_period_stat methods, this returns the full dict.
-    assert result is full_response
+    assert result == full_response[FIELD_DATA]
 
 
-async def test_async_get_today_energy_forwards_empty_response() -> None:
-    """Empty response from _get_json is forwarded without modification."""
+async def test_async_get_today_energy_forwards_empty_payload() -> None:
+    """Empty or missing payload data returns an empty payload dict."""
     api = JackeryApi.__new__(JackeryApi)
 
     async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029

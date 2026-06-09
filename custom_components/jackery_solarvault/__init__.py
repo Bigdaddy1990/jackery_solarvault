@@ -15,7 +15,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
-from .client.local_mqtt import JackeryLocalMqttClient
+from .client.local_mqtt import (
+    _LOCAL_MQTT_RUNTIME_KEY,
+    JackeryLocalMqttClient,
+    _local_mqtt_client,
+)
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -97,9 +101,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029
-    """
-    Register global Jackery SolarVault services with Home Assistant.
-    
+    """Register global Jackery SolarVault services with Home Assistant.
+
     Returns:
         True if setup completed successfully, False otherwise.
     """
@@ -179,11 +182,10 @@ def _async_clean_legacy_entities(
 def _entry_bootstrap_mqtt_session(
     entry: JackeryConfigEntry,
 ) -> dict[str, str] | None:
-    """
-    Validate and extract a bootstrap MQTT session snapshot from the config entry.
-    
+    """Validate and extract a bootstrap MQTT session snapshot from the config entry.
+
     Parses ENTRY_BOOTSTRAP_MQTT_SESSION in the entry data and ensures it contains non-empty string values for 'user_id', 'seed_b64', and 'mac_id'. If present and non-empty, includes 'mac_id_source'.
-    
+
     Returns:
         A dict with keys 'user_id', 'seed_b64', and 'mac_id', and optionally 'mac_id_source', each mapped to their string value; `None` if the snapshot is missing or invalid.
     """
@@ -211,11 +213,10 @@ def _entry_bootstrap_mqtt_session(
 async def _async_prime_entry_bootstrap_mqtt_session(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, str] | None:
-    """
-    Persist a validated setup-flow bootstrap MQTT session to the integration's persistent cache and remove the bootstrap data from the config entry.
-    
+    """Persist a validated setup-flow bootstrap MQTT session to the integration's persistent cache and remove the bootstrap data from the config entry.
+
     If a validated bootstrap snapshot exists and differs from the cached session, the snapshot is saved to the persistent MQTT session store. The function also removes the bootstrap snapshot from the config entry data after caching.
-    
+
     Returns:
         The validated bootstrap snapshot as a dict of session fields (e.g., user id, seed, mac id, and optionally mac id source), or `None` if no valid bootstrap snapshot is present.
     """
@@ -239,15 +240,14 @@ async def _async_prime_entry_bootstrap_mqtt_session(
 def _entry_runtime_bucket(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
-    """
-    Get or create the mutable runtime storage dictionary for the given config entry.
-    
+    """Get or create the mutable runtime storage dictionary for the given config entry.
+
     Ensures hass.data[DOMAIN][entry.entry_id] exists and returns that dictionary.
-    
+
     Parameters:
         hass (HomeAssistant): Home Assistant instance.
         entry (JackeryConfigEntry): Config entry whose runtime bucket to access.
-    
+
     Returns:
         dict[str, Any]: Mutable dictionary for storing per-entry runtime values.
     """
@@ -257,9 +257,8 @@ def _entry_runtime_bucket(
 def _entry_startup_task(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> asyncio.Task[None] | None:
-    """
-    Get the registered per-entry background startup task for the given config entry.
-    
+    """Get the registered per-entry background startup task for the given config entry.
+
     Returns:
         The `asyncio.Task[None]` stored under the entry's runtime bucket if present and a Task, `None` otherwise.
     """
@@ -271,9 +270,8 @@ def _entry_startup_task(
 
 
 def _build_api(hass: HomeAssistant, entry: JackeryConfigEntry) -> JackeryApi:
-    """
-    Create a JackeryApi client configured from the config entry's stored credentials.
-    
+    """Create a JackeryApi client configured from the config entry's stored credentials.
+
     Returns:
         JackeryApi: API client initialized with the integration's aiohttp session and the entry's
         account, password, and optional `mqtt_mac_id` and `region_code`.
@@ -293,9 +291,8 @@ async def _async_restore_cached_mqtt_session(
     entry: JackeryConfigEntry,
     api: JackeryApi,
 ) -> dict[str, str] | None:
-    """
-    Restore and apply a cached or bootstrapped MQTT session snapshot to the given API client.
-    
+    """Restore and apply a cached or bootstrapped MQTT session snapshot to the given API client.
+
     Returns:
         dict[str, str] | None: The restored MQTT session snapshot containing `user_id`, `seed_b64`, `mac_id`
         and optionally `mac_id_source`, or `None` if no snapshot is available.
@@ -317,11 +314,10 @@ async def _async_authenticate_api_layer(
     entry: JackeryConfigEntry,
     api: JackeryApi,
 ) -> None:
-    """
-    Authenticate the integration's API client and persist an updated MQTT session snapshot.
-    
+    """Authenticate the integration's API client and persist an updated MQTT session snapshot.
+
     Attempts to restore a cached or bootstrap MQTT session into the API, performs API login, and if the API provides a new MQTT session snapshot that differs from the cached one, saves the refreshed snapshot to persistent storage.
-    
+
     Raises:
         ConfigEntryAuthFailed: If the configured account credentials are rejected by the Jackery API.
     """
@@ -352,33 +348,10 @@ async def _async_authenticate_api_layer(
         )
 
 
-_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
-
-
-def _local_mqtt_client(
-    hass: HomeAssistant, entry: JackeryConfigEntry
-) -> JackeryLocalMqttClient | None:
-    """
-    Retrieve the per-entry local MQTT client from hass.data if present.
-    
-    Looks up the runtime bucket for the config entry and returns the stored
-    `JackeryLocalMqttClient` if it exists and has the correct type; otherwise
-    returns `None`.
-    
-    Returns:
-        `JackeryLocalMqttClient` instance for the entry, `None` if no valid client is stored.
-    """
-    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if not isinstance(bucket, dict):
-        return None
-    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
-    return client if isinstance(client, JackeryLocalMqttClient) else None
-
-
 async def _async_start_local_mqtt(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
-    coordinator: JackerySolarVaultCoordinator,
+    coordinator: JackerySolarVaultCoordinator | None = None,
 ) -> None:
     """Start the optional per-entry local MQTT listener (PROTOCOL.md §5).
 
@@ -423,16 +396,15 @@ async def _async_start_local_mqtt(
         data: dict[str, Any] | None,
         _raw_bytes: bytes,
     ) -> None:
-        """
-        Forward parsed LAN MQTT JSON payloads to the coordinator's local-MQTT message handler.
-        
+        """Forward parsed LAN MQTT JSON payloads to the coordinator's local-MQTT message handler.
+
         Ignores messages where `data` is None; otherwise forwards `data` with its `topic` to the coordinator.
-        
+
         Parameters:
         	topic (str): MQTT topic of the received message.
         	data (dict[str, Any] | None): Parsed JSON payload from the MQTT message, or `None` if no payload.
         """
-        if data is None:
+        if data is None or coordinator is None:
             return
         await coordinator.async_handle_local_mqtt_message(topic, data)
 
@@ -450,9 +422,8 @@ async def _async_start_local_mqtt(
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
 
     async def _async_stop_local_mqtt() -> None:
-        """
-        Stop the stored per-entry local MQTT client and remove its runtime reference.
-        
+        """Stop the stored per-entry local MQTT client and remove its runtime reference.
+
         Stops the client, suppressing any exceptions raised during shutdown. If the per-entry runtime bucket still holds the same client instance, removes that reference.
         """
         with contextlib.suppress(Exception):
@@ -486,9 +457,8 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """
-    Complete background startup for a config entry by authenticating, running discovery, starting transports, and applying local MQTT configuration.
-    
+    """Complete background startup for a config entry by authenticating, running discovery, starting transports, and applying local MQTT configuration.
+
     Performs API authentication and cloud discovery, attempts an initial HTTP refresh, starts cloud MQTT push, the integration's local MQTT listener (and a direct local-MQTT client if none is present), and BLE transport concurrently. On authentication failures it records a coordinator-facing auth-failure message (so reauth is reported on the next refresh) and defers reporting for MQTT auth failures to the coordinator; on refresh failures it will load a cached discovery snapshot when available. All transport/startup errors are logged; the function always removes the per-entry background startup task marker from runtime storage before returning.
     """
     try:
@@ -529,9 +499,8 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
             )
 
         async def _async_start_direct_local_mqtt_if_needed() -> None:
-            """
-            Start a direct local MQTT client for the current entry if no local MQTT client is present.
-            
+            """Start a direct local MQTT client for the current entry if no local MQTT client is present.
+
             Does nothing if a local MQTT client is already stored for the entry.
             """
             if _local_mqtt_client(hass, entry) is not None:
@@ -613,11 +582,10 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
-    """
-    Set up the config entry without blocking Home Assistant startup.
-    
+    """Set up the config entry without blocking Home Assistant startup.
+
     Schedules network- and transport-dependent initialization (login, discovery, first refresh, and transports) to run in a background task after the coordinator, cached local state, and entity platforms are ready.
-    
+
     Returns:
         True if setup completed successfully.
     """
@@ -747,14 +715,13 @@ def _async_remove_entities_with_suffixes(
     suffixes: Iterable[str],
     log_label: str,
 ) -> None:
-    """
-    Remove legacy entity-registry entries for a specific entity domain.
-    
+    """Remove legacy entity-registry entries for a specific entity domain.
+
     Entries whose unique ID matches the integration's legacy unique-id pattern and
     that end with any of the provided `suffixes` are removed from the registry and
     logged using `log_label`. If `suffixes` is empty, the function returns without
     making changes.
-    
+
     Parameters:
         domain (str): Entity domain to restrict removals (e.g., "sensor",
             "binary_sensor").
@@ -806,9 +773,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
 async def async_remove_config_entry_device(  # noqa: RUF029
     hass: HomeAssistant, entry: JackeryConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:
-    """
-    Allow the user to remove a device associated with this config entry.
-    
+    """Allow the user to remove a device associated with this config entry.
+
     Returns:
         True if the device may be removed from the UI, False otherwise.
     """

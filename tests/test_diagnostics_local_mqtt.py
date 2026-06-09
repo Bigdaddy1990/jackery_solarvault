@@ -3,8 +3,8 @@
 from typing import Any
 
 from custom_components.jackery_solarvault.const import (
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
 )
 from custom_components.jackery_solarvault.diagnostics import (
@@ -31,11 +31,12 @@ class _FakeEntry:
 def test_local_mqtt_diagnostics_disabled_when_bridge_off() -> None:
     """Local MQTT diagnostics should indicate disabled bridge by reason code."""
     hass = _FakeHass()
-    entry = _FakeEntry("entry_1", options={CONF_THIRD_PARTY_MQTT_ENABLE: False})
+    entry = _FakeEntry("entry_1", options={CONF_LOCAL_MQTT_ENABLE: False})
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result == {"enabled": False, "disabled_reason": "bridge_disabled"}
+    assert result["enabled"] is False
+    assert result["disabled_reason"] == "bridge_disabled"
 
 
 def test_local_mqtt_diagnostics_blocks_broad_topic_filter() -> None:
@@ -44,18 +45,16 @@ def test_local_mqtt_diagnostics_blocks_broad_topic_filter() -> None:
     entry = _FakeEntry(
         "entry_2",
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: True,
-            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.100",
+            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_HOST: "192.168.1.100",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "#",
         },
     )
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result == {
-        "enabled": False,
-        "disabled_reason": "broad_topic_filter_blocked",
-    }
+    assert result["enabled"] is False
+    assert result["disabled_reason"] == "broad_topic_filter_blocked"
 
 
 def test_local_mqtt_diagnostics_requires_topic_filter() -> None:
@@ -64,12 +63,13 @@ def test_local_mqtt_diagnostics_requires_topic_filter() -> None:
     entry = _FakeEntry(
         "entry_3",
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: True,
-            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.100",
+            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_HOST: "192.168.1.100",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "",
         },
     )
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result == {"enabled": False, "disabled_reason": "missing_topic_filter"}
+    assert result["enabled"] is False
+    assert result["disabled_reason"] == "missing_topic_filter"

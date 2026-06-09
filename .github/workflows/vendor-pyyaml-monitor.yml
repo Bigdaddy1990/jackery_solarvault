@@ -7,6 +7,11 @@ on:
     # upstream Tuesday release cadence.
     - cron: "30 2 * * 3"
   workflow_dispatch:
+    inputs:
+      fail_on_outdated:
+        description: Fail the workflow when vendored PyYAML is outdated
+        required: false
+        default: 'false'
 
 permissions:
   contents: write

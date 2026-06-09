@@ -69,7 +69,8 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update pyupgrade mypy pyright --check --py314-plus || true
+          pre-commit run --hook-stage manual pyupgrade --all-files || true
+          pre-commit run --hook-stage manual mypy --all-files || true
 
 
       - name: Run test requirements and localization sync

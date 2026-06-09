@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
 
-from . import _local_mqtt_client
+from .client.local_mqtt import _local_mqtt_client
 from .const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
@@ -191,15 +191,14 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
 def _local_mqtt_diagnostics(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
-    coordinator: JackerySolarVaultCoordinator,
-    redactions_disabled: bool,
+    coordinator: JackerySolarVaultCoordinator | None = None,
+    redactions_disabled: bool = False,
 ) -> dict[str, Any]:
-    """
-    Builds a diagnostics block for the integration's local MQTT client or returns an indicator that local MQTT is unavailable.
-    
+    """Builds a diagnostics block for the integration's local MQTT client or returns an indicator that local MQTT is unavailable.
+
     Parameters:
         redactions_disabled (bool): When True, request the client's diagnostics without redaction; when False, request a redacted snapshot.
-    
+
     Returns:
         dict: If a client diagnostics snapshot is available, returns that snapshot (with redaction controlled by `redactions_disabled`). Otherwise returns a block of the form `{"enabled": False, "disabled_reason": <reason>, "configured_local_mqtt": {...}}` describing why the client is unavailable and the configured connection parameters.
     """  # noqa: E501
@@ -221,11 +220,12 @@ def _local_mqtt_diagnostics(
     ).strip()
 
     client = _local_mqtt_client(hass, entry)
-    if coordinator._local_mqtt_unsubs:  # noqa: SLF001
+    local_mqtt_unsubs = getattr(coordinator, "_local_mqtt_unsubs", None)
+    if local_mqtt_unsubs:
         return {
             "enabled": True,
             "mode": "homeassistant_mqtt_integration",
-            "subscribed_topic_count": len(coordinator._local_mqtt_unsubs),  # noqa: SLF001
+            "subscribed_topic_count": len(local_mqtt_unsubs),
             "configured_local_mqtt": {
                 "host": host,
                 "port": port,

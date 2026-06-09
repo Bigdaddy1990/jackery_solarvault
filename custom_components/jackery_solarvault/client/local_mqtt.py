@@ -12,6 +12,8 @@ we do NOT touch the coordinator from here so the cloud parsing pipeline
 stays the single source of truth.
 """
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Awaitable, Callable
 import contextlib
@@ -24,7 +26,8 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ..const import (
+    DOMAIN,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_KEEPALIVE_SEC,
@@ -99,9 +102,8 @@ class JackeryLocalMqttClient:
         sink: LocalMqttSink | None = None,
         topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
     ) -> None:
-        """
-        Initialize client configuration and runtime state for a local LAN MQTT subscriber without establishing a network connection.
-        
+        """Initialize client configuration and runtime state for a local LAN MQTT subscriber without establishing a network connection.
+
         Parameters:
             hass: Home Assistant instance used for creating background tasks and logging.
             host: MQTT broker hostname or IP address.
@@ -196,9 +198,8 @@ class JackeryLocalMqttClient:
     # ------------------------------------------------------------------
 
     async def _async_run_session(self) -> None:
-        """
-        Manage a single MQTT session: connect to the configured broker, subscribe to the configured topic filter, and forward incoming messages to the client's message handler.
-        
+        """Manage a single MQTT session: connect to the configured broker, subscribe to the configured topic filter, and forward incoming messages to the client's message handler.
+
         On successful connection this updates the client's connection state and last-connect timestamp and begins consuming messages until the session ends. Subscription, connect, and disconnect failures are recorded for diagnostics. Ensures the internal connection event is set before exit so callers waiting for startup cannot deadlock.
         """  # noqa: E501
         connected = False
@@ -315,9 +316,8 @@ class JackeryLocalMqttClient:
         topic: str,
         payload: bytes | bytearray | str,
     ) -> None:
-        """
-        Handle a received MQTT message: record routing and topic diagnostics, apply filtering and payload guards, extract a Jackery JSON payload when present, and forward the result to the configured sink.
-        
+        """Handle a received MQTT message: record routing and topic diagnostics, apply filtering and payload guards, extract a Jackery JSON payload when present, and forward the result to the configured sink.
+
         Updates internal counters and last-seen metadata. If the message passes topic filtering and size/noise guards and a Jackery payload (a JSON object) can be extracted, schedules the configured sink with (topic, extracted_dict, raw_bytes). Messages are counted or dropped when they fail filtering, exceed size limits, appear to be Home Assistant event wrappers, are non-UTF-8/binary, or contain non-object JSON.
         """  # noqa: E501
         if topic not in self._topics_seen_set:
@@ -396,9 +396,8 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
-        """
-        Determine whether a topic should be suppressed as broad high-volume noise.
-        
+        """Determine whether a topic should be suppressed as broad high-volume noise.
+
         Returns:
             True if the topic is a known high-volume non-device topic (starts with "$SYS/"), or if the configured topic filter is globally broad and the topic starts with "homeassistant/"; False otherwise.
         """
@@ -410,11 +409,10 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
-        """
-        Detect whether the payload appears to be a Home Assistant `state_changed` event wrapper.
-        
+        """Detect whether the payload appears to be a Home Assistant `state_changed` event wrapper.
+
         Checks the payload prefix for the presence of HA event markers typically found in state-changed events.
-        
+
         Returns:
             `true` if the payload prefix contains `event_type`, `state_changed`, `event_data`, `old_state`, and `new_state`, `false` otherwise.
         """
@@ -431,14 +429,13 @@ class JackeryLocalMqttClient:
     def _extract_local_jackery_payload(
         payload: dict[str, Any],
     ) -> dict[str, Any] | None:
-        """
-        Extracts a Jackery-specific payload from a parsed JSON object or from a Home Assistant event wrapper.
-        
+        """Extracts a Jackery-specific payload from a parsed JSON object or from a Home Assistant event wrapper.
+
         If the input appears to be a Home Assistant event (contains `event_type` and `event_data`), looks for a dict candidate in `event_data["payload"]`, `event_data["body"]`, `event_data["data"]`, or `event_data` itself and returns the first candidate that contains any of the Jackery marker keys. If the input is not an HA event wrapper, returns the input `payload` unchanged. Returns `None` when the input is an HA event but `event_data` is not a dict or no candidate contains Jackery marker keys.
-        
+
         Parameters:
             payload (dict): Parsed JSON object from an MQTT message, possibly an HA event wrapper.
-        
+
         Returns:
             dict | None: The extracted Jackery payload dict when found, the original `payload` if it is not an HA event wrapper, or `None` if a wrapper is present but no Jackery payload can be extracted.
         """
@@ -461,9 +458,8 @@ class JackeryLocalMqttClient:
         return None
 
     def _is_broad_topic_filter(self) -> bool:
-        """
-        Determine whether the configured topic filter is a global wildcard.
-        
+        """Determine whether the configured topic filter is a global wildcard.
+
         @returns
             `true` if the topic filter is exactly "#" or "+/#", `false` otherwise.
         """
@@ -471,9 +467,8 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
-        """
-        Determine whether an MQTT topic matches a topic filter that may include the `+` and `#` wildcards.
-        
+        """Determine whether an MQTT topic matches a topic filter that may include the `+` and `#` wildcards.
+
         Returns:
             `true` if the topic matches the filter, `false` otherwise.
         """
@@ -502,9 +497,8 @@ class JackeryLocalMqttClient:
         """  # noqa: E501
 
         async def _runner() -> None:
-            """
-            Await the provided coroutine and allow any exception it raises to propagate.
-            
+            """Await the provided coroutine and allow any exception it raises to propagate.
+
             This helper awaits the closure-captured coroutine `coro`. It does not swallow exceptions so that callers or task completion callbacks can observe and handle errors.
             """
             await coro
@@ -514,11 +508,10 @@ class JackeryLocalMqttClient:
         )
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """
-            Log non-cancellation exceptions raised by a completed asyncio Task.
-            
+            """Log non-cancellation exceptions raised by a completed asyncio Task.
+
             Retrieves the task result to surface any exception raised by the task; ignores CancelledError and logs other exceptions at error level so they are not silently swallowed.
-            
+
             Parameters:
                 done (asyncio.Task[None]): Completed task to check for exceptions.
             """  # noqa: E501
@@ -619,9 +612,8 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _utc_now_iso() -> str:
-        """
-        Get the current UTC time as an ISO 8601 string including the timezone offset.
-        
+        """Get the current UTC time as an ISO 8601 string including the timezone offset.
+
         Returns:
             ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """  # noqa: E501
@@ -630,13 +622,26 @@ class JackeryLocalMqttClient:
     # --- restored from 01.06\custom_components\jackery_solarvault\client\local_mqtt.py ---  # noqa: E501
     @staticmethod
     def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
-        """
-        Detect whether a byte payload appears to be a Home Assistant event-style JSON wrapper.
-        
+        """Detect whether a byte payload appears to be a Home Assistant event-style JSON wrapper.
+
         Checks the first 1024 bytes for the presence of the JSON keys "event_type" and "event_data".
-        
+
         Returns:
             True if both `"event_type"` and `"event_data"` appear in the payload head, False otherwise.
         """
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return b'"event_type"' in head and b'"event_data"' in head
+
+
+_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
+
+
+def _local_mqtt_client(
+    hass: HomeAssistant, entry: Any
+) -> JackeryLocalMqttClient | None:
+    """Return the per-entry local MQTT client stored in ``hass.data``."""
+    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if not isinstance(bucket, dict):
+        return None
+    client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
+    return client if isinstance(client, JackeryLocalMqttClient) else None

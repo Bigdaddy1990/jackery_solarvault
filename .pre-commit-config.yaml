@@ -18,20 +18,13 @@ repos:
     hooks:
       - id: pyupgrade
         args:
-          - --py3-plus
-          - --py38-plus
-          - --py39-plus
-          - --py310-plus
-          - --py311-plus
-          - --py312-plus
-          - --py313-plus
           - --py314-plus
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
       - id: mypy
         additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^(/manifest.*|docs/|scripts/)
+        exclude: ^(manifest.*|docs/|scripts/)
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:

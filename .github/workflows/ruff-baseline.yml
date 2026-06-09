@@ -21,17 +21,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
-          ruff check . --fix all | true
-          ruff check . --fix --unsafe-fixes | true
-          ruff check . --unsafe-fixes  | true
-          ruff check . --target-version py314  | true
-          ruff check . --preview | true
-          ruff check . --line-length 88 | true
-          ruff check . --show-fixes | true
-          ruff check . --add-noqa | true
-          ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" | true
-          ruff check . --fix all | true
-          ruff check . --output-format=github | true
+          ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes || true
+          ruff check . --unsafe-fixes || true
+          ruff check . --target-version py314 || true
+          ruff check . --preview || true
+          ruff check . --line-length 88 || true
+          ruff check . --show-fixes || true
+          ruff check . --add-noqa || true
+          ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff check . --fix || true
+          ruff check . --output-format=github || true
           ruff format .
 
       - name: Commit baseline changes

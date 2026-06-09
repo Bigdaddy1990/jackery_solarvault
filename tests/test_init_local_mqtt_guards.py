@@ -157,7 +157,7 @@ class TestLocalMqttClient:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("JackeryLocalMqttClient not importable")
 
         from custom_components.jackery_solarvault import (
@@ -223,7 +223,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,  # noqa: F401
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -244,7 +244,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -265,7 +265,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -286,7 +286,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -307,7 +307,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -335,7 +335,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -368,7 +368,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -401,7 +401,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -435,7 +435,7 @@ class TestAsyncStartLocalMqttGuards:
                 JackeryLocalMqttClient,
             )
             from custom_components.jackery_solarvault.const import DOMAIN
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -479,7 +479,7 @@ class TestAsyncStartLocalMqttGuards:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -520,7 +520,7 @@ class TestLocalMqttSink:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -574,7 +574,7 @@ class TestLocalMqttSink:
             from custom_components.jackery_solarvault.client.local_mqtt import (
                 JackeryLocalMqttClient,
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("Required modules not importable")
 
         hass = MagicMock()
@@ -636,7 +636,7 @@ class TestRsaPkcs1V15Encrypt:
             from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         # Generate a real EC key (not RSA) and serialize it as DER
@@ -658,7 +658,7 @@ class TestRsaPkcs1V15Encrypt:
             from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         # Generate a real RSA key and encode as DER
@@ -688,7 +688,7 @@ class TestRsaPkcs1V15Encrypt:
             from custom_components.jackery_solarvault.client.api import (
                 _rsa_pkcs1v15_encrypt,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         ec_key = ec.generate_private_key(ec.SECP256R1()).public_key()
@@ -720,7 +720,7 @@ class TestGenerateUdid:
                 _generate_udid,  # noqa: PLC2701
             )
             from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result = _generate_udid("test@example.com")
@@ -732,7 +732,7 @@ class TestGenerateUdid:
             from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result1 = _generate_udid("user@example.com")
@@ -745,7 +745,7 @@ class TestGenerateUdid:
             from custom_components.jackery_solarvault.client.api import (
                 _generate_udid,  # noqa: PLC2701
             )
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result1 = _generate_udid("user1@example.com")
@@ -759,7 +759,7 @@ class TestGenerateUdid:
                 _generate_udid,  # noqa: PLC2701
             )
             from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result = _generate_udid("seed")
@@ -774,7 +774,7 @@ class TestGenerateUdid:
                 _generate_udid,  # noqa: PLC2701
             )
             from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result = _generate_udid("some_account")
@@ -790,7 +790,7 @@ class TestGenerateUdid:
                 _generate_udid,  # noqa: PLC2701
             )
             from custom_components.jackery_solarvault.const import MQTT_MAC_ID_PREFIX
-        except ImportError, SyntaxError:
+        except (ImportError, SyntaxError):
             pytest.skip("api module not importable")
 
         result = _generate_udid("test_seed")
