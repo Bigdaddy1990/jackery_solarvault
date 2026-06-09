@@ -1,9 +1,8 @@
 """Tests for Jackery cloud price configuration calls."""
 
 import asyncio
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
-import aiohttp
 import pytest
 
 from custom_components.jackery_solarvault.client.api import (
@@ -23,9 +22,12 @@ from custom_components.jackery_solarvault.const import (
     SAVE_SINGLE_MODE_PATH,
 )
 
+if TYPE_CHECKING:
+    import aiohttp
+
 
 def _api() -> JackeryApi:
-    return JackeryApi(cast(aiohttp.ClientSession, object()), "account", "password")
+    return JackeryApi(cast("aiohttp.ClientSession", object()), "account", "password")
 
 
 @pytest.mark.asyncio()
@@ -140,7 +142,7 @@ async def test_login_rejects_non_object_data_payload() -> None:
         def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
-    api = JackeryApi(cast(aiohttp.ClientSession, _Session()), "account", "password")
+    api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
 
     with pytest.raises(JackeryApiError, match="Login returned data list"):
         await api.async_login()
@@ -166,7 +168,7 @@ async def test_login_rejection_does_not_update_last_success_response() -> None:
         def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
-    api = JackeryApi(cast(aiohttp.ClientSession, _Session()), "account", "password")
+    api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
 
     with pytest.raises(JackeryAuthError):
         await api.async_login()
@@ -197,7 +199,7 @@ async def test_get_json_rejects_unparseable_success_body() -> None:
         def get(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
-    api = JackeryApi(cast(aiohttp.ClientSession, _Session()), "account", "password")
+    api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
     api._token = "token"  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="returned invalid JSON"):

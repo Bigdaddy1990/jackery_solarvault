@@ -6,7 +6,7 @@ from .nodes import *
 from .tokens import *
 
 __version__ = "6.0.3"
-try:  # noqa: RUF067
+try:
     from .cyaml import *
 
     __with_libyaml__ = True
@@ -20,14 +20,14 @@ import io
 # XXX "Warnings control" is now deprecated. Leaving in the API function to not
 # break code that uses it.
 # ------------------------------------------------------------------------------
-def warnings(settings=None):  # noqa: ANN001, ANN201, D103, RUF067
+def warnings(settings=None):  # noqa: ANN001, ANN201, D103
     if settings is None:
         return {}
     return None
 
 
 # ------------------------------------------------------------------------------
-def scan(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
+def scan(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
     """Scan a YAML stream and produce scanning tokens."""
     loader = Loader(stream)
     try:
@@ -37,7 +37,7 @@ def scan(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
         loader.dispose()
 
 
-def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
+def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
     """Parse a YAML stream and produce parsing events."""
     loader = Loader(stream)
     try:
@@ -47,7 +47,7 @@ def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
         loader.dispose()
 
 
-def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
+def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
     """Parse the first YAML document in a stream
     and produce the corresponding representation tree.
     """  # noqa: D205
@@ -58,7 +58,7 @@ def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
         loader.dispose()
 
 
-def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF067
+def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
     """Parse all YAML documents in a stream
     and produce corresponding representation trees.
     """  # noqa: D205
@@ -70,7 +70,7 @@ def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803, RUF
         loader.dispose()
 
 
-def load(stream, Loader):  # noqa: ANN001, ANN201, N803, RUF067
+def load(stream, Loader):  # noqa: ANN001, ANN201, N803
     """Parse the first YAML document in a stream
     and produce the corresponding Python object.
     """  # noqa: D205
@@ -81,7 +81,7 @@ def load(stream, Loader):  # noqa: ANN001, ANN201, N803, RUF067
         loader.dispose()
 
 
-def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803, RUF067
+def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803
     """Parse all YAML documents in a stream
     and produce corresponding Python objects.
     """  # noqa: D205
@@ -93,7 +93,7 @@ def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803, RUF067
         loader.dispose()
 
 
-def full_load(stream):  # noqa: ANN001, ANN201, RUF067
+def full_load(stream):  # noqa: ANN001, ANN201
     """Parse the first YAML document in a stream
     and produce the corresponding Python object.
 
@@ -103,7 +103,7 @@ def full_load(stream):  # noqa: ANN001, ANN201, RUF067
     return load(stream, FullLoader)  # noqa: F405
 
 
-def full_load_all(stream):  # noqa: ANN001, ANN201, RUF067
+def full_load_all(stream):  # noqa: ANN001, ANN201
     """Parse all YAML documents in a stream
     and produce corresponding Python objects.
 
@@ -113,7 +113,7 @@ def full_load_all(stream):  # noqa: ANN001, ANN201, RUF067
     return load_all(stream, FullLoader)  # noqa: F405
 
 
-def safe_load(stream):  # noqa: ANN001, ANN201, RUF067
+def safe_load(stream):  # noqa: ANN001, ANN201
     """Parse the first YAML document in a stream
     and produce the corresponding Python object.
 
@@ -123,7 +123,7 @@ def safe_load(stream):  # noqa: ANN001, ANN201, RUF067
     return load(stream, SafeLoader)  # noqa: F405
 
 
-def safe_load_all(stream):  # noqa: ANN001, ANN201, RUF067
+def safe_load_all(stream):  # noqa: ANN001, ANN201
     """Parse all YAML documents in a stream
     and produce corresponding Python objects.
 
@@ -133,7 +133,7 @@ def safe_load_all(stream):  # noqa: ANN001, ANN201, RUF067
     return load_all(stream, SafeLoader)  # noqa: F405
 
 
-def unsafe_load(stream):  # noqa: ANN001, ANN201, RUF067
+def unsafe_load(stream):  # noqa: ANN001, ANN201
     """Parse the first YAML document in a stream
     and produce the corresponding Python object.
 
@@ -143,7 +143,7 @@ def unsafe_load(stream):  # noqa: ANN001, ANN201, RUF067
     return load(stream, UnsafeLoader)  # noqa: F405
 
 
-def unsafe_load_all(stream):  # noqa: ANN001, ANN201, RUF067
+def unsafe_load_all(stream):  # noqa: ANN001, ANN201
     """Parse all YAML documents in a stream
     and produce corresponding Python objects.
 
@@ -153,7 +153,7 @@ def unsafe_load_all(stream):  # noqa: ANN001, ANN201, RUF067
     return load_all(stream, UnsafeLoader)  # noqa: F405
 
 
-def emit(  # noqa: ANN201, PLR0913, PLR0917, RUF067
+def emit(  # noqa: ANN201, PLR0913, PLR0917
     events,  # noqa: ANN001
     stream=None,  # noqa: ANN001
     Dumper=Dumper,  # noqa: ANN001, F405, N803
@@ -188,7 +188,7 @@ def emit(  # noqa: ANN201, PLR0913, PLR0917, RUF067
     return None
 
 
-def serialize_all(  # noqa: ANN201, PLR0913, PLR0917, RUF067
+def serialize_all(  # noqa: ANN201, PLR0913, PLR0917
     nodes,  # noqa: ANN001
     stream=None,  # noqa: ANN001
     Dumper=Dumper,  # noqa: ANN001, F405, N803
@@ -235,14 +235,14 @@ def serialize_all(  # noqa: ANN201, PLR0913, PLR0917, RUF067
     return None
 
 
-def serialize(node, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN201, F405, N803, RUF067
+def serialize(node, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN201, F405, N803
     """Serialize a representation tree into a YAML stream.
     If stream is None, return the produced string instead.
     """  # noqa: D205
     return serialize_all([node], stream, Dumper=Dumper, **kwds)
 
 
-def dump_all(  # noqa: ANN201, PLR0913, PLR0917, RUF067
+def dump_all(  # noqa: ANN201, PLR0913, PLR0917
     documents,  # noqa: ANN001
     stream=None,  # noqa: ANN001
     Dumper=Dumper,  # noqa: ANN001, F405, N803
@@ -295,14 +295,14 @@ def dump_all(  # noqa: ANN201, PLR0913, PLR0917, RUF067
     return None
 
 
-def dump(data, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN201, F405, N803, RUF067
+def dump(data, stream=None, Dumper=Dumper, **kwds):  # noqa: ANN001, ANN003, ANN201, F405, N803
     """Serialize a Python object into a YAML stream.
     If stream is None, return the produced string instead.
     """  # noqa: D205
     return dump_all([data], stream, Dumper=Dumper, **kwds)
 
 
-def safe_dump_all(documents, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201, RUF067
+def safe_dump_all(documents, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201
     """Serialize a sequence of Python objects into a YAML stream.
     Produce only basic YAML tags.
     If stream is None, return the produced string instead.
@@ -310,7 +310,7 @@ def safe_dump_all(documents, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN2
     return dump_all(documents, stream, Dumper=SafeDumper, **kwds)  # noqa: F405
 
 
-def safe_dump(data, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201, RUF067
+def safe_dump(data, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201
     """Serialize a Python object into a YAML stream.
     Produce only basic YAML tags.
     If stream is None, return the produced string instead.
@@ -318,7 +318,7 @@ def safe_dump(data, stream=None, **kwds):  # noqa: ANN001, ANN003, ANN201, RUF06
     return dump_all([data], stream, Dumper=SafeDumper, **kwds)  # noqa: F405
 
 
-def add_implicit_resolver(tag, regexp, first=None, Loader=None, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803, RUF067
+def add_implicit_resolver(tag, regexp, first=None, Loader=None, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803
     """Add an implicit scalar detector.
     If an implicit scalar value matches the given regexp,
     the corresponding tag is assigned to the scalar.
@@ -333,7 +333,7 @@ def add_implicit_resolver(tag, regexp, first=None, Loader=None, Dumper=Dumper) -
     Dumper.add_implicit_resolver(tag, regexp, first)
 
 
-def add_path_resolver(tag, path, kind=None, Loader=None, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803, RUF067
+def add_path_resolver(tag, path, kind=None, Loader=None, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803
     """Add a path based resolver for the given tag.
     A path is a list of keys that forms a path
     to a node in the representation tree.
@@ -348,7 +348,7 @@ def add_path_resolver(tag, path, kind=None, Loader=None, Dumper=Dumper) -> None:
     Dumper.add_path_resolver(tag, path, kind)
 
 
-def add_constructor(tag, constructor, Loader=None) -> None:  # noqa: ANN001, N803, RUF067
+def add_constructor(tag, constructor, Loader=None) -> None:  # noqa: ANN001, N803
     """Add a constructor for the given tag.
     Constructor is a function that accepts a Loader instance
     and a node object and produces the corresponding Python object.
@@ -361,7 +361,7 @@ def add_constructor(tag, constructor, Loader=None) -> None:  # noqa: ANN001, N80
         Loader.add_constructor(tag, constructor)
 
 
-def add_multi_constructor(tag_prefix, multi_constructor, Loader=None) -> None:  # noqa: ANN001, N803, RUF067
+def add_multi_constructor(tag_prefix, multi_constructor, Loader=None) -> None:  # noqa: ANN001, N803
     """Add a multi-constructor for the given tag prefix.
     Multi-constructor is called for a node if its tag starts with tag_prefix.
     Multi-constructor accepts a Loader instance, a tag suffix,
@@ -375,7 +375,7 @@ def add_multi_constructor(tag_prefix, multi_constructor, Loader=None) -> None:  
         Loader.add_multi_constructor(tag_prefix, multi_constructor)
 
 
-def add_representer(data_type, representer, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803, RUF067
+def add_representer(data_type, representer, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803
     """Add a representer for the given type.
     Representer is a function accepting a Dumper instance
     and an instance of the given data type
@@ -384,7 +384,7 @@ def add_representer(data_type, representer, Dumper=Dumper) -> None:  # noqa: ANN
     Dumper.add_representer(data_type, representer)
 
 
-def add_multi_representer(data_type, multi_representer, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803, RUF067
+def add_multi_representer(data_type, multi_representer, Dumper=Dumper) -> None:  # noqa: ANN001, F405, N803
     """Add a representer for the given type.
     Multi-representer is a function accepting a Dumper instance
     and an instance of the given data type or subtype
@@ -393,7 +393,7 @@ def add_multi_representer(data_type, multi_representer, Dumper=Dumper) -> None: 
     Dumper.add_multi_representer(data_type, multi_representer)
 
 
-class YAMLObjectMetaclass(type):  # noqa: RUF067
+class YAMLObjectMetaclass(type):
     """The metaclass for YAMLObject."""
 
     def __init__(cls, name, bases, kwds) -> None:  # noqa: ANN001, D107
@@ -408,7 +408,7 @@ class YAMLObjectMetaclass(type):  # noqa: RUF067
             cls.yaml_dumper.add_representer(cls, cls.to_yaml)
 
 
-class YAMLObject(metaclass=YAMLObjectMetaclass):  # noqa: RUF067
+class YAMLObject(metaclass=YAMLObjectMetaclass):
     """An object that can dump itself to a YAML stream
     and load itself from a YAML stream.
     """  # noqa: D205
