@@ -15,7 +15,6 @@ import base64
 import re
 from unittest.mock import MagicMock
 
-from annotatedyaml._vendor.yaml import loader as _loader  # noqa: PLC2701
 from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
     ConstructorError,
     FullConstructor,
