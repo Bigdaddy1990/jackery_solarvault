@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 30
     env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '2026.6.0' }}
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -49,7 +49,7 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system -r requirements-test.txt --prerelease=allow
-          uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
         with:
@@ -69,7 +69,7 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update pyupgrade --check --py314-plus || true
+          pre-commit run --hook-stage manual python-typing-update pyupgrade mypy pyright --check --py314-plus || true
 
 
       - name: Run test requirements and localization sync
