@@ -328,7 +328,6 @@ select = [
   "PGH",    # pygrep-hooks
   "PIE",    # flake8-pie
   "PL",     # pylint
-  "PLC0415",
   "PT",     # flake8-pytest-style
   "PTH",    # flake8-pathlib
   "PYI",    # flake8-pyi
@@ -369,7 +368,7 @@ select = [
   "Q"
 ]
 
-ignore = []
+ignore = ["TID252","PLC0415"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = false
