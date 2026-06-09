@@ -1,20 +1,24 @@
 """Diagnostics support for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.core import HomeAssistant
 
-from . import JackeryConfigEntry
 from .const import REDACT_KEYS as _STATIC_REDACT_KEYS
-from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
     dev_mode_redactions_disabled,
     diagnostic_redactions_disabled,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.core import HomeAssistant
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ def _redacted_payload_map(
     """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(
-        sorted(payloads, key=lambda value: str(value)),
+        sorted(payloads, key=str),
         start=1,
     ):
         payload = payloads[key]

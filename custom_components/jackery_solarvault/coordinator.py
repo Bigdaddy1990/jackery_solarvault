@@ -2,7 +2,6 @@
 
 import asyncio
 import binascii
-from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import date, datetime, timedelta
 import importlib
@@ -11,14 +10,12 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .api import JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_CONTROL_SOCKET_PRIORITY,
@@ -285,6 +282,13 @@ from .const import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .api import JackeryApi
+    from .client.ble_transport import BleFrameObservation
     from .mqtt_push import JackeryMqttPushClient
 
 import operator
@@ -1249,7 +1253,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             return
         try:
-            from .client.ble_transport import BleFrameObservation, JackeryBleListener
+            from .client.ble_transport import JackeryBleListener
         except ImportError as err:
             _LOGGER.warning(
                 "Jackery BLE transport requested but module import failed: %s",
@@ -5407,7 +5411,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             devices = {}
         redacted_devices: dict[str, Any] = {}
         for index, device_id in enumerate(
-            sorted(devices, key=lambda value: str(value)),
+            sorted(devices, key=str),
             start=1,
         ):
             state = devices.get(device_id)
