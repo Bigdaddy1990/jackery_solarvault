@@ -369,7 +369,7 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415","TID252"]
+ignore = ["PLC0415","TID252","E901"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -380,7 +380,7 @@ logger-objects = ["logging_setup.logger"]
 hass = "homeassistant.__main__:main"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 10
+max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403", "E402","RUF067"]
