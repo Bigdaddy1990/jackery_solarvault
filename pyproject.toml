@@ -369,7 +369,7 @@ select = [
   "Q"
 ]
 
-ignore = ["TID252","PLC0415"]
+ignore = ["PLC0415","TID252"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -380,7 +380,7 @@ logger-objects = ["logging_setup.logger"]
 hass = "homeassistant.__main__:main"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 25
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403", "E402","RUF067"]
@@ -498,6 +498,7 @@ exclude_lines = [
   "raise NotImplementedError",
   # TYPE_CHECKING and @overload blocks are never executed during pytest run
   "if TYPE_CHECKING:",
+  "@overload",
 ]
 
 [tool.coverage.html]
@@ -545,6 +546,16 @@ ignored-classes = [
   "_CountingAttr", # for attrs
 ]
 mixin-class-rgx = ".*[Mm]ix[Ii]n"
+
+[tool.smellcheck]
+select = []  # only run these checks (default: all)
+ignore = []          # skip these checks
+per-file-ignores = {"tests/*" = []}  # per-path overrides
+fail-on = "warning"                  # override default fail-on
+format = "text"                      # override default format
+baseline = ".smellcheck-baseline.json"  # suppress known findings
+cache = true                           # enable file-level caching (default: true)
+cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-cache)
 
 [tool.pylint."MESSAGES CONTROL"]
 # Reasons disabled:
@@ -822,3 +833,16 @@ per-file-ignores = [
   # or a dict is returned
   "tests/**:redefined-outer-name,use-implicit-booleaness-not-comparison",
 ]
+
+# Bandit configuration aligned with Home Assistant guidelines
+[tool.bandit]
+exclude_dirs = ["tests", "scripts"]
+tests = []
+skips = ["B101","B102","B110","B112","B307","B324","B410","B603","B608","B612","B703"]
+
+[tool.cfduplication]
+# Minimum duplicated line threshold
+MinLineCount= 50
+# Paths to ignore for duplication checking
+IgnorePatterns = ["docs/**","tests/**"]
+
