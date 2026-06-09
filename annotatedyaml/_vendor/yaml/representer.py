@@ -118,9 +118,8 @@ class BaseRepresenter:  # noqa: D101
 
     @classmethod
     def add_multi_representer(cls, data_type, representer) -> None:  # noqa: ANN001
-        """
-        Register a multi-type representer on the representer class, using copy-on-write to avoid mutating a parent class's registry.
-        
+        """Register a multi-type representer on the representer class, using copy-on-write to avoid mutating a parent class's registry.
+
         Parameters:
             cls: The representer class receiving the registration.
             data_type: The Python type to register the representer for, or `None` to set the fallback representer.
@@ -181,19 +180,18 @@ class BaseRepresenter:  # noqa: D101
         return node
 
     def represent_mapping(self, tag, mapping, flow_style=None):  # noqa: ANN001, ANN201
-        """
-        Create a MappingNode with represented key/value nodes for the given mapping.
-        
+        """Create a MappingNode with represented key/value nodes for the given mapping.
+
         Parameters:
             tag (str): YAML tag to attach to the mapping node.
             mapping (Mapping | Iterable[tuple]): A mapping (has `.items()`) or an iterable of (key, value) pairs to represent.
             flow_style (bool | None): If not None, forces the node's flow style; if None, the flow style is chosen from `default_flow_style` when set, otherwise inferred from the represented key/value nodes.
-        
+
         Notes:
             - If `self.alias_key` is set, the created node is cached in `self.represented_objects` under that key.
             - If `mapping` provides `.items()` and `self.sort_keys` is True, keys are sorted when possible (TypeError from sorting is ignored).
             - The node's flow style is set to `self.default_flow_style` when that is not None; otherwise it is set to True only when all key and value nodes are unstyled scalars.
-        
+
         Returns:
             MappingNode: A YAML mapping node containing the represented (key_node, value_node) pairs.
         """  # noqa: E501
@@ -374,9 +372,8 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         return self.represent_mapping("tag:yaml.org,2002:map", data)
 
     def represent_set(self, data):  # noqa: ANN001, ANN201
-        """
-        Represent a Python set as a YAML set node where each element is a mapping key with a YAML null value.
-        
+        """Represent a Python set as a YAML set node where each element is a mapping key with a YAML null value.
+
         Returns:
             MappingNode: A mapping node tagged "tag:yaml.org,2002:set" whose keys are the set elements and whose values are YAML null (represented as Python `None`).
         """  # noqa: E501
@@ -430,9 +427,8 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         return self.represent_mapping(tag, state, flow_style=flow_style)
 
     def represent_undefined(self, data) -> Never:  # noqa: ANN001, PLR6301
-        """
-        Always raises a RepresenterError indicating the object cannot be represented.
-        
+        """Always raises a RepresenterError indicating the object cannot be represented.
+
         Raises:
             RepresenterError: always raised with message "cannot represent an object" and the unrepresentable `data` passed as the second argument.
         """  # noqa: E501

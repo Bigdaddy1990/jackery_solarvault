@@ -59,12 +59,11 @@ except ImportError:  # pragma: no cover - optional test dependency
     BLEAK_RETRY_EXCEPTIONS = (BleakError,)
 
     async def establish_connection(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401, RUF029
-        """
-        Stub used when bleak-retry-connector is not installed that signals the missing dependency.
-        
+        """Stub used when bleak-retry-connector is not installed that signals the missing dependency.
+
         Raises:
             RuntimeError: Always raised with a message indicating that bleak-retry-connector is required.
-        """
+        """  # noqa: E501
         raise RuntimeError(  # noqa: TRY003
             "bleak-retry-connector is required for Jackery BLE transport"
         )
@@ -229,9 +228,8 @@ class JackeryBleListener:
         ble_address_resolver: Callable[[str], str | None],
         serial_resolver: Callable[[str], str | None] | None = None,
     ) -> None:
-        """
-        Create a Jackery BLE diagnostic listener tied to Home Assistant and a frame sink.
-        
+        """Create a Jackery BLE diagnostic listener tied to Home Assistant and a frame sink.
+
         Parameters:
             hass (HomeAssistant): Home Assistant instance used for Bluetooth callbacks and advertisement registration.
             sink (FrameSink): Async consumer invoked for each observed notification with (device_id, observation).
@@ -287,15 +285,14 @@ class JackeryBleListener:
         *,
         timeout_sec: float,
     ) -> bool:
-        """
-        Ensure a background connection runner is started for the device and wait until a BLE client is available or the timeout elapses.
-        
+        """Ensure a background connection runner is started for the device and wait until a BLE client is available or the timeout elapses.
+
         If the listener cannot resolve a BLE address for the device, the method returns immediately. Otherwise it schedules the connection runner (if not already running) and polls until a client appears, the provided timeout expires, or the listener is stopped.
-        
+
         Parameters:
             device_id (str): Identifier of the target device whose BLE client is required.
             timeout_sec (float): Maximum seconds to wait for a client to become available.
-        
+
         Returns:
             bool: `True` if a BLE client is available for the device, `False` otherwise.
         """  # noqa: E501
@@ -421,22 +418,21 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """
-        Send a single encrypted command frame to the device over BLE.
-        
+        """Send a single encrypted command frame to the device over BLE.
+
         Writes the command (possibly split across MTU-sized chunks) to the device's write characteristic and optionally waits for a matching notify frame to be observed as an ACK.
-        
+
         Returns:
             `True` if the write completed (and, when `wait_for_ack` is enabled, a matching notify frame was observed within `ack_timeout_sec`); `False` if there is no active BLE client for `device_id`.
-        
+
         Raises:
             ValueError: for malformed inputs such as an invalid `mtu_override`.
             RuntimeError: when a required device AES key is missing, when the GATT write fails or times out, or when ACK waiting times out.
-        
+
         Parameters of note:
             ack_cmds: optional sequence of `cmd` integers that are accepted as the ACK; when omitted, any decoded frame for the same device counts as the ACK.
             mtu_override: optional explicit MTU to use for chunking; otherwise the negotiated per-device MTU or a default is used.
-        """
+        """  # noqa: E501
         client = self._clients.get(device_id)
         if client is None:
             _LOGGER.debug(
@@ -838,9 +834,8 @@ class JackeryBleListener:
                     _characteristic: Any,  # noqa: ANN401
                     data: bytearray,  # noqa: ANN401, RUF100
                 ) -> None:
-                    """
-                    Handle a BLE notification by forwarding the notification payload to the listener's notification processor.
-                    
+                    """Handle a BLE notification by forwarding the notification payload to the listener's notification processor.
+
                     Parameters:
                         data (bytearray): Raw payload from the BLE characteristic; converted to bytes before processing.
                     """  # noqa: E501
@@ -934,7 +929,7 @@ class JackeryBleListener:
         Updates the device's statistics with the current disconnect timestamp and emits a debug log.
         Parameters:
                 device_id (str): Identifier of the Jackery device whose disconnect is being recorded.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)

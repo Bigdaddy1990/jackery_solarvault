@@ -99,9 +99,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     def _append_unique(
         entities: list[BinarySensorEntity], entity: BinarySensorEntity
     ) -> None:
-        """
-        Append a binary sensor entity to a list and record its unique ID if that ID has not been seen.
-        
+        """Append a binary sensor entity to a list and record its unique ID if that ID has not been seen.
+
         Parameters:
             entities: List to append the entity to when its unique ID is new.
             entity: Binary sensor entity to check and potentially append.
@@ -111,11 +110,10 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         )
 
     def _collect_entities() -> list[BinarySensorEntity]:
-        """
-        Build a list of binary sensor entities for every device in the coordinator payload.
-        
+        """Build a list of binary sensor entities for every device in the coordinator payload.
+
         Creates one JackeryBinarySensor for each entry in BINARY_DESCRIPTIONS and one JackerySmartPlugStateBinarySensor for each smart plug that exposes a serial number. Smart-plug entities are assigned a stable 1-based plug index and a deterministic `plug_key` derived from the plug serial and index to preserve entity identity if the payload order changes.
-        
+
         Returns:
             list[BinarySensorEntity]: Constructed binary sensor entities ready to be added.
         """  # noqa: E501
@@ -145,9 +143,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
-        """
-        Register new binary sensor entities when the coordinator's entity signature changes.
-        
+        """Register new binary sensor entities when the coordinator's entity signature changes.
+
         If the current coordinator entity signature differs from the last recorded signature, collect newly constructed entities, update the stored signature, and register the new entities with the platform. No action is taken when the signature is unchanged.
         """  # noqa: E501
         nonlocal last_signature
@@ -184,9 +181,8 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """
-        Determine whether this binary sensor is currently active.
-        
+        """Determine whether this binary sensor is currently active.
+
         Returns:
             `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
         """  # noqa: E501
@@ -211,16 +207,15 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         plug_sn: str,
         plug_key: str,
     ) -> None:
-        """
-        Represents a binary sensor for a specific smart plug's switch state.
-        
+        """Represents a binary sensor for a specific smart plug's switch state.
+
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator providing device payloads and updates.
             device_id (str): Identifier of the parent device this plug belongs to.
             plug_index (int): 1-based index of the plug within the device's sorted smart-plug list.
             plug_sn (str): Serial number of the smart plug used to locate the plug in payloads.
             plug_key (str): Stable subdevice key used to form the entity's internal unique key.
-        
+
         Notes:
             Builds and stores the plug's `device_info` at construction so the device registry can use it when the entity is added.
         """  # noqa: E501
@@ -251,9 +246,8 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """
-        Report whether the smart plug is currently providing power.
-        
+        """Report whether the smart plug is currently providing power.
+
         Returns:
             `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
         """  # noqa: E501

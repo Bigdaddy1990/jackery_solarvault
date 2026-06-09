@@ -40,9 +40,8 @@ class Serializer:  # noqa: D101
         self.closed = None
 
     def open(self) -> None:
-        """
-        Open the serializer and start a YAML stream.
-        
+        """Open the serializer and start a YAML stream.
+
         If the serializer has not been opened, emits a StreamStartEvent using the configured encoding and marks the serializer as opened. Raises SerializerError if the serializer is already opened or has already been closed.
         """  # noqa: E501
         if self.closed is None:
@@ -54,13 +53,12 @@ class Serializer:  # noqa: D101
             raise SerializerError("serializer is already opened")  # noqa: TRY003
 
     def close(self) -> None:
-        """
-        Close the serializer stream and mark the serializer as closed.
-        
+        """Close the serializer stream and mark the serializer as closed.
+
         If the serializer has not been opened, raises a SerializerError. If the
         serializer is open, emits a StreamEndEvent and sets the serializer state to
         closed. If the serializer is already closed, this method does nothing.
-        
+
         Raises:
             SerializerError: If the serializer has not been opened.
         """
@@ -74,12 +72,11 @@ class Serializer:  # noqa: D101
     #    self.close()
 
     def serialize(self, node) -> None:  # noqa: ANN001
-        """
-        Serialize the given node tree into a YAML document by emitting the appropriate stream and document events.
-        
+        """Serialize the given node tree into a YAML document by emitting the appropriate stream and document events.
+
         Parameters:
             node (Node): Root node of the node tree to serialize (for example, ScalarNode, SequenceNode, or MappingNode).
-        
+
         Raises:
             SerializerError: If the serializer has not been opened or has already been closed.
         """  # noqa: E501
@@ -102,11 +99,10 @@ class Serializer:  # noqa: D101
         self.last_anchor_id = 0
 
     def anchor_node(self, node) -> None:  # noqa: ANN001
-        """
-        Register the given node and its descendants in the serializer's anchor table and assign a generated anchor if the same node is seen more than once.
-        
+        """Register the given node and its descendants in the serializer's anchor table and assign a generated anchor if the same node is seen more than once.
+
         This updates self.anchors so every visited node has an entry (initially None). If a node is encountered again, an anchor identifier is generated and stored for that node. Sequence and mapping children are processed recursively.
-        
+
         Parameters:
             node (ScalarNode | SequenceNode | MappingNode): The root node to register; for sequences and mappings, child nodes are traversed recursively.
         """  # noqa: E501
@@ -124,12 +120,11 @@ class Serializer:  # noqa: D101
                     self.anchor_node(value)
 
     def generate_anchor(self, node):  # noqa: ANN001, ANN201
-        """
-        Generate a unique anchor identifier for a node.
-        
+        """Generate a unique anchor identifier for a node.
+
         Parameters:
             node: The node to assign an anchor to.
-        
+
         Returns:
             str: Anchor string formatted with ANCHOR_TEMPLATE and a monotonically increasing numeric id (e.g., "id001").
         """  # noqa: E501
@@ -137,11 +132,10 @@ class Serializer:  # noqa: D101
         return self.ANCHOR_TEMPLATE % self.last_anchor_id
 
     def serialize_node(self, node, parent, index) -> None:  # noqa: ANN001
-        """
-        Emit YAML events for `node`, handling aliases for repeated nodes and emitting the appropriate scalar, sequence, or mapping event sequences.
-        
+        """Emit YAML events for `node`, handling aliases for repeated nodes and emitting the appropriate scalar, sequence, or mapping event sequences.
+
         If `node` has already been serialized, an AliasEvent for the node's anchor is emitted. Otherwise the node is marked as serialized, the resolver context is adjusted based on `parent` and `index`, the node's events are emitted (including implicit tag decisions), and the resolver context is restored.
-        
+
         Parameters:
             node: The node to serialize (ScalarNode, SequenceNode, or MappingNode).
             parent: The parent node used to establish resolver context; may be None.

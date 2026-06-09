@@ -131,11 +131,10 @@ class JackeryMqttPushClient:
         password: str,
         user_id: str,
     ) -> None:
-        """
-        Start or restart the MQTT push client session for a specific user.
-        
+        """Start or restart the MQTT push client session for a specific user.
+
         If the provided credentials match the running session and the client is already connected, this returns immediately. Otherwise it stops any existing session, builds user-scoped subscription and availability topics, creates an SSL context, records the credential fingerprint and connection attempt, and launches the session runner as a background task. After launching the runner, waits up to 12 seconds for the client to report connected; the wait timeout is suppressed.
-        
+
         Parameters:
             user_id (str): User identifier used to construct the subscription and availability topic namespace.
         """  # noqa: E501
@@ -266,14 +265,13 @@ class JackeryMqttPushClient:
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
-        """
-        Block until the MQTT client is marked connected or raise a RuntimeError if it does not become connected within timeout.
-        
+        """Block until the MQTT client is marked connected or raise a RuntimeError if it does not become connected within timeout.
+
         If the wait times out and no prior `_last_error` exists, this method sets `_last_error` to "publish timeout waiting for MQTT connect" before raising. If a prior `_last_error` exists, or the wait completes but the client is not marked connected, the raised `RuntimeError` will include the current `_last_error`.
-        
+
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        
+
         Raises:
             RuntimeError: If the client is not connected after waiting; the exception message includes the current `_last_error` when available.
         """  # noqa: E501
@@ -316,9 +314,8 @@ class JackeryMqttPushClient:
         password: str,
         ssl_context: ssl.SSLContext,
     ) -> None:
-        """
-        Run an MQTT session: connect to the broker, subscribe to configured topics, forward incoming messages for processing, and maintain connection and diagnostic state.
-        
+        """Run an MQTT session: connect to the broker, subscribe to configured topics, forward incoming messages for processing, and maintain connection and diagnostic state.
+
         On a successful connection this sets internal connection flags and timestamps, subscribes to the client's topic list (using lower QoS for notice topics and higher QoS for others), publishes the retained "birth" (online) message to the availability topic when configured, and dispatches incoming messages to the internal message handler. It also schedules the optional connect callback once connected and schedules the optional disconnect callback when a previously established session ends. On connect or runtime errors it updates internal error state and the connected event to reflect whether the termination was a connect failure.
         """  # noqa: E501
         connected = False
@@ -493,12 +490,11 @@ class JackeryMqttPushClient:
 
     @staticmethod
     def _is_connect_auth_failure_rc(rc: int) -> bool:
-        """
-        Identify whether an MQTT CONNACK code indicates an authentication failure.
-        
+        """Identify whether an MQTT CONNACK code indicates an authentication failure.
+
         Parameters:
             rc (int): CONNACK return code to evaluate.
-        
+
         Returns:
             True if `rc` is 4, 5, 134, or 135 (authentication failure codes), False otherwise.
         """  # noqa: E501
@@ -575,11 +571,10 @@ class JackeryMqttPushClient:
         topic: str,
         payload: bytes | bytearray | str,
     ) -> None:
-        """
-        Validate and dispatch an incoming MQTT message payload.
-        
+        """Validate and dispatch an incoming MQTT message payload.
+
         Parses the payload as UTF-8 JSON and requires the top-level value to be an object. If `FIELD_BODY` is not a dict but `FIELD_DATA` is, promotes `FIELD_DATA` into `FIELD_BODY`. On successful validation updates diagnostics (`_messages_seen`, `_last_message_at`, clears `_last_message_error`) and schedules the configured message callback with `(topic, data)`. On parse or validation failure increments `_messages_dropped` and sets `_last_message_error`.
-        
+
         Parameters:
             topic (str): MQTT topic the message was received on.
             payload (bytes | bytearray | str): Raw message payload; bytes/bytearray are decoded as UTF-8, str is used as-is.
@@ -621,9 +616,7 @@ class JackeryMqttPushClient:
         """  # noqa: E501
 
         async def _runner() -> None:
-            """
-            Execute the provided coroutine until it completes.
-            """
+            """Execute the provided coroutine until it completes."""
             await coro
 
         task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
@@ -645,9 +638,8 @@ class JackeryMqttPushClient:
 
     @staticmethod
     def _utc_now_iso() -> str:
-        """
-        Get the current UTC time as an ISO 8601-formatted string including timezone information.
-        
+        """Get the current UTC time as an ISO 8601-formatted string including timezone information.
+
         Returns:
             str: ISO 8601 representation of the current UTC time including the timezone designator.
         """  # noqa: E501
@@ -655,12 +647,11 @@ class JackeryMqttPushClient:
 
     @staticmethod
     def _redact_topic(topic: str | None) -> str | None:
-        """
-        Redacts the user identifier segment from an MQTT topic when the topic uses the configured topic prefix.
-        
+        """Redacts the user identifier segment from an MQTT topic when the topic uses the configured topic prefix.
+
         Parameters:
             topic: MQTT topic to redact, or None.
-        
+
         Returns:
             The topic with the third segment replaced by `REDACTED_VALUE` when the first two segments match `MQTT_TOPIC_PREFIX`; `None` if `topic` is `None`.
         """  # noqa: E501
@@ -699,15 +690,14 @@ class JackeryMqttPushClient:
         """  # noqa: E501
 
         def topic_value(topic: str | None) -> str | None:
-            """
-            Return the topic with the user-specific segment redacted when redaction is enabled.
-            
+            """Return the topic with the user-specific segment redacted when redaction is enabled.
+
             Parameters:
                 topic (str | None): MQTT topic to process; may be None.
-            
+
             Returns:
                 None if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic.
-            """  # noqa: D206, E101, E501
+            """  # noqa: E501
             return self._redact_topic(topic) if redact_topics else topic
 
         return {
@@ -743,9 +733,8 @@ class JackeryMqttPushClient:
 
     @property
     def diagnostics(self) -> dict[str, Any]:
-        """
-        Provide a diagnostics snapshot for the MQTT push client.
-        
+        """Provide a diagnostics snapshot for the MQTT push client.
+
         Returns:
             dict[str, Any]: Snapshot containing connection state and flags, timestamps for last connect/disconnect/message/publish, message counters and last message error, subscribed topics (optionally redacted) and last published topic, TLS status and certificate source, broker host/port, connection attempt and authentication-failure metrics, and computed monitoring metrics.
         """  # noqa: E501
@@ -779,9 +768,8 @@ class JackeryMqttPushClient:
 
     @property
     def consecutive_auth_failures(self) -> int:
-        """
-        Number of consecutive MQTT authentication failures observed for connect attempts.
-        
+        """Number of consecutive MQTT authentication failures observed for connect attempts.
+
         Returns:
             The count of consecutive authentication failures.
         """  # noqa: E501

@@ -21,16 +21,15 @@ class Mark:  # noqa: D101
         self.pointer = pointer
 
     def get_snippet(self, indent=4, max_length=75):  # noqa: ANN001, ANN201
-        """
-        Produce a single-line excerpt of the source buffer with a caret pointing at the marker's pointer.
-        
+        """Produce a single-line excerpt of the source buffer with a caret pointing at the marker's pointer.
+
         Parameters:
-        	indent (int): Number of leading spaces before the snippet.
-        	max_length (int): Maximum length of the excerpt; longer content is truncated and indicated with " ... ".
-        
+                indent (int): Number of leading spaces before the snippet.
+                max_length (int): Maximum length of the excerpt; longer content is truncated and indicated with " ... ".
+
         Returns:
-        	str or None: The formatted snippet followed by a newline and a caret aligned under the pointer, or `None` if the mark has no buffer.
-        """  # noqa: E501
+                str or None: The formatted snippet followed by a newline and a caret aligned under the pointer, or `None` if the mark has no buffer.
+        """  # noqa: D206, E101, E501
         if self.buffer is None:
             return None
         head = ""
@@ -63,9 +62,8 @@ class Mark:  # noqa: D101
         )
 
     def __str__(self) -> str:
-        """
-        Return a human-readable description of this mark's location and an optional source snippet.
-        
+        """Return a human-readable description of this mark's location and an optional source snippet.
+
         Returns:
             str: Description containing the mark's name and 1-based line and column numbers; if a buffer is available, the description is followed by a one-line source excerpt with a caret (`^`) indicating the marker position.
         """  # noqa: E501
@@ -109,9 +107,8 @@ class MarkedYAMLError(YAMLError):  # noqa: D101
         self.note = note
 
     def __str__(self) -> str:
-        """
-        Return a formatted error message that includes optional context, source marks, a problem description, and a note.
-        
+        """Return a formatted error message that includes optional context, source marks, a problem description, and a note.
+
         Assembles lines in the following order, joining them with newline characters: context (if present); the context mark only when the problem or problem mark is missing or when the context and problem marks refer to different locations (name, line, or column); problem (if present); problem mark (if present); note (if present).
         """  # noqa: E501
         lines = []

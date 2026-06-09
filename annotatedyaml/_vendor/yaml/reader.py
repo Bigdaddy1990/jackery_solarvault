@@ -25,9 +25,8 @@ from .error import Mark, YAMLError
 
 class ReaderError(YAMLError):  # noqa: D101
     def __init__(self, name, position, character, encoding, reason) -> None:  # noqa: ANN001
-        """
-        Create a ReaderError holding context about a decoding or character validation failure.
-        
+        """Create a ReaderError holding context about a decoding or character validation failure.
+
         Parameters:
             name (str): Source name or identifier where the error occurred.
             position (int): Byte or character index in the source where the offending value was observed.
@@ -86,12 +85,11 @@ class Reader:  # noqa: D101
     # Yeah, it's ugly and slow.
 
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Initialize the Reader for a Unicode string, a bytes object, or a file-like stream and prepare decoding, buffering, and position-tracking state.
-        
+        """Initialize the Reader for a Unicode string, a bytes object, or a file-like stream and prepare decoding, buffering, and position-tracking state.
+
         Parameters:
             stream (str | bytes | file-like): Source to read from. If a `str`, the content is validated for allowed characters and stored as the internal Unicode buffer with a terminating NUL. If `bytes`, the raw byte buffer is stored and encoding detection is performed. Otherwise `stream` is treated as a file-like object (expected to support `read`) and the reader will read raw bytes from it and detect/initialize decoding.
-        
+
         Notes:
             The initializer sets reader metadata (`name`), cursor/position counters (`index`, `line`, `column`, `pointer`, `stream_pointer`), buffer fields (`buffer`, `raw_buffer`), decoding routine (`raw_decode`) and `encoding`, and the `eof` flag as appropriate for the provided input.
         """  # noqa: E501
@@ -123,14 +121,13 @@ class Reader:  # noqa: D101
             self.determine_encoding()
 
     def peek(self, index=0):  # noqa: ANN001, ANN201
-        """
-        Get the character at the current pointer plus an optional offset.
-        
+        """Get the character at the current pointer plus an optional offset.
+
         Ensures the requested position is available in the internal buffer before accessing it.
-        
+
         Parameters:
             index (int): Offset from the current pointer (0 returns the current character).
-        
+
         Returns:
             str: The character at buffer[pointer + index].
         """  # noqa: E501
@@ -141,12 +138,11 @@ class Reader:  # noqa: D101
             return self.buffer[self.pointer + index]
 
     def prefix(self, length=1):  # noqa: ANN001, ANN201
-        """
-        Return the next substring from the unread buffer without advancing the reader.
-        
+        """Return the next substring from the unread buffer without advancing the reader.
+
         Parameters:
             length (int): Number of characters to include; ensures at least this many characters are available before slicing.
-        
+
         Returns:
             str: The substring of length `length` starting at the current unread buffer position.
         """  # noqa: E501
@@ -178,11 +174,10 @@ class Reader:  # noqa: D101
             length -= 1
 
     def get_mark(self):  # noqa: ANN201
-        """
-        Create a Mark for the reader's current position for error reporting.
-        
+        """Create a Mark for the reader's current position for error reporting.
+
         If the reader was created from an in-memory buffer (no underlying stream), the mark includes the current Unicode buffer and buffer pointer; otherwise the buffer and pointer fields are None.
-        
+
         Returns:
             Mark: Contains `name`, `index`, `line`, `column`, and `buffer`/`pointer` (buffer and pointer are `None` for stream-backed readers).
         """  # noqa: E501
@@ -289,7 +284,7 @@ class Reader:  # noqa: D101
 
         Description:
                 This method reads up to `size` bytes from `self.stream`, initializes `self.raw_buffer` if it is None or appends the data otherwise, increments `self.stream_pointer` by the number of bytes read, and sets `self.eof` to `True` when no bytes are returned.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         data = self.stream.read(size)
         if self.raw_buffer is None:
             self.raw_buffer = data

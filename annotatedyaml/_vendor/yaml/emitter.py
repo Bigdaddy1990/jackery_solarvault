@@ -29,9 +29,8 @@ class ScalarAnalysis:
         allow_double_quoted,  # noqa: ANN001
         allow_block,  # noqa: ANN001
     ) -> None:
-        """
-        Record which scalar styles and formatting are allowed for a given scalar value.
-        
+        """Record which scalar styles and formatting are allowed for a given scalar value.
+
         Parameters:
             scalar (str): The original scalar text.
             empty (bool): True if the scalar is empty.
@@ -157,11 +156,10 @@ class Emitter:  # noqa: D101, PLR0904
         self.state = None
 
     def emit(self, event) -> None:  # noqa: ANN001
-        """
-        Enqueue a YAML event and drive the emitter's state machine to process available events.
-        
+        """Enqueue a YAML event and drive the emitter's state machine to process available events.
+
         Appends the given event to the internal queue and processes queued events until additional lookahead is required, producing YAML output to the configured stream and updating the emitter's internal state.
-        
+
         Parameters:
             event: YAML event to emit (e.g., StreamStartEvent, DocumentStartEvent, ScalarEvent,
                    SequenceStartEvent, MappingStartEvent, AliasEvent, DocumentEndEvent,
@@ -267,20 +265,17 @@ class Emitter:  # noqa: D101, PLR0904
     # Document handlers.
 
     def expect_first_document_start(self):  # noqa: ANN201
-        """
-        Begin processing the first document start event and transition the emitter to process the document root.
-        """  # noqa: E501
+        """Begin processing the first document start event and transition the emitter to process the document root."""  # noqa: E501
         return self.expect_document_start(first=True)
 
     def expect_document_start(self, first=False) -> None:  # noqa: ANN001
-        """
-        Process a document start or stream end event and transition the emitter to the next state.
-        
+        """Process a document start or stream end event and transition the emitter to the next state.
+
         When the current event is a DocumentStartEvent, prepare and emit any YAML version and %TAG directives, update tag prefixes from the event, and emit a document start marker (`---`) unless the document may be emitted implicitly (e.g., the first document without directives and not canonical). When the current event is a StreamEndEvent, emit a pending end marker (`...`) if open-ended and finalize the stream.
-        
+
         Parameters:
             first (bool): If True, treat this as the first document in the stream which may allow omitting an explicit `---` marker.
-        
+
         Raises:
             EmitterError: If the current event is neither a DocumentStartEvent nor a StreamEndEvent.
         """  # noqa: E501
@@ -324,11 +319,10 @@ class Emitter:  # noqa: D101, PLR0904
             raise EmitterError(f"expected DocumentStartEvent, but got {self.event}")  # noqa: TRY003
 
     def expect_document_end(self) -> None:
-        """
-        Handle the DocumentEndEvent by writing the document terminator and transitioning the emitter to expect the next document start.
-        
+        """Handle the DocumentEndEvent by writing the document terminator and transitioning the emitter to expect the next document start.
+
         Writes indentation, emits the explicit document end indicator (`...`) followed by indentation when the event is explicit, flushes the underlying stream, and sets the next state to `expect_document_start`.
-        
+
         Raises:
             EmitterError: if the current event is not a DocumentEndEvent.
         """  # noqa: E501
@@ -410,9 +404,8 @@ class Emitter:  # noqa: D101, PLR0904
             raise EmitterError(f"expected NodeEvent, but got {self.event}")  # noqa: TRY003
 
     def expect_alias(self) -> None:
-        """
-        Emit an alias node for the current event and restore the previous emitter state.
-        
+        """Emit an alias node for the current event and restore the previous emitter state.
+
         Raises:
             EmitterError: If the current event has no anchor.
         """  # noqa: E501
@@ -422,9 +415,8 @@ class Emitter:  # noqa: D101, PLR0904
         self.state = self.states.pop()
 
     def expect_scalar(self) -> None:
-        """
-        Emit the current scalar event using flow indentation when appropriate and restore the previous indentation and emitter state.
-        
+        """Emit the current scalar event using flow indentation when appropriate and restore the previous indentation and emitter state.
+
         This temporarily increases indentation for flow context, emits the scalar for the active event, then restores the previous `indent` and `state`.
         """  # noqa: E501
         self.increase_indent(flow=True)
@@ -445,9 +437,8 @@ class Emitter:  # noqa: D101, PLR0904
         self.state = self.expect_first_flow_sequence_item
 
     def expect_first_flow_sequence_item(self) -> None:
-        """
-        Emit the first item of a flow sequence or close the sequence if it is empty.
-        
+        """Emit the first item of a flow sequence or close the sequence if it is empty.
+
         If the current event is a SequenceEndEvent, closes the flow sequence and restores prior indentation and state; otherwise, writes indentation when required, registers the handler for subsequent items, and emits the first sequence element.
         """  # noqa: E501
         if isinstance(self.event, SequenceEndEvent):  # noqa: F405
@@ -462,9 +453,8 @@ class Emitter:  # noqa: D101, PLR0904
             self.expect_node(sequence=True)
 
     def expect_flow_sequence_item(self) -> None:
-        """
-        Emit the next element of a flow-style sequence or close the sequence when it ends.
-        
+        """Emit the next element of a flow-style sequence or close the sequence when it ends.
+
         If the current event is a sequence end, write the closing `]`, restore indentation and flow level, and return to the previous emitter state. Otherwise, write the item separator (`,`), optionally emit indentation when required, schedule this handler for subsequent items, and emit the next sequence element.
         """  # noqa: E501
         if isinstance(self.event, SequenceEndEvent):  # noqa: F405
@@ -486,7 +476,7 @@ class Emitter:  # noqa: D101, PLR0904
 
     def expect_flow_mapping(self) -> None:
         """Begin emitting a mapping in flow style.
-        
+
         Writes the opening `{`, increments the emitter's flow nesting level, adjusts indentation for flow context, and transitions the state machine to expect the first flow mapping key.
         """  # noqa: E501
         self.write_indicator("{", True, whitespace=True)
@@ -495,9 +485,8 @@ class Emitter:  # noqa: D101, PLR0904
         self.state = self.expect_first_flow_mapping_key
 
     def expect_first_flow_mapping_key(self) -> None:
-        """
-        Emit the first key of a flow-style mapping or close the mapping if it ends.
-        
+        """Emit the first key of a flow-style mapping or close the mapping if it ends.
+
         If the current event is a MappingEndEvent, write the closing '}' and restore the emitter's flow level and indentation state. Otherwise, ensure indentation when in canonical mode or when the line is over the configured width, then either emit the key as a simple key (when allowed) and push the corresponding simple-value handler, or emit an explicit mapping key indicator ('?'), push the mapping-value handler, and emit the key node.
         """  # noqa: E501
         if isinstance(self.event, MappingEndEvent):  # noqa: F405
@@ -517,9 +506,8 @@ class Emitter:  # noqa: D101, PLR0904
                 self.expect_node(mapping=True)
 
     def expect_flow_mapping_key(self) -> None:
-        """
-        Emit the next key in a flow-style mapping or close the mapping if its end event is received.
-        
+        """Emit the next key in a flow-style mapping or close the mapping if its end event is received.
+
         If the current event is a mapping end, restore the previous indentation, decrement the flow level, write the closing `}` (and a separating comma/indent when in canonical mode), and return to the previous emitter state. Otherwise, write the item separator `,`, optionally write indentation if needed, and then either emit the key as a simple key (pushing the simple-value handler) when eligible, or write the explicit key indicator `?`, push the mapping-value handler, and emit the key node.
         """  # noqa: E501
         if isinstance(self.event, MappingEndEvent):  # noqa: F405
@@ -562,9 +550,8 @@ class Emitter:  # noqa: D101, PLR0904
     # Block sequence handlers.
 
     def expect_block_sequence(self) -> None:
-        """
-        Enter block sequence emission: adjust indentation for block context and transition to the first block-sequence-item state.
-        
+        """Enter block sequence emission: adjust indentation for block context and transition to the first block-sequence-item state.
+
         If the sequence is inside a mapping and the emitter is not at an indention point, treat it as indentless when increasing indentation.
         """  # noqa: E501
         indentless = self.mapping_context and not self.indention
@@ -695,11 +682,10 @@ class Emitter:  # noqa: D101, PLR0904
         )
 
     def check_simple_key(self):  # noqa: ANN201
-        """
-        Determine whether the current event is eligible to be emitted as a simple key.
-        
+        """Determine whether the current event is eligible to be emitted as a simple key.
+
         Calculates an approximate length of the key representation (including prepared anchor, prepared tag, and scalar text) and checks eligibility constraints: total length must be less than 128 and the event must be an alias, a non-empty single-line scalar, or an empty sequence/mapping. May populate `self.prepared_anchor`, `self.prepared_tag`, and `self.analysis` as cached side effects.
-        
+
         Returns:
             `true` if the event qualifies as a simple key, `false` otherwise.
         """  # noqa: E501
@@ -750,11 +736,10 @@ class Emitter:  # noqa: D101, PLR0904
         self.prepared_anchor = None
 
     def process_tag(self) -> None:
-        """
-        Decide whether the current event's tag should be emitted, prepare it if required, and write it to the output.
-        
+        """Decide whether the current event's tag should be emitted, prepare it if required, and write it to the output.
+
         For scalar events this honors the chosen scalar style and the event's implicit flags; for non-scalar events it honors the event's implicit flag. If tag emission is suppressed by emitter rules, no tag is written. If a tag must be emitted but is not provided, an exception is raised.
-            
+
         Raises:
             EmitterError: If a tag is required but not specified.
         """  # noqa: E501
@@ -783,11 +768,10 @@ class Emitter:  # noqa: D101, PLR0904
         self.prepared_tag = None
 
     def choose_scalar_style(self):  # noqa: ANN201
-        """
-        Determine the YAML scalar style to use for the current scalar event.
-        
+        """Determine the YAML scalar style to use for the current scalar event.
+
         Considers the event's explicit style, the emitter's canonical mode, the event's implicit flags, the current context (flow level and simple-key), and the precomputed scalar analysis.
-        
+
         Returns:
             style (str): The scalar style indicator:
               - `"` for double-quoted style
@@ -830,9 +814,8 @@ class Emitter:  # noqa: D101, PLR0904
         return '"'
 
     def process_scalar(self) -> None:
-        """
-        Emit the current event's scalar using the appropriate YAML scalar style.
-        
+        """Emit the current event's scalar using the appropriate YAML scalar style.
+
         Ensures the scalar has been analyzed and a style has been selected, then writes the scalar to the output using the chosen writer (plain, single-quoted, double-quoted, folded, or literal). Uses line-splitting when not emitting a simple key, and clears the emitter's temporary analysis and style state after emission.
         """  # noqa: E501
         if self.analysis is None:
@@ -938,17 +921,16 @@ class Emitter:  # noqa: D101, PLR0904
         return "".join(chunks)
 
     def prepare_tag(self, tag):  # noqa: ANN001, ANN201
-        """
-        Prepare a YAML tag for emission by resolving registered tag handles and percent-encoding disallowed characters.
-        
+        """Prepare a YAML tag for emission by resolving registered tag handles and percent-encoding disallowed characters.
+
         If the tag is the single-character local tag `"!"`, it is returned unchanged. If the tag starts with a registered prefix, the matching handle is prepended to the percent-encoded suffix; otherwise the suffix is percent-encoded and returned in the form `!<suffix>`.
-        
+
         Parameters:
             tag (str): The input tag to prepare; must be non-empty.
-        
+
         Returns:
             str: The prepared tag suitable for emission (either the unchanged `"!"`, `handle + encoded_suffix`, or `!<encoded_suffix>`).
-        
+
         Raises:
             EmitterError: If `tag` is an empty string.
         """  # noqa: E501
@@ -999,7 +981,7 @@ class Emitter:  # noqa: D101, PLR0904
 
         Raises:
                 EmitterError: If `anchor` is empty or contains any character other than `0-9`, `A-Z`, `a-z`, `-`, or `_`.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         if not anchor:
             raise EmitterError("anchor must not be empty")  # noqa: TRY003
         for ch in anchor:
@@ -1226,11 +1208,10 @@ class Emitter:  # noqa: D101, PLR0904
         whitespace=False,  # noqa: ANN001
         indention=False,  # noqa: ANN001
     ) -> None:
-        """
-        Write a YAML indicator to the output stream and update the emitter's position and state.
-        
+        """Write a YAML indicator to the output stream and update the emitter's position and state.
+
         Ensures a separating space is inserted before the indicator when required, updates `whitespace`, `indention`, `column`, and clears `open_ended`, and encodes the output using the emitter's `encoding` when set.
-        
+
         Parameters:
             indicator (str): The indicator text to write (e.g. '-', '?', ':', ',', '[', ']', '{', '}', '&', '*').
             need_whitespace (bool): If True, prepend a space before `indicator` unless the emitter is already at whitespace.
@@ -1247,9 +1228,8 @@ class Emitter:  # noqa: D101, PLR0904
         self.stream.write(data)
 
     def write_indent(self) -> None:
-        """
-        Ensure the emitter is positioned at the current indentation level by inserting a line break if needed and writing spaces up to self.indent.
-        
+        """Ensure the emitter is positioned at the current indentation level by inserting a line break if needed and writing spaces up to self.indent.
+
         If the current line is not at the target indentation, writes a line break and then writes spaces to advance the column to self.indent. Updates self.whitespace and self.column accordingly; if self.encoding is set, the spaces are encoded before writing.
         """  # noqa: E501
         indent = self.indent or 0
@@ -1298,13 +1278,12 @@ class Emitter:  # noqa: D101, PLR0904
         self.write_line_break()
 
     def write_tag_directive(self, handle_text, prefix_text) -> None:  # noqa: ANN001
-        """
-        Write a %TAG directive with the given handle and prefix, then write a line break.
-        
+        """Write a %TAG directive with the given handle and prefix, then write a line break.
+
         Parameters:
             handle_text (str): Tag handle to write after `%TAG` (e.g., '!yaml!').
             prefix_text (str): Tag prefix or URI to write after the handle.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         data = f"%TAG {handle_text} {prefix_text}"
         if self.encoding:
             data = data.encode(self.encoding)
@@ -1314,11 +1293,10 @@ class Emitter:  # noqa: D101, PLR0904
     # Scalar streams.
 
     def write_single_quoted(self, text, split=True) -> None:  # noqa: ANN001, PLR0912
-        """
-        Emit a single-quoted YAML scalar to the emitter's output stream.
-        
+        """Emit a single-quoted YAML scalar to the emitter's output stream.
+
         The scalar is written surrounded by single quotes; internal single quotes are represented by doubling them, and existing line breaks in the text are preserved and emitted as YAML line breaks. When `split` is True, the emitter may insert line breaks and indentation to respect the configured line width; when False, the scalar is emitted without automatic splitting.
-        
+
         Parameters:
             text (str): The scalar content to emit.
             split (bool): Allow the emitter to insert line breaks/indentation to respect configured line width when True.
@@ -1473,17 +1451,16 @@ class Emitter:  # noqa: D101, PLR0904
         self.write_indicator('"', False)
 
     def determine_block_hints(self, text):  # noqa: ANN001, ANN201
-        """
-        Compute block-scalar header hints for indentation and chomping based on the scalar text.
-        
+        """Compute block-scalar header hints for indentation and chomping based on the scalar text.
+
         The hint string may include an indentation indicator (the emitter's best indent as a decimal)
         when the text begins with whitespace or a line break, and a chomping indicator:
         '-' to strip the final line break, '+' to keep trailing line breaks, or no chomping
         indicator when the default chomping applies.
-        
+
         Parameters:
             text (str): The scalar content to inspect.
-        
+
         Returns:
             str: The hint string to append to a block scalar indicator (for example, '2-', '+', or '').
         """  # noqa: E501
@@ -1498,11 +1475,10 @@ class Emitter:  # noqa: D101, PLR0904
         return hints
 
     def write_folded(self, text) -> None:  # noqa: ANN001, PLR0912
-        """
-        Emit a folded block scalar using the `>` indicator.
-        
+        """Emit a folded block scalar using the `>` indicator.
+
         Writes the block header with computed indentation and chomping hints, then serializes `text` according to YAML folded-scalar rules (preserving and folding line breaks and spaces and emitting required indentation/line breaks). If the computed chomping indicator is `+`, sets `self.open_ended = True`.
-        
+
         Parameters:
             text (str): Scalar content to emit as a folded block scalar.
         """  # noqa: E501
@@ -1604,11 +1580,10 @@ class Emitter:  # noqa: D101, PLR0904
             end += 1
 
     def write_plain(self, text, split=True) -> None:  # noqa: ANN001, PLR0912, PLR0915
-        """
-        Emit a plain (unquoted) scalar value to the configured output stream.
-        
+        """Emit a plain (unquoted) scalar value to the configured output stream.
+
         If the emitter is in root context, this sets the emitter to open-ended before writing. If `text` is empty, nothing is written. The `split` flag controls whether the emitter may insert indentation/line breaks to avoid exceeding the configured line width (`best_width`).
-        
+
         Parameters:
             text (str): The scalar content to emit.
             split (bool): If True, allow automatic insertion of indentation/line breaks to keep lines within `best_width`; if False, avoid automatic splitting.

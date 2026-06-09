@@ -158,7 +158,7 @@ def _wire_float(value: Any) -> float:  # noqa: ANN401
 
     Raises:
         HomeAssistantError: If the input cannot be parsed as a float (error message: "invalid number value").
-    """  # noqa: D206, E101, E501
+    """  # noqa: E501
     parsed = safe_float(value)
     if parsed is None:
         raise HomeAssistantError("invalid number value")  # noqa: TRY003
@@ -529,7 +529,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
                 A tuple of allowed native values. Returns an empty tuple when there is no restriction.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         allowed = self.entity_description.allowed_values
         if allowed is None:
             return ()

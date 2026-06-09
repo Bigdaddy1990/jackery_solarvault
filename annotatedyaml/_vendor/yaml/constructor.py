@@ -29,9 +29,8 @@ class BaseConstructor:  # noqa: D101
     yaml_multi_constructors = {}  # noqa: RUF012
 
     def __init__(self) -> None:
-        """
-        Initialize constructor state for node construction and recursion detection.
-        
+        """Initialize constructor state for node construction and recursion detection.
+
         Attributes:
             constructed_objects (dict): Mapping from node objects to their constructed Python objects.
             recursive_objects (dict): Nodes currently under construction used to detect recursion.
@@ -117,18 +116,17 @@ class BaseConstructor:  # noqa: D101
         return data
 
     def construct_object(self, node, deep=False):  # noqa: ANN001, ANN201, PLR0912
-        """
-        Construct a Python object from a YAML node, caching the result and detecting recursion.
-        
+        """Construct a Python object from a YAML node, caching the result and detecting recursion.
+
         Selects and invokes the appropriate constructor for the node's tag, caches the constructed value so subsequent constructions of the same node return the cached object, and supports constructor generators by advancing them to their first yield (generators may be exhausted immediately when `deep` is True or queued for later completion).
-        
+
         Parameters:
             node: The YAML node to construct.
             deep (bool): If True, force full construction of nested values for this call.
-        
+
         Returns:
             The Python object constructed from `node`.
-        
+
         Raises:
             ConstructorError: If a recursive node is detected that cannot be constructed (construction already in progress).
         """  # noqa: E501
@@ -183,15 +181,14 @@ class BaseConstructor:  # noqa: D101
         return data
 
     def construct_scalar(self, node):  # noqa: ANN001, ANN201, PLR6301
-        """
-        Constructs a Python value from a YAML scalar node.
-        
+        """Constructs a Python value from a YAML scalar node.
+
         Parameters:
             node (ScalarNode): The YAML scalar node to construct.
-        
+
         Returns:
             The scalar node's value.
-        
+
         Raises:
             ConstructorError: If `node` is not a `ScalarNode`.
         """
@@ -272,7 +269,7 @@ class BaseConstructor:  # noqa: D101
 
         Raises:
                 ConstructorError: If `node` is not a MappingNode.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         if not isinstance(node, MappingNode):  # noqa: F405
             raise ConstructorError(
                 None,
@@ -304,11 +301,10 @@ class BaseConstructor:  # noqa: D101
 
     @classmethod
     def add_multi_constructor(cls, tag_prefix, multi_constructor) -> None:  # noqa: ANN001
-        """
-        Register a multi-constructor for a YAML tag prefix on the class.
-        
+        """Register a multi-constructor for a YAML tag prefix on the class.
+
         If the class inherits `yaml_multi_constructors`, a shallow copy is made before modification to avoid mutating the parent class's mapping. Associates `tag_prefix` (use `None` for the fallback) with `multi_constructor`.
-        
+
         Parameters:
             tag_prefix (str | None): Tag prefix to register; use `None` to provide a fallback constructor.
             multi_constructor (callable): Constructor callable invoked for tags that start with `tag_prefix`.
@@ -320,14 +316,13 @@ class BaseConstructor:  # noqa: D101
 
 class SafeConstructor(BaseConstructor):  # noqa: D101
     def construct_scalar(self, node):  # noqa: ANN001, ANN201
-        """
-        Construct a scalar value from a YAML node, using a mapping entry tagged `tag:yaml.org,2002:value` as the scalar if present.
-        
+        """Construct a scalar value from a YAML node, using a mapping entry tagged `tag:yaml.org,2002:value` as the scalar if present.
+
         If `node` is a mapping that contains an entry whose key has the tag `tag:yaml.org,2002:value`, the value of that entry is used as the constructed scalar; otherwise the node is handled by the superclass scalar constructor.
-        
+
         Parameters:
             node: The YAML node to construct from. May be a ScalarNode or a MappingNode containing a `tag:yaml.org,2002:value` entry.
-        
+
         Returns:
             The constructed scalar value for `node`.
         """  # noqa: E501
@@ -405,9 +400,8 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         return super().construct_mapping(node, deep=deep)
 
     def construct_yaml_null(self, node) -> None:  # noqa: ANN001
-        """
-        Produce Python None for a YAML null node.
-        
+        """Produce Python None for a YAML null node.
+
         This constructor maps a YAML null scalar to Python's None; the node's scalar value is ignored.
         """  # noqa: E501
         self.construct_scalar(node)
@@ -472,12 +466,11 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
     nan_value = -inf_value / inf_value  # Trying to make a quiet NaN (like C99).
 
     def construct_yaml_float(self, node):  # noqa: ANN001, ANN201
-        """
-        Parse a YAML scalar node into a Python float, supporting sign prefixes, underscores, `.inf`/`.nan`, and sexagesimal (`:`) notation.
-        
+        """Parse a YAML scalar node into a Python float, supporting sign prefixes, underscores, `.inf`/`.nan`, and sexagesimal (`:`) notation.
+
         Parameters:
             node: YAML scalar node containing the textual float representation.
-        
+
         Returns:
             A Python float parsed from the scalar. `+.inf`/`-.inf` map to `self.inf_value` with sign applied, and `.nan` maps to `self.nan_value`.
         """  # noqa: E501
@@ -504,15 +497,14 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         return sign * float(value)
 
     def construct_yaml_binary(self, node):  # noqa: ANN001, ANN201
-        """
-        Decode a base64-encoded YAML scalar into raw bytes.
-        
+        """Decode a base64-encoded YAML scalar into raw bytes.
+
         Parameters:
             node (ScalarNode): YAML scalar node containing base64-encoded ASCII data.
-        
+
         Returns:
             bytes: Decoded binary data.
-        
+
         Raises:
             ConstructorError: If the scalar cannot be encoded to ASCII or if base64 decoding fails.
         """  # noqa: E501
@@ -547,12 +539,11 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
     )
 
     def construct_yaml_timestamp(self, node):  # noqa: ANN001, ANN201
-        """
-        Parse a YAML timestamp scalar into its corresponding Python value.
-        
+        """Parse a YAML timestamp scalar into its corresponding Python value.
+
         Parameters:
             node: A YAML scalar node containing a timestamp string matching the constructor's expected pattern.
-        
+
         Returns:
             `datetime.date` when the scalar contains only a date (YYYY-MM-DD); otherwise a `datetime.datetime` with hour, minute, second, and microsecond (fractional seconds truncated or padded to six digits) and `tzinfo` set for timezone offsets or UTC.
         """  # noqa: E501
@@ -635,15 +626,14 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
     def construct_yaml_pairs(self, node):  # noqa: ANN001, ANN201
         # Note: the same code as `construct_yaml_omap`.
-        """
-        Builds a list of (key, value) pairs from a YAML sequence whose elements are single-item mappings.
-        
+        """Builds a list of (key, value) pairs from a YAML sequence whose elements are single-item mappings.
+
         Parameters:
             node: SequenceNode — a YAML sequence where each element must be a MappingNode containing exactly one key/value pair.
-        
+
         Returns:
             pairs (list): A list of (key, value) tuples constructed from the sequence elements.
-        
+
         Raises:
             ConstructorError: If `node` is not a sequence, if an element is not a mapping, or if a mapping element does not contain exactly one item.
         """  # noqa: E501
@@ -678,14 +668,13 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
             pairs.append((key, value))
 
     def construct_yaml_set(self, node):  # noqa: ANN001, ANN201
-        """
-        Construct a Python set from a YAML mapping node, yielding an empty set first to support recursive references.
-        
+        """Construct a Python set from a YAML mapping node, yielding an empty set first to support recursive references.
+
         Yields an empty set immediately so other nodes can reference it during construction, then populates and returns the set with keys constructed from the mapping node.
-        
+
         Parameters:
             node: The YAML MappingNode whose keys represent set members.
-        
+
         Returns:
             set: A Python set containing the constructed keys from the mapping node.
         """  # noqa: E501
@@ -706,9 +695,8 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         return self.construct_scalar(node)
 
     def construct_yaml_seq(self, node):  # noqa: ANN001, ANN201
-        """
-        Construct a YAML sequence node into a Python list, yielding an initially empty list to support recursive references.
-        
+        """Construct a YAML sequence node into a Python list, yielding an initially empty list to support recursive references.
+
         Returns:
             list: The constructed list; yielded empty before population so recursive structures can reference it during construction.
         """  # noqa: E501
@@ -717,12 +705,11 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         data.extend(self.construct_sequence(node))
 
     def construct_yaml_map(self, node):  # noqa: ANN001, ANN201
-        """
-        Construct a Python dict from a YAML mapping node, yielding an initially empty dict to support recursive references.
-        
+        """Construct a Python dict from a YAML mapping node, yielding an initially empty dict to support recursive references.
+
         Parameters:
             node (MappingNode): The YAML mapping node to construct.
-        
+
         Returns:
             dict: A dictionary populated with constructed key/value pairs from the mapping node.
         """  # noqa: E501
@@ -732,18 +719,17 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         data.update(value)
 
     def construct_yaml_object(self, node, cls):  # noqa: ANN001, ANN201
-        """
-        Create an uninitialized instance of `cls` from a mapping node and populate its state.
-        
+        """Create an uninitialized instance of `cls` from a mapping node and populate its state.
+
         Yields the newly allocated instance so callers can obtain a reference before its contents are filled. After the yield, constructs a mapping from `node` and applies it to the instance: if the instance implements `__setstate__`, the constructed mapping is passed to `__setstate__` (constructed with deep construction); otherwise the mapping is used to update the instance's `__dict__`.
-        
+
         Parameters:
             node: The mapping node containing the serialized state.
             cls: The class whose uninitialized instance will be created.
-        
+
         Returns:
             data: The newly allocated instance (yielded before population).
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         data = cls.__new__(cls)
         yield data
         if hasattr(data, "__setstate__"):
@@ -834,14 +820,13 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         return ["^extend$", "^__.*__$"]
 
     def get_state_keys_blacklist_regexp(self):  # noqa: ANN201
-        """
-        Compile and cache a regular expression that matches any blacklisted state key.
-        
+        """Compile and cache a regular expression that matches any blacklisted state key.
+
         Compiles a regex from the patterns returned by get_state_keys_blacklist() and stores it on the instance as the attribute `state_keys_blacklist_regexp` for reuse.
-        
+
         Returns:
             re.Pattern: Compiled regular expression matching blacklisted state keys.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         if not hasattr(self, "state_keys_blacklist_regexp"):
             self.state_keys_blacklist_regexp = re.compile(
                 "(" + "|".join(self.get_state_keys_blacklist()) + ")"
@@ -849,12 +834,11 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         return self.state_keys_blacklist_regexp
 
     def construct_python_str(self, node):  # noqa: ANN001, ANN201
-        """
-        Constructs a text value from a YAML scalar node.
-        
+        """Constructs a text value from a YAML scalar node.
+
         Parameters:
             node: The YAML scalar node to construct.
-        
+
         Returns:
             str: The constructed string value.
         """
@@ -872,15 +856,14 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         return self.construct_scalar(node)
 
     def construct_python_bytes(self, node):  # noqa: ANN001, ANN201
-        """
-        Construct a bytes object from a YAML scalar by decoding its base64-encoded ASCII content.
-        
+        """Construct a bytes object from a YAML scalar by decoding its base64-encoded ASCII content.
+
         Parameters:
             node: YAML scalar node containing base64-encoded ASCII text.
-        
+
         Returns:
             The decoded binary data as bytes.
-        
+
         Raises:
             ConstructorError: If the scalar cannot be converted to ASCII or if base64 decoding fails.
         """  # noqa: E501
@@ -901,9 +884,8 @@ class FullConstructor(SafeConstructor):  # noqa: D101
             )
 
     def construct_python_long(self, node):  # noqa: ANN001, ANN201
-        """
-        Convert a YAML integer node to a Python integer.
-        
+        """Convert a YAML integer node to a Python integer.
+
         Returns:
             int: The integer value represented by the YAML node.
         """
@@ -1026,16 +1008,15 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         return getattr(module, object_name)
 
     def construct_python_name(self, suffix, node):  # noqa: ANN001, ANN201
-        """
-        Resolve a Python object from a tag suffix and return it.
-        
+        """Resolve a Python object from a tag suffix and return it.
+
         Parameters:
             suffix (str): Dotted Python name (module or module.object) encoded in the tag suffix.
             node (ScalarNode): YAML scalar node whose value must be empty; used for error location.
-        
+
         Returns:
             object: The Python object referenced by `suffix`.
-        
+
         Raises:
             ConstructorError: If the node's scalar value is not empty or if the name cannot be resolved.
         """  # noqa: E501
@@ -1050,16 +1031,15 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         return self.find_python_name(suffix, node.start_mark)
 
     def construct_python_module(self, suffix, node):  # noqa: ANN001, ANN201
-        """
-        Resolve the Python module named by the tag suffix.
-        
+        """Resolve the Python module named by the tag suffix.
+
         Parameters:
             suffix (str): Dotted module name to resolve.
             node (ScalarNode): YAML scalar node that must be empty; its start_mark is used for error reporting.
-        
+
         Returns:
             module: The module object corresponding to `suffix`.
-        
+
         Raises:
             ConstructorError: If the scalar node is not empty or the module cannot be resolved/imported.
         """  # noqa: E501
@@ -1082,9 +1062,8 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         newobj=False,  # noqa: ANN001
         unsafe=False,  # noqa: ANN001
     ):
-        """
-        Instantiate a Python object by resolving a dotted-name suffix and constructing it with the provided arguments.
-        
+        """Instantiate a Python object by resolving a dotted-name suffix and constructing it with the provided arguments.
+
         Parameters:
             suffix (str): Dotted-name identifying the object to instantiate.
             node: YAML node used to provide location information for errors.
@@ -1092,10 +1071,10 @@ class FullConstructor(SafeConstructor):  # noqa: D101
             kwds (dict, optional): Keyword arguments to pass to the constructor. Defaults to an empty dict.
             newobj (bool, optional): If True and the resolved object is a type, allocate an uninitialized instance via its `__new__` without calling `__init__`.
             unsafe (bool, optional): If False, require the resolved object to be a class; if True, allow non-type callables.
-        
+
         Returns:
             The newly created object instance.
-        
+
         Raises:
             ConstructorError: If the name cannot be resolved or, when `unsafe` is False, the resolved object is not a class.
         """  # noqa: E501
@@ -1147,13 +1126,12 @@ class FullConstructor(SafeConstructor):  # noqa: D101
     def construct_python_object(self, suffix, node):  # noqa: ANN001, ANN201
         # Format:
         #   !!python/object:module.name { ... state ... }
-        """
-        Constructs a Python object instance from a mapping node and applies its saved state, yielding the partially constructed instance to support recursive references.
-        
+        """Constructs a Python object instance from a mapping node and applies its saved state, yielding the partially constructed instance to support recursive references.
+
         Parameters:
             suffix (str): The class identifier suffix from the tag (for example "module.ClassName").
             node (MappingNode): YAML mapping node containing the instance state.
-        
+
         Returns:
             instance: The fully initialized instance of the resolved Python class.
         """  # noqa: E501

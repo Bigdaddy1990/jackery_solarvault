@@ -49,8 +49,8 @@ class _FakeHass:
 
     def async_create_background_task(  # noqa: PLR6301
         self,
-        coro: Any,
-        name: str = "",  # noqa: ANN401
+        coro: Any,  # noqa: ANN401
+        name: str = "",
     ) -> asyncio.Task[Any]:
         return asyncio.get_event_loop().create_task(coro)
 
@@ -114,7 +114,7 @@ class TestAsyncFinishEntryStartupAuthFailure:
                 _STARTUP_TASK_RUNTIME_KEY: asyncio.get_event_loop().create_task(
                     asyncio.sleep(0)
                 )
-            }  # noqa: E501
+            }
         }
 
         with patch(
@@ -250,7 +250,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         hass.data[DOMAIN] = {entry.entry_id: {}}
         coordinator.async_start_mqtt = AsyncMock(
             side_effect=RuntimeError("broker down")
-        )  # noqa: E501
+        )
 
         with (
             patch(

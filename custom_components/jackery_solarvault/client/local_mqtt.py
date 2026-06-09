@@ -259,9 +259,8 @@ class JackeryLocalMqttClient:
             self._connected_event.set()
 
     def _handle_connect_failure(self, rc: int) -> None:
-        """
-        Mark the client as disconnected after a broker CONNACK refusal and record the refusal reason for diagnostics.
-        
+        """Mark the client as disconnected after a broker CONNACK refusal and record the refusal reason for diagnostics.
+
         Parameters:
             rc (int): MQTT CONNACK return code indicating the broker's refusal reason.
         """  # noqa: E501
@@ -397,9 +396,8 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
-        """
-        Determine whether the topic should be suppressed as broad, high-volume noise.
-        
+        """Determine whether the topic should be suppressed as broad, high-volume noise.
+
         Returns:
             True if the topic starts with "$SYS/", or if the configured topic filter is globally broad and the topic starts with "homeassistant/"; False otherwise.
         """  # noqa: E501
@@ -411,11 +409,10 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
-        """
-        Detect whether a payload appears to be a Home Assistant `state_changed` event wrapper.
-        
+        """Detect whether a payload appears to be a Home Assistant `state_changed` event wrapper.
+
         Scans the first bytes of the payload for Home Assistant event markers commonly present in `state_changed` events.
-        
+
         Returns:
             True if the payload prefix contains the markers "event_type", "state_changed", "event_data", "old_state", and "new_state", False otherwise.
         """  # noqa: E501
@@ -461,9 +458,8 @@ class JackeryLocalMqttClient:
         return None
 
     def _is_broad_topic_filter(self) -> bool:
-        """
-        Check whether the configured topic filter is the global MQTT wildcard.
-        
+        """Check whether the configured topic filter is the global MQTT wildcard.
+
         Returns:
             `true` if the topic filter is exactly "#" or "+/#", `false` otherwise.
         """
@@ -471,9 +467,8 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
-        """
-        Check whether an MQTT topic matches a topic filter using the MQTT `+` and `#` wildcards.
-        
+        """Check whether an MQTT topic matches a topic filter using the MQTT `+` and `#` wildcards.
+
         Returns:
             `true` if the topic matches the filter, `false` otherwise.
         """  # noqa: E501
@@ -513,11 +508,10 @@ class JackeryLocalMqttClient:
         )
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """
-            Log any non-cancellation exception raised by a completed asyncio Task.
-            
+            """Log any non-cancellation exception raised by a completed asyncio Task.
+
             Retrieves the task's result to surface exceptions raised during its execution; ignores CancelledError and logs other exceptions at error level.
-            
+
             Parameters:
                 done (asyncio.Task[None]): Completed task to inspect for exceptions.
             """  # noqa: E501
@@ -646,16 +640,15 @@ def _local_mqtt_client(
     hass: HomeAssistant,
     entry: Any,  # noqa: ANN401
 ) -> JackeryLocalMqttClient | None:
-    """
-    Get the JackeryLocalMqttClient instance associated with the given config entry from hass.data.
-    
+    """Get the JackeryLocalMqttClient instance associated with the given config entry from hass.data.
+
     Parameters:
         hass (HomeAssistant): Home Assistant instance containing integration runtime data.
         entry: Config entry-like object with an `entry_id` attribute used as the lookup key.
-    
+
     Returns:
         The per-entry JackeryLocalMqttClient if present, `None` otherwise.
-    """
+    """  # noqa: E501
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None

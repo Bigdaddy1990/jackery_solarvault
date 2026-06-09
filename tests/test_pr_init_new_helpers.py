@@ -58,8 +58,8 @@ class _FakeHass:
 
     def async_create_background_task(  # noqa: PLR6301
         self,
-        coro: Any,
-        name: str = "",  # noqa: ANN401
+        coro: Any,  # noqa: ANN401
+        name: str = "",
     ) -> asyncio.Task[Any]:
         return asyncio.get_event_loop().create_task(coro)
 
@@ -500,7 +500,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = (
@@ -580,7 +580,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = (
@@ -600,7 +600,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry_id]["local_mqtt_client"]
@@ -617,7 +617,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"]
@@ -639,7 +639,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         # Retrieve the sink and call it directly
@@ -663,7 +663,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"]
@@ -681,7 +681,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         assert len(entry._unload_callbacks) == 1  # noqa: SLF001
@@ -695,7 +695,7 @@ class TestAsyncStartLocalMqttNewKeys:
 
         with patch.object(
             JackeryLocalMqttClient, "async_start", new_callable=AsyncMock
-        ):  # noqa: E501
+        ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         bucket = hass.data[DOMAIN][entry.entry_id]

@@ -24,9 +24,8 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper with the output stream and YAML formatting/serialization options.
-        
+        """Initialize the dumper with the output stream and YAML formatting/serialization options.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style: Preferred scalar style or None to use node-specific styles.
@@ -149,9 +148,8 @@ class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize the dumper with the output stream and YAML formatting/serialization options.
-        
+        """Initialize the dumper with the output stream and YAML formatting/serialization options.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style: Preferred scalar style or None to use node-specific styles.

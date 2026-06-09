@@ -1,8 +1,7 @@
 class Token:  # noqa: D100, D101
     def __init__(self, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Create a token and record its source start and end marks.
-        
+        """Create a token and record its source start and end marks.
+
         Parameters:
             start_mark: Mark locating where the token begins in the source, or None if unknown.
             end_mark: Mark locating where the token ends in the source, or None if unknown.
@@ -32,9 +31,8 @@ class DirectiveToken(Token):  # noqa: D101
     id = "<directive>"
 
     def __init__(self, name, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Initialize a DirectiveToken with its directive name, value, and source location marks.
-        
+        """Initialize a DirectiveToken with its directive name, value, and source location marks.
+
         Parameters:
             name (str): Directive name, e.g. "YAML" or "TAG".
             value (str): Directive value as it appears in the source.
@@ -59,9 +57,8 @@ class StreamStartToken(Token):  # noqa: D101
     id = "<stream start>"
 
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """
-        Create a StreamStartToken with optional source location marks and encoding.
-        
+        """Create a StreamStartToken with optional source location marks and encoding.
+
         Parameters:
             start_mark: Start location mark for the token, or None.
             end_mark: End location mark for the token, or None.
@@ -124,14 +121,13 @@ class AliasToken(Token):  # noqa: D101
     id = "<alias>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Create a token carrying a payload and its source location marks.
-        
+        """Create a token carrying a payload and its source location marks.
+
         Parameters:
             value: The token's payload (e.g., alias, anchor, or tag string).
             start_mark: Source mark where the token begins; may be None.
             end_mark: Source mark where the token ends; may be None.
-        """  # noqa: E501
+        """
         self.value = value
         self.start_mark = start_mark
         self.end_mark = end_mark
@@ -141,14 +137,13 @@ class AnchorToken(Token):  # noqa: D101
     id = "<anchor>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Create a token carrying a payload and its source location marks.
-        
+        """Create a token carrying a payload and its source location marks.
+
         Parameters:
             value: The token's payload (e.g., alias, anchor, or tag string).
             start_mark: Source mark where the token begins; may be None.
             end_mark: Source mark where the token ends; may be None.
-        """  # noqa: E501
+        """
         self.value = value
         self.start_mark = start_mark
         self.end_mark = end_mark
@@ -158,14 +153,13 @@ class TagToken(Token):  # noqa: D101
     id = "<tag>"
 
     def __init__(self, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Create a token carrying a payload and its source location marks.
-        
+        """Create a token carrying a payload and its source location marks.
+
         Parameters:
             value: The token's payload (e.g., alias, anchor, or tag string).
             start_mark: Source mark where the token begins; may be None.
             end_mark: Source mark where the token ends; may be None.
-        """  # noqa: E501
+        """
         self.value = value
         self.start_mark = start_mark
         self.end_mark = end_mark
@@ -175,16 +169,15 @@ class ScalarToken(Token):  # noqa: D101
     id = "<scalar>"
 
     def __init__(self, value, plain, start_mark, end_mark, style=None) -> None:  # noqa: ANN001
-        """
-        Create a scalar token containing its textual value, plain-flag, source marks, and optional style.
-        
+        """Create a scalar token containing its textual value, plain-flag, source marks, and optional style.
+
         Parameters:
             value: The scalar content.
             plain: True if the scalar is plain (unquoted), False otherwise.
             start_mark: Source location mark where the token starts.
             end_mark: Source location mark where the token ends.
             style: Optional scalar style indicator (for example, quote style), or None.
-        """
+        """  # noqa: E501
         self.value = value
         self.plain = plain
         self.start_mark = start_mark

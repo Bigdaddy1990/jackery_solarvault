@@ -19,9 +19,8 @@ from .serializer import *  # noqa: F403
 
 class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Create a C-accelerated base YAML loader configured with the given input stream.
-        
+        """Create a C-accelerated base YAML loader configured with the given input stream.
+
         Parameters:
             stream: YAML input source — a text string, bytes, or a file-like object providing YAML content.
         """  # noqa: E501
@@ -32,9 +31,8 @@ class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
 
 class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Constructs a safe C-accelerated YAML loader for the provided input stream.
-        
+        """Constructs a safe C-accelerated YAML loader for the provided input stream.
+
         Parameters:
             stream: YAML input to parse — typically a file-like object, string, or bytes containing YAML content.
         """  # noqa: E501
@@ -45,9 +43,8 @@ class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
 
 class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Create a C-accelerated loader that applies full construction and tag resolution to the given input stream.
-        
+        """Create a C-accelerated loader that applies full construction and tag resolution to the given input stream.
+
         Parameters:
             stream: YAML input source (text/bytes or a file-like object) to be parsed.
         """  # noqa: E501
@@ -98,9 +95,8 @@ class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a C-accelerated YAML dumper configured for emission, representation, and resolution.
-        
+        r"""Initialize a C-accelerated YAML dumper configured for emission, representation, and resolution.
+
         Parameters:
             stream: IO-like target to write the emitted YAML to.
             default_style: Default scalar style (e.g., '|', '>', '"', "'") or None to use no explicit style.
@@ -158,9 +154,8 @@ class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Create a safe C-backed YAML dumper configured with emitter and representer options.
-        
+        r"""Create a safe C-backed YAML dumper configured with emitter and representer options.
+
         Parameters:
             stream: Output stream or file-like object to write YAML to.
             default_style (str | None): Default scalar style (e.g., '|', '>', '"') or None to use no default.
@@ -218,9 +213,8 @@ class CDumper(CEmitter, Serializer, Representer, Resolver):  # noqa: D101, F405
         tags=None,  # noqa: ANN001
         sort_keys=True,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a C-accelerated YAML dumper configured for emission, representation, and resolution.
-        
+        r"""Initialize a C-accelerated YAML dumper configured for emission, representation, and resolution.
+
         Parameters:
             stream: IO-like target to write the emitted YAML to.
             default_style: Default scalar style (e.g., '|', '>', '"', "'") or None to use no explicit style.

@@ -1,25 +1,23 @@
 class Node:  # noqa: D100, D101
     def __init__(self, tag, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Initialize a Node with its tag, value, and optional source-location marks.
-        
+        """Initialize a Node with its tag, value, and optional source-location marks.
+
         Parameters:
             tag: YAML tag identifier for the node.
             value: Python object representing the node content.
             start_mark: Source-location mark for the node's start position, or None.
             end_mark: Source-location mark for the node's end position, or None.
-        """  # noqa: E501
+        """
         self.tag = tag
         self.value = value
         self.start_mark = start_mark
         self.end_mark = end_mark
 
     def __repr__(self) -> str:
-        """
-        Concise string representation of the node that includes its runtime class name, tag, and value.
-        
+        """Concise string representation of the node that includes its runtime class name, tag, and value.
+
         The node's value is rendered with `repr()`.
-        
+
         Returns:
             A string formatted as ClassName(tag=<tag_repr>, value=<value_repr>).
         """  # noqa: E501
@@ -44,16 +42,15 @@ class ScalarNode(Node):  # noqa: D101
     id = "scalar"
 
     def __init__(self, tag, value, start_mark=None, end_mark=None, style=None) -> None:  # noqa: ANN001
-        """
-        Initialize a YAML scalar node with a tag, value, optional start/end location marks, and an optional display style.
-        
+        """Initialize a YAML scalar node with a tag, value, optional start/end location marks, and an optional display style.
+
         Parameters:
-        	tag: The YAML tag for the scalar (e.g., "tag:yaml.org,2002:str").
-        	value: The scalar value.
-        	start_mark: Optional parse location for the start of the scalar or None.
-        	end_mark: Optional parse location for the end of the scalar or None.
-        	style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
-        """  # noqa: E501
+                tag: The YAML tag for the scalar (e.g., "tag:yaml.org,2002:str").
+                value: The scalar value.
+                start_mark: Optional parse location for the start of the scalar or None.
+                end_mark: Optional parse location for the end of the scalar or None.
+                style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
+        """  # noqa: D206, E101, E501
         self.tag = tag
         self.value = value
         self.start_mark = start_mark
@@ -70,9 +67,8 @@ class CollectionNode(Node):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         flow_style=None,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a collection-style YAML node with its tag, contained value, optional source marks, and flow style.
-        
+        """Initialize a collection-style YAML node with its tag, contained value, optional source marks, and flow style.
+
         Parameters:
             tag: YAML tag that identifies the node.
             value: Node content — for SequenceNode, a list of child nodes; for MappingNode, a list of (key_node, value_node) pairs.

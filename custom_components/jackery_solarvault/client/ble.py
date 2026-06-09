@@ -456,14 +456,13 @@ def encrypt_binary_notify(
 
 
 def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
-    """
-    Decrypt a raw notify payload (IV || ciphertext) and parse the contained binary frame header.
-    
-    Expects `raw` as 16-byte IV concatenated with AES-CBC ciphertext; decrypts the ciphertext and validates the binary-frame structure (magic, payload marker, declared body length, and trailer). Raises `ValueError` for any structural or length mismatch (too-short input, ciphertext not AES-block-aligned, wrong magic or payload marker, or truncated body). 
-    
+    """Decrypt a raw notify payload (IV || ciphertext) and parse the contained binary frame header.
+
+    Expects `raw` as 16-byte IV concatenated with AES-CBC ciphertext; decrypts the ciphertext and validates the binary-frame structure (magic, payload marker, declared body length, and trailer). Raises `ValueError` for any structural or length mismatch (too-short input, ciphertext not AES-block-aligned, wrong magic or payload marker, or truncated body).
+
     Returns:
         BleBinaryFrame: Parsed frame with `frame_index`, `chunk_count`, `flags`, `cmd`, `body`, and 4-byte `trailer`.
-    """
+    """  # noqa: E501
     if len(raw) < BLE_AES_IV_LEN + _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
         raise ValueError(f"notify too short: {len(raw)} bytes")  # noqa: TRY003
     iv = raw[:BLE_AES_IV_LEN]
@@ -569,25 +568,24 @@ _HEADER_HEX_LEN: int = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4
 
 
 def parse_plaintext_frame(text: str) -> BleFrame:
-    """
-    Parse a hex-encoded plaintext BLE frame into a BleFrame dataclass.
-    
+    """Parse a hex-encoded plaintext BLE frame into a BleFrame dataclass.
+
     The input must be the module's plaintext-hex frame: magic, version, frame index,
     chunk count, action id, command, payload marker, payload byte-length (hex16),
     followed by the payload bytes encoded as uppercase hex.
-    
+
     Parameters:
         text (str): Hex-encoded plaintext frame string in the format described above.
-    
+
     Returns:
         BleFrame: Parsed frame containing `frame_index`, `chunk_count`, `action_id`,
         `ble_cmd`, and `chunk_payload` (raw bytes).
-    
+
     Raises:
         ValueError: If the input is too short, the magic/version/payload marker do not
         match expected values, the declared payload length does not match the available
         hex data, or any hex field fails to parse.
-    """  # noqa: E501
+    """
     if len(text) < _HEADER_HEX_LEN:
         raise ValueError("frame too short")  # noqa: TRY003
     if not text.startswith(BLE_FRAME_MAGIC):

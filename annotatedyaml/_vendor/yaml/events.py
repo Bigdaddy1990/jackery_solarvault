@@ -13,9 +13,8 @@ class Event:  # noqa: D101
         self.end_mark = end_mark
 
     def __repr__(self) -> str:
-        """
-        Build a representation string listing the event's present attributes among `anchor`, `tag`, `implicit`, and `value`.
-        
+        """Build a representation string listing the event's present attributes among `anchor`, `tag`, `implicit`, and `value`.
+
         Returns:
             representation (str): String in the form `ClassName(key=value, ...)` containing only attributes that exist on the instance.
         """  # noqa: E501
@@ -28,9 +27,8 @@ class Event:  # noqa: D101
 
 class NodeEvent(Event):  # noqa: D101
     def __init__(self, anchor, start_mark=None, end_mark=None) -> None:  # noqa: ANN001
-        """
-        Initialize the event with a node anchor and optional source position marks.
-        
+        """Initialize the event with a node anchor and optional source position marks.
+
         Parameters:
             anchor: Anchor identifier for the node (may be None).
             start_mark: Optional mark indicating the start position in the source.
@@ -51,9 +49,8 @@ class CollectionStartEvent(NodeEvent):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         flow_style=None,  # noqa: ANN001
     ) -> None:
-        """
-        Create a collection-start event with an anchor, tag, implicitness, optional position marks, and flow style.
-        
+        """Create a collection-start event with an anchor, tag, implicitness, optional position marks, and flow style.
+
         Parameters:
             anchor: Anchor name for the collection, or None if not anchored.
             tag: Tag for the collection, or None if not provided.
@@ -79,9 +76,8 @@ class CollectionEndEvent(Event):  # noqa: D101
 
 class StreamStartEvent(Event):  # noqa: D101
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """
-        Create a StreamStartEvent that records optional start/end position markers and an optional stream encoding.
-        
+        """Create a StreamStartEvent that records optional start/end position markers and an optional stream encoding.
+
         Parameters:
             start_mark: Optional start position marker associated with the event.
             end_mark: Optional end position marker associated with the event.
@@ -105,9 +101,8 @@ class DocumentStartEvent(Event):  # noqa: D101
         version=None,  # noqa: ANN001
         tags=None,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a document start event with optional position, explicitness, version, and tag declarations.
-        
+        """Initialize a document start event with optional position, explicitness, version, and tag declarations.
+
         Parameters:
             start_mark: Mark object indicating the event's start position, or None.
             end_mark: Mark object indicating the event's end position, or None.
@@ -124,9 +119,8 @@ class DocumentStartEvent(Event):  # noqa: D101
 
 class DocumentEndEvent(Event):  # noqa: D101
     def __init__(self, start_mark=None, end_mark=None, explicit=None) -> None:  # noqa: ANN001
-        """
-        Create a DocumentEndEvent with optional source position marks and explicitness.
-        
+        """Create a DocumentEndEvent with optional source position marks and explicitness.
+
         Parameters:
             start_mark: Optional start position metadata for the event.
             end_mark: Optional end position metadata for the event.

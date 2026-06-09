@@ -453,7 +453,7 @@ def test_legacy_suffix_matches_digits_only_head_with_underscore_prefix_suffix() 
     assert (
         _legacy_suffix_matches("99999_today_battery_charge", "_today_battery_charge")
         is True
-    )  # noqa: E501
+    )
 
 
 def test_legacy_suffix_matches_rejects_head_with_leading_letter() -> None:

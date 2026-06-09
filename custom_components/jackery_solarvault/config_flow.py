@@ -278,11 +278,10 @@ def _reconfigure_options(
     entry: ConfigEntry,
     user_input: dict[str, Any],
 ) -> dict[str, Any]:
-    """
-    Compose the options mapping to save when reconfiguring an existing config entry.
-    
+    """Compose the options mapping to save when reconfiguring an existing config entry.
+
     Preserves any option keys not exposed by the reconfigure form, applies submitted boolean option toggles from `user_input`, and ensures local-MQTT-related fields are taken from the existing entry rather than the form.
-    
+
     Returns:
         dict[str, Any]: The merged options dictionary ready to be stored on the config entry.
     """  # noqa: E501
@@ -423,11 +422,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @callback
     def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
-        """
-        Abort discovery flows when the integration is already configured or another flow is in progress.
-        
+        """Abort discovery flows when the integration is already configured or another flow is in progress.
+
         If an existing configured entry is present, the flow is aborted with reason "already_configured". If another flow for this integration is in progress (excluding the current flow), the flow is aborted with reason "already_in_progress".
-        
+
         Returns:
             ConfigFlowResult | None: An abort result with the appropriate reason when a duplicate discovery or in-progress flow is detected, `None` otherwise.
         """  # noqa: E501
@@ -451,12 +449,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_user()
 
     async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Route DHCP discovery to the user setup flow unless a duplicate or in-progress discovery aborts the flow.
-        
+        """Route DHCP discovery to the user setup flow unless a duplicate or in-progress discovery aborts the flow.
+
         Parameters:
             discovery_info (Any): DHCP discovery information provided by Home Assistant.
-        
+
         Returns:
             ConfigFlowResult: An abort result when the discovery is duplicate or the result of proceeding to the user step.
         """  # noqa: E501
@@ -477,12 +474,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_user()
 
     async def async_step_zeroconf(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """
-        Handle a Zeroconf discovery event by aborting duplicate or already-in-progress flows, otherwise continue to the user setup step.
-        
+        """Handle a Zeroconf discovery event by aborting duplicate or already-in-progress flows, otherwise continue to the user setup step.
+
         Parameters:
             discovery_info (Any): Discovery payload from Zeroconf; unused by this step.
-        
+
         Returns:
             ConfigFlowResult: An abort result if the discovery is a duplicate or another flow is in progress, otherwise the result returned by the user setup step.
         """  # noqa: E501
@@ -493,13 +489,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Present the user setup form and create a config entry after validating credentials.
-        
+        """Present the user setup form and create a config entry after validating credentials.
+
         Validates and normalizes the submitted username, prevents duplicate configuration, attempts authentication against the Jackery API, and on success creates a config entry containing credentials, API-derived bootstrap data, and resolved default options. If validation or authentication fails, returns the user form populated with appropriate error messages.
+
         Returns:
             A ConfigFlowResult representing either the user form (possibly with errors) or a created config entry.
-        """  # noqa: D206, E101, E501
+        """  # noqa: E501
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -661,11 +657,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """
-        Prompt for the account's current password, validate it with the Jackery API, and update the config entry on success.
-        
+        """Prompt for the account's current password, validate it with the Jackery API, and update the config entry on success.
+
         Aborts if the reauthentication target entry or its stored username cannot be retrieved. On successful authentication, updates the entry data with API-derived bootstrap fields and aborts with FLOW_ABORT_REAUTH_SUCCESSFUL. On authentication or connection failure, re-displays the password form with an appropriate error shown.
-        
+
         Returns:
             ConfigFlowResult: a form to collect a password, an abort result, or an update-and-abort result after successful reauthentication.
         """  # noqa: E501
