@@ -18,14 +18,14 @@ def explore_module(package):  # noqa: ANN001, ANN201
         yield name
 
 
-def main():  # noqa: ANN201
+def main() -> None:  # noqa: ANN201
     """Run the script."""
     if not Path("requirements_all.txt").is_file():
         return
 
     msg = {}
 
-    def add_msg(key, item):  # noqa: ANN001, ANN202
+    def add_msg(key, item) -> None:  # noqa: ANN001, ANN202
         """Add a message."""
         if key not in msg:
             msg[key] = []
