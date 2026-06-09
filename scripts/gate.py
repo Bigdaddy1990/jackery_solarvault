@@ -223,20 +223,25 @@ def _run_gate(gate: Gate, *, fix: bool) -> GateResult:
             return GateResult(gate.name, "SKIP", 0.0, detail=f"{cmd[0]} not on PATH")
         return GateResult(gate.name, "FAIL", 0.0, detail=f"missing tool: {cmd[0]}")
     start = time.perf_counter()
-    proc = subprocess.run(
-        cmd,
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=_subprocess_env(),
-    )
-    duration = time.perf_counter() - start
-    if proc.returncode == 0:
-        return GateResult(gate.name, "PASS", duration)
-    output = (proc.stdout + proc.stderr).strip().splitlines()
-    detail = "\n".join(output[-20:]) if output else f"exit {proc.returncode}"
-    return GateResult(gate.name, "FAIL", duration, detail=detail)
+    try:
+        proc = subprocess.run(
+          cmd,
+          cwd=ROOT,
+          capture_output=True,
+          text=True,
+          check=False,
+          env=_subprocess_env(),
+          timeout=600,
+      )
+      duration = time.perf_counter() - start
+      if proc.returncode == 0:
+          return GateResult(gate.name, "PASS", duration)
+      output = (proc.stdout + proc.stderr).strip().splitlines()
+      detail = "\n".join(output[-20:]) if output else f"exit {proc.returncode}"
+      return GateResult(gate.name, "FAIL", duration, detail=detail)
+  except subprocess.TimeoutExpired:
+      duration = time.perf_counter() - start
+      return GateResult(gate.name, "FAIL", duration, detail=f"timeout after {duration:.1f}s")
 
 
 def _print_results(results: Sequence[GateResult]) -> None:
