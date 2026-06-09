@@ -1,7 +1,0 @@
-# Minimum duplicated line threshold
-MinLineCount: 50
-
-# Paths to ignore for duplication checking
-IgnorePatterns:
-  - docs/**
-  - tests/**
