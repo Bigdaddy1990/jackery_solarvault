@@ -150,7 +150,7 @@ from jackery_solarvault.const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from jackery_solarvault.util import (
+from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     safe_bool,
