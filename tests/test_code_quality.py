@@ -518,7 +518,8 @@ def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> 
         "verify_py314_exception_style",
         script,
     )
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 

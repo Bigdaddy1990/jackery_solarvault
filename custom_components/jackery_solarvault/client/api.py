@@ -15,13 +15,12 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
-from collections.abc import Awaitable, Callable
 import hashlib
 import inspect
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 import aiohttp
@@ -30,7 +29,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
+from jackery_solarvault.const import (
     AES_KEY,
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
@@ -136,7 +135,10 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import app_period_date_bounds, chart_series_debug
+from jackery_solarvault.util import app_period_date_bounds, chart_series_debug
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 _LOGGER = logging.getLogger(__name__)
 
