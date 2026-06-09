@@ -845,4 +845,3 @@ skips = ["B101","B102","B110","B112","B307","B410","B603","B608","B612","B703"]
 MinLineCount= 50
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**","tests/**"]
-
