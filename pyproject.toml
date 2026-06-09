@@ -375,6 +375,9 @@ unfixable = []
 future-annotations = false
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
+"*/scripts/**" = ["E901"]
+"*/*annotetedyaml/**" = ["E901","E501"]
+"*/*tests/**" = ["E901"]
 
 [project.scripts]
 hass = "homeassistant.__main__:main"
