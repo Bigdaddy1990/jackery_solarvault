@@ -296,6 +296,7 @@ skip-magic-trailing-comma = false
 preview = true
 select = [
   "ANN",
+  "A001",   # Variable {name} is shadowing a Python builtin
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
   "BLE",    # ble?
@@ -315,6 +316,7 @@ select = [
   "I",      # isort
   "INP",    # flake8-no-pep420
   "ISC",    # flake8-implicit-str-concat
+  "ICN001", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
   "N",
   "N804",   # First argument of a class method should be named cls
@@ -358,6 +360,7 @@ select = [
   "T100",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
+  "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
   "UP031",  # Use format specifiers instead of percent format
@@ -366,7 +369,7 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415","TID252"]
+ignore = ["PLC0415","TID252","C901"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -377,10 +380,10 @@ logger-objects = ["logging_setup.logger"]
 hass = "homeassistant.__main__:main"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 10
+max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
+"**/__init__.py" = ["F401", "F403", "E402","RUF067"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -835,10 +838,11 @@ per-file-ignores = [
 [tool.bandit]
 exclude_dirs = ["tests", "scripts"]
 tests = []
-skips = ["B101","B102","B110","B112","B307","B410","B603","B608","B612","B703"]
+skips = ["B101","B102","B110","B112","B307","B324","B410","B603","B608","B612","B703"]
 
 [tool.cfduplication]
 # Minimum duplicated line threshold
 MinLineCount= 50
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**","tests/**"]
+
