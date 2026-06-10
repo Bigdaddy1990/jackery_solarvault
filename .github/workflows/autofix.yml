@@ -49,7 +49,7 @@ jobs:
         run: |
           uv pip install --system --upgrade -r requirements.txt 
           uv pip install --system --upgrade -r requirements-test.txt
-          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports codecov codefactor
+          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
         with:
