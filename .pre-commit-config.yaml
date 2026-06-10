@@ -84,7 +84,7 @@ repos:
       - id: destroyed-symlinks
 
   - repo: https://github.com/cheickmec/smellcheck
-    rev: v0.3.1
+    rev: v0.3.10
     hooks:
       - id: smellcheck
         args: ['--fail-on', 'warning']
