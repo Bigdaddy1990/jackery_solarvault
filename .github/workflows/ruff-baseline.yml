@@ -55,7 +55,6 @@ jobs:
           ruff check . --output-format=github || true
           ruff format .
 
-
       - name: Commit baseline changes
         run: |
           if [ -z "$(git status --porcelain)" ]; then
