@@ -22,14 +22,17 @@ import io
 # break code that uses it.
 # ------------------------------------------------------------------------------
 def warnings(settings=None):  # noqa: ANN001, ANN201
-    """Deprecated: stub for configuring YAML warnings — when called with no arguments returns the current warning settings, otherwise performs no action.
+    """Deprecated stub for configuring YAML warnings.
+
+    When called with no arguments it returns the current warning settings.
+    Supplying any value keeps the function as a no-op and returns ``None``.
 
     Parameters:
-        settings (optional): If provided, the function does not modify any state and returns None.
+        settings (optional): Optional warning settings placeholder.
 
     Returns:
-        dict: The current warning settings (an empty dict) when `settings` is None, `None` otherwise.
-    """  # noqa: E501
+        dict | None: ``{}`` when ``settings`` is ``None``; otherwise ``None``.
+    """
     if settings is None:
         return {}
     return None
@@ -58,11 +61,11 @@ def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
     Parameters:
         stream: A text or byte stream containing YAML documents.
-        Loader (class): Loader class to use for parsing (defaults to the module's Loader).
+        Loader (class): Loader class to use for parsing.
 
     Returns:
         Event: Event instances parsed from the stream, yielded one at a time.
-    """  # noqa: E501
+    """
     loader = Loader(stream)
     try:
         while loader.check_event():
@@ -72,15 +75,15 @@ def parse(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
 
 def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
-    """Obtain the representation-tree root node for the first YAML document in the provided stream.
+    """Return the representation-tree root node of the first document.
 
     Parameters:
-        stream: Text or binary stream (or stream-like object) containing YAML content.
-        Loader: Loader class to use for parsing; instantiated with `stream`.
+        stream: Text or binary stream containing YAML content.
+        Loader: Loader class to instantiate with ``stream``.
 
     Returns:
         The root node of the first YAML document's representation tree.
-    """  # noqa: E501
+    """
     loader = Loader(stream)
     try:
         return loader.get_single_node()
@@ -89,15 +92,15 @@ def compose(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
 
 
 def compose_all(stream, Loader=Loader):  # noqa: ANN001, ANN201, F405, N803
-    """Yield the root node of the representation tree for each YAML document in the given stream.
+    """Yield the representation-tree root node for each document in ``stream``.
 
     Parameters:
-        stream: A text or binary stream (or string) containing one or more YAML documents.
-        Loader (class): Loader class to use for parsing; must accept `stream` in its constructor.
+        stream: Text, bytes, or a stream containing YAML documents.
+        Loader (class): Loader class to use for parsing.
 
     Yields:
-        nodes.Node: The root node of the representation tree for each parsed document.
-    """  # noqa: E501
+        nodes.Node: The root node of each parsed document.
+    """
     loader = Loader(stream)
     try:
         while loader.check_node():

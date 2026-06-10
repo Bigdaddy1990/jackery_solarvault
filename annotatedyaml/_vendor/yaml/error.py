@@ -21,15 +21,16 @@ class Mark:  # noqa: D101
         self.pointer = pointer
 
     def get_snippet(self, indent=4, max_length=75):  # noqa: ANN001, ANN201
-        """Produce a single-line excerpt of the source buffer with a caret pointing at the marker's pointer.
+        """Return a one-line excerpt of the source buffer and a caret marker.
 
         Parameters:
-                indent (int): Number of leading spaces before the snippet.
-                max_length (int): Maximum length of the excerpt; longer content is truncated and indicated with " ... ".
+            indent (int): Number of leading spaces before the snippet.
+            max_length (int): Maximum length of the excerpt before truncation.
 
         Returns:
-                str or None: The formatted snippet followed by a newline and a caret aligned under the pointer, or `None` if the mark has no buffer.
-        """  # noqa: E501
+            str | None: Snippet text followed by a caret marker, or ``None``
+                when the mark has no backing buffer.
+        """
         if self.buffer is None:
             return None
         head = ""
@@ -62,11 +63,13 @@ class Mark:  # noqa: D101
         )
 
     def __str__(self) -> str:
-        """Return a human-readable description of this mark's location and an optional source snippet.
+        """Return a human-readable description of this mark.
 
         Returns:
-            str: Description containing the mark's name and 1-based line and column numbers; if a buffer is available, the description is followed by a one-line source excerpt with a caret (`^`) indicating the marker position.
-        """  # noqa: E501
+            str: Description containing the source name plus 1-based line and
+                column numbers. If a buffer is available, a one-line excerpt and
+                caret marker are appended.
+        """
         snippet = self.get_snippet()
         where = '  in "%s", line %d, column %d' % (  # noqa: UP031
             self.name,

@@ -25,11 +25,11 @@ class BaseLoader(Reader, Scanner, Parser, Composer, BaseConstructor, BaseResolve
 
 class FullLoader(Reader, Scanner, Parser, Composer, FullConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Configure the FullLoader to read YAML from the given input stream.
+        """Configure the full loader for the given YAML input stream.
 
         Parameters:
-                stream (str | io.TextIOBase | io.BufferedIOBase): Input YAML as a string or a text/binary file-like object.
-        """  # noqa: E501
+            stream: Input YAML as a string or a text/binary file-like object.
+        """
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405
@@ -55,11 +55,11 @@ class SafeLoader(Reader, Scanner, Parser, Composer, SafeConstructor, Resolver): 
 
 class Loader(Reader, Scanner, Parser, Composer, Constructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Initialize the loader with a YAML input stream and configure its reader, scanner, parser, composer, constructor, and resolver components.
+        """Initialize the legacy unsafe loader with a YAML input stream.
 
         Parameters:
-            stream: YAML input — a text string, bytes, or a file-like object containing the YAML document(s).
-        """  # noqa: E501
+            stream: YAML input as text, bytes, or a file-like object.
+        """
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405
@@ -74,11 +74,11 @@ class Loader(Reader, Scanner, Parser, Composer, Constructor, Resolver):  # noqa:
 # to ensure backwards compatibility.
 class UnsafeLoader(Reader, Scanner, Parser, Composer, Constructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Initialize the loader with a YAML input stream and configure its reader, scanner, parser, composer, constructor, and resolver components.
+        """Initialize the unsafe loader with a YAML input stream.
 
         Parameters:
-            stream: YAML input — a text string, bytes, or a file-like object containing the YAML document(s).
-        """  # noqa: E501
+            stream: YAML input as text, bytes, or a file-like object.
+        """
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405
