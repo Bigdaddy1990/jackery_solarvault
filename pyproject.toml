@@ -550,12 +550,16 @@ mixin-class-rgx = ".*[Mm]ix[Ii]n"
 [tool.smellcheck]
 select = []  # only run these checks (default: all)
 ignore = []          # skip these checks
-per-file-ignores = { "scripts/*" = [], "annotation*/" = [] }  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
 baseline = ".smellcheck-baseline.json"  # suppress known findings
 cache = false                           # enable file-level caching (default: true)
 cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-cache)
+
+# per-path overrides
+[tool.smellcheck.per-file-ignores]
+"scripts/*" = []
+"annotation*/" = []
 
 [tool.pylint."MESSAGES CONTROL"]
 # Reasons disabled:
@@ -845,4 +849,3 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 MinLineCount= 50
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**", "tests/**", "scripts/**", "annotatedyaml/**"]
-

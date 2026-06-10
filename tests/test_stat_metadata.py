@@ -186,9 +186,9 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
 
     found: dict[str, tuple[str | None, object | None]] = {}
     for call in _stat_description_calls():
-        key = _const_keyword(call, "key")
-        if isinstance(key, str) and key in expected:
-            found[key] = (
+        stat_key = _const_keyword(call, "key")
+        if isinstance(stat_key, str) and stat_key in expected:
+            found[stat_key] = (
                 _state_class_keyword(call),
                 _const_keyword(call, "reset_period"),
             )
