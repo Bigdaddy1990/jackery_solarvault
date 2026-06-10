@@ -231,7 +231,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.16"
+required-version = ">=0.15.15"
 line-length = 88
 src = ["custom_components"]
 indent-width = 4
@@ -274,7 +274,7 @@ exclude = [
     "docs",
     "logs",
     "APP",
-    ".scripts"
+    ".scripts",
     ".annotatedyaml"
 ]
 
@@ -550,10 +550,7 @@ mixin-class-rgx = ".*[Mm]ix[Ii]n"
 [tool.smellcheck]
 select = []  # only run these checks (default: all)
 ignore = []          # skip these checks
-per-file-ignores = {
-   "scripts/*" = [],
-   "annotation*/" = []
-}  # per-path overrides
+per-file-ignores = { "scripts/*" = [], "annotation*/" = [] }  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
 baseline = ".smellcheck-baseline.json"  # suppress known findings
