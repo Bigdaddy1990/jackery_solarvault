@@ -35,7 +35,8 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           ruff check . --fix || true
-          pre-commit all-files || true
+          pre-commit run --all-files || true
+          pre-commit run --hook-stage manual python-typing-update pyupgrade --check --py314-plus || true
 
       - name: Commit baseline changes
         run: |
