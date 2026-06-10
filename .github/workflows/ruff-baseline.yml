@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install pip ruff pre-commit --upgrade 
+      - run: python -m pip install pip ruff pre-commit --upgrade
       - run: |
           ruff check ./custom_components/jackery_solarvault --fix || true
           ruff check ./custom_components/jackery_solarvault --unsafe-fixes || true
@@ -57,7 +57,7 @@ jobs:
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual pyupgrade --all-files || true
           pre-commit run --hook-stage manual mypy --all-files || true
-          
+
       - name: Commit baseline changes
         run: |
           if [ -z "$(git status --porcelain)" ]; then
