@@ -15,7 +15,7 @@ import base64
 import re
 from unittest.mock import MagicMock
 
-import annotatedyaml._vendor.yaml as yaml  # noqa: PLC2701
+from annotatedyaml._vendor import yaml
 from annotatedyaml._vendor.yaml import loader as _loader  # noqa: PLC2701
 
 from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
@@ -104,8 +104,9 @@ class TestAddConstructor:
         yaml.add_constructor(tag, constructor_fn, Loader=IsolatedLoader)
 
         assert tag in IsolatedLoader.yaml_constructors
-        # Should NOT be on the global Loader unless it was already there
-        assert tag not in _loader.Loader.yaml_constructors or called_with == []
+        assert tag not in _loader.Loader.yaml_constructors
+        assert tag not in _loader.FullLoader.yaml_constructors
+        assert tag not in _loader.UnsafeLoader.yaml_constructors
 
     def test_add_constructor_loader_none_functional_round_trip(self) -> None:  # noqa: PLR6301
         """Constructor registered with Loader=None is invoked when loading via safe_load-equivalent."""  # noqa: E501
@@ -167,6 +168,8 @@ class TestAddMultiConstructor:
 
         assert prefix in IsolatedLoader.yaml_multi_constructors
         assert prefix not in _loader.Loader.yaml_multi_constructors
+        assert prefix not in _loader.FullLoader.yaml_multi_constructors
+        assert prefix not in _loader.UnsafeLoader.yaml_multi_constructors
 
     def test_add_multi_constructor_functional_with_default_loaders(self) -> None:  # noqa: PLR6301
         """Multi-constructor registered via add_multi_constructor(Loader=None) is invoked during load."""  # noqa: E501
@@ -227,9 +230,12 @@ class TestAddImplicitResolver:
         wildcard_resolvers = IsolatedLoader.yaml_implicit_resolvers.get(None, [])
         assert tag in [t for t, _ in wildcard_resolvers]
 
-        # Should NOT be on the global Loader
         loader_wildcard = _loader.Loader.yaml_implicit_resolvers.get(None, [])
+        full_loader_wildcard = _loader.FullLoader.yaml_implicit_resolvers.get(None, [])
+        unsafe_loader_wildcard = _loader.UnsafeLoader.yaml_implicit_resolvers.get(None, [])
         assert tag not in [t for t, _ in loader_wildcard]
+        assert tag not in [t for t, _ in full_loader_wildcard]
+        assert tag not in [t for t, _ in unsafe_loader_wildcard]
 
     def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(  # noqa: PLR6301
         self,
@@ -617,3 +623,5 @@ class TestAddPathResolver:
 
         assert tag in IsolatedLoader.yaml_path_resolvers.values()
         assert tag not in _loader.Loader.yaml_path_resolvers.values()
+        assert tag not in _loader.FullLoader.yaml_path_resolvers.values()
+        assert tag not in _loader.UnsafeLoader.yaml_path_resolvers.values()
