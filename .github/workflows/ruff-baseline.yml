@@ -54,7 +54,9 @@ jobs:
           ruff check . --fix || true
           ruff check . --output-format=github || true
           ruff format .
-          pre-commit --all-files
+          pre-commit run --all-files || true
+          pre-commit run --hook-stage manual pyupgrade --all-files || true
+          pre-commit run --hook-stage manual mypy --all-files || true
           
       - name: Commit baseline changes
         run: |
