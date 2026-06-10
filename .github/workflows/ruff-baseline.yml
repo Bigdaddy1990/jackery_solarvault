@@ -21,28 +21,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install pip ruff pre-commit --upgrade 
       - run: |
-          ruff check .custom_components.jackery_solarvault --fix || true
-          ruff check .custom_components.jackery_solarvault --unsafe-fixes || true
-          ruff check .custom_components.jackery_solarvault --target-version py314 .custom_components.jackery_solarvault.|| true
-          ruff check .custom_components.jackery_solarvault --preview || true
-          ruff check .custom_components.jackery_solarvault --line-length 88 || true
-          ruff check .custom_components.jackery_solarvault --show-fixes || true
-          ruff check .custom_components.jackery_solarvault --add-noqa || true
-          ruff check .custom_components.jackery_solarvault --extend-select "E","F","I","B","UP","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
-          ruff format .custom_components.jackery_solarvault || true
-          ruff check .custom_components.jackery_solarvault --fix || true
-          ruff check .custom_components.jackery_solarvault --output-format=github || true
-          ruff check .tests --fix || true
-          ruff check .tests --unsafe-fixes || true
-          ruff check .tests --target-version py314 || true
-          ruff check .tests --preview || true
-          ruff check .tests --line-length 88 || true
-          ruff check .tests --show-fixes || true
-          ruff check .tests --add-noqa || true
-          ruff check .tests --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
-          ruff check .tests --fix || true
-          ruff check .tests --output-format=github || true
-          ruff format .tests || true
           ruff check . --fix || true
           ruff check . --unsafe-fixes || true
           ruff check . --target-version py314 || true
@@ -54,6 +32,7 @@ jobs:
           ruff check . --fix || true
           ruff check . --output-format=github || true
           ruff format .
+          pre-commit all-files
 
       - name: Commit baseline changes
         run: |
