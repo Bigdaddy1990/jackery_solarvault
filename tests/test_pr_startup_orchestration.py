@@ -532,7 +532,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
         original_error = HomeAssistantError(
@@ -556,7 +556,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""  # noqa: E501
-        from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
         coordinator = MagicMock()
@@ -838,7 +838,7 @@ def test_api_module_uses_relative_const_import() -> None:
     This test confirms the module imports without error and that encrypt_mqtt_body
     (a new function added in this PR) is available.
     """
-    from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body
+    from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body  # noqa: I001
 
     assert callable(encrypt_mqtt_body)
 
@@ -848,7 +848,7 @@ def test_api_module_encrypt_mqtt_body_requires_16_byte_key() -> None:
 
     This confirms the relative import fix did not break the function.
     """
-    from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body
+    from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body  # noqa: I001
 
     with pytest.raises(ValueError, match="16 bytes"):
         encrypt_mqtt_body({"cmd": 1}, b"0123456789abcdef01234567")  # 24 bytes

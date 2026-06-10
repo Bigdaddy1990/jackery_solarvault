@@ -1,0 +1,4 @@
+-r requirements-test.txt
+homeassistant>=2026.6.1
+prek
+pytest-homeassistant
