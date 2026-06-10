@@ -233,7 +233,7 @@ filterwarnings = [
 target-version = "py314"
 required-version = ">=0.15.16"
 line-length = 88
-src = ["custom_components","tests"]
+src = ["custom_components"]
 indent-width = 4
 show-fixes = true
 fix = true
@@ -275,6 +275,7 @@ exclude = [
     "logs",
     "APP",
     ".scripts"
+    ".annotatedyaml"
 ]
 
 [tool.ruff.analyze]
@@ -296,7 +297,6 @@ skip-magic-trailing-comma = false
 preview = true
 select = [
   "ANN",
-  "A001",   # Variable {name} is shadowing a Python builtin
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
   "BLE",    # ble?
@@ -372,7 +372,7 @@ select = [
 ignore = ["PLC0415", "TID252"]
 fixable = ["ALL"]
 unfixable = []
-future-annotations = false
+future-annotations = true
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
 
@@ -536,7 +536,7 @@ overgeneral-exceptions = [
 ]
 
 [tool.pylint.TYPING]
-runtime-typing = true
+runtime-typing = false
 
 [tool.pylint.CODE_STYLE]
 max-line-length-suggestions = 72
@@ -550,11 +550,14 @@ mixin-class-rgx = ".*[Mm]ix[Ii]n"
 [tool.smellcheck]
 select = []  # only run these checks (default: all)
 ignore = []          # skip these checks
-per-file-ignores = {"tests/*" = []}  # per-path overrides
+per-file-ignores = {
+   "scripts/*" = [],
+   "annotation*/" = []
+}  # per-path overrides
 fail-on = "warning"                  # override default fail-on
 format = "text"                      # override default format
 baseline = ".smellcheck-baseline.json"  # suppress known findings
-cache = true                           # enable file-level caching (default: true)
+cache = false                           # enable file-level caching (default: true)
 cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-cache)
 
 [tool.pylint."MESSAGES CONTROL"]
@@ -836,7 +839,7 @@ per-file-ignores = [
 
 # Bandit configuration aligned with Home Assistant guidelines
 [tool.bandit]
-exclude_dirs = ["tests", "scripts"]
+exclude_dirs = ["tests", "scripts", "annotatedyaml", "docs"]
 tests = []
 skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608", "B612", "B703"]
 
@@ -844,5 +847,5 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 # Minimum duplicated line threshold
 MinLineCount= 50
 # Paths to ignore for duplication checking
-IgnorePatterns = ["docs/**", "tests/**"]
+IgnorePatterns = ["docs/**", "tests/**", "scripts/**", "annotatedyaml/**"]
 
