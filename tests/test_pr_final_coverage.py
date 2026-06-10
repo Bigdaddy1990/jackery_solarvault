@@ -151,7 +151,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
-        from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
@@ -284,7 +284,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped, not re-raised."""
-        from custom_components.jackery_solarvault.button import JackeryRebootButton
+        from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
@@ -350,14 +350,14 @@ def test_query_button_descriptions_count_is_14() -> None:
     The PR introduced 14 documented app-command buttons. This test pins the count
     so that accidental additions or deletions are caught immediately.
     """
-    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS  # noqa: I001
 
     assert len(QUERY_BUTTON_DESCRIPTIONS) == 14  # noqa: PLR2004
 
 
 def test_query_button_descriptions_unique_action_ids() -> None:
     """Every description must have a unique action_id."""
-    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS  # noqa: I001
 
     action_ids = [desc.action_id for desc in QUERY_BUTTON_DESCRIPTIONS]
     assert len(action_ids) == len(set(action_ids)), "Duplicate action_id found"
@@ -365,7 +365,7 @@ def test_query_button_descriptions_unique_action_ids() -> None:
 
 def test_query_button_descriptions_unique_cmds() -> None:
     """Non-subdevice descriptions must each use a unique cmd value."""
-    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS
+    from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS  # noqa: I001
 
     # Non-subdevice buttons each map to a distinct MQTT command.
     non_subdevice = [
@@ -599,7 +599,7 @@ def test_blocked_topic_filters_scoped_topic_not_blocked() -> None:
 
 async def test_read_schedule_button_wraps_untranslated_ha_error() -> None:
     """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""  # noqa: E501
-    from custom_components.jackery_solarvault.button import JackeryReadScheduleButton
+    from custom_components.jackery_solarvault.button import JackeryReadScheduleButton  # noqa: I001
     from homeassistant.exceptions import HomeAssistantError
 
     coordinator = _make_mock_coordinator("12345")

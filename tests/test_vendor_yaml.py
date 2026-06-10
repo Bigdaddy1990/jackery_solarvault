@@ -15,9 +15,8 @@ import base64
 import re
 from unittest.mock import MagicMock
 
-from annotatedyaml._vendor import yaml
+from annotatedyaml._vendor import yaml  # noqa: PLC2701
 from annotatedyaml._vendor.yaml import loader as _loader  # noqa: PLC2701
-
 from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
     ConstructorError,
     FullConstructor,
@@ -232,7 +231,9 @@ class TestAddImplicitResolver:
 
         loader_wildcard = _loader.Loader.yaml_implicit_resolvers.get(None, [])
         full_loader_wildcard = _loader.FullLoader.yaml_implicit_resolvers.get(None, [])
-        unsafe_loader_wildcard = _loader.UnsafeLoader.yaml_implicit_resolvers.get(None, [])
+        unsafe_loader_wildcard = _loader.UnsafeLoader.yaml_implicit_resolvers.get(
+            None, []
+        )  # noqa: E501, RUF100
         assert tag not in [t for t, _ in loader_wildcard]
         assert tag not in [t for t, _ in full_loader_wildcard]
         assert tag not in [t for t, _ in unsafe_loader_wildcard]
