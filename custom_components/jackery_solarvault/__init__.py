@@ -460,7 +460,7 @@ async def _async_finish_entry_startup(  # noqa: PLR0912, PLR0915
 
     Performs API authentication and cloud discovery, attempts an initial HTTP refresh, starts cloud MQTT push, the integration's local MQTT listener (and a direct local-MQTT client if none is present), and BLE transport concurrently. On authentication failures it records a coordinator-facing auth-failure message (so reauth is reported on the next refresh) and defers reporting for MQTT auth failures to the coordinator; on refresh failures it will load a cached discovery snapshot when available. All transport/startup errors are logged; the function always removes the per-entry background startup task marker from runtime storage before returning.
     """  # noqa: E501
-    try:
+    try:  # noqa: PLW0717, RUF100
         try:
             await _async_authenticate_api_layer(hass, entry, coordinator.api)
         except ConfigEntryAuthFailed as err:

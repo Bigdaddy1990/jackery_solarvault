@@ -4305,7 +4305,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_flush_ble_partial_update(self, device_id: str) -> None:
         """Flush the latest pending BLE payload for one device."""
-        try:
+        try:  # noqa: PLW0717, RUF100
             await asyncio.sleep(_BLE_PARTIAL_UPDATE_COALESCE_SEC)
             pending = self._ble_pending_updates.pop(device_id, None)
             if not isinstance(pending, dict):
@@ -6493,7 +6493,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _entity_statistic_ids_by_key(self, device_id: str) -> dict[str, str]:
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
-            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # noqa: I001
             from homeassistant.helpers import entity_registry as er
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Entity registry unavailable for entity repair: %s", err)
