@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> Any:  # noqa: ANN401
     """Lazily import and return the `JackeryMqttPushClient` class when accessed as a module attribute.
 
     Parameters:
@@ -34,7 +34,7 @@ def __getattr__(name: str) -> Any:
 
     Raises:
         AttributeError: If `name` is not `"JackeryMqttPushClient"`.
-    """
+    """  # noqa: E501
     if name == "JackeryMqttPushClient":
         from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
 

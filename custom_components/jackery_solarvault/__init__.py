@@ -79,7 +79,7 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029
     """Set up global Jackery SolarVault services."""
     async_setup_services(hass)
     return True
@@ -96,7 +96,7 @@ def _async_clean_legacy_entities(
     Parameters:
         hass (HomeAssistant): Home Assistant instance.
         entry (JackeryConfigEntry): The config entry for the Jackery SolarVault integration.
-    """
+    """  # noqa: E501
     _async_remove_stale_energy_helpers(hass)
     _async_remove_entities_with_suffixes(
         hass,
@@ -179,11 +179,11 @@ async def _async_authenticate(
     try:
         await api.async_login()
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(
+        raise ConfigEntryAuthFailed(  # noqa: TRY003
             f"Jackery login rejected the credentials: {err}",
         ) from err
     except JackeryError as err:
-        raise ConfigEntryNotReady(
+        raise ConfigEntryNotReady(  # noqa: TRY003
             f"Cannot reach Jackery cloud right now: {err}",
         ) from err
     return api
@@ -196,7 +196,7 @@ async def _async_push_third_party_mqtt_config(
     """Push third-party MQTT bridge settings from the config entry to each device managed by the coordinator.
 
     If the third-party MQTT option is disabled or no IP is configured, the push is skipped. Attempts are best-effort per device; failures are logged and do not raise, and the user may retry via the `set_third_party_mqtt_config` service.
-    """
+    """  # noqa: E501
     if not config_entry_bool_option(
         entry,
         CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -266,7 +266,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     Returns:
         True if setup completed successfully.
-    """
+    """  # noqa: E501
     _async_clean_legacy_entities(hass, entry)
     api = await _async_authenticate(hass, entry)
 
@@ -279,7 +279,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     )
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
-    try:
+    try:  # noqa: PLW0717
         # Discovery must run first (MQTT subscriptions and the first refresh
         # both rely on the device list it produces). The HTTP first refresh and
         # the MQTT connect afterwards are independent and run in parallel to
@@ -300,12 +300,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             ),
         )
         if isinstance(refresh_result, BaseException):
-            raise refresh_result
+            raise refresh_result  # noqa: TRY301
         if isinstance(mqtt_result, ConfigEntryAuthFailed):
             # Broker explicitly rejected MQTT credentials. HTTP login may have
             # succeeded, but the user must update credentials regardless —
             # surface this so HA opens the reauth UI.
-            raise mqtt_result
+            raise mqtt_result  # noqa: TRY301
         if isinstance(mqtt_result, BaseException):
             # Other MQTT failures (network, TLS handshake, broker outage) must
             # not block setup — push is an optional channel on top of polling.
@@ -345,7 +345,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     """Remove stale Energy helper entities that were created without a unit of measurement.
 
     Scans the entity registry for entities whose IDs match the integration's stale-energy helper pattern, have no `unit_of_measurement` in their current state, and reference a known vendor token; removes matching entities from the registry and logs an informational message for each removal.
-    """
+    """  # noqa: E501
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
@@ -389,7 +389,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
 
     Returns:
         True if `uid` is exactly `<legacy_head><key_suffix>`, `False` otherwise.
-    """
+    """  # noqa: E501
     if not uid.endswith(key_suffix):
         return False
     head = uid[: -len(key_suffix)]

@@ -163,7 +163,7 @@ class JackeryOptionsFlow(OptionsFlow):
 
         Returns:
             ConfigFlowResult: A flow result that either creates the entry with the provided options or displays the options form.
-        """
+        """  # noqa: E501
         current_options = _current_option_values(self.config_entry)
         if user_input is not None:
             return self.async_create_entry(
@@ -254,7 +254,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: The next flow step to show or the created config entry on successful authentication.
-        """
+        """  # noqa: E501
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -443,7 +443,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
                 ConfigFlowResult: A flow result that either shows the reauthentication form (with errors if authentication failed), aborts if the reauth entry is missing, or updates and reloads the config entry after successful authentication.
-        """
+        """  # noqa: E501
         try:
             entry = self._get_reauth_entry()
         except KeyError, RuntimeError:

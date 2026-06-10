@@ -105,13 +105,13 @@ def _raise_select_action_error(
 
     Raises:
         HomeAssistantError: Always raised with the assembled translation metadata.
-    """
+    """  # noqa: E501
     raise HomeAssistantError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
         translation_placeholders={
             "entity": entity.entity_description.key,
-            "device_id": entity._device_id,
+            "device_id": entity._device_id,  # noqa: SLF001
             **{key: str(value) for key, value in placeholders.items()},
         },
     )
@@ -122,7 +122,7 @@ def _raise_select_action_error(
 # ---------------------------------------------------------------------------
 
 
-def _storm_minutes_value(
+def _storm_minutes_value(  # noqa: PLR0912
     properties: dict[str, object],
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
@@ -207,7 +207,7 @@ def _price_source_label(source: dict[str, object]) -> str:
         str: Label containing the provider name, the country/region in parentheses
         when available, and `#<company_id>` appended when `FIELD_PLATFORM_COMPANY_ID`
         is present and non-empty.
-    """
+    """  # noqa: E501
     name = str(
         source.get(FIELD_COMPANY_NAME)
         or source.get(FIELD_NAME)
@@ -233,7 +233,7 @@ def _price_source_regions(source: dict[str, object]) -> list[str]:
 
     Returns:
         list[str]: A list of trimmed, non-empty region parts split on commas from the first available of `FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`. Returns an empty list if neither field is present or is empty.
-    """
+    """  # noqa: E501
     raw = source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION)
     if raw in {None, ""}:
         return []
@@ -254,7 +254,7 @@ def _price_source_matches_current(
 
     Returns:
         True if the source's platform company id equals `company_id` (string comparison) and `region` is empty or included in the source's regions, False otherwise.
-    """
+    """  # noqa: E501
     if str(source.get(FIELD_PLATFORM_COMPANY_ID)) != str(company_id):
         return False
     if region in {None, ""}:
@@ -273,7 +273,7 @@ def _price_sources_from_payload(payload: dict[str, object]) -> list[dict[str, ob
         list[dict[str, object]]: A list of source dictionaries from `PAYLOAD_PRICE_SOURCES`
         where each entry is a dict and contains a non-empty `FIELD_PLATFORM_COMPANY_ID`
         and a non-empty country/region value (`FIELD_COUNTRY` or `FIELD_SYSTEM_REGION`).
-    """
+    """  # noqa: E501
     raw = payload.get(PAYLOAD_PRICE_SOURCES)
     if not isinstance(raw, list):
         return []
@@ -292,27 +292,27 @@ def _price_mode_dynamic_available(entity: JackerySelect) -> bool:
 
     Returns:
         bool: `True` if dynamic pricing can be selected (the entity's price includes a non-empty provider id and a region, or the payload contains one or more valid price sources), `False` otherwise.
-    """
-    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
-    region = entity._price.get(FIELD_SYSTEM_REGION)
+    """  # noqa: E501
+    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+    region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
     if company_id not in {None, ""} and bool(region):
         return True
-    return bool(_price_sources_from_payload(entity._payload))
+    return bool(_price_sources_from_payload(entity._payload))  # noqa: SLF001
 
 
 def _price_mode_current_int(entity: JackerySelect) -> int | None:
-    raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)
+    raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)  # noqa: SLF001
     if raw is None:
         raw = task_plan_value(
-            entity._task_plan,
+            entity._task_plan,  # noqa: SLF001
             FIELD_DYNAMIC_OR_SINGLE,
             FIELD_PRICE_MODE,
         )
     if raw is None:
-        work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))
-        if work_mode == 7:
+        work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))  # noqa: SLF001
+        if work_mode == 7:  # noqa: PLR2004
             return 1
-        if entity._price.get(FIELD_SINGLE_PRICE) is not None:
+        if entity._price.get(FIELD_SINGLE_PRICE) is not None:  # noqa: SLF001
             return 2
         return None
     return safe_int(raw)
@@ -396,7 +396,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
         Raises:
             ConfigEntryAuthFailed: If authentication with the config entry has failed.
             HomeAssistantError: If the selection cannot be applied; preserved translation keys are re-raised unchanged, otherwise an actionable translation-keyed `HomeAssistantError` is raised.
-        """
+        """  # noqa: E501
         try:
             await self.entity_description.select_fn(self, option)
             await self.coordinator.async_request_refresh()
@@ -406,10 +406,10 @@ class JackerySelect(JackeryEntity, SelectEntity):
             if getattr(err, "translation_key", None):
                 raise
             _raise_select_action_error(self, "entity_action_failed", error=err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _raise_select_action_error(self, "entity_action_failed", error=err)
 
-    def _warn_unknown_once(self, value: Any) -> None:
+    def _warn_unknown_once(self, value: Any) -> None:  # noqa: ANN401
         """Record and log an unmapped raw value once for this entity instance.
 
         If the entity description does not request unknown-value warnings or this value
@@ -438,11 +438,11 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
 
 def _work_mode_current(entity: JackerySelect) -> str | None:
-    raw = entity._properties.get(FIELD_WORK_MODEL)
+    raw = entity._properties.get(FIELD_WORK_MODEL)  # noqa: SLF001
     if raw is None:
-        raw = task_plan_value(entity._task_plan, FIELD_WORK_MODEL)
+        raw = task_plan_value(entity._task_plan, FIELD_WORK_MODEL)  # noqa: SLF001
     if raw is None:
-        mode_hint = safe_int(entity._price.get(FIELD_DYNAMIC_OR_SINGLE))
+        mode_hint = safe_int(entity._price.get(FIELD_DYNAMIC_OR_SINGLE))  # noqa: SLF001
         if mode_hint == 1:
             return WORK_MODE_TO_OPTION[7]
         return None
@@ -452,7 +452,7 @@ def _work_mode_current(entity: JackerySelect) -> str | None:
     option = WORK_MODE_TO_OPTION.get(value) or WORK_MODE_READ_ALIASES.get(value)
     if option is not None:
         return option
-    entity._warn_unknown_once(value)
+    entity._warn_unknown_once(value)  # noqa: SLF001
     return None
 
 
@@ -465,15 +465,15 @@ async def _work_mode_select(entity: JackerySelect, option: str) -> None:
 
     Raises:
         HomeAssistantError: If `option` is not a valid work-mode option (translation key `invalid_select_option`).
-    """
+    """  # noqa: E501
     mode = _OPTION_TO_WORK_MODE.get(option)
     if mode is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_set_work_model(entity._device_id, mode)
+    await entity.coordinator.async_set_work_model(entity._device_id, mode)  # noqa: SLF001
 
 
 def _temp_unit_current(entity: JackerySelect) -> str | None:
-    val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))
+    val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))  # noqa: SLF001
     if val is None:
         return None
     return TEMP_UNIT_TO_OPTION.get(val)
@@ -488,20 +488,20 @@ async def _temp_unit_select(entity: JackerySelect, option: str) -> None:
 
     Raises:
         HomeAssistantError: If `option` is not a valid selection (translation key `invalid_select_option`).
-    """
+    """  # noqa: E501
     if option not in _OPTION_TO_TEMP_UNIT:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_set_temp_unit(
-        entity._device_id,
+        entity._device_id,  # noqa: SLF001
         _OPTION_TO_TEMP_UNIT[option],
     )
 
 
 def _island_auto_off_current(entity: JackerySelect) -> str | None:
-    raw = entity._properties.get(FIELD_OFF_GRID_TIME)
+    raw = entity._properties.get(FIELD_OFF_GRID_TIME)  # noqa: SLF001
     if raw is None:
         raw = task_plan_value(
-            entity._task_plan,
+            entity._task_plan,  # noqa: SLF001
             FIELD_OFF_GRID_TIME,
             FIELD_OFF_GRID_DOWN_TIME,
             FIELD_OFF_GRID_AUTO_OFF_TIME,
@@ -530,25 +530,25 @@ async def _island_auto_off_select(entity: JackerySelect, option: str) -> None:
 
     Description:
         Converts the validated option into hours, then requests the coordinator to set the device's off-grid time in minutes (hours * 60).
-    """
+    """  # noqa: E501
     if option not in _AUTO_OFF_OPTION_TO_HOURS:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     hours = _AUTO_OFF_OPTION_TO_HOURS[option]
-    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)
+    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)  # noqa: SLF001
 
 
 def _storm_minutes_current_value(entity: JackerySelect) -> int | None:
     current = _storm_minutes_value(
-        entity._properties,
-        entity._weather_plan,
-        entity._task_plan,
+        entity._properties,  # noqa: SLF001
+        entity._weather_plan,  # noqa: SLF001
+        entity._task_plan,  # noqa: SLF001
     )
     if current is not None:
         return current
     return _storm_minutes_fallback(
-        entity._properties,
-        entity._weather_plan,
-        entity._task_plan,
+        entity._properties,  # noqa: SLF001
+        entity._weather_plan,  # noqa: SLF001
+        entity._task_plan,  # noqa: SLF001
     )
 
 
@@ -578,12 +578,12 @@ async def _storm_minutes_select(entity: JackerySelect, option: str) -> None:
 
     Raises:
         HomeAssistantError: If `option` does not match the required `min_<minutes>` pattern (translation key `invalid_select_option`).
-    """
+    """  # noqa: E501
     match = re.fullmatch(r"min_(\d+)", option)
     if not match:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     minutes = int(match.group(1))
-    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
+    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)  # noqa: SLF001
 
 
 def _price_mode_current(entity: JackerySelect) -> str | None:
@@ -593,7 +593,7 @@ def _price_mode_current(entity: JackerySelect) -> str | None:
     option = PRICE_MODE_TO_OPTION.get(mode)
     if option is not None:
         return option
-    entity._warn_unknown_once(mode)
+    entity._warn_unknown_once(mode)  # noqa: SLF001
     return None
 
 
@@ -608,7 +608,7 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
     Raises:
         HomeAssistantError: with translation_key `"invalid_select_option"` if `option` is not a valid choice.
         HomeAssistantError: with translation_key `"dynamic_tariff_unavailable"` if the user selected dynamic pricing but dynamic pricing is not available for the device.
-    """
+    """  # noqa: E501
     mode = _OPTION_TO_PRICE_MODE.get(option)
     if mode is None:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -622,15 +622,15 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
                 "dynamic_tariff_unavailable",
                 option=option,
             )
-        await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
-    elif mode == 2:
-        await entity.coordinator.async_set_price_mode_single(entity._device_id)
+        await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)  # noqa: SLF001
+    elif mode == 2:  # noqa: PLR2004
+        await entity.coordinator.async_set_price_mode_single(entity._device_id)  # noqa: SLF001
 
 
 def _price_provider_options(entity: JackerySelect) -> list[str]:
     labels = [
         _price_source_label(source)
-        for source in _price_sources_from_payload(entity._payload)
+        for source in _price_sources_from_payload(entity._payload)  # noqa: SLF001
     ]
     current = entity.current_option
     if current and current not in labels:
@@ -645,18 +645,18 @@ def _price_provider_current(entity: JackerySelect) -> str | None:
 
     Returns:
         str | None: The provider label, or `None` when no company id is set.
-    """
-    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
-    region = entity._price.get(FIELD_SYSTEM_REGION)
+    """  # noqa: E501
+    company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+    region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
     if company_id in {None, ""}:
         return None
-    for source in _price_sources_from_payload(entity._payload):
+    for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
         if _price_source_matches_current(source, company_id, region):
             return _price_source_label(source)
     return _price_source_label({
         FIELD_PLATFORM_COMPANY_ID: company_id,
         FIELD_COUNTRY: region,
-        FIELD_COMPANY_NAME: entity._price.get(FIELD_COMPANY_NAME),
+        FIELD_COMPANY_NAME: entity._price.get(FIELD_COMPANY_NAME),  # noqa: SLF001
     })
 
 
@@ -667,10 +667,10 @@ async def _price_provider_select(entity: JackerySelect, option: str) -> None:
 
     Parameters:
         option (str): The provider label chosen from the entity's available options.
-    """
-    for source in _price_sources_from_payload(entity._payload):
+    """  # noqa: E501
+    for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
         if _price_source_label(source) == option:
-            await entity.coordinator.async_set_price_source(entity._device_id, source)
+            await entity.coordinator.async_set_price_source(entity._device_id, source)  # noqa: SLF001
             return
     _raise_select_action_error(entity, "invalid_select_option", option=option)
 
@@ -738,7 +738,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -755,7 +755,7 @@ async def async_setup_entry(
             entity (SelectEntity): Candidate select entity; will be appended only when its unique ID
                 has not been seen. The function uses the module-level `seen_unique_ids`, the
                 platform name `"select"`, and the module logger to enforce uniqueness.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -766,7 +766,7 @@ async def async_setup_entry(
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
-    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
+    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:  # noqa: PLR0911
         """Decide whether a selector (by key) should be exposed for a device based on its payload and advanced-support flag.
 
         Parameters:
@@ -778,7 +778,7 @@ async def async_setup_entry(
         Returns:
             bool: `True` if the selector identified by `key` should be created for the device given the payload and
             `supports_advanced`, `False` otherwise.
-        """
+        """  # noqa: E501
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":

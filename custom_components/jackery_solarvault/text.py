@@ -35,7 +35,7 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -48,7 +48,7 @@ async def async_setup_entry(
         hass: Home Assistant core instance; the coordinator is read from `entry.runtime_data`.
         entry: The integration config entry; provides `runtime_data` containing the JackerySolarVaultCoordinator.
         async_add_entities: Callback used to add new TextEntity instances to Home Assistant.
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -58,7 +58,7 @@ async def async_setup_entry(
         Parameters:
             entities (list[TextEntity]): Mutable list of entities to append to.
             entity (TextEntity): Entity to append; its unique ID will be recorded to prevent duplicates.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -74,7 +74,7 @@ async def async_setup_entry(
 
         Returns:
             list[TextEntity]: List of created text entities (empty if none).
-        """
+        """  # noqa: E501
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
@@ -119,7 +119,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator providing system data and API.
             device_id (str): Identifier of the system whose name this entity exposes.
-        """
+        """  # noqa: E501
         super().__init__(coordinator, device_id, "system_name")
 
     @property
@@ -128,7 +128,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             str | None: The system's editable name if present, otherwise the device's product name, or `None` if neither is available.
-        """
+        """  # noqa: E501
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -144,7 +144,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         Raises:
             HomeAssistantError: If the device lacks a resolvable system id or the provided name is empty/invalid, or if the remote service reports failure.
             ConfigEntryAuthFailed: If authentication to the Jackery API fails and re-authentication is required.
-        """
+        """  # noqa: E501
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:
@@ -168,7 +168,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         try:
             ok = await self.coordinator.api.async_set_system_name(system_id, new_name)
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(
+            raise ConfigEntryAuthFailed(  # noqa: TRY003
                 "Jackery credentials were rejected while renaming a system. "
                 "Re-authentication is required.",
             ) from err

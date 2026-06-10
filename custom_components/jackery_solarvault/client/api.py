@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
+from jackery_solarvault.const import (
     AES_KEY,
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
@@ -135,7 +135,7 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import app_period_date_bounds, chart_series_debug
+from jackery_solarvault.util import app_period_date_bounds, chart_series_debug
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -188,7 +188,7 @@ def _generate_udid(seed: str) -> str:
 
     Returns:
         mqtt_mac_id (str): The MQTT MAC id formed by concatenating `MQTT_MAC_ID_PREFIX` with a UUIDv3 generated from the MD5 digest of `seed`, with dashes removed.
-    """
+    """  # noqa: E501
     md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
@@ -197,7 +197,7 @@ def _generate_udid(seed: str) -> str:
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:
+class JackeryApi:  # noqa: PLR0904
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(
@@ -219,7 +219,7 @@ class JackeryApi:
 
         Description:
             Stores the provided inputs, initializes token/mqtt-related caches and an asyncio.Lock for serialized login, and creates diagnostic response buffers and an optional payload debug callback slot.
-        """
+        """  # noqa: E501
         self._session = session
         self._account = account
         self._password = password
@@ -257,7 +257,7 @@ class JackeryApi:
 
         Parameters:
             systems (list[dict[str, Any]]): List of system metadata dictionaries; expected to contain `FIELD_COUNTRY_CODE`.
-        """
+        """  # noqa: E501
         if self._region_code:
             return
         for item in systems:
@@ -280,7 +280,7 @@ class JackeryApi:
 
         Returns:
             dict[str, str]: Mapping of header names to header values to be sent with HTTP requests.
-        """
+        """  # noqa: E501
         h = {
             "accept-encoding": "gzip",
             "accept-language": "de-DE",
@@ -313,11 +313,11 @@ class JackeryApi:
 
         Raises:
             JackeryAuthError: If the input does not match the required 33-character lowercase hex format.
-        """
+        """  # noqa: E501
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
-            raise JackeryAuthError(
+            raise JackeryAuthError(  # noqa: TRY003
                 "Invalid mqtt_mac_id format. Expected 33 lowercase hex chars "
                 "(example: 271c55f5731fa3d9ba1fe131e088946e0).",
             )
@@ -332,7 +332,7 @@ class JackeryApi:
 
         Returns:
             str: The normalized configured MAC id if valid, otherwise a generated UDID string.
-        """
+        """  # noqa: E501
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -362,7 +362,7 @@ class JackeryApi:
         Raises:
             JackeryApiError: On HTTP failures, request/timeout errors, non-200 responses, or invalid JSON payloads.
             JackeryAuthError: When the server rejects authentication or no token is returned.
-        """
+        """  # noqa: E501
         mac_id = self._resolve_login_mac_id()
         login_bean = {
             FIELD_ACCOUNT: self._account,
@@ -390,15 +390,15 @@ class JackeryApi:
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
         form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
-        try:
+        try:  # noqa: PLW0717
             async with self._session.post(
                 url,
                 data=form_body,
                 headers=headers,
                 timeout=LOGIN_TIMEOUT_SEC,
             ) as resp:
-                if resp.status != 200:
-                    raise JackeryApiError(f"Login HTTP {resp.status}")
+                if resp.status != 200:  # noqa: PLR2004
+                    raise JackeryApiError(f"Login HTTP {resp.status}")  # noqa: TRY003
                 try:
                     data = await resp.json(content_type=None)
                 except (
@@ -408,11 +408,11 @@ class JackeryApi:
                     ValueError,
                 ) as err:
                     raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    raise JackeryApiError(
+                    raise JackeryApiError(  # noqa: TRY003
                         f"Login returned invalid JSON: {raw!r}",
                     ) from err
         except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(
+            raise JackeryApiError(  # noqa: TRY003
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}",
             ) from err
 
@@ -428,13 +428,13 @@ class JackeryApi:
         )
 
         if self._extract_code(data) != CODE_OK:
-            raise JackeryAuthError(
-                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})",
+            raise JackeryAuthError(  # noqa: TRY003
+                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})",  # noqa: E501
             )
 
         token = data.get(FIELD_TOKEN) or ""
         if not token:
-            raise JackeryAuthError("Login succeeded but no token returned")
+            raise JackeryAuthError("Login succeeded but no token returned")  # noqa: TRY003
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
@@ -457,21 +457,21 @@ class JackeryApi:
                 - username: MQTT username.
                 - password: MQTT password (base64-encoded ciphertext).
                 - userId: The MQTT user id from the login response.
-        """
+        """  # noqa: D420, E501
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
-            raise JackeryAuthError(
+            raise JackeryAuthError(  # noqa: TRY003
                 "Login response missing MQTT fields (userId/mqttPassWord/macId)",
             )
 
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
         except (binascii.Error, ValueError) as err:
-            raise JackeryAuthError(
+            raise JackeryAuthError(  # noqa: TRY003
                 "Invalid mqttPassWord base64 in login response",
             ) from err
-        if len(seed) != 32:
-            raise JackeryAuthError(
+        if len(seed) != 32:  # noqa: PLR2004
+            raise JackeryAuthError(  # noqa: TRY003
                 f"Unexpected mqttPassWord decoded length: {len(seed)} (expected 32)",
             )
 
@@ -499,7 +499,7 @@ class JackeryApi:
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""
+        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""  # noqa: E501
         return self._mqtt_mac_id_source
 
     @property
@@ -517,17 +517,17 @@ class JackeryApi:
 
         Raises:
             JackeryAuthError: If no token is available after attempting login.
-        """
+        """  # noqa: E501
         if self._token is None:
             async with self._lock:
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError("Login succeeded without returning a token")
+            raise JackeryAuthError("Login succeeded without returning a token")  # noqa: TRY003
         return self._token
 
     @staticmethod
-    def _extract_code(data: dict[str, Any] | Any) -> int | None:
+    def _extract_code(data: dict[str, Any] | Any) -> int | None:  # noqa: ANN401, PLR0911
         """Normalize API `code` to int when possible."""
         if not isinstance(data, dict):
             return None
@@ -549,7 +549,7 @@ class JackeryApi:
     def _is_token_expired_response(
         self,
         status: int,
-        data: dict[str, Any] | Any,
+        data: dict[str, Any] | Any,  # noqa: ANN401
     ) -> bool:
         """Determine whether a response indicates an expired authentication token.
 
@@ -559,7 +559,7 @@ class JackeryApi:
 
         Returns:
             bool: `True` if the response payload signals that the authentication token has expired, `False` otherwise.
-        """
+        """  # noqa: E501
         if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
@@ -569,7 +569,7 @@ class JackeryApi:
         return "token expires" in msg or "token expired" in msg
 
     @staticmethod
-    def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
+    def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:  # noqa: ANN401
         """Detects whether a response payload contains text suggesting an authentication or authorization failure.
 
         Parameters:
@@ -577,7 +577,7 @@ class JackeryApi:
 
         Returns:
             bool: `True` if common text fields contain markers indicating authentication/authorization issues (for example: unauthorized, token expired, login, auth), `False` otherwise.
-        """
+        """  # noqa: E501
         if not isinstance(data, dict):
             return False
         parts = [
@@ -615,14 +615,14 @@ class JackeryApi:
     def _is_auth_failure_response(
         self,
         status: int,
-        data: dict[str, Any] | Any,
+        data: dict[str, Any] | Any,  # noqa: ANN401
     ) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
             return True
-        if status != 200:
+        if status != 200:  # noqa: PLR2004
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
         return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
@@ -641,7 +641,7 @@ class JackeryApi:
 
         Returns:
             str: Single-line message containing the method, path, HTTP status, response code (if present), and response message (if present).
-        """
+        """  # noqa: E501
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
@@ -661,7 +661,7 @@ class JackeryApi:
         Parameters:
             event_or_factory (dict[str, Any] | Callable[[], dict[str, Any]]):
                 Either a debug event dictionary or a zero-argument callable that returns such a dictionary.
-        """
+        """  # noqa: E501
         callback = self.payload_debug_callback
         if callback is None:
             return
@@ -669,11 +669,11 @@ class JackeryApi:
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
-    def _http_payload_debug(
+    def _http_payload_debug(  # noqa: PLR0913
         *,
         method: str,
         path: str,
@@ -694,7 +694,7 @@ class JackeryApi:
             response (dict): Raw parsed response (empty dict when None).
             response_data_type (str): The Python type name of the response `data` field (e.g., "dict", "list", "NoneType").
             chart_series_debug (Any, optional): Added when `chart_series_debug(payload)` returns debug metadata for chart-like payloads.
-        """
+        """  # noqa: E501
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -723,7 +723,7 @@ class JackeryApi:
 
         Returns:
             dict[str, Any]: The payload dictionary from `data[FIELD_DATA]` or an empty dict.
-        """
+        """  # noqa: E501
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
             return payload
@@ -744,7 +744,7 @@ class JackeryApi:
 
         Returns:
             List of dict items from `FIELD_DATA`; empty list when `FIELD_DATA` is absent or has an unexpected shape.
-        """
+        """  # noqa: E501
         payload = data.get(FIELD_DATA)
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
@@ -770,7 +770,7 @@ class JackeryApi:
 
         Returns:
             dict: The matching OTA item if found; otherwise the first item in `items` if present; or an empty dict when `items` is empty.
-        """
+        """  # noqa: E501
         requested_sn = str(device_sn)
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
@@ -791,7 +791,7 @@ class JackeryApi:
         Raises:
             JackeryAuthError: When the response indicates an authentication/authorization failure.
             JackeryApiError: For HTTP errors, request failures, token-expiry/retry failures, or when the API returns a non-OK application code.
-        """
+        """  # noqa: E501
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -817,7 +817,7 @@ class JackeryApi:
         try:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(
+            raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_GET} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
@@ -828,7 +828,7 @@ class JackeryApi:
             try:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
-                raise JackeryApiError(
+                raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
@@ -837,12 +837,12 @@ class JackeryApi:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_GET, path, status, data),
             )
-        if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
+        if status != 200:  # noqa: PLR2004
+            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")  # noqa: TRY003
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(
-                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
+            raise JackeryApiError(  # noqa: TRY003
+                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",  # noqa: E501
             )
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
@@ -886,7 +886,7 @@ class JackeryApi:
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:
+    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH,
@@ -993,7 +993,7 @@ class JackeryApi:
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
 
-    async def _async_get_device_period_stat(
+    async def _async_get_device_period_stat(  # noqa: PLR0913
         self,
         path: str,
         *,
@@ -1170,7 +1170,7 @@ class JackeryApi:
 
         Returns:
                 list[dict[str, Any]]: A list of battery pack dictionaries; an empty list if no packs are present or the response shape is not recognized.
-        """
+        """  # noqa: E501
         data = await self._get_json(
             BATTERY_PACK_PATH,
             params={FIELD_DEVICE_SN: str(device_sn)},
@@ -1345,7 +1345,7 @@ class JackeryApi:
         Raises:
             JackeryAuthError: When the response indicates an authentication or authorization failure.
             JackeryApiError: On HTTP errors, request failures, or when the application-level response code is not OK.
-        """
+        """  # noqa: E501
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1376,7 +1376,7 @@ class JackeryApi:
         try:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(
+            raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_PUT} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
@@ -1391,7 +1391,7 @@ class JackeryApi:
             try:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
-                raise JackeryApiError(
+                raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
@@ -1400,12 +1400,12 @@ class JackeryApi:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_PUT, path, status, data),
             )
-        if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
+        if status != 200:  # noqa: PLR2004
+            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")  # noqa: TRY003
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(
-                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",
+            raise JackeryApiError(  # noqa: TRY003
+                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}",  # noqa: E501
             )
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
@@ -1434,9 +1434,9 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `system_name` is empty or only whitespace.
-        """
+        """  # noqa: E501
         if not system_name or not system_name.strip():
-            raise JackeryApiError("system_name must be a non-empty string")
+            raise JackeryApiError("system_name must be a non-empty string")  # noqa: TRY003
         data = await self._put_json(
             SYSTEM_NAME_PATH,
             {FIELD_SYSTEM_NAME: system_name.strip(), FIELD_ID: str(system_id)},
@@ -1464,7 +1464,7 @@ class JackeryApi:
         Raises:
                 JackeryAuthError: When the response indicates an authentication/authorization failure.
                 JackeryApiError: On network/request failures, non-200 HTTP status, or when the API returns an application error code.
-        """
+        """  # noqa: E501
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -1497,7 +1497,7 @@ class JackeryApi:
         try:
             status, data = await _do()
         except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(
+            raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_POST} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}",
             ) from err
@@ -1512,7 +1512,7 @@ class JackeryApi:
             try:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
-                raise JackeryApiError(
+                raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}",
                 ) from err
@@ -1521,13 +1521,13 @@ class JackeryApi:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_POST, path, status, data),
             )
-        if status != 200:
-            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
+        if status != 200:  # noqa: PLR2004
+            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")  # noqa: TRY003
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
-            raise JackeryApiError(
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
+            raise JackeryApiError(  # noqa: TRY003
+                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # noqa: E501
                 f"data={data.get(FIELD_DATA)!r}",
             )
         await self._emit_payload_debug(
@@ -1555,9 +1555,9 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `max_power` validation fails or the API call reports an error.
-        """
+        """  # noqa: E501
         if not isinstance(max_power, int) or max_power < 0:
-            raise JackeryApiError("max_power must be a non-negative integer")
+            raise JackeryApiError("max_power must be a non-negative integer")  # noqa: TRY003
         data = await self._post_form(
             MAX_POWER_SAVE_PATH,
             {FIELD_MAX_POWER: max_power, FIELD_DEVICE_ID: str(device_id)},
@@ -1583,13 +1583,13 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `single_price` is negative or `currency` is empty.
-        """
+        """  # noqa: E501
         price = float(single_price)
         if price < 0:
-            raise JackeryApiError("single_price must be >= 0")
+            raise JackeryApiError("single_price must be >= 0")  # noqa: TRY003
         cur = str(currency or "").strip()
         if not cur:
-            raise JackeryApiError("currency must be a non-empty string")
+            raise JackeryApiError("currency must be a non-empty string")  # noqa: TRY003
         # Keep stable decimal formatting for backend parsing.
         price_text = f"{price:.4f}".rstrip("0").rstrip(".")
         data = await self._post_form(
@@ -1622,10 +1622,10 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `system_region` is empty or the API request fails.
-        """
+        """  # noqa: E501
         region = str(system_region or "").strip()
         if not region:
-            raise JackeryApiError("system_region must be a non-empty string")
+            raise JackeryApiError("system_region must be a non-empty string")  # noqa: TRY003
         data = await self._post_form(
             SAVE_DYNAMIC_MODE_PATH,
             {

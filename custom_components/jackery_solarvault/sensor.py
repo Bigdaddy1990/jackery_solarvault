@@ -68,7 +68,7 @@ Unique IDs follow ``PROTOCOL.md §11`` strictly:
 The ``key`` attribute of each ``JackerySensorDescription`` is the
 ``<stable_key_suffix>``; translation keys, names and any localized text
 must never affect ``unique_id``.
-"""
+"""  # noqa: E501
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -331,7 +331,7 @@ SAVINGS_PRICE_PRECISION = 5
 # ---------------------------------------------------------------------------
 # Value extraction helpers
 # ---------------------------------------------------------------------------
-def _path(props: dict[str, Any], *keys: str) -> Any:
+def _path(props: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401
     """Walk a nested path; return None on missing intermediate keys."""
     node: Any = props
     for k in keys:
@@ -342,7 +342,7 @@ def _path(props: dict[str, Any], *keys: str) -> Any:
 
 
 def _div(divisor: float) -> Callable[[Any], float | None]:
-    def _f(value: Any) -> float | None:
+    def _f(value: Any) -> float | None:  # noqa: ANN401
         try:
             return round(float(value) / divisor, 2)
         except TypeError, ValueError:
@@ -351,7 +351,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     return _f
 
 
-def _signed_diff(merged_value: Any, http_value: Any) -> int | None:
+def _signed_diff(merged_value: Any, http_value: Any) -> int | None:  # noqa: ANN401
     """Return ``merged - http`` as int when both inputs parse, else None.
 
     Used to surface MQTT-vs-HTTP drift in net-power sensor attributes so
@@ -365,11 +365,11 @@ def _signed_diff(merged_value: Any, http_value: Any) -> int | None:
     return merged_int - http_int
 
 
-def _identity(value: Any) -> Any:
+def _identity(value: Any) -> Any:  # noqa: ANN401
     return value
 
 
-def _temp_unit_label(value: Any) -> str | None:
+def _temp_unit_label(value: Any) -> str | None:  # noqa: ANN401
     unit = safe_int(value)
     if unit is None:
         return None
@@ -440,7 +440,7 @@ def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
 
 
 def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
-    def _getter(props: dict[str, Any]) -> Any:
+    def _getter(props: dict[str, Any]) -> Any:  # noqa: ANN401
         for key in keys:
             if key in props and props.get(key) is not None:
                 return props.get(key)
@@ -452,7 +452,7 @@ def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
 def _payload_http_prop(key: str) -> Callable[[dict[str, Any]], Any]:
     """Read the latest HTTP property value before MQTT overlay values."""
 
-    def _getter(payload: dict[str, Any]) -> Any:
+    def _getter(payload: dict[str, Any]) -> Any:  # noqa: ANN401
         http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
         if isinstance(http_props, dict) and http_props:
             return http_props.get(key)
@@ -471,7 +471,7 @@ def _nested(*keys: str) -> Callable[[dict[str, Any]], Any]:
 def _pv_channel_power(channel_key: str) -> Callable[[dict[str, Any]], Any]:
     """Read per-channel PV power and default to 0W when channel exists."""
 
-    def _getter(props: dict[str, Any]) -> Any:
+    def _getter(props: dict[str, Any]) -> Any:  # noqa: ANN401
         channel = props.get(channel_key)
         if not isinstance(channel, dict):
             return None
@@ -977,7 +977,7 @@ StatResetPeriod = Literal["day", "week", "month", "year"]
 
 def _period_start(
     reset_period: StatResetPeriod,
-    timezone: Any | None = None,
+    timezone: Any | None = None,  # noqa: ANN401
 ) -> datetime:
     """Return the local start timestamp of the current statistic period."""
     now = dt_util.now(timezone)
@@ -1195,7 +1195,7 @@ def _chart_value_for_day(
     return safe_float(values[index])
 
 
-def _stat_description_has_value(
+def _stat_description_has_value(  # noqa: PLR0911
     payload: dict[str, Any],
     description: JackeryStatSensorDescription,
 ) -> bool:
@@ -1554,7 +1554,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # These values largely duplicate the per-device and home sensors and were
     # removed to reduce redundancy in Home Assistant. Removing them here ensures
     # the integration only exposes one set of PV, home and battery statistics.
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -1567,7 +1567,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="home_month_energy",
         translation_key="home_month_energy",
@@ -1580,7 +1580,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="home_year_energy",
         translation_key="home_year_energy",
@@ -1596,7 +1596,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- PROTOCOL.md §2: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -1609,7 +1609,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_input_month_energy",
         translation_key="device_ongrid_input_month_energy",
@@ -1622,7 +1622,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_input_year_energy",
         translation_key="device_ongrid_input_year_energy",
@@ -1635,7 +1635,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_output_week_energy",
         translation_key="device_ongrid_output_week_energy",
@@ -1648,7 +1648,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_output_month_energy",
         translation_key="device_ongrid_output_month_energy",
@@ -1661,7 +1661,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
     JackeryStatSensorDescription(
         key="device_ongrid_output_year_energy",
         translation_key="device_ongrid_output_year_energy",
@@ -1728,7 +1728,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-down",
     ),
-    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE  # noqa: E501
     JackeryStatSensorDescription(
         key="battery_discharge_month_energy",
         translation_key="battery_discharge_month_energy",
@@ -2290,7 +2290,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         return savings if isinstance(savings, dict) else {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the selected calculated value."""
         raw: Any = self._calculation
         for key in self.entity_description.path:
@@ -2399,7 +2399,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -2432,7 +2432,7 @@ async def async_setup_entry(
             logger=_LOGGER,
         )
 
-    def _collect_entities() -> list[SensorEntity]:
+    def _collect_entities() -> list[SensorEntity]:  # noqa: C901, PLR0912, PLR0915
         entities: list[SensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -2580,7 +2580,7 @@ async def async_setup_entry(
             # Smart meter / CT values arrive through MQTT sub-device responses.
             # Create them when discovery confirms a meter accessory, or when a
             # CT payload was already received before entity setup.
-            if coordinator._has_smart_meter_accessory(payload) or payload.get(
+            if coordinator._has_smart_meter_accessory(payload) or payload.get(  # noqa: SLF001
                 PAYLOAD_CT_METER,
             ):
                 for ct_desc in SMART_METER_SENSOR_DESCRIPTIONS:
@@ -2653,7 +2653,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
@@ -2770,7 +2770,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             tzinfo=self._local_timezone(),
         )
 
-    def _local_timezone(self) -> Any:
+    def _local_timezone(self) -> Any:  # noqa: ANN401
         """Return the Home Assistant local timezone for period sensors."""
         timezone = dt_util.get_time_zone(self.hass.config.time_zone)
         return timezone or dt_util.DEFAULT_TIME_ZONE
@@ -2834,7 +2834,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return False
         return data_begin > wall_clock_start.date()
 
-    def _source_for_section(self, section: str) -> dict[str, Any]:
+    def _source_for_section(self, section: str) -> dict[str, Any]:  # noqa: PLR0911
         if section == PAYLOAD_PRICE:
             return self._price
         if section == PAYLOAD_DEVICE_STATISTIC:
@@ -2850,7 +2850,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
-    def _non_negative_period_raw(self, raw: Any) -> Any:
+    def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401
         """Clamp bogus negative app energy totals before HA records them."""
         if self._reset_period is None:
             return raw
@@ -2886,7 +2886,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 return value, candidate_section, candidate_source
         return None
 
-    def _resolve_period_value(
+    def _resolve_period_value(  # noqa: PLR6301
         self,
         source: dict[str, Any],
         section: str,
@@ -2915,7 +2915,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         server_total = effective_period_total_value(source, section, stat_key)
         return None, values, chart_series_sum, server_total
 
-    def _refresh_cache(self) -> None:
+    def _refresh_cache(self) -> None:  # noqa: C901, PLR0912, PLR0914, PLR0915
         """Recompute native_value and extra_state_attributes once per update."""
         section = self.entity_description.section
         stat_key = self.entity_description.stat_key
@@ -2989,7 +2989,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 "chart_series_sum": chart_series_sum,
                 "server_total": server_total,
             }
-            if isinstance(values, list) and len(values) <= 31:
+            if isinstance(values, list) and len(values) <= 31:  # noqa: PLR2004
                 attrs["period_values"] = values
             year_backfill = source.get(APP_YEAR_BACKFILL_META)
             if isinstance(year_backfill, dict):
@@ -3134,7 +3134,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -3186,7 +3186,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             return {}
         return pack if isinstance(pack, dict) else {}
 
-    def _value_from_pack(self, pack: dict[str, Any]) -> Any:
+    def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401
         """Return the current value from a BatteryPackSub payload."""
         field = self.entity_description.field
         raw = pack.get(field)
@@ -3254,7 +3254,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -3308,7 +3308,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         plug_sn: str,
         description: JackerySmartPlugSensorDescription,
     ) -> None:
-        """Initialise the entity from coordinator, sorted index/serial and description."""
+        """Initialise the entity from coordinator, sorted index/serial and description."""  # noqa: E501
         super().__init__(
             coordinator,
             device_id,
@@ -3343,7 +3343,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         field = self.entity_description.field
         raw = self._plug.get(field)
@@ -3429,7 +3429,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return meter_head if isinstance(meter_head, dict) else {}
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         raw = self._meter_head.get(self.entity_description.field)
         if raw is None:
@@ -3536,7 +3536,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Calculate derived smart-meter powers from signed phase values."""
         return calculated_smart_meter_power(ct, calculation)
 
-    def _value_from_ct(self, ct: dict[str, Any]) -> Any:
+    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # noqa: ANN401
         """Calculate the current value from a CT payload."""
         raw = None
 
@@ -3659,7 +3659,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -4001,7 +4001,7 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
         """Return diagnostic attributes for the current state."""
         props = self._properties
         return {
-            "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",
+            "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501
             "source": "on-grid_fields_preferred_then_grid-side_fallback",
             "positive": "grid-side input exceeds output",
             "negative": "grid-side output exceeds input",
@@ -4081,14 +4081,14 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 "max(smart_meter_net_power - jackery_grid_side_input_power "
                 "+ jackery_grid_side_output_power, 0)"
             ),
-            "source": "otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",
-            "scope": "Jackery-corrected home load; external non-Jackery generation must be measured separately",
+            "source": "otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",  # noqa: E501
+            "scope": "Jackery-corrected home load; external non-Jackery generation must be measured separately",  # noqa: E501
         }
         if not isinstance(ct, dict):
             ct = {}
 
         result = self._home_consumption_power(ct, props)
-        meter_net = JackerySmartMeterSensor._net_power(ct)
+        meter_net = JackerySmartMeterSensor._net_power(ct)  # noqa: SLF001
         input_available = self._grid_side_input_power(props) is not None
         output_available = self._grid_side_output_power(props) is not None
         reported_load_available = (
@@ -4126,7 +4126,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 2,
             )
 
-        phases = JackerySmartMeterSensor._signed_phase_values(ct)
+        phases = JackerySmartMeterSensor._signed_phase_values(ct)  # noqa: SLF001
         if phases is not None:
             attrs["phase_a_signed_power"] = round(phases[0], 2)
             attrs["phase_b_signed_power"] = round(phases[1], 2)
@@ -4254,7 +4254,7 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
         self._source_key = source_key
 
     @property
-    def native_value(self) -> Any:
+    def native_value(self) -> Any:  # noqa: ANN401
         """Return the entity's current value."""
         return self._system.get(self._source_key)
 

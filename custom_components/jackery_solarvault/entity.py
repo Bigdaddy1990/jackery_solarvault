@@ -96,7 +96,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
-    def _alarm(self) -> Any:
+    def _alarm(self) -> Any:  # noqa: ANN401
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -137,7 +137,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: Device registry metadata containing identifiers {(DOMAIN, self._device_id)}, manufacturer, name, model, serial_number (or None), and sw_version (or None).
-        """
+        """  # noqa: E501
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -177,7 +177,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: A DeviceInfo object describing the smart-plug subdevice, including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device pointing to the parent device.
-        """
+        """  # noqa: E501
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)

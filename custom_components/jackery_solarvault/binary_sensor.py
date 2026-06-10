@@ -83,7 +83,7 @@ BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
 )
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -91,7 +91,7 @@ async def async_setup_entry(
     """Create and register coordinator-backed binary sensor entities for devices and their smart plugs.
 
     Collects binary sensors described in BINARY_DESCRIPTIONS and a binary power/state sensor for each detected smart plug, avoiding duplicate unique IDs, adds any new entities via the provided callback, and registers a listener to add entities when coordinator data changes.
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -104,7 +104,7 @@ async def async_setup_entry(
         Parameters:
             entities (list[BinarySensorEntity]): List of entities to append to.
             entity (BinarySensorEntity): Binary sensor entity to add.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -122,7 +122,7 @@ async def async_setup_entry(
 
         Returns:
             list[BinarySensorEntity]: Entities to add; duplicates are filtered by unique ID when appended.
-        """
+        """  # noqa: E501
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for desc in BINARY_DESCRIPTIONS:
@@ -206,7 +206,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         """Create a smart-plug state binary sensor entity for a specific plug index and serial.
 
         Builds and stores the per-plug `device_info` at construction so the entity is registered with the correct device metadata.
-        """
+        """  # noqa: E501
         super().__init__(
             coordinator,
             device_id,
@@ -248,7 +248,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values; always contains `"plug_index"`.
-        """
+        """  # noqa: E501
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,

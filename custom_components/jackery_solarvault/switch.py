@@ -69,7 +69,7 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _standby_is_on(raw: Any) -> bool | None:
+def _standby_is_on(raw: Any) -> bool | None:  # noqa: ANN401
     """Treat the raw autoStandby integer flag as on=1 / off=0."""
     if raw is None:
         return None
@@ -264,7 +264,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Raises:
             HomeAssistantError: With translation_key "entity_action_failed" and translation placeholders
             "entity" (entity key), "device_id" (the device identifier), and "error" (stringified error).
-        """
+        """  # noqa: E501
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -303,7 +303,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """Turn the entity on using the configured description setter and request a coordinator refresh.
 
         If no setter is configured this is a no-op. Re-raises ConfigEntryAuthFailed and re-raises HomeAssistantError instances that already include a `translation_key`; all other errors are converted into a translatable action error via `_raise_action_error`.
-        """
+        """  # noqa: E501
         if self.entity_description.setter is None:
             return
         try:
@@ -319,14 +319,14 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off using its configured setter.
 
         If the description has no `setter`, this is a no-op. Otherwise the configured setter is awaited to apply the `off` state and the coordinator is asked to refresh. Authentication errors (`ConfigEntryAuthFailed`) and `HomeAssistantError` instances that include a `translation_key` are re-raised; other errors are converted into a translatable entity action error via `_raise_action_error`.
-        """
+        """  # noqa: E501
         if self.entity_description.setter is None:
             return
         try:
@@ -342,7 +342,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)
 
 
@@ -406,7 +406,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Parameters:
             error (object): The original error object; its string representation is included in the raised error's placeholders.
-        """
+        """  # noqa: E501
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -426,7 +426,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Raises:
             ConfigEntryAuthFailed: Re-raised when authentication with the config entry fails.
             HomeAssistantError: Raised (via the entity's action error helper) when the plug serial is missing or an unexpected error occurs while applying the state.
-        """
+        """  # noqa: E501
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
@@ -444,7 +444,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -464,7 +464,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their values.
-        """
+        """  # noqa: E501
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -500,7 +500,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         Parameters:
             plug_index (int): 1-based index of the plug in the device's sorted smart-plug list.
             plug_sn (str): Serial number of the target smart plug.
-        """
+        """  # noqa: E501
         JackeryEntity.__init__(
             self,
             coordinator,
@@ -526,7 +526,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
                 - "entity": "smart_plug_priority_enabled"
                 - "device_id": the entity's device id
                 - "error": stringified `error`
-        """
+        """  # noqa: E501
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -548,7 +548,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         Raises:
             ConfigEntryAuthFailed: If the coordinator reports authentication failure.
             HomeAssistantError: If the plug serial is missing or the coordinator call fails (converted to a translatable action error).
-        """
+        """  # noqa: E501
         plug_sn = _smart_plug_serial(self._plug)
         if plug_sn is None:
             self._raise_action_error("missing deviceSn")
@@ -566,7 +566,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)
 
 
@@ -575,7 +575,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -588,7 +588,7 @@ async def async_setup_entry(
         hass: Home Assistant instance.
         entry: Integration config entry containing the coordinator in runtime_data.
         async_add_entities: Callback used to register new SwitchEntity instances with Home Assistant.
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -598,7 +598,7 @@ async def async_setup_entry(
         Parameters:
             entities (list[SwitchEntity]): Target list to which the entity will be appended when not duplicated.
             entity (SwitchEntity): Switch entity to add; its unique identifier will be recorded to prevent future duplicates.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -631,7 +631,7 @@ async def async_setup_entry(
 
         Returns:
             list[SwitchEntity]: Discovered SwitchEntity instances for all devices; may be empty.
-        """
+        """  # noqa: E501
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}

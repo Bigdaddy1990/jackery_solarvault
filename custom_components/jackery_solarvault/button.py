@@ -27,7 +27,7 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -35,7 +35,7 @@ async def async_setup_entry(
     """Set up Jackery SolarVault button entities for a config entry.
 
     Creates and registers reboot button entities for devices in the coordinator's data while avoiding duplicates by unique ID. Monitors a signature of the coordinator data and adds new entities when that signature changes; registers a listener so updates stop when the config entry is unloaded.
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -45,7 +45,7 @@ async def async_setup_entry(
         Parameters:
             entities (list[ButtonEntity]): Target list to receive the entity when added.
             entity (ButtonEntity): Button entity to append; skipped if its unique ID is already tracked.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -61,7 +61,7 @@ async def async_setup_entry(
 
         Returns:
             list[ButtonEntity]: ButtonEntity instances corresponding to devices that expose or support the reboot action.
-        """
+        """  # noqa: E501
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -102,7 +102,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator that manages device state and actions.
             device_id (str): Unique identifier of the target device.
-        """
+        """  # noqa: E501
         super().__init__(coordinator, device_id, "reboot_device")
 
     def _raise_action_error(self, error: object) -> None:
@@ -115,7 +115,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
         Parameters:
             error (object): The original exception or error information to include in the translated message.
-        """
+        """  # noqa: E501
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -134,7 +134,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         If a HomeAssistantError with a translation_key is raised by the coordinator, it is re-raised unchanged.
         All other HomeAssistantError or generic Exception instances are wrapped and raised through the entity's
         _error translation helper.
-        """
+        """  # noqa: E501
         try:
             await self.coordinator.async_reboot_device(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -144,5 +144,5 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             self._raise_action_error(err)

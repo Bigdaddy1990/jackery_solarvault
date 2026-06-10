@@ -51,7 +51,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
 
         Returns:
             FlowResult: Presents the confirmation form when `user_input` is None, or completes the repair by creating an empty repair entry after submission.
-        """
+        """  # noqa: E501
         if user_input is not None:
             await self._async_force_refresh()
             return self.async_create_entry(data={})
@@ -68,7 +68,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
 
         Raises:
             ConfigEntryAuthFailed: If the config entry authentication failed during refresh.
-        """
+        """  # noqa: E501
         coordinator = self._coordinator()
         if coordinator is None:
             return
@@ -76,7 +76,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
@@ -86,7 +86,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
 
         Returns:
             JackerySolarVaultCoordinator | None: The coordinator for the stored entry, or `None` if the entry is missing or its `runtime_data` is not a `JackerySolarVaultCoordinator`.
-        """
+        """  # noqa: E501
         if not self._entry_id:
             return None
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
@@ -98,7 +98,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(
+async def async_create_fix_flow(  # noqa: RUF029
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,
@@ -117,7 +117,7 @@ async def async_create_fix_flow(
 
     Raises:
         data_entry_flow.UnknownFlow: If no repair flow is registered for the given `issue_id` under the integration domain.
-    """
+    """  # noqa: E501
     if issue_id.endswith(f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"):
         issue_data = data or {}
         entry_id = issue_data.get("entry_id")
@@ -127,6 +127,6 @@ async def async_create_fix_flow(
             "examples": str(issue_data.get("examples", "unknown")),
         }
         return AppDataInconsistencyRepairFlow(entry_id, description_placeholders)
-    raise data_entry_flow.UnknownFlow(
+    raise data_entry_flow.UnknownFlow(  # noqa: TRY003
         f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'",
     )

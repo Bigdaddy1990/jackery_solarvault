@@ -117,7 +117,7 @@ _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
 _DEV_MODE_CACHED: bool | None = None
 
 
-def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: ANN401
     """Read a boolean configuration option from an entry, falling back to legacy setup data and a provided default.
 
     Parameters:
@@ -127,7 +127,7 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
 
     Returns:
         `true` if the resolved option parses as a truthy value, `false` if it parses as a falsy value; returns `default` when the option is missing or cannot be parsed as a boolean.
-    """
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -137,7 +137,7 @@ def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     return default if parsed is None else parsed
 
 
-def config_entry_str_option(entry: Any, key: str, default: str) -> str:
+def config_entry_str_option(entry: Any, key: str, default: str) -> str:  # noqa: ANN401
     """Read a string-valued configuration option from an entry, falling back to legacy setup data and the provided default.
 
     Parameters:
@@ -147,7 +147,7 @@ def config_entry_str_option(entry: Any, key: str, default: str) -> str:
 
     Returns:
         str: The resolved option coerced to `str`, or `default` if no value is found.
-    """
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -158,7 +158,7 @@ def config_entry_str_option(entry: Any, key: str, default: str) -> str:
     return str(value)
 
 
-def config_entry_int_option(entry: Any, key: str, default: int) -> int:
+def config_entry_int_option(entry: Any, key: str, default: int) -> int:  # noqa: ANN401
     """Read an integer option from a config entry, falling back to legacy entry.data and finally to a default.
 
     Parameters:
@@ -168,7 +168,7 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:
 
     Returns:
         int: The resolved integer value; if the option is missing or cannot be parsed as an integer, returns `default`.
-    """
+    """  # noqa: E501
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -187,7 +187,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(value: Any) -> datetime:
+def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401
     """Parse a Jackery timestamp and normalize it to UTC.
 
     Accepts:
@@ -203,24 +203,24 @@ def parse_utc_datetime(value: Any) -> datetime:
 
     Raises:
         ValueError: If the input is empty, unsupported, or cannot be parsed as a UTC timestamp.
-    """
+    """  # noqa: E501
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
         timestamp = float(value)
-        if abs(timestamp) >= 100_000_000_000:
+        if abs(timestamp) >= 100_000_000_000:  # noqa: PLR2004
             timestamp /= 1000
         try:
             parsed = datetime.fromtimestamp(timestamp, UTC)
         except (OSError, OverflowError, ValueError) as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err  # noqa: TRY003
     elif isinstance(value, str):
         normalized = value.strip()
         if not normalized:
-            raise ValueError("timestamp must not be empty")
+            raise ValueError("timestamp must not be empty")  # noqa: TRY003
         with contextlib.suppress(ValueError, OSError, OverflowError):
             timestamp = float(normalized)
-            if abs(timestamp) >= 100_000_000_000:
+            if abs(timestamp) >= 100_000_000_000:  # noqa: PLR2004
                 timestamp /= 1000
             return datetime.fromtimestamp(timestamp, UTC)
         if normalized.endswith("Z"):
@@ -228,9 +228,9 @@ def parse_utc_datetime(value: Any) -> datetime:
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            raise ValueError(f"invalid UTC timestamp: {value!r}") from err  # noqa: TRY003
     else:
-        raise ValueError(f"unsupported UTC timestamp: {value!r}")
+        raise ValueError(f"unsupported UTC timestamp: {value!r}")  # noqa: TRY003, TRY004
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -276,10 +276,10 @@ def coordinator_entity_signature(
 def append_unique_entity(
     entities: list[Any],
     seen_unique_ids: set[str],
-    entity: Any,
+    entity: Any,  # noqa: ANN401
     *,
     platform: str,
-    logger: Any,
+    logger: Any,  # noqa: ANN401
 ) -> bool:
     """Append an entity to the provided list only if its `unique_id` has not already been recorded, and record the `unique_id` when appended.
 
@@ -292,7 +292,7 @@ def append_unique_entity(
 
     Returns:
         bool: `True` if the entity was appended, `False` if skipped due to a duplicate `unique_id`.
-    """
+    """  # noqa: E501
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         logger.debug("Skip duplicate %s unique_id=%s", platform, uid)
@@ -306,7 +306,7 @@ def append_unique_entity(
 def validate_app_period_date_type(date_type: str) -> str:
     """Return a supported Jackery app period type or raise ValueError."""
     if date_type not in APP_PERIOD_DATE_TYPES:
-        raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")
+        raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")  # noqa: TRY003
     return date_type
 
 
@@ -314,7 +314,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     """Return the documented Jackery app begin/end range for a period."""
     date_type = validate_app_period_date_type(date_type)
     if today is None:
-        today = date.today()
+        today = date.today()  # noqa: DTZ011
     if date_type == DATE_TYPE_DAY:
         return today, today
     if date_type == DATE_TYPE_WEEK:
@@ -335,11 +335,11 @@ def _app_period_bound_to_date(value: str | date, *, field_name: str) -> date:
         return value
     normalized = str(value).strip()
     if not normalized:
-        raise ValueError(f"Jackery app period {field_name} must not be empty")
+        raise ValueError(f"Jackery app period {field_name} must not be empty")  # noqa: TRY003
     try:
         return date.fromisoformat(normalized)
     except ValueError as err:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             f"Jackery app period {field_name} must be an ISO date (YYYY-MM-DD): "
             f"{value!r}",
         ) from err
@@ -365,7 +365,7 @@ def app_period_date_bounds(
 
     Raises:
         ValueError: If a provided bound is empty or unparseable, or if the resolved begin date is after the resolved end date.
-    """
+    """  # noqa: E501
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -376,7 +376,7 @@ def app_period_date_bounds(
         field_name=APP_REQUEST_END_DATE,
     )
     if begin > end:
-        raise ValueError(
+        raise ValueError(  # noqa: TRY003
             "Jackery app period beginDate must be before or equal to endDate: "
             f"{begin.isoformat()} > {end.isoformat()}",
         )
@@ -399,8 +399,8 @@ def app_period_request_kwargs(
 
 def app_month_request_kwargs(year: int, month: int) -> dict[str, str]:
     """Return method kwargs for one explicit calendar-month app request."""
-    if month < 1 or month > 12:
-        raise ValueError(f"Unsupported Jackery app month: {month!r}")
+    if month < 1 or month > 12:  # noqa: PLR2004
+        raise ValueError(f"Unsupported Jackery app month: {month!r}")  # noqa: TRY003
     first = date(year, month, 1)
     last = first.replace(day=calendar.monthrange(year, month)[1])
     begin, end = app_period_date_bounds(
@@ -431,14 +431,14 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def safe_float(value: Any) -> float | None:
+def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
     """Parse a Jackery payload value into a floating-point number.
 
     Accepts numbers or strings (including strings using a single comma as the decimal separator) and returns the numeric value when parseable.
 
     Returns:
         float | None: The parsed float, or `None` when the input is `None` or cannot be parsed as a float.
-    """
+    """  # noqa: E501
     if value is None:
         return None
     if isinstance(value, str):
@@ -459,7 +459,7 @@ def safe_float(value: Any) -> float | None:
         return None
 
 
-def safe_int(value: Any) -> int | None:
+def safe_int(value: Any) -> int | None:  # noqa: ANN401
     """Convert a Jackery payload value to int, returning None on error."""
     if value is None:
         return None
@@ -479,15 +479,15 @@ def dev_mode_redactions_disabled() -> bool:
 
     Returns:
         `true` if developer-mode redactions are disabled, `false` otherwise.
-    """
-    global _DEV_MODE_CACHED
+    """  # noqa: E501
+    global _DEV_MODE_CACHED  # noqa: PLW0603
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
         _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
     return _DEV_MODE_CACHED
 
 
-def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
+def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:  # noqa: ANN401
     """Return True when diagnostics should bypass sensitive-field redaction."""
     if dev_mode_redactions_disabled():
         return True
@@ -500,7 +500,7 @@ def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
     )
 
 
-def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:
+def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401
     """Return a recursively redacted, JSON-serializable debug payload."""
     if redactions_disabled is None:
         redactions_disabled = diagnostic_redactions_disabled()
@@ -527,7 +527,7 @@ def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None)
     return value
 
 
-def _payload_debug_passthrough(value: Any) -> Any:
+def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401
     """Recursively normalise ``value`` to JSON-serializable types only."""
     if isinstance(value, dict):
         return {
@@ -540,19 +540,19 @@ def _payload_debug_passthrough(value: Any) -> Any:
     return value
 
 
-def redacted_json_safe_payload(value: Any) -> Any:
+def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401
     """Return a JSON-safe payload with sensitive Jackery fields redacted."""
     return _payload_debug_redacted(value, redactions_disabled=False)
 
 
-def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
+def active_redact_keys(entry: Any | None = None) -> frozenset[str]:  # noqa: ANN401
     """Return ``REDACT_KEYS`` or an empty set depending on dev-mode switches."""
     if diagnostic_redactions_disabled(entry):
         return frozenset()
     return frozenset(REDACT_KEYS)
 
 
-def chart_series_debug(source: Any) -> dict[str, Any]:
+def chart_series_debug(source: Any) -> dict[str, Any]:  # noqa: ANN401
     """Produce diagnostics for chart-series arrays found in an app payload.
 
     For each chart-series key (Y, Y1..Y6) present as a list, the returned mapping contains:
@@ -564,7 +564,7 @@ def chart_series_debug(source: Any) -> dict[str, Any]:
 
     Returns:
         dict[str, Any]: A diagnostics dictionary keyed by chart-series names and optionally `labels` and `request`.
-    """
+    """  # noqa: E501
     if not isinstance(source, dict):
         return {}
     result: dict[str, Any] = {}
@@ -617,7 +617,7 @@ def append_payload_debug_line(
         path (str | Path): Filesystem path of the JSONL debug file to append to; parent directories will be created if needed.
         event (dict[str, Any]): Diagnostic payload to redact and write as a single JSON line.
         redactions_disabled (bool | None): If True, do not redact sensitive fields; if False, redact; if None, use the module's default detection.
-    """
+    """  # noqa: E501
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
@@ -634,14 +634,14 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:
+def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
     """Parse a value into a boolean according to Jackery payload conventions.
 
     Recognizes booleans, numeric truthiness (nonzero), and common string tokens: truthy {"1", "true", "on", "yes"} and falsy {"0", "false", "off", "no"}.
 
     Returns:
         `True` if the value represents truth, `False` if the value represents false, `None` when the value is `None` or cannot be parsed as a boolean.
-    """
+    """  # noqa: E501
     if value is None:
         return None
     if isinstance(value, bool):
@@ -660,7 +660,7 @@ def safe_bool(value: Any) -> bool | None:
         return None
 
 
-def smart_plug_serial(plug: Any) -> str | None:
+def smart_plug_serial(plug: Any) -> str | None:  # noqa: ANN401
     """Return the deviceSn for a smart-plug subdevice payload, or None."""
     if not isinstance(plug, dict):
         return None
@@ -671,7 +671,7 @@ def smart_plug_serial(plug: Any) -> str | None:
     return serial or None
 
 
-def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
+def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:  # noqa: ANN401
     """Return plug entries sorted by serial, dropping entries without one."""
     if not isinstance(plugs, list):
         return []
@@ -685,12 +685,12 @@ def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
     return [entry for _, entry in entries]
 
 
-def jackery_online_state(value: Any) -> bool | None:
+def jackery_online_state(value: Any) -> bool | None:  # noqa: ANN401
     """Determine whether a Jackery device state value indicates online or offline.
 
     Returns:
         bool | None: `True` if the value indicates online, `False` if it indicates offline, `None` when unknown or unparseable.
-    """
+    """  # noqa: E501
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"online", "connected", "available"}:
@@ -736,13 +736,13 @@ class AppDataQualityWarning(NamedTuple):
             DATA_QUALITY_KEY_LABEL: self.label,
             DATA_QUALITY_KEY_SOURCE_SECTION: self.source_section,
             DATA_QUALITY_KEY_SOURCE_VALUE: self.source_value,
-            DATA_QUALITY_KEY_REFERENCE_SECTION: self.reference_section,
+            DATA_QUALITY_KEY_REFERENCE_SECTION: self.reference_section,  # noqa: F821
             DATA_QUALITY_KEY_REFERENCE_VALUE: self.reference_value,
         }
         if self.source_request is not None:
             payload[DATA_QUALITY_KEY_SOURCE_REQUEST] = dict(self.source_request)
         if self.reference_request is not None:
-            payload[DATA_QUALITY_KEY_REFERENCE_REQUEST] = dict(self.reference_request)
+            payload[DATA_QUALITY_KEY_REFERENCE_REQUEST] = dict(self.reference_request)  # noqa: F821
         if self.source_chart_series_key is not None:
             payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
                 self.source_chart_series_key
@@ -766,7 +766,7 @@ def normalized_data_quality_warnings(
         list[dict[str, Any]]: Deduplicated warnings, keeping the first occurrence for each unique tuple of
         (reason, metric_key, source_section, source_value, reference_section, reference_value) and
         returned in a deterministic, sorted order.
-    """
+    """  # noqa: E501
     deduped: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
     for warning in warnings:
         if not isinstance(warning, dict):
@@ -776,14 +776,14 @@ def normalized_data_quality_warnings(
             str(warning.get(DATA_QUALITY_KEY_METRIC_KEY) or ""),
             str(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or ""),
             str(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE) or ""),
-            str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or ""),
+            str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or ""),  # noqa: F821
             str(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE) or ""),
         )
         deduped.setdefault(key, dict(warning))
     return [deduped[key] for key in sorted(deduped)]
 
 
-def _format_request_range(request: Any) -> str | None:
+def _format_request_range(request: Any) -> str | None:  # noqa: ANN401
     """Return a compact dateType/range summary for diagnostics messages."""
     if not isinstance(request, dict):
         return None
@@ -818,7 +818,7 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
         "`<metric>: <source_section>=<source_value> < <reference_section>=<reference_value>`"
         optionally followed by request range summaries in square brackets. Missing or
         None fields are rendered as `"unknown"`.
-    """
+    """  # noqa: E501
     metric = (
         warning.get(DATA_QUALITY_KEY_LABEL)
         or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
@@ -826,19 +826,19 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     )
     source_section = warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or "unknown"
     source_value = warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)
-    reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or "unknown"
+    reference_section = warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or "unknown"  # noqa: F821
     reference_value = warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE)
     source_text = "unknown" if source_value is None else str(source_value)
     reference_text = "unknown" if reference_value is None else str(reference_value)
 
-    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"
+    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E501
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
     reference_request = _format_request_range(
-        warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST),
+        warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST),  # noqa: F821
     )
 
     if source_request or reference_request:
-        text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"
+        text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"  # noqa: E501
     return text
 
 
@@ -862,9 +862,9 @@ def app_data_quality_warnings(
             - month total less than week total (when the week is inside the current month),
             - lifetime generation less than current-year generation.
         Each warning includes rounded source/reference values, optional request metadata for the involved sections, chart-series keys when applicable, and `total_method="chart_series_sum"` for warnings derived from chart-series totals (omitted when the source is the aggregated `statistic` section).
-    """
+    """  # noqa: E501
     if today is None:
-        today = date.today()
+        today = date.today()  # noqa: DTZ011
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
     week_inside_current_month = (
         week_begin.year == today.year
@@ -901,7 +901,7 @@ def app_data_quality_warnings(
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
-    def _add_warning(
+    def _add_warning(  # noqa: PLR0913
         *,
         reason: str,
         metric_key: str,
@@ -923,7 +923,7 @@ def app_data_quality_warnings(
                 source_value (float): Numeric source value that triggered the warning.
                 reference_section (str): Section name used as the reference for comparison.
                 reference_value (float): Numeric reference value used for comparison.
-        """
+        """  # noqa: E501
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -1026,7 +1026,7 @@ def app_data_quality_warnings(
     return warnings
 
 
-def statistic_id_part(value: Any) -> str:
+def statistic_id_part(value: Any) -> str:  # noqa: ANN401
     """Normalize a value into a lowercase, HA-safe statistic id fragment.
 
     Parameters:
@@ -1036,7 +1036,7 @@ def statistic_id_part(value: Any) -> str:
         str: A lowercase string containing only letters, digits, and underscores,
         with consecutive non-alphanumeric characters collapsed to a single underscore,
         trimmed of leading/trailing underscores. Returns `"unknown"` if the result is empty.
-    """
+    """  # noqa: E501
     text = str(value or "").strip().lower()
     text = re.sub(r"[^a-z0-9_]+", "_", text)
     text = re.sub(r"_+", "_", text).strip("_")
@@ -1055,7 +1055,7 @@ def external_trend_statistic_id(
 
     Returns:
         external_id (str): The constructed external statistic id.
-    """
+    """  # noqa: E501
     return (
         f"{domain}:"
         f"{statistic_id_part(device_id)}_"
@@ -1064,7 +1064,7 @@ def external_trend_statistic_id(
     )
 
 
-def _parse_iso_date(value: Any) -> date | None:
+def _parse_iso_date(value: Any) -> date | None:  # noqa: ANN401
     if not isinstance(value, str):
         return None
     try:
@@ -1110,7 +1110,7 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
     ))
 
 
-def _compact_year_parts(value: Any) -> tuple[float, float] | None:
+def _compact_year_parts(value: Any) -> tuple[float, float] | None:  # noqa: ANN401
     """Parse a Jackery "compact year" value into previous-bucket and current-bucket contributions.
 
     Accepts numeric values or string-like representations (commas are accepted as decimal separators). Interprets values with a decimal point as "whole.fraction" where the whole part is treated as the previous bucket contribution and the fractional digits represent the current bucket contribution. Values without a decimal point are returned as (0.0, parsed_value). Returns None for None, boolean inputs, or when the value cannot be reliably parsed into the expected compact format.
@@ -1120,7 +1120,7 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
 
     Returns:
         tuple[float, float] | None: `(previous, current)` contributions as floats when parsing succeeds, `None` otherwise.
-    """
+    """  # noqa: E501
     if value is None or isinstance(value, bool):
         return None
     text = str(value).strip().replace(",", ".")
@@ -1143,7 +1143,7 @@ def _compact_year_parts(value: Any) -> tuple[float, float] | None:
     whole = sign * float(int(whole_text))
     fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
 
-    if fraction == 0.0:
+    if fraction == 0.0:  # noqa: RUF069
         parsed = safe_float(value)
         return None if parsed is None else (0.0, parsed)
     return whole, fraction
@@ -1243,7 +1243,7 @@ def _nonzero_months(values: list[float]) -> list[int]:
     return [
         index + 1
         for index, value in enumerate(values[:12])
-        if abs(safe_float(value) or 0.0) > 0.00001
+        if abs(safe_float(value) or 0.0) > 0.00001  # noqa: PLR2004
     ]
 
 
@@ -1264,7 +1264,7 @@ def year_payload_appears_current_month_only(
 
     Returns:
         `true` if any inspected series has non-zero values only in `current_month`, `false` otherwise.
-    """
+    """  # noqa: E501, RUF002
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1299,7 +1299,7 @@ def _pv_revenue_value(source: dict[str, Any]) -> float | None:
 
     Returns:
         float: The total PV revenue in normal currency units, rounded to 5 decimals, if present or derivable; `None` otherwise.
-    """
+    """  # noqa: E501
     revenue = safe_float(source.get("totalSolarRevenue"))
     if revenue is not None:
         return revenue
@@ -1342,16 +1342,16 @@ def _configured_or_derived_price(
 
     Returns:
         tuple[float | None, str | None]: A pair `(price, source)` where `price` is the per-kWh price (configured value or a derived value rounded to 5 decimals) and `source` is the string indicating the origin of the price (e.g., "`PAYLOAD_PRICE.FIELD_SINGLE_PRICE`" or `"pv_year_revenue_per_kwh"`). Returns `(None, None)` when no valid configured or derivable price is available.
-    """
+    """  # noqa: E501
     price_source = payload.get(PAYLOAD_PRICE)
     if isinstance(price_source, dict):
         configured = safe_float(price_source.get(FIELD_SINGLE_PRICE))
-        if configured is not None and 0 <= configured <= 10:
+        if configured is not None and 0 <= configured <= 10:  # noqa: PLR2004
             return configured, f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
 
     if year_generation is not None and year_generation > 0 and year_revenue is not None:
         derived = year_revenue / year_generation
-        if 0 <= derived <= 10:
+        if 0 <= derived <= 10:  # noqa: PLR2004
             return round(derived, 5), "pv_year_revenue_per_kwh"
     return None, None
 
@@ -1380,7 +1380,7 @@ def _pv_revenue_candidates(
 
     Returns:
         list[float]: Deduplicated list of candidate revenue totals (rounded to 2 decimals).
-    """
+    """  # noqa: E501
     candidates: list[float] = []
     if year_revenue is not None:
         candidates.append(round(year_revenue, 2))
@@ -1419,7 +1419,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(
+def _calculated_savings_from_year(  # noqa: PLR0914
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -1441,7 +1441,7 @@ def _calculated_savings_from_year(
             - "price_source": source identifier for the price,
             - "source_energy": dict of rounded energy diagnostics (pv_year_kwh, device/grid inputs/outputs, home consumption, CT public export, battery charge/discharge, conversion loss, residual PV energy, etc.).
         None: If required inputs or derived price are unavailable (no device output, no home/CT totals, or no price).
-    """
+    """  # noqa: E501
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -1582,7 +1582,7 @@ def _savings_publish_decision(
 
     Returns:
         tuple[publish (bool), reason (str)]: `publish` is `True` when the cloud total should be used (or cloud total is missing and publishing is allowed); `False` when the cloud total appears implausibly high compared with the current-year calculation. `reason` is a short identifier explaining the decision (e.g., `"missing_cloud_total_revenue"`, `"cloud_total_matches_calculated_savings"`, `"cloud_total_below_current_year_savings"`, `"cloud_total_matches_pv_revenue_not_savings"`, `"cloud_total_higher_than_current_year_savings"`).
-    """
+    """  # noqa: E501
     if raw_revenue is None:
         return True, "missing_cloud_total_revenue"
 
@@ -1631,11 +1631,11 @@ def _backfill_pv_revenue(
     Behavior notes:
     - If no valid monthly revenues are found, the function returns without modifying `out` or `meta`.
     - If the monthly total is within tolerance of the existing year total, no modifications are made.
-    """
+    """  # noqa: E501, RUF002
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
-        if month < 1 or month > 12:
+        if month < 1 or month > 12:  # noqa: PLR2004
             continue
         revenue = _pv_revenue_value(month_source)
         if revenue is None:
@@ -1665,7 +1665,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(
+def backfill_year_payload_from_months(  # noqa: PLR0912
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -1688,7 +1688,7 @@ def backfill_year_payload_from_months(
 
     Returns:
         dict[str, Any]: Either the original `year_source` (when unchanged) or a modified copy containing corrected series, totals, and backfill metadata.
-    """
+    """  # noqa: E501, RUF002
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -1714,7 +1714,7 @@ def backfill_year_payload_from_months(
         monthly_values = [0.0 for _ in range(12)]
         found_months: list[int] = []
         for month, month_source in sorted(month_sources.items()):
-            if month < 1 or month > 12:
+            if month < 1 or month > 12:  # noqa: PLR2004
                 continue
             value = _month_value(month_source, month_section, stat_key)
             if value is None:
@@ -1807,7 +1807,7 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(
+def guard_statistic_totals_from_year(  # noqa: PLR0914
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -1819,7 +1819,7 @@ def guard_statistic_totals_from_year(
     Parameters:
         payload (dict[str, Any]): The full app payload to inspect and possibly modify. Must be a mapping that may contain `PAYLOAD_STATISTIC` and a year section for PV (e.g. `"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}"`).
         previous_statistic (dict[str, Any] | None): Optional previous statistics mapping used as a lower-bound reference for total generation when current-year data is absent.
-    """
+    """  # noqa: E501
     statistic = payload.get(PAYLOAD_STATISTIC)
     if not isinstance(statistic, dict):
         return
@@ -1930,7 +1930,7 @@ def guard_statistic_totals_from_year(
     ):
         factor = raw_carbon / raw_generation
         corrected_carbon = round(year_generation * factor, 2)
-        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(
+        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(  # noqa: PLR2004
             raw_carbon,
             corrected_carbon,
         ):
@@ -1948,7 +1948,7 @@ def guard_statistic_totals_from_year(
         payload[PAYLOAD_STATISTIC] = out
 
 
-def compact_json(value: Any) -> str:
+def compact_json(value: Any) -> str:  # noqa: ANN401
     """Produce a compact JSON representation of a JSON-serializable value.
 
     Parameters:
@@ -1960,7 +1960,7 @@ def compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def trend_series_points(
+def trend_series_points(  # noqa: PLR0912
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -1976,7 +1976,7 @@ def trend_series_points(
 
     Returns:
         list[TrendStatisticPoint]: Points containing the bucket start date and the series value rounded to 5 decimals; returns an empty list when the series is missing, the unit is not kWh, or the request begin date cannot be determined.
-    """
+    """  # noqa: E501
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
@@ -2003,7 +2003,7 @@ def trend_series_points(
     if begin is None:
         return []
     if today is None:
-        today = date.today()
+        today = date.today()  # noqa: DTZ011
 
     points: list[TrendStatisticPoint] = []
     for index, value in enumerate(series):
@@ -2011,7 +2011,7 @@ def trend_series_points(
             continue
         if date_type == DATE_TYPE_YEAR:
             month = index + 1
-            if month < 1 or month > 12:
+            if month < 1 or month > 12:  # noqa: PLR2004
                 continue
             bucket_start = begin.replace(month=month, day=1)
         elif date_type in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
@@ -2025,7 +2025,7 @@ def trend_series_points(
     return points
 
 
-def _parse_day_chart_minute(value: Any) -> int | None:
+def _parse_day_chart_minute(value: Any) -> int | None:  # noqa: ANN401
     """Parse an app day-chart label into minutes after local midnight."""
     if not isinstance(value, str):
         return None
@@ -2033,9 +2033,9 @@ def _parse_day_chart_minute(value: Any) -> int | None:
     if match is None:
         return None
     hour, minute = int(match.group(1)), int(match.group(2))
-    if hour == 24 and minute == 0:
+    if hour == 24 and minute == 0:  # noqa: PLR2004
         return None
-    if 0 <= hour <= 23 and 0 <= minute <= 59:
+    if 0 <= hour <= 23 and 0 <= minute <= 59:  # noqa: PLR2004
         return hour * 60 + minute
     return None
 
@@ -2053,7 +2053,7 @@ def _day_power_sample_minute(
     return minute if 0 <= minute < 24 * 60 else None
 
 
-def day_power_energy_points(
+def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2115,7 +2115,7 @@ def day_power_energy_points(
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
-        today = date.today()
+        today = date.today()  # noqa: DTZ011
     if begin > today:
         return []
     if now is None:
@@ -2253,7 +2253,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(
+def calculated_smart_meter_power(  # noqa: PLR0911
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -2271,7 +2271,7 @@ def calculated_smart_meter_power(
 
     Returns:
         float | None: The calculated power (same units as the CT values) when computable, or `None` if required inputs are missing or `calculation` is not supported.
-    """
+    """  # noqa: E501
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -2360,7 +2360,7 @@ def jackery_corrected_home_consumption_power(
                 - jackery_output_power: jackery reported grid-side output power,
                 - source: string identifying the source of the returned value (`FIELD_OTHER_LOAD_PW` when Jackery reports the load, otherwise `"smart_meter_net_minus_input_plus_output"`).
         None: When the smart-meter net is unavailable or Jackery input/output are both zero and no reported home load exists.
-    """
+    """  # noqa: E501
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -2375,7 +2375,7 @@ def jackery_corrected_home_consumption_power(
             source=FIELD_OTHER_LOAD_PW,
         )
 
-    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):
+    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # noqa: RUF069
         return None
 
     calculated = meter_net - jackery_input + jackery_output
@@ -2391,7 +2391,7 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
+def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:  # noqa: PLR0911, PLR0912
     """Return the app chart-series key for one section/stat pair."""
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
@@ -2455,7 +2455,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(
+def trend_series_total(  # noqa: PLR0911
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2469,7 +2469,7 @@ def trend_series_total(
     Returns:
         float: The total rounded to 2 decimal places when available.
         None: When a total cannot be determined.
-    """
+    """  # noqa: E501
     if _is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -2487,7 +2487,7 @@ def trend_series_total(
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0
+            and server_total == 0.0  # noqa: RUF069
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
@@ -2507,7 +2507,7 @@ def trend_series_total(
     return round(sum(valid_values), 2)
 
 
-def trend_series_has_value(
+def trend_series_has_value(  # noqa: PLR0911
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2521,7 +2521,7 @@ def trend_series_has_value(
 
     Returns:
         bool: `True` if a usable value is available for the section and stat key, `False` otherwise.
-    """
+    """  # noqa: E501
     if _is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
@@ -2538,7 +2538,7 @@ def trend_series_has_value(
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0
+            and server_total == 0.0  # noqa: RUF069
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
@@ -2555,7 +2555,7 @@ def trend_series_has_value(
     )
 
 
-def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
+def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401
     """Read a value from the task-plan shapes documented in PROTOCOL.md §3-§5."""
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:

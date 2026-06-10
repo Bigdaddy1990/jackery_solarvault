@@ -132,7 +132,7 @@ async def _set_max_feed_grid(
     value: float,
 ) -> None:
     """Set the maximum grid feed-in power on a device."""
-    await coord.async_set_max_feed_grid(dev_id, 800 if int(value) <= 800 else 2500)
+    await coord.async_set_max_feed_grid(dev_id, 800 if int(value) <= 800 else 2500)  # noqa: PLR2004
 
 
 async def _set_max_output_power(
@@ -177,11 +177,11 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
 
     Returns:
         float: `800.0` if the device reports a maximum output power of 800 W or lower and no indicators of higher capability are present; `2500.0` otherwise.
-    """
+    """  # noqa: E501
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
-        if feed_limit is not None and feed_limit > 800:
+        if feed_limit is not None and feed_limit > 800:  # noqa: PLR2004
             return 2500.0
     for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
         meta = payload.get(section) or {}
@@ -190,12 +190,12 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     max_out_int = safe_int(props.get(FIELD_MAX_OUT_PW))
     if max_out_int is None:
         max_out_int = 2500
-    return 800.0 if max_out_int <= 800 else 2500.0
+    return 800.0 if max_out_int <= 800 else 2500.0  # noqa: PLR2004
 
 
 def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
     """Jackery's app exposes feed-in as a binary 800/2500W selection."""
-    if _max_feed_grid_dynamic_max(payload) <= 800:
+    if _max_feed_grid_dynamic_max(payload) <= 800:  # noqa: PLR2004
         return (800.0,)
     return (800.0, 2500.0)
 
@@ -338,7 +338,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Raises:
             HomeAssistantError: Error populated with `translation_domain=DOMAIN`, the provided `translation_key`, and `translation_placeholders` containing the entity key (`"entity"`), device id (`"device_id"`), and the provided placeholders (stringified).
-        """
+        """  # noqa: E501
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
@@ -395,7 +395,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         Raises:
             ConfigEntryAuthFailed: If the underlying setter reports an authentication failure.
             HomeAssistantError: If the value is outside the configured min/max or not in the allowed-values set (translation keys `invalid_number_range` or `invalid_number_allowed_values`), or if the setter fails and the description requests errors be raised (`entity_action_failed`).
-        """
+        """  # noqa: E501
         if self.entity_description.validate_range and (
             value < self.native_min_value or value > self.native_max_value
         ):
@@ -435,7 +435,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 self.entity_description.key,
                 err,
             )
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             if self.entity_description.raise_on_setter_error:
                 self._raise_action_error("entity_action_failed", error=err)
             _LOGGER.debug(
@@ -452,7 +452,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -460,7 +460,7 @@ async def async_setup_entry(
     """Create and add Jackery number entities for devices present in the coordinator.
 
     Scans the coordinator payload to instantiate description-driven NumberEntity objects (using NUMBER_DESCRIPTIONS) for each device when their required payload fields are present, adds them via the provided async_add_entities callback while preventing duplicate unique IDs, and registers a listener to add new entities when the coordinator data signature changes.
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -472,7 +472,7 @@ async def async_setup_entry(
         Parameters:
             entities (list[NumberEntity]): List to which the entity will be appended when unique.
             entity (NumberEntity): The entity to append.
-        """
+        """  # noqa: E501
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -490,7 +490,7 @@ async def async_setup_entry(
 
         Returns:
             bool: `True` if any of the provided keys are present in the payload's properties section, `False` otherwise.
-        """
+        """  # noqa: E501
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
@@ -505,7 +505,7 @@ async def async_setup_entry(
             `true` if `FIELD_SINGLE_PRICE` or `FIELD_DYNAMIC_OR_SINGLE` is present in the
             price section, or if `FIELD_ID` or `FIELD_SYSTEM_ID` is present in the system
             section; `false` otherwise.
-        """
+        """  # noqa: E501
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (
@@ -534,7 +534,7 @@ async def async_setup_entry(
 
         Returns:
             list[NumberEntity]: NumberEntity instances created for each device and description where the device payload is present and the optional gating predicate permits creation.
-        """
+        """  # noqa: E501
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for description in NUMBER_DESCRIPTIONS:

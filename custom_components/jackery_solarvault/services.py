@@ -155,7 +155,7 @@ def _loaded_coordinators(hass: HomeAssistant) -> list[JackerySolarVaultCoordinat
 
     Returns:
         list[JackerySolarVaultCoordinator]: Coordinator instances attached to loaded config entries.
-    """
+    """  # noqa: E501
     coordinators: list[JackerySolarVaultCoordinator] = []
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         coordinator = getattr(loaded_entry, "runtime_data", None)
@@ -206,7 +206,7 @@ def _coordinator_for_system(
 
     Returns:
         JackerySolarVaultCoordinator | None: The matching coordinator if found, otherwise `None`.
-    """
+    """  # noqa: E501
     for coordinator in _loaded_coordinators(hass):
         for payload in (coordinator.data or {}).values():
             system: dict[str, Any] = payload.get(PAYLOAD_SYSTEM) or {}
@@ -231,7 +231,7 @@ def _service_validation_error(
 
     Returns:
         ServiceValidationError: An error with `translation_domain` set to the integration DOMAIN and `translation_placeholders` containing `device_id` and the stringified `error`.
-    """
+    """  # noqa: E501
     return ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key=translation_key,
@@ -242,7 +242,7 @@ def _service_validation_error(
     )
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
+def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # noqa: ANN401
     """Convert a service-provided BLE command body into a dictionary.
 
     Accepts either a mapping (returned as a shallow copy) or a JSON string representing an object.
@@ -259,7 +259,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
     Raises:
         ServiceValidationError: If `raw_body` is neither a mapping nor a valid JSON object string,
         or if JSON parsing fails.
-    """
+    """  # noqa: E501
     if isinstance(raw_body, dict):
         return dict(raw_body)
     if isinstance(raw_body, str):
@@ -295,7 +295,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
 
     Raises:
         ServiceValidationError: if no coordinator owns the provided `system_id`, or if the API fails; the error includes `system_id` and `error` placeholders.
-    """
+    """  # noqa: E501
     system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()
     new_name = call.data[SERVICE_FIELD_NEW_NAME].strip()
     coordinator = _coordinator_for_system(hass, system_id)
@@ -363,7 +363,7 @@ async def _async_handle_delete_storm_alert(
     If no coordinator owns the resolved device id or the coordinator/API call fails,
     a ServiceValidationError is raised with `translation_key="delete_storm_alert_failed"`
     and placeholders `device_id`, `alert_id`, and `error`.
-    """
+    """  # noqa: E501
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -409,7 +409,7 @@ async def _async_handle_set_third_party_mqtt_config(
 
     Raises:
         ServiceValidationError: If no coordinator owns the resolved device_id, or if the coordinator/API returns an error; the exception's translation_placeholders include `device_id` and an `error` message.
-    """
+    """  # noqa: E501
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
@@ -493,7 +493,7 @@ async def _async_handle_send_ble_command(
         if parameter coercion/validation fails, or if the command could not be sent (including when
         BLE writes are disabled or there is no active BLE session). The error will use the
         `translation_key` "send_ble_command_failed".
-    """
+    """  # noqa: E501
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)

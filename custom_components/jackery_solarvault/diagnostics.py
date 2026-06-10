@@ -59,7 +59,7 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(
+async def async_get_config_entry_diagnostics(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> dict[str, Any]:
@@ -73,7 +73,7 @@ async def async_get_config_entry_diagnostics(
             - `options`: redacted copy of the config entry options
             - `devices`: anonymized and redacted mapping of device payloads
             - `raw_api`: detailed redacted snapshots and coordinator metadata
-    """
+    """  # noqa: E501
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
