@@ -40,7 +40,9 @@
     "custom_components.jackery_solarvault.client.api",
     "custom_components.jackery_solarvault.client.ble",
     "custom_components.jackery_solarvault.client.ble_transport",
+    "custom_components.jackery_solarvault.client.local_mqtt",
     "custom_components.jackery_solarvault.client.mqtt_push",
+    "aiohttp",
     "aiomqtt"
   ],
   "quality_scale": "custom",

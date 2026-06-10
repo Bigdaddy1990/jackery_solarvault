@@ -8,7 +8,7 @@ optional callables on the description.
 
 from dataclasses import dataclass
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import (
     NumberDeviceClass,
@@ -90,7 +90,7 @@ def _rounded_int(value: Any) -> int:  # noqa: ANN401
 
     Raises:
         HomeAssistantError: If the input cannot be parsed as a numeric value (message "invalid number value").
-    """  # noqa: E501
+    """
     parsed = safe_float(value)
     if parsed is None:
         raise HomeAssistantError("invalid number value")  # noqa: TRY003
@@ -122,6 +122,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     value_transform: Callable[[float], Any] = _rounded_int
     raise_on_setter_error: bool = True
     integer_value: bool = False
+    display_precision: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ def _wire_int(value: Any) -> int:  # noqa: ANN401
 
     Raises:
         HomeAssistantError: If the input cannot be interpreted as an integer (error message "invalid number value").
-    """  # noqa: E501
+    """
     parsed = first_nonblank_int(value)
     if parsed is None:
         raise HomeAssistantError("invalid number value")  # noqa: TRY003
@@ -158,7 +159,7 @@ def _wire_float(value: Any) -> float:  # noqa: ANN401
 
     Raises:
         HomeAssistantError: If the input cannot be parsed as a float (error message: "invalid number value").
-    """  # noqa: E501
+    """
     parsed = safe_float(value)
     if parsed is None:
         raise HomeAssistantError("invalid number value")  # noqa: TRY003
@@ -173,7 +174,7 @@ async def _set_soc_charge(
     Parameters:
         dev_id (str): Identifier of the target device.
         value (float): Desired SOC charge limit as a percentage; converted to an integer before sending to the coordinator.
-    """  # noqa: E501
+    """
     await coord.async_set_soc_limits(dev_id, charge_limit=_wire_int(value))
 
 
@@ -185,7 +186,7 @@ async def _set_soc_discharge(
     Parameters:
         dev_id (str): Identifier of the target device.
         value (float): Desired discharge limit as a percentage; values are converted to an integer before being sent.
-    """  # noqa: E501
+    """
     await coord.async_set_soc_limits(dev_id, discharge_limit=_wire_int(value))
 
 
@@ -196,7 +197,7 @@ async def _set_max_feed_grid(
 
     Parameters:
         value (float): Requested feed-in indicator; values less than or equal to 800 select 800, otherwise 2500.
-    """  # noqa: E501
+    """
     parsed = _wire_int(value)
     await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)  # noqa: PLR2004
 
@@ -213,7 +214,7 @@ async def _set_max_output_power(
 
     Raises:
         HomeAssistantError: If `value` cannot be parsed as a valid number.
-    """  # noqa: E501
+    """
     await coord.async_set_max_output_power(dev_id, _wire_int(value))
 
 
@@ -233,7 +234,7 @@ async def _set_single_price(
         coord (JackerySolarVaultCoordinator): Coordinator that performs the write operation.
         dev_id (str): Identifier of the target device.
         value (float): Price value to write, expressed in the device's configured currency unit.
-    """  # noqa: E501
+    """
     await coord.async_set_single_price(dev_id, value)
 
 
@@ -246,7 +247,7 @@ async def _set_third_party_mqtt_port(
         coord (JackerySolarVaultCoordinator): Coordinator used to apply the configuration change.
         dev_id (str): Identifier of the target device.
         value (float): Port number; converted to `int` before being written.
-    """  # noqa: E501
+    """
     await coord.async_update_third_party_mqtt_config(
         dev_id,
         {FIELD_THIRD_PARTY_MQTT_PORT: int(value)},
@@ -272,7 +273,7 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
 
     Returns:
         float: Either 800.0 or 2500.0 representing the dynamic maximum feed-grid power.
-    """  # noqa: E501
+    """
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
@@ -296,7 +297,7 @@ def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
 
     Returns:
         tuple[float, ...]: Allowed feed-in values; either `(800.0,)` when the device's dynamic max is 800 or less, otherwise `(800.0, 2500.0)`.
-    """  # noqa: E501
+    """
     if _max_feed_grid_dynamic_max(payload) <= 800:  # noqa: PLR2004
         return (800.0,)
     return (800.0, 2500.0)
@@ -314,7 +315,7 @@ def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
 
     Returns:
         str: Currency symbol or code for the single-tariff price (defaults to "€").
-    """  # noqa: E501
+    """
     price = payload.get(PAYLOAD_PRICE) or {}
     return str(
         price.get(FIELD_SINGLE_CURRENCY)
@@ -431,6 +432,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
         setter=_set_third_party_mqtt_port,
         integer_value=True,
+        display_precision=0,
     ),
 )
 
@@ -464,7 +466,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Raises:
             HomeAssistantError: An error with `translation_domain`, `translation_key`, and `translation_placeholders` populated (includes `entity` and `device_id` plus provided placeholders).
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
@@ -487,7 +489,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             The found native value as a `float` (rounded to an integer when configured), or `entity_description.none_fallback` (which may be `None`).
-        """  # noqa: E501
+        """
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -519,22 +521,27 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             str | None: The unit of measurement, or `None` if not set.
-        """  # noqa: E501
+        """
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
+
+    @property
+    def suggested_display_precision(self) -> int | None:
+        """Return the suggested number of decimal places for display."""
+        return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
         """Determine the discrete native values allowed for this entity based on its description and current payload.
 
         Returns:
                 A tuple of allowed native values. Returns an empty tuple when there is no restriction.
-        """  # noqa: E501
+        """
         allowed = self.entity_description.allowed_values
         if allowed is None:
             return ()
         if callable(allowed):
-            return tuple(cast("tuple[float, ...]", allowed(self._payload)))
+            return tuple(allowed(self._payload))
         return tuple(allowed)
 
     async def async_set_native_value(self, value: float) -> None:
@@ -544,7 +551,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Parameters:
             value (float): The target native value to set for the entity.
-        """  # noqa: E501
+        """
         parsed_value = safe_float(value)
         if parsed_value is None:
             self._raise_action_error(
@@ -621,7 +628,7 @@ async def async_setup_entry(  # noqa: RUF029
         Parameters:
             entities (list[NumberEntity]): List to append the entity to when unique.
             entity (NumberEntity): The entity to add; duplicates (by unique ID) are ignored.
-        """  # noqa: E501
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
         )
@@ -635,7 +642,7 @@ async def async_setup_entry(  # noqa: RUF029
 
         Returns:
             bool: `True` if at least one key is present in the properties section, `False` otherwise.
-        """  # noqa: E501
+        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
@@ -647,7 +654,7 @@ async def async_setup_entry(  # noqa: RUF029
 
         Returns:
             bool: `true` if the payload's price section contains `FIELD_SINGLE_PRICE` or `FIELD_DYNAMIC_OR_SINGLE`, or the system section contains `FIELD_ID` or `FIELD_SYSTEM_ID`; `false` otherwise.
-        """  # noqa: E501
+        """
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (
@@ -679,7 +686,7 @@ async def async_setup_entry(  # noqa: RUF029
 
         Returns:
             list[NumberEntity]: NumberEntity instances ready to be added to Home Assistant.
-        """  # noqa: E501
+        """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for description in NUMBER_DESCRIPTIONS:

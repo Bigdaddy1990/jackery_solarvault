@@ -74,6 +74,8 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+_BLE_SERVICE_CONNECT_TIMEOUT_SEC = 35.0
+
 
 _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 
@@ -1013,7 +1015,7 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
 
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g., "12345"), otherwise the original input.
-    """  # noqa: E501
+    """
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
@@ -1033,7 +1035,7 @@ async def _async_handle_send_device_schedule(
 
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
-    """  # noqa: E501
+    """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)

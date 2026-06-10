@@ -100,7 +100,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             dict[str, Any]: The PV trends data from the device payload, or an empty dict if not present.
-        """  # noqa: E501
+        """
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
@@ -109,7 +109,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             alarm (object | None): The alarm payload from the device payload, or `None` if no alarm data is present.
-        """  # noqa: E501
+        """
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -148,7 +148,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: Identifiers, manufacturer, name, model, and optional `serial_number` and `sw_version`.
-        """  # noqa: E501
+        """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -184,7 +184,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: Device registry metadata for the smart-plug including identifiers, manufacturer, name, model, serial_number, sw_version, and via_device.
-        """  # noqa: E501
+        """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
@@ -229,7 +229,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             `true` if the entity is considered available, `false` otherwise.
-        """  # noqa: E501
+        """
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)

@@ -7,14 +7,14 @@ from homeassistant.components.diagnostics import async_redact_data
 
 from .client.local_mqtt import _local_mqtt_client
 from .const import (
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
     CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     REDACT_KEYS as _STATIC_REDACT_KEYS,
 )
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from .coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#", "homeassistant"})
+_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
 
 # Kept as an import alias so tests / external callers can still reference the
 # static redact-key set when needed. Runtime redaction in this module always
@@ -60,7 +60,7 @@ def _redacted_payload_map(
 
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
-    """  # noqa: E501
+    """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
@@ -85,7 +85,7 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             - `options`: redacted copy of the config entry's options.
             - `devices`: mapping of stable local device labels to redacted device payloads.
             - `raw_api`: raw diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill (redacted according to the entry's redaction settings).
-    """  # noqa: E501
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
@@ -194,21 +194,24 @@ def _local_mqtt_diagnostics(
     coordinator: JackerySolarVaultCoordinator | None = None,
     redactions_disabled: bool = False,
 ) -> dict[str, Any]:
-    """Builds a diagnostics block for the integration's local MQTT client or returns an indicator that local MQTT is unavailable.
+    """Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
 
     Parameters:
-        redactions_disabled (bool): When True, request the client's diagnostics without redaction; when False, request a redacted snapshot.
+        redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
 
     Returns:
-        dict: If a client diagnostics snapshot is available, returns that snapshot (with redaction controlled by `redactions_disabled`). Otherwise returns a block of the form `{"enabled": False, "disabled_reason": <reason>, "configured_local_mqtt": {...}}` describing why the client is unavailable and the configured connection parameters.
-    """  # noqa: E501
+        dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
+        MQTT client is available, otherwise the client's diagnostics snapshot.
+    """
     enabled = config_entry_bool_option(
-        entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE
+        entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
     )
     host = config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "").strip()
     port = str(
         config_entry_str_option(
-            entry, CONF_LOCAL_MQTT_PORT, str(DEFAULT_LOCAL_MQTT_PORT)
+            entry,
+            CONF_LOCAL_MQTT_PORT,
+            str(DEFAULT_LOCAL_MQTT_PORT),
         )
     ).strip()  # noqa: E501, RUF100
     username = config_entry_str_option(entry, CONF_LOCAL_MQTT_USERNAME, "").strip()

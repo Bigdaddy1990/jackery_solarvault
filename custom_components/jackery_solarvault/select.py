@@ -139,7 +139,7 @@ def _storm_minutes_value(  # noqa: PLR0912
 
     Returns:
         int | None: The storm lead time in minutes when a valid value is found, or `None` if no valid value is present.
-    """  # noqa: E501
+    """
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
         raw = properties.get(key)
@@ -185,7 +185,7 @@ def _storm_minutes_fallback(
 
     Returns:
         int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
-    """  # noqa: E501
+    """
     raw = properties.get(FIELD_WPS)
     if raw is None:
         raw = weather_plan.get(FIELD_WPS)
@@ -683,7 +683,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         hass (HomeAssistant): Home Assistant core instance.
         entry (JackeryConfigEntry): Config entry whose runtime_data provides the coordinator and device payloads.
         async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
-    """  # noqa: E501
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -706,7 +706,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
-        """  # noqa: E501
+        """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -748,7 +748,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[SelectEntity]: Created JackerySelect instances for eligible devices.
-        """  # noqa: E501
+        """
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             supports_advanced = coordinator.device_supports_advanced(dev_id)
@@ -765,7 +765,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
 
         When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature; if the signature is unchanged, take no action.
-        """  # noqa: E501
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

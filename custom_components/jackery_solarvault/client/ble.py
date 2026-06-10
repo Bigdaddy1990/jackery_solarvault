@@ -51,7 +51,7 @@ length picks the cipher mode — observed in the wild: a SolarVault 3 Pro
 Max returned a 16-byte key (AES-128). The crypto helpers below accept
 both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
-"""  # noqa: E501
+"""
 
 from dataclasses import dataclass
 import logging
@@ -133,7 +133,7 @@ def hex16(value: int) -> str:
 
     Raises:
         ValueError: If `value` is not between 0 and 0xFFFF (inclusive).
-    """  # noqa: E501
+    """
     if not 0 <= value <= 0xFFFF:  # noqa: PLR2004
         raise ValueError(f"hex16: {value} does not fit into 16 bits")  # noqa: TRY003
     return f"{value:04X}"
@@ -150,7 +150,7 @@ def parse_hex16(text: str) -> int:
 
     Raises:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
-    """  # noqa: E501
+    """
     if len(text) != _HEX16_WIDTH:
         raise ValueError(  # noqa: TRY003
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
@@ -166,7 +166,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # noqa: E501
+    """
     return data.hex().upper()
 
 
@@ -242,7 +242,7 @@ def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
 
     Raises:
         ValueError: If `key` length is not 16 or 32 bytes, or if `iv` is not 16 bytes.
-    """  # noqa: E501
+    """
     _validate_key_len(key, fn="aes_encrypt")
     if len(iv) != BLE_AES_IV_LEN:
         raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
@@ -268,7 +268,7 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
 
     Raises:
         ValueError: If `key` length is not 16 or 32 bytes, if `iv` is not 16 bytes, or if the ciphertext is malformed or padding is invalid.
-    """  # noqa: E501
+    """
     _validate_key_len(key, fn="aes_decrypt")
     if len(iv) != BLE_AES_IV_LEN:
         raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
@@ -397,7 +397,7 @@ def build_binary_frame(  # noqa: PLR0913
         ValueError: If `cmd` or `flags` do not fit in 16 bits, if `frame_index` or
             `chunk_count` are outside the range 1..0xFFFF, if `body` is longer than
             0xFFFF bytes, or if `trailer` is not exactly 4 bytes.
-    """  # noqa: E501
+    """
     if not 0 <= cmd <= 0xFFFF:  # noqa: PLR2004
         raise ValueError(f"cmd {cmd} does not fit into 16 bits")  # noqa: TRY003
     if not 0 <= flags <= 0xFFFF:  # noqa: PLR2004
@@ -462,7 +462,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
 
     Returns:
         BleBinaryFrame: Parsed frame with `frame_index`, `chunk_count`, `flags`, `cmd`, `body`, and 4-byte `trailer`.
-    """  # noqa: E501
+    """
     if len(raw) < BLE_AES_IV_LEN + _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
         raise ValueError(f"notify too short: {len(raw)} bytes")  # noqa: TRY003
     iv = raw[:BLE_AES_IV_LEN]
@@ -544,7 +544,7 @@ def build_plaintext_frame(frame: BleFrame) -> str:
 
     Raises:
         ValueError: If the chunk_payload's hex encoding has an odd length.
-    """  # noqa: E501
+    """
     chunk_hex = hex_encode(frame.chunk_payload)
     if len(chunk_hex) % 2 != 0:
         raise ValueError("chunk_payload must serialise to an even hex length")  # noqa: TRY003
@@ -639,7 +639,7 @@ def _append_random_and_crc(plaintext_frame: str, random16: int | None) -> str:
 
     Returns:
         str: The input string followed by a 4-character uppercase hex tag and a 4-character uppercase CRC-16 (Modbus) computed over the UTF-8 bytes of (plaintext_frame + tag).
-    """  # noqa: E501
+    """
     if random16 is None:
         random16 = secrets.randbelow(0x10000)
     tag = hex16(random16)
@@ -667,7 +667,7 @@ def encrypt_frame(
 
     Returns:
         bytes: The concatenation of the 16-byte IV and the AES ciphertext (`iv || ciphertext`).
-    """  # noqa: E501
+    """
     plaintext_frame = build_plaintext_frame(frame)
     payload = _append_random_and_crc(plaintext_frame, random16)
     actual_iv = random_iv() if iv is None else iv
@@ -685,7 +685,7 @@ def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
 
     Raises:
         ValueError: If the input blob is shorter than IV + one AES block, if the decrypted plaintext is too short to contain the random tag and CRC, or if the CRC verification fails.
-    """  # noqa: E501
+    """
     if len(blob) < BLE_AES_IV_LEN + algorithms.AES.block_size // 8:
         raise ValueError("ciphertext blob too short")  # noqa: TRY003
     iv = blob[:BLE_AES_IV_LEN]
@@ -734,7 +734,7 @@ def chunk_size_for_mtu(mtu: int) -> int:
 
     Returns:
         int: Maximum number of payload bytes allowed in a single frame (mtu - 60).
-    """  # noqa: E501
+    """
     if mtu <= _BLE_FRAME_OVERHEAD:
         raise ValueError(  # noqa: TRY003
             f"BLE MTU {mtu} is below the {_BLE_FRAME_OVERHEAD}-byte frame overhead"
@@ -749,7 +749,7 @@ def split_body_for_mtu(body: bytes, mtu: int) -> list[bytes]:
 
     Returns:
         list[bytes]: A list of byte chunks ready to be embedded in individual binary frames.
-    """  # noqa: E501
+    """
     size = chunk_size_for_mtu(mtu)
     if not body:
         return [b""]
@@ -775,7 +775,7 @@ def split_payload_into_frames(
 
     Returns:
         list[BleFrame]: Ordered list of frames representing the payload chunks.
-    """  # noqa: E501
+    """
     chunk_size = chunk_size_for_mtu(mtu)
     if not payload:
         # Send a single empty-body frame so queries (cmd=0 weather alerts

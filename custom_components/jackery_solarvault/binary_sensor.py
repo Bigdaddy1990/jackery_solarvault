@@ -92,7 +92,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     """Set up coordinator-backed binary sensor entities for a Jackery config entry and register a listener to rebuild entities when coordinator data changes.
 
     Discovers per-device binary sensors and per-plug smart-plug binary sensors from the coordinator data, de-duplicates entities across rebuilds, and calls the provided `async_add_entities` callback to register newly discovered entities when the coordinator's entity signature changes.
-    """  # noqa: E501
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -104,7 +104,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities: List to append the entity to when its unique ID is new.
             entity: Binary sensor entity to check and potentially append.
-        """  # noqa: E501
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="binary_sensor", logger=_LOGGER
         )
@@ -116,7 +116,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[BinarySensorEntity]: Constructed binary sensor entities ready to be added.
-        """  # noqa: E501
+        """
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for desc in BINARY_DESCRIPTIONS:
@@ -146,7 +146,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Register new binary sensor entities when the coordinator's entity signature changes.
 
         If the current coordinator entity signature differs from the last recorded signature, collect newly constructed entities, update the stored signature, and register the new entities with the platform. No action is taken when the signature is unchanged.
-        """  # noqa: E501
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -185,7 +185,7 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Returns:
             `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknown.
-        """  # noqa: E501
+        """
         return safe_bool(
             self.entity_description.getter(self._properties, self._device_meta)
         )
@@ -218,7 +218,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Notes:
             Builds and stores the plug's `device_info` at construction so the device registry can use it when the entity is added.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, f"{plug_key}_switch_state")
         self._plug_index = plug_index
         self._plug_sn = plug_sn
@@ -238,7 +238,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Returns:
             dict[str, Any]: The matching smart-plug payload dictionary, or an empty dict if no matching plug is found.
-        """  # noqa: E501
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -250,7 +250,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Returns:
             `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
-        """  # noqa: E501
+        """
         raw = self._plug.get(FIELD_SWITCH_STATE)
         if raw is None:
             raw = self._plug.get(FIELD_SYS_SWITCH)
@@ -264,7 +264,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
-        """  # noqa: E501
+        """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,

@@ -35,7 +35,7 @@ def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
 
     Raises:
         AttributeError: If `name` is not a supported attribute.
-    """  # noqa: E501
+    """
     if name == "JackeryMqttPushClient":
         module = import_module(f"{__name__}.mqtt_push")
         return module.JackeryMqttPushClient

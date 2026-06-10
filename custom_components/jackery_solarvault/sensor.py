@@ -68,7 +68,7 @@ Unique IDs follow ``PROTOCOL.md §11`` strictly:
 The ``key`` attribute of each ``JackerySensorDescription`` is the
 ``<stable_key_suffix>``; translation keys, names and any localized text
 must never affect ``unique_id``.
-"""  # noqa: E501
+"""
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -419,12 +419,12 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
 
     Returns:
         Callable[[Any], float | None]: A function that accepts any value, returns the quotient rounded to 2 decimals when the value can be converted to float, or `None` when conversion fails.
-    """  # noqa: E501
+    """
 
     def _f(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -1662,7 +1662,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # These values largely duplicate the per-device and home sensors and were
     # removed to reduce redundancy in Home Assistant. Removing them here ensures
     # the integration only exposes one set of PV, home and battery statistics.
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -1675,7 +1675,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_month_energy",
         translation_key="home_month_energy",
@@ -1688,7 +1688,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:home-lightning-bolt",
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY  # noqa: E501
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_year_energy",
         translation_key="home_year_energy",
@@ -1704,7 +1704,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- PROTOCOL.md §2: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -1717,7 +1717,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_month_energy",
         translation_key="device_ongrid_input_month_energy",
@@ -1730,7 +1730,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_year_energy",
         translation_key="device_ongrid_input_year_energy",
@@ -1743,7 +1743,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-import",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_week_energy",
         translation_key="device_ongrid_output_week_energy",
@@ -1756,7 +1756,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_month_energy",
         translation_key="device_ongrid_output_month_energy",
@@ -1769,7 +1769,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-export",
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # noqa: E501
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_year_energy",
         translation_key="device_ongrid_output_year_energy",
@@ -1935,7 +1935,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:battery-arrow-down",
     ),
-    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE  # noqa: E501
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE
     JackeryStatSensorDescription(
         key="battery_discharge_month_energy",
         translation_key="battery_discharge_month_energy",
@@ -3213,7 +3213,7 @@ async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
       (e.g., absent statistic sections).
     - Registers a listener that rebuilds the entity set only when the coordinator data signature
       changes, and primes the initial entity creation immediately.
-    """  # noqa: E501
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
     create_smart_meter_derived = config_entry_bool_option(
@@ -3248,7 +3248,7 @@ async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
 
         Returns:
             list[SensorEntity]: A list of instantiated sensor entities ready for registration.
-        """  # noqa: E501
+        """
         entities: list[SensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -3447,7 +3447,7 @@ async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
         """Detects changes in the coordinator data signature and adds any newly discovered entities to Home Assistant.
 
         Compares the current coordinator entity signature with the previously stored signature; when different, updates the stored signature, collects entities to create, and calls the platform's entity adder for any discovered entities.
-        """  # noqa: E501
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -3496,6 +3496,20 @@ class JackerySensor(JackeryEntity, SensorEntity):
             return None
         return self.entity_description.transform(raw)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose HTTP-only value alongside merged value for diagnostics.
+
+        Shows the raw HTTP property value before MQTT/BLE overlay so users
+        can see when a live source is overriding cloud data.
+        """
+        merged_raw = self.entity_description.getter(self._properties)
+        http_raw = self.entity_description.getter(self._http_properties)
+        attrs: dict[str, Any] = {}
+        if merged_raw is not None and http_raw is not None and merged_raw != http_raw:
+            attrs["http_raw_value"] = http_raw
+        return attrs
+
 
 class JackeryStatSensor(JackeryEntity, SensorEntity):
     """Sensor sourced from the statistic / price section of the payload.
@@ -3540,7 +3554,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             coordinator (JackerySolarVaultCoordinator): Coordinator providing device payloads and update callbacks.
             device_id (str): Unique device identifier used to scope entity unique_id and device registry linkage.
             description (JackeryStatSensorDescription): Sensor description that supplies stat key, source section, transforms, and optional reset_period.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
         self._attr_entity_registry_enabled_default = (
@@ -3572,7 +3586,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             datetime | None: Timezone-aware local midnight for the period start, or `None` when no reset period is configured.
-        """  # noqa: E501
+        """
         if self._reset_period is None:
             return None
         if self._reset_period == DATE_TYPE_DAY and self._is_period_data_stale():
@@ -3603,7 +3617,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             timezone (Any): Timezone object from Home Assistant configuration; falls back to Home Assistant's default timezone when the configured value is unavailable.
-        """  # noqa: E501
+        """
         timezone = dt_util.get_time_zone(self.hass.config.time_zone)
         return timezone or dt_util.DEFAULT_TIME_ZONE
 
@@ -3612,7 +3626,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             date: Local date in the configured Home Assistant timezone.
-        """  # noqa: E501
+        """
         return dt_util.now(self._local_timezone()).date()
 
     def _period_begin_from_meta(self) -> str | None:
@@ -3620,7 +3634,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             str: The `begin_date` string from the source's request metadata when present and valid, or `None` if the metadata is missing, not a dict, or the begin date is absent/invalid.
-        """  # noqa: E501
+        """
         section = self._cached_source_section
         source = self._source_for_section(section)
         request = source.get(APP_REQUEST_META)
@@ -3640,7 +3654,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             `true` if the source period begin date is before the current local period start date, `false` otherwise.
-        """  # noqa: E501
+        """
         if self._reset_period is None:
             return False
         wall_clock_start = _period_start(self._reset_period, self._local_timezone())
@@ -3658,7 +3672,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             True if the source period begin date is after the local period start for the sensor's reset period, False otherwise.
-        """  # noqa: E501
+        """
         if self._reset_period is None:
             return False
         wall_clock_start = _period_start(self._reset_period, self._local_timezone())
@@ -3679,7 +3693,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
                 dict[str, Any]: The dict storing data for the requested section, or an empty dict if no usable source is available.
-        """  # noqa: E501
+        """
         if section == PAYLOAD_PRICE:
             return self._price
         if section == PAYLOAD_DEVICE_STATISTIC:
@@ -3704,7 +3718,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             The original `raw` value, or `0` when a negative energy total was detected.
-        """  # noqa: E501
+        """
         if self._reset_period is None:
             return raw
         if self.entity_description.device_class != SensorDeviceClass.ENERGY:
@@ -3726,7 +3740,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             `source_section` is the chart section used (e.g., `"<prefix>_week"`), and `source_dict` is the
             corresponding source payload dictionary; `None` when the function is not applicable or no
             suitable week/month bucket contains today's value.
-        """  # noqa: E501
+        """
         if self._reset_period != DATE_TYPE_DAY:
             return None
         prefix = _day_section_prefix(section)
@@ -4048,7 +4062,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             pack_index (int): 1-based index of the battery pack within the device's battery pack list.
             description (JackeryBatteryPackSensorDescription): Metadata describing which pack field to expose and how to transform it.
             enabled_default (bool): Whether the entity should be enabled by default in the entity registry.
-        """  # noqa: E501
+        """
         super().__init__(
             coordinator,
             device_id,
@@ -4073,7 +4087,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict: The battery pack dictionary when available, otherwise an empty dict.
-        """  # noqa: E501
+        """
         packs = self._payload.get(PAYLOAD_BATTERY_PACKS) or []
         if not isinstance(packs, list):
             return {}
@@ -4093,7 +4107,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
         Returns:
             The transformed field value when present, `None` if the field (and any fallbacks) are absent.
-        """  # noqa: E501
+        """
         field = self.entity_description.field
         raw = pack.get(field)
         if raw is None:
@@ -4126,7 +4140,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             includes communication fields (`FIELD_COMM_STATE`, `FIELD_COMM_MODE`) for normal sensors.
             For diagnostic-category entities, includes a larger set of update/version/communication/diagnostic
             keys when present in the payload.
-        """  # noqa: E501
+        """
         attrs: dict[str, Any] = {"pack_index": self._pack_index}
         if self.entity_description.entity_category != EntityCategory.DIAGNOSTIC:
             for key in (FIELD_COMM_STATE, FIELD_COMM_MODE):
@@ -4156,7 +4170,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         """Refresh the cached native value and extra state attributes from the current battery pack.
 
         This updates self._cached_native_value and self._cached_attrs using the current pack snapshot; intended to be run once per coordinator update.
-        """  # noqa: E501
+        """
         pack = self._pack
         self._cached_native_value = self._value_from_pack(pack)
         self._cached_attrs = self._attrs_from_pack(pack)
@@ -4178,7 +4192,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
         Returns:
             The cached native value from the most recent coordinator update, or `None` if unavailable.
-        """  # noqa: E501
+        """
         return self._cached_native_value
 
     @property
@@ -4228,7 +4242,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of diagnostic attribute names to their values (may be empty).
-        """  # noqa: E501
+        """
         return self._cached_attrs
 
 
@@ -4257,7 +4271,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
         Notes:
             Builds and caches the per-plug `device_info` at construction time from the current plug payload.
-        """  # noqa: E501
+        """
         super().__init__(
             coordinator,
             device_id,
@@ -4292,7 +4306,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict: The matching plug payload dictionary, or an empty dict if no match is found.
-        """  # noqa: E501
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -4306,7 +4320,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
         Returns:
             The transformed sensor value, or `None` if the value is not available.
-        """  # noqa: E501
+        """
         field = self.entity_description.field
         raw = self._plug.get(field)
         if raw is None:
@@ -4328,7 +4342,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
         Returns:
             datetime: The period start datetime for the configured reset period (local timezone), or `None` when no reset period is configured.
-        """  # noqa: E501
+        """
         if self._reset_period is None:
             return None
         return _period_start(self._reset_period)
@@ -4384,7 +4398,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             device_id (str): Identifier of the parent Jackery device used for entity/device registry relationships.
             meter_head_index (int): 1-based index of the meter head entry in the device's `meter_heads` payload list.
             description (JackeryMeterHeadSensorDescription): Sensor description containing the field key, unit, device class, and other metadata used to extract and present the meter-head value.
-        """  # noqa: E501
+        """
         super().__init__(
             coordinator,
             device_id,
@@ -4422,7 +4436,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
         Returns:
             The transformed value of the meter head's configured field, or `None` if the field is absent.
-        """  # noqa: E501
+        """
         raw = self._meter_head.get(self.entity_description.field)
         if raw is None:
             return None
@@ -4436,7 +4450,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             DeviceInfo: Device registry information including unique identifier (per-device meter-head id),
             manufacturer, display name, model, serial number when available, software version when available,
             and a `via_device` tuple referencing the parent device.
-        """  # noqa: E501
+        """
         base_name = (
             self._system.get(FIELD_DEVICE_NAME)
             or self._discovery.get(FIELD_DEVICE_NAME)
@@ -4491,7 +4505,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to values.
-        """  # noqa: E501
+        """
         attrs: dict[str, Any] = {
             "meter_head_index": self._meter_head_index,
             "meter_head_id": self._meter_head_sn,
@@ -4599,7 +4613,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of diagnostic attribute names to their values (may be empty if no diagnostics are available).
-        """  # noqa: E501
+        """
         if self.entity_description.calculation:
             return {
                 "calculation": self.entity_description.calculation,
@@ -4698,7 +4712,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
         Returns:
             DeviceInfo: Device registry information used to register the associated smart-meter (identifiers, manufacturer, model, name, serial_number, and via_device).
-        """  # noqa: E501
+        """
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             ct = {}
@@ -4764,7 +4778,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: A dictionary of redacted diagnostic attributes when the redaction yields a mapping, otherwise an empty dictionary.
-        """  # noqa: E501
+        """
         redacted = redacted_json_safe_payload(self._properties)
         return redacted if isinstance(redacted, dict) else {}
 
@@ -4792,7 +4806,7 @@ class JackeryBleTransportSensor(JackeryEntity, SensorEntity):
         """Create the BLE transport diagnostic entity for the given device managed by the coordinator.
 
         This entity exposes BLE listener decode statistics and last-frame metadata for the specified device.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, "ble_transport")
 
     def _observation(self) -> dict[str, Any]:
@@ -4802,7 +4816,7 @@ class JackeryBleTransportSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: Observation data for this device, or an empty dict if no valid record exists.
-        """  # noqa: E501
+        """
         observations = self.coordinator.ble_observations()
         result = observations.get(self._device_id)
         return result if isinstance(result, dict) else {}
@@ -4828,7 +4842,7 @@ class JackeryBleTransportSensor(JackeryEntity, SensorEntity):
 
         Returns:
             attrs (dict[str, Any]): Observation dictionary with `last_frame` sanitized.
-        """  # noqa: E501
+        """
         attrs = dict(self._observation())
         last_frame = attrs.get("last_frame")
         if not isinstance(last_frame, dict):
@@ -5196,7 +5210,7 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
         """Return diagnostic attributes for the current state."""
         props = self._properties
         return {
-            "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501
+            "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",
             "source": "on-grid_fields_preferred_then_grid-side_fallback",
             "positive": "grid-side input exceeds output",
             "negative": "grid-side output exceeds input",
@@ -5272,8 +5286,8 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 "max(smart_meter_net_power - jackery_grid_side_input_power "
                 "+ jackery_grid_side_output_power, 0)"
             ),
-            "source": "otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",  # noqa: E501
-            "scope": "Jackery-corrected home load; external non-Jackery generation must be measured separately",  # noqa: E501
+            "source": "otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",
+            "scope": "Jackery-corrected home load; external non-Jackery generation must be measured separately",
         }
         if not isinstance(ct, dict):
             ct = {}
@@ -5410,13 +5424,13 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
 
         Returns:
             datetime: Timezone-aware UTC datetime parsed from the milliseconds value, or `None` if the value is missing or cannot be parsed.
-        """  # noqa: E501
+        """
         ts_ms = self._device_meta.get(self._source_key)
         if not ts_ms:
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 

@@ -64,7 +64,7 @@ def is_periodic_section(section_key: str) -> bool:
 
     Returns:
         `true` if the section_key represents a periodic section, `false` otherwise.
-    """  # noqa: E501
+    """
     return any(
         section_key == prefix or section_key.startswith(f"{prefix}_")
         for prefix in PERIODIC_SECTION_PREFIXES
@@ -81,7 +81,7 @@ def _is_blankable(value: object) -> bool:
 
     Returns:
         `True` if the value is blank as described above, `False` otherwise.
-    """  # noqa: E501
+    """
     if value is None:
         return True
     if isinstance(value, str) and not value.strip():

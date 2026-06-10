@@ -16,6 +16,7 @@ from .const import (
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_BLE_WRITES,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_WEEK_STATISTICS,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
+    DEFAULT_ENABLE_BLE_WRITES,
     DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     DEFAULT_ENABLE_MONTH_STATISTICS,
     DEFAULT_ENABLE_WEEK_STATISTICS,
@@ -75,10 +77,11 @@ _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES,
     CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
-    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,  # noqa: E501
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
 }
 
 
@@ -90,7 +93,7 @@ def _normalize_account(value: Any) -> str:  # noqa: ANN401
 
     Returns:
         str: The trimmed account string if `value` is a `str`, otherwise an empty string.
-    """  # noqa: E501
+    """
     return value.strip() if isinstance(value, str) else ""
 
 
@@ -103,7 +106,7 @@ def _entry_text(entry: ConfigEntry, key: str) -> str:
 
     Returns:
         str: The stored string value for `key`, or an empty string if the key is missing or its value is not a string.
-    """  # noqa: E501
+    """
     value = entry.data.get(key)
     return value if isinstance(value, str) else ""
 
@@ -116,7 +119,7 @@ def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
 
     Returns:
         dict[str, bool]: Mapping of option keys to their boolean values; stored option values are used when present, otherwise legacy defaults are applied.
-    """  # noqa: E501
+    """
     return {
         key: config_entry_bool_option(entry, key, default)
         for key, default in _OPTION_DEFAULTS.items()
@@ -137,7 +140,7 @@ def _flow_options(
 
     Returns:
         dict[str, bool]: A dictionary containing every option key with its resolved boolean value.
-    """  # noqa: E501
+    """
     current = current_options or {}
     return {
         key: user_input.get(key, current.get(key, default))
@@ -164,7 +167,7 @@ def _entry_data_from_api_login(
           - `CONF_MQTT_MAC_ID` (str): MQTT MAC ID from the API or the existing entry.
           - `CONF_REGION_CODE` (str): Region code from the API or the existing entry.
           - `ENTRY_BOOTSTRAP_MQTT_SESSION` (dict): A copy of the MQTT session snapshot returned by the API, if present.
-    """  # noqa: E501
+    """
     data: dict[str, Any] = {
         CONF_USERNAME: account,
         CONF_PASSWORD: password,
@@ -204,7 +207,7 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
 
     Returns:
         dict[str, Any]: Normalized local-MQTT option values suitable for storing in entry options or using in configuration logic.
-    """  # noqa: E501
+    """
     options: Mapping[str, Any] = entry.options
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(
@@ -245,7 +248,7 @@ def _merge_local_mqtt_options(
             - CONF_LOCAL_MQTT_USERNAME (str)
             - CONF_LOCAL_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
-    """  # noqa: E501
+    """
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(
             user_input.get(CONF_LOCAL_MQTT_ENABLE, current[CONF_LOCAL_MQTT_ENABLE])
@@ -274,6 +277,50 @@ def _merge_local_mqtt_options(
     }
 
 
+def _local_mqtt_option_schema(
+    current: dict[str, Any],
+) -> dict[vol.Optional, object]:
+    """Return voluptuous Optional schema entries for local MQTT option fields.
+
+    Builds the standard six vol.Optional descriptors (enable, host, port,
+    username, password, topic_filter) with the given *current* values as
+    form defaults. The returned dict is meant to be unpacked into a
+    ``vol.Schema({...})`` call alongside non-MQTT option fields.
+
+    Parameters:
+        current: Normalized local-MQTT options (e.g. from ``_current_local_mqtt_options``).
+
+    Returns:
+        dict[vol.Optional, object]: Mapping of vol.Optional keys to their voluptuous types.
+    """
+    return {
+        vol.Optional(
+            CONF_LOCAL_MQTT_ENABLE,
+            default=current[CONF_LOCAL_MQTT_ENABLE],
+        ): bool,
+        vol.Optional(
+            CONF_LOCAL_MQTT_HOST,
+            default=current[CONF_LOCAL_MQTT_HOST],
+        ): str,
+        vol.Optional(
+            CONF_LOCAL_MQTT_PORT,
+            default=current[CONF_LOCAL_MQTT_PORT],
+        ): vol.All(int, vol.Range(min=1, max=65535)),
+        vol.Optional(
+            CONF_LOCAL_MQTT_USERNAME,
+            default=current[CONF_LOCAL_MQTT_USERNAME],
+        ): str,
+        vol.Optional(
+            CONF_LOCAL_MQTT_PASSWORD,
+            default=current[CONF_LOCAL_MQTT_PASSWORD],
+        ): str,
+        vol.Optional(
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+            default=current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+        ): str,
+    }
+
+
 def _reconfigure_options(
     entry: ConfigEntry,
     user_input: dict[str, Any],
@@ -284,7 +331,7 @@ def _reconfigure_options(
 
     Returns:
         dict[str, Any]: The merged options dictionary ready to be stored on the config entry.
-    """  # noqa: E501
+    """
     merged = dict(entry.options)
     merged.update(_flow_options(user_input, _current_option_values(entry)))
     merged.update(_current_local_mqtt_options(entry))
@@ -330,7 +377,7 @@ class JackeryOptionsFlow(OptionsFlow):
 
         Returns:
             ConfigFlowResult: A config flow result that either creates the updated options entry or displays the options form.
-        """  # noqa: E501
+        """
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
@@ -372,6 +419,10 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_enable_ble_transport,
             ): bool,
             vol.Optional(
+                CONF_ENABLE_BLE_WRITES,
+                default=current_options[CONF_ENABLE_BLE_WRITES],
+            ): bool,
+            vol.Optional(
                 CONF_ENABLE_WEEK_STATISTICS,
                 default=current_enable_week_statistics,
             ): bool,
@@ -407,10 +458,6 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_LOCAL_MQTT_PASSWORD,
                 default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
             ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
@@ -428,7 +475,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult | None: An abort result with the appropriate reason when a duplicate discovery or in-progress flow is detected, `None` otherwise.
-        """  # noqa: E501
+        """
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
         if any(
@@ -443,20 +490,22 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: An abort result when the discovery is ignored, otherwise the result from the user step.
-        """  # noqa: E501
+        """
+        self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
 
     async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """Route DHCP discovery to the user setup flow unless a duplicate or in-progress discovery aborts the flow.
+        """Start account setup from a DHCP discovery signal.
 
         Parameters:
             discovery_info (Any): DHCP discovery information provided by Home Assistant.
 
         Returns:
             ConfigFlowResult: An abort result when the discovery is duplicate or the result of proceeding to the user step.
-        """  # noqa: E501
+        """
+        self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
@@ -468,7 +517,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: An abort result when the discovery is a duplicate, or the result produced by the user step.
-        """  # noqa: E501
+        """
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
@@ -481,7 +530,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: An abort result if the discovery is a duplicate or another flow is in progress, otherwise the result returned by the user setup step.
-        """  # noqa: E501
+        """
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
         return await self.async_step_user()
@@ -489,13 +538,18 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Present the user setup form and create a config entry after validating credentials.
+        """Handle the initial user-driven config flow step.
 
-        Validates and normalizes the submitted username, prevents duplicate configuration, attempts authentication against the Jackery API, and on success creates a config entry containing credentials, API-derived bootstrap data, and resolved default options. If validation or authentication fails, returns the user form populated with appropriate error messages.
+        Validates and normalizes the submitted username, prevents duplicate configuration,
+        attempts authentication against the Jackery API, and on success creates a config
+        entry containing credentials, API-derived bootstrap data, and resolved default
+        options. If validation or authentication fails, returns the user form populated
+        with appropriate error messages.
 
         Returns:
-            A ConfigFlowResult representing either the user form (possibly with errors) or a created config entry.
-        """  # noqa: E501
+            A ConfigFlowResult representing either the user form (possibly with errors)
+            or a created config entry.
+        """
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -526,11 +580,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_create_entry(
                     title=account,
-                    data=_entry_data_from_api_login(
-                        account,
-                        user_input[CONF_PASSWORD],
-                        api,
-                    ),
+                    data={
+                        CONF_USERNAME: account,
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
                     options=_flow_options(user_input),
                 )
 
@@ -550,12 +603,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Parameters:
             user_input (dict[str, Any] | None): Form data submitted by the user; when `None` the reconfigure form is shown.
 
-        Returns:
-            ConfigFlowResult: The next result for the config flow (form, abort, or update-and-abort on success).
-        """  # noqa: E501
+        HA's reconfigure flow lets the user change credentials and toggle
+        the calculated-sensor options without removing the entry. The
+        normalized account from user input must match the entry that
+        triggered the flow; otherwise we abort to keep unique-id semantics
+        stable across the reconfigure round-trip.
+        """
         try:
             entry = self._get_reconfigure_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -589,12 +645,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 else:
                     return self.async_update_reload_and_abort(
                         entry,
-                        data_updates=_entry_data_from_api_login(
-                            account,
-                            user_input[CONF_PASSWORD],
-                            api,
-                            entry,
-                        ),
+                        data_updates={
+                            CONF_USERNAME: account,
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        },
                         options=_reconfigure_options(entry, user_input),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
@@ -621,6 +675,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_ENABLE_BLE_TRANSPORT,
                 default=current_options[CONF_ENABLE_BLE_TRANSPORT],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_BLE_WRITES,
+                default=current_options[CONF_ENABLE_BLE_WRITES],
             ): bool,
             vol.Optional(
                 CONF_ENABLE_WEEK_STATISTICS,
@@ -663,10 +721,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: a form to collect a password, an abort result, or an update-and-abort result after successful reauthentication.
-        """  # noqa: E501
+        """
         try:
             entry = self._get_reauth_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)
@@ -692,12 +750,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     entry,
-                    data_updates=_entry_data_from_api_login(
-                        stored_username,
-                        user_input[CONF_PASSWORD],
-                        api,
-                        entry,
-                    ),
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
                     reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
                 )
 

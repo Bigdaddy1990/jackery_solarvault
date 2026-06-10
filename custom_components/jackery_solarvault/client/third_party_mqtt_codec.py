@@ -19,7 +19,7 @@ def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` length is not 16 bytes.
-    """  # noqa: E501
+    """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(  # noqa: TRY003
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
@@ -41,7 +41,7 @@ def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` does not have length 16, or if `value` is not a valid app-encoded field (invalid Base64 or decryption/UTF-8 decoding failure).
-    """  # noqa: E501
+    """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(  # noqa: TRY003
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "

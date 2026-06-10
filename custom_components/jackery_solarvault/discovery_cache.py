@@ -1,13 +1,14 @@
 """Persistent discovery cache for local offline startup."""
 
-from __future__ import annotations
 
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"
@@ -16,9 +17,8 @@ _KEY_DEVICE_INDEX: Final = "device_index"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """
-    Create a Store instance for this integration's persistent discovery cache.
-    
+    """Create a Store instance for this integration's persistent discovery cache.
+
     Returns:
         Store[dict[str, Any]]: A Store configured with the integration's storage key and storage schema version.
     """

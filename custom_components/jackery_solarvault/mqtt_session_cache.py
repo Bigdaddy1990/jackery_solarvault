@@ -14,11 +14,9 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from __future__ import annotations
 
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -28,6 +26,9 @@ from .const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
@@ -44,12 +45,11 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
-async def async_load_mqtt_session(
+async def async_load_mqtt_session(  # noqa: PLR0911
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """
-    Load cached MQTT session credentials for the specified config entry from persistent storage.
-    
+    """Load cached MQTT session credentials for the specified config entry from persistent storage.
+
     Returns:
         dict[str, str] | None: A mapping containing the keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present. Returns `None` if the stored data is missing, malformed, or any required field is missing or empty.
     """
@@ -82,7 +82,7 @@ async def async_load_mqtt_session(
     return result
 
 
-async def async_save_mqtt_session(
+async def async_save_mqtt_session(  # noqa: PLR0913
     hass: HomeAssistant,
     entry_id: str,
     *,
@@ -92,9 +92,8 @@ async def async_save_mqtt_session(
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """
-    Persist MQTT session fields for a config entry, overwriting any existing cached row.
-    
+    """Persist MQTT session fields for a config entry, overwriting any existing cached row.
+
     Parameters:
         entry_id: Config entry identifier to associate with the cached session.
         user_id: `userId` returned by the Jackery cloud used as the MQTT client identifier/username.

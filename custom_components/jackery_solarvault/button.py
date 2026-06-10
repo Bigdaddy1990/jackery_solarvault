@@ -174,7 +174,7 @@ async def _query_third_party_mqtt_config(
 
     Parameters:
         device_id (str): The identifier of the device whose third-party MQTT configuration should be queried.
-    """  # noqa: E501
+    """
     await coordinator.async_query_third_party_mqtt_config(device_id)
 
 
@@ -193,7 +193,7 @@ async def _query_battery_packs(
     Parameters:
         coordinator (JackerySolarVaultCoordinator): Coordinator instance to perform the query.
         device_id (str): Identifier of the target device.
-    """  # noqa: E501
+    """
     await coordinator.async_query_battery_packs(device_id)
 
 
@@ -217,7 +217,7 @@ async def _query_smart_plugs(
     """Request an update of the device's smart-plug inventory.
 
     This asks the integration coordinator to fetch the smart-plug list for the specified device.
-    """  # noqa: E501
+    """
     await coordinator.async_query_smart_plugs(device_id)
 
 
@@ -229,7 +229,7 @@ async def _query_subdevice_combo(
     Parameters:
         coordinator (JackerySolarVaultCoordinator): Coordinator responsible for communicating with the device.
         device_id (str): Identifier of the device whose subdevice combo should be queried.
-    """  # noqa: E501
+    """
     await coordinator.async_query_subdevice_combo(device_id)
 
 
@@ -376,7 +376,7 @@ def _storm_alert_id(alert: object) -> str | None:
 
     Returns:
         str | None: The alert id as a string when present and not empty, otherwise `None`.
-    """  # noqa: E501
+    """
     if not isinstance(alert, dict):
         return None
     raw = alert.get(FIELD_ALERT_ID)
@@ -393,7 +393,7 @@ def _storm_alerts(weather_plan: object) -> list[dict[str, Any]]:
 
     Returns:
         list[dict[str, Any]]: List of alert dictionaries that include a stable alert id; returns an empty list if the input is invalid or no matching alerts exist.
-    """  # noqa: E501
+    """
     if not isinstance(weather_plan, dict):
         return []
     storm = weather_plan.get(FIELD_STORM)
@@ -413,7 +413,7 @@ def _smart_plug_device_sn(plug: object) -> str | None:
 
     Returns:
         The device serial as a string when available, `None` otherwise.
-    """  # noqa: E501
+    """
     if not isinstance(plug, dict):
         return None
     raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
@@ -434,7 +434,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     Parameters:
         entry (JackeryConfigEntry): Config entry whose runtime_data contains the integration coordinator.
         async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity instances with Home Assistant.
-    """  # noqa: E501
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -444,7 +444,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         Parameters:
             entities (list[ButtonEntity]): List to append to when the entity is unique.
             entity (ButtonEntity): Button entity to check and append.
-        """  # noqa: E501
+        """
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="button", logger=_LOGGER
         )
@@ -462,7 +462,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
         Returns:
             list[ButtonEntity]: List of unique ButtonEntity instances ready for registration.
-        """  # noqa: E501
+        """
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
@@ -498,9 +498,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             )
             if coordinator.device_supports_advanced(dev_id) or FIELD_REBOOT in props:
                 _append_unique(entities, JackeryRebootButton(coordinator, dev_id))
-            for index, plug in enumerate(
-                sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)), start=1
-            ):
+            for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
                 plug_sn = _smart_plug_device_sn(plug)
                 if plug_sn is None:
                     continue
@@ -510,7 +508,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
                         coordinator,
                         dev_id,
                         task_type=TIMER_TASK_TYPE_SMART_PLUG,
-                        key_suffix=f"smart_plug_{index}_read_schedule",
+                        key_suffix=f"smart_plug_{plug_sn}_read_schedule",
                         translation_key="read_smart_plug_schedule",
                         icon="mdi:calendar-clock",
                         plug_sn=plug_sn,
@@ -536,7 +534,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         """Register new button entities when the coordinator's entity signature changes.
 
         If the current coordinator-derived signature differs from the previously cached signature, update the cache and call the platform entity addition callback with any newly discovered entities.
-        """  # noqa: E501
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -566,7 +564,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
 
         Parameters:
             description (JackeryQueryButtonDescription): Metadata for the button; `description.key` becomes the entity key and `description.translation_key` / `description.icon` are set on the entity.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, description.key)
         self._query_description = description
         self._attr_translation_key = description.translation_key
@@ -600,7 +598,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             HomeAssistantError: An error with translation_domain set to DOMAIN, translation_key
                 "entity_action_failed", and translation_placeholders containing `entity`,
                 `device_id`, and `error`.
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -615,7 +613,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         """Trigger the configured query action for this entity's device.
 
         Invokes the action from the associated query description for this device. Re-raises ConfigEntryAuthFailed; if a HomeAssistantError contains a `translation_key` it is re-raised as-is; all other errors are converted and raised via the entity's `_raise_action_error` helper.
-        """  # noqa: E501
+        """
         try:
             await self._query_description.action(self.coordinator, self._device_id)
         except ConfigEntryAuthFailed:
@@ -643,7 +641,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         Parameters:
             coordinator (JackerySolarVaultCoordinator): Coordinator that manages device state and provides control actions.
             device_id (str): Unique identifier of the target device for the reboot action.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, "reboot_device")
 
     def _raise_action_error(self, error: object) -> None:
@@ -651,7 +649,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
         Raises a HomeAssistantError with translation_domain=DOMAIN and translation_key="entity_action_failed".
         The error includes translation placeholders: "entity" set to "reboot_device", "device_id" set to this entity's device id, and "error" set to str(error).
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -666,7 +664,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         """Restart the associated device and request a coordinator refresh.
 
         This triggers a device reboot via the coordinator and then requests the coordinator to refresh device data.
-        """  # noqa: E501
+        """
         try:
             await self.coordinator.async_reboot_device(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -704,7 +702,7 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
 
         Parameters:
             error (object): The original error to include in the translation placeholders.
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -721,7 +719,7 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
         Raises:
             ConfigEntryAuthFailed: If authentication with the config entry has failed (re-raised).
             HomeAssistantError: Re-raised if the caught error already contains a `translation_key`; otherwise raised with a translation key indicating the entity action failed.
-        """  # noqa: E501
+        """
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -761,7 +759,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             translation_key (str): Translation key used for the button's name.
             icon (str): Material Design Icon name for the button.
             plug_sn (str, optional): Smart-plug device serial number to target when reading a plug-specific schedule; omit for device-level schedules.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, key_suffix)
         self._task_type = task_type
         self._plug_sn = plug_sn
@@ -774,7 +772,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
 
         Returns:
             dict[str, Any]: A dictionary including "taskType" and, if present, the device serial under FIELD_DEVICE_SN.
-        """  # noqa: E501
+        """
         attrs: dict[str, Any] = {"taskType": self._task_type}
         if self._plug_sn:
             attrs[FIELD_DEVICE_SN] = self._plug_sn
@@ -787,7 +785,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             HomeAssistantError: An error with translation_domain set to DOMAIN, translation_key
                 "entity_action_failed", and translation_placeholders containing `entity`,
                 `device_id`, and `error`.
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -804,7 +802,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         Raises:
             ConfigEntryAuthFailed: Re-raised when authentication has failed.
             HomeAssistantError: Re-raised unchanged if it already has a `translation_key`; other exceptions are converted into a translated `HomeAssistantError` indicating the entity action failed.
-        """  # noqa: E501
+        """
         try:
             await self.coordinator.async_read_device_schedule(
                 self._device_id,
@@ -842,7 +840,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             coordinator (JackerySolarVaultCoordinator): Coordinator managing device state and actions.
             device_id (str): Identifier of the device the alert belongs to.
             alert_id (str): Stable identifier of the storm alert; included in the entity's unique id.
-        """  # noqa: E501
+        """
         super().__init__(coordinator, device_id, f"delete_storm_alert_{alert_id}")
         self._alert_id = alert_id
 
@@ -854,7 +852,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
         Returns:
             dict: The matching alert dictionary, or an empty dict if no matching alert is present.
-        """  # noqa: E501
+        """
         for alert in _storm_alerts(self._payload.get(PAYLOAD_WEATHER_PLAN)):
             if _storm_alert_id(alert) == self._alert_id:
                 return alert
@@ -868,7 +866,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
         Returns:
             True if the base entity is available and the referenced storm alert exists, False otherwise.
-        """  # noqa: E501
+        """
         return super().available and bool(self._alert)
 
     @property
@@ -879,7 +877,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
         Returns:
             dict[str, Any]: Mapping containing `FIELD_ALERT_ID` and any of `FIELD_START_TS`, `FIELD_END_TS`, `FIELD_STATUS`, `FIELD_MANUAL` present on the alert.
-        """  # noqa: E501
+        """
         attrs: dict[str, Any] = {FIELD_ALERT_ID: self._alert_id}
         alert = self._alert
         for key in (FIELD_START_TS, FIELD_END_TS, FIELD_STATUS, FIELD_MANUAL):
@@ -895,7 +893,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
         Raises:
             HomeAssistantError: localized error for a failed entity action.
-        """  # noqa: E501
+        """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="entity_action_failed",
@@ -912,7 +910,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
         Raises:
             ConfigEntryAuthFailed: If authentication with the config entry failed.
             HomeAssistantError: On other failures; raised with a translated error message and placeholders.
-        """  # noqa: E501
+        """
         try:
             await self.coordinator.async_delete_storm_alert(
                 self._device_id,

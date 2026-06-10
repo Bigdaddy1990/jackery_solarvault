@@ -21,15 +21,17 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
-from __future__ import annotations
 
-from datetime import date
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from datetime import date
+
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
@@ -154,10 +156,10 @@ async def async_save_daily_cache(
     await store.async_save(data)
 
 
-def daily_delta(
+def daily_delta(  # noqa: PLR0911
     snapshot: dict[str, Any] | None,
     metric_key: str,
-    current_lifetime_wh: int | float | None,
+    current_lifetime_wh: float | None,
     *,
     today: date,
 ) -> int | None:
@@ -170,7 +172,7 @@ def daily_delta(
         today (date): Local date used to validate that `snapshot["day"]` matches the current day.
 
     Returns:
-        int | None: The computed delta in watt‑hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
+        int | None: The computed delta in watt-hours as an `int` if the snapshot is valid for `today`, `current_lifetime_wh` and the stored anchor convert to integers, the anchor exists, and `current >= anchor`; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None
@@ -262,12 +264,11 @@ def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
 
 
 def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
-    """
-    Extracts the ISO day string from a snapshot.
-    
+    """Extracts the ISO day string from a snapshot.
+
     Parameters:
         snapshot (dict[str, Any] | None): Snapshot expected to contain the day value under the module's day key.
-    
+
     Returns:
         str | None: The ISO day string (`YYYY-MM-DD`) if present and a `str`, otherwise `None`.
     """
