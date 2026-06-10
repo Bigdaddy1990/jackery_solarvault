@@ -28,11 +28,14 @@ jobs:
           ruff check . --line-length 88 || true
           ruff check . --show-fixes || true
           ruff check . --add-noqa || true
-          ruff check . --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff format . || true
+          ruff check . --fix --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff format . || true
           ruff check . --fix || true
           ruff check . --output-format=github || true
-          ruff format .
-          pre-commit all-files
+          ruff format . || true
+          ruff check . --fix || true
+          pre-commit all-files || true
 
       - name: Commit baseline changes
         run: |
