@@ -26,6 +26,80 @@ context.
 - Quality-scale status is no longer enforced by the local test suite; classification remains a Home Assistant/HACS review concern.
 
 ### Fixed
+- **Discovery duplication on restart/reconfigure (Bugs 3a, 3i).**
+  Restored `async_step_mqtt` and `async_step_zeroconf` discovery steps
+  from pre-merge backup. Added `_abort_if_unique_id_configured()` to
+  `async_step_bluetooth` and `_async_current_entries()` guard to all
+  discovery steps so already-configured devices are no longer offered
+  for re-authentication on HA restart. Restored
+  `_async_retry_after_invalid_discovery_devices` in coordinator with
+  two-strike logic before dropping persistently invalid device IDs.
+- **Shelly proxy crash on HA disconnect (Bug 3h).**
+  Restored MQTT Last Will & Testament (`will=aiomqtt.Will(offline)`)
+  and birth message publish (`_MQTT_AVAILABILITY_ONLINE`) after
+  successful subscription. Restored `_MAX_PENDING_MESSAGE_TASKS` (32)
+  deque bound to prevent unbounded task accumulation. Added QoS
+  differentiation (QoS 0 for notice topics, QoS 1 for all others).
+  Restored `_MQTT_AVAILABILITY_*` constants and
+  `_MQTT_AVAILABILITY_TOPIC_SUFFIX` for the `status` sub-topic.
+- **CT values all 0 in main device (Bug 3e).**
+  Added AccCTBody merge-up logic in coordinator CT meter processing.
+  Shelly Pro 3EM wraps `volt`/`curr`/`freq`/`fact`/`ap`/`rep` inside
+  a nested `AccCTBody` dict; the merge now promotes those keys so
+  sensors reading `volt`/`curr` find them. Changed CT merge from
+  `_merge_dict_values` to `merge_live_properties` per AGENTS.md §2.3.
+- **Savings calculation wrong (Bug 3c).**
+  `_pv_revenue_value` in util.py now uses `APP_STAT_TOTAL_SOLAR_REVENUE`
+  and `APP_STAT_PV_PROFIT` constants instead of string literals.
+- **stat_day stuck at 0 (Bug 3b).**
+  Added `day ≤ week` validation check (AGENTS.md §2.2) to the period
+  validator in util.py. Added `reference_chart_series_key` to
+  `AppDataQualityWarning.as_dict()` for diagnostics completeness.
+- **OTA and smart-part commands restored.**
+  Restored `async_notify_device_can_ota` (actionId 3007),
+  `async_notify_device_ota_total_page` (3008),
+  `async_device_get_ota_page_data` (3009),
+  `async_bind_smart_part` (3012), and `async_unbind_smart_part` (3013)
+  in coordinator. Added corresponding `ACTION_ID_*` and `MQTT_CMD_*`
+  constants to const.py.
+- **RejectionMetrics restored.**
+  Restored `RejectionMetrics` dataclass in coordinator with 6 counters
+  (`http_auth_rejections`, `mqtt_broker_rejections`,
+  `payload_validation_rejections`, `schema_rejections`,
+  `timestamp_skew_rejections`, `auth_token_expiry_rejections`) and
+  `as_dict()` diagnostics export. Initialized in coordinator `__init__`.
+- **send_device_schedule service registered.**
+  `SERVICE_SEND_DEVICE_SCHEDULE` is now properly registered in
+  `async_setup_services` with `SEND_DEVICE_SCHEDULE_SCHEMA` validation
+  (actionId must be one of 3015/3016/3017/3018).
+- **7 orphaned constants consumed.**
+  `FIELD_ACC_CT_BODY`, `APP_STAT_PV_PROFIT`,
+  `APP_STAT_TOTAL_SOLAR_REVENUE`,
+  `DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY`,
+  `DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY`,
+  `SERVICE_SEND_DEVICE_SCHEDULE`, and
+  `DATA_QUALITY_REASON_ZERO_UNCONFIRMED` are now defined in const.py
+  and consumed by their respective modules.
+- **MQTT Crypto Layer C implemented.**
+  MQTT command bodies are now AES-128-CBC/PKCS7 encrypted with the
+  per-device `bluetoothKey` (key=K, iv=K, Base64 output) per
+  PROTOCOL.md §14 and `jackery_complete_reference.json`
+  `layer_c_payload` spec. Encryption is transparent — if no
+  bluetoothKey is available, bodies are sent plaintext with a
+  diagnostic warning. BLE path is unaffected (own frame-layer crypto).
+  `mqtt_layer_c_encrypted` diagnostic field added.
+- **async_remove_config_entry_device callback added.**
+  Users can now remove devices from the config entry via the HA UI.
+- **HA 2026.12.0 deprecation fix.**
+  Removed redundant `async_on_unload` wrapper around
+  `add_update_listener` in `async_setup_entry`. The listener handles
+  cleanup internally; the wrapper triggered a deprecation warning.
+- **Tests tracked in git.**
+  45 test files (43 test_*.py + conftest.py + __init__.py) added.
+- **manifest.json: aiousbwatcher added to requirements.**
+  Fresh installs no longer fail without manual pip install.
+
+### Fixed
 - Live MQTT adaptive polling no longer suppresses active app-protocol backfill. Even when the HTTP refresh is skipped because MQTT is live, the integration still schedules `QuerySubDeviceGroupProperty` for add-on batteries and the Smart Meter/CT path at the configured fast interval.
 - Add-on battery firmware enrichment no longer blocks the main coordinator refresh. Pack OTA metadata is fetched in the background, matched by pack `deviceSn`, cached, and merged into the existing pack payload.
 - Pack OTA metadata merges no longer refresh `_last_seen_at`, so firmware/update enrichment cannot accidentally keep a disconnected or removed add-on battery alive forever.
