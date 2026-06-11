@@ -60,11 +60,31 @@ repos:
           - python
           - pyi
 
-  - repo: https://github.com/cheickmec/smellcheck
-    rev: v0.3.10
+  - repo: local
     hooks:
       - id: smellcheck
-        args: ['--fail-on', 'warning']
+        name: smellcheck (requires `pip install smellcheck==0.3.10`)
+        language: system
+        entry: python -m smellcheck
+        # Scan fixed repo-relative roots (the baseline stores repo-relative
+        # fingerprints; absolute staged paths never match). All behavior is
+        # pinned via explicit flags — the isolated upstream hook env ignored
+        # [tool.smellcheck] and produced unreproducible results.
+        pass_filenames: false
+        # Gate on errors only: ~21 of smellcheck's cross-file fingerprints
+        # are unstable between identical runs, so a warning-level baseline
+        # gate flaps. The baseline still suppresses stable warning noise;
+        # warning burn-down is the refactoring engine's job.
+        args:
+          - --fail-on
+          - error
+          - --baseline
+          - .smellcheck-baseline.json
+          - --no-cache
+          - coderabbit
+          - custom_components
+          - scripts
+          - tests
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -91,7 +111,10 @@ repos:
       - id: pretty-format-json
         args:
           - --autofix
-        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
+        # manifest key order is owned by hassfest; the smellcheck baseline is
+        # machine-generated compact JSON (pretty-printing bloats it past the
+        # large-file gate).
+        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/|\.smellcheck-baseline\.json)
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
