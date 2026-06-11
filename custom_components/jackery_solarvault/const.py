@@ -13,7 +13,7 @@ LOGIN_PATH: Final = "/v1/auth/login"
 # API timeouts. Login uses a longer budget than the polling requests because
 # hybrid AES+RSA-login plus chained credential fetches takes noticeably longer
 # than GET /v1/device/* reads (which are served from a cache on Jackery's side).
-LOGIN_TIMEOUT_SEC: Final = 30
+LOGIN_TIMEOUT_SEC: Final = 60
 
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
