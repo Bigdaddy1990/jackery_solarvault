@@ -1,0 +1,21 @@
+ruff check . --add-noqa --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N" .\custom_components\jackery_solarvault\
+ruff format .\custom_components\jackery_solarvault\
+ruff check . --add-noqa --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N" .\tests\
+ruff format .\tests\
+ruff check . --fix --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N" .\custom_components\jackery_solarvault\
+ruff format .\custom_components\jackery_solarvault\
+ruff check . --fix --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N" .\custom_components\jackery_solarvault\
+ruff format .\tests\
+
+PS D:\Downloads\Clause\v0.1.0\custom_components\jackery_solarvault> ruff check . --add-noqa --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N"
+warning: --fix is incompatible with --add-noqa.
+Added 7 noqa directives.
+PS D:\Downloads\Clause\v0.1.0\custom_components\jackery_solarvault> ruff check . --add-noqa --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N"
+warning: --fix is incompatible with --add-noqa.
+Added 7 noqa directives.
+PS D:\Downloads\Clause\v0.1.0\custom_components\jackery_solarvault> ruff check . --add-noqa
+warning: --fix is incompatible with --add-noqa.
+Added 327 noqa directives.
+PS D:\Downloads\Clause\v0.1.0\custom_components\jackery_solarvault> ruff format .
+24 files left unchanged
+PS D:\Downloads\Clause\v0.1.0\custom_components\jackery_solarvault> ruff check . --fix --preview --show-fixes --unsafe-fixes --line-length 88 --target-version py314 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501","PLC0415"
