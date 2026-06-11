@@ -27,6 +27,8 @@ import aiohttp
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
+padder = PKCS7(128).padder()
+padded = padder.update(plaintext) + padder.finalize()
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from ..const import (  # noqa: RUF100, TID252
