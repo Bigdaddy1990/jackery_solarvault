@@ -560,6 +560,18 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 [tool.smellcheck.per-file-ignores]
 "scripts/*" = []
 "annotation*/" = []
+# Untracked scratch parsers (gitignored); suppress every rule (smellcheck
+# resolves only exact rule IDs, no family prefixes or wildcards).
+"*_tmp_*.py" = [
+  "SC101", "SC102", "SC103", "SC104", "SC105", "SC106", "SC107", "SC201",
+  "SC202", "SC203", "SC204", "SC205", "SC206", "SC207", "SC208", "SC209",
+  "SC210", "SC211", "SC301", "SC302", "SC303", "SC304", "SC305", "SC306",
+  "SC307", "SC308", "SC309", "SC401", "SC402", "SC403", "SC404", "SC405",
+  "SC406", "SC407", "SC501", "SC502", "SC503", "SC504", "SC505", "SC506",
+  "SC507", "SC508", "SC509", "SC601", "SC602", "SC603", "SC604", "SC605",
+  "SC606", "SC701", "SC702", "SC703", "SC704", "SC705", "SC706", "SC801",
+  "SC802", "SC803", "SC804", "SC805",
+]
 
 [tool.pylint."MESSAGES CONTROL"]
 # Reasons disabled:
