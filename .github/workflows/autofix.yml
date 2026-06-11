@@ -47,7 +47,7 @@ jobs:
 
       - name: Install deps (uv)
         run: |
-          uv pip install --system --upgrade -r requirements.txt 
+          uv pip install --system --upgrade -r requirements.txt
           uv pip install --system --upgrade -r requirements-test.txt
           uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
 
