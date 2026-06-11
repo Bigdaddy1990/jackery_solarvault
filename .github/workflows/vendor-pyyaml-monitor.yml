@@ -7,11 +7,6 @@ on:
     # upstream Tuesday release cadence.
     - cron: "30 2 * * 3"
   workflow_dispatch:
-    inputs:
-      fail_on_outdated:
-        description: Fail the workflow when vendored PyYAML is outdated
-        required: false
-        default: 'false'
 
 permissions:
   contents: write
@@ -24,8 +19,6 @@ jobs:
   vendor-check:
     name: Check vendored PyYAML status
     runs-on: ubuntu-latest
-    env:
-      FAIL_ON_OUTDATED: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.fail_on_outdated || 'false' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -36,7 +29,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Upgrade pip
-        run: python -m pip install --upgrade pip
+        run: python -m pip install --upgrade pip pyyaml
 
       - name: install depencies
         run: |
