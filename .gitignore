@@ -241,3 +241,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated payload-debug logs (only created when the dedicated DEBUG logger
+# is enabled; never check these into the repo).
+jackery_solarvault_payload_debug.jsonl
+jackery_solarvault_payload_debug.jsonl.1
+
+# smellcheck file-level caches (regenerated on every scan).
+.smellcheck-cache/
+
+# Downloaded NVD CVE database dump (87 MB reference data, not repo content).
+docs/IwIP Net Logs/nvdcve-*.json.txt
+
+# Embedded git clone of https://github.com/l-mb/python-refactoring-skills.git
+# (kept local; register as a proper submodule if it should be versioned).
+python-refactoring-skills/
+
+# Runtime logs and diagnostics exports (config-entry dumps contain local
+# MQTT credentials in plain text — never commit).
+logs/
+
+# Local safety snapshot of the integration. The ".backup_current" dot makes
+# it an invalid Python package name (breaks mypy) and a second manifest.json
+# under custom_components/ (breaks hassfest/HACS) — keep it out of git.
+custom_components/jackery_solarvault.backup_current/
