@@ -21,28 +21,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python -m pip install pip ruff pre-commit --upgrade
       - run: |
-          ruff check ./custom_components/jackery_solarvault --fix || true
-          ruff check ./custom_components/jackery_solarvault --unsafe-fixes || true
-          ruff check ./custom_components/jackery_solarvault --target-version py314 .custom_components.jackery_solarvault.|| true
-          ruff check ./custom_components/jackery_solarvault --preview || true
-          ruff check ./custom_components/jackery_solarvault --line-length 88 || true
-          ruff check ./custom_components/jackery_solarvault --show-fixes || true
-          ruff check ./custom_components/jackery_solarvault --add-noqa || true
-          ruff check ./custom_components/jackery_solarvault --extend-select "E","F","I","B","UP","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
-          ruff format ./custom_components/jackery_solarvault || true
-          ruff check ./custom_components/jackery_solarvault --fix || true
-          ruff check ./custom_components/jackery_solarvault --output-format=github || true
-          ruff check ./tests --fix || true
-          ruff check ./tests --unsafe-fixes || true
-          ruff check ./tests --target-version py314 || true
-          ruff check ./tests --preview || true
-          ruff check ./tests --line-length 88 || true
-          ruff check ./tests --show-fixes || true
-          ruff check /tests --add-noqa || true
-          ruff check /tests --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
-          ruff check /tests --fix || true
-          ruff check /tests --output-format=github || true
-          ruff format /tests || true
           ruff check . --fix || true
           ruff check . --unsafe-fixes || true
           ruff check . --target-version py314 || true
@@ -50,10 +28,13 @@ jobs:
           ruff check . --line-length 88 || true
           ruff check . --show-fixes || true
           ruff check . --add-noqa || true
-          ruff check . --extend-select "E","F","I","B","UP","TID252","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff format . || true
+          ruff check . --fix --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff format . || true
           ruff check . --fix || true
           ruff check . --output-format=github || true
-          ruff format .
+          ruff format . || true
+          ruff check . --fix || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual pyupgrade --all-files || true
           pre-commit run --hook-stage manual mypy --all-files || true
@@ -70,9 +51,9 @@ jobs:
           git commit -m "chore: ruff baseline (format+fix)"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
-      - uses: peter-evans/create-pull-request@v8
-        with:
-          branch: chore/ruff-baseline
-          title: "chore: ruff baseline (format+fix)"
-          commit-message: "chore: ruff baseline (format+fix)"
-          body: "Automated ruff baseline via GitHub Actions."
+    #- uses: peter-evans/create-pull-request@v8
+     #  with:
+     #    branch: chore/ruff-baseline
+     #    title: "chore: ruff baseline (format+fix)"
+     #    commit-message: "chore: ruff baseline (format+fix)"
+     #    body: "Automated ruff baseline via GitHub Actions."
