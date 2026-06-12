@@ -9,7 +9,7 @@ autotyping>=24.9.0
 codecov>=2.1.13
 coverage>=7.14.0
 coverage[toml]
-homeassistant-stubs>=2026.6.1
+homeassistant-stubs>=2026.6.2
 hypothesis>=6.155.2
 ifaddr==0.2.0
 iniconfig>=1.0.1
