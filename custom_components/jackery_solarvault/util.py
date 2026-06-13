@@ -475,6 +475,36 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401
+    """Return the first provided value that can be parsed as an integer.
+
+    Boolean values, blank strings, and non-finite numeric strings are rejected
+    so callers can safely use this for protocol fields that require a real
+    integer value.
+    """
+    for value in values:
+        if value is None or isinstance(value, bool):
+            continue
+        if isinstance(value, str):
+            candidate = value.strip()
+            if not candidate:
+                continue
+        else:
+            candidate = value
+        try:
+            parsed = int(candidate)
+        except (TypeError, ValueError):
+            try:
+                parsed_float = float(candidate)
+            except (TypeError, ValueError):
+                continue
+            if not parsed_float.is_integer():
+                continue
+            parsed = int(parsed_float)
+        return parsed
+    return None
+
+
 def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
 

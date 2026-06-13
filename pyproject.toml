@@ -236,7 +236,7 @@ src = ["custom_components"]
 indent-width = 4
 show-fixes = true
 fix = true
-unsafe-fixes = true
+unsafe-fixes = false
 force-exclude = true
 output-format= "github"
 preview = true
@@ -274,7 +274,6 @@ exclude = [
     "logs",
     "APP",
     ".scripts",
-    ".annotatedyaml"
 ]
 
 [tool.ruff.analyze]
@@ -560,7 +559,6 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 # per-path overrides
 [tool.smellcheck.per-file-ignores]
 "scripts/*" = []
-"annotation*/" = []
 # Untracked scratch parsers (gitignored); suppress every rule (smellcheck
 # resolves only exact rule IDs, no family prefixes or wildcards).
 "*_tmp_*.py" = [
@@ -853,7 +851,7 @@ per-file-ignores = [
 
 # Bandit configuration aligned with Home Assistant guidelines
 [tool.bandit]
-exclude_dirs = ["tests", "scripts", "annotatedyaml", "docs"]
+exclude_dirs = ["tests", "scripts", "docs"]
 tests = []
 skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608", "B612", "B703"]
 
@@ -861,4 +859,4 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 # Minimum duplicated line threshold
 MinLineCount= 50
 # Paths to ignore for duplication checking
-IgnorePatterns = ["docs/**", "tests/**", "scripts/**", "annotatedyaml/**"]
+IgnorePatterns = ["docs/**", "tests/**", "scripts/**"]

@@ -41,7 +41,6 @@ repos:
         args:
           - --fix
           - --show-fixes
-          - --unsafe-fixes
           - --preview
           - --target-version=py314
           - --extend-select=RUF100

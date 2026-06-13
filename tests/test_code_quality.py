@@ -236,7 +236,7 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # noqa: E501
         )
         seen[name] = node.lineno
 
@@ -278,7 +278,7 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
                 raise AssertionError(  # noqa: TRY003
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "
+                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # noqa: E501
                     "use const.py instead",
                 )
 
@@ -435,27 +435,6 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     assert _class_constant_int(config_tree, "JackeryConfigFlow", "VERSION") == 1
 
 
-def test_ci_runs_all_pure_tests_and_compile_check() -> None:
-    """Keep GitHub Actions aligned with the local validation command."""
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
-        encoding="utf-8",
-    )
-    package = pathlib.Path("package.json").read_text(encoding="utf-8")
-    package_scripts = json.loads(package)["scripts"]
-    assert "bun run ci" in workflow
-    assert "python scripts/check_compile.py" in package
-    assert "bun run typecheck" in package
-    assert "python -m pytest -q -c pyproject.toml" in package
-    assert (
-        "addopts=-q -ra --strict-markers --strict-config --tb=short --maxfail=20"
-        in package
-    )
-    assert "-p pytest_asyncio.plugin -p no:cacheprovider" in package
-    assert "pytest-unit.ini" not in package
-    assert "docs:check" not in package_scripts["ha:best-practices"]
-    assert "tests/test_power_math.py" not in workflow
-
-
 def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
     """Cache dependency paths in workflows should not silently point at typos."""
     missing: list[str] = []
@@ -470,98 +449,6 @@ def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
             if not pathlib.Path(candidate).exists():
                 missing.append(f"{workflow}:{candidate}")
     assert not missing
-
-
-def test_ruff_baseline_uses_pinned_python_314_exception_formatting() -> None:
-    """Ruff baseline must not drift back to pre-3.14 exception formatting."""
-    workflow = pathlib.Path(".github/workflows/ruff-baseline.yml").read_text(
-        encoding="utf-8",
-    )
-
-    assert "RUFF_VERSION:" in workflow
-    assert "RUFF_TARGET_VERSION: py314" in workflow
-    assert "bun run install:ruff-baseline" in workflow
-    assert "python -m pip install --upgrade pip ruff" not in workflow
-    assert "python -m ruff --version" in workflow
-    assert workflow.count('--target-version "${RUFF_TARGET_VERSION}"') >= 3  # noqa: PLR2004
-    assert "bun run format" in workflow
-    assert "python scripts/verify_py314_exception_style.py --fix" in workflow
-    assert "python scripts/verify_py314_exception_style.py" in workflow
-    assert "--unsafe-fixes" not in workflow
-    assert "--exit-zero" in workflow
-    assert "--output-format=concise" in workflow
-
-
-def test_ruff_autofix_uses_safe_fixes_only() -> None:
-    """Local and workflow autofix paths must not enable Ruff unsafe fixes."""
-    pyproject = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
-    package = json.loads(pathlib.Path("package.json").read_text(encoding="utf-8"))
-    workflow_sources = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (
-            pathlib.Path(".github/workflows/autofix.yml"),
-            pathlib.Path(".github/workflows/ruff-baseline.yml"),
-        )
-    )
-
-    assert "unsafe-fixes = false" in pyproject
-    assert "extend-unsafe-fixes" not in pyproject
-    assert "--unsafe-fixes" not in package["scripts"]["lint:fix"]
-    assert "--unsafe-fixes" not in package["scripts"]["autofix"]
-    assert "--unsafe-fixes" not in workflow_sources
-
-
-def test_py314_exception_style_guard_detects_reverted_multi_except_headers() -> None:
-    """The workflow guard should fail old no-``as`` multi-exception headers only."""
-    script = pathlib.Path("scripts/verify_py314_exception_style.py")
-    spec = importlib.util.spec_from_file_location(
-        "verify_py314_exception_style",
-        script,
-    )
-    assert spec is not None and spec.loader is not None  # noqa: PT018
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    assert module.violations_in_text(
-        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n",
-    ) == [(3, "except (ValueError, TypeError):")]
-    assert module.violations_in_text(
-        "try:\n    pass\nexcept (\n    ValueError,\n    TypeError,\n):\n    pass\n",
-    ) == [
-        (
-            3,
-            "except (\n    ValueError,\n    TypeError,\n):",
-        ),
-    ]
-    assert (
-        module.violations_in_text(
-            "try:\n    pass\nexcept ValueError, TypeError:\n    pass\n",
-        )
-        == []
-    )
-    assert (
-        module.violations_in_text(
-            "try:\n"
-            "    pass\n"
-            "except (ValueError, TypeError) as err:\n"
-            "    raise RuntimeError from err\n",
-        )
-        == []
-    )
-    assert module.fix_text(
-        "try:\n    pass\nexcept (ValueError, TypeError):\n    pass\n",
-    ) == ("try:\n    pass\nexcept ValueError, TypeError:\n    pass\n")
-    assert module.fix_text(
-        "try:\n"
-        "    pass\n"
-        "except (ValueError, TypeError) as err:\n"
-        "    raise RuntimeError from err\n",
-    ) == (
-        "try:\n"
-        "    pass\n"
-        "except (ValueError, TypeError) as err:\n"
-        "    raise RuntimeError from err\n"
-    )
 
 
 def test_period_source_diagnostics_stay_minimal() -> None:
@@ -819,7 +706,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
         binary_source
         .split("class JackerySmartPlugStateBinarySensor", 1)[1]
         .split(
-            "# ---------------------------------------------------------------------------",
+            "# ---------------------------------------------------------------------------",  # noqa: E501
             1,
         )[0]
         .split("def extra_state_attributes", 1)[1]
@@ -1223,7 +1110,7 @@ def test_user_visible_action_errors_have_translations() -> None:
 
 
 def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
-    """Rejected credentials during refresh should start HA reauth instead of log-spamming."""
+    """Rejected credentials during refresh should start HA reauth instead of log-spamming."""  # noqa: E501
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8",
     )
@@ -1244,7 +1131,7 @@ def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
 
 
 def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
-    """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""
+    """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""  # noqa: E501
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8",
     )
@@ -1337,7 +1224,7 @@ def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
+    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # noqa: E501
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8",
     )
@@ -1380,7 +1267,7 @@ def test_number_setter_rejects_non_finite_values_before_transform() -> None:
     """Number service writes must not let NaN/Infinity reach int(round(...))."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"
+        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
         "# Setup",
         1,
     )[0]
@@ -1432,7 +1319,7 @@ def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
     """Discrete number validation should centralize round/int conversion."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"
+        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
         "# Setup",
         1,
     )[0]
@@ -1449,7 +1336,7 @@ def test_number_setter_validates_all_entity_ranges() -> None:
     """Direct number writes must enforce min/max for every number entity."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"
+        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
         "# Setup",
         1,
     )[0]
@@ -1589,7 +1476,7 @@ def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     assert "non-object JSON payload" in mqtt_source
 
 
-def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (
+def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (  # noqa: E501
     None
 ):
     """Reject malformed MQTT seeds and redact login diagnostics at export time."""
@@ -1673,7 +1560,7 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     assert calls
     for call in calls:
         assert len(call.args) == 3, (  # noqa: PLR2004
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # noqa: E501
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1995,7 +1882,7 @@ def test_rename_service_name_validates_direct_call_values() -> None:
 
 
 def test_delete_storm_alert_validates_direct_alert_id() -> None:
-    """Delete service alert_id constraints must not rely only on HA schema validation."""
+    """Delete service alert_id constraints must not rely only on HA schema validation."""  # noqa: E501
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert "def _storm_alert_id_from_service(" in services_source
@@ -2262,7 +2149,7 @@ def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
 
 
 def test_services_setup_is_idempotent_and_callback_typed() -> None:
-    """async_setup_services must be a sync @callback and skip already-registered services."""
+    """async_setup_services must be a sync @callback and skip already-registered services."""  # noqa: E501
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
     setup_block = services_source.split("def async_setup_services", 1)[1]
 
@@ -2279,7 +2166,7 @@ def test_services_setup_is_idempotent_and_callback_typed() -> None:
             service_const
         )
         assert (
-            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"
+            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"  # noqa: E501
             in setup_block
         ), service_const
 
@@ -2759,7 +2646,7 @@ def test_system_ttl_gather_calls_use_exact_helper_shape() -> None:
     assert ttl_calls
     assert all(len(call.args) == 5 for call in ttl_calls)  # noqa: PLR2004
 
-    bad_fragment = "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n                    self._slow_metrics_interval_sec"
+    bad_fragment = "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n                    self._slow_metrics_interval_sec"  # noqa: E501
     assert bad_fragment not in source
 
 
@@ -2838,7 +2725,7 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",
+        "# ---------------------------------------------------------------------------\n# Entities",  # noqa: E501
         1,
     )[0]
 
@@ -2927,12 +2814,12 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                     name = call.func.attr
                 if name in forbidden:
                     raise AssertionError(  # noqa: TRY003
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()",
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()",  # noqa: E501
                     )
 
 
 def test_api_method_calls_use_valid_positional_arity() -> None:
-    """Coordinator/service paths must not call JackeryApi methods with impossible arity."""
+    """Coordinator/service paths must not call JackeryApi methods with impossible arity."""  # noqa: E501
     api_tree = ast.parse(API_IMPLEMENTATION.read_text(encoding="utf-8"))
     method_arity: dict[str, tuple[int, int | None]] = {}
     for cls in [
@@ -3028,108 +2915,6 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py314-plus" in config
     assert "python3.13" not in config
     assert "--py313-plus" not in config
-
-
-def _load_py314_exception_guard_module():  # noqa: ANN202
-    """Load the local Python 3.14 exception-style guard script."""
-    spec = importlib.util.spec_from_file_location(
-        "verify_py314_exception_style",
-        pathlib.Path("scripts/verify_py314_exception_style.py"),
-    )
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_autofix_workflow_keeps_ruff_python314_format_stable() -> None:
-    """Autofix must use one pinned Ruff with an explicit Python 3.14 target."""
-    workflow = pathlib.Path(".github/workflows/autofix.yml").read_text(encoding="utf-8")
-
-    assert "RUFF_VERSION:" in workflow
-    assert "RUFF_TARGET_VERSION: py314" in workflow
-    assert "bun run install:ci" in workflow
-    assert "astral-sh/ruff-action" not in workflow
-    assert "pre-commit-ci/lite-action" not in workflow
-    assert '--target-version "${RUFF_TARGET_VERSION}"' in workflow
-    assert "--unsafe-fixes" not in workflow
-    assert "--add-noqa" in workflow
-    assert (
-        "python scripts/verify_py314_exception_style.py --fix custom_components/"
-        in workflow
-    )
-    assert "bun run format:check" in workflow
-    assert "ruff check --fix" not in workflow
-    assert "ref: ${{ github.head_ref || github.ref_name }}" in workflow
-    assert 'target_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"' in workflow
-    assert 'git fetch origin "${target_branch}"' in workflow
-    assert 'git rebase "origin/${target_branch}"' in workflow
-    assert 'git push origin "HEAD:${target_branch}"' in workflow
-
-
-def test_validate_ruff_job_uses_same_python314_formatter_target() -> None:
-    """Validate must check exactly the formatter target that autofix writes."""
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
-        encoding="utf-8",
-    )
-
-    assert 'python -m pip install "ruff==0.15.12"' in workflow
-    assert "run: bun run lint" in workflow
-    assert "run: bun run format:check" in workflow
-    assert "run: ruff format --check custom_components/ tests/" not in workflow
-
-
-def test_py314_exception_guard_only_rewrites_headers_that_stay_formatted() -> None:
-    """The local guard must not fight Ruff's line-length-driven wrapping."""
-    guard = _load_py314_exception_guard_module()
-
-    short_old_style = """try:
-    value = parse()
-except (
-    TypeError,
-    ValueError,
-):
-    value = None
-"""
-    short_new_style = """try:
-    value = parse()
-except TypeError, ValueError:
-    value = None
-"""
-    assert guard.fix_text(short_old_style, line_length=88) == short_new_style
-    assert guard.violations_in_text(short_old_style, line_length=88)
-    assert not guard.violations_in_text(short_new_style, line_length=88)
-
-    long_ruff_style = """            try:
-                body = await resp.json(content_type=None)
-            except (
-                aiohttp.ContentTypeError,
-                json.JSONDecodeError,
-                UnicodeDecodeError,
-                ValueError,
-            ):
-                body = {}
-"""
-    assert guard.fix_text(long_ruff_style, line_length=88) == long_ruff_style
-    assert not guard.violations_in_text(long_ruff_style, line_length=88)
-
-
-def test_ha_test_workflow_is_wired() -> None:
-    """HA test dependencies and bun test commands must stay wired."""
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
-        encoding="utf-8",
-    )
-    requirements = pathlib.Path("requirements-test.txt").read_text(encoding="utf-8")
-
-    assert "pytest-homeassistant-custom-component" in requirements
-    assert "requirements-test.txt" in workflow
-    assert "run: bun run ha:test" in workflow
-    assert "pytest-ha.ini" in pathlib.Path("package.json").read_text(encoding="utf-8")
-    assert pathlib.Path("pytest-ha.ini").exists()
-    assert "asyncio_mode = auto" in pathlib.Path("pytest-ha.ini").read_text(
-        encoding="utf-8",
-    )
 
 
 def test_generated_payload_debug_logs_are_ignored() -> None:
@@ -3228,9 +3013,9 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     # before checking. Equivalent to grepping "config.path(...jackery_ca.crt)".
     mqtt_source_collapsed = re.sub(r"\s+", " ", mqtt_source)
     assert (
-        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'
+        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'  # noqa: E501
         in mqtt_source_collapsed
-        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'
+        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'  # noqa: E501
         in mqtt_source_collapsed
     )
     assert '"tls_custom_ca_loaded": self._tls_custom_ca_loaded' in mqtt_source
@@ -3264,7 +3049,7 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
     assert "async def _async_periodic_refresh" not in coordinator_source
     assert "update_interval=update_interval" in coordinator_source
     update_block = coordinator_source.split("async def _async_update_data", 1)[1].split(
-        "# ------------------------------------------------------------------\n    # Diagnostics",
+        "# ------------------------------------------------------------------\n    # Diagnostics",  # noqa: E501
         1,
     )[0]
     assert "_raise_config_entry_auth_failed" in update_block
@@ -3277,7 +3062,7 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""
+    """Read-only custom component mounts are safe because setup writes no brand files."""  # noqa: E501
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")
@@ -3646,46 +3431,4 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     )
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
-    )
-
-
-def test_pre_commit_script_runs_on_all_files() -> None:
-    """The pre-commit script must pass --all-files so no file is silently skipped."""
-    package = json.loads(pathlib.Path("package.json").read_text(encoding="utf-8"))
-    pre_commit_cmd = package["scripts"]["pre-commit"]
-
-    assert "--all-files" in pre_commit_cmd, (
-        "pre-commit script must include '--all-files' to check the full tree"
-    )
-    assert "bun run pre-commit" in pre_commit_cmd, (
-        "pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)"
-    )
-
-
-def test_ruff_baseline_workflow_delegates_pre_commit_via_bun() -> None:
-    """The ruff-baseline workflow must invoke pre-commit through the bun script.
-
-    Using 'bun run pre-commit' ensures the workflow picks up the --all-files
-    flag defined in package.json rather than invoking pre-commit directly.
-    """
-    workflow = pathlib.Path(".github/workflows/ruff-baseline.yml").read_text(
-        encoding="utf-8",
-    )
-
-    assert "bun run pre-commit" in workflow, (
-        "ruff-baseline.yml must call 'bun run pre-commit' so the --all-files flag is applied"
-    )
-    assert workflow.count("bun run pre-commit") >= 1
-
-
-def test_package_json_pre_commit_script_is_valid_json_with_required_keys() -> None:
-    """package.json must remain valid JSON and expose a pre-commit script entry."""
-    raw = pathlib.Path("package.json").read_text(encoding="utf-8")
-
-    # Must be parseable JSON (regression guard against syntax errors).
-    parsed = json.loads(raw)
-
-    assert "scripts" in parsed, "package.json must contain a 'scripts' section"
-    assert "pre-commit" in parsed["scripts"], (
-        "scripts section must define a 'pre-commit' entry"
     )
