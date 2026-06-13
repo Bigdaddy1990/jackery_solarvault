@@ -375,13 +375,21 @@ def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
     """
     for key in ("deviceId", "device_id", "id"):
         value = payload.get(key)
-        if isinstance(value, str | int) and str(value).strip():
+        if (
+            isinstance(value, str | int)
+            and not isinstance(value, bool)
+            and str(value).strip()
+        ):
             return str(value).strip()
     props = payload.get("properties")
     if isinstance(props, dict):
         for key in ("deviceId", "device_id"):
             value = props.get(key)
-            if isinstance(value, str | int) and str(value).strip():
+            if (
+                isinstance(value, str | int)
+                and not isinstance(value, bool)
+                and str(value).strip()
+            ):
                 return str(value).strip()
     return None
 

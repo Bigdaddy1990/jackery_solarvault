@@ -27,7 +27,7 @@ class SmartModeEndpointMixin(BaseHTTPMixin):
         Returns:
             dict[str, Any]: Smart mode check result as a dictionary.
         """
-        data = await self._get_json(
+        data = await self._post_json(
             SMART_MODE_CHECK_PATH,
             {FIELD_DEVICE_ID: str(device_id), FIELD_SYSTEM_ID: str(system_id)},
         )
