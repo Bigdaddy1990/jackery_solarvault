@@ -369,7 +369,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
@@ -567,7 +567,7 @@ class JackeryLocalMqttClient:
             "configured_target": target,
             "connected": self._connected,
             "started": self._runner_task is not None,
-            "topic_filter": self._topic_filter,
+            "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,

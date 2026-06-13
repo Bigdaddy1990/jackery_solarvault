@@ -3,7 +3,6 @@
 Encapsulates backoff, pause, auth-failure detection, and reconnect
 throttling so the coordinator never touches MQTT protocol state directly.
 """
-
 import logging
 import time
 from typing import TYPE_CHECKING

@@ -553,7 +553,7 @@ class JackeryBleListener:
         pending = _PendingAck(
             expected_cmds=(
                 frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
-                if ack_cmds
+                if ack_cmds is not None
                 else None
             ),
             future=loop.create_future(),

@@ -9,7 +9,7 @@ Source: coordinator.py lines 2135-2181 (Phase 2c extraction).
 
 from typing import Any
 
-from jackery_solarvault.const import (
+from ..const import (
     ACTION_ID_GET_DEVICE_OTA_VERSION,
     ACTION_ID_GET_TIME_ZONE,
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,

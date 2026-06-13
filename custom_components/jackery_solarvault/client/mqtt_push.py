@@ -1,5 +1,4 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
-
 import asyncio
 import contextlib
 from datetime import UTC, datetime
@@ -224,13 +223,13 @@ class JackeryMqttPushClient:
         If the client is not yet connected, waits up to 12 seconds for connection readiness. Serializes `payload` with compact JSON (no unnecessary whitespace, UTF-8), publishes using the given `qos` and `retain` flags, and on success updates the client's last-published topic and timestamp.
 
         Parameters:
-        	topic (str): MQTT topic to publish to.
-        	payload (dict[str, Any]): Mapping to serialize as the message body.
-        	qos (int): MQTT Quality of Service level.
-        	retain (bool): Whether the broker should retain the message.
+            topic (str): MQTT topic to publish to.
+            payload (dict[str, Any]): Mapping to serialize as the message body.
+            qos (int): MQTT Quality of Service level.
+            retain (bool): Whether the broker should retain the message.
 
         Raises:
-        	RuntimeError: If the MQTT client is not running or the publish fails.
+            RuntimeError: If the MQTT client is not running or the publish fails.
         """
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if not self._connected:
@@ -551,7 +550,8 @@ class JackeryMqttPushClient:
 
         strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
         if (
-            isinstance(strict_flag, int)
+            self._enable_tls_x509_relaxation
+            and isinstance(strict_flag, int)
             and hasattr(ctx, "verify_flags")
             and ctx.verify_flags & strict_flag
         ):

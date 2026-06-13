@@ -4,7 +4,7 @@ import base64
 import secrets
 from typing import Any
 
-from jackery_solarvault.const import (
+from ..const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -25,7 +25,6 @@ from jackery_solarvault.const import (
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
-
 from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 
 
@@ -83,7 +82,7 @@ def generate_third_party_mqtt_token() -> str:
     """Generate a 9-digit numeric token used as the app fallback token.
 
     Returns:
-        str: A 9-character string consisting only of decimal digits (0–9).
+        str: A 9-character string consisting only of decimal digits (0-9).
     """
     return "".join(str(secrets.randbelow(10)) for _ in range(9))
 
@@ -150,17 +149,17 @@ def stable_third_party_mqtt_token(
     """Normalize and validate a ThirdParty MQTT token and determine whether a generated token should be used.
 
     Parameters:
-    	token (str): Candidate token value; will be coerced to string and stripped of surrounding whitespace.
-    	generated_token (str | None): Previously generated 9-digit token, or `None` if none exists.
+        token (str): Candidate token value; will be coerced to string and stripped of surrounding whitespace.
+        generated_token (str | None): Previously generated 9-digit token, or `None` if none exists.
 
     Returns:
-    	(token_str (str), use_generated (bool), new_generated_token (str | None)):
-    		- token_str: The 9-digit token to use.
-    		- use_generated: `True` if the chosen token is (or should be treated as) a generated token, `False` if it is a valid user-provided token.
-    		- new_generated_token: The newly generated token when one was created, otherwise `None`.
+        (token_str (str), use_generated (bool), new_generated_token (str | None)):
+            - token_str: The 9-digit token to use.
+            - use_generated: `True` if the chosen token is (or should be treated as) a generated token, `False` if it is a valid user-provided token.
+            - new_generated_token: The newly generated token when one was created, otherwise `None`.
 
     Raises:
-    	ValueError: If a provided non-empty token is not exactly nine decimal digits.
+        ValueError: If a provided non-empty token is not exactly nine decimal digits.
     """
     raw_token = str(token).strip()
     if raw_token:
@@ -201,7 +200,7 @@ def decode_third_party_mqtt_config_body(
         config["_decode_error"] = "missing_bluetooth_key"
         return config
 
-    decoded_any = False
+    decoded_fields: set[str] = set()
     failed_fields: list[str] = []
     for key in (
         FIELD_THIRD_PARTY_MQTT_USERNAME,
@@ -216,9 +215,11 @@ def decode_third_party_mqtt_config_body(
         except ValueError:
             failed_fields.append(key)
             continue
-        decoded_any = True
+        decoded_fields.add(key)
 
-    config["_ha_plaintext"] = decoded_any
+    config["_ha_plaintext"] = bool(decoded_fields) and not failed_fields
+    if decoded_fields:
+        config["_decoded_fields"] = sorted(decoded_fields)
     if failed_fields:
         config["_decode_failed_fields"] = failed_fields
     return config
@@ -252,12 +253,18 @@ def third_party_mqtt_config_plaintext(
             ):
                 if current.get(key) is not None:
                     config[key] = current[key]
-            if current.get("_ha_plaintext") is True:
+            decoded_fields = set(current.get("_decoded_fields") or ())
+            failed_fields = set(current.get("_decode_failed_fields") or ())
+            if current.get("_ha_plaintext") is True or decoded_fields:
                 for key in (
                     FIELD_THIRD_PARTY_MQTT_USERNAME,
                     FIELD_THIRD_PARTY_MQTT_PASSWORD,
                     FIELD_THIRD_PARTY_MQTT_TOKEN,
                 ):
+                    if key in failed_fields:
+                        continue
+                    if decoded_fields and key not in decoded_fields:
+                        continue
                     if current.get(key) is not None:
                         config[key] = current[key]
     return config

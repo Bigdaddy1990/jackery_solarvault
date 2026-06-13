@@ -822,7 +822,7 @@ def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
 
 
 def stable_subdevice_key(prefix: str, identity: str | None, fallback_index: int) -> str:
-
+    """Build a stable subdevice key from the best available identifiers."""
     raw = str(identity or "").strip() or str(fallback_index)
     normalized = _SUBDEVICE_ID_RE.sub("_", raw).strip("_").lower()
     return f"{prefix}_{normalized or fallback_index}"

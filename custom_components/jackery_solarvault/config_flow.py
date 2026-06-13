@@ -1,5 +1,4 @@
 """Config flow for Jackery SolarVault."""
-
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -285,7 +284,7 @@ def _local_mqtt_option_schema(
     The returned mapping contains vol.Optional descriptors for:
     - CONF_LOCAL_MQTT_ENABLE (bool)
     - CONF_LOCAL_MQTT_HOST (str)
-    - CONF_LOCAL_MQTT_PORT (int, 1–65535)
+    - CONF_LOCAL_MQTT_PORT (int, 1-65535)
     - CONF_LOCAL_MQTT_USERNAME (str)
     - CONF_LOCAL_MQTT_PASSWORD (str)
     - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
@@ -623,7 +622,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except KeyError, RuntimeError:
+        except (KeyError, RuntimeError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}

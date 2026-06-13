@@ -477,10 +477,13 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
-        # Soft assertion — every frame seen so far carries 0x0064 here.
-        # We do not refuse parsing on mismatch, but the caller's debug
-        # log will surface unexpected values for analysis.
-        pass
+        # Soft assertion - every frame seen so far carries 0x0064 here.
+        # We do not refuse parsing on mismatch, but log unexpected values for analysis.
+        _LOGGER.debug(
+            "BLE binary frame version mismatch: expected %s, got %s",
+            _BINARY_FRAME_VERSION_BE.hex(),
+            plaintext[2:4].hex(),
+        )
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
         raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")  # noqa: TRY003
     frame_index = int.from_bytes(plaintext[4:6], "big")
@@ -768,13 +771,13 @@ def split_payload_into_frames(
     Non-empty payloads are sliced into chunks of size chunk_size_for_mtu(mtu); each chunk is returned as a BleFrame with a 1-based frame_index, the total chunk_count, and the provided action_id and ble_cmd. For an empty payload, returns a single BleFrame with an empty chunk_payload and chunk_count set to 1.
 
     Parameters:
-    	payload (bytes): The full logical payload to split.
-    	action_id (int): Action identifier to include in each resulting frame.
-    	ble_cmd (int): BLE command identifier to include in each resulting frame.
-    	mtu (int): Maximum transmission unit used to compute per-frame chunk size.
+        payload (bytes): The full logical payload to split.
+        action_id (int): Action identifier to include in each resulting frame.
+        ble_cmd (int): BLE command identifier to include in each resulting frame.
+        mtu (int): Maximum transmission unit used to compute per-frame chunk size.
 
     Returns:
-    	list[BleFrame]: Ordered list of frames representing the payload chunks.
+        list[BleFrame]: Ordered list of frames representing the payload chunks.
     """
     chunk_size = chunk_size_for_mtu(mtu)
     if not payload:

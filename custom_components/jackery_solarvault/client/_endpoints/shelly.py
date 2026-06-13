@@ -2,8 +2,7 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import BaseHTTPMixin, JackeryApiError
-from jackery_solarvault.const import (
+from ...const import (
     FIELD_ACTION,
     FIELD_DATA,
     FIELD_DEVICE_ID,
@@ -16,6 +15,7 @@ from jackery_solarvault.const import (
     SHELLY_UNBIND_ACCOUNT_PATH,
     SHELLY_UNBIND_DEVICE_PATH,
 )
+from .._http import BaseHTTPMixin, JackeryApiError, _write_accepted
 
 
 class ShellyEndpointMixin(BaseHTTPMixin):
@@ -94,7 +94,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_FUNCTION: str(function),
             },
         )
-        return bool(data.get(FIELD_DATA, True))
+        return _write_accepted(data)
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
         """Retrieve the Shelly OAuth authorization URL and accompanying state for the redirect flow.
@@ -126,7 +126,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_DEVICE_ID: str(device_id),
             },
         )
-        return bool(data.get(FIELD_DATA, True))
+        return _write_accepted(data)
 
     async def async_unbind_shelly_account(self) -> bool:
         """Unbinds the Shelly account associated with the current user.
@@ -135,7 +135,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             True if the account unbind succeeded, False otherwise.
         """
         data = await self._post_form(SHELLY_UNBIND_ACCOUNT_PATH, {})
-        return bool(data.get(FIELD_DATA, True))
+        return _write_accepted(data)
 
     async def async_get_shelly_binding_failures(
         self,

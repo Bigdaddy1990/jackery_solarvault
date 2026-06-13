@@ -2,14 +2,14 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import BaseHTTPMixin
-from jackery_solarvault.const import (
+from ...const import (
     FIELD_DEVICE_ID,
     FIELD_SYSTEM_ID,
     SMART_MODE_CHECK_PATH,
     SMART_MODE_INFO_PATH,
     SMART_MODE_START_PATH,
 )
+from .._http import BaseHTTPMixin
 
 
 class SmartModeEndpointMixin(BaseHTTPMixin):

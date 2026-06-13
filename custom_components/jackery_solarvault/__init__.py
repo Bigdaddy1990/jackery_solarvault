@@ -124,8 +124,6 @@ async def _load_dotenv_if_present(hass_config_path: Path) -> None:
     text: str | None = await asyncio.to_thread(_read_env_sync)
     if text is None:
         return
-    from .util import _DEV_MODE_ENV
-
     for raw_line in text.splitlines():
         stripped = raw_line.strip()
         if not stripped or stripped.startswith("#"):
@@ -300,10 +298,10 @@ def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:
     """Validate and extract a bootstrap MQTT session snapshot from a config entry's data.
 
     Parameters:
-    	entry (ConfigEntry): Config entry whose data may contain an `ENTRY_BOOTSTRAP_MQTT_SESSION` mapping.
+        entry (ConfigEntry): Config entry whose data may contain an `ENTRY_BOOTSTRAP_MQTT_SESSION` mapping.
 
     Returns:
-    	dict[str, str]: Validated snapshot containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`, and optionally `MQTT_SESSION_MAC_ID_SOURCE`, or `None` if the snapshot is missing or any required field is absent/invalid.
+        dict[str, str]: Validated snapshot containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`, and optionally `MQTT_SESSION_MAC_ID_SOURCE`, or `None` if the snapshot is missing or any required field is absent/invalid.
     """
     raw = entry.data.get(ENTRY_BOOTSTRAP_MQTT_SESSION)
     if not isinstance(raw, dict):
@@ -684,8 +682,8 @@ async def _async_start_local_mqtt(
         """Dispatches a parsed local MQTT JSON message to the coordinator.
 
         Parameters:
-        	topic (str): MQTT topic the message was received on.
-        	data (dict[str, Any] | None): Parsed JSON payload to route; if `None`, the message is ignored.
+            topic (str): MQTT topic the message was received on.
+            data (dict[str, Any] | None): Parsed JSON payload to route; if `None`, the message is ignored.
         """
         if data is None:
             return
@@ -715,7 +713,13 @@ async def _async_start_local_mqtt(
         if isinstance(stashed, dict) and stashed.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
             stashed.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
 
-    entry.async_on_unload(_async_stop_local_mqtt)
+    def _on_unload() -> None:
+        hass.async_create_task(
+            _async_stop_local_mqtt(),
+            name=f"{DOMAIN}_stop_local_mqtt_{entry.entry_id}",
+        )
+
+    entry.async_on_unload(_on_unload)
     await client.async_start()
 
 
