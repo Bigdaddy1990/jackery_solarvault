@@ -43,7 +43,7 @@ def _make_rsa_public_key_b64() -> str:
         der = k.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
         print(base64.b64encode(der).decode())
     The value below is a real 1024-bit RSA SubjectPublicKeyInfo DER blob.
-    """  # noqa: E501
+    """
     return (
         "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCtW7ln1ZQNCL9P9Gju+5brZZ1R"
         "wyXwrLY8iFbe1QK9YpPn14ZI2+csvW6+Sbm5UAObHVmD6gY+usoY0+qGShKbo/Dk"
@@ -61,7 +61,7 @@ def _make_ec_public_key_b64() -> str:
         k = ec.generate_private_key(ec.SECP256R1())
         der = k.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
         print(base64.b64encode(der).decode())
-    """  # noqa: E501
+    """
     # Real P-256 SubjectPublicKeyInfo DER, base64-encoded.
     return (
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExi9GR8jfqTcSd+4R753arn4NjqQh"

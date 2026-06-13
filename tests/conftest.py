@@ -15,7 +15,14 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-@pytest.fixture(autouse=True)  # noqa: RUF076
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Enable custom integrations for every collected test without autouse."""
+    marker = pytest.mark.usefixtures("auto_enable_custom_integrations")
+    for item in items:
+        item.add_marker(marker)
+
+
+@pytest.fixture()
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
@@ -45,7 +52,7 @@ def mock_jackery_login() -> Generator[None]:
 
         Returns:
             str: The authentication token assigned to the API instance.
-        """  # noqa: E501
+        """
         api._token = "test-token"  # noqa: SLF001
         api._mqtt_user_id = "test-user"  # noqa: SLF001
         api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="  # noqa: SLF001

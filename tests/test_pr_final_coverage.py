@@ -96,7 +96,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_true_when_alert_exists_and_coordinator_healthy(  # noqa: PLR6301
         self,
     ) -> None:
-        """Available must be True when the alert is present and coordinator is healthy."""  # noqa: E501
+        """Available must be True when the alert is present and coordinator is healthy."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -145,12 +145,12 @@ class TestDeleteStormAlertButtonAvailable:
 
 
 class TestTranslatedHomeAssistantErrorReRaise:
-    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""  # noqa: E501
+    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""
 
     async def test_reboot_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
@@ -173,7 +173,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_refresh_weather_plan_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
@@ -196,7 +196,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_read_schedule_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
@@ -226,7 +226,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_delete_storm_alert_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -249,7 +249,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_query_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButton,
             JackeryQueryButtonDescription,
@@ -498,7 +498,7 @@ def test_legacy_suffix_matches_prevents_current_entity_deletion_regression() -> 
 
 
 async def test_async_unload_entry_returns_false_when_unload_platforms_fails() -> None:
-    """async_unload_entry must return False when async_unload_platforms returns False."""  # noqa: E501
+    """async_unload_entry must return False when async_unload_platforms returns False."""
     from custom_components.jackery_solarvault import async_unload_entry
 
     hass = MagicMock()
@@ -598,7 +598,7 @@ def test_blocked_topic_filters_scoped_topic_not_blocked() -> None:
 
 
 async def test_read_schedule_button_wraps_untranslated_ha_error() -> None:
-    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""  # noqa: E501
+    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""
     from custom_components.jackery_solarvault.button import JackeryReadScheduleButton  # noqa: I001
     from homeassistant.exceptions import HomeAssistantError
 
