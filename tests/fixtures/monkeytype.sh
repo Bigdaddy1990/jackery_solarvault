@@ -22,4 +22,4 @@ if [ $# -eq 0 ]
 fi
 
 echo "Run monkeytype on tests in $1"
-monkeytype run "$(command -v pytest)" "$1"
+monkeytype run "$(command -v pytest)" "$@"
