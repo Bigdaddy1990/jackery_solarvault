@@ -66,13 +66,14 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 60
 # Adaptive polling: when MQTT delivered an inbound message within the
-# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a      #######HTTP SHOULD NEVER BE SKIPED!!!!!!
+# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
 # keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
 # cloud_polling because HTTP polling is the startup, fallback and keep-alive
 # data path; MQTT push is an optional live enhancement.
-MQTT_LIVE_THRESHOLD_SEC: Final = 15  # MQTT IS NOT ALLOWED RUN BEFORE SETUP COMPLETE AND NEVER PAUSED HTTP OR BLE, THEY NEED RUN ALL OR GATE BREAKES!
+MQTT_LIVE_THRESHOLD_SEC: Final = 15
 ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = (
-    15  # REMOVE!300s are not live polling! this caused all problems with live polling!
+    15
+)
 )
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
