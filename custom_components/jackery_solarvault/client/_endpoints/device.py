@@ -484,16 +484,16 @@ class DeviceEndpointMixin(BaseHTTPMixin):
             },
         )
 
-    async def async_get_ble_ota_versions(self, list: str) -> dict[str, Any]:
+    async def async_get_ble_ota_versions(self, version_list: str) -> dict[str, Any]:
         """List available BLE OTA versions.
 
         Parameters:
-            list: Version list query parameter.
+            version_list: Version list query parameter.
 
         Returns:
             dict: Backend response data.
         """
-        return await self._post_json(BLE_OTA_VERSIONS_PATH, {"list": list})
+        return await self._post_json(BLE_OTA_VERSIONS_PATH, {"list": version_list})
 
     async def async_start_ota_update(
         self,
