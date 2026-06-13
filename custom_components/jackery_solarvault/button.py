@@ -252,6 +252,7 @@ async def _query_subdevice_combo(
 
 # --- Portable / Explorer powerstation actions --------------------------------
 
+
 async def _portable_restart(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:

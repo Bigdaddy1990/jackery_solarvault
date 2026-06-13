@@ -84,7 +84,5 @@ def strip_lifetime_counters(
 ) -> dict[str, Any]:
     """Remove cumulative energy counters before merging live properties."""
     return {
-        key: value
-        for key, value in source.items()
-        if key not in lifetime_counter_keys
+        key: value for key, value in source.items() if key not in lifetime_counter_keys
     }

@@ -2729,9 +2729,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         threshold_seconds: int = BATTERY_PACK_STALE_THRESHOLD_SEC,
     ) -> tuple[list[dict[str, Any]], int, list[int]]:
         """Remove packs that have been silent past the stale threshold."""
-        return _drop_stale_battery_packs_fn(
-            packs, threshold_seconds=threshold_seconds
-        )
+        return _drop_stale_battery_packs_fn(packs, threshold_seconds=threshold_seconds)
 
     @staticmethod
     def _resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
@@ -3214,7 +3212,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 code = None
         if code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -8901,9 +8899,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             device_id=device_id, system_id=system_id
         )
 
-    async def async_get_smart_mode_info(
-        self, system_id: str
-    ) -> dict[str, Any]:
+    async def async_get_smart_mode_info(self, system_id: str) -> dict[str, Any]:
         """Get smart mode configuration for a system.
 
         Calls ``/v1/device/smartMode/getSmartMode`` (GET).
@@ -8922,9 +8918,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # TOU (Time-of-Use) Plan
     # ------------------------------------------------------------------
 
-    async def async_query_tou_plan(
-        self, device_id: str
-    ) -> dict[str, Any]:
+    async def async_query_tou_plan(self, device_id: str) -> dict[str, Any]:
         """Query the current TOU schedule plan for a device.
 
         Calls ``/v1/device/tou/queryTouPlan`` (GET).

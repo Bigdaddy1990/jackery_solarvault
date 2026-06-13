@@ -665,7 +665,9 @@ _AC_OUTPUT_MODE_OPTIONS: dict[int, str] = {
     1: "quiet",
     2: "high-performance",
 }
-_OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {v: k for k, v in _AC_OUTPUT_MODE_OPTIONS.items()}
+_OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {
+    v: k for k, v in _AC_OUTPUT_MODE_OPTIONS.items()
+}
 
 
 def _portable_ac_output_mode_current(entity: JackerySelect) -> str | None:
@@ -692,7 +694,9 @@ _OUTPUT_PRIORITY_OPTIONS: dict[int, str] = {
     1: "grid-first",
     2: "solar-first",
 }
-_OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {v: k for k, v in _OUTPUT_PRIORITY_OPTIONS.items()}
+_OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {
+    v: k for k, v in _OUTPUT_PRIORITY_OPTIONS.items()
+}
 
 
 def _portable_output_priority_current(entity: JackerySelect) -> str | None:
