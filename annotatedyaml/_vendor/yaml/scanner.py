@@ -240,7 +240,7 @@ class Scanner:  # noqa: D101, PLR0904
         if ch == "." and self.check_document_end():
             return self.fetch_document_end()
 
-        # TODO: support for BOM within a stream.
+        # Future support: handle BOM within a stream.
         # if ch == '\uFEFF':
         #    return self.fetch_bom()    <-- issue BOMToken
 
@@ -1000,7 +1000,7 @@ class Scanner:  # noqa: D101, PLR0904
         # specification requires. Any such mark will be considered as a part
         # of the document.
         #
-        # TODO: We need to make tab handling rules more sane. A good rule is
+        # Tab-handling note: a saner rule would be
         #   Tabs cannot precede tokens
         #   BLOCK-SEQUENCE-START, BLOCK-MAPPING-START, BLOCK-END,
         #   KEY(block), VALUE(block), BLOCK-ENTRY
