@@ -48,7 +48,7 @@ class SimpleKey:
             line (int): Line number of the candidate start (0-based).
             column (int): Column number of the candidate start (0-based).
             mark (Mark): Scanner mark object representing the exact start position for error reporting.
-        """  # noqa: E501
+        """
         self.token_number = token_number
         self.required = required
         self.index = index
@@ -70,7 +70,7 @@ class Scanner:  # noqa: D101, PLR0904
         - allow_simple_key and possible_simple_keys: state and candidates used to detect simple keys
 
         Also calls fetch_stream_start() to enqueue the STREAM-START token.
-        """  # noqa: E501
+        """
         # It is assumed that Scanner and Reader will have a common descendant.
         # Reader do the dirty work of checking for BOM and converting the
         # input data to Unicode. It also adds NUL to the end.
@@ -143,7 +143,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             True if the next queued token is an instance of any provided class, False otherwise.
-        """  # noqa: E501
+        """
         while self.need_more_tokens():
             self.fetch_more_tokens()
         if self.tokens:
@@ -163,7 +163,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             token | None: The next token from the queue, or `None` when the token stream is exhausted.
-        """  # noqa: E501
+        """
         while self.need_more_tokens():
             self.fetch_more_tokens()
         if self.tokens:
@@ -176,7 +176,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             token | None: The next token from the queue, or `None` if the stream is exhausted.
-        """  # noqa: E501
+        """
         while self.need_more_tokens():
             self.fetch_more_tokens()
         if self.tokens:
@@ -191,7 +191,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             `False` if the stream is finished, `True` if more tokens are required (the token buffer is empty or a pending simple-key candidate must be resolved), `None` if there is currently no need to fetch more tokens.
-        """  # noqa: E501
+        """
         if self.done:
             return False
         if not self.tokens:
@@ -211,7 +211,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the character at the current position cannot start any valid token.
-        """  # noqa: E501
+        """
         self.scan_to_next_token()
 
         # Remove obsolete possible simple keys.
@@ -332,7 +332,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             The smallest `token_number` among saved simple-key candidates, or `None` if no candidates exist.
-        """  # noqa: E501
+        """
         min_token_number = None
         for level in self.possible_simple_keys:
             key = self.possible_simple_keys[level]
@@ -383,7 +383,7 @@ class Scanner:  # noqa: D101, PLR0904
         - token_number: the index in the token stream where the key token would be inserted,
         - required: true when in block context and the current column equals the current indent (indicating a required key),
         - the scanner position (index, line, column) and mark for error reporting.
-        """  # noqa: E501
+        """
         required = not self.flow_level and self.indent == self.column
 
         # The next token might be a simple key. Let's save it's number and
@@ -447,7 +447,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             column (int): Target column to unwind to; indentation levels strictly greater than this column will be removed.
-        """  # noqa: E501
+        """
         if self.flow_level:
             return
 
@@ -466,7 +466,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             True if the indentation was increased to column, False otherwise.
-        """  # noqa: E501
+        """
         if self.indent < column:
             self.indents.append(self.indent)
             self.indent = column
@@ -483,7 +483,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Append a STREAM-START token to the scanner's token buffer.
 
         The appended token uses the scanner's current mark for both start and end and includes the scanner's configured encoding.
-        """  # noqa: E501
+        """
         mark = self.get_mark()
 
         # Add STREAM-START.
@@ -494,7 +494,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Finalize scanning by emitting a STREAM-END token and resetting scanner state.
 
         Resets indentation to -1, clears any pending simple-key candidates and disables simple-key handling, appends a `StreamEndToken` at the current mark, and marks the scanner as finished.
-        """  # noqa: E501
+        """
         self.unwind_indent(-1)
 
         # Reset simple keys.
@@ -516,7 +516,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Process a directive at the current scanner position and append the resulting DirectiveToken to the token buffer.
 
         This will unwind block indentation to the base level, clear any pending simple-key candidate and disable further simple-key recognition before scanning and appending the directive token.
-        """  # noqa: E501
+        """
         self.unwind_indent(-1)
 
         # Reset simple keys.
@@ -530,11 +530,11 @@ class Scanner:  # noqa: D101, PLR0904
         """Handle a document start marker ('---') and append a DocumentStartToken to the token buffer.
 
         This prepares scanner state for a new document by resetting indentation and simple-key tracking, consumes the document-start indicator, and enqueues the corresponding DocumentStartToken with its marks.
-        """  # noqa: E501
+        """
         self.fetch_document_indicator(DocumentStartToken)  # noqa: F405
 
     def fetch_document_end(self) -> None:
-        """Process a document end marker ('...') at the current position and append a DocumentEndToken to the token queue."""  # noqa: E501
+        """Process a document end marker ('...') at the current position and append a DocumentEndToken to the token queue."""
         self.fetch_document_indicator(DocumentEndToken)  # noqa: F405
 
     def fetch_document_indicator(self, TokenClass) -> None:  # noqa: ANN001, N803
@@ -543,7 +543,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             TokenClass (type): Token class to create for the indicator (e.g., DocumentStartToken or DocumentEndToken). The token will be instantiated with the start and end marks surrounding the three-character indicator.
-        """  # noqa: E501
+        """
         self.unwind_indent(-1)
 
         # Reset simple keys. Note that there could not be a block collection
@@ -558,13 +558,13 @@ class Scanner:  # noqa: D101, PLR0904
         self.tokens.append(TokenClass(start_mark, end_mark))
 
     def fetch_flow_sequence_start(self) -> None:
-        """Start a flow sequence by updating the scanner's flow context and appending a FlowSequenceStartToken to the token buffer."""  # noqa: E501
+        """Start a flow sequence by updating the scanner's flow context and appending a FlowSequenceStartToken to the token buffer."""
         self.fetch_flow_collection_start(FlowSequenceStartToken)  # noqa: F405
 
     def fetch_flow_mapping_start(self) -> None:
         """Mark the start of a flow-style mapping (`{`) and update scanner state for entering a flow collection.
         This adjusts flow-level tracking and enables simple-key recognition appropriate for the new flow context.
-        """  # noqa: D205, E501
+        """  # noqa: D205
         self.fetch_flow_collection_start(FlowMappingStartToken)  # noqa: F405
 
     def fetch_flow_collection_start(self, TokenClass) -> None:  # noqa: ANN001, N803
@@ -575,7 +575,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             TokenClass (type): Token class to instantiate for the flow collection start (e.g., FlowSequenceStartToken or FlowMappingStartToken).
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # Increase the flow level.
@@ -591,14 +591,14 @@ class Scanner:  # noqa: D101, PLR0904
         self.tokens.append(TokenClass(start_mark, end_mark))
 
     def fetch_flow_sequence_end(self) -> None:
-        """Process the end of a flow sequence (`]`), update scanner flow/simple-key state, and emit a FlowSequenceEndToken."""  # noqa: E501
+        """Process the end of a flow sequence (`]`), update scanner flow/simple-key state, and emit a FlowSequenceEndToken."""
         self.fetch_flow_collection_end(FlowSequenceEndToken)  # noqa: F405
 
     def fetch_flow_mapping_end(self) -> None:
         """Finalize a flow mapping by consuming its closing delimiter and emitting a FlowMappingEndToken.
 
         This ends the current flow-mapping context and appends the corresponding FlowMappingEndToken to the scanner's token buffer.
-        """  # noqa: E501
+        """
         self.fetch_flow_collection_end(FlowMappingEndToken)  # noqa: F405
 
     def fetch_flow_collection_end(self, TokenClass) -> None:  # noqa: ANN001, N803
@@ -607,7 +607,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             TokenClass (type): Token class to instantiate for the collection end (e.g., FlowSequenceEndToken or FlowMappingEndToken).
-        """  # noqa: E501
+        """
         self.remove_possible_simple_key()
 
         # Decrease the flow level.
@@ -627,7 +627,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Consume a flow entry separator (`,`) and emit a FlowEntryToken while enabling simple-key recognition and clearing any pending simple-key candidate at the current flow level.
 
         This modifies scanner state by advancing one character, appending a FlowEntryToken for the consumed separator, setting `allow_simple_key` to True, and removing any saved possible simple key for the current flow level.
-        """  # noqa: E501
+        """
         self.allow_simple_key = True
 
         # Reset possible simple key on the current level.
@@ -647,7 +647,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
                 ScannerError: If sequence entries are not allowed at the current position.
-        """  # noqa: E501
+        """
         if not self.flow_level:
             # Are we allowed to start a new entry?
             if not self.allow_simple_key:
@@ -685,7 +685,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: if a mapping key is not allowed at the current position.
-        """  # noqa: E501
+        """
         if not self.flow_level:
             # Are we allowed to start a key (not necessary a simple)?
             if not self.allow_simple_key:
@@ -718,7 +718,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: When in block context and mapping values are not allowed at this position.
-        """  # noqa: E501
+        """
         if self.flow_level in self.possible_simple_keys:
             # Add KEY.
             key = self.possible_simple_keys[self.flow_level]
@@ -779,7 +779,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Scan an alias and append an AliasToken to the token buffer.
 
         If a simple key can start at this position, record it; then disable simple-key allowance and append the scanned AliasToken.
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # No simple keys after ALIAS.
@@ -793,7 +793,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Scan an anchor at the current position and append the resulting AnchorToken to the token buffer.
 
         Saves a possible simple-key candidate for the current flow level, disables further simple-key recognition, and appends the scanned AnchorToken to self.tokens.
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # No simple keys after ANCHOR.
@@ -807,7 +807,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Handle a YAML tag indicator at the current scanner position.
 
         Records the current position as a possible simple key (if allowed), disables further simple-key recognition, and appends the scanned TagToken to the internal token buffer.
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # No simple keys after TAG.
@@ -821,7 +821,7 @@ class Scanner:  # noqa: D101, PLR0904
         self.fetch_block_scalar(style="|")
 
     def fetch_folded(self) -> None:
-        """Fetches a folded block scalar and appends the resulting scalar token to the token stream using the ">" style."""  # noqa: E501
+        """Fetches a folded block scalar and appends the resulting scalar token to the token stream using the ">" style."""
         self.fetch_block_scalar(style=">")
 
     def fetch_block_scalar(self, style) -> None:  # noqa: ANN001
@@ -832,7 +832,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             style (str): Block scalar style indicator (e.g., '|' for literal, '>' for folded).
-        """  # noqa: E501
+        """
         self.allow_simple_key = True
 
         # Reset possible simple key on the current level.
@@ -842,11 +842,11 @@ class Scanner:  # noqa: D101, PLR0904
         self.tokens.append(self.scan_block_scalar(style))
 
     def fetch_single(self) -> None:
-        """Read a single-quoted (') flow scalar from the input and add the resulting scalar token to the scanner's token buffer."""  # noqa: E501
+        """Read a single-quoted (') flow scalar from the input and add the resulting scalar token to the scanner's token buffer."""
         self.fetch_flow_scalar(style="'")
 
     def fetch_double(self) -> None:
-        """Read a double-quoted flow scalar and append the resulting ScalarToken to the token buffer."""  # noqa: E501
+        """Read a double-quoted flow scalar and append the resulting ScalarToken to the token buffer."""
         self.fetch_flow_scalar(style='"')
 
     def fetch_flow_scalar(self, style) -> None:  # noqa: ANN001
@@ -855,7 +855,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             style (str): Quote character indicating scalar style, e.g. "'" for single-quoted or '"' for double-quoted.
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # No simple keys after flow scalars.
@@ -869,7 +869,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Consume a plain scalar and append the resulting ScalarToken to the token buffer.
 
         Records a possible simple-key candidate at the current position, disables simple-key recognition for subsequent characters (the invoked scan may re-enable it if the scalar ends at a line start), and appends the token produced by scan_plain() to self.tokens.
-        """  # noqa: E501
+        """
         self.save_possible_simple_key()
 
         # No simple keys after plain scalars. But note that `scan_plain` will
@@ -889,7 +889,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             `True` if the scanner is at column 0, `None` otherwise.
-        """  # noqa: E501
+        """
         if self.column == 0:
             return True
         return None
@@ -902,7 +902,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             `True` if a document start marker is present at the current position, `None` otherwise.
-        """  # noqa: E501
+        """
         if self.column == 0:  # noqa: SIM102
             if self.prefix(3) == "---" and self.peek(3) in "\0 \t\r\n\x85\u2028\u2029":
                 return True
@@ -916,7 +916,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             `True` if a document-end indicator is present at column 0 and followed by whitespace, a line break, or end-of-stream; `None` otherwise.
-        """  # noqa: E501
+        """
         if self.column == 0:  # noqa: SIM102
             if self.prefix(3) == "..." and self.peek(3) in "\0 \t\r\n\x85\u2028\u2029":
                 return True
@@ -928,7 +928,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             True if the character following '-' is space, tab, a line-break (including CR, LF, NEL, LS, PS), or the end-of-stream marker; False otherwise.
-        """  # noqa: E501
+        """
         return self.peek(1) in "\0 \t\r\n\x85\u2028\u2029"
 
     def check_key(self) -> bool:
@@ -939,7 +939,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             True if a key indicator is valid at the current scanning position, False otherwise.
-        """  # noqa: E501
+        """
         if self.flow_level:
             return True
 
@@ -952,7 +952,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             True if ':' is a valid value indicator in the current context; False otherwise. In flow context this is always True; in block context it is True only when the following character is end-of-stream, a space, tab, or a line-break (CR, LF, NEL, LS, PS).
-        """  # noqa: E501
+        """
         if self.flow_level:
             return True
 
@@ -982,7 +982,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             `True` if a plain scalar can start at the current position, `False` otherwise.
-        """  # noqa: E501
+        """
         ch = self.peek()
         return ch not in "\0 \t\r\n\x85\u2028\u2029-?:,[]{}#&*!|>'\"%@`" or (
             self.peek(1) not in "\0 \t\r\n\x85\u2028\u2029"
@@ -1013,7 +1013,7 @@ class Scanner:  # noqa: D101, PLR0904
         """Advance the scanner to the next non-space, non-comment, non-line-break character.
 
         Consumes a leading UTF-8 byte order mark (U+FEFF) only if it appears at the very start of the stream, then skips spaces, comments (from `#` to the line break), and normalized line breaks. If a line break is encountered while in block context (flow level == 0), sets `allow_simple_key` to True. Stops with the scanner positioned at the first character that can start a token or at end-of-stream.
-        """  # noqa: E501
+        """
         if self.index == 0 and self.peek() == "\ufeff":
             self.forward()
         found = False
@@ -1039,7 +1039,7 @@ class Scanner:  # noqa: D101, PLR0904
             directive_token (DirectiveToken): Token containing the directive `name`, a directive-specific
             `value` (`(major, minor)` tuple of ints for "YAML", `(handle, prefix)` tuple of strings for "TAG",
             or `None` for other directives), the `start_mark`, and the `end_mark`.
-        """  # noqa: E501
+        """
         start_mark = self.get_mark()
         self.forward()
         name = self.scan_directive_name(start_mark)
@@ -1069,7 +1069,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If no valid name character is found at start_mark or if the name is not terminated by a space, line break, or end-of-stream character.
-        """  # noqa: E501
+        """
         length = 0
         ch = self.peek(length)
         while "0" <= ch <= "9" or "A" <= ch <= "Z" or "a" <= ch <= "z" or ch in "-_":
@@ -1106,7 +1106,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the value is not a valid `major.minor` numeric form or is terminated incorrectly.
-        """  # noqa: E501
+        """
         while self.peek() == " ":
             self.forward()
         major = self.scan_yaml_directive_number(start_mark)
@@ -1142,7 +1142,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the next character is not a digit.
-        """  # noqa: E501
+        """
         ch = self.peek()
         if not ("0" <= ch <= "9"):
             raise ScannerError(  # noqa: TRY003
@@ -1167,7 +1167,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             (handle, prefix): `handle` is the tag handle (including its `!` markers), and `prefix` is the tag prefix URI.
-        """  # noqa: E501
+        """
         while self.peek() == " ":
             self.forward()
         handle = self.scan_tag_directive_handle(start_mark)
@@ -1188,7 +1188,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the character following the handle is not a space.
-        """  # noqa: E501
+        """
         value = self.scan_tag_handle("directive", start_mark)
         ch = self.peek()
         if ch != " ":
@@ -1212,7 +1212,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the character following the URI is not a valid terminator (space, line break, NEL, U+2028/U+2029, or end-of-stream).
-        """  # noqa: E501
+        """
         value = self.scan_tag_uri("directive", start_mark)
         ch = self.peek()
         if ch not in "\0 \r\n\x85\u2028\u2029":
@@ -1235,7 +1235,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the line does not end with a comment or a line break (an unexpected character is encountered).
-        """  # noqa: E501
+        """
         while self.peek() == " ":
             self.forward()
         if self.peek() == "#":
@@ -1272,7 +1272,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If no identifier follows the indicator or if the identifier is not properly terminated by a valid YAML delimiter.
-        """  # noqa: E501
+        """
         start_mark = self.get_mark()
         indicator = self.peek()
         name = "alias" if indicator == "*" else "anchor"
@@ -1313,7 +1313,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the tag is malformed (for example, missing closing `>` for a `<...>` tag or invalid termination).
-        """  # noqa: E501
+        """
         start_mark = self.get_mark()
         ch = self.peek(1)
         if ch == "<":
@@ -1371,7 +1371,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             ScalarToken: A token containing the parsed scalar value (with line breaks and folding applied according to the header and style), the original start/end marks, and the provided style.
-        """  # noqa: E501
+        """
         folded = style == ">"
 
         chunks = []
@@ -1463,7 +1463,7 @@ class Scanner:  # noqa: D101, PLR0904
         Raises:
             ScannerError: if an indentation digit of '0' is encountered or if an unexpected
             non-terminating character follows the indicators.
-        """  # noqa: E501, RUF002
+        """  # noqa: RUF002
         chomping = None
         increment = None
         ch = self.peek()
@@ -1513,7 +1513,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Parameters:
             start_mark: Mark object representing the position where scanning of the block scalar began (used for error reporting).
-        """  # noqa: E501
+        """
         while self.peek() == " ":
             self.forward()
         if self.peek() == "#":
@@ -1540,7 +1540,7 @@ class Scanner:  # noqa: D101, PLR0904
                 - chunks (list[str]): Normalized line break strings encountered before the scalar content.
                 - max_indent (int): The maximum column (indentation) observed among consumed space runs.
                 - end_mark (Mark): The scanner mark at the end of the consumed sequence.
-        """  # noqa: E501
+        """
         chunks = []
         max_indent = 0
         end_mark = self.get_mark()
@@ -1569,7 +1569,7 @@ class Scanner:  # noqa: D101, PLR0904
         Returns:
             (list[str], Mark): A tuple where the first element is a list of normalized line break strings collected
             from the block scalar, and the second element is the mark representing the scanner position after the last consumed break.
-        """  # noqa: E501
+        """
         chunks = []
         end_mark = self.get_mark()
         while self.column < indent and self.peek() == " ":
@@ -1597,7 +1597,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             ScalarToken: A token containing the parsed scalar value (unquoted and with escapes handled), with its style set to the provided `style` and start/end marks set to the scalar's extent.
-        """  # noqa: E501
+        """
         double = style == '"'
         chunks = []
         start_mark = self.get_mark()
@@ -1651,7 +1651,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If a hex/unicode escape in a double-quoted scalar has an invalid length or contains non-hex digits, or if an unknown escape character is encountered while scanning a double-quoted scalar.
-        """  # noqa: E501
+        """
         chunks = []
         while True:
             length = 0
@@ -1681,7 +1681,7 @@ class Scanner:  # noqa: D101, PLR0904
                             raise ScannerError(  # noqa: TRY003
                                 "while scanning a double-quoted scalar",
                                 start_mark,
-                                "expected escape sequence of %d hexadecimal numbers, but found %r"  # noqa: E501, UP031
+                                "expected escape sequence of %d hexadecimal numbers, but found %r"  # noqa: UP031
                                 % (length, self.peek(k)),
                                 self.get_mark(),
                             )
@@ -1716,7 +1716,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the stream ends unexpectedly while scanning a quoted scalar.
-        """  # noqa: E501
+        """
         chunks = []
         length = 0
         while self.peek(length) in " \t":
@@ -1755,7 +1755,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             list: A list of collected line-break chunks (strings).
-        """  # noqa: E501
+        """
         chunks = []
         while True:
             # Instead of checking indentation, we check for document
@@ -1789,7 +1789,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             ScalarToken: A plain-style scalar token containing the scanned string and its start/end marks.
-        """  # noqa: E501
+        """
         chunks = []
         start_mark = self.get_mark()
         end_mark = start_mark
@@ -1848,7 +1848,7 @@ class Scanner:  # noqa: D101, PLR0904
         Returns:
             list: A list of string chunks representing consumed spaces and/or normalized line breaks, or
             `None` if the plain scalar must end (for example when a document separator follows).
-        """  # noqa: E501
+        """
         chunks = []
         length = 0
         while self.peek(length) == " ":
@@ -1899,7 +1899,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If the current character is not `!`, or if a handle begins but is not terminated by a closing `!`.
-        """  # noqa: E501
+        """
         ch = self.peek()
         if ch != "!":
             raise ScannerError(  # noqa: TRY003
@@ -1945,7 +1945,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If no valid URI content is found at the current position.
-        """  # noqa: E501
+        """
         chunks = []
         length = 0
         ch = self.peek(length)
@@ -1989,7 +1989,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Raises:
             ScannerError: If an escape sequence does not contain two hexadecimal digits or if the decoded bytes are not valid UTF-8.
-        """  # noqa: E501
+        """
         codes = []
         mark = self.get_mark()
         while self.peek() == "%":
@@ -1999,7 +1999,7 @@ class Scanner:  # noqa: D101, PLR0904
                     raise ScannerError(  # noqa: TRY003
                         f"while scanning a {name}",
                         start_mark,
-                        f"expected URI escape sequence of 2 hexadecimal numbers, but found {self.peek(k)!r}",  # noqa: E501
+                        f"expected URI escape sequence of 2 hexadecimal numbers, but found {self.peek(k)!r}",
                         self.get_mark(),
                     )
             codes.append(int(self.prefix(2), 16))
@@ -2025,7 +2025,7 @@ class Scanner:  # noqa: D101, PLR0904
 
         Returns:
             str: The normalized line break: '\n' for CR/LF/CRLF/NEL, U+2028 or U+2029 when present, or '' if no line break was found.
-        """  # noqa: E501
+        """
         ch = self.peek()
         if ch in "\r\n\x85":
             if self.prefix(2) == "\r\n":
