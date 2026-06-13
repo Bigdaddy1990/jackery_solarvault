@@ -1887,9 +1887,7 @@ ACTION_ID_PORTABLE_GET_CHARGE_PLAN: Final = 26  # ble=15 QueryElectricityStrateg
 ACTION_ID_PORTABLE_ADD_CHARGE_PLAN: Final = 27  # ble=16 InsertElectricityStrategy
 ACTION_ID_PORTABLE_UPDATE_CHARGE_PLAN: Final = 28  # ble=17 UpdateElectricityStrategy
 ACTION_ID_PORTABLE_DELETE_CHARGE_PLAN: Final = 29  # ble=18 DeleteElectricityStrategy
-ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN: Final = (
-    30  # ble=21 QueryCurrentElectricityStrategy
-)
+ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN: Final = 30  # ble=21 QueryCurrentElectricityStrategy
 ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT: Final = 31  # ble=0 DevicePropertyChange
 ACTION_ID_PORTABLE_USE_POWER_MODE: Final = 32  # ble=0 DevicePropertyChange
 ACTION_ID_PORTABLE_CUSTOM_USE_BATTERY: Final = 33  # ble=22 SetBatteryBoundry

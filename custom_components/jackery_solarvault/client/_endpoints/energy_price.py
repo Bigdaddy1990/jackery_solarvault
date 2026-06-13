@@ -2,12 +2,7 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import (
-    BaseHTTPMixin,
-    JackeryApiError,
-    _write_accepted,
-)
-from jackery_solarvault.const import (
+from ...const import (
     BIND_CURRENCY_PATH,
     CANCEL_CONTRACT_PATH,
     CONTRACT_LIST_PATH,
@@ -31,6 +26,7 @@ from jackery_solarvault.const import (
     SAVE_SINGLE_MODE_PATH,
     SAVE_TOU_PLAN_PATH,
 )
+from .._http import BaseHTTPMixin, JackeryApiError, _write_accepted
 
 
 class EnergyPriceEndpointMixin(BaseHTTPMixin):
@@ -241,7 +237,9 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
             {"deviceId": str(device_id), "tasks": tasks},
         )
 
-    async def async_query_tou_plan(self, *, device_id: str | int) -> dict[str, Any]:
+    async def async_query_tou_plan(
+        self, *, device_id: str | int
+    ) -> dict[str, Any]:
         """Query the current TOU (Time-of-Use) schedule plan."""
         data = await self._get_json(
             QUERY_TOU_PLAN_PATH, params={FIELD_DEVICE_ID: str(device_id)}

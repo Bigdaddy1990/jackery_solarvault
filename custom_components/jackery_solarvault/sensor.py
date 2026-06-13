@@ -2343,14 +2343,18 @@ SMART_MODE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="smart_mode_active",
         translation_key="smart_mode_active",
-        getter=lambda pl: (pl.get(PAYLOAD_SMART_MODE) or {}).get("isActive"),
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_SMART_MODE) or {}).get("isActive")
+        ),
         value_map={0: "inactive", 1: "active"},
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="smart_mode_time_difference",
         translation_key="smart_mode_time_difference",
-        getter=lambda pl: (pl.get(PAYLOAD_SMART_MODE) or {}).get("timeDifference"),
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_SMART_MODE) or {}).get("timeDifference")
+        ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )
@@ -2359,7 +2363,9 @@ TOU_PLAN_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="tou_plan_tasks",
         translation_key="tou_plan_tasks",
-        getter=lambda pl: (pl.get(PAYLOAD_TOU_SCHEDULE) or {}).get("tasks"),
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_TOU_SCHEDULE) or {}).get("tasks")
+        ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )

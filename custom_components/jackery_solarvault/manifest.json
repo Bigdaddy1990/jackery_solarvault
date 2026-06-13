@@ -6,7 +6,6 @@
     "dhcp",
     "mqtt",
     "recorder",
-    "usb",
     "zeroconf"
   ],
   "bluetooth": [

@@ -605,11 +605,11 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
 
 # UPS model options (field "ups", msgId=24)
 _UPS_MODEL_OPTIONS: dict[int, str] = {
-    0: "Standard",
-    1: "LiFePO4",
-    2: "AGM",
-    3: "Gel",
-    4: "Custom",
+    0: "standard",
+    1: "lifepo4",
+    2: "agm",
+    3: "gel",
+    4: "custom",
 }
 _OPTION_TO_UPS_MODEL: dict[str, int] = {v: k for k, v in _UPS_MODEL_OPTIONS.items()}
 
@@ -634,9 +634,9 @@ async def _portable_ups_model_select(entity: JackerySelect, option: str) -> None
 
 # Power mode options (field "pm", msgId=32)
 _POWER_MODE_OPTIONS: dict[int, str] = {
-    0: "Standard",
-    1: "Eco",
-    2: "Performance",
+    0: "standard",
+    1: "eco",
+    2: "performance",
 }
 _OPTION_TO_POWER_MODE: dict[str, int] = {v: k for k, v in _POWER_MODE_OPTIONS.items()}
 
@@ -661,13 +661,11 @@ async def _portable_power_mode_select(entity: JackerySelect, option: str) -> Non
 
 # AC output mode options (field "acmode", msgId=40)
 _AC_OUTPUT_MODE_OPTIONS: dict[int, str] = {
-    0: "Normal",
-    1: "Quiet",
-    2: "High Performance",
+    0: "normal",
+    1: "quiet",
+    2: "high-performance",
 }
-_OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {
-    v: k for k, v in _AC_OUTPUT_MODE_OPTIONS.items()
-}
+_OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {v: k for k, v in _AC_OUTPUT_MODE_OPTIONS.items()}
 
 
 def _portable_ac_output_mode_current(entity: JackerySelect) -> str | None:
@@ -690,13 +688,11 @@ async def _portable_ac_output_mode_select(entity: JackerySelect, option: str) ->
 
 # Output priority options (field "outPrio", msgId=48)
 _OUTPUT_PRIORITY_OPTIONS: dict[int, str] = {
-    0: "Battery First",
-    1: "Grid First",
-    2: "Solar First",
+    0: "battery-first",
+    1: "grid-first",
+    2: "solar-first",
 }
-_OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {
-    v: k for k, v in _OUTPUT_PRIORITY_OPTIONS.items()
-}
+_OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {v: k for k, v in _OUTPUT_PRIORITY_OPTIONS.items()}
 
 
 def _portable_output_priority_current(entity: JackerySelect) -> str | None:

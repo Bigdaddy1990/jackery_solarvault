@@ -362,59 +362,59 @@
       "portable_ups_model": {
         "name": "UPS model",
         "state": {
-          "Standard": "Standard",
-          "LiFePO4": "LiFePO4",
-          "AGM": "AGM",
-          "Gel": "Gel",
-          "Custom": "Custom"
+          "standard": "Standard",
+          "lifepo4": "LiFePO4",
+          "agm": "agm",
+          "gel": "gel",
+          "custom": "Custom"
         }
       },
       "portable_power_mode": {
         "name": "Power mode",
         "state": {
-          "Standard": "Standard",
-          "Eco": "Eco",
-          "Performance": "Performance"
+          "standard": "Standard",
+          "eco": "Eco",
+          "performance": "Performance"
         }
       },
       "portable_ac_output_mode": {
         "name": "AC output mode",
         "state": {
-          "Normal": "Normal",
-          "Quiet": "Quiet",
-          "High Performance": "High Performance"
+          "normal": "Normal",
+          "quiet": "Quiet",
+          "high-performance": "High Performance"
         }
       },
       "portable_output_priority": {
         "name": "Output priority",
         "state": {
-          "Battery First": "Battery first",
-          "Grid First": "Grid first",
-          "Solar First": "Solar first"
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
         }
       },
       "portable_ac1_priority": {
         "name": "AC1 output priority",
         "state": {
-          "Battery First": "Battery first",
-          "Grid First": "Grid first",
-          "Solar First": "Solar first"
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
         }
       },
       "portable_ac2_priority": {
         "name": "AC2 output priority",
         "state": {
-          "Battery First": "Battery first",
-          "Grid First": "Grid first",
-          "Solar First": "Solar first"
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
         }
       },
       "portable_dc_priority": {
         "name": "DC output priority",
         "state": {
-          "Battery First": "Battery first",
-          "Grid First": "Grid first",
-          "Solar First": "Solar first"
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
         }
       }
     },
