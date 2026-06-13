@@ -25,6 +25,7 @@ Covers:
 
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -880,3 +881,15 @@ def test_client_init_getattr_raises_attribute_error_for_unknown() -> None:
 
     with pytest.raises(AttributeError, match="NonExistent"):
         _ = client_pkg.NonExistent  # type: ignore[attr-defined]
+
+
+def test_custom_component_runtime_modules_use_package_relative_imports() -> None:
+    """Runtime modules must not import the integration as a top-level package."""
+    root = Path("custom_components/jackery_solarvault")
+    offenders: list[str] = []
+    for path in root.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "from jackery_solarvault" in source or "import jackery_solarvault" in source:
+            offenders.append(str(path))
+
+    assert sorted(offenders) == []

@@ -4,12 +4,10 @@ aiousbwatcher>=1.1.1
 annotated-doc>=0.0.4
 annotated-types>=0.6.0
 annotatedyaml>=1.0.2
+defusedxml>=0.7.1
 astral>=2.2
 attrs>=17.3.0
 autotyping>=24.9.0
-codecov>=2.1.13
-coverage>=7.14.0
-coverage[toml]
 homeassistant-stubs>=2026.6.2
 hypothesis>=6.155.2
 ifaddr>=0.2.0
@@ -22,12 +20,8 @@ packaging>=23.1
 pip>=24.2
 pylint>=4.0.5
 pytest>=9.0.3
-pytest-asyncio>=1.4.0
-pytest-cov>=7.1.0
 pytest-github-actions-annotate-failures>=0.3.0
-pytest-homeassistant-custom-component  # follows daily HA Version
-pytest_aiohttp==1.1.1
-pytest_socket>=0.8.0
+pytest-homeassistant-custom-component>=0.13.339  # follows daily HA Version
 python-dateutil>=2.7
 python_discovery>=1.4.0
 pyupgrade>=3.21.2
@@ -36,7 +30,6 @@ ruff>=0.15.15
 semgrep>=1.166.0
 serialx>=1.8.2
 smellcheck>=0.3.10
-syrupy>=5.3.2
 types-aiofiles>=25.1.0.20260518
 types-atomicwrites>=1.4.5.1
 types-caldav>=1.3.0.20250516
