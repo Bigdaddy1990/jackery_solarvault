@@ -19,17 +19,11 @@ repos:
       - id: pyupgrade
         args:
           - --py314-plus
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: ''
     hooks:
-      - id: mypy
-        # Deferred quality gate (AGENTS.md note 2026-06-06, BUG_LIST.md §9):
-        # strict-typing debt is tracked and worked off separately. Run via
-        #   pre-commit run --hook-stage manual mypy
-        # CI runs mypy from the full environment (validate.yml) instead —
-        # this isolated hook env lacks homeassistant-stubs and reports
-        # false "Any" subclass errors.
-        stages: [manual]
+    -   id: mypy
+        args: [--strict, --ignore-missing-imports]
         additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^(manifest.*|docs/|scripts/)
   - repo: https://github.com/JelleZijlstra/autotyping
