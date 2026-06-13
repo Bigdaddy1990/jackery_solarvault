@@ -9,7 +9,6 @@ autotyping>=24.9.0
 codecov>=2.1.13
 coverage>=7.14.0
 coverage[toml]
-homeassistant-stubs>=2026.6.1
 hypothesis>=6.155.2
 ifaddr==0.2.0
 iniconfig>=1.0.1
@@ -23,7 +22,7 @@ pylint>=4.0.5
 pytest>=9.0.3
 pytest-asyncio>=1.4.0
 pytest-cov>=7.1.0
-pytest-github-actions-annotate-failures>=0.4.0
+pytest-github-actions-annotate-failures>=0.3.0
 pytest-homeassistant-custom-component  # follows daily HA Version
 pytest_aiohttp==1.1.1
 pytest_socket>=0.8.0
