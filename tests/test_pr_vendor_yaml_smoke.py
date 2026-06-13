@@ -28,17 +28,12 @@ All tests run without a real Home Assistant environment.
 
 import base64
 import datetime
+import math
 from typing import Any
 
-import pytest
-
-import annotatedyaml._vendor.yaml as yaml
+from annotatedyaml._vendor import yaml
 from annotatedyaml._vendor.yaml.composer import Composer
-from annotatedyaml._vendor.yaml.constructor import (
-    SafeConstructor,
-    ConstructorError,
-)
-
+import pytest
 
 # ---------------------------------------------------------------------------
 # dump_all / dump — return-type matrix
@@ -97,13 +92,13 @@ class TestDump:
     """Tests for the dump function whose docstring was reformatted in this PR."""
 
     def test_dump_returns_str_when_no_stream(self) -> None:  # noqa: PLR6301
-        """dump must return a str when no stream is provided."""
+        """Dump must return a str when no stream is provided."""
         result = yaml.dump({"key": "value"})
         assert isinstance(result, str)
         assert "key: value" in result
 
     def test_dump_returns_none_when_stream_provided(self) -> None:  # noqa: PLR6301
-        """dump must return None when a stream is provided."""
+        """Dump must return None when a stream is provided."""
         import io
         buf = io.StringIO()
         result = yaml.dump({"key": "val"}, stream=buf)
@@ -111,20 +106,20 @@ class TestDump:
         assert "key: val" in buf.getvalue()
 
     def test_dump_scalar(self) -> None:  # noqa: PLR6301
-        """dump must correctly serialize a scalar string."""
+        """Dump must correctly serialize a scalar string."""
         result = yaml.dump("hello")
         assert isinstance(result, str)
         assert "hello" in result
 
     def test_dump_integer(self) -> None:  # noqa: PLR6301
-        """dump must serialize an integer as a bare YAML integer."""
+        """Dump must serialize an integer as a bare YAML integer."""
         result = yaml.dump(42)
         assert "42" in result
 
     def test_dump_none(self) -> None:  # noqa: PLR6301
-        """dump must serialize Python None as 'null' in YAML."""
+        """Dump must serialize Python None as 'null' in YAML."""
         result = yaml.dump(None)
-        assert result.strip() in ("null", "~", "null\n...", "null\n")
+        assert result.strip() in {"null", "~", "null\n...", "null\n"}
 
 
 class TestSafeDump:
@@ -177,6 +172,7 @@ class TestAddImplicitResolver:
         pattern = re.compile(r"^MYVAL$")
         # Register on a local SafeLoader subclass to avoid polluting global state
         from annotatedyaml._vendor.yaml.loader import SafeLoader
+
         class _TestLoader(SafeLoader):
             pass
         _TestLoader.add_implicit_resolver(tag, pattern, ["M"])
@@ -201,6 +197,7 @@ class TestAddConstructor:
     def test_add_constructor_registered_and_invoked(self) -> None:  # noqa: PLR6301
         """A registered constructor must be invoked when loading a tagged scalar."""
         from annotatedyaml._vendor.yaml.loader import SafeLoader
+
         class _TestLoader(SafeLoader):
             pass
         tag = "tag:test.example,2024:myobj"
@@ -220,6 +217,7 @@ class TestAddRepresenter:
     def test_add_representer_used_for_custom_type(self) -> None:  # noqa: PLR6301
         """A registered representer must be called when dumping an instance of that type."""
         from annotatedyaml._vendor.yaml.dumper import SafeDumper
+
         class _TestDumper(SafeDumper):
             pass
 
@@ -237,6 +235,7 @@ class TestAddRepresenter:
     def test_add_multi_representer_used_for_subclasses(self) -> None:  # noqa: PLR6301
         """add_multi_representer must be applied to subclasses of the registered type."""
         from annotatedyaml._vendor.yaml.dumper import SafeDumper
+
         class _TestDumper(SafeDumper):
             pass
 
@@ -266,19 +265,19 @@ class TestYAMLObject:
     def test_yaml_object_round_trip(self) -> None:  # noqa: PLR6301
         """A YAMLObject subclass must serialise and deserialise correctly."""
 
-        class MyPoint(yaml.YAMLObject):  # noqa: F405
+        class MyPoint(yaml.YAMLObject):
             yaml_tag = "!point"
-            yaml_loader = [yaml.SafeLoader]  # noqa: F405
-            yaml_dumper = yaml.SafeDumper  # noqa: F405
+            yaml_loader = [yaml.SafeLoader]
+            yaml_dumper = yaml.SafeDumper
 
             def __init__(self, x: int, y: int) -> None:
                 self.x = x
                 self.y = y
 
-        dumped = yaml.dump(MyPoint(3, 4), Dumper=yaml.SafeDumper)  # noqa: F405
+        dumped = yaml.dump(MyPoint(3, 4), Dumper=yaml.SafeDumper)
         assert "!point" in dumped
 
-        loaded = yaml.load(dumped, Loader=yaml.SafeLoader)  # noqa: F405
+        loaded = yaml.load(dumped, Loader=yaml.SafeLoader)
         assert isinstance(loaded, MyPoint)
         assert loaded.x == 3  # noqa: PLR2004
         assert loaded.y == 4  # noqa: PLR2004
@@ -286,30 +285,30 @@ class TestYAMLObject:
     def test_yaml_object_from_yaml_returns_instance(self) -> None:  # noqa: PLR6301
         """YAMLObject.from_yaml must construct an instance from a mapping node."""
 
-        class MyThing(yaml.YAMLObject):  # noqa: F405
+        class MyThing(yaml.YAMLObject):
             yaml_tag = "!thing"
-            yaml_loader = [yaml.SafeLoader]  # noqa: F405
-            yaml_dumper = yaml.SafeDumper  # noqa: F405
+            yaml_loader = [yaml.SafeLoader]
+            yaml_dumper = yaml.SafeDumper
 
             def __init__(self, name: str = "") -> None:
                 self.name = name
 
-        loaded = yaml.load("!thing {name: foo}", Loader=yaml.SafeLoader)  # noqa: F405
+        loaded = yaml.load("!thing {name: foo}", Loader=yaml.SafeLoader)
         assert isinstance(loaded, MyThing)
         assert loaded.name == "foo"
 
     def test_yaml_object_to_yaml_produces_tag(self) -> None:  # noqa: PLR6301
         """YAMLObject.to_yaml must produce output that includes the yaml_tag."""
 
-        class MyWidget(yaml.YAMLObject):  # noqa: F405
+        class MyWidget(yaml.YAMLObject):
             yaml_tag = "!widget"
-            yaml_loader = [yaml.SafeLoader]  # noqa: F405
-            yaml_dumper = yaml.SafeDumper  # noqa: F405
+            yaml_loader = [yaml.SafeLoader]
+            yaml_dumper = yaml.SafeDumper
 
             def __init__(self, size: int = 1) -> None:
                 self.size = size
 
-        dumped = yaml.dump(MyWidget(5), Dumper=yaml.SafeDumper)  # noqa: F405
+        dumped = yaml.dump(MyWidget(5), Dumper=yaml.SafeDumper)
         assert "!widget" in dumped
         assert "size: 5" in dumped or "size: '5'" in dumped
 
@@ -350,17 +349,17 @@ class TestComposerInit:
 class TestSafeConstructorBool:
     """Tests for SafeConstructor.construct_yaml_bool (docstring reformatted)."""
 
-    @pytest.mark.parametrize("yaml_text,expected", [
-        ("true", True),
-        ("false", False),
-        ("yes", True),
-        ("no", False),
-        ("on", True),
-        ("off", False),
-        ("True", True),
-        ("False", False),
-        ("YES", True),
-        ("NO", False),
+    @pytest.mark.parametrize(["yaml_text", "expected"], [
+        ["true", True],
+        ["false", False],
+        ["yes", True],
+        ["no", False],
+        ["on", True],
+        ["off", False],
+        ["True", True],
+        ["False", False],
+        ["YES", True],
+        ["NO", False],
     ])
     def test_bool_values_via_safe_load(self, yaml_text: str, expected: bool) -> None:  # noqa: PLR6301
         """Bool scalar variants must load to the correct Python bool."""
@@ -371,15 +370,15 @@ class TestSafeConstructorBool:
 class TestSafeConstructorInt:
     """Tests for SafeConstructor.construct_yaml_int (docstring reformatted)."""
 
-    @pytest.mark.parametrize("yaml_text,expected", [
-        ("42", 42),
-        ("-7", -7),
-        ("+100", 100),
-        ("0b1010", 10),   # binary
-        ("0xFF", 255),    # hexadecimal
-        ("010", 8),       # octal (leading zero)
-        ("1_000", 1000),  # underscores
-        ("3:25", 205),    # sexagesimal: 3*60 + 25
+    @pytest.mark.parametrize(["yaml_text", "expected"], [
+        ["42", 42],
+        ["-7", -7],
+        ["+100", 100],
+        ["0b1010", 10],   # binary
+        ["0xFF", 255],    # hexadecimal
+        ["010", 8],       # octal (leading zero)
+        ["1_000", 1000],  # underscores
+        ["3:25", 205],    # sexagesimal: 3*60 + 25
     ])
     def test_int_formats_via_safe_load(self, yaml_text: str, expected: int) -> None:  # noqa: PLR6301
         """Various integer formats must be parsed correctly."""
@@ -390,11 +389,11 @@ class TestSafeConstructorInt:
 class TestSafeConstructorFloat:
     """Tests for SafeConstructor.construct_yaml_float (docstring reformatted)."""
 
-    @pytest.mark.parametrize("yaml_text,expected", [
-        ("3.14", 3.14),
-        ("-0.5", -0.5),
-        ("+1.0", 1.0),
-        ("1_000.5", 1000.5),
+    @pytest.mark.parametrize(["yaml_text", "expected"], [
+        ["3.14", math.pi],
+        ["-0.5", -0.5],
+        ["+1.0", 1.0],
+        ["1_000.5", 1000.5],
     ])
     def test_float_values_via_safe_load(self, yaml_text: str, expected: float) -> None:  # noqa: PLR6301
         """Float scalar variants must load to the correct Python float."""
@@ -405,13 +404,15 @@ class TestSafeConstructorFloat:
         """'.inf' must load to positive infinity."""
         import math
         result = yaml.safe_load(".inf")
-        assert math.isinf(result) and result > 0
+        assert math.isinf(result)
+        assert result > 0
 
     def test_neg_inf_via_safe_load(self) -> None:  # noqa: PLR6301
         """'-.inf' must load to negative infinity."""
         import math
         result = yaml.safe_load("-.inf")
-        assert math.isinf(result) and result < 0
+        assert math.isinf(result)
+        assert result < 0
 
     def test_nan_via_safe_load(self) -> None:  # noqa: PLR6301
         """.nan must load to a NaN float."""
@@ -555,16 +556,16 @@ class TestLoadBoundaryConditions:
         """get_single_node (via load) must raise if the stream has multiple documents."""
         from annotatedyaml._vendor.yaml.composer import ComposerError
         with pytest.raises((ComposerError, Exception)):
-            yaml.load("---\na: 1\n---\nb: 2\n", Loader=yaml.SafeLoader)  # noqa: F405
+            yaml.load("---\na: 1\n---\nb: 2\n", Loader=yaml.SafeLoader)
 
     def test_compose_returns_node_for_mapping(self) -> None:  # noqa: PLR6301
-        """compose must return a MappingNode for a YAML mapping."""
+        """Compose must return a MappingNode for a YAML mapping."""
         from annotatedyaml._vendor.yaml.nodes import MappingNode
         node = yaml.compose("{key: val}")
         assert isinstance(node, MappingNode)
 
     def test_compose_sequence_returns_sequence_node(self) -> None:  # noqa: PLR6301
-        """compose must return a SequenceNode for a YAML sequence."""
+        """Compose must return a SequenceNode for a YAML sequence."""
         from annotatedyaml._vendor.yaml.nodes import SequenceNode
         node = yaml.compose("[1, 2, 3]")
         assert isinstance(node, SequenceNode)
