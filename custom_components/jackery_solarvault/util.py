@@ -475,7 +475,7 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401
+def first_nonblank_int(*values: Any) -> int | None:
     """Return the first provided value that can be parsed as an integer.
 
     Boolean values, blank strings, and non-finite numeric strings are rejected
