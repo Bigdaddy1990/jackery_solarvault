@@ -15,7 +15,7 @@ from ...const import (
     SHELLY_UNBIND_ACCOUNT_PATH,
     SHELLY_UNBIND_DEVICE_PATH,
 )
-from .._http import BaseHTTPMixin, JackeryApiError, _write_accepted
+from .._http import BaseHTTPMixin, JackeryApiError
 
 
 class ShellyEndpointMixin(BaseHTTPMixin):
@@ -98,7 +98,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
         if val is True:
             return True
         if isinstance(val, (str, int)):
-            return str(val).lower() in ("true", "1", "ok")
+            return str(val).lower() in {"true", "1", "ok"}
         return False
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
@@ -135,7 +135,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
         if val is True:
             return True
         if isinstance(val, (str, int)):
-            return str(val).lower() in ("true", "1", "ok")
+            return str(val).lower() in {"true", "1", "ok"}
         return False
 
     async def async_unbind_shelly_account(self) -> bool:
@@ -149,7 +149,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
         if val is True:
             return True
         if isinstance(val, (str, int)):
-            return str(val).lower() in ("true", "1", "ok")
+            return str(val).lower() in {"true", "1", "ok"}
         return False
 
     async def async_get_shelly_binding_failures(
