@@ -30,6 +30,7 @@ def _load_with_loader(stream: str, loader: type[object]) -> object:
     """Load test YAML through a specific vendored loader API under test."""
     return _yaml_load(stream, Loader=loader)  # nosec B506
 
+
 # ---------------------------------------------------------------------------
 # warnings() stub
 # ---------------------------------------------------------------------------
