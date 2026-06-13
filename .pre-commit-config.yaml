@@ -53,25 +53,6 @@ repos:
           - python
           - pyi
 
-  - repo: local
-    hooks:
-      - id: smellcheck
-        name: smellcheck (requires `pip install smellcheck==0.3.10`)
-        language: system
-        entry: python -m smellcheck
-        pass_filenames: false
-
-        args:
-          - --fail-on
-          - error
-          - --baseline
-          - .smellcheck-baseline.json
-          - --no-cache
-          - coderabbit
-          - custom_components
-          - scripts
-          - tests
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
