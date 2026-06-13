@@ -67,7 +67,20 @@ jobs:
   ha-fixture-tests:
     name: HA fixture tests
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('tests/ha/**/*.py') != '' }}
+  ha-fixture-tests:
+    name: HA fixture tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Home Assistant test dependencies
+        if: ${{ hashFiles('tests/ha/**/*.py') != '' }}
+        run: python -m pip install -r requirements-test.txt
+      - name: Run HA fixture tests
+        if: ${{ hashFiles('tests/ha/**/*.py') != '' }}
+        run: pytest -q -p no:cacheprovider
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
