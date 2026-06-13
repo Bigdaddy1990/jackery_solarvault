@@ -43,8 +43,8 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..util import first_nonblank_int
 from . import ble
+from ..util import first_nonblank_int
 
 if TYPE_CHECKING:
     from homeassistant.components.bluetooth import (
@@ -698,7 +698,7 @@ class JackeryBleListener:
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)
-        try:
+        try:  # noqa: PLW0717
             while not self._stop_event.is_set():
                 ble_device = bluetooth.async_ble_device_from_address(
                     self._hass,
