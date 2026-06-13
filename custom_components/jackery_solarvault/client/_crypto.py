@@ -21,7 +21,8 @@ from ..const import MQTT_MAC_ID_PREFIX
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    # Jackery Layer A protocol requires ECB.
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -103,6 +104,6 @@ def _generate_udid(seed: str) -> str:
     Returns:
         str: MQTT UDID string comprising `MQTT_MAC_ID_PREFIX` followed by 32 lowercase hex characters (no dashes).
     """
-    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
+    md5_digest = hashlib.md5(seed.encode("utf-8"), usedforsecurity=False).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")

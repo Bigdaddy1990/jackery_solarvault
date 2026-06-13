@@ -126,7 +126,8 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, lambda loader, node: return_value, Loader=MyLoader)
 
-        result = yaml.load(f"{tag} whatever", Loader=MyLoader)
+        # Custom loader API is under test.
+        result = yaml.load(f"{tag} whatever", Loader=MyLoader)  # nosec B506
         assert result is return_value
 
 
