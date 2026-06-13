@@ -126,13 +126,21 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
             ) from err
 
+        safe_response = dict(data)
+        safe_response.pop(FIELD_TOKEN, None)
+        inner = safe_response.get(FIELD_DATA)
+        if isinstance(inner, dict):
+            scrubbed_inner = dict(inner)
+            scrubbed_inner.pop(FIELD_MQTT_PASSWORD, None)
+            safe_response[FIELD_DATA] = scrubbed_inner
+
         await self._emit_payload_debug(
             self._http_payload_debug(
                 method=HTTP_METHOD_POST,
                 path=LOGIN_PATH,
                 body={"form_fields": sorted(form_body)},
                 status=200,
-                response=dict(data),
+                response=safe_response,
             )
         )
 
