@@ -6,6 +6,7 @@
     "dhcp",
     "mqtt",
     "recorder",
+    "usb",
     "zeroconf"
   ],
   "bluetooth": [
@@ -19,7 +20,6 @@
     "@Bigdaddy1990"
   ],
   "config_flow": true,
-  "single_config_entry": true,
   "dependencies": [],
   "dhcp": [
     {
@@ -52,6 +52,7 @@
     "bleak-retry-connector>=3.5.0",
     "cryptography"
   ],
+  "single_config_entry": true,
   "version": "0.1.1",
   "zeroconf": [
     "_jackery-solarvault._tcp.local."
