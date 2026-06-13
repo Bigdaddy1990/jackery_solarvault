@@ -145,7 +145,10 @@ def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803
 
 
 def full_load(stream):  # noqa: ANN001, ANN201
-    """Parse the first YAML document in a stream and construct its corresponding Python object, resolving all YAML tags except those considered unsafe for untrusted input.
+    """Parse the first YAML document in a stream.
+
+    Construct its corresponding Python object, resolving all YAML tags except
+    those considered unsafe for untrusted input.
 
     Parameters:
         stream: A text or binary stream containing one or more YAML documents.
@@ -159,7 +162,8 @@ def full_load(stream):  # noqa: ANN001, ANN201
 def full_load_all(stream):  # noqa: ANN001, ANN201
     """Yield Python objects for each YAML document in a stream using the FullLoader.
 
-    The FullLoader resolves YAML tags while avoiding tag handlers that are unsafe for untrusted input.
+    The FullLoader resolves YAML tags while avoiding tag handlers that are
+    unsafe for untrusted input.
 
     Returns:
         iterator: Yields the Python object produced for each document in the stream.
@@ -168,7 +172,9 @@ def full_load_all(stream):  # noqa: ANN001, ANN201
 
 
 def safe_load(stream):  # noqa: ANN001, ANN201
-    """Parse the first YAML document from a stream and produce the corresponding Python object.
+    """Parse the first YAML document from a stream.
+
+    Produce the corresponding Python object.
 
     This loader resolves only basic YAML tags and is safe for untrusted input.
 
@@ -184,7 +190,8 @@ def safe_load_all(stream):  # noqa: ANN001, ANN201
     Only basic YAML tags are resolved; safe for untrusted input.
 
     Returns:
-        iterator: An iterator that yields the Python object for each document in the stream.
+        iterator: An iterator that yields the Python object for each document
+            in the stream.
     """
     return load_all(stream, SafeLoader)  # noqa: F405
 

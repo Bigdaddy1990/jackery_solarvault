@@ -15,7 +15,14 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-@pytest.fixture(autouse=True)
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Enable custom integrations for every collected test without autouse."""
+    marker = pytest.mark.usefixtures("auto_enable_custom_integrations")
+    for item in items:
+        item.add_marker(marker)
+
+
+@pytest.fixture()
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
