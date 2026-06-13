@@ -4,11 +4,11 @@ aiousbwatcher>=1.1.1
 annotated-doc>=0.0.4
 annotated-types>=0.6.0
 annotatedyaml>=1.0.2
-defusedxml>=0.7.1
 astral>=2.2
 attrs>=17.3.0
 autotyping>=24.9.0
 coverage[toml]==7.14.0
+defusedxml>=0.7.1
 hypothesis>=6.155.2
 ifaddr>=0.2.0
 iniconfig>=1.0.1
