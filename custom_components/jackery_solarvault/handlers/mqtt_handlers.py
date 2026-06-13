@@ -11,10 +11,11 @@ Source: coordinator.py lines 2389-3421 (Phase 5 extraction).
 from datetime import UTC, datetime
 from typing import Any
 
-from jackery_solarvault.const import (
+from ..const import (
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     DEVICE_LIFETIME_COUNTER_KEYS,
     FIELD_ACTION_ID,
+    FIELD_BATTERY_PACKS,
     FIELD_BODY,
     FIELD_COMM_STATE,
     FIELD_CURRENT_VERSION,
@@ -42,14 +43,12 @@ from jackery_solarvault.const import (
     FIELD_UPGRADE_TYPE,
     FIELD_VERSION,
     PACK_FIELD_LAST_SEEN_AT,
+    PAYLOAD_BATTERY_PACKS,
     SUBDEVICE_ONLY_PROPERTY_KEYS,
 )
-from jackery_solarvault.models.property_merge import (
-    merge_dict_values,
-    sync_property_aliases,
-)
-from jackery_solarvault.subdevices.detector import subdevice_identity_values
-from jackery_solarvault.util import safe_float
+from ..models.property_merge import merge_dict_values, sync_property_aliases
+from ..subdevices.detector import subdevice_identity_values
+from ..util import safe_float
 
 # ---------------------------------------------------------------------------
 # MQTT envelope normalization
@@ -73,6 +72,7 @@ def normalize_local_mqtt_payload(
             FIELD_DATA,
             FIELD_MESSAGE_TYPE,
             FIELD_ACTION_ID,
+    FIELD_BATTERY_PACKS,
         )
     ):
         return payload
@@ -158,7 +158,7 @@ def merge_battery_pack_lists(
     Overlay non-null fields from up to the first five update entries onto up to the first five existing dict items, matching by device SN (FIELD_DEVICE_SN / FIELD_DEV_SN / FIELD_SN) and falling back to list position when no SN match exists. Non-dict and None entries from the prior list are ignored; the result is capped to five items. The function updates a pack's PACK_FIELD_LAST_SEEN_AT timestamp only when its commState transitions to "1".
 
     Returns:
-    	Merged list of battery pack dictionaries (up to five items).
+        Merged list of battery pack dictionaries (up to five items).
     """
     merged: list[dict[str, Any]] = [
         dict(item) for item in current or [] if isinstance(item, dict)
@@ -391,7 +391,7 @@ def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def merge_battery_pack_lifetime_from_ble(
+def merge_battery_pack_lifetime_from_ble(  # noqa: PLR0911, PLR0912
     updated: dict[str, Any],
     body: dict[str, Any],
 ) -> bool:
@@ -406,7 +406,13 @@ def merge_battery_pack_lifetime_from_ble(
     if not sn:
         return False
     sn_str = str(sn).strip()
-    packs = updated.get("batteryPacks")
+    if not sn_str:
+        return False
+    packs_key = FIELD_BATTERY_PACKS
+    packs = updated.get(packs_key)
+    if not isinstance(packs, list):
+        packs_key = PAYLOAD_BATTERY_PACKS
+        packs = updated.get(packs_key)
     if not isinstance(packs, list):
         return False
     in_egy = body.get(FIELD_IN_EGY)
@@ -439,7 +445,7 @@ def merge_battery_pack_lifetime_from_ble(
             touched = True
         merged_packs.append(new_pack)
     if touched:
-        updated["batteryPacks"] = merged_packs
+        updated[packs_key] = merged_packs
         return True
     if matched:
         return False
@@ -458,7 +464,7 @@ def merge_battery_pack_lifetime_from_ble(
     if out_egy is not None:
         minimal_pack[FIELD_OUT_EGY] = out_egy
     merged_packs.append(minimal_pack)
-    updated["batteryPacks"] = merged_packs
+    updated[packs_key] = merged_packs
     return True
 
 

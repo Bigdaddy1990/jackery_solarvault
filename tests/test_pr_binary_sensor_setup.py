@@ -41,9 +41,8 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_PROPERTIES,
     PAYLOAD_SMART_PLUGS,
 )
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from custom_components.jackery_solarvault.util import stable_subdevice_key
-
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -54,20 +53,18 @@ def _make_coordinator(
     data: dict[str, Any] | None = None,
 ) -> Any:
     """Build a minimal coordinator stub."""
-    coord = SimpleNamespace(
+    return SimpleNamespace(
         data=data,
         async_add_listener=MagicMock(return_value=lambda: None),
     )
-    return coord
 
 
 def _make_entry(coordinator: Any) -> Any:
     """Build a minimal config-entry stub."""
-    entry = SimpleNamespace(
+    return SimpleNamespace(
         runtime_data=coordinator,
         async_on_unload=MagicMock(),
     )
-    return entry
 
 
 def _make_device_payload(
@@ -123,7 +120,7 @@ def test_parallel_updates_is_zero() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_creates_binary_sensors_for_each_device() -> None:
     """async_setup_entry must create BINARY_DESCRIPTIONS-count entities per device."""
     dev_id = "device_001"
@@ -133,7 +130,7 @@ async def test_async_setup_entry_creates_binary_sensors_for_each_device() -> Non
     entry = _make_entry(coordinator)
     added_entities: list[Any] = []
 
-    async_add_entities = MagicMock(side_effect=lambda entities: added_entities.extend(entities))
+    async_add_entities = MagicMock(side_effect=added_entities.extend)
 
     await async_setup_entry(None, entry, async_add_entities)
 
@@ -144,7 +141,7 @@ async def test_async_setup_entry_creates_binary_sensors_for_each_device() -> Non
     assert all(isinstance(e, JackeryBinarySensor) for e in entities)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_creates_multiple_devices() -> None:
     """async_setup_entry must create entities for each device in coordinator data."""
     coordinator = _make_coordinator(
@@ -163,7 +160,7 @@ async def test_async_setup_entry_creates_multiple_devices() -> None:
     assert len(entities) == 2 * len(BINARY_DESCRIPTIONS)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_no_data_no_call() -> None:
     """async_setup_entry must not call async_add_entities when coordinator.data is empty."""
     coordinator = _make_coordinator(data={})
@@ -175,7 +172,7 @@ async def test_async_setup_entry_no_data_no_call() -> None:
     async_add_entities.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_none_data_no_call() -> None:
     """async_setup_entry must not call async_add_entities when coordinator.data is None."""
     coordinator = _make_coordinator(data=None)
@@ -192,7 +189,7 @@ async def test_async_setup_entry_none_data_no_call() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_creates_smart_plug_entities() -> None:
     """async_setup_entry must create JackerySmartPlugStateBinarySensor for plugs with serials."""
     dev_id = "dev_001"
@@ -213,14 +210,14 @@ async def test_async_setup_entry_creates_smart_plug_entities() -> None:
     assert len(plug_entities) == 2  # noqa: PLR2004
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_skips_plugs_without_serial() -> None:
     """async_setup_entry must skip smart plugs that have no extractable serial number."""
     dev_id = "dev_001"
     plugs = [
         {},             # no serial fields at all
         {"sn": ""},     # empty serial
-        {"sn": "SN-X"}, # valid serial
+        {"sn": "SN-X"},  # valid serial
     ]
     coordinator = _make_coordinator(
         data={dev_id: _make_device_payload(smart_plugs=plugs)}
@@ -241,7 +238,7 @@ async def test_async_setup_entry_skips_plugs_without_serial() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_listener_registered() -> None:
     """async_setup_entry must register a listener via entry.async_on_unload."""
     dev_id = "dev_001"
@@ -257,7 +254,7 @@ async def test_async_setup_entry_listener_registered() -> None:
     assert callable(unsubscribe_fn)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_same_signature_no_double_add() -> None:
     """Re-invoking _add_new_entities with unchanged coordinator data must not add entities again."""
     dev_id = "dev_001"
@@ -287,7 +284,7 @@ async def test_async_setup_entry_same_signature_no_double_add() -> None:
     assert async_add_entities.call_count == first_call_count
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_new_device_triggers_add() -> None:
     """Listener invocation with new device data must call async_add_entities again."""
     dev_id_a = "dev_a"
@@ -518,7 +515,7 @@ def test_smart_plug_sn_stored_correctly() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
     """Duplicate entity unique_ids across rebuild calls must not produce duplicate entities."""
     dev_id = "dev_dup"

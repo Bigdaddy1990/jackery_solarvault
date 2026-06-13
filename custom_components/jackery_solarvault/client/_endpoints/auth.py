@@ -7,17 +7,7 @@ from typing import Any
 
 import aiohttp
 
-from jackery_solarvault.client._crypto import (
-    _aes_cbc_encrypt,
-    _aes_ecb_encrypt,
-    _rsa_pkcs1v15_encrypt,
-)
-from jackery_solarvault.client._http import (
-    BaseHTTPMixin,
-    JackeryApiError,
-    JackeryAuthError,
-)
-from jackery_solarvault.const import (
+from ...const import (
     AES_KEY,
     BASE_URL,
     CANCEL_ACCOUNT_PATH,
@@ -58,6 +48,8 @@ from jackery_solarvault.const import (
     USER_INFO_PATH,
     VERIFY_CODE_PATH,
 )
+from .._crypto import _aes_cbc_encrypt, _aes_ecb_encrypt, _rsa_pkcs1v15_encrypt
+from .._http import BaseHTTPMixin, JackeryApiError, JackeryAuthError
 
 
 class AuthEndpointMixin(BaseHTTPMixin):
@@ -111,6 +103,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
                     raise JackeryApiError(f"Login HTTP {resp.status}")  # noqa: TRY003
                 try:
                     data = await resp.json(content_type=None)
+                    if not isinstance(data, dict):
+                        raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                        raise JackeryApiError(  # noqa: TRY003
+                            f"Login returned JSON {type(data).__name__}, expected object: {raw!r}"
+                        )
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,

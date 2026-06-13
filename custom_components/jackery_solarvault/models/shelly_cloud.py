@@ -10,7 +10,7 @@ Source: coordinator.py lines 3131-3296 (Phase 6 extraction).
 
 from typing import TYPE_CHECKING, Any
 
-from jackery_solarvault.const import (
+from ..const import (
     FIELD_CONTROL_ALLOWED,
     FIELD_DEVICE_CODE,
     FIELD_DEV_TYPE,
@@ -38,19 +38,18 @@ from jackery_solarvault.const import (
     SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
 )
-from jackery_solarvault.handlers.mqtt_handlers import (
+from ..handlers.mqtt_handlers import (
     merge_smart_plug_lists,
     merge_subdevice_list_by_identity,
     merge_subdevice_lists_by_sn,
 )
-from jackery_solarvault.subdevices.detector import (
+from ..subdevices.detector import (
     entry_subdevice_candidates,
     subdevice_dev_type,
     subdevice_id,
     subdevice_identity_values,
     subdevice_serial,
 )
-
 from .property_merge import merge_dict_values
 
 if TYPE_CHECKING:
@@ -60,7 +59,7 @@ if TYPE_CHECKING:
 def shelly_cloud_api_device_id(item: dict[str, Any]) -> str | None:
     """Determine the native Shelly Cloud device identifier for a device payload.
 
-    Returns the Shelly-native device id used by Shelly Cloud realtime/control APIs when the provided item represents a Shelly Cloud–related payload (e.g., identified as Shelly, marked as cloud, or containing host/device code). Selection preference:
+    Returns the Shelly-native device id used by Shelly Cloud realtime/control APIs when the provided item represents a Shelly Cloud-related payload (e.g., identified as Shelly, marked as cloud, or containing host/device code). Selection preference:
     - a non-empty, non-numeric deviceId when present,
     - otherwise a subdevice serial-based id if available,
     - otherwise a generic subdevice id.
@@ -153,7 +152,7 @@ def shelly_cloud_device_matches_entry(
     )
 
 
-def merge_shelly_cloud_item(  # noqa: PLR0911
+def merge_shelly_cloud_item(  # noqa: PLR0911, PLR0912
     entry: dict[str, Any],
     source: Mapping[str, Any],
 ) -> bool:
@@ -213,10 +212,8 @@ def merge_shelly_cloud_item(  # noqa: PLR0911
     if isinstance(ct, dict) and item_ids & subdevice_identity_values(ct):
         entry[PAYLOAD_CT_METER] = merge_dict_values(ct, normalized)
         return True
-    for bucket, merger in (
-        (PAYLOAD_SMART_PLUGS, merge_smart_plug_lists),
-        (PAYLOAD_METER_HEADS, merge_subdevice_list_by_identity),
-    ):
+    has_serial = bool(subdevice_serial(normalized))
+    for bucket in (PAYLOAD_SMART_PLUGS, PAYLOAD_METER_HEADS):
         items = entry.get(bucket)
         if not isinstance(items, list):
             continue
@@ -224,7 +221,15 @@ def merge_shelly_cloud_item(  # noqa: PLR0911
             isinstance(item, dict) and item_ids & subdevice_identity_values(item)
             for item in items
         ):
-            entry[bucket] = merger(items, [normalized])
+            if has_serial:
+                merger = (
+                    merge_smart_plug_lists
+                    if bucket == PAYLOAD_SMART_PLUGS
+                    else merge_subdevice_lists_by_sn
+                )
+                entry[bucket] = merger(items, [normalized])
+            else:
+                entry[bucket] = merge_subdevice_list_by_identity(items, normalized)
             return True
     return False
 
@@ -233,10 +238,10 @@ def shelly_cloud_device_ids(entry: dict[str, Any]) -> list[str]:
     """Collects known Shelly Cloud device identifiers associated with an entry.
 
     Parameters:
-    	entry (dict[str, Any]): Entry dictionary containing stored device/subdevice descriptors.
+        entry (dict[str, Any]): Entry dictionary containing stored device/subdevice descriptors.
 
     Returns:
-    	list[str]: Deduplicated list of Shelly Cloud device IDs discovered for the given entry.
+        list[str]: Deduplicated list of Shelly Cloud device IDs discovered for the given entry.
     """
     ids: list[str] = []
     for candidate in entry_subdevice_candidates(entry):

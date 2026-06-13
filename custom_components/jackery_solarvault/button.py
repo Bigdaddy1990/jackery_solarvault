@@ -903,7 +903,22 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         If the current coordinator-derived signature differs from the previously cached signature, update the cache and call the platform entity addition callback with any newly discovered entities.
         """
         nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
+        storm_signature = tuple(
+            (
+                dev_id,
+                tuple(
+                    sorted(
+                        alert_id
+                        for alert in _storm_alerts(
+                            (payload or {}).get(PAYLOAD_WEATHER_PLAN)
+                        )
+                        if (alert_id := _storm_alert_id(alert)) is not None
+                    )
+                ),
+            )
+            for dev_id, payload in sorted((coordinator.data or {}).items())
+        )
+        sig = (coordinator_entity_signature(coordinator.data), storm_signature)
         if sig == last_signature:
             return
         last_signature = sig

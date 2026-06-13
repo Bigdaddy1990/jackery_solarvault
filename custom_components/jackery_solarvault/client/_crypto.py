@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from jackery_solarvault.const import MQTT_MAC_ID_PREFIX
+from ..const import MQTT_MAC_ID_PREFIX
 
 
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:

@@ -544,7 +544,7 @@ try:
     from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
     from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers.recorder import session_scope
-except ImportError, RuntimeError:
+except (ImportError, RuntimeError):
     get_instance = None  # type: ignore[assignment]
     Statistics = None  # type: ignore[assignment,misc]
     StatisticsMeta = None  # type: ignore[assignment,misc]
@@ -2342,7 +2342,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             key = base64.b64decode(str(raw))
-        except ValueError, binascii.Error:
+        except (ValueError, binascii.Error):
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -3212,7 +3212,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 code = None
         if code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -5552,7 +5552,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -8349,7 +8349,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return round(float(value) / 1000.0, 5)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:

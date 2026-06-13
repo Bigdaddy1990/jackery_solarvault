@@ -23,7 +23,6 @@ from ..const import (
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
 )
-
 from .api import JackeryAuthError, JackeryError, encrypt_mqtt_body
 
 if TYPE_CHECKING:

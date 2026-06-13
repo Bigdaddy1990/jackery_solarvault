@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from jackery_solarvault.const import (
+from ..const import (
     APP_REQUEST_META,
     APP_VERSION,
     APP_VERSION_CODE,
@@ -44,8 +44,7 @@ from jackery_solarvault.const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from jackery_solarvault.util import chart_series_debug
-
+from ..util import chart_series_debug
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
@@ -86,7 +85,7 @@ def _write_accepted(data: dict[str, Any]) -> bool:
     Returns:
         `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
     """
-    from jackery_solarvault.util import safe_bool
+    from ..util import safe_bool
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -684,7 +683,7 @@ class BaseHTTPMixin:
             """Perform an HTTP PUT to the prepared URL and return the response status and parsed body.
 
             Returns:
-            	A tuple (status, body) where `status` is the HTTP status code and `body` is the parsed JSON response when available; if the response cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to HTTP_RAW_TEXT_LIMIT.
+                A tuple (status, body) where `status` is the HTTP status code and `body` is the parsed JSON response when available; if the response cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to HTTP_RAW_TEXT_LIMIT.
             """
             async with self._session.put(
                 url,
@@ -720,6 +719,7 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_PUT, path
             )
             self._auth_retries += 1
+            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -828,6 +828,7 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
             )
             self._auth_retries += 1
+            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -871,11 +872,11 @@ class BaseHTTPMixin:
         """Send a JSON POST to the Jackery API and return the parsed response, retrying once after an automatic re-login if the token is expired.
 
         Parameters:
-        	path (str): Request path appended to the base API URL.
-        	payload (dict[str, Any]): JSON-serializable request body.
+            path (str): Request path appended to the base API URL.
+            payload (dict[str, Any]): JSON-serializable request body.
 
         Returns:
-        	response (dict): Parsed response object from the API.
+            response (dict): Parsed response object from the API.
         """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
@@ -928,6 +929,7 @@ class BaseHTTPMixin:
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
             self._auth_retries += 1
+            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()

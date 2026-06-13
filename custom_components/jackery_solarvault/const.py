@@ -314,8 +314,7 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
 DEFAULT_ENABLE_BLE_TRANSPORT: Final = True
 CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
-# Default off and gated by JACKERY_DEV_MODE=1 per FehlerLOG 2026-05-25
-# ("BLE-Schreibbefehle waren als normale UI-Option erreichbar"). The UI
+# Default off and gated by JACKERY_DEV_MODE=1 per the 2026-05-25 safety review. The UI
 # toggle was removed; BLE write commands are gated behind dev mode.
 DEFAULT_ENABLE_BLE_WRITES: Final = False
 CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"

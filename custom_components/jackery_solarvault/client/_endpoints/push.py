@@ -2,13 +2,13 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import BaseHTTPMixin
-from jackery_solarvault.const import (
+from ...const import (
     NOTIFY_LIST_PATH,
     PUSH_CONFIG_GET_PATH,
     PUSH_CONFIG_SET_PATH,
     UNREAD_COUNT_PATH,
 )
+from .._http import BaseHTTPMixin
 
 
 class PushEndpointMixin(BaseHTTPMixin):

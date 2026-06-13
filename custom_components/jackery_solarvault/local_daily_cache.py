@@ -170,13 +170,13 @@ def daily_delta(  # noqa: PLR0911
     Compute today's energy delta by subtracting the stored midnight anchor from the current lifetime counter.
     
     Parameters:
-    	snapshot (dict | None): Stored snapshot expected to contain `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
-    	metric_key (str): Key in `snapshot["values"]` identifying the metric anchor to use.
-    	current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
-    	today (date): Local date used to validate that `snapshot["day"]` matches the current day.
+        snapshot (dict | None): Stored snapshot expected to contain `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
+        metric_key (str): Key in `snapshot["values"]` identifying the metric anchor to use.
+        current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
+        today (date): Local date used to validate that `snapshot["day"]` matches the current day.
     
     Returns:
-    	int | None: Delta in watt-hours as an `int` when the snapshot is valid for `today`, the anchor exists and both the anchor and current value convert to integers and `current >= anchor`; `None` otherwise.
+        int | None: Delta in watt-hours as an `int` when the snapshot is valid for `today`, the anchor exists and both the anchor and current value convert to integers and `current >= anchor`; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None

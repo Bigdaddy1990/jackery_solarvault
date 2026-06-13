@@ -1,26 +1,9 @@
-name: Manual Codecov Coverage Upload
-
-on:
-  workflow_dispatch:
-
-# This manual workflow is an on-demand fallback for coverage uploads.
-# Push/PR automation remains in .github/workflows/ci.yml, which also calls
-# the shared coverage upload steps to avoid drift.
-
-permissions:
-  contents: read
-  id-token: write
-
-jobs:
-  coverage:
-    name: Collect and upload coverage
-    uses: ./.github/workflows/reusable-python-tests.yml
-    secrets: inherit
-    with:
-      python-version: "3.14"
-      run-codecov: true
-      upload-coverage-artifact: true
-      coverage-artifact-name: codecov-coverage-report
-      upload-junit-artifact: true
-      junit-artifact-name: codecov-junit-report
-      publish-pages: false
+coverage:
+  status:
+    project:
+      default:
+        target: 85%
+    patch:
+      default:
+        target: 80%
+comment: false
