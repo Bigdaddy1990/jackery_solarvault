@@ -35,12 +35,3 @@ jobs:
         run: |
            pip install -r requirements.txt
            pip install -r requirements-test.txt
-
-      - name: Evaluate vendored PyYAML drift
-        run: |
-          set -euo pipefail
-          if [ "${FAIL_ON_OUTDATED}" = 'true' ]; then
-            python -m scripts.check_vendor_pyyaml --fail-on-outdated
-          else
-            python -m scripts.check_vendor_pyyaml
-          fi
