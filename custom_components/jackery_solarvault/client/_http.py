@@ -615,8 +615,8 @@ class BaseHTTPMixin:
             self._auth_retries += 1
             async with self._lock:
                 # Another coroutine may have refreshed the token already.
-                if self._token is None:
-                    await self.async_login()
+                self._token = None
+                await self.async_login()
             try:
                 status, data = await _do()
             except (TimeoutError, aiohttp.ClientError) as err:
@@ -721,6 +721,7 @@ class BaseHTTPMixin:
             self._auth_retries += 1
             self._token = None
             async with self._lock:
+                self._token = None
                 await self.async_login()
             try:
                 status, data = await _do()
@@ -829,6 +830,7 @@ class BaseHTTPMixin:
             self._auth_retries += 1
             self._token = None
             async with self._lock:
+                self._token = None
                 await self.async_login()
             try:
                 status, data = await _do()
@@ -929,6 +931,7 @@ class BaseHTTPMixin:
             self._auth_retries += 1
             self._token = None
             async with self._lock:
+                self._token = None
                 await self.async_login()
             try:
                 status, data = await _do()

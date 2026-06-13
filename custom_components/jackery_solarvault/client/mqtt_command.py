@@ -4,6 +4,9 @@ Handles Layer C encryption, payload construction, publish-with-retry,
 and credential refresh.  The coordinator calls these helpers instead of
 building MQTT payloads directly.
 """
+
+from __future__ import annotations
+
 import json
 import logging
 import time

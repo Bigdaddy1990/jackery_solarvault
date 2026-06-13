@@ -551,10 +551,12 @@ class JackeryLocalMqttClient:
             # in normal diagnostics exports. The count and ``topics_truncated``
             # flag are still useful to confirm the listener is receiving.
             topics = [REDACTED_VALUE for _ in self._topics_seen]
+            topic_filter = REDACTED_VALUE
         else:
             target = {"host": self._host, "port": self._port}
             last_topic = self._last_topic
             topics = list(self._topics_seen)
+            topic_filter = self._topic_filter
         routing_warning = None
         if (
             self._messages_received > 0
@@ -567,7 +569,7 @@ class JackeryLocalMqttClient:
             "configured_target": target,
             "connected": self._connected,
             "started": self._runner_task is not None,
-            "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
+            "topic_filter": topic_filter,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,

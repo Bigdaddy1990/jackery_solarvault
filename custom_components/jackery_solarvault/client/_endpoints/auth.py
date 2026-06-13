@@ -118,6 +118,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
                     raise JackeryApiError(  # noqa: TRY003
                         f"Login returned invalid JSON: {raw!r}"
                     ) from err
+                if not isinstance(data, dict):
+                    raw = str(data)[:HTTP_RAW_TEXT_LIMIT]
+                    raise JackeryApiError(  # noqa: TRY003
+                        f"Login returned non-object JSON: {raw!r}"
+                    )
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(  # noqa: TRY003
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"

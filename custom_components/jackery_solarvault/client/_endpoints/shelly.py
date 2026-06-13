@@ -15,7 +15,7 @@ from ...const import (
     SHELLY_UNBIND_ACCOUNT_PATH,
     SHELLY_UNBIND_DEVICE_PATH,
 )
-from .._http import BaseHTTPMixin, JackeryApiError, _write_accepted
+from .._http import BaseHTTPMixin, JackeryApiError
 
 
 class ShellyEndpointMixin(BaseHTTPMixin):
@@ -94,7 +94,12 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_FUNCTION: str(function),
             },
         )
-        return _write_accepted(data)
+        val = data.get(FIELD_DATA)
+        if val is True:
+            return True
+        if isinstance(val, (str, int)):
+            return str(val).lower() in {"true", "1", "ok"}
+        return False
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
         """Retrieve the Shelly OAuth authorization URL and accompanying state for the redirect flow.
@@ -126,7 +131,12 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_DEVICE_ID: str(device_id),
             },
         )
-        return _write_accepted(data)
+        val = data.get(FIELD_DATA)
+        if val is True:
+            return True
+        if isinstance(val, (str, int)):
+            return str(val).lower() in {"true", "1", "ok"}
+        return False
 
     async def async_unbind_shelly_account(self) -> bool:
         """Unbinds the Shelly account associated with the current user.
@@ -135,7 +145,12 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             True if the account unbind succeeded, False otherwise.
         """
         data = await self._post_form(SHELLY_UNBIND_ACCOUNT_PATH, {})
-        return _write_accepted(data)
+        val = data.get(FIELD_DATA)
+        if val is True:
+            return True
+        if isinstance(val, (str, int)):
+            return str(val).lower() in {"true", "1", "ok"}
+        return False
 
     async def async_get_shelly_binding_failures(
         self,

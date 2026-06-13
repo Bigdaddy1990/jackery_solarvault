@@ -202,11 +202,12 @@ def decode_third_party_mqtt_config_body(
 
     decoded_fields: set[str] = set()
     failed_fields: list[str] = []
-    for key in (
+    credential_keys = (
         FIELD_THIRD_PARTY_MQTT_USERNAME,
         FIELD_THIRD_PARTY_MQTT_PASSWORD,
         FIELD_THIRD_PARTY_MQTT_TOKEN,
-    ):
+    )
+    for key in credential_keys:
         value = body.get(key)
         if not isinstance(value, str) or not value:
             continue
