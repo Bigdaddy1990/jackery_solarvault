@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from ...const import (
+from jackery_solarvault.client._http import BaseHTTPMixin, JackeryApiError
+from jackery_solarvault.const import (
     FIELD_ACTION,
     FIELD_DATA,
     FIELD_DEVICE_ID,
@@ -15,7 +16,6 @@ from ...const import (
     SHELLY_UNBIND_ACCOUNT_PATH,
     SHELLY_UNBIND_DEVICE_PATH,
 )
-from .._http import BaseHTTPMixin, JackeryApiError
 
 
 class ShellyEndpointMixin(BaseHTTPMixin):
