@@ -195,7 +195,6 @@ jobs:
           PY
 
           ruff check . --fix || true
-          ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --add-noqa || true
           ruff check . --extend-select RUF100 || true
