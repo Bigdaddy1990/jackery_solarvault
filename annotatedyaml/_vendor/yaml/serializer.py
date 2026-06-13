@@ -28,7 +28,7 @@ class Serializer:  # noqa: D101
             explicit_end (bool | None): If True, emit an explicit document end marker; if False, omit it; if None, leave behavior to defaults.
             version (tuple | None): Optional YAML version tuple to include in the document start (e.g., (1, 2)); if None no version is emitted.
             tags (dict | None): Optional mapping of tag handles to tag prefixes to include in the document start; if None no tags are emitted.
-        """
+        """  # noqa: E501
         self.use_encoding = encoding
         self.use_explicit_start = explicit_start
         self.use_explicit_end = explicit_end
@@ -43,7 +43,7 @@ class Serializer:  # noqa: D101
         """Open the serializer and start a YAML stream.
 
         If the serializer has not been opened, emits a StreamStartEvent using the configured encoding and marks the serializer as opened. Raises SerializerError if the serializer is already opened or has already been closed.
-        """
+        """  # noqa: E501
         if self.closed is None:
             self.emit(StreamStartEvent(encoding=self.use_encoding))  # noqa: F405
             self.closed = False
@@ -79,7 +79,7 @@ class Serializer:  # noqa: D101
 
         Raises:
             SerializerError: If the serializer has not been opened or has already been closed.
-        """
+        """  # noqa: E501
         if self.closed is None:
             raise SerializerError("serializer is not opened")  # noqa: TRY003
         if self.closed:
@@ -105,7 +105,7 @@ class Serializer:  # noqa: D101
 
         Parameters:
             node (ScalarNode | SequenceNode | MappingNode): The root node to register; for sequences and mappings, child nodes are traversed recursively.
-        """
+        """  # noqa: E501
         if node in self.anchors:
             if self.anchors[node] is None:
                 self.anchors[node] = self.generate_anchor(node)
@@ -127,7 +127,7 @@ class Serializer:  # noqa: D101
 
         Returns:
             str: Anchor string formatted with ANCHOR_TEMPLATE and a monotonically increasing numeric id (e.g., "id001").
-        """
+        """  # noqa: E501
         self.last_anchor_id += 1
         return self.ANCHOR_TEMPLATE % self.last_anchor_id
 
@@ -140,7 +140,7 @@ class Serializer:  # noqa: D101
             node: The node to serialize (ScalarNode, SequenceNode, or MappingNode).
             parent: The parent node used to establish resolver context; may be None.
             index: The position of `node` within `parent` used by the resolver; may be an integer, a key node, or None.
-        """
+        """  # noqa: E501
         alias = self.anchors[node]
         if node in self.serialized_nodes:
             self.emit(AliasEvent(alias))  # noqa: F405

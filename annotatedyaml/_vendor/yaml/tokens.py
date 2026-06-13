@@ -5,7 +5,7 @@ class Token:  # noqa: D100, D101
         Parameters:
             start_mark: Mark locating where the token begins in the source, or None if unknown.
             end_mark: Mark locating where the token ends in the source, or None if unknown.
-        """
+        """  # noqa: E501
         self.start_mark = start_mark
         self.end_mark = end_mark
 
@@ -16,7 +16,7 @@ class Token:  # noqa: D100, D101
 
         Returns:
             str: The formatted representation of the instance.
-        """
+        """  # noqa: E501
         attributes = [key for key in self.__dict__ if not key.endswith("_mark")]
         attributes.sort()
         arguments = ", ".join([f"{key}={getattr(self, key)!r}" for key in attributes])
@@ -38,7 +38,7 @@ class DirectiveToken(Token):  # noqa: D101
             value (str): Directive value as it appears in the source.
             start_mark: Start location mark for the directive in the source; may be None.
             end_mark: End location mark for the directive in the source; may be None.
-        """
+        """  # noqa: E501
         self.name = name
         self.value = value
         self.start_mark = start_mark
@@ -63,7 +63,7 @@ class StreamStartToken(Token):  # noqa: D101
             start_mark: Start location mark for the token, or None.
             end_mark: End location mark for the token, or None.
             encoding (str | None): Character encoding of the stream, or None if unspecified.
-        """
+        """  # noqa: E501
         self.start_mark = start_mark
         self.end_mark = end_mark
         self.encoding = encoding
@@ -177,7 +177,7 @@ class ScalarToken(Token):  # noqa: D101
             start_mark: Source location mark where the token starts.
             end_mark: Source location mark where the token ends.
             style: Optional scalar style indicator (for example, quote style), or None.
-        """
+        """  # noqa: E501
         self.value = value
         self.plain = plain
         self.start_mark = start_mark

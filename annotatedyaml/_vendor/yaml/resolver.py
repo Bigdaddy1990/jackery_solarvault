@@ -25,7 +25,7 @@ class BaseResolver:  # noqa: D101
         Creates two empty stacks:
         - resolver_exact_paths: per-depth dicts mapping (path, kind) to resolved tag for exact matches.
         - resolver_prefix_paths: per-depth lists of (path, kind) candidate entries used while traversing.
-        """
+        """  # noqa: E501
         self.resolver_exact_paths = []
         self.resolver_prefix_paths = []
 
@@ -39,7 +39,7 @@ class BaseResolver:  # noqa: D101
             tag (str): The YAML tag to associate with matches (e.g., 'tag:yaml.org,2002:int').
             regexp (re.Pattern | callable): A compiled regular expression (or regex-like callable) used to test scalar values.
             first (iterable[str] | None): An iterable of characters whose presence as the scalar's first character triggers testing with `regexp`, or `None` to register as a wildcard matcher.
-        """
+        """  # noqa: E501
         if "yaml_implicit_resolvers" not in cls.__dict__:
             implicit_resolvers = {}
             for key in cls.yaml_implicit_resolvers:
@@ -86,7 +86,7 @@ class BaseResolver:  # noqa: D101
             - This API is experimental and may change.
             - The provided pattern is normalized to an internal sequence of (node_check, index_check) pairs and stored
               on the class-level registry so it is applied during resolution.
-        """
+        """  # noqa: E501
         if "yaml_path_resolvers" not in cls.__dict__:
             cls.yaml_path_resolvers = cls.yaml_path_resolvers.copy()
         new_path = []
@@ -136,7 +136,7 @@ class BaseResolver:  # noqa: D101
         Parameters:
             current_node: The node being entered at this depth, or `None` when entering the root/empty context.
             current_index: The index or key within the parent for `current_node` (an integer, a `ScalarNode` used as a key, or `None`).
-        """
+        """  # noqa: E501
         if not self.yaml_path_resolvers:
             return
         exact_paths = {}
@@ -164,7 +164,7 @@ class BaseResolver:  # noqa: D101
         """Restore resolver state by removing the most-recent exact-path and prefix-path frames.
 
         If no path-based resolvers are registered, this method does nothing. Otherwise it pops the top frames from the instance stacks `resolver_exact_paths` and `resolver_prefix_paths`.
-        """
+        """  # noqa: E501
         if not self.yaml_path_resolvers:
             return
         self.resolver_exact_paths.pop()
@@ -189,7 +189,7 @@ class BaseResolver:  # noqa: D101
 
         Returns:
                 True if the node and index satisfy the path element's checks, `None` otherwise.
-        """
+        """  # noqa: E501
         node_check, index_check = path[depth - 1]
         if isinstance(node_check, str):
             if current_node.tag != node_check:
@@ -224,7 +224,7 @@ class BaseResolver:  # noqa: D101
         Returns:
             The resolved tag (string) when a match is found or a default tag for the node kind; `None` if
             no resolver or default applies.
-        """
+        """  # noqa: E501
         if kind is ScalarNode and implicit[0]:  # noqa: F405
             if value == "":  # noqa: PLC1901
                 resolvers = self.yaml_implicit_resolvers.get("", [])

@@ -23,7 +23,7 @@ class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
 
         Parameters:
             stream: YAML input source — a text string, bytes, or a file-like object providing YAML content.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         BaseConstructor.__init__(self)  # noqa: F405
         BaseResolver.__init__(self)  # noqa: F405
@@ -35,7 +35,7 @@ class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
 
         Parameters:
             stream: YAML input to parse — typically a file-like object, string, or bytes containing YAML content.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         SafeConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
@@ -47,7 +47,7 @@ class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
 
         Parameters:
             stream: YAML input source (text/bytes or a file-like object) to be parsed.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         FullConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
@@ -59,7 +59,7 @@ class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
 
         Parameters:
             stream: A text or binary file-like object or string containing YAML content to be loaded.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         UnsafeConstructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
@@ -71,7 +71,7 @@ class CLoader(CParser, Constructor, Resolver):  # noqa: D101, F405
 
         Parameters:
             stream: Input source for YAML content; a text or binary stream or path-like object accepted by the underlying C parser.
-        """
+        """  # noqa: E501
         CParser.__init__(self, stream)
         Constructor.__init__(self)  # noqa: F405
         Resolver.__init__(self)  # noqa: F405
@@ -112,7 +112,7 @@ class CBaseDumper(CEmitter, BaseRepresenter, BaseResolver):  # noqa: D101, F405
             version: YAML version tuple (major, minor) to emit, or None to omit a version directive.
             tags: Mapping of tag prefixes to URIs for tag resolution, or None to use defaults.
             sort_keys: When True, sort mapping keys when representing mappings; when False, preserve insertion order.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,
@@ -171,7 +171,7 @@ class CSafeDumper(CEmitter, SafeRepresenter, Resolver):  # noqa: D101, F405
             version (tuple | None): YAML version tuple to emit (major, minor), or None to omit version.
             tags (dict | None): Mapping of tag handles to tag URIs for the emitter.
             sort_keys (bool): Whether to sort mapping keys when representing mappings.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,
@@ -230,7 +230,7 @@ class CDumper(CEmitter, Serializer, Representer, Resolver):  # noqa: D101, F405
             version: YAML version tuple (major, minor) to emit, or None to omit a version directive.
             tags: Mapping of tag prefixes to URIs for tag resolution, or None to use defaults.
             sort_keys: When True, sort mapping keys when representing mappings; when False, preserve insertion order.
-        """
+        """  # noqa: E501
         CEmitter.__init__(
             self,
             stream,

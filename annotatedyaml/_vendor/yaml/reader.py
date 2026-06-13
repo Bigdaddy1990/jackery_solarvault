@@ -33,7 +33,7 @@ class ReaderError(YAMLError):  # noqa: D101
             character (int | bytes | str): The offending value — an integer code point, a single-character string, or a raw byte.
             encoding (str): The encoding associated with the error (for example, "utf-8" or "utf-16-le").
             reason (str): Human-readable explanation of why the value is invalid or could not be decoded.
-        """
+        """  # noqa: E501
         self.name = name
         self.character = character
         self.position = position
@@ -49,7 +49,7 @@ class ReaderError(YAMLError):  # noqa: D101
 
         Returns:
             The formatted error message string.
-        """
+        """  # noqa: E501
         if isinstance(self.character, bytes):
             return (
                 "'%s' codec can't decode byte #x%02x: %s\n"  # noqa: UP031
@@ -92,7 +92,7 @@ class Reader:  # noqa: D101
 
         Notes:
             The initializer sets reader metadata (`name`), cursor/position counters (`index`, `line`, `column`, `pointer`, `stream_pointer`), buffer fields (`buffer`, `raw_buffer`), decoding routine (`raw_decode`) and `encoding`, and the `eof` flag as appropriate for the provided input.
-        """
+        """  # noqa: E501
         self.name = None
         self.stream = None
         self.stream_pointer = 0
@@ -130,7 +130,7 @@ class Reader:  # noqa: D101
 
         Returns:
             str: The character at buffer[pointer + index].
-        """
+        """  # noqa: E501
         try:
             return self.buffer[self.pointer + index]
         except IndexError:
@@ -145,7 +145,7 @@ class Reader:  # noqa: D101
 
         Returns:
             str: The substring of length `length` starting at the current unread buffer position.
-        """
+        """  # noqa: E501
         if self.pointer + length >= len(self.buffer):
             self.update(length)
         return self.buffer[self.pointer : self.pointer + length]
@@ -157,7 +157,7 @@ class Reader:  # noqa: D101
 
         Parameters:
             length (int): Number of characters to consume from the buffer.
-        """
+        """  # noqa: E501
         if self.pointer + length + 1 >= len(self.buffer):
             self.update(length + 1)
         while length:
@@ -180,7 +180,7 @@ class Reader:  # noqa: D101
 
         Returns:
             Mark: Contains `name`, `index`, `line`, `column`, and `buffer`/`pointer` (buffer and pointer are `None` for stream-backed readers).
-        """
+        """  # noqa: E501
         if self.stream is None:
             return Mark(
                 self.name, self.index, self.line, self.column, self.buffer, self.pointer
@@ -193,7 +193,7 @@ class Reader:  # noqa: D101
         Ensures enough initial raw bytes are available to detect a UTF-16 little-endian or big-endian BOM.
         Sets `self.raw_decode` to the corresponding decoder and `self.encoding` to the detected encoding; defaults to UTF-8 if no BOM is present.
         After selecting a decoder, ensures the Unicode buffer contains at least one decoded character.
-        """
+        """  # noqa: E501
         while not self.eof and (self.raw_buffer is None or len(self.raw_buffer) < 2):  # noqa: PLR2004
             self.update_raw()
         if isinstance(self.raw_buffer, bytes):
@@ -220,7 +220,7 @@ class Reader:  # noqa: D101
 
         Raises:
             ReaderError: If a disallowed character is found; the error includes the source name, absolute position, Unicode code point of the offending character, encoding `"unicode"`, and the reason `"special characters are not allowed"`.
-        """
+        """  # noqa: E501
         match = self.NON_PRINTABLE.search(data)
         if match:
             character = match.group()
@@ -241,7 +241,7 @@ class Reader:  # noqa: D101
 
         Raises:
             ReaderError: If a decoding error occurs while converting raw bytes to Unicode, or if the decoded text contains disallowed (non-printable) characters.
-        """
+        """  # noqa: E501
         if self.raw_buffer is None:
             return
         self.buffer = self.buffer[self.pointer :]
@@ -284,7 +284,7 @@ class Reader:  # noqa: D101
 
         Description:
                 This method reads up to `size` bytes from `self.stream`, initializes `self.raw_buffer` if it is None or appends the data otherwise, increments `self.stream_pointer` by the number of bytes read, and sets `self.eof` to `True` when no bytes are returned.
-        """
+        """  # noqa: E501
         data = self.stream.read(size)
         if self.raw_buffer is None:
             self.raw_buffer = data
