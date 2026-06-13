@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,  # noqa: TC001
@@ -235,62 +235,6 @@ def _async_clean_legacy_entities(
     )
 
 
-async def _async_authenticate(
-    hass: HomeAssistant, entry: JackeryConfigEntry
-) -> JackeryApi:
-    """Authenticate with the Jackery cloud and return a configured API client for the given entry.
-
-    If a cached MQTT session exists it will be hydrated into the returned client before attempting cloud login. If cloud login succeeds the client will be authenticated; transient cloud errors are logged but do not prevent returning a client configured from cache. Invalid credentials trigger the Home Assistant re-auth flow.
-
-    Returns:
-        JackeryApi: Configured API client for the entry; authenticated if login succeeded.
-
-    Raises:
-        ConfigEntryAuthFailed: If the provided credentials are rejected by the cloud.
-    """
-    session = async_get_clientsession(hass)
-    api = JackeryApi(
-        session=session,
-        account=entry.data[CONF_USERNAME],
-        password=entry.data[CONF_PASSWORD],
-        mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
-        region_code=entry.data.get(CONF_REGION_CODE),
-    )
-
-    # Hydrate the MQTT session from the persistent cache BEFORE attempting
-    # the cloud login. The MQTT password derivation is local, so a cached
-    # ``userId/macId/seed`` triple lets the coordinator (re-)open the broker
-    # session even while ``/v1/user/login`` is unreachable.
-    cached = await async_load_mqtt_session(hass, entry.entry_id)
-    if cached:
-        api.hydrate_mqtt_session(
-            user_id=cached[MQTT_SESSION_USER_ID],
-            seed_b64=cached[MQTT_SESSION_SEED_B64],
-            mac_id=cached[MQTT_SESSION_MAC_ID],
-            mac_id_source=cached.get(MQTT_SESSION_MAC_ID_SOURCE),
-        )
-
-    try:
-        await api.async_login()
-    except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(  # noqa: TRY003
-            f"Jackery login rejected the credentials: {err}"
-        ) from err
-    except JackeryError as err:
-        # Cloud failure must not break setup (AGENTS.md §3.3): fall back to
-        # cached discovery and local transports; cloud reconnect is retried.
-        _LOGGER.warning(
-            "Jackery cloud login is unavailable during setup; trying cached "
-            "discovery and local transports: %s",
-            err,
-        )
-    else:
-        snapshot = api.mqtt_session_snapshot()
-        if snapshot is not None and snapshot != cached:
-            await async_save_mqtt_session(hass, entry.entry_id, **snapshot)  # type: ignore[arg-type]
-    return api
-
-
 _STARTUP_TASK_RUNTIME_KEY = "startup_task"
 
 
@@ -394,14 +338,12 @@ async def _async_prime_entry_bootstrap_mqtt_session(
     snapshot = _entry_bootstrap_mqtt_session(entry)
     if snapshot is None:
         return None
-    hydrate = getattr(api, "hydrate_mqtt_session", None)
-    if callable(hydrate):
-        hydrate(
-            user_id=snapshot[MQTT_SESSION_USER_ID],
-            seed_b64=snapshot[MQTT_SESSION_SEED_B64],
-            mac_id=snapshot[MQTT_SESSION_MAC_ID],
-            mac_id_source=snapshot.get(MQTT_SESSION_MAC_ID_SOURCE),
-        )
+    api.hydrate_mqtt_session(
+        user_id=snapshot[MQTT_SESSION_USER_ID],
+        seed_b64=snapshot[MQTT_SESSION_SEED_B64],
+        mac_id=snapshot[MQTT_SESSION_MAC_ID],
+        mac_id_source=snapshot.get(MQTT_SESSION_MAC_ID_SOURCE),
+    )
     await async_save_mqtt_session(hass, entry.entry_id, **snapshot)  # type: ignore[arg-type]
     return snapshot
 

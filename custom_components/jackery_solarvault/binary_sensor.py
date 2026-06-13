@@ -271,6 +271,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
         """
+        plug = self._plug
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -281,6 +282,6 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
             FIELD_SYS_SWITCH,
             FIELD_VERSION,
         ):
-            if key in self._plug:
-                attrs[key] = self._plug.get(key)
+            if key in plug:
+                attrs[key] = plug[key]
         return attrs
