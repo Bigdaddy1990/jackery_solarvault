@@ -236,7 +236,7 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # noqa: E501
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
         )
         seen[name] = node.lineno
 
@@ -278,7 +278,7 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
                 raise AssertionError(  # noqa: TRY003
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # noqa: E501
+                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "
                     "use const.py instead",
                 )
 
@@ -819,7 +819,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
         binary_source
         .split("class JackerySmartPlugStateBinarySensor", 1)[1]
         .split(
-            "# ---------------------------------------------------------------------------",  # noqa: E501
+            "# ---------------------------------------------------------------------------",
             1,
         )[0]
         .split("def extra_state_attributes", 1)[1]
@@ -1223,7 +1223,7 @@ def test_user_visible_action_errors_have_translations() -> None:
 
 
 def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
-    """Rejected credentials during refresh should start HA reauth instead of log-spamming."""  # noqa: E501
+    """Rejected credentials during refresh should start HA reauth instead of log-spamming."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8",
     )
@@ -1244,7 +1244,7 @@ def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
 
 
 def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
-    """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""  # noqa: E501
+    """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8",
     )
@@ -1337,7 +1337,7 @@ def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # noqa: E501
+    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8",
     )
@@ -1380,7 +1380,7 @@ def test_number_setter_rejects_non_finite_values_before_transform() -> None:
     """Number service writes must not let NaN/Infinity reach int(round(...))."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
+        "\n\n# ---------------------------------------------------------------------------\n"
         "# Setup",
         1,
     )[0]
@@ -1432,7 +1432,7 @@ def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
     """Discrete number validation should centralize round/int conversion."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
+        "\n\n# ---------------------------------------------------------------------------\n"
         "# Setup",
         1,
     )[0]
@@ -1449,7 +1449,7 @@ def test_number_setter_validates_all_entity_ranges() -> None:
     """Direct number writes must enforce min/max for every number entity."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501
+        "\n\n# ---------------------------------------------------------------------------\n"
         "# Setup",
         1,
     )[0]
@@ -1589,7 +1589,7 @@ def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     assert "non-object JSON payload" in mqtt_source
 
 
-def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (  # noqa: E501
+def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (
     None
 ):
     """Reject malformed MQTT seeds and redact login diagnostics at export time."""
@@ -1673,7 +1673,7 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     assert calls
     for call in calls:
         assert len(call.args) == 3, (  # noqa: PLR2004
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # noqa: E501
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1995,7 +1995,7 @@ def test_rename_service_name_validates_direct_call_values() -> None:
 
 
 def test_delete_storm_alert_validates_direct_alert_id() -> None:
-    """Delete service alert_id constraints must not rely only on HA schema validation."""  # noqa: E501
+    """Delete service alert_id constraints must not rely only on HA schema validation."""
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert "def _storm_alert_id_from_service(" in services_source
@@ -2262,7 +2262,7 @@ def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
 
 
 def test_services_setup_is_idempotent_and_callback_typed() -> None:
-    """async_setup_services must be a sync @callback and skip already-registered services."""  # noqa: E501
+    """async_setup_services must be a sync @callback and skip already-registered services."""
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
     setup_block = services_source.split("def async_setup_services", 1)[1]
 
@@ -2279,7 +2279,7 @@ def test_services_setup_is_idempotent_and_callback_typed() -> None:
             service_const
         )
         assert (
-            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"  # noqa: E501
+            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"
             in setup_block
         ), service_const
 
@@ -2759,7 +2759,7 @@ def test_system_ttl_gather_calls_use_exact_helper_shape() -> None:
     assert ttl_calls
     assert all(len(call.args) == 5 for call in ttl_calls)  # noqa: PLR2004
 
-    bad_fragment = "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n                    self._slow_metrics_interval_sec"  # noqa: E501
+    bad_fragment = "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n                    self._slow_metrics_interval_sec"
     assert bad_fragment not in source
 
 
@@ -2838,7 +2838,7 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",  # noqa: E501
+        "# ---------------------------------------------------------------------------\n# Entities",
         1,
     )[0]
 
@@ -2927,12 +2927,12 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                     name = call.func.attr
                 if name in forbidden:
                     raise AssertionError(  # noqa: TRY003
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()",  # noqa: E501
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()",
                     )
 
 
 def test_api_method_calls_use_valid_positional_arity() -> None:
-    """Coordinator/service paths must not call JackeryApi methods with impossible arity."""  # noqa: E501
+    """Coordinator/service paths must not call JackeryApi methods with impossible arity."""
     api_tree = ast.parse(API_IMPLEMENTATION.read_text(encoding="utf-8"))
     method_arity: dict[str, tuple[int, int | None]] = {}
     for cls in [
@@ -3228,9 +3228,9 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     # before checking. Equivalent to grepping "config.path(...jackery_ca.crt)".
     mqtt_source_collapsed = re.sub(r"\s+", " ", mqtt_source)
     assert (
-        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'  # noqa: E501
+        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'
         in mqtt_source_collapsed
-        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'  # noqa: E501
+        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'
         in mqtt_source_collapsed
     )
     assert '"tls_custom_ca_loaded": self._tls_custom_ca_loaded' in mqtt_source
@@ -3264,7 +3264,7 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
     assert "async def _async_periodic_refresh" not in coordinator_source
     assert "update_interval=update_interval" in coordinator_source
     update_block = coordinator_source.split("async def _async_update_data", 1)[1].split(
-        "# ------------------------------------------------------------------\n    # Diagnostics",  # noqa: E501
+        "# ------------------------------------------------------------------\n    # Diagnostics",
         1,
     )[0]
     assert "_raise_config_entry_auth_failed" in update_block
@@ -3277,7 +3277,7 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""  # noqa: E501
+    """Read-only custom component mounts are safe because setup writes no brand files."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")
@@ -3658,7 +3658,7 @@ def test_pre_commit_script_runs_on_all_files() -> None:
         "pre-commit script must include '--all-files' to check the full tree"
     )
     assert "bun run pre-commit" in pre_commit_cmd, (
-        "pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)"  # noqa: E501
+        "pre-commit script must delegate to bun run pre-commit (not invoke pre-commit directly)"
     )
 
 
@@ -3673,7 +3673,7 @@ def test_ruff_baseline_workflow_delegates_pre_commit_via_bun() -> None:
     )
 
     assert "bun run pre-commit" in workflow, (
-        "ruff-baseline.yml must call 'bun run pre-commit' so the --all-files flag is applied"  # noqa: E501
+        "ruff-baseline.yml must call 'bun run pre-commit' so the --all-files flag is applied"
     )
     assert workflow.count("bun run pre-commit") >= 1
 

@@ -59,7 +59,7 @@ def test_mypy_runs_in_default_and_full_but_not_fast() -> None:
 
 
 def test_hassfest_passes_integration_path_argument() -> None:
-    """``hassfest.py`` is mandatory and rejects bare invocation (issue surfaced 2026-05-28)."""  # noqa: E501
+    """``hassfest.py`` is mandatory and rejects bare invocation (issue surfaced 2026-05-28)."""
     hassfest = next(g for g in gate.GATES if g.name == "manifest")
     assert "--integration-path" in hassfest.cmd
     assert "custom_components/jackery_solarvault" in hassfest.cmd

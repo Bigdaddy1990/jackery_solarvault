@@ -151,7 +151,7 @@ async def test_http_payload_debug_returns_dict_with_required_keys() -> None:  # 
 
 
 async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
-    """Verify the dict from _http_payload_debug is received directly (not via lambda)."""  # noqa: E501
+    """Verify the dict from _http_payload_debug is received directly (not via lambda)."""
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
@@ -254,7 +254,7 @@ def test_decrypt_binary_notify_version_mismatch_empty_body() -> None:
 
 
 def test_client_init_getattr_raises_attribute_error_for_unknown_name() -> None:
-    """Accessing an unknown attribute on the client package must raise AttributeError."""  # noqa: E501
+    """Accessing an unknown attribute on the client package must raise AttributeError."""
     import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError):

@@ -322,7 +322,7 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement  # noqa: E501
+    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement
     assert "requires explicit app ranges" in coordinator_source
     # coordinator uses _local_today() which wraps dt_util.now() with timezone
     assert (

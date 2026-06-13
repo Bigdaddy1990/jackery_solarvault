@@ -11,21 +11,21 @@ class ComposerError(MarkedYAMLError):  # noqa: D101
 
 class Composer:  # noqa: D101
     def __init__(self) -> None:
-        """Initialize the composer and its anchor registry.
+        """Initialize the Composer and its anchor registry.
 
-        Creates self.anchors, a dictionary that maps anchor names (strings) to composed node objects used to resolve aliases during document composition.
-        """  # noqa: E501
+        Creates self.anchors as a dict mapping anchor names to composed node objects for resolving aliases during document composition.
+        """
         self.anchors = {}
 
     def check_node(self) -> bool:
         # Drop the STREAM-START event.
         """Indicates whether another document is available in the event stream.
 
-        If a leading `StreamStartEvent` is present, it is consumed.
+        If a leading StreamStartEvent is present, it is consumed.
 
         Returns:
-            `true` if the stream has not reached a `StreamEndEvent` (another document is available), `false` otherwise.
-        """  # noqa: E501
+            True if the stream has not reached a StreamEndEvent (another document is available), False otherwise.
+        """
         if self.check_event(StreamStartEvent):  # noqa: F405
             self.get_event()
 
@@ -38,7 +38,7 @@ class Composer:  # noqa: D101
 
         Returns:
             node (Node | None): The composed document root node, or None when no further documents are available.
-        """  # noqa: E501
+        """
         if not self.check_event(StreamEndEvent):  # noqa: F405
             return self.compose_document()
         return None
@@ -54,7 +54,7 @@ class Composer:  # noqa: D101
 
         Raises:
             ComposerError: If more than one document is found in the stream.
-        """  # noqa: E501
+        """
         self.get_event()
 
         # Compose a document if the stream is not empty.
@@ -85,7 +85,7 @@ class Composer:  # noqa: D101
 
         Returns:
             The root node of the composed document.
-        """  # noqa: E501
+        """
         self.get_event()
 
         # Compose the root node.
@@ -98,18 +98,18 @@ class Composer:  # noqa: D101
         return node
 
     def compose_node(self, parent, index):  # noqa: ANN001, ANN201
-        """Compose and return a node for the next events in the stream, resolving anchors and aliases.
+        """Compose a node from the upcoming parser events, resolving anchors and aliases.
 
         Parameters:
-            parent: The parent node used to inform resolver context, or `None` if there is no parent.
-            index: The index (position) within the parent used to inform resolver context, or `None` when not applicable.
+            parent: The parent node used to provide resolver context, or `None` if there is no parent.
+            index: The index (position) within the parent used to provide resolver context, or `None` when not applicable.
 
         Returns:
-            node: The composed node (a `ScalarNode`, `SequenceNode`, or `MappingNode`), or an existing node referenced by an alias.
+            node: The composed `ScalarNode`, `SequenceNode`, or `MappingNode`, or an existing node referenced by an alias.
 
         Raises:
             ComposerError: If an alias refers to an undefined anchor or if an anchor is defined more than once.
-        """  # noqa: E501
+        """
         if self.check_event(AliasEvent):  # noqa: F405
             event = self.get_event()
             anchor = event.anchor
@@ -138,14 +138,14 @@ class Composer:  # noqa: D101
         return node
 
     def compose_scalar_node(self, anchor):  # noqa: ANN001, ANN201
-        """Compose and return a ScalarNode for the next scalar event, registering it under `anchor` if provided.
+        """Compose a ScalarNode from the next scalar event and register it under `anchor` if provided.
 
         Parameters:
             anchor (str | None): Anchor name to register the created node under, or `None` to skip registration.
 
         Returns:
-            ScalarNode: The composed scalar node with its tag resolved when the event tag is `None` or `"!"`.
-        """  # noqa: E501
+            ScalarNode: The composed scalar node. If the event tag is `None` or `"!"`, the node's tag is resolved before construction.
+        """
         event = self.get_event()
         tag = event.tag
         if tag is None or tag == "!":
@@ -158,16 +158,16 @@ class Composer:  # noqa: D101
         return node
 
     def compose_sequence_node(self, anchor):  # noqa: ANN001, ANN201
-        """Compose a sequence node representing the next YAML sequence in the event stream.
+        """Compose and return a SequenceNode for the next YAML sequence in the event stream.
 
-        Creates a SequenceNode for the upcoming sequence start event, resolves the node tag when unspecified, registers the node under `anchor` if provided, composes and appends child nodes until the sequence end event, sets the node's end mark, and returns the completed SequenceNode.
+        If the sequence start event does not specify a tag, the resolver determines the node's tag. If `anchor` is provided, the composed node is registered under that anchor; the node's children are composed from subsequent events and its end mark is set from the sequence end event.
 
         Parameters:
             anchor (str | None): Anchor name to associate with the created node, or None if no anchor.
 
         Returns:
-            SequenceNode: The composed sequence node containing its children and end mark.
-        """  # noqa: E501
+            SequenceNode: The composed sequence node containing its child nodes and end mark.
+        """
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":
@@ -195,7 +195,7 @@ class Composer:  # noqa: D101
 
         Returns:
             MappingNode: The composed mapping node whose `value` is a list of (key_node, value_node) pairs.
-        """  # noqa: E501
+        """
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":
@@ -209,7 +209,7 @@ class Composer:  # noqa: D101
             # key_event = self.peek_event()
             item_key = self.compose_node(node, None)
             # if item_key in node.value:
-            #    raise ComposerError("while composing a mapping", start_event.start_mark,  # noqa: E501
+            #    raise ComposerError("while composing a mapping", start_event.start_mark,
             #            "found duplicate key", key_event.start_mark)
             item_value = self.compose_node(node, item_key)
             # node.value[item_key] = item_value

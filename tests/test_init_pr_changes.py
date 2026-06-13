@@ -274,7 +274,7 @@ async def test_async_start_local_mqtt_blocks_broad_wildcard_filter() -> None:
 
 
 async def test_async_start_local_mqtt_stores_client_in_hass_data() -> None:
-    """When enabled with a host, the client is stored at hass.data[DOMAIN][entry_id][key]."""  # noqa: E501
+    """When enabled with a host, the client is stored at hass.data[DOMAIN][entry_id][key]."""
     hass = _FakeHass()
     entry = _make_local_mqtt_entry(enable=True, host="192.168.1.100", port=1884)
 

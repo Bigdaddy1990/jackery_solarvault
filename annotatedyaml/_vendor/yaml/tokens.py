@@ -5,7 +5,7 @@ class Token:  # noqa: D100, D101
         Parameters:
             start_mark: Mark locating where the token begins in the source, or None if unknown.
             end_mark: Mark locating where the token ends in the source, or None if unknown.
-        """  # noqa: E501
+        """
         self.start_mark = start_mark
         self.end_mark = end_mark
 
@@ -16,7 +16,7 @@ class Token:  # noqa: D100, D101
 
         Returns:
             str: The formatted representation of the instance.
-        """  # noqa: E501
+        """
         attributes = [key for key in self.__dict__ if not key.endswith("_mark")]
         attributes.sort()
         arguments = ", ".join([f"{key}={getattr(self, key)!r}" for key in attributes])
@@ -31,14 +31,14 @@ class DirectiveToken(Token):  # noqa: D101
     id = "<directive>"
 
     def __init__(self, name, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """Initialize a DirectiveToken with its directive name, value, and source location marks.
+        """Initialize the token with a directive name, its raw value, and optional source location marks.
 
         Parameters:
             name (str): Directive name, e.g. "YAML" or "TAG".
             value (str): Directive value as it appears in the source.
             start_mark: Start location mark for the directive in the source; may be None.
             end_mark: End location mark for the directive in the source; may be None.
-        """  # noqa: E501
+        """
         self.name = name
         self.value = value
         self.start_mark = start_mark
@@ -57,13 +57,13 @@ class StreamStartToken(Token):  # noqa: D101
     id = "<stream start>"
 
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """Create a StreamStartToken with optional source location marks and encoding.
+        """Initialize a StreamStartToken with optional source location marks and an optional encoding.
 
         Parameters:
             start_mark: Start location mark for the token, or None.
             end_mark: End location mark for the token, or None.
             encoding (str | None): Character encoding of the stream, or None if unspecified.
-        """  # noqa: E501
+        """
         self.start_mark = start_mark
         self.end_mark = end_mark
         self.encoding = encoding
@@ -169,15 +169,15 @@ class ScalarToken(Token):  # noqa: D101
     id = "<scalar>"
 
     def __init__(self, value, plain, start_mark, end_mark, style=None) -> None:  # noqa: ANN001
-        """Create a scalar token containing its textual value, plain-flag, source marks, and optional style.
+        """Create a scalar token with its textual value, plain-flag, source start/end marks, and optional style.
 
         Parameters:
             value: The scalar content.
             plain: True if the scalar is plain (unquoted), False otherwise.
             start_mark: Source location mark where the token starts.
             end_mark: Source location mark where the token ends.
-            style: Optional scalar style indicator (for example, quote style), or None.
-        """  # noqa: E501
+            style: Optional scalar style indicator (e.g., quote style), or None.
+        """
         self.value = value
         self.plain = plain
         self.start_mark = start_mark

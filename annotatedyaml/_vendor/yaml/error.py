@@ -102,7 +102,7 @@ class MarkedYAMLError(YAMLError):  # noqa: D101
             problem (str | None): Short description of the specific problem encountered.
             problem_mark (Mark | None): Source location associated with `problem`.
             note (str | None): Optional additional information or suggestion related to the error.
-        """  # noqa: E501
+        """
         self.context = context
         self.context_mark = context_mark
         self.problem = problem
@@ -110,10 +110,13 @@ class MarkedYAMLError(YAMLError):  # noqa: D101
         self.note = note
 
     def __str__(self) -> str:
-        """Return a formatted error message that includes optional context, source marks, a problem description, and a note.
+        """Format the error as a multiline message combining context, source marks, problem, and note.
 
-        Assembles lines in the following order, joining them with newline characters: context (if present); the context mark only when the problem or problem mark is missing or when the context and problem marks refer to different locations (name, line, or column); problem (if present); problem mark (if present); note (if present).
-        """  # noqa: E501
+        Assembles lines in this order when present: context; the context mark (included only if the problem or problem mark is missing, or if the context and problem marks refer to different name, line, or column); problem; problem mark; note. The returned string is the lines joined with newline characters.
+
+        Returns:
+            str: The formatted error message.
+        """
         lines = []
         if self.context is not None:
             lines.append(self.context)

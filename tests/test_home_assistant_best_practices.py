@@ -15,7 +15,7 @@ def _read(relative_path: str) -> str:
 
     Returns:
         str: The file contents decoded as UTF-8.
-    """  # noqa: E501
+    """
     return (COMPONENT / relative_path).read_text(encoding="utf-8")
 
 
@@ -23,7 +23,7 @@ def test_read_only_platforms_define_parallel_updates_zero() -> None:
     """Ensure coordinator-backed read-only platform modules disable parallel entity update jobs.
 
     Checks that the component's sensor.py and binary_sensor.py contain the exact declaration "PARALLEL_UPDATES = 0".
-    """  # noqa: E501
+    """
     for relative_path in ("sensor.py", "binary_sensor.py"):
         source = _read(relative_path)
         assert "PARALLEL_UPDATES = 0" in source, relative_path
@@ -33,7 +33,7 @@ def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
     """Ensure config_flow defines and uses the reconfigure-specific missing-entry abort reason.
 
     Asserts that `config_flow.py` contains the `FLOW_ABORT_RECONFIGURE_ENTRY_MISSING` identifier and that the code calls `self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)`.
-    """  # noqa: E501
+    """
     source = _read("config_flow.py")
     assert "FLOW_ABORT_RECONFIGURE_ENTRY_MISSING" in source
     assert (
@@ -45,7 +45,7 @@ def test_abort_translations_cover_reconfigure_entry_missing() -> None:
     """Verify that the `config.abort.reconfigure_entry_missing` key exists in the component's root `strings.json` and in every locale JSON under `translations/`.
 
     This ensures the reconfigure-specific abort reason is present in the default strings and all translations.
-    """  # noqa: E501
+    """
     for relative_path in ("strings.json",):
         data = json.loads(_read(relative_path))
         abort = data.get("config", {}).get("abort", {})

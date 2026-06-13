@@ -10,7 +10,7 @@ Covers:
 Also covers:
 - _rsa_pkcs1v15_encrypt (client/api.py): TypeError raised when loaded key is not RSA
 - _generate_udid: output format includes MQTT_MAC_ID_PREFIX + 32 hex chars
-"""  # noqa: E501
+"""
 
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -59,7 +59,7 @@ class TestBlockedLocalMqttTopicFilters:
         assert "home/devices/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
     def test_empty_string_is_not_in_blocked_set(self) -> None:  # noqa: PLR6301
-        """Empty string must not be blocked (it is handled separately by emptiness check)."""  # noqa: E501
+        """Empty string must not be blocked (it is handled separately by emptiness check)."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
         )
@@ -302,7 +302,7 @@ class TestAsyncStartLocalMqttGuards:
             mock_cls.assert_not_called()
 
     async def test_skips_when_topic_filter_is_whitespace_only(self) -> None:  # noqa: PLR6301
-        """When the topic filter is whitespace-only after strip, no client is created."""  # noqa: E501
+        """When the topic filter is whitespace-only after strip, no client is created."""
         try:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
@@ -393,7 +393,7 @@ class TestAsyncStartLocalMqttGuards:
         assert "blocked" in caplog.text.lower() or "+/#" in caplog.text
 
     async def test_starts_client_when_all_conditions_met(self) -> None:  # noqa: PLR6301
-        """When all conditions are met with a scoped topic filter, the client is started."""  # noqa: E501
+        """When all conditions are met with a scoped topic filter, the client is started."""
         try:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701
@@ -512,7 +512,7 @@ class TestLocalMqttSink:
     """Tests for the _sink function created inside _async_start_local_mqtt."""
 
     async def test_sink_routes_data_to_coordinator(self) -> None:  # noqa: PLR6301
-        """The _sink must forward non-None data to coordinator.async_handle_local_mqtt_message."""  # noqa: E501
+        """The _sink must forward non-None data to coordinator.async_handle_local_mqtt_message."""
         try:
             from custom_components.jackery_solarvault import (
                 _async_start_local_mqtt,  # noqa: PLC2701

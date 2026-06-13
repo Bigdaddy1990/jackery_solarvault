@@ -64,7 +64,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
     Returns:
         JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
-    """  # noqa: E501
+    """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = _RejectingPriceApi()
     coordinator.data = {
@@ -89,7 +89,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
         Raises:
             AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
-        """  # noqa: E501
+        """
         raise AssertionError("rejected writer must not patch local price data")  # noqa: TRY003
 
     coordinator._push_partial_update = _fail_push  # noqa: SLF001

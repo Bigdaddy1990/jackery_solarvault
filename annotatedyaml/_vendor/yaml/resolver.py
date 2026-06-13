@@ -20,12 +20,12 @@ class BaseResolver:  # noqa: D101
     yaml_path_resolvers = {}  # noqa: RUF012
 
     def __init__(self) -> None:
-        """Initialize resolver path stacks for experimental path-based tag resolution.
+        """Initialize instance stacks used for experimental path-based tag resolution.
 
         Creates two empty stacks:
-        - resolver_exact_paths: per-depth dicts mapping (path, kind) to resolved tag for exact matches.
-        - resolver_prefix_paths: per-depth lists of (path, kind) candidate entries used while traversing.
-        """  # noqa: E501
+        - resolver_exact_paths: per-depth dictionaries mapping resolver patterns to tags for exact matches.
+        - resolver_prefix_paths: per-depth lists of resolver pattern candidates used while traversing the node tree.
+        """
         self.resolver_exact_paths = []
         self.resolver_prefix_paths = []
 
@@ -39,7 +39,7 @@ class BaseResolver:  # noqa: D101
             tag (str): The YAML tag to associate with matches (e.g., 'tag:yaml.org,2002:int').
             regexp (re.Pattern | callable): A compiled regular expression (or regex-like callable) used to test scalar values.
             first (iterable[str] | None): An iterable of characters whose presence as the scalar's first character triggers testing with `regexp`, or `None` to register as a wildcard matcher.
-        """  # noqa: E501
+        """
         if "yaml_implicit_resolvers" not in cls.__dict__:
             implicit_resolvers = {}
             for key in cls.yaml_implicit_resolvers:
@@ -86,7 +86,7 @@ class BaseResolver:  # noqa: D101
             - This API is experimental and may change.
             - The provided pattern is normalized to an internal sequence of (node_check, index_check) pairs and stored
               on the class-level registry so it is applied during resolution.
-        """  # noqa: E501
+        """
         if "yaml_path_resolvers" not in cls.__dict__:
             cls.yaml_path_resolvers = cls.yaml_path_resolvers.copy()
         new_path = []
@@ -136,7 +136,7 @@ class BaseResolver:  # noqa: D101
         Parameters:
             current_node: The node being entered at this depth, or `None` when entering the root/empty context.
             current_index: The index or key within the parent for `current_node` (an integer, a `ScalarNode` used as a key, or `None`).
-        """  # noqa: E501
+        """
         if not self.yaml_path_resolvers:
             return
         exact_paths = {}
@@ -164,7 +164,7 @@ class BaseResolver:  # noqa: D101
         """Restore resolver state by removing the most-recent exact-path and prefix-path frames.
 
         If no path-based resolvers are registered, this method does nothing. Otherwise it pops the top frames from the instance stacks `resolver_exact_paths` and `resolver_prefix_paths`.
-        """  # noqa: E501
+        """
         if not self.yaml_path_resolvers:
             return
         self.resolver_exact_paths.pop()
@@ -178,18 +178,18 @@ class BaseResolver:  # noqa: D101
         current_node,  # noqa: ANN001
         current_index,  # noqa: ANN001
     ) -> bool | None:
-        """Determine whether the resolver path element at the specified depth matches the current traversal node and index.
+        """Check whether the resolver path element at the given depth matches the current node and index.
 
         Parameters:
-                depth (int): 1-based traversal depth used to select the path element to check.
-                path (Sequence[Tuple[Any, Any]]): Compiled resolver path where each element is (node_check, index_check).
-                kind (type | None): Expected node kind for the overall resolver (may be None); used by callers to categorize matches.
-                current_node (Node): The node object at the current traversal position.
-                current_index (int | ScalarNode | None): The current mapping key, sequence index, or `None` when not applicable.
+            depth (int): 1-based traversal depth selecting which (node_check, index_check) pair to evaluate.
+            path (Sequence[Tuple[Any, Any]]): Compiled resolver path where each element is (node_check, index_check).
+            kind (type | None): Expected node kind for the overall resolver; accepted but not used by this check.
+            current_node (Node): Node at the current traversal position.
+            current_index (int | ScalarNode | None): Mapping key, sequence index, or `None` when not applicable.
 
         Returns:
-                True if the node and index satisfy the path element's checks, `None` otherwise.
-        """  # noqa: E501
+            True if both the node and index satisfy the path element's checks, `None` otherwise.
+        """
         node_check, index_check = path[depth - 1]
         if isinstance(node_check, str):
             if current_node.tag != node_check:
@@ -224,7 +224,7 @@ class BaseResolver:  # noqa: D101
         Returns:
             The resolved tag (string) when a match is found or a default tag for the node kind; `None` if
             no resolver or default applies.
-        """  # noqa: E501
+        """
         if kind is ScalarNode and implicit[0]:  # noqa: F405
             if value == "":  # noqa: PLC1901
                 resolvers = self.yaml_implicit_resolvers.get("", [])
