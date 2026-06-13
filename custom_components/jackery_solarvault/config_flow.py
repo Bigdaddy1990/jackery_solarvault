@@ -131,16 +131,17 @@ def _flow_options(
     user_input: dict[str, Any],
     current_options: dict[str, bool] | None = None,
 ) -> dict[str, bool]:
-    """Produce a complete mapping of all boolean option keys to their selected values.
-
-    For each known option key, use the value from `user_input` when present; otherwise use the value from `current_options` if provided; if neither is present, use the configured default.
-
+    """
+    Resolve boolean option values for all known option keys.
+    
+    For each option key defined in _OPTION_DEFAULTS, prefer the value from user_input when present, otherwise use current_options when provided, otherwise fall back to the configured default.
+    
     Parameters:
         user_input (dict[str, Any]): Form-submitted option values keyed by option name.
         current_options (dict[str, bool] | None): Existing option values to preserve when a key is omitted.
-
+    
     Returns:
-        dict[str, bool]: A dictionary containing every option key with its resolved boolean value.
+        dict[str, bool]: Mapping of every known option key to its resolved boolean value (`True` or `False`).
     """
     current = current_options or {}
     return {
@@ -155,19 +156,19 @@ def _entry_data_from_api_login(
     api: JackeryApi,
     existing_entry: ConfigEntry | None = None,
 ) -> dict[str, Any]:
-    """Create config entry data populated from credentials and values retrieved from a successful JackeryApi login.
-
+    """
+    Build the config entry data after a successful Jackery API login.
+    
+    Stores CONF_USERNAME and CONF_PASSWORD. Adds CONF_MQTT_MAC_ID and CONF_REGION_CODE from the API when available; if not available, uses those keys from existing_entry only when they exist as strings. If the API provides an MQTT session snapshot, includes a copy under ENTRY_BOOTSTRAP_MQTT_SESSION.
+    
     Parameters:
-        account (str): Account username to store under `CONF_USERNAME`.
-        password (str): Account password to store under `CONF_PASSWORD`.
-        api (JackeryApi): Authenticated API client providing optional bootstrap values (`mqtt_mac_id`, `region_code`, and an MQTT session snapshot).
-        existing_entry (ConfigEntry | None): Optional existing config entry whose string fields are used as fallbacks when the API does not provide them.
-
+        account (str): Username to store under CONF_USERNAME.
+        password (str): Password to store under CONF_PASSWORD.
+        api (JackeryApi): Authenticated API client exposing `mqtt_mac_id`, `region_code`, and `mqtt_session_snapshot()`.
+        existing_entry (ConfigEntry | None): Optional existing entry whose string fields are used as fallbacks.
+    
     Returns:
-        dict[str, Any]: A dictionary containing at minimum `CONF_USERNAME` and `CONF_PASSWORD`. May also include:
-          - `CONF_MQTT_MAC_ID` (str): MQTT MAC ID from the API or the existing entry.
-          - `CONF_REGION_CODE` (str): Region code from the API or the existing entry.
-          - `ENTRY_BOOTSTRAP_MQTT_SESSION` (dict): A copy of the MQTT session snapshot returned by the API, if present.
+        dict[str, Any]: Mapping containing at minimum CONF_USERNAME and CONF_PASSWORD, and optionally CONF_MQTT_MAC_ID, CONF_REGION_CODE, and ENTRY_BOOTSTRAP_MQTT_SESSION.
     """
     data: dict[str, Any] = {
         CONF_USERNAME: account,
@@ -196,18 +197,19 @@ def _entry_data_from_api_login(
 
 
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
-    """Return a dictionary of local MQTT option values normalized with safe defaults.
-
-    The returned mapping contains the following keys with normalized types and fallbacks:
-    - CONF_LOCAL_MQTT_ENABLE: bool — whether local MQTT is enabled (defaults to DEFAULT_LOCAL_MQTT_ENABLE).
-    - CONF_LOCAL_MQTT_HOST: str — MQTT host (empty string when not set).
-    - CONF_LOCAL_MQTT_PORT: int — MQTT port (defaults to DEFAULT_LOCAL_MQTT_PORT).
-    - CONF_LOCAL_MQTT_USERNAME: str — MQTT username (empty string when not set).
-    - CONF_LOCAL_MQTT_PASSWORD: str — MQTT password (empty string when not set).
-    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — topic filter string trimmed of surrounding whitespace (empty string when not set).
-
+    """
+    Normalize and return local MQTT option values from a ConfigEntry.
+    
+    The returned mapping contains the following keys with normalized types and safe defaults:
+    - CONF_LOCAL_MQTT_ENABLE: bool — whether local MQTT is enabled (defaults to DEFAULT_LOCAL_MQTT_ENABLE)
+    - CONF_LOCAL_MQTT_HOST: str — MQTT host (empty string when not set)
+    - CONF_LOCAL_MQTT_PORT: int — MQTT port (defaults to DEFAULT_LOCAL_MQTT_PORT)
+    - CONF_LOCAL_MQTT_USERNAME: str — MQTT username (empty string when not set)
+    - CONF_LOCAL_MQTT_PASSWORD: str — MQTT password (empty string when not set)
+    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — topic filter trimmed of surrounding whitespace (empty string when not set)
+    
     Returns:
-        dict[str, Any]: Normalized local-MQTT option values suitable for storing in entry options or using in configuration logic.
+        dict[str, Any]: Normalized local MQTT option values suitable for storing in entry options or using in configuration logic.
     """
     options: Mapping[str, Any] = entry.options
     return {
@@ -281,18 +283,22 @@ def _merge_local_mqtt_options(
 def _local_mqtt_option_schema(
     current: dict[str, Any],
 ) -> dict[vol.Optional, object]:
-    """Return voluptuous Optional schema entries for local MQTT option fields.
-
-    Builds the standard six vol.Optional descriptors (enable, host, port,
-    username, password, topic_filter) with the given *current* values as
-    form defaults. The returned dict is meant to be unpacked into a
-    ``vol.Schema({...})`` call alongside non-MQTT option fields.
-
+    """
+    Build voluptuous Optional schema entries for the six local MQTT option fields.
+    
+    The returned mapping contains vol.Optional descriptors for:
+    - CONF_LOCAL_MQTT_ENABLE (bool)
+    - CONF_LOCAL_MQTT_HOST (str)
+    - CONF_LOCAL_MQTT_PORT (int, 1–65535)
+    - CONF_LOCAL_MQTT_USERNAME (str)
+    - CONF_LOCAL_MQTT_PASSWORD (str)
+    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
+    
     Parameters:
-        current: Normalized local-MQTT options (e.g. from ``_current_local_mqtt_options``).
-
+        current: Normalized local-MQTT options (e.g. from `_current_local_mqtt_options`) used as form defaults.
+    
     Returns:
-        dict[vol.Optional, object]: Mapping of vol.Optional keys to their voluptuous types.
+        dict[vol.Optional, object]: Mapping of vol.Optional keys to their voluptuous validators suitable for inclusion in a vol.Schema.
     """
     return {
         vol.Optional(
@@ -517,12 +523,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_user()
 
     async def async_step_mqtt(self, discovery_info: Any) -> ConfigFlowResult:  # noqa: ANN401
-        """Handle a discovered MQTT device by aborting duplicate discovery flows or continuing to the user step.
-
-        Aborts if there is an existing configured entry or another in-progress flow for this integration; otherwise delegates to the user configuration step.
-
+        """
+        Handle a discovered MQTT device and route to the user configuration step if not a duplicate.
+        
+        Aborts when a configured entry already exists or another in-progress flow for this integration is present; otherwise delegates to `async_step_user()`.
+        
         Returns:
-            ConfigFlowResult: An abort result when the discovery is a duplicate, or the result produced by the user step.
+            ConfigFlowResult: An abort result when the discovery is a duplicate, or the result returned by `async_step_user()`.
         """
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
@@ -544,17 +551,22 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial user-driven config flow step.
-
-        Validates and normalizes the submitted username, prevents duplicate configuration,
-        attempts authentication against the Jackery API, and on success creates a config
-        entry containing credentials, API-derived bootstrap data, and resolved default
-        options. If validation or authentication fails, returns the user form populated
-        with appropriate error messages.
-
+        """
+        Handle the initial user-driven config flow step.
+        
+        Validate and normalize the submitted username, prevent duplicate configuration,
+        authenticate against the Jackery API, and on success create a config entry that
+        contains credentials, API-derived bootstrap data, and resolved option values.
+        If validation or authentication fails, present the user form populated with
+        appropriate error messages.
+        
+        Parameters:
+            user_input (dict[str, Any] | None): Form input containing at least
+                CONF_USERNAME and CONF_PASSWORD; may include option toggles.
+        
         Returns:
-            A ConfigFlowResult representing either the user form (possibly with errors)
-            or a created config entry.
+            ConfigFlowResult: Either the user form (possibly with errors) or a created
+            config entry.
         """
         errors: dict[str, str] = {}
 
@@ -605,18 +617,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle reconfiguration of an existing config entry by validating credentials and updating stored entry data and options.
-
-        Validates that the normalized account in `user_input` matches the entry that triggered the reconfigure flow, attempts to authenticate with the Jackery API using the provided password (preserving existing MQTT/bootstrap metadata from the entry when constructing the API client), and on successful authentication updates the entry data and options and aborts the flow with a success reason. If authentication or connection fails, the form is re-displayed with appropriate errors; if the account does not match the entry, the flow is aborted.
-
+        """
+        Reconfigure an existing config entry by validating the provided credentials and applying updated entry data and options.
+        
+        Validates that the normalized username in `user_input` matches the entry being reconfigured, attempts to authenticate with the Jackery API (preserving existing MQTT/bootstrap metadata from the entry), and on successful authentication updates the entry's stored data and options and ends the flow with a successful abort reason. If authentication fails or a connection error occurs, the reconfigure form is re-displayed with error messages; if the provided account does not match the entry, the flow is aborted.
+        
         Parameters:
-            user_input (dict[str, Any] | None): Form data submitted by the user; when `None` the reconfigure form is shown.
-
-        HA's reconfigure flow lets the user change credentials and toggle
-        the calculated-sensor options without removing the entry. The
-        normalized account from user input must match the entry that
-        triggered the flow; otherwise we abort to keep unique-id semantics
-        stable across the reconfigure round-trip.
+            user_input (dict[str, Any] | None): Form data submitted by the user. When `None`, the reconfigure form is shown.
+        
+        Returns:
+            ConfigFlowResult: A result that either shows the reconfigure form with validation errors, aborts the flow for account mismatches or missing entry, or updates the entry and aborts with a success reason.
         """
         try:
             entry = self._get_reconfigure_entry()
@@ -735,10 +745,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for the account's current password, validate it with the Jackery API, and update the config entry on success.
-
-        Aborts if the reauthentication target entry or its stored username cannot be retrieved. On successful authentication, updates the entry data with API-derived bootstrap fields and aborts with FLOW_ABORT_REAUTH_SUCCESSFUL. On authentication or connection failure, re-displays the password form with an appropriate error shown.
-
+        """
+        Prompt for the account's current password, validate it with the Jackery API, and update the config entry on success.
+        
+        Aborts if the reauthentication target entry or its stored username cannot be retrieved. On successful authentication, updates the entry data with API-derived bootstrap fields, persists any MQTT session snapshot, and aborts with FLOW_ABORT_REAUTH_SUCCESSFUL. On authentication or connection failure, re-displays the password form with an appropriate error.
+        
         Returns:
             ConfigFlowResult: a form to collect a password, an abort result, or an update-and-abort result after successful reauthentication.
         """

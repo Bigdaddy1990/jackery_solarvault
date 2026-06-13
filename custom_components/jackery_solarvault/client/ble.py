@@ -140,14 +140,15 @@ def hex16(value: int) -> str:
 
 
 def parse_hex16(text: str) -> int:
-    """Convert a 4-character hexadecimal string to its integer value.
-
+    """
+    Parse a 4-character hexadecimal string and return its integer value.
+    
     Parameters:
-        text (str): Hex string exactly 4 characters long (case-insensitive).
-
+        text (str): Hexadecimal string exactly 4 characters long (case-insensitive).
+    
     Returns:
         int: Integer value represented by `text`.
-
+    
     Raises:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
     """
@@ -211,14 +212,15 @@ def crc16_hex(data: bytes) -> str:
 
 
 def _validate_key_len(key: bytes, *, fn: str) -> None:
-    """Validate that `key` has a supported AES length (16 or 32 bytes).
-
+    """
+    Ensure `key` has a supported AES length (16 or 32 bytes).
+    
     Parameters:
-        key (bytes): The AES key to validate.
-        fn (str): Function name used in the raised error message when validation fails.
-
+        key (bytes): AES key to validate.
+        fn (str): Name of the calling function; used as a prefix in the raised error message.
+    
     Raises:
-        ValueError: If `len(key)` is not 16 or 32; the error message prefixes with `fn`.
+        ValueError: If `len(key)` is not 16 or 32; message is prefixed with `fn`.
     """
     if len(key) not in BLE_AES_KEY_LENGTHS:
         raise ValueError(  # noqa: TRY003
@@ -676,13 +678,14 @@ def encrypt_frame(
 
 
 def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
-    """Decrypts an AES-CBC-PKCS7 encrypted BLE frame (IV || ciphertext), verifies its CRC suffix, and returns the parsed BleFrame.
-
-    Decrypts the input blob expecting a 16-byte IV followed by AES-CBC ciphertext, UTF-8 decodes the plaintext, verifies the trailing CRC-16 (Modbus) over the preceding data, strips the 16-bit random tag, and parses the remaining hex-string plaintext into a BleFrame.
-
+    """
+    Decrypt a BLE plaintext frame encrypted with AES-CBC-PKCS7 and return the parsed BleFrame.
+    
+    Decrypts an IV-prefixed blob (16-byte IV || ciphertext), verifies the trailing Modbus CRC-16 over the plaintext-with-tag, removes the appended 16-bit random tag, and parses the remaining hex-string plaintext into a BleFrame.
+    
     Returns:
-        BleFrame: The parsed frame extracted from the decrypted plaintext.
-
+        BleFrame: The parsed frame extracted from the decrypted and verified plaintext.
+    
     Raises:
         ValueError: If the input blob is shorter than IV + one AES block, if the decrypted plaintext is too short to contain the random tag and CRC, or if the CRC verification fails.
     """
@@ -763,18 +766,19 @@ def split_payload_into_frames(
     ble_cmd: int,
     mtu: int,
 ) -> list[BleFrame]:
-    """Split a logical payload into a sequence of BLE frames sized for the given MTU.
-
-    For a non-empty payload, the payload is sliced into chunks sized by chunk_size_for_mtu(mtu). Each chunk is returned as a BleFrame with a 1-based frame_index, the total chunk_count, and the provided action_id and ble_cmd. For an empty payload, returns a single BleFrame with an empty chunk_payload and chunk_count set to 1.
-
+    """
+    Split a payload into BLE-sized frames for the given MTU.
+    
+    Non-empty payloads are sliced into chunks of size chunk_size_for_mtu(mtu); each chunk is returned as a BleFrame with a 1-based frame_index, the total chunk_count, and the provided action_id and ble_cmd. For an empty payload, returns a single BleFrame with an empty chunk_payload and chunk_count set to 1.
+    
     Parameters:
-        payload (bytes): The full logical payload to split.
-        action_id (int): Action identifier carried into each resulting frame.
-        ble_cmd (int): BLE command identifier carried into each resulting frame.
-        mtu (int): Maximum transmission unit used to compute per-frame chunk size.
-
+    	payload (bytes): The full logical payload to split.
+    	action_id (int): Action identifier to include in each resulting frame.
+    	ble_cmd (int): BLE command identifier to include in each resulting frame.
+    	mtu (int): Maximum transmission unit used to compute per-frame chunk size.
+    
     Returns:
-        list[BleFrame]: Ordered list of frames representing the payload chunks.
+    	list[BleFrame]: Ordered list of frames representing the payload chunks.
     """
     chunk_size = chunk_size_for_mtu(mtu)
     if not payload:

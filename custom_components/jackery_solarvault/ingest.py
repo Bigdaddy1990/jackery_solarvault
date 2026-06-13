@@ -72,13 +72,14 @@ def is_periodic_section(section_key: str) -> bool:
 
 
 def _is_blankable(value: object) -> bool:
-    """Determine whether a value should be treated as blank and ignored when merging live properties.
-
+    """
+    Determine whether a value should be treated as blank.
+    
     A value is considered blank if it is:
     - `None`
     - a string that is empty or contains only whitespace
     - an empty `list` or `dict`
-
+    
     Returns:
         `True` if the value is blank as described above, `False` otherwise.
     """
@@ -93,22 +94,17 @@ def merge_live_properties(
     base: dict[str, Any],
     update: dict[str, Any],
 ) -> dict[str, Any]:
-    """Merge live device-property fields without ever blanking populated keys.
-
-    Perform a recursive, update-wins merge where empty or blanking values in
-    `update` do not overwrite populated values in `base`. Dictionary values are
-    merged recursively; non-dictionary values from `update` replace those in
-    `base` unless the `update` value is blank (None, empty/whitespace string, or
-    empty list/dict) and the corresponding `base` value is populated.
-
+    """
+    Produce a merged mapping of live device properties where populated base values are never overwritten by blank update values.
+    
+    Performs an update-wins merge: dictionary values are merged recursively; non-dictionary values from `update` replace those in `base` unless the `update` value is considered blank (None, an empty or whitespace-only string, or an empty list/dict) and the corresponding `base` value is populated. The inputs are not mutated.
+    
     Parameters:
         base (dict[str, Any]): Original live properties to merge into.
-        update (dict[str, Any]): Incoming update to apply; blanking values in this
-            mapping will not replace populated values from `base`.
-
+        update (dict[str, Any]): Incoming update to apply; blank values in this mapping will not replace populated values from `base`.
+    
     Returns:
-        dict[str, Any]: A new mapping containing the merged properties with the
-        "never blank populated keys" rule enforced.
+        dict[str, Any]: A new mapping containing the merged properties with the "never blank populated keys" rule enforced.
     """
     merged: dict[str, Any] = dict(base)
     for key, value in update.items():

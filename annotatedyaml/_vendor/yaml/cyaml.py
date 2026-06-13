@@ -19,10 +19,11 @@ from .serializer import *  # noqa: F403
 
 class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Create a C-accelerated base YAML loader configured with the given input stream.
-
+        """
+        Initialize the C-accelerated base YAML loader using the given input stream.
+        
         Parameters:
-            stream: YAML input source — a text string, bytes, or a file-like object providing YAML content.
+            stream: YAML input source — a text string, bytes, or a file-like object that yields YAML content.
         """
         CParser.__init__(self, stream)
         BaseConstructor.__init__(self)  # noqa: F405
@@ -31,10 +32,11 @@ class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
 
 class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Constructs a safe C-accelerated YAML loader for the provided input stream.
-
+        """
+        Construct a safe C-accelerated YAML loader for the given input stream.
+        
         Parameters:
-            stream: YAML input to parse — typically a file-like object, string, or bytes containing YAML content.
+            stream: YAML input to parse — typically a file-like object, str, or bytes containing YAML content.
         """
         CParser.__init__(self, stream)
         SafeConstructor.__init__(self)  # noqa: F405
@@ -43,10 +45,11 @@ class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
 
 class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Create a C-accelerated loader that applies full construction and tag resolution to the given input stream.
-
+        """
+        Create a C-accelerated loader that performs full construction and tag resolution for the given YAML input.
+        
         Parameters:
-            stream: YAML input source (text/bytes or a file-like object) to be parsed.
+            stream: YAML input source (text, bytes, or a file-like object) to be parsed.
         """
         CParser.__init__(self, stream)
         FullConstructor.__init__(self)  # noqa: F405
@@ -55,10 +58,11 @@ class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
 
 class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Initialize a YAML loader that parses `stream` and constructs Python objects using unsafe construction rules.
-
+        """
+        Initialize the loader to parse `stream` and construct Python objects using unsafe construction rules.
+        
         Parameters:
-            stream: A text or binary file-like object or string containing YAML content to be loaded.
+            stream: A text or binary file-like object or a string containing YAML content to be loaded.
         """
         CParser.__init__(self, stream)
         UnsafeConstructor.__init__(self)  # noqa: F405
@@ -67,10 +71,11 @@ class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
 
 class CLoader(CParser, Constructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """Initialize the default C-backed YAML loader with parsing, construction, and resolution components.
-
+        """
+        Initialize the C-backed YAML loader with parsing, construction, and resolution components.
+        
         Parameters:
-            stream: Input source for YAML content; a text or binary stream or path-like object accepted by the underlying C parser.
+            stream: A text or binary stream or a path-like object providing YAML content.
         """
         CParser.__init__(self, stream)
         Constructor.__init__(self)  # noqa: F405

@@ -20,11 +20,12 @@ class BaseResolver:  # noqa: D101
     yaml_path_resolvers = {}  # noqa: RUF012
 
     def __init__(self) -> None:
-        """Initialize resolver path stacks for experimental path-based tag resolution.
-
+        """
+        Initialize instance stacks used for experimental path-based tag resolution.
+        
         Creates two empty stacks:
-        - resolver_exact_paths: per-depth dicts mapping (path, kind) to resolved tag for exact matches.
-        - resolver_prefix_paths: per-depth lists of (path, kind) candidate entries used while traversing.
+        - resolver_exact_paths: per-depth dictionaries mapping resolver patterns to tags for exact matches.
+        - resolver_prefix_paths: per-depth lists of resolver pattern candidates used while traversing the node tree.
         """
         self.resolver_exact_paths = []
         self.resolver_prefix_paths = []
@@ -178,17 +179,18 @@ class BaseResolver:  # noqa: D101
         current_node,  # noqa: ANN001
         current_index,  # noqa: ANN001
     ) -> bool | None:
-        """Determine whether the resolver path element at the specified depth matches the current traversal node and index.
-
+        """
+        Check whether the resolver path element at the given depth matches the current node and index.
+        
         Parameters:
-                depth (int): 1-based traversal depth used to select the path element to check.
-                path (Sequence[Tuple[Any, Any]]): Compiled resolver path where each element is (node_check, index_check).
-                kind (type | None): Expected node kind for the overall resolver (may be None); used by callers to categorize matches.
-                current_node (Node): The node object at the current traversal position.
-                current_index (int | ScalarNode | None): The current mapping key, sequence index, or `None` when not applicable.
-
+            depth (int): 1-based traversal depth selecting which (node_check, index_check) pair to evaluate.
+            path (Sequence[Tuple[Any, Any]]): Compiled resolver path where each element is (node_check, index_check).
+            kind (type | None): Expected node kind for the overall resolver; accepted but not used by this check.
+            current_node (Node): Node at the current traversal position.
+            current_index (int | ScalarNode | None): Mapping key, sequence index, or `None` when not applicable.
+        
         Returns:
-                True if the node and index satisfy the path element's checks, `None` otherwise.
+            True if both the node and index satisfy the path element's checks, `None` otherwise.
         """
         node_check, index_check = path[depth - 1]
         if isinstance(node_check, str):

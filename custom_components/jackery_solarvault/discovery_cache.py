@@ -28,12 +28,13 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_discovery_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
-    """Retrieve the cached device index for the specified config entry from persistent storage.
-
+    """
+    Retrieve the cached device index for the specified config entry from persistent storage.
+    
     If the stored payload is missing or does not match the expected nested structure, an empty dict is returned.
-
+    
     Returns:
-        Mapping of device ID (as `str`) to a shallow copy of the stored metadata `dict` for each device. Returns an empty dict if no valid cache exists.
+        Mapping from device ID (string) to a shallow copy of that device's metadata dict; returns an empty dict if no valid cache exists.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):

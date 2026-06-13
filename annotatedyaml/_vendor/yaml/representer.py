@@ -118,31 +118,30 @@ class BaseRepresenter:  # noqa: D101
 
     @classmethod
     def add_multi_representer(cls, data_type, representer) -> None:  # noqa: ANN001
-        """Register a multi-type representer on the representer class, using copy-on-write to avoid mutating a parent class's registry.
-
+        """
+        Register a multi-type representer on the class using copy-on-write to avoid mutating a parent class's registry.
+        
         Parameters:
-            cls: The representer class receiving the registration.
-            data_type: The Python type to register the representer for, or `None` to set the fallback representer.
-            representer: Callable used to represent instances of `data_type`.
+            data_type (type | None): Type for which the representer will be used, or `None` to set the fallback representer.
+            representer (callable): Callable that converts instances of `data_type` into a node.
         """
         if "yaml_multi_representers" not in cls.__dict__:
             cls.yaml_multi_representers = cls.yaml_multi_representers.copy()
         cls.yaml_multi_representers[data_type] = representer
 
     def represent_scalar(self, tag, value, style=None):  # noqa: ANN001, ANN201
-        """Create a ScalarNode for the given value using the specified YAML tag and style.
-
-        If `style` is None, the instance's `default_style` is used. If the representer currently
-        has an `alias_key`, the created node is cached in `represented_objects` under that key.
-
+        """
+        Create a YAML ScalarNode with the given tag, value, and style.
+        
+        If `style` is None, `self.default_style` is used. If `self.alias_key` is not None, the created node is cached in `self.represented_objects` under that key.
+        
         Parameters:
             tag (str): YAML tag to assign to the scalar node.
             value (any): Content of the scalar node.
-            style (str | None): Scalar style indicator (e.g., plain, single-quoted, folded); if
-                None, `default_style` is applied.
-
+            style (str | None): Scalar style indicator (e.g., plain, single-quoted, folded); if None, `default_style` is applied.
+        
         Returns:
-            ScalarNode: A YAML scalar node with the provided tag, value, and resolved style.
+            ScalarNode: The created YAML scalar node.
         """
         if style is None:
             style = self.default_style
@@ -233,13 +232,11 @@ class BaseRepresenter:  # noqa: D101
 
 class SafeRepresenter(BaseRepresenter):  # noqa: D101
     def ignore_aliases(self, data) -> bool | None:  # noqa: ANN001, PLR6301
-        """Decides whether YAML aliasing should be disabled for a given value.
-
-        Parameters:
-            data: The value to test for alias suppression.
-
+        """
+        Determine whether YAML aliases should be disabled for a value.
+        
         Returns:
-            `True` if aliases should be ignored for `data` (for `None`, the empty tuple `()`, and instances of `str`, `bytes`, `bool`, `int`, or `float`); `None` otherwise.
+            `True` if aliases should be ignored for the value (for `None`, the empty tuple `()`, or instances of `str`, `bytes`, `bool`, `int`, or `float`); `None` otherwise.
         """
         if data is None:
             return True
@@ -258,26 +255,22 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         return self.represent_scalar("tag:yaml.org,2002:null", "null")
 
     def represent_str(self, data):  # noqa: ANN001, ANN201
-        """Represent a Python string as a YAML scalar with the standard string tag.
-
-        Parameters:
-            data (str): The string value to represent.
-
+        """
+        Represent a Python string as a YAML scalar using the standard string tag.
+        
         Returns:
-            ScalarNode: A YAML scalar node tagged "tag:yaml.org,2002:str" containing the given string.
+            ScalarNode: YAML scalar node with tag "tag:yaml.org,2002:str" containing the input string.
         """
         return self.represent_scalar("tag:yaml.org,2002:str", data)
 
     def represent_binary(self, data):  # noqa: ANN001, ANN201
-        """Represent binary data as a YAML binary scalar.
-
-        Base64-encodes the provided bytes and returns a ScalarNode tagged `tag:yaml.org,2002:binary` using block style.
-
-        Parameters:
-            data (bytes): Binary data to encode.
-
+        """
+        Represent binary data as a YAML binary scalar.
+        
+        Base64-encodes the given bytes and returns a YAML scalar tagged `tag:yaml.org,2002:binary` using block style (`"|"`).
+        
         Returns:
-            ScalarNode: A YAML scalar node containing the base64-encoded ASCII string with block style (`"|"`).
+            ScalarNode: A scalar node containing the base64-encoded ASCII string with block style `"|"`.
         """
         if hasattr(base64, "encodebytes"):
             data = base64.encodebytes(data).decode("ascii")
@@ -286,13 +279,11 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         return self.represent_scalar("tag:yaml.org,2002:binary", data, style="|")
 
     def represent_bool(self, data):  # noqa: ANN001, ANN201
-        """Create a YAML boolean scalar node for the given value.
-
-        Parameters:
-            data (bool): The value to represent; its truthiness determines the scalar content.
-
+        """
+        Create a YAML scalar node using the YAML boolean tag.
+        
         Returns:
-            ScalarNode: A scalar node with the YAML boolean tag whose value is `true` if `data` is truthy, `false` otherwise.
+            ScalarNode: A scalar node with the YAML boolean tag whose value is "true" if the input is truthy, "false" otherwise.
         """
         value = "true" if data else "false"
         return self.represent_scalar("tag:yaml.org,2002:bool", value)
@@ -347,13 +338,11 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         #            pairs = False
         #            break
         # if not pairs:
-        """Represent a Python list as a YAML sequence node.
-
-        Parameters:
-            data (list): The list whose elements should be represented as YAML sequence items.
-
+        """
+        Represent a Python list as a YAML sequence node.
+        
         Returns:
-            SequenceNode: A YAML sequence node tagged `tag:yaml.org,2002:seq` containing the represented elements of `data`.
+            SequenceNode: YAML sequence node tagged "tag:yaml.org,2002:seq" containing the represented elements of `data`.
         """
         return self.represent_sequence("tag:yaml.org,2002:seq", data)
 
@@ -364,10 +353,14 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
     # return SequenceNode(u'tag:yaml.org,2002:pairs', value)
 
     def represent_dict(self, data):  # noqa: ANN001, ANN201
-        """Represent a Python dict as a YAML mapping node using the standard YAML map tag.
-
+        """
+        Represent a Python dict as a YAML mapping node using the standard YAML map tag.
+        
+        Parameters:
+            data (dict): Mapping to represent.
+        
         Returns:
-            A MappingNode for `data` with tag `tag:yaml.org,2002:map`.
+            MappingNode: A YAML mapping node tagged with "tag:yaml.org,2002:map".
         """
         return self.represent_mapping("tag:yaml.org,2002:map", data)
 
@@ -395,13 +388,14 @@ class SafeRepresenter(BaseRepresenter):  # noqa: D101
         return self.represent_scalar("tag:yaml.org,2002:timestamp", value)
 
     def represent_datetime(self, data):  # noqa: ANN001, ANN201
-        """Represent a datetime as an ISO 8601 timestamp scalar.
-
+        """
+        Represent a datetime as an ISO 8601 timestamp scalar.
+        
         Parameters:
-            data (datetime.datetime): The datetime to represent.
-
+            data (datetime.datetime): The datetime to represent; the date and time are separated by a space.
+        
         Returns:
-            ScalarNode: A YAML scalar node with tag `tag:yaml.org,2002:timestamp` whose value is `data.isoformat(" ")` (ISO 8601 with a space between date and time).
+            ScalarNode: A YAML scalar node tagged `tag:yaml.org,2002:timestamp` whose value is `data.isoformat(" ")`.
         """
         value = data.isoformat(" ")
         return self.represent_scalar("tag:yaml.org,2002:timestamp", value)
@@ -601,11 +595,12 @@ class Representer(SafeRepresenter):  # noqa: D101
 
     def represent_ordered_dict(self, data):  # noqa: ANN001, ANN201
         # Provide uniform representation across different Python versions.
-        """Represent an ordered mapping as a YAML `python/object/apply` sequence of key/value pairs.
-
+        """
+        Represent an ordered mapping as a YAML `python/object/apply` sequence while preserving iteration order.
+        
         Parameters:
-            data: An ordered mapping (e.g., collections.OrderedDict) whose iteration order will be preserved when converting to YAML.
-
+            data: An ordered mapping (for example, collections.OrderedDict) whose iteration order will be preserved.
+        
         Returns:
             A SequenceNode tagged with `tag:yaml.org,2002:python/object/apply:{module}.{typename}` containing a single sequence whose element is a list of `[key, value]` pairs representing the mapping's items.
         """

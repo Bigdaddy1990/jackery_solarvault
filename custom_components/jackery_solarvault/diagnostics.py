@@ -49,15 +49,16 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
-
-    Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
-
+    """
+    Produce a deterministic mapping of redacted payloads with original keys replaced by stable generated labels.
+    
+    Processes entries in a stable order (sorted by the string form of each key). Each payload is redacted using `redact_keys`; non-mapping payloads are wrapped as `{"value": payload}` before redaction.
+    
     Parameters:
         payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
         prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
         redact_keys (frozenset[str]): Field names to redact from each payload.
-
+    
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
@@ -194,14 +195,16 @@ def _local_mqtt_diagnostics(
     coordinator: JackerySolarVaultCoordinator | None = None,
     redactions_disabled: bool = False,
 ) -> dict[str, Any]:
-    """Build a diagnostics block for the integration's local MQTT client or indicate that local MQTT is unavailable.
-
+    """
+    Build a diagnostics block describing the integration's local MQTT status and configuration.
+    
+    When the coordinator indicates active local subscriptions, returns a block with "enabled": True, "mode": "homeassistant_mqtt_integration", "subscribed_topic_count", and a "configured_local_mqtt" mirror of host/port/auth/topic settings. If no client is available, returns "enabled": False with a concrete "disabled_reason" (one of "bridge_disabled", "missing_broker_host", "missing_broker_port", "broad_topic_filter_blocked", "missing_topic_filter", or "client_not_started") and the "configured_local_mqtt" mirror. When a client is available and no coordinator subscription indicator is present, returns the client's diagnostics snapshot.
+    
     Parameters:
         redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
-
+    
     Returns:
-        dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
-        MQTT client is available, otherwise the client's diagnostics snapshot.
+        dict[str, Any]: Diagnostics block as described above — either the client's diagnostics snapshot or a structured dictionary reflecting enabled state, reason, and configured local MQTT details.
     """
     enabled = config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE

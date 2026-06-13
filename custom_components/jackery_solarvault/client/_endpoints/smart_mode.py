@@ -18,14 +18,15 @@ class SmartModeEndpointMixin(BaseHTTPMixin):
     async def async_check_smart_mode_set(
         self, *, device_id: str | int, system_id: str | int
     ) -> dict[str, Any]:
-        """Check if smart mode is configured for a device/system.
-
+        """
+        Determine whether smart mode is configured for the given device and system.
+        
         Parameters:
-            device_id: Device identifier.
-            system_id: System identifier.
-
+            device_id (str | int): Device identifier.
+            system_id (str | int): System identifier.
+        
         Returns:
-            dict: Smart mode check result.
+            dict[str, Any]: Smart mode check result as a dictionary.
         """
         data = await self._get_json(
             SMART_MODE_CHECK_PATH,
@@ -34,13 +35,14 @@ class SmartModeEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, SMART_MODE_CHECK_PATH)
 
     async def async_get_smart_mode_info(self, system_id: str | int) -> dict[str, Any]:
-        """Get smart mode configuration.
-
+        """
+        Retrieve smart mode configuration for the specified system.
+        
         Parameters:
-            system_id: System identifier.
-
+            system_id (str | int): Identifier of the system to fetch configuration for.
+        
         Returns:
-            dict: Smart mode configuration.
+            dict[str, Any]: Dictionary containing the smart mode configuration for the system.
         """
         data = await self._get_json(
             SMART_MODE_INFO_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -48,13 +50,14 @@ class SmartModeEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, SMART_MODE_INFO_PATH)
 
     async def async_start_smart_mode(self, system_id: str | int) -> dict[str, Any]:
-        """Start or enable smart mode.
-
+        """
+        Enable smart mode for the specified system.
+        
         Parameters:
-            system_id: System identifier.
-
+            system_id (str | int): Identifier of the target system.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Backend response data.
         """
         return await self._post_json(
             SMART_MODE_START_PATH, {FIELD_SYSTEM_ID: str(system_id)}

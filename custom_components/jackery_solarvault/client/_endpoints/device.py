@@ -66,12 +66,13 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     """Device, system, battery, OTA, and location endpoint methods."""
 
     async def async_get_system_list(self) -> list[dict[str, Any]]:
-        """Fetch the list of systems and their devices from the cloud.
-
-        May update the client's region code by inferring it from the first system with a non-empty countryCode.
-
+        """
+        Fetch the list of systems and their devices from the cloud.
+        
+        May update the client's inferred region code from the first system that contains a non-empty `countryCode`.
+        
         Returns:
-            list[dict]: A list of system objects as returned by the backend; each system typically contains fields such as `id`, `systemName`, `deviceName`, `countryCode`, `currency`, `timezone`, and a `devices` list of device objects.
+            list[dict]: System objects returned by the backend (each typically includes fields like `id`, `systemName`, `devices`, `countryCode`, etc.).
         """
         data = await self._get_json(SYSTEM_LIST_PATH)
         self.last_system_list_response = data
@@ -80,13 +81,14 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         return systems
 
     async def async_get_device_property(self, device_id: str | int) -> dict:
-        """Fetches the device properties for the given device identifier.
-
+        """
+        Retrieve the device properties for a given device identifier.
+        
         Parameters:
-            device_id (str | int): Device identifier; will be stringified for the request.
-
+            device_id (str | int): Device identifier; it will be converted to a string for the request.
+        
         Returns:
-            dict: The device properties dictionary extracted from the response. Returns an empty dict if the response `data` field is missing or is not a dict.
+            dict: Device properties dictionary extracted from the response; an empty dict if the response payload is missing or not a dict.
         """
         data = await self._get_json(
             DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: str(device_id)}
@@ -188,10 +190,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         return []
 
     async def async_get_ota_info(self, device_sn: str) -> dict:
-        """Retrieve OTA information for the device identified by `device_sn`.
-
-        Normalizes multiple backend response shapes and selects the matching OTA item when available.
-
+        """
+        Retrieve OTA information for the device identified by device_sn.
+        
+        Normalizes several backend response shapes and selects the OTA entry that matches the given device serial number.
+        
         Returns:
             dict: OTA information object for the device, or an empty dict if no suitable item is found.
         """
@@ -263,16 +266,17 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         guid: str,
         timezone_offset: int = 0,
     ) -> dict[str, Any]:
-        """Bind a device to the account.
-
+        """
+        Bind a device to the user's account.
+        
         Parameters:
-            bind_key: Device bind key (from QR code or sticker).
-            dev_id: Device identifier.
-            guid: Unique device GUID.
-            timezone_offset: Timezone offset in seconds.
-
+            bind_key (str): Bind key from the device QR code or sticker.
+            dev_id (str): Device identifier.
+            guid (str): Unique device GUID.
+            timezone_offset (int): Timezone offset in seconds.
+        
         Returns:
-            dict: Backend response data.
+            dict: Raw backend response data.
         """
         return await self._post_json(
             DEVICE_BIND_PATH,
@@ -285,13 +289,14 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_unbind_device(self, device_id: str | int) -> dict[str, Any]:
-        """Unbind a device from the account.
-
+        """
+        Unbind a device from the account.
+        
         Parameters:
-            device_id: Device identifier to unbind.
-
+            device_id (str | int): Identifier of the device to unbind.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Backend response data.
         """
         return await self._post_json(DEVICE_UNBIND_PATH, {"deviceId": str(device_id)})
 
@@ -330,10 +335,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_get_device_shared_list(self) -> list[dict[str, Any]]:
-        """List devices shared with the current account.
-
+        """
+        Return the list of devices shared with the current account.
+        
         Returns:
-            list: Shared device entries.
+            list[dict[str, Any]]: Shared device entries as extracted from the backend payload.
         """
         data = await self._get_json(DEVICE_SHARED_LIST_PATH)
         return self._payload_list(data, DEVICE_SHARED_LIST_PATH)
@@ -341,14 +347,15 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_get_device_shared_managers(
         self, *, bind_user_id: str, level: int = 0
     ) -> list[dict[str, Any]]:
-        """List share managers for a binding.
-
+        """
+        Return the list of managers for a shared device binding.
+        
         Parameters:
-            bind_user_id: User ID of the binding owner.
-            level: Share level filter.
-
+            bind_user_id (str): User ID that owns the binding.
+            level (int): Share level filter; only managers at this level are returned.
+        
         Returns:
-            list: Manager entries.
+            list[dict[str, Any]]: List of manager entries as dictionaries.
         """
         data = await self._get_json(
             DEVICE_SHARED_MANAGER_PATH,
@@ -376,12 +383,13 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_remove_all_shared_access(
         self, *, bind_user_id: str, level: int = 0
     ) -> dict[str, Any]:
-        """Remove all shared access for a user.
-
+        """
+        Remove all shared access entries for a user at the specified share level.
+        
         Parameters:
-            bind_user_id: User ID whose access is being removed.
-            level: Share level filter.
-
+            bind_user_id (str): ID of the user whose shared access entries will be removed.
+            level (int): Share level to remove (defaults to 0).
+        
         Returns:
             dict: Backend response data.
         """
@@ -393,15 +401,16 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_check_system_bound(
         self, *, bind_key: str, device_sn: str, guid: str
     ) -> dict[str, Any]:
-        """Check if a system is already bound.
-
+        """
+        Determine whether a system identified by the provided bind key, serial number, and GUID is already bound.
+        
         Parameters:
-            bind_key: Device bind key.
-            device_sn: Device serial number.
-            guid: Device GUID.
-
+            bind_key (str): Device bind key.
+            device_sn (str): Device serial number.
+            guid (str): Device GUID.
+        
         Returns:
-            dict: Backend response data.
+            dict: Backend response data from the system existence endpoint.
         """
         return await self._get_json(
             SYSTEM_EXIST_PATH,
@@ -409,26 +418,29 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:
-        """Create or configure a system.
-
-        Parameters are passed directly to the backend.
-
+        """
+        Create or configure a system using backend-provided parameters.
+        
+        Parameters:
+            **kwargs: Arbitrary keyword arguments forwarded directly to the backend API as the system creation/configuration payload.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: The backend response data.
         """
         return await self._post_json(SYSTEM_CREATE_PATH, kwargs)
 
     async def async_modify_device_name(
         self, *, device_name: str, id: str | int
     ) -> dict[str, Any]:
-        """Rename a device.
-
+        """
+        Set the device's display name.
+        
         Parameters:
-            device_name: New device name.
-            id: Device identifier.
-
+            device_name (str): New device name.
+            id (str | int): Device identifier; converted to string for the request.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Response data from the backend.
         """
         return await self._post_json(
             SYSTEM_DEVICE_NAME_PATH,
@@ -485,13 +497,14 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_get_ble_ota_versions(self, version_list: str) -> dict[str, Any]:
-        """List available BLE OTA versions.
-
+        """
+        Retrieve available BLE OTA versions for the specified version list.
+        
         Parameters:
-            version_list: Version list query parameter.
-
+            version_list (str): Version list query parameter as a raw string.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Backend response data containing OTA version information.
         """
         return await self._post_json(BLE_OTA_VERSIONS_PATH, {"list": version_list})
 
@@ -503,14 +516,15 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         target_firmware_ids: str,
         target_version_id: str,
     ) -> dict[str, Any]:
-        """Start an OTA firmware update.
-
+        """
+        Initiates an OTA firmware update for a device or its sub-device.
+        
         Parameters:
-            device_sn: Device serial number.
-            sub_device_sn: Sub-device serial number (empty for main device).
-            target_firmware_ids: Target firmware IDs.
-            target_version_id: Target version ID.
-
+            device_sn (str): Device serial number.
+            sub_device_sn (str): Sub-device serial number; use an empty string for the main device.
+            target_firmware_ids (str): Comma-separated target firmware IDs or identifier accepted by the backend.
+            target_version_id (str): Target firmware version ID.
+        
         Returns:
             dict: Backend response data.
         """
@@ -527,14 +541,15 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_get_charge_report(
         self, *, device_sn: str, page_index: int = 1
     ) -> dict[str, Any]:
-        """Fetch charge report history.
-
+        """
+        Fetch charge report history for a device.
+        
         Parameters:
             device_sn: Device serial number.
-            page_index: Page number (1-based).
-
+            page_index: Page number, starting at 1.
+        
         Returns:
-            dict: Backend response data.
+            dict: Charge report payload for the requested page, or an empty dict if no payload is present.
         """
         data = await self._get_json(
             CHARGE_REPORT_PATH,

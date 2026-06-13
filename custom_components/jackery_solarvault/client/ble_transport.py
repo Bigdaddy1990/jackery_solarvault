@@ -358,17 +358,19 @@ class JackeryBleListener:
         )
 
     def mtu_for_device(self, device_id: str) -> int:
-        """Get the negotiated BLE MTU for a device.
-
+        """
+        Return the negotiated BLE MTU for the given device.
+        
         Returns:
-            int: Cached MTU for the given `device_id`, or `ble.DEFAULT_BLE_MTU` if no negotiated MTU is available.
+            int: The device's negotiated MTU, or `ble.DEFAULT_BLE_MTU` if no negotiated MTU is cached.
         """
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
-        """Send periodic no-op query frames to keep a device's GATT session active.
-
-        This background loop sends a minimal query (the module's query-device-property command) at the module's keep-alive interval to prevent the peripheral from closing idle BLE connections. The task is cancellable: Cancellation is propagated (CancelledError) while transient write errors are caught and logged so the loop continues.
+        """
+        Periodically sends a minimal query to keep a device's GATT session alive.
+        
+        Runs until the listener stop event is set or the device's client is no longer present. At each keep-alive interval it sends the module's query-device-property command with an empty JSON body to prevent idle BLE disconnects. The task is cancellable (a CancelledError will be propagated); transient write failures are handled internally so the loop continues.
         """
         try:
             while not self._stop_event.is_set():
@@ -649,12 +651,10 @@ class JackeryBleListener:
         )
 
     async def async_stop(self) -> None:
-        """Shut the listener down. Safe to call from coordinator unload.
-
-        Uses a hard timeout on the gather so a stuck GATT disconnect or
-        radio hang cannot block HA shutdown beyond ``_STOP_TIMEOUT_SEC``.
-        Any task that misses the timeout is left to be reaped by the
-        event-loop during interpreter teardown.
+        """
+        Stop the BLE listener and clean up background resources.
+        
+        Sets the internal stop event, unregisters Home Assistant advertisement callbacks, cancels active per-device connection tasks and awaits their completion up to _STOP_TIMEOUT_SEC, clears connection state, cancels any pending ACK futures so writers do not hang, and logs shutdown completion. Connection tasks that do not exit before the timeout are left to be reaped by the event loop.
         """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
@@ -789,7 +789,11 @@ class JackeryBleListener:
     async def _async_run_connection(  # noqa: PLR0915
         self, device_id: str, address: str
     ) -> None:
-        """Maintain a GATT session for one device, reconnecting on drop."""
+        """
+        Maintain a GATT session for a single device, subscribing to notifications and transparently reconnecting on disconnect.
+        
+        This runner establishes a BLE connection to the provided address, publishes the active client to the listener so other operations can reuse the session, starts notification subscription and a periodic keep-alive task, and monitors the connection until it is lost or the listener is stopped. On disconnect or error it cleans up session state (client, negotiated MTU, keep-alive task), records connect/disconnect statistics, and applies a backoff before attempting to reconnect. The method does not return a value; it runs until the listener is stopped or the task is cancelled.
+        """
         from bleak import BleakClient
 
         stats = self.stats_for(device_id)
@@ -845,10 +849,11 @@ class JackeryBleListener:
                     _characteristic: Any,  # noqa: ANN401
                     data: bytearray,  # noqa: ANN401, RUF100
                 ) -> None:
-                    """Handle a BLE notification by forwarding the notification payload to the listener's notification processor.
-
+                    """
+                    Process a BLE notification payload for the associated device and forward it to the listener's notification handler.
+                    
                     Parameters:
-                        data (bytearray): Raw payload from the BLE characteristic; converted to bytes before processing.
+                        data (bytearray): Raw payload received from the BLE characteristic; converted to `bytes` before processing.
                     """
                     await self._handle_notification(device_id, bytes(data))
 
@@ -935,11 +940,10 @@ class JackeryBleListener:
             self._connections.pop(device_id, None)
 
     def _on_disconnect(self, device_id: str) -> None:
-        """Record a disconnect event for the given device.
-
-        Updates the device's statistics with the current disconnect timestamp and emits a debug log.
-        Parameters:
-                device_id (str): Identifier of the Jackery device whose disconnect is being recorded.
+        """
+        Record the current time as the device's last disconnect timestamp.
+        
+        Updates the per-device statistics by setting BleListenerStats.last_disconnect_at to now.
         """
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
@@ -950,13 +954,14 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """Decrypt + parse a 0xEE02 notify frame and forward it to the sink.
-
-        The wire format is the live-captured binary layout documented in
-        :func:`.ble.decrypt_binary_notify` (``iv || ciphertext`` containing
-        a DFED-prefixed binary header + body + 4-byte trailer). Both the
-        raw bytes and the decoded :class:`.ble.BleBinaryFrame` are emitted
-        so the diagnostics surface can still help if decode fails.
+        """
+        Process a received BLE notify payload for the given device and forward a parsed observation to the sink.
+        
+        Attempts to decrypt and parse the raw notification into a BleBinaryFrame when an AES key for the device is available, records per-device statistics and last-frame diagnostics, resolves any pending ACK waiters when a frame is successfully parsed, and forwards a BleFrameObservation (including raw bytes, base64 form, parsed frame if available, and a decode error message if decoding failed) to the configured frame sink.
+        
+        Parameters:
+            device_id (str): Identifier of the originating device.
+            raw (bytes): Raw notification payload as received from BLE.
         """
         stats = self.stats_for(device_id)
         stats.frames_received += 1

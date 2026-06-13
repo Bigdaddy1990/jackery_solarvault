@@ -49,10 +49,11 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
     """Hide expected passive broker reset noise from aiomqtt internals."""
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
-        """Suppress aiomqtt passive socket-reset log messages that are expected and noisy.
-
+        """
+        Suppress aiomqtt log records for expected "failed to receive on socket" passive disconnect messages containing common reset indicators.
+        
         Returns:
-            bool: `True` if the record should be logged, `False` if suppressed.
+            bool: `True` if the record should be logged, `False` if it should be suppressed.
         """
         message = record.getMessage()
         if "failed to receive on socket" not in message:
@@ -219,21 +220,19 @@ class JackeryMqttPushClient:
         qos: int = 0,
         retain: bool = False,
     ) -> None:
-        """Publish a mapping as compact UTF-8 JSON to the given MQTT topic.
-
-        If not already connected, waits up to 12 seconds for the client to become connected.
-        Serializes `payload` using compact JSON (no unnecessary whitespace, UTF-8) and publishes it
-        with the specified `qos` and `retain` flags. On success updates the client's last-published
-        topic and publish timestamp.
-
+        """
+        Publish a dict payload as compact UTF-8 JSON to an MQTT topic.
+        
+        If the client is not yet connected, waits up to 12 seconds for connection readiness. Serializes `payload` with compact JSON (no unnecessary whitespace, UTF-8), publishes using the given `qos` and `retain` flags, and on success updates the client's last-published topic and timestamp.
+        
         Parameters:
-                topic: MQTT topic to publish to.
-                payload: Mapping to serialize as the message body.
-                qos: MQTT Quality of Service level (default 0).
-                retain: Whether the broker should retain the message (default False).
-
+        	topic (str): MQTT topic to publish to.
+        	payload (dict[str, Any]): Mapping to serialize as the message body.
+        	qos (int): MQTT Quality of Service level.
+        	retain (bool): Whether the broker should retain the message.
+        
         Raises:
-                RuntimeError: If the MQTT client is not running or the publish fails.
+        	RuntimeError: If the MQTT client is not running or the publish fails.
         """
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if not self._connected:
@@ -571,13 +570,14 @@ class JackeryMqttPushClient:
         topic: str,
         payload: bytes | bytearray | str,
     ) -> None:
-        """Validate and dispatch an incoming MQTT message payload.
-
-        Parses the payload as UTF-8 JSON and requires the top-level value to be an object. If `FIELD_BODY` is not a dict but `FIELD_DATA` is, promotes `FIELD_DATA` into `FIELD_BODY`. On successful validation updates diagnostics (`_messages_seen`, `_last_message_at`, clears `_last_message_error`) and schedules the configured message callback with `(topic, data)`. On parse or validation failure increments `_messages_dropped` and sets `_last_message_error`.
-
+        """
+        Validate and dispatch an incoming MQTT message payload.
+        
+        Parses the payload as UTF-8 JSON and requires the top-level value to be an object. If `FIELD_BODY` is not a dict but `FIELD_DATA` is a dict, promotes `FIELD_DATA` into `FIELD_BODY`. On success updates diagnostics (`_messages_seen`, `_last_message_at`, clears `_last_message_error`) and schedules the configured message callback with `(topic, data)`. On parse or validation failure increments `_messages_dropped` and sets `_last_message_error`.
+        
         Parameters:
             topic (str): MQTT topic the message was received on.
-            payload (bytes | bytearray | str): Raw message payload; bytes/bytearray are decoded as UTF-8, str is used as-is.
+            payload (bytes | bytearray | str): Raw message payload; `bytes`/`bytearray` are decoded as UTF-8, `str` is used as-is.
         """
         try:
             if isinstance(payload, str):
@@ -604,28 +604,32 @@ class JackeryMqttPushClient:
         self._schedule_coroutine(self._message_callback(topic, data), "message")
 
     def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        """Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions.
-
+        """
+        Schedule an awaitable to run as a Home Assistant background task and log any non-cancellation exceptions.
+        
+        The awaitable is wrapped and scheduled as a task named "jackery_mqtt_<label>". If the task is cancelled, the cancellation is ignored; any other exception raised by the task is logged.
+        
         Parameters:
             coro (Awaitable[None]): The awaitable to run in the background.
-            label (str): Short label used to name the task (`jackery_mqtt_<label>`) and included in error logs.
-
-        Notes:
-            - The task is created via Home Assistant's `async_create_task`.
-            - If the task is cancelled, the cancellation is ignored; any other exception raised by the task is logged.
+            label (str): Short label used to name the task and included in error logs.
         """
 
         async def _runner() -> None:
-            """Execute the provided coroutine until it completes."""
+            """
+            Run the provided coroutine to completion.
+            
+            Exceptions raised by the coroutine are not caught and will surface to the task's done callback.
+            """
             await coro
 
         task = self._hass.async_create_task(_runner(), name=f"jackery_mqtt_{label}")
 
         def _log_task_result(done: asyncio.Task[None]) -> None:
-            """Log any non-cancellation exception raised by a completed asyncio Task.
-
+            """
+            Log non-cancellation exceptions raised by a completed asyncio Task.
+            
             Parameters:
-                done (asyncio.Task[None]): Completed task whose exception (if any) will be retrieved and logged. Cancellation is ignored.
+                done (asyncio.Task[None]): The completed task whose exception (if any) will be retrieved and logged; cancellations are ignored.
             """
             try:
                 done.result()
@@ -663,40 +667,44 @@ class JackeryMqttPushClient:
         return "/".join(parts)
 
     def diagnostics_snapshot(self, *, redact_topics: bool = True) -> dict[str, Any]:
-        """Provide a snapshot of the client's current diagnostics and computed metrics.
-
+        """
+        Return a diagnostics snapshot of the client's current state and computed metrics.
+        
         Parameters:
-            redact_topics (bool): If True, redact identifying parts of topic strings in the returned
-                `topics` list and `last_published_topic`; if False, return topics unchanged.
-
+            redact_topics (bool): If True, redact the user-specific segment from topic strings in the
+                returned `topics` list and `last_published_topic`; if False, return topics unchanged.
+        
         Returns:
-            dict[str, Any]: Mapping containing connection state, counters, timestamps, broker configuration,
-            TLS information, and computed diagnostics. Notable keys include:
-              - "connected": whether the client is currently connected
-              - "started": whether the client runner task exists
-              - "messages_seen", "messages_dropped": message counters
-              - "topics": list of subscribed topics (redacted when `redact_topics` is True)
-              - "topic_count": number of subscribed topics
-              - "last_error", "last_message_error": last observed error strings
-              - "last_published_topic", "last_connect_at", "last_disconnect_at",
-                "last_message_at", "last_publish_at": last-seen topic/timestamps (ISO strings or None)
-              - "seconds_since_last_message": seconds elapsed since last message (float) or None
-              - "mqtt_silent_for_too_long": whether the connection has been silent past the threshold
-              - "host", "port": broker connection constants
-              - "connect_attempts", "consecutive_auth_failures", "last_connect_failure_signature"
-              - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
-                "tls_certificate_source": TLS and certificate source flags
-              - "library": identifier of the MQTT client library
+            dict[str, Any]: A mapping with connection state, counters, timestamps, broker configuration,
+            TLS information, and computed diagnostics. Notable keys:
+              - connected: whether the client is currently connected
+              - started: whether the client runner task exists
+              - messages_seen, messages_dropped: message counters
+              - birth_publishes, birth_publish_failed, last_birth_at: birth/availability publish metrics
+              - topics: list of subscribed topics (redacted when `redact_topics` is True)
+              - topic_count: number of subscribed topics
+              - last_error, last_message_error: last observed error strings
+              - last_published_topic, last_connect_at, last_disconnect_at, last_message_at, last_publish_at:
+                last-seen topic/timestamps (ISO strings or None)
+              - seconds_since_last_message: seconds elapsed since last message (float) or None
+              - mqtt_silent_for_too_long: whether the connection has been silent past the threshold
+              - host, port: broker connection constants
+              - connect_attempts, consecutive_auth_failures, last_connect_failure_signature:
+                connection/auth diagnostics
+              - tls_insecure, tls_x509_strict_disabled, tls_custom_ca_loaded, tls_certificate_source:
+                TLS and certificate source flags
+              - library: identifier of the MQTT client library
         """
 
         def topic_value(topic: str | None) -> str | None:
-            """Return the topic with the user-specific segment redacted when redaction is enabled.
-
+            """
+            Return the topic string with the user identifier segment redacted when redaction is enabled.
+            
             Parameters:
                 topic (str | None): MQTT topic to process; may be None.
-
+            
             Returns:
-                None if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic.
+                `None` if `topic` is `None`; otherwise the redacted topic when redaction is enabled, or the original topic string.
             """
             return self._redact_topic(topic) if redact_topics else topic
 
@@ -733,10 +741,11 @@ class JackeryMqttPushClient:
 
     @property
     def diagnostics(self) -> dict[str, Any]:
-        """Provide a diagnostics snapshot for the MQTT push client.
-
+        """
+        Produce a diagnostics snapshot for the MQTT push client.
+        
         Returns:
-            dict[str, Any]: Snapshot containing connection state and flags, timestamps for last connect/disconnect/message/publish, message counters and last message error, subscribed topics (optionally redacted) and last published topic, TLS status and certificate source, broker host/port, connection attempt and authentication-failure metrics, and computed monitoring metrics.
+            A mapping containing connection state and readiness, timestamps (last connect/disconnect/message/publish), message counters and last message error, subscribed topics (optionally redacted) and last published topic, TLS/certificate status and source, broker host/port, connection attempt and authentication-failure metrics, and computed monitoring flags (e.g., seconds_since_last_message, mqtt_silent_for_too_long).
         """
         return self.diagnostics_snapshot()
 
@@ -759,8 +768,9 @@ class JackeryMqttPushClient:
 
     @property
     def seconds_since_last_message(self) -> float | None:
-        """Seconds elapsed since the last received MQTT message.
-
+        """
+        Return the number of seconds elapsed since the last received MQTT message.
+        
         Returns:
             float | None: Number of seconds since the last message, or `None` if no last-message timestamp is available.
         """
@@ -776,11 +786,11 @@ class JackeryMqttPushClient:
         return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
-        """Determine if the MQTT connection has been silent longer than the configured threshold.
-
-        Uses the time of the most recent received message when available; otherwise falls back to the last connect time.
-        If the client is not connected or no usable timestamp is available, this returns False.
-
+        """
+        Determine whether the MQTT connection has been silent longer than the configured threshold.
+        
+        Uses the timestamp of the most recent received message when available; otherwise falls back to the last connect time. Returns False if the client is not connected or no usable timestamp can be determined.
+        
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
         """
@@ -800,10 +810,11 @@ class JackeryMqttPushClient:
 
     @property
     def is_started(self) -> bool:
-        """Whether the MQTT push client's background runner task exists.
-
+        """
+        Indicates whether the MQTT push client's background runner task is active.
+        
         Returns:
-            `True` if the client has an active runner task, `False` otherwise.
+            bool: `True` if a runner task exists, `False` otherwise.
         """
         return self._runner_task is not None
 

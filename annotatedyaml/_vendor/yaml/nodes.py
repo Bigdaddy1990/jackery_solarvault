@@ -67,14 +67,15 @@ class CollectionNode(Node):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         flow_style=None,  # noqa: ANN001
     ) -> None:
-        """Initialize a collection-style YAML node with its tag, contained value, optional source marks, and flow style.
-
+        """
+        Create a collection-style YAML node with a tag, contained value, optional source marks, and flow-style indicator.
+        
         Parameters:
             tag: YAML tag that identifies the node.
             value: Node content — for SequenceNode, a list of child nodes; for MappingNode, a list of (key_node, value_node) pairs.
             start_mark: Optional source location marking the start of the node.
             end_mark: Optional source location marking the end of the node.
-            flow_style: Optional flow-style indicator: `True` for flow form, `False` for block form, or `None` to keep the original/unspecified style.
+            flow_style: Optional flow-style indicator: True for flow form, False for block form, or None to preserve/leave unspecified.
         """
         self.tag = tag
         self.value = value

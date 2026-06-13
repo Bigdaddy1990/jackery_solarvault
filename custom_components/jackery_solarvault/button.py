@@ -158,8 +158,9 @@ async def _get_time_zone(
 async def _send_time_zone(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Send the configured time zone to the device identified by device_id.
-
+    """
+    Send the configured time zone to the given device.
+    
     Parameters:
         device_id (str): Identifier of the target device.
     """
@@ -169,15 +170,19 @@ async def _send_time_zone(
 async def _sync_mqtt_connect_info(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Synchronizes a device's MQTT connection information via the coordinator."""
+    """
+    Request the coordinator to synchronize MQTT connection information for the given device.
+    
+    """
     await coordinator.async_sync_mqtt_connect_info(device_id)
 
 
 async def _query_device_ota_version(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Request the device's OTA firmware version through the coordinator.
-
+    """
+    Request the OTA firmware version for the specified device.
+    
     Parameters:
         device_id (str): Unique identifier of the target device.
     """
@@ -198,7 +203,12 @@ async def _query_third_party_mqtt_config(
 async def _query_wifi_config(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Request the device Wi-Fi configuration via the coordinator."""
+    """
+    Request the Wi-Fi configuration for the specified device through the coordinator.
+    
+    Parameters:
+        device_id (str): Coordinator-managed device identifier.
+    """
     await coordinator.async_query_wifi_config(device_id)
 
 
@@ -231,9 +241,10 @@ async def _query_meter_heads(
 async def _query_smart_plugs(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Request an update of the device's smart-plug inventory.
-
-    This asks the integration coordinator to fetch the smart-plug list for the specified device.
+    """
+    Request the device's smart-plug inventory from the coordinator.
+    
+    Triggers the coordinator to fetch and update the smart-plug list for the given device.
     """
     await coordinator.async_query_smart_plugs(device_id)
 
@@ -256,7 +267,13 @@ async def _query_subdevice_combo(
 async def _portable_restart(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Restart a portable Explorer device (msgId=45, bleMsgType=96)."""
+    """
+    Restart a portable Explorer device by sending the portable reboot command.
+    
+    Parameters:
+        coordinator (JackerySolarVaultCoordinator): Coordinator used to send the command.
+        device_id (str): Identifier of the target portable device.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_RESTART,
@@ -268,7 +285,11 @@ async def _portable_restart(
 async def _portable_power_off(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Power off a portable Explorer device (msgId=46, bleMsgType=97)."""
+    """
+    Shuts down (powers off) the specified portable Explorer device.
+    
+    Sends the portable power-off command for the given device identifier.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_OFF,
@@ -280,7 +301,11 @@ async def _portable_power_off(
 async def _portable_power_pack_blink(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Blink the power pack LEDs on a portable device (msgId=39, bleMsgType=98)."""
+    """
+    Blink the power pack LEDs on the specified portable device.
+    
+    Sends a portable command to request the device blink its power pack LEDs.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
@@ -292,7 +317,12 @@ async def _portable_power_pack_blink(
 async def _portable_read_device_info(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable device info (msgId=6, bleMsgType=3)."""
+    """
+    Request device information from a portable (Explorer) device via the coordinator.
+    
+    Parameters:
+        device_id (str): Identifier of the target portable device.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
@@ -304,7 +334,11 @@ async def _portable_read_device_info(
 async def _portable_read_wifi_list(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable WiFi list (msgId=5, bleMsgType=1)."""
+    """
+    Request the portable device's available WiFi networks.
+    
+    Sends a portable command to query the device WiFi list (msgId=5, bleMsgType=1).
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_WIFI_LIST,
@@ -316,7 +350,13 @@ async def _portable_read_wifi_list(
 async def _portable_get_power_pack_list(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable battery pack list (msgId=8, bleMsgType=6)."""
+    """
+    Request the portable device's list of power/battery packs.
+    
+    Parameters:
+        coordinator: The integration coordinator managing device communication.
+        device_id (str): Identifier of the target portable device.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
@@ -328,7 +368,11 @@ async def _portable_get_power_pack_list(
 async def _portable_get_electricity_data_count(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable electricity data count (msgId=9, bleMsgType=7)."""
+    """
+    Request the portable device's stored electricity data count.
+    
+    Sends a portable command via the coordinator to query how many electricity data records the portable device holds (uses action_id ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT, cmd=9).
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
@@ -340,7 +384,9 @@ async def _portable_get_electricity_data_count(
 async def _portable_send_time_zone(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Send timezone to portable device (msgId=25, bleMsgType=8)."""
+    """
+    Send the coordinator's configured time zone to the specified portable device.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_SEND_TIME_ZONE,
@@ -352,7 +398,11 @@ async def _portable_send_time_zone(
 async def _portable_sync_mqtt_info(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Sync MQTT connection info on portable device (msgId=50, bleMsgType=99)."""
+    """
+    Synchronize MQTT connection information on a portable device.
+    
+    Sends the appropriate portable command through the coordinator to update the device's MQTT connection settings.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
@@ -376,7 +426,11 @@ async def _portable_get_wifi_config(
 async def _portable_get_charge_plan(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable charge/discharge plan (msgId=26)."""
+    """
+    Request the portable unit's charge/discharge plan.
+    
+    Sends the portable query for the device's electricity strategy (message type MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY, command 26).
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
@@ -402,7 +456,12 @@ async def _portable_current_charge_plan(
 async def _portable_get_peaks_troughs(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable TOU peaks/troughs schedule (msgId=43)."""
+    """
+    Request the portable device's time-of-use (TOU) peaks and troughs schedule.
+    
+    Parameters:
+        device_id (str): Identifier of the target portable device.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
@@ -415,7 +474,11 @@ async def _portable_get_peaks_troughs(
 async def _portable_read_sub_ct(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable sub-device CT (msgId=51, bleMsgType=110)."""
+    """
+    Request the portable device to read sub-device CT (current transformer) properties.
+    
+    This triggers sending the appropriate portable query command for sub-device CT to the coordinator.
+    """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_SUB_CT,
@@ -726,12 +789,16 @@ def _storm_alerts(weather_plan: object) -> list[dict[str, Any]]:
 
 
 def _smart_plug_device_sn(plug: object) -> str | None:
-    """Extract the smart-plug device serial used for schedule commands.
-
-    Checks FIELD_DEVICE_SN, then FIELD_DEV_SN, then FIELD_SN and returns the first non-empty value as a string.
-
+    """
+    Extract the stable serial number for a smart plug from a plug mapping.
+    
+    Checks the plug mapping for FIELD_DEVICE_SN, then FIELD_DEV_SN, then FIELD_SN and returns the first non-empty value found.
+    
+    Parameters:
+        plug (object): A mapping-like object representing a smart plug (typically a dict).
+    
     Returns:
-        The device serial as a string when available, `None` otherwise.
+        str: The serial number as a string when available, `None` otherwise.
     """
     if not isinstance(plug, dict):
         return None
@@ -758,10 +825,13 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
-        """Append the given ButtonEntity to entities if its unique identifier has not been seen, and record that identifier to prevent duplicate button entities.
-
+        """
+        Append a ButtonEntity to the provided list if its unique identifier has not already been recorded.
+        
+        Records the entity's unique id to prevent registering duplicate button entities.
+        
         Parameters:
-            entities (list[ButtonEntity]): List to append to when the entity is unique.
+            entities (list[ButtonEntity]): List to append the entity to when unique.
             entity (ButtonEntity): Button entity to check and append.
         """
         append_unique_entity(
@@ -879,10 +949,11 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         *,
         description: JackeryQueryButtonDescription,
     ) -> None:
-        """Create a query button entity for a specific device using a button description.
-
+        """
+        Create a query button entity for a specific device from a query button description.
+        
         Parameters:
-            description (JackeryQueryButtonDescription): Metadata for the button; `description.key` becomes the entity key and `description.translation_key` / `description.icon` are set on the entity.
+            description (JackeryQueryButtonDescription): Metadata for the button; `description.key` is used as the entity key and `description.translation_key` / `description.icon` are applied to the entity.
         """
         super().__init__(coordinator, device_id, description.key)
         self._query_description = description
@@ -911,12 +982,12 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         return attrs
 
     def _raise_action_error(self, error: object) -> None:
-        """Raise a Home Assistant translated action-failed error for this button.
-
+        """
+        Raise a Home Assistant translated "action failed" error for this button.
+        
         Raises:
-            HomeAssistantError: An error with translation_domain set to DOMAIN, translation_key
-                "entity_action_failed", and translation_placeholders containing `entity`,
-                `device_id`, and `error`.
+            HomeAssistantError: Error with translation_domain=DOMAIN, translation_key="entity_action_failed",
+            and translation_placeholders containing `entity`, `device_id`, and `error`.
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -929,9 +1000,10 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Trigger the configured query action for this entity's device.
-
-        Invokes the action from the associated query description for this device. Re-raises ConfigEntryAuthFailed; if a HomeAssistantError contains a `translation_key` it is re-raised as-is; all other errors are converted and raised via the entity's `_raise_action_error` helper.
+        """
+        Execute the query action defined by this entity's query description.
+        
+        Calls the configured action callable for this entity's device. Propagates ConfigEntryAuthFailed; if a HomeAssistantError with a `translation_key` is raised it is propagated unchanged; any other exception is converted and raised via this entity's `_raise_action_error` helper.
         """
         try:
             await self._query_description.action(self.coordinator, self._device_id)
@@ -964,10 +1036,13 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         super().__init__(coordinator, device_id, "reboot_device")
 
     def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable Home Assistant error for a failed button action.
-
-        Raises a HomeAssistantError with translation_domain=DOMAIN and translation_key="entity_action_failed".
-        The error includes translation placeholders: "entity" set to "reboot_device", "device_id" set to this entity's device id, and "error" set to str(error).
+        """
+        Raise a translatable HomeAssistantError for a failed reboot action.
+        
+        The exception uses translation_domain=DOMAIN and translation_key="entity_action_failed" and includes translation placeholders:
+        - "entity": "reboot_device"
+        - "device_id": this entity's device id
+        - "error": str(error)
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -980,9 +1055,10 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Restart the associated device and request a coordinator refresh.
-
-        This triggers a device reboot via the coordinator and then requests the coordinator to refresh device data.
+        """
+        Reboot the associated device and request the coordinator to refresh its data.
+        
+        If authentication fails, the original ConfigEntryAuthFailed is propagated. A HomeAssistantError that already has a `translation_key` is re-raised unchanged; all other exceptions are converted and surfaced via `_raise_action_error`.
         """
         try:
             await self.coordinator.async_reboot_device(self._device_id)
@@ -1007,7 +1083,9 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
     ) -> None:
-        """Create a button entity that refreshes the device weather/storm plan."""
+        """
+        Create the button entity that triggers querying the device weather and storm plan.
+        """
         super().__init__(coordinator, device_id, "refresh_weather_plan")
 
     def _raise_action_error(self, error: object) -> None:
@@ -1033,11 +1111,12 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Refresh the device's weather/storm plan and request a coordinator refresh.
-
+        """
+        Refresh the device weather/storm plan and trigger a coordinator refresh.
+        
         Raises:
-            ConfigEntryAuthFailed: If authentication with the config entry has failed (re-raised).
-            HomeAssistantError: Re-raised if the caught error already contains a `translation_key`; otherwise raised with a translation key indicating the entity action failed.
+            ConfigEntryAuthFailed: If authentication with the config entry has failed.
+            HomeAssistantError: If the action fails; if the caught error already has a `translation_key` it is re-raised unchanged, otherwise a `HomeAssistantError` is raised with a translation key indicating the entity action failed.
         """
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
@@ -1087,10 +1166,13 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Provide the command metadata exposed as entity attributes for this schedule-read button.
-
+        """
+        Expose the schedule-read command metadata as entity attributes.
+        
+        Includes "taskType" and, when this button targets a specific smart plug, the plug's device serial under FIELD_DEVICE_SN.
+        
         Returns:
-            dict[str, Any]: A dictionary including "taskType" and, if present, the device serial under FIELD_DEVICE_SN.
+            dict[str, Any]: Attributes dictionary containing "taskType" and optionally FIELD_DEVICE_SN.
         """
         attrs: dict[str, Any] = {"taskType": self._task_type}
         if self._plug_sn:
@@ -1098,12 +1180,12 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         return attrs
 
     def _raise_action_error(self, error: object) -> None:
-        """Raise a Home Assistant translated action-failed error for this button.
-
+        """
+        Raise a Home Assistant translated "action failed" error for this button.
+        
         Raises:
-            HomeAssistantError: An error with translation_domain set to DOMAIN, translation_key
-                "entity_action_failed", and translation_placeholders containing `entity`,
-                `device_id`, and `error`.
+            HomeAssistantError: Error with translation_domain=DOMAIN, translation_key="entity_action_failed",
+            and translation_placeholders containing `entity`, `device_id`, and `error`.
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -1165,12 +1247,13 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
     @property
     def _alert(self) -> dict[str, Any]:
-        """Return the storm alert dict from the current payload that matches this button's alert id.
-
-        Searches the entity payload's weather plan alerts and returns the alert whose stable alert id equals self._alert_id.
-
+        """
+        Finds the storm alert in the current payload that matches this button's alert id.
+        
+        Scans the entity payload's weather plan alerts and returns the alert dictionary whose stable alert id equals this button's stored alert id.
+        
         Returns:
-            dict: The matching alert dictionary, or an empty dict if no matching alert is present.
+            dict[str, Any]: The matching alert dictionary, or an empty dict if no matching alert is present.
         """
         payload = self._payload
         if payload:
@@ -1226,11 +1309,12 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Delete the associated storm alert and request the coordinator to refresh device data.
-
+        """
+        Delete the associated storm alert and request a coordinator data refresh.
+        
         Raises:
-            ConfigEntryAuthFailed: If authentication with the config entry failed.
-            HomeAssistantError: On other failures; raised with a translated error message and placeholders.
+            ConfigEntryAuthFailed: If authentication with the config entry failed (re-raised).
+            HomeAssistantError: If an error occurs; errors that already have a `translation_key` are re-raised, other exceptions are converted and raised via the entity's `_raise_action_error`.
         """
         try:
             await self.coordinator.async_delete_storm_alert(

@@ -166,17 +166,18 @@ class AuthEndpointMixin(BaseHTTPMixin):
         return token
 
     async def async_get_mqtt_credentials(self) -> dict[str, str]:
-        """Build MQTT client credentials from the active authenticated session.
-
+        """
+        Construct MQTT connection credentials from the active authenticated session.
+        
         Returns:
             dict[str, str]: Mapping with keys:
-                - ``clientId``: MQTT client identifier.
-                - ``username``: MQTT username (constructed from the login ``userId`` and MAC id).
-                - ``password``: MQTT password: AES-CBC(encrypt(username)) encoded as base64 using the login-derived seed.
+                - ``clientId``: MQTT client identifier composed from the login user id and client suffix.
+                - ``username``: MQTT username composed from the login user id and MAC id.
+                - ``password``: Base64-encoded AES-CBC encryption of ``username`` using the login-provided seed.
                 - ``userId``: MQTT user id from the login response.
-
+        
         Raises:
-            JackeryAuthError: If authentication has not provided required MQTT fields.
+            JackeryAuthError: If the session is missing required MQTT fields, if the MQTT seed is not valid base64, or if the decoded seed is not exactly 32 bytes.
         """
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
@@ -214,22 +215,45 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
     @property
     def mqtt_fingerprint(self) -> tuple[str | None, str | None, str | None]:
-        """Tuple that changes whenever a new login session rotates MQTT seed."""
+        """
+        Current MQTT fingerprint identifying the session's MQTT credentials.
+        
+        Returns:
+            tuple[str | None, str | None, str | None]: `(user_id, mac_id, seed_b64)` where
+                `user_id` is the MQTT user identifier or `None`,
+                `mac_id` is the MQTT MAC identifier or `None`,
+                `seed_b64` is the base64-encoded MQTT seed or `None`.
+        """
         return (self._mqtt_user_id, self._mqtt_mac_id, self._mqtt_seed_b64)
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """Identify the source of the current MQTT MAC ID."""
+        """
+        Identify the source of the current MQTT MAC ID.
+        
+        Returns:
+            source (str): A string describing how the MQTT MAC ID was obtained (for example, the provider or method).
+        """
         return self._mqtt_mac_id_source
 
     @property
     def mqtt_mac_id(self) -> str | None:
-        """Return the MQTT MAC ID assigned to the current MQTT session, if available."""
+        """
+        Get the MQTT MAC ID for the current session.
+        
+        Returns:
+            str | None: The MQTT MAC ID as a string, or None if no MAC ID is available.
+        """
         return self._mqtt_mac_id
 
     @property
     def region_code(self) -> str | None:
-        """Get the region code pinned for HTTP login calls."""
+        """
+        Return the region code used for HTTP login calls.
+        
+        Returns:
+            str | None: The pinned region code, or None if none is set.
+        """
         return self._region_code
 
     # --- New auth endpoints (PROTOCOL.md §2) --------------------------------
@@ -242,16 +266,17 @@ class AuthEndpointMixin(BaseHTTPMixin):
         region_code: str,
         verification_code: str,
     ) -> dict[str, Any]:
-        """Register a new Jackery account.
-
+        """
+        Create a new Jackery account using the provided email, password, region code, and verification code.
+        
         Parameters:
-            email: Email address for the new account.
-            password: Desired password.
-            region_code: Region/country code.
-            verification_code: Email verification code.
-
+            email (str): Email address for the new account.
+            password (str): Desired account password.
+            region_code (str): Region or country code to register the account under.
+            verification_code (str): Verification code sent to the email.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Decoded backend response payload.
         """
         return await self._post_json(
             REGISTER_PATH,
@@ -353,13 +378,14 @@ class AuthEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_update_user_info(self, *, nick_name: str) -> dict[str, Any]:
-        """Update the user's display name.
-
+        """
+        Update the user's display name.
+        
         Parameters:
-            nick_name: New display name.
-
+            nick_name (str): New display name; sent to the backend as the `nickName` field.
+        
         Returns:
-            dict: Backend response data.
+            dict[str, Any]: Decoded backend response data.
         """
         return await self._post_json(MODIFY_INFO_PATH, {"nickName": nick_name})
 
@@ -375,10 +401,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
         return await self._post_json(UPLOAD_HEADIMG_PATH, {"image": image})
 
     async def async_get_user_info(self) -> dict[str, Any]:
-        """Fetch the current user's profile information.
-
+        """
+        Return the decoded backend payload for the current user's profile.
+        
         Returns:
-            dict: User profile data.
+            dict[str, Any]: User profile data as returned by the backend.
         """
         data = await self._get_json(USER_INFO_PATH)
         return self._payload_dict(data, USER_INFO_PATH)
@@ -386,14 +413,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
     async def async_cancel_account(
         self, *, email: str, verification_code: str
     ) -> dict[str, Any]:
-        """Cancel (delete) the user account.
-
-        Parameters:
-            email: Account email address.
-            verification_code: Email verification code.
-
+        """
+        Cancel the authenticated user's account using a verification code.
+        
         Returns:
-            dict: Backend response data.
+            dict: Backend response payload.
         """
         return await self._post_json(
             CANCEL_ACCOUNT_PATH,
@@ -401,13 +425,14 @@ class AuthEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_update_register_id(self, *, register_id: str) -> dict[str, Any]:
-        """Update the push registration ID.
-
+        """
+        Update the push notification registration ID for the authenticated account.
+        
         Parameters:
-            register_id: Push notification registration token.
-
+            register_id (str): Push notification registration token to associate with the account.
+        
         Returns:
-            dict: Backend response data.
+            dict: Backend response payload.
         """
         return await self._post_json(
             UPDATE_REGISTER_ID_PATH, {"registerId": register_id}

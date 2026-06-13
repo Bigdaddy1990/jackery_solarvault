@@ -356,16 +356,15 @@ def dump_all(  # noqa: ANN201, PLR0913, PLR0917
     tags=None,  # noqa: ANN001
     sort_keys=True,  # noqa: ANN001
 ):
-    """Serialize a sequence of Python objects into YAML and write it to the given stream or return the serialized content when no stream is provided.
-
-    If `stream` is None, the function returns the produced YAML: a `str` when `encoding` is None, or `bytes` when `encoding` is provided.
-
+    """
+    Serialize a sequence of Python objects to YAML, writing to the provided stream or returning the serialized output when no stream is provided.
+    
     Parameters:
-        stream: Optional file-like object to write output to. If omitted, an in-memory text or binary buffer is used and its contents are returned.
-        Dumper: Dumper class to use for serialization.
-        encoding: If provided, output is produced as `bytes`; otherwise output is `str`.
-        sort_keys: When True, mapping keys are sorted before serialization; when False, insertion order is preserved.
-
+        stream (optional): File-like object to write output to. If omitted, an in-memory text buffer is used when `encoding` is None (resulting in `str`), otherwise an in-memory binary buffer is used (resulting in `bytes`).
+        Dumper (class, optional): Dumper class used for serialization.
+        encoding (str or None, optional): If provided, output is produced as `bytes`; if `None`, output is produced as `str`.
+        sort_keys (bool, optional): When True, mapping keys are sorted before serialization; when False, insertion order is preserved.
+    
     Returns:
         `str` if `stream` is None and `encoding` is None, `bytes` if `stream` is None and `encoding` is provided, or `None` when writing to a provided stream.
     """
@@ -554,9 +553,15 @@ class YAMLObjectMetaclass(type):
     """The metaclass for YAMLObject."""
 
     def __init__(cls, name, bases, kwds) -> None:  # noqa: ANN001
-        """Initialize the metaclass and, if the class defines a non-None `yaml_tag`, register its YAML constructor and representer.
-
+        """
+        Initialize the metaclass and, if the class defines a non-None `yaml_tag`, register its YAML constructor and representer.
+        
         If `kwds` contains a non-None `yaml_tag`, registers `cls.from_yaml` as the constructor for that tag on each loader in `cls.yaml_loader` (or on the single loader object), and registers `cls.to_yaml` as the representer for `cls` on `cls.yaml_dumper`.
+        
+        Parameters:
+            name (str): The class name being created.
+            bases (tuple): Base classes of the class being created.
+            kwds (dict): Keyword attributes supplied to the class statement; a non-None `yaml_tag` in this dict triggers registration.
         """
         super().__init__(name, bases, kwds)
         if "yaml_tag" in kwds and kwds["yaml_tag"] is not None:
@@ -584,12 +589,13 @@ class YAMLObject(metaclass=YAMLObjectMetaclass):
 
     @classmethod
     def from_yaml(cls, loader, node):  # noqa: ANN001, ANN206
-        """Create an instance of the class from a YAML representation node.
-
+        """
+        Create an instance of the class from a YAML representation node.
+        
         Parameters:
-            loader: The loader responsible for constructing Python objects from representation nodes.
+            loader: The loader used to construct Python objects from representation nodes.
             node: The YAML representation node describing the object.
-
+        
         Returns:
             An instance of `cls` constructed from `node`.
         """
