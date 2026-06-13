@@ -27,6 +27,7 @@ jobs:
           ruff check . --preview || true
           ruff check . --line-length 88 || true
           ruff check . --show-fixes || true
+          ruff format . || true
           ruff check . --add-noqa || true
           ruff format . || true
           ruff check . --fix --extend-select "E","F","I","B","UP","TID","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
@@ -35,6 +36,7 @@ jobs:
           ruff check . --output-format=github || true
           ruff format . || true
           ruff check . --fix || true
+          ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual pyupgrade --all-files || true
           pre-commit run --hook-stage manual mypy --all-files || true
