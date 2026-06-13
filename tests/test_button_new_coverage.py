@@ -352,12 +352,12 @@ class TestQueryButtonDescriptions:
         assert isinstance(QUERY_BUTTON_DESCRIPTIONS, tuple)
 
     def test_has_expected_count(self) -> None:  # noqa: PLR6301
-        """Must have exactly 14 descriptions as implemented."""
+        """Must have exactly 28 descriptions (14 SolarVault + 14 portable)."""
         from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
-        assert len(QUERY_BUTTON_DESCRIPTIONS) == 14  # noqa: PLR2004
+        assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004
 
     def test_all_entries_are_query_button_descriptions(self) -> None:  # noqa: PLR6301
         """All entries must be JackeryQueryButtonDescription instances."""

@@ -8,7 +8,7 @@ Covers:
   when the coordinator raises a HomeAssistantError that already carries a
   translation_key, it must propagate unchanged rather than being wrapped.
 - async_setup: global setup must return True (it only registers services).
-- QUERY_BUTTON_DESCRIPTIONS count: must be exactly 14 (regression pin).
+- QUERY_BUTTON_DESCRIPTIONS count: must be exactly 28 (14 SolarVault + 14 portable, regression pin).
 - _storm_alert_id: integer 0 alertId is distinct from empty string and None.
 - _legacy_suffix_matches: boundary — suffix with trailing underscore before
   a digits-only head is accepted; a head with trailing non-digit is rejected.
@@ -344,15 +344,15 @@ class TestAsyncSetup:
 # ---------------------------------------------------------------------------
 
 
-def test_query_button_descriptions_count_is_14() -> None:
-    """QUERY_BUTTON_DESCRIPTIONS must contain exactly 14 entries (regression pin).
+def test_query_button_descriptions_count_is_28() -> None:
+    """QUERY_BUTTON_DESCRIPTIONS must contain exactly 28 entries (regression pin).
 
-    The PR introduced 14 documented app-command buttons. This test pins the count
-    so that accidental additions or deletions are caught immediately.
+    14 SolarVault app-command buttons plus 14 portable/Explorer powerstation buttons.
+    This test pins the count so that accidental additions or deletions are caught immediately.
     """
     from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS  # noqa: I001
 
-    assert len(QUERY_BUTTON_DESCRIPTIONS) == 14  # noqa: PLR2004
+    assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004
 
 
 def test_query_button_descriptions_unique_action_ids() -> None:
