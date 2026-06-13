@@ -32,13 +32,6 @@ contributors consistently deliver Platinum-quality changes.
 
 Run every command before begin a new task:
 
-```bash
-ruff . check                           # Run Ruff lint (includes UP, E, F, ...)
-ruff . format                          # Apply repository formatting rules
-# repeat till all ruff check errors are fixed
-python -m scripts.enforce_test_requirements  # Confirm tests declare third-party deps
-python -m scripts.*...  #running local hass-tests, enforces, fixtures and sync-files
-mypy custom_components/jackery_solarvault    # Ensure static typing stays strict
 python -m scripts.hassfest \
   --integration-path custom_components/jackery_solarvault  # Validate manifest & strings
 python -m scripts.sync_contributor_guides           # Refresh assistant copies AGENTS/copilot-...
