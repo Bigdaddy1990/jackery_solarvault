@@ -44,6 +44,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from . import ble
+from ..util import first_nonblank_int
 
 if TYPE_CHECKING:
     from homeassistant.components.bluetooth import (
@@ -124,6 +125,14 @@ class BleListenerStats:
     # how much BLE telemetry is still unconsumed (cmd=120 system /
     # per-device / CT variants currently — see coordinator sink).
     unrouted_frames_by_cmd: dict[int, int] = field(default_factory=dict)
+
+
+def _coerce_ble_int(value: Any, field_name: str) -> int:  # noqa: ANN401
+    """Coerce BLE numeric options with shared non-blank integer parsing."""
+    parsed = first_nonblank_int(value)
+    if parsed is None:
+        raise ValueError(f"{field_name} must be an integer")  # noqa: TRY003
+    return parsed
 
 
 @dataclass(slots=True)
@@ -358,7 +367,7 @@ class JackeryBleListener:
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
-            mtu = int(mtu_override)
+            mtu = _coerce_ble_int(mtu_override, "mtu_override")
         else:
             mtu = self.mtu_for_device(device_id)
         try:
@@ -447,7 +456,11 @@ class JackeryBleListener:
         """Create and register a pending-ACK record for ``device_id``."""
         loop = asyncio.get_running_loop()
         pending = _PendingAck(
-            expected_cmds=(frozenset(int(c) for c in ack_cmds) if ack_cmds else None),
+            expected_cmds=(
+                frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
+                if ack_cmds is not None and ack_cmds
+                else None
+            ),
             future=loop.create_future(),
         )
         self._pending_acks.setdefault(device_id, []).append(pending)

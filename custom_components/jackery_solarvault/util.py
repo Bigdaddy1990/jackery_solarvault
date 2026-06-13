@@ -178,7 +178,7 @@ def config_entry_int_option(entry: Any, key: str, default: int) -> int:  # noqa:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -431,6 +431,36 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
     }
 
 
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401
+    """Return the first provided value that can be parsed as an integer.
+
+    Boolean values, blank strings, and non-finite numeric strings are rejected
+    so callers can safely use this for protocol fields that require a real
+    integer value.
+    """
+    for value in values:
+        if value is None or isinstance(value, bool):
+            continue
+        if isinstance(value, str):
+            candidate = value.strip()
+            if not candidate:
+                continue
+        else:
+            candidate = value
+        try:
+            parsed = int(candidate)
+        except (TypeError, ValueError):
+            try:
+                parsed_float = float(candidate)
+            except (TypeError, ValueError):
+                continue
+            if not parsed_float.is_integer():
+                continue
+            parsed = int(parsed_float)
+        return parsed
+    return None
+
+
 def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
     """Parse a Jackery payload value into a floating-point number.
 
@@ -455,7 +485,7 @@ def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -465,10 +495,10 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
@@ -656,7 +686,7 @@ def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
