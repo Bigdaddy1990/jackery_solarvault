@@ -115,8 +115,7 @@ class DeviceEndpointMixin(BaseHTTPMixin):
             SYSTEM_NAME_PATH,
             {FIELD_SYSTEM_NAME: system_name.strip(), FIELD_ID: str(system_id)},
         )
-        return data.get(FIELD_DATA) is True
-
+        return _write_accepted(data)
     async def async_get_location(self, device_id: str | int) -> dict:
         """Retrieve the GPS coordinates previously set for the specified device.
 
