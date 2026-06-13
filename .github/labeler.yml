@@ -21,4 +21,4 @@ chore:
   - head-branch: ['^chore/']
 dependencies:
   - changed-files:
-      - any-glob-to-any-file: ['requirements*.txt', 'pyproject.toml', 'package.json', 'bunfig.toml', '.bun-version', '.pre-commit-config.yaml']
+      - any-glob-to-any-file: ['requirements*.txt', 'pyproject.toml', '.pre-commit-config.yaml']

@@ -10,4 +10,4 @@
 - [ ] Tests check executable code behavior, not markdown/html wording.
 - [ ] Statistic changes keep HTTP polling, MQTT push, BLE transport, app-stat imports, entity-stat imports and repair paths separate.
 - [ ] Historical day repair can correct bad Recorder spike rows; live/current imports remain gap-only.
-- [ ] `bun run lint` and the relevant `bun run test:unit` selection pass locally.
+- [ ] `ruff check .`, `ruff format --check .`, and the relevant `python -m pytest` selection pass locally.

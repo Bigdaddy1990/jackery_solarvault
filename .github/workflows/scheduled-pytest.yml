@@ -5,6 +5,17 @@ on:
     # Run twice per week during the early-morning UTC window to avoid CI contention
     - cron: "0 3 * * 2,5"
   workflow_dispatch:
+    inputs:
+      override_ci_window:
+        description: Set to true after coordinating with maintainers
+        required: true
+        default: "false"
+        type: boolean
+      run_reason:
+        description: Reason for the manual full-suite run
+        required: false
+        default: manual dispatch
+        type: string
 
 permissions:
   contents: read
