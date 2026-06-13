@@ -70,18 +70,8 @@ class JwtResponseData(TypedDict):
     jwt: str
 
 
-class UserInfoResponseData(TypedDict):
-    """user/info response data — same shape as LoginResponseData."""
-
-    userId: str
-    username: str
-    appUserName: str
-    mqttPassWord: str
-    account: str
-    nickname: str | None
-    mobPhone: str | None
-    avatar: str | None
-    passwordFlag: bool
+UserInfoResponseData = LoginResponseData
+"""user/info response data — same shape as LoginResponseData."""
 
 
 class MqttCredentialsResponseData(TypedDict):

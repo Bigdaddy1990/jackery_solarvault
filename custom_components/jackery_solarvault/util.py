@@ -201,7 +201,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -502,7 +502,7 @@ def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -518,10 +518,10 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload val
         return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         try:
             return int(float(value))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 
@@ -753,7 +753,7 @@ def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -782,6 +782,28 @@ def smart_plug_serial(plug: object) -> str | None:
     return serial or None
 
 
+def meter_head_serial(meter_head: object) -> str | None:
+    """Extract the stable identity from a meter-head/collector payload."""
+    return smart_plug_serial(meter_head)
+
+
+def _sorted_by_serial(
+    items: object,
+    serial_fn: Any,  # noqa: ANN401
+) -> list[dict[str, Any]]:
+    """Return items sorted by identity extracted via `serial_fn`, omitting items without one."""
+    if not isinstance(items, list):
+        return []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in items:
+        sn = serial_fn(entry)
+        if sn is None:
+            continue
+        entries.append((sn, entry))
+    entries.sort(key=operator.itemgetter(0))
+    return [entry for _, entry in entries]
+
+
 def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
     """Return plug entries sorted by stable serial/id values.
 
@@ -791,52 +813,16 @@ def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
     Returns:
         list[dict[str, Any]]: The input entries that contain a stable identity (as determined by `smart_plug_serial`), sorted ascending by that identity. Entries without an identity are omitted.
     """
-    if not isinstance(plugs, list):
-        return []
-    entries: list[tuple[str, dict[str, Any]]] = []
-    for entry in plugs:
-        sn = smart_plug_serial(entry)
-        if sn is None:
-            continue
-        entries.append((sn, entry))
-    entries.sort(key=operator.itemgetter(0))
-    return [entry for _, entry in entries]
-
-
-def meter_head_serial(meter_head: object) -> str | None:
-    """Extract the stable identity from a meter-head/collector payload."""
-    if not isinstance(meter_head, dict):
-        return None
-    raw = (
-        meter_head.get(FIELD_DEVICE_SN)
-        or meter_head.get(FIELD_DEV_SN)
-        or meter_head.get(FIELD_SN)
-        or meter_head.get(FIELD_DEVICE_ID)
-        or meter_head.get(FIELD_ID)
-        or meter_head.get(FIELD_DEV_ID)
-    )
-    if raw is None:
-        return None
-    serial = str(raw).strip()
-    return serial or None
+    return _sorted_by_serial(plugs, smart_plug_serial)
 
 
 def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
     """Return meter-head entries sorted by stable serial/id values."""
-    if not isinstance(meter_heads, list):
-        return []
-    entries: list[tuple[str, dict[str, Any]]] = []
-    for entry in meter_heads:
-        sn = meter_head_serial(entry)
-        if sn is None:
-            continue
-        entries.append((sn, entry))
-    entries.sort(key=operator.itemgetter(0))
-    return [entry for _, entry in entries]
+    return _sorted_by_serial(meter_heads, meter_head_serial)
 
 
 def stable_subdevice_key(prefix: str, identity: str | None, fallback_index: int) -> str:
-    """Build a safe stable suffix for a subdevice unique/device id."""
+
     raw = str(identity or "").strip() or str(fallback_index)
     normalized = _SUBDEVICE_ID_RE.sub("_", raw).strip("_").lower()
     return f"{prefix}_{normalized or fallback_index}"
