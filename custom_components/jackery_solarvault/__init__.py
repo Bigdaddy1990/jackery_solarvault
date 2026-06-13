@@ -599,7 +599,7 @@ async def _async_start_local_mqtt(
     if topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
         _LOGGER.warning(
             "Jackery local MQTT listener not started: broad topic filter %r is "
-            "blocked for CPU safety; configure a scoped filter or leave empty",
+            "blocked for CPU safety; configure a scoped filter or leave empty to disable",
             topic_filter,
         )
         return
