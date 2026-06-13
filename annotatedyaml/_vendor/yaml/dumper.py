@@ -41,7 +41,7 @@ class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):  # noqa: D
             version: YAML version tuple to include in the document (for example, (1, 2)).
             tags: Mapping of tag handles to tag prefixes for the serializer.
             sort_keys: Sort mapping keys before emitting when True.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -103,7 +103,7 @@ class SafeDumper(Emitter, Serializer, SafeRepresenter, Resolver):  # noqa: D101,
             version: YAML version tuple to include in the document header (e.g., (1, 2)) or None.
             tags: Mapping of tag handles to tag prefixes to include in the document.
             sort_keys: If True, sort mapping keys when representing mappings.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,
@@ -165,7 +165,7 @@ class Dumper(Emitter, Serializer, Representer, Resolver):  # noqa: D101, F405
             version: YAML version tuple to include in the document (for example, (1, 2)).
             tags: Mapping of tag handles to tag prefixes for the serializer.
             sort_keys: Sort mapping keys before emitting when True.
-        """
+        """  # noqa: E501
         Emitter.__init__(  # noqa: F405
             self,
             stream,

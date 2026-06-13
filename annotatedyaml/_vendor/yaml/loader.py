@@ -14,7 +14,7 @@ class BaseLoader(Reader, Scanner, Parser, Composer, BaseConstructor, BaseResolve
 
         Parameters:
             stream: A text or binary stream, or a string containing YAML content to be read by the loader.
-        """
+        """  # noqa: E501
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405
@@ -44,7 +44,7 @@ class SafeLoader(Reader, Scanner, Parser, Composer, SafeConstructor, Resolver): 
 
         Parameters:
             stream: YAML input source (e.g., a string or a file-like object) to be consumed by the loader.
-        """
+        """  # noqa: E501
         Reader.__init__(self, stream)  # noqa: F405
         Scanner.__init__(self)  # noqa: F405
         Parser.__init__(self)  # noqa: F405
