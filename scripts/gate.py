@@ -18,7 +18,6 @@ Exit code is 0 when every selected gate passes, 1 if any required gate
 fails, and 2 for invalid invocations.
 """
 
-from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence

@@ -11,7 +11,7 @@ Source: coordinator.py lines 2389-3421 (Phase 5 extraction).
 from datetime import UTC, datetime
 from typing import Any
 
-from ..const import (
+from jackery_solarvault.const import (
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     DEVICE_LIFETIME_COUNTER_KEYS,
     FIELD_ACTION_ID,
@@ -44,9 +44,12 @@ from ..const import (
     PACK_FIELD_LAST_SEEN_AT,
     SUBDEVICE_ONLY_PROPERTY_KEYS,
 )
-from ..models.property_merge import merge_dict_values, sync_property_aliases
-from ..subdevices.detector import subdevice_identity_values
-from ..util import safe_float
+from jackery_solarvault.models.property_merge import (
+    merge_dict_values,
+    sync_property_aliases,
+)
+from jackery_solarvault.subdevices.detector import subdevice_identity_values
+from jackery_solarvault.util import safe_float
 
 # ---------------------------------------------------------------------------
 # MQTT envelope normalization
@@ -146,22 +149,14 @@ def merge_battery_pack_lists(
     previous_comm_state_by_sn: dict[str, str] = {}
     previous_comm_state_by_index: dict[int, str] = {}
     for idx, item in enumerate(merged):
-        sn = (
-            item.get(FIELD_DEVICE_SN)
-            or item.get(FIELD_DEV_SN)
-            or item.get(FIELD_SN)
-        )
+        sn = item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
         if sn:
             index_by_sn[str(sn)] = idx
-            previous_comm_state_by_sn[str(sn)] = str(
-                item.get(FIELD_COMM_STATE) or ""
-            )
+            previous_comm_state_by_sn[str(sn)] = str(item.get(FIELD_COMM_STATE) or "")
         previous_comm_state_by_index[idx] = str(item.get(FIELD_COMM_STATE) or "")
 
     for update_idx, raw_update in enumerate(updates[:5]):
-        update = {
-            key: value for key, value in raw_update.items() if value is not None
-        }
+        update = {key: value for key, value in raw_update.items() if value is not None}
         sn = (
             update.get(FIELD_DEVICE_SN)
             or update.get(FIELD_DEV_SN)
@@ -185,11 +180,7 @@ def merge_battery_pack_lists(
     now_iso = datetime.now(UTC).isoformat()
     for idx, pack in enumerate(merged):
         comm_state = str(pack.get(FIELD_COMM_STATE) or "")
-        sn = (
-            pack.get(FIELD_DEVICE_SN)
-            or pack.get(FIELD_DEV_SN)
-            or pack.get(FIELD_SN)
-        )
+        sn = pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
         if sn:
             previous_comm_state = previous_comm_state_by_sn.get(str(sn), "")
         else:
@@ -215,18 +206,12 @@ def merge_subdevice_lists_by_sn(
     ]
     index_by_sn: dict[str, int] = {}
     for idx, item in enumerate(merged):
-        sn = (
-            item.get(FIELD_DEVICE_SN)
-            or item.get(FIELD_DEV_SN)
-            or item.get(FIELD_SN)
-        )
+        sn = item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
         if sn:
             index_by_sn[str(sn)] = idx
 
     for update_idx, raw_update in enumerate(updates):
-        update = {
-            key: value for key, value in raw_update.items() if value is not None
-        }
+        update = {key: value for key, value in raw_update.items() if value is not None}
         sn = (
             update.get(FIELD_DEVICE_SN)
             or update.get(FIELD_DEV_SN)
@@ -397,9 +382,7 @@ def merge_battery_pack_lifetime_from_ble(
             merged_packs.append(pack)
             continue
         pack_sn = (
-            pack.get(FIELD_DEVICE_SN)
-            or pack.get(FIELD_DEV_SN)
-            or pack.get(FIELD_SN)
+            pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
         )
         if pack_sn != sn:
             merged_packs.append(pack)
@@ -470,11 +453,7 @@ def merge_battery_pack_ota_lists(
     ][:5]
     index_by_sn: dict[str, int] = {}
     for idx, item in enumerate(merged):
-        sn = (
-            item.get(FIELD_DEVICE_SN)
-            or item.get(FIELD_DEV_SN)
-            or item.get(FIELD_SN)
-        )
+        sn = item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
         if sn:
             index_by_sn[str(sn)] = idx
 

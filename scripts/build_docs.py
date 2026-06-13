@@ -1,6 +1,5 @@
 """Build the Markdown files in docs/ into standalone HTML pages."""
 
-from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable

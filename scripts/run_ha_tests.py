@@ -17,7 +17,6 @@ Usage from package.json::
                 -c pytest-ha.ini tests/ha"
 """
 
-from __future__ import annotations
 
 import contextlib
 import os

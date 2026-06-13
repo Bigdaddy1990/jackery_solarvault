@@ -10,7 +10,7 @@ Reference: jackery_entity_field_candidates_v2.json, hbxn_model_fields.html
 import contextlib
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_BATTERIES,
@@ -61,8 +61,11 @@ from ..const import (
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
     SUBDEVICE_TYPE_SMART_METER,
 )
-from ..models.property_merge import find_list_for_key, merge_dict_values
-from ..util import safe_float, safe_int
+from jackery_solarvault.models.property_merge import (
+    find_list_for_key,
+    merge_dict_values,
+)
+from jackery_solarvault.util import safe_float, safe_int
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -81,10 +84,7 @@ def is_subdevice_payload(
         return True
     action_id = payload.get(FIELD_ACTION_ID)
     action_id_int = safe_float(action_id)
-    if (
-        action_id_int is not None
-        and int(action_id_int) in MQTT_ACTION_IDS_SUBDEVICE
-    ):
+    if action_id_int is not None and int(action_id_int) in MQTT_ACTION_IDS_SUBDEVICE:
         return True
     updates = body.get(FIELD_UPDATES)
     if isinstance(updates, dict) and any(
@@ -179,24 +179,22 @@ def battery_packs_from_source(
         ]
         return packs[:5] if packs else None
     normalized_source = normalize_battery_pack_payload(source)
-    if looks_like_battery_pack(normalized_source, ct_meter_keys, battery_pack_hint_keys):
+    if looks_like_battery_pack(
+        normalized_source, ct_meter_keys, battery_pack_hint_keys
+    ):
         return [normalized_source]
     return None
 
 
 def subdevice_serial(item: dict[str, Any]) -> str | None:
     """Return the stable serial field used by app subdevice payloads."""
-    serial = (
-        item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
-    )
+    serial = item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
     return str(serial) if serial else None
 
 
 def subdevice_id(item: dict[str, Any]) -> str | None:
     """Return the cloud id field used by accessory HTTP statistic APIs."""
-    dev_id = (
-        item.get(FIELD_DEVICE_ID) or item.get(FIELD_ID) or item.get(FIELD_DEV_ID)
-    )
+    dev_id = item.get(FIELD_DEVICE_ID) or item.get(FIELD_ID) or item.get(FIELD_DEV_ID)
     return str(dev_id) if dev_id else None
 
 
@@ -255,9 +253,7 @@ def smart_meter_accessories(source: dict[str, Any]) -> list[dict[str, Any]]:
     accessories: Any = source.get(FIELD_ACCESSORIES)
     if not isinstance(accessories, list):
         system = source.get(PAYLOAD_SYSTEM) or source.get(PAYLOAD_SYSTEM_META) or {}
-        accessories = (
-            system.get(FIELD_ACCESSORIES) if isinstance(system, dict) else []
-        )
+        accessories = system.get(FIELD_ACCESSORIES) if isinstance(system, dict) else []
     if not isinstance(accessories, list):
         return []
     return [
@@ -271,9 +267,7 @@ def smart_meter_accessory_device_id(source: dict[str, Any]) -> str | None:
     """Return the app's subDeviceId for CT statistic endpoints."""
     for item in smart_meter_accessories(source):
         dev_id = (
-            item.get(FIELD_DEVICE_ID)
-            or item.get(FIELD_ID)
-            or item.get(FIELD_DEV_ID)
+            item.get(FIELD_DEVICE_ID) or item.get(FIELD_ID) or item.get(FIELD_DEV_ID)
         )
         if dev_id is not None:
             return str(dev_id)
@@ -405,7 +399,7 @@ def battery_packs_need_query(payload: dict[str, Any]) -> bool:
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     try:
         expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         expected = 0
     packs = payload.get(PAYLOAD_BATTERY_PACKS)
     if not isinstance(packs, list):

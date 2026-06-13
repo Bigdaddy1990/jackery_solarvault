@@ -10,7 +10,7 @@ Source: coordinator.py lines 3131-3296 (Phase 6 extraction).
 
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_CONTROL_ALLOWED,
     FIELD_DEVICE_CODE,
     FIELD_DEV_TYPE,
@@ -38,13 +38,13 @@ from ..const import (
     SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
 )
-from ..handlers.mqtt_handlers import (
+from jackery_solarvault.handlers.mqtt_handlers import (
     merge_smart_plug_lists,
     merge_subdevice_list_by_identity,
     merge_subdevice_lists_by_sn,
 )
-from ..models.property_merge import merge_dict_values
-from ..subdevices.detector import (
+from jackery_solarvault.models.property_merge import merge_dict_values
+from jackery_solarvault.subdevices.detector import (
     entry_subdevice_candidates,
     subdevice_dev_type,
     subdevice_id,
@@ -163,9 +163,7 @@ def merge_shelly_cloud_item(  # noqa: PLR0911
         return False
     if dev_type == SUBDEVICE_DEV_TYPE_METER_HEAD:
         current = entry.get(PAYLOAD_METER_HEADS)
-        merged_meter_heads = merge_subdevice_list_by_identity(
-            current, normalized
-        )
+        merged_meter_heads = merge_subdevice_list_by_identity(current, normalized)
         if merged_meter_heads != current:
             entry[PAYLOAD_METER_HEADS] = merged_meter_heads
             return True
@@ -185,8 +183,7 @@ def merge_shelly_cloud_item(  # noqa: PLR0911
         if not isinstance(items, list):
             continue
         if any(
-            isinstance(item, dict)
-            and item_ids & subdevice_identity_values(item)
+            isinstance(item, dict) and item_ids & subdevice_identity_values(item)
             for item in items
         ):
             entry[bucket] = merger(items, [normalized])

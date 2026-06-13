@@ -36,7 +36,7 @@ class BaseConstructor:  # noqa: D101
             recursive_objects (dict): Nodes currently under construction used to detect recursion.
             state_generators (list): Queue of generator objects representing deferred construction steps.
             deep_construct (bool): If True, generator-based constructors are exhausted immediately; if False, they are deferred.
-        """  # noqa: E501
+        """
         self.constructed_objects = {}
         self.recursive_objects = {}
         self.state_generators = []
@@ -59,7 +59,7 @@ class BaseConstructor:  # noqa: D101
 
         Raises:
             ConstructorError: If `key` matches the constructor's blacklist for state keys.
-        """  # noqa: E501
+        """
         if self.get_state_keys_blacklist_regexp().match(key):
             raise ConstructorError(
                 None,
@@ -88,7 +88,7 @@ class BaseConstructor:  # noqa: D101
 
         Returns:
             The constructed Python object for the single document, or `None` if no document is present.
-        """  # noqa: E501
+        """
         node = self.get_single_node()
         if node is not None:
             return self.construct_document(node)
@@ -102,7 +102,7 @@ class BaseConstructor:  # noqa: D101
 
         Returns:
             The fully constructed Python representation of the document.
-        """  # noqa: E501
+        """
         data = self.construct_object(node)
         while self.state_generators:
             state_generators = self.state_generators
@@ -129,7 +129,7 @@ class BaseConstructor:  # noqa: D101
 
         Raises:
             ConstructorError: If a recursive node is detected that cannot be constructed (construction already in progress).
-        """  # noqa: E501
+        """
         if node in self.constructed_objects:
             return self.constructed_objects[node]
         if deep:
@@ -235,7 +235,7 @@ class BaseConstructor:  # noqa: D101
 
         Raises:
             ConstructorError: If `node` is not a MappingNode or if a constructed key is not hashable.
-        """  # noqa: E501
+        """
         if not isinstance(node, MappingNode):  # noqa: F405
             raise ConstructorError(
                 None,
@@ -269,7 +269,7 @@ class BaseConstructor:  # noqa: D101
 
         Raises:
                 ConstructorError: If `node` is not a MappingNode.
-        """  # noqa: E501
+        """
         if not isinstance(node, MappingNode):  # noqa: F405
             raise ConstructorError(
                 None,
@@ -294,7 +294,7 @@ class BaseConstructor:  # noqa: D101
             cls (type): The class on which to register the constructor.
             tag (str): The exact YAML tag to register (e.g., 'tag:yaml.org,2002:str').
             constructor (callable): A callable that will be invoked to construct Python objects for nodes with the given tag.
-        """  # noqa: E501
+        """
         if "yaml_constructors" not in cls.__dict__:
             cls.yaml_constructors = cls.yaml_constructors.copy()
         cls.yaml_constructors[tag] = constructor
@@ -308,7 +308,7 @@ class BaseConstructor:  # noqa: D101
         Parameters:
             tag_prefix (str | None): Tag prefix to register; use `None` to provide a fallback constructor.
             multi_constructor (callable): Constructor callable invoked for tags that start with `tag_prefix`.
-        """  # noqa: E501
+        """
         if "yaml_multi_constructors" not in cls.__dict__:
             cls.yaml_multi_constructors = cls.yaml_multi_constructors.copy()
         cls.yaml_multi_constructors[tag_prefix] = multi_constructor
@@ -325,7 +325,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             The constructed scalar value for `node`.
-        """  # noqa: E501
+        """
         if isinstance(node, MappingNode):  # noqa: F405
             for key_node, value_node in node.value:
                 if key_node.tag == "tag:yaml.org,2002:value":
@@ -342,7 +342,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If a merge value is neither a mapping nor a sequence of mappings, or if an element of a merge sequence is not a mapping.
-        """  # noqa: E501
+        """
         merge = []
         index = 0
         while index < len(node.value):
@@ -359,7 +359,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
                             raise ConstructorError(  # noqa: TRY003
                                 "while constructing a mapping",
                                 node.start_mark,
-                                f"expected a mapping for merging, but found {subnode.id}",  # noqa: E501
+                                f"expected a mapping for merging, but found {subnode.id}",
                                 subnode.start_mark,
                             )
                         self.flatten_mapping(subnode)
@@ -371,7 +371,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
                     raise ConstructorError(  # noqa: TRY003
                         "while constructing a mapping",
                         node.start_mark,
-                        f"expected a mapping or list of mappings for merging, but found {value_node.id}",  # noqa: E501
+                        f"expected a mapping or list of mappings for merging, but found {value_node.id}",
                         value_node.start_mark,
                     )
             elif key_node.tag == "tag:yaml.org,2002:value":
@@ -394,7 +394,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If `node` is not a mapping node, contains unhashable keys, or otherwise cannot be constructed.
-        """  # noqa: E501
+        """
         if isinstance(node, MappingNode):  # noqa: F405
             self.flatten_mapping(node)
         return super().construct_mapping(node, deep=deep)
@@ -403,7 +403,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
         """Produce Python None for a YAML null node.
 
         This constructor maps a YAML null scalar to Python's None; the node's scalar value is ignored.
-        """  # noqa: E501
+        """
         self.construct_scalar(node)
 
     bool_values = {  # noqa: RUF012
@@ -423,7 +423,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             True if the YAML value represents a true boolean, False otherwise.
-        """  # noqa: E501
+        """
         value = self.construct_scalar(node)
         return self.bool_values[value.lower()]
 
@@ -435,7 +435,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             int: The integer represented by the node's scalar.
-        """  # noqa: E501
+        """
         value = self.construct_scalar(node)
         value = value.replace("_", "")
         sign = +1
@@ -473,7 +473,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             A Python float parsed from the scalar. `+.inf`/`-.inf` map to `self.inf_value` with sign applied, and `.nan` maps to `self.nan_value`.
-        """  # noqa: E501
+        """
         value = self.construct_scalar(node)
         value = value.replace("_", "").lower()
         sign = +1
@@ -507,7 +507,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If the scalar cannot be encoded to ASCII or if base64 decoding fails.
-        """  # noqa: E501
+        """
         try:
             value = self.construct_scalar(node).encode("ascii")
         except UnicodeEncodeError as exc:
@@ -546,7 +546,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             `datetime.date` when the scalar contains only a date (YYYY-MM-DD); otherwise a `datetime.datetime` with hour, minute, second, and microsecond (fractional seconds truncated or padded to six digits) and `tzinfo` set for timezone offsets or UTC.
-        """  # noqa: E501
+        """
         self.construct_scalar(node)
         match = self.timestamp_regexp.match(node.value)
         values = match.groupdict()
@@ -593,7 +593,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If `node` is not a SequenceNode, if any sequence element is not a MappingNode, or if a mapping element does not contain exactly one item.
-        """  # noqa: E501
+        """
         omap = []
         yield omap
         if not isinstance(node, SequenceNode):  # noqa: F405
@@ -636,7 +636,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If `node` is not a sequence, if an element is not a mapping, or if a mapping element does not contain exactly one item.
-        """  # noqa: E501
+        """
         pairs = []
         yield pairs
         if not isinstance(node, SequenceNode):  # noqa: F405
@@ -677,7 +677,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             set: A Python set containing the constructed keys from the mapping node.
-        """  # noqa: E501
+        """
         data = set()
         yield data
         value = self.construct_mapping(node)
@@ -699,7 +699,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             list: The constructed list; yielded empty before population so recursive structures can reference it during construction.
-        """  # noqa: E501
+        """
         data = []
         yield data
         data.extend(self.construct_sequence(node))
@@ -712,7 +712,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             dict: A dictionary populated with constructed key/value pairs from the mapping node.
-        """  # noqa: E501
+        """
         data = {}
         yield data
         value = self.construct_mapping(node)
@@ -729,7 +729,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Returns:
             data: The newly allocated instance (yielded before population).
-        """  # noqa: E501
+        """
         data = cls.__new__(cls)
         yield data
         if hasattr(data, "__setstate__"):
@@ -747,7 +747,7 @@ class SafeConstructor(BaseConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: Always raised to signal that no constructor is available for `node.tag`.
-        """  # noqa: E501
+        """
         raise ConstructorError(
             None,
             None,
@@ -816,7 +816,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             list[str]: Regular-expression strings; each pattern matches a state key that must not be assigned (e.g., "^extend$" and names matching "^__.*__$").
-        """  # noqa: E501
+        """
         return ["^extend$", "^__.*__$"]
 
     def get_state_keys_blacklist_regexp(self):  # noqa: ANN201
@@ -826,7 +826,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             re.Pattern: Compiled regular expression matching blacklisted state keys.
-        """  # noqa: E501
+        """
         if not hasattr(self, "state_keys_blacklist_regexp"):
             self.state_keys_blacklist_regexp = re.compile(
                 "(" + "|".join(self.get_state_keys_blacklist()) + ")"
@@ -866,7 +866,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If the scalar cannot be converted to ASCII or if base64 decoding fails.
-        """  # noqa: E501
+        """
         try:
             value = self.construct_scalar(node).encode("ascii")
         except UnicodeEncodeError as exc:
@@ -899,7 +899,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             complex: The complex number produced from the node's scalar value.
-        """  # noqa: E501
+        """
         return complex(self.construct_scalar(node))
 
     def construct_python_tuple(self, node):  # noqa: ANN001, ANN201
@@ -926,7 +926,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If `name` is empty, if `unsafe` import fails, or if the module is not present in sys.modules.
-        """  # noqa: E501
+        """
         if not name:
             raise ConstructorError(  # noqa: TRY003
                 "while constructing a Python module",
@@ -967,7 +967,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
         Raises:
             ConstructorError: If `name` is empty; if the module cannot be imported (when `unsafe` is True);
             if the module is not present in sys.modules; or if the named attribute is not found on the module.
-        """  # noqa: E501
+        """
         if not name:
             raise ConstructorError(  # noqa: TRY003
                 "while constructing a Python object",
@@ -1019,7 +1019,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If the node's scalar value is not empty or if the name cannot be resolved.
-        """  # noqa: E501
+        """
         value = self.construct_scalar(node)
         if value:
             raise ConstructorError(  # noqa: TRY003
@@ -1042,7 +1042,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If the scalar node is not empty or the module cannot be resolved/imported.
-        """  # noqa: E501
+        """
         value = self.construct_scalar(node)
         if value:
             raise ConstructorError(  # noqa: TRY003
@@ -1077,7 +1077,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If the name cannot be resolved or, when `unsafe` is False, the resolved object is not a class.
-        """  # noqa: E501
+        """
         if not args:
             args = []
         if not kwds:
@@ -1104,7 +1104,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If a state key is blacklisted by `check_state_key` and `unsafe` is False.
-        """  # noqa: E501
+        """
         if hasattr(instance, "__setstate__"):
             instance.__setstate__(state)
         else:
@@ -1134,7 +1134,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             instance: The fully initialized instance of the resolved Python class.
-        """  # noqa: E501
+        """
         instance = self.make_python_instance(suffix, node, newobj=True)
         yield instance
         deep = hasattr(instance, "__setstate__")
@@ -1166,7 +1166,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             object: The constructed Python object after applying state, extending list contents, and assigning dict items.
-        """  # noqa: E501
+        """
         if isinstance(node, SequenceNode):  # noqa: F405
             args = self.construct_sequence(node, deep=True)
             kwds = {}
@@ -1199,7 +1199,7 @@ class FullConstructor(SafeConstructor):  # noqa: D101
 
         Returns:
             instance: A newly created Python object instance constructed according to the node's specification.
-        """  # noqa: E501
+        """
         return self.construct_python_object_apply(suffix, node, newobj=True)
 
 
@@ -1269,7 +1269,7 @@ class UnsafeConstructor(FullConstructor):  # noqa: D101
 
         Returns:
             module: The imported or already-loaded module object.
-        """  # noqa: E501
+        """
         return super().find_python_module(name, mark, unsafe=True)
 
     def find_python_name(self, name, mark):  # noqa: ANN001, ANN201
@@ -1284,7 +1284,7 @@ class UnsafeConstructor(FullConstructor):  # noqa: D101
 
         Raises:
             ConstructorError: If `name` is empty, the module or object cannot be found, or an import fails.
-        """  # noqa: E501
+        """
         return super().find_python_name(name, mark, unsafe=True)
 
     def make_python_instance(self, suffix, node, args=None, kwds=None, newobj=False):  # noqa: ANN001, ANN201
@@ -1299,7 +1299,7 @@ class UnsafeConstructor(FullConstructor):  # noqa: D101
 
         Returns:
             object: The constructed Python instance; may be created unsafely (module/name imports and state application are allowed).
-        """  # noqa: E501
+        """
         return super().make_python_instance(
             suffix, node, args, kwds, newobj, unsafe=True
         )
@@ -1310,7 +1310,7 @@ class UnsafeConstructor(FullConstructor):  # noqa: D101
         Parameters:
             instance: The target object to restore state onto. If the object defines `__setstate__`, that method will be called with the provided state; otherwise the function will update the instance's `__dict__` and/or set attributes directly.
             state: The state to apply. Accepted shapes are the same as used by YAML Python object state representations (typically a mapping, or a two-tuple `(state, slotstate)`); mapping entries will be used to update `instance.__dict__` and `slotstate` entries will be assigned as attributes.
-        """  # noqa: E501
+        """
         return super().set_python_instance_state(instance, state, unsafe=True)
 
 
