@@ -17,9 +17,9 @@ command -v monkeytype >/dev/null 2>&1 || {
 if [ $# -eq 0 ]
   then
     echo "Run monkeytype on test suite"
-    monkeytype run "`command -v pytest`"
+    monkeytype run "$(command -v pytest)"
     exit
 fi
 
 echo "Run monkeytype on tests in $1"
-monkeytype run "`command -v pytest`" "$1"
+monkeytype run "$(command -v pytest)" "$@"
