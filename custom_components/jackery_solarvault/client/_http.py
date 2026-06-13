@@ -719,7 +719,6 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_PUT, path
             )
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
