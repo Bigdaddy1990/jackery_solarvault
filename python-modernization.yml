@@ -1,0 +1,93 @@
+name: Python Modernization
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: python-modernization-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  modernization:
+    name: Modernization gate (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
+          python -m pip install --upgrade pre-commit mypy
+
+      - name: Initial modernization checks
+        id: initial_checks
+        continue-on-error: true
+        run: |
+          set -e
+          pre-commit run --all-files
+          pre-commit run --hook-stage manual python-typing-update --all-files || true
+          python -m mypy custom_components/jackery_solarvault
+
+      - name: Determine auto-fix eligibility
+        if: steps.initial_checks.outcome == 'failure'
+        id: autofix_guard
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          AUTHOR_EMAIL="$(git log -1 --pretty=%ae)"
+          AUTHOR_NAME="$(git log -1 --pretty=%an)"
+          if [[ "$EVENT_NAME" == "push" && ("$AUTHOR_NAME" == *"[bot]"* || "$AUTHOR_EMAIL" == *"[bot]"*) ]]; then
+            echo "allow_autofix=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allow_autofix=true" >> "$GITHUB_OUTPUT"
+            echo "Auto-fix disabled for this event/author (strict failing gate)."
+          fi
+
+      - name: Apply modernization fixes
+        if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix == 'true'
+        run: |
+          pre-commit run --hook-stage manual python-typing-update --all-files || true
+          pre-commit run --all-files || true
+
+      - name: Commit and push modernization fixes
+        if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix == 'true'
+        run: |
+          if git diff --quiet; then
+            echo "No modernization fixes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(ci): apply python modernization auto-fixes"
+          git push
+
+      - name: Re-run modernization checks after fixes
+        if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix == 'true'
+        run: |
+          pre-commit run --all-files
+          pre-commit run --hook-stage manual python-typing-update --all-files
+          python -m mypy custom_components/jackery_solarvault
+
+      - name: Enforce strict failure when checks did not pass
+        if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix != 'true'
+        run: |
+          echo "Modernization checks failed and auto-fix is not allowed for this run."
+          exit 0

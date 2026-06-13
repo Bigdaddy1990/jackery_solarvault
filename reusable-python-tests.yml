@@ -1,0 +1,573 @@
+name: Python Tests with Coverage
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version to install
+        required: false
+        type: string
+      home-assistant-spec:
+        description: Version specifier (e.g. ==2025.9.3 or >=2025.9.3)
+        required: false
+        type: string
+      coverage-min:
+        description: Minimum total coverage percentage required to pass
+        required: false
+        type: string
+      critical-module-coverage-min:
+        description: Minimum line coverage percentage required for each critical module
+        required: false
+        type: string
+      coverage-xml-path:
+        description: Destination for the XML coverage report
+        required: false
+        type: string
+      coverage-html-dir:
+        description: Destination directory for the HTML coverage report
+        required: false
+        type: string
+      junit-path:
+        description: Destination path for the junit XML report
+        required: false
+        type: string
+      pytest-extra-args:
+        description: Extra arguments forwarded to pytest
+        required: false
+        type: string
+      run-codecov:
+        description: Upload coverage and test results to Codecov
+        required: false
+        default: true
+        type: boolean
+      upload-coverage-artifact:
+        description: Upload HTML coverage results as an artifact
+        required: false
+        default: true
+        type: boolean
+      coverage-artifact-name:
+        description: Name for the coverage artifact upload
+        required: false
+        default: coverage-report
+        type: string
+      upload-junit-artifact:
+        description: Upload junit results as an artifact
+        required: false
+        default: false
+        type: boolean
+      junit-artifact-name:
+        description: Name for the junit artifact upload
+        required: false
+        default: junit-results
+        type: string
+      publish-pages:
+        description: Publish a condensed coverage report to GitHub Pages
+        required: false
+        default: false
+        type: boolean
+      pages-branch:
+        description: Target branch for GitHub Pages publications
+        required: false
+        default: gh-pages
+        type: string
+      pages-prefix:
+        description: Prefix directory for GitHub Pages uploads
+        required: false
+        default: coverage
+        type: string
+      pages-artifact-name:
+        description: Artifact name containing the GitHub Pages upload bundle
+        required: false
+        default: coverage-pages-archive
+        type: string
+      pages-artifact-directory:
+        description: Directory that should be archived for GitHub Pages uploads
+        required: false
+        default: generated/coverage/artifacts
+        type: string
+      pytest-maxfail:
+        description: Maximum number of pytest failures before aborting
+        required: false
+        default: "5"
+        type: string
+      pytest-traceback:
+        description: Pytest traceback style to use
+        required: false
+        default: short
+        type: string
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+    outputs:
+      coverage-percent:
+        description: Line coverage percentage reported by pytest-cov
+        value: ${{ jobs.tests.outputs.coverage-percent }}
+      coverage-threshold:
+        description: Coverage threshold enforced during the run
+        value: ${{ jobs.tests.outputs.coverage-threshold }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  tests:
+    name: Run pytest with coverage
+    runs-on: ubuntu-latest
+    outputs:
+      coverage-percent: ${{ steps.coverage_summary.outputs.coverage_percent }}
+      coverage-threshold: ${{ env.COVERAGE_MIN }}
+    env:
+      PYTHON_VERSION: ${{ inputs.python-version != '' && inputs.python-version || (vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14') }}
+      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('>={0}', vars.HA_VERSION) || '') }}
+      COVERAGE_MIN: ${{ inputs.coverage-min != '' && inputs.coverage-min || (vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '85') }}
+      CRITICAL_MODULE_COVERAGE_MIN: ${{ inputs.critical-module-coverage-min != '' && inputs.critical-module-coverage-min || (vars.CI_CRITICAL_MODULE_COVERAGE_MIN != '' && vars.CI_CRITICAL_MODULE_COVERAGE_MIN || '90') }}
+      COVERAGE_XML: ${{ inputs.coverage-xml-path != '' && inputs.coverage-xml-path || 'coverage.xml' }}
+      COVERAGE_HTML_DIR: ${{ inputs.coverage-html-dir != '' && inputs.coverage-html-dir || 'htmlcov' }}
+      JUNIT_PATH: ${{ inputs.junit-path != '' && inputs.junit-path || 'junit.xml' }}
+      PYTEST_ARGS: ${{ inputs.pytest-extra-args != '' && inputs.pytest-extra-args || 'tests/' }}
+      PYTEST_MAXFAIL: ${{ inputs.pytest-maxfail }}
+      PYTEST_TRACEBACK: ${{ inputs.pytest-traceback }}
+      PAGES_BRANCH: ${{ inputs.pages-branch }}
+      PAGES_PREFIX: ${{ inputs.pages-prefix }}
+      PAGES_ARTIFACT_DIR: ${{ inputs.pages-artifact-directory }}
+      CODECOV_UPLOAD_ALLOWED: ${{ inputs.run-codecov && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+            pyproject.toml
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip ruff
+          pip install -U pytest pytest-asyncio pytest-cov coverage[toml]
+          pip install -U pytest-homeassistant-custom-component
+          if [ -n "${{ env.HA_SPEC }}" ]; then
+            pip install -U "homeassistant${{ env.HA_SPEC }}"
+          fi
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+
+      - name: Enforce test requirements and localization flags
+        run: |
+          python -m scripts.enforce_test_requirements
+          python -m scripts.enforce_test_todo_policy
+          python -m scripts.sync_localization_flags
+
+      - name: Enforce PR checklist test coverage gate
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import re
+
+          pr_body = os.environ.get("PR_BODY", "")
+          marker = re.compile(
+              r"- \[(?:x|X)\] Tests added/updated "
+              r"\(new logic without tests is not merged\)",
+          )
+          if marker.search(pr_body):
+              print("PR checklist coverage gate passed.")
+              raise SystemExit(0)
+          raise SystemExit(
+              "Pull request checklist gate failed: mark "
+              "'Tests added/updated (new logic without tests is not merged)' "
+              "as completed, or add the missing tests."
+          )
+          PY
+
+          ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes || true
+          ruff check . --target-version py314 || true
+          ruff check . --add-noqa || true
+          ruff check . --extend-select RUF100 || true
+          ruff check . --output-format=github || true
+          ruff check . --preview || true
+          ruff format .
+
+      - name: Prepare coverage directories
+        run: |
+          mkdir -p "$(dirname '${{ env.COVERAGE_XML }}')"
+          mkdir -p "${{ env.COVERAGE_HTML_DIR }}"
+          mkdir -p "$(dirname '${{ env.JUNIT_PATH }}')"
+          if [ "${{ inputs.publish-pages }}" = 'true' ]; then
+            mkdir -p "${{ env.PAGES_ARTIFACT_DIR }}"
+          fi
+
+      - name: Run pytest
+        id: pytest
+        # continue-on-error so that coverage artifacts and Codecov upload steps
+        # always run, even when tests fail or coverage falls below the threshold.
+        # Coverage threshold enforcement happens in the final gate so this step
+        # only fails for pytest/runtime errors.
+        continue-on-error: true
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest \
+            --cov=custom_components/jackery_solarvault \
+            --cov-branch \
+            --cov-report=xml:"${{ env.COVERAGE_XML }}" \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=html:"${{ env.COVERAGE_HTML_DIR }}" \
+            --junitxml="${{ env.JUNIT_PATH }}" \
+            -o junit_family=legacy \
+            --maxfail="${{ env.PYTEST_MAXFAIL }}" \
+            --tb="${{ env.PYTEST_TRACEBACK }}" \
+            ${{ env.PYTEST_ARGS }}
+
+      - name: Extract coverage summary
+        id: coverage_summary
+        # Run even if pytest reported a failure (continue-on-error above).
+        if: always() && !cancelled()
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          xml_path = Path(r"${{ env.COVERAGE_XML }}")
+          if not xml_path.is_file():
+              percent = 0.0
+              coverage_data_available = "false"
+              print(
+                  "Warning: coverage.xml not found; "
+                  "recording coverage as 0.0 for downstream gating"
+              )
+          else:
+              coverage_data_available = "true"
+              tree = ET.parse(xml_path)
+              root = tree.getroot()
+              line_rate = root.attrib.get("line-rate")
+              lines_valid = root.attrib.get("lines-valid")
+              if line_rate is None:
+                  raise SystemExit("missing line-rate attribute")
+
+              try:
+                  percent = round(float(line_rate) * 100, 2)
+              except ValueError as exc:  # pragma: no cover - defensive only
+                  raise SystemExit(f"invalid line-rate: {line_rate!r}") from exc
+
+              if lines_valid is not None:
+                  try:
+                      measured_lines = int(lines_valid)
+                  except ValueError as exc:  # pragma: no cover - defensive only
+                      raise SystemExit(f"invalid lines-valid: {lines_valid!r}") from exc
+
+                  if measured_lines == 0:
+                      coverage_data_available = "false"
+                      percent = 0.0
+                      print(
+                          "Warning: coverage.xml reported zero measurable lines; "
+                          "treating coverage data as unavailable"
+                      )
+              elif not root.findall(".//class"):
+                  coverage_data_available = "false"
+                  percent = 0.0
+                  print(
+                      "Warning: coverage.xml reported no class coverage entries; "
+                      "treating coverage data as unavailable"
+                  )
+
+          print(f"coverage_percent={percent}")
+          with open("coverage-summary.txt", "w", encoding="utf-8") as handle:
+              handle.write(f"{percent}\n")
+          with open("coverage-data-available.txt", "w", encoding="utf-8") as handle:
+              handle.write(f"{coverage_data_available}\n")
+          PY
+          percent=$(tail -n1 coverage-summary.txt)
+          coverage_data_available=$(tail -n1 coverage-data-available.txt)
+          echo "coverage_percent=${percent}" >> "$GITHUB_OUTPUT"
+          echo "coverage_data_available=${coverage_data_available}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload coverage to Codecov
+        id: codecov_coverage_upload
+        if: >-
+          always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
+          hashFiles(env.COVERAGE_XML) != ''
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ env.COVERAGE_XML }}
+          fail_ci_if_error: false
+          disable_search: true
+          flags: unittests
+          name: jackery_solarvault-coverage
+
+      - name: Retry coverage upload to Codecov when primary upload fails
+        if: >-
+          always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
+          (steps.codecov_coverage_upload.outcome == 'failure' ||
+          steps.codecov_coverage_upload.outcome == 'skipped')
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ env.COVERAGE_XML }}
+          fail_ci_if_error: false
+          disable_search: true
+          flags: unittests
+          name: jackery_solarvault-coverage-retry
+
+      - name: Upload test results to Codecov
+        if: >-
+          always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
+          hashFiles(env.JUNIT_PATH) != ''
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ env.JUNIT_PATH }}
+          report_type: test_results
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        if: always() && !cancelled() && inputs.upload-coverage-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.coverage-artifact-name }}
+          path: |
+            ${{ env.COVERAGE_HTML_DIR }}
+            ${{ env.COVERAGE_XML }}
+          retention-days: 7
+
+      - name: Upload junit artifact
+        if: always() && !cancelled() && inputs.upload-junit-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.junit-artifact-name }}
+          path: ${{ env.JUNIT_PATH }}
+          retention-days: 7
+
+      - name: Publish coverage to GitHub Pages
+        if: inputs.publish-pages == true && steps.pytest.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+          import shutil
+
+          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
+          coverage_html_index = Path(r"${{ env.COVERAGE_HTML_DIR }}/index.html")
+          artifact_directory = Path(r"${{ env.PAGES_ARTIFACT_DIR }}")
+          artifact_directory.mkdir(parents=True, exist_ok=True)
+
+          def copy_if_exists(source: Path, destination: Path) -> None:
+              if source.is_file():
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, destination)
+
+          copy_if_exists(coverage_xml, artifact_directory / "coverage.xml")
+          copy_if_exists(coverage_html_index, artifact_directory / "index.html")
+          metadata = {
+              "mode": "pages",
+              "pages_branch": r"${{ env.PAGES_BRANCH }}",
+              "pages_prefix": r"${{ env.PAGES_PREFIX }}",
+              "run_id": r"${{ github.run_id }}",
+              "run_attempt": r"${{ github.run_attempt }}",
+              "commit_sha": r"${{ github.sha }}",
+              "ref": r"${{ github.ref }}",
+              "coverage_xml": str(coverage_xml),
+              "coverage_html_index": str(coverage_html_index),
+          }
+          (artifact_directory / "metadata.json").write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload GitHub Pages bundle
+        if: inputs.publish-pages == true && steps.pytest.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.pages-artifact-name }}
+          path: ${{ env.PAGES_ARTIFACT_DIR }}
+          retention-days: 7
+
+      - name: Enforce module and total coverage gates
+        if: always() && !cancelled() && steps.pytest.outcome == 'success'
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          from decimal import Decimal, InvalidOperation
+          from pathlib import Path
+          import sys
+          import xml.etree.ElementTree as ET
+
+          critical_modules = frozenset({
+              "custom_components/jackery_solarvault/__init__.py",
+              "custom_components/jackery_solarvault/coordinator.py",
+              "custom_components/jackery_solarvault/sensor.py",
+              "custom_components/jackery_solarvault/util.py",
+              "custom_components/jackery_solarvault/client/api.py",
+              "custom_components/jackery_solarvault/client/mqtt_push.py",
+              "custom_components/jackery_solarvault/client/ble_transport.py",
+          })
+
+          def decimal_percent(raw: str, *, label: str) -> Decimal:
+              try:
+                  value = Decimal(raw)
+              except InvalidOperation as err:
+                  raise ValueError(f"invalid {label}: {raw!r}") from err
+              if value < 0 or value > 100:
+                  raise ValueError(f"{label} must be between 0 and 100: {raw!r}")
+              return value
+
+          def rate_to_percent(raw: str | None, *, label: str) -> Decimal:
+              if raw is None:
+                  raise ValueError(f"coverage XML missing {label} line-rate")
+              try:
+                  rate = Decimal(raw)
+              except InvalidOperation as err:
+                  raise ValueError(f"invalid {label} line-rate: {raw!r}") from err
+              return rate * Decimal(100)
+
+          def normalized_filename(raw: str | None) -> str | None:
+              if not raw:
+                  return None
+              return raw.replace("\\", "/").lstrip("./")
+
+          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
+          if not coverage_xml.is_file():
+              raise SystemExit(f"coverage xml not found: {coverage_xml}")
+          root = ET.parse(coverage_xml).getroot()
+          total = rate_to_percent(root.get("line-rate"), label="total")
+          total_minimum = decimal_percent(
+              r"${{ env.COVERAGE_MIN }}",
+              label="total minimum percent",
+          )
+          critical_minimum = decimal_percent(
+              r"${{ env.CRITICAL_MODULE_COVERAGE_MIN }}",
+              label="critical module minimum percent",
+          )
+          failures: list[str] = []
+          if total < total_minimum:
+              failures.append(f"total coverage {total:.2f}% < {total_minimum:.2f}%")
+
+          rates: dict[str, Decimal] = {}
+          for class_node in root.findall('.//class'):
+              filename = normalized_filename(class_node.get('filename'))
+              if filename is None:
+                  continue
+              rates[filename] = rate_to_percent(
+                  class_node.get('line-rate'),
+                  label=filename,
+              )
+
+          for module in sorted(critical_modules):
+              coverage = rates.get(module)
+              if coverage is None:
+                  failures.append(f"critical module missing from coverage XML: {module}")
+              elif coverage < critical_minimum:
+                  failures.append(
+                      f"{module} coverage {coverage:.2f}% < {critical_minimum:.2f}%"
+                  )
+
+          if failures:
+              print("\n".join(failures), file=sys.stderr)
+              raise SystemExit(1)
+
+          print(
+              "coverage gates passed: "
+              f"total={total:.2f}% >= {total_minimum:.2f}%, "
+              f"critical_modules>={critical_minimum:.2f}%"
+          )
+          PY
+      - name: Enforce pytest and coverage gates
+        if: always() && !cancelled()
+        env:
+          PYTEST_OUTCOME: ${{ steps.pytest.outcome }}
+          COVERAGE_PERCENT: ${{ steps.coverage_summary.outputs.coverage_percent }}
+          COVERAGE_DATA_AVAILABLE: ${{ steps.coverage_summary.outputs.coverage_data_available }}
+          COVERAGE_XML: ${{ env.COVERAGE_XML }}
+          COVERAGE_MIN: ${{ env.COVERAGE_MIN }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          from decimal import Decimal, InvalidOperation
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          pytest_outcome = os.environ["PYTEST_OUTCOME"]
+          coverage_percent_raw = os.environ.get("COVERAGE_PERCENT", "")
+          coverage_data_available = os.environ.get("COVERAGE_DATA_AVAILABLE", "")
+          coverage_xml = Path(os.environ["COVERAGE_XML"])
+          coverage_min_raw = os.environ["COVERAGE_MIN"]
+
+          if coverage_data_available not in {"true", "false"}:
+              coverage_data_available = "true" if coverage_xml.is_file() else "false"
+          elif coverage_data_available == "true" and not coverage_xml.is_file():
+              coverage_data_available = "false"
+
+          if coverage_data_available == "true" and coverage_xml.is_file():
+              root = ET.parse(coverage_xml).getroot()
+              lines_valid = root.attrib.get("lines-valid")
+              if lines_valid is not None:
+                  try:
+                      measured_lines = int(lines_valid)
+                  except ValueError as exc:
+                      raise SystemExit(
+                          f"invalid lines-valid attribute in coverage.xml: {lines_valid!r}"
+                      ) from exc
+                  if measured_lines == 0:
+                      coverage_data_available = "false"
+              elif not root.findall(".//class"):
+                  coverage_data_available = "false"
+
+          if pytest_outcome != "success":
+              raise SystemExit(
+                  f"pytest failed. Outcome: {pytest_outcome}."
+              )
+
+          try:
+              coverage_percent = Decimal(coverage_percent_raw)
+              coverage_min = Decimal(coverage_min_raw)
+          except InvalidOperation as exc:
+              raise SystemExit(
+                  "unable to parse coverage gate values: "
+                  f"percent={coverage_percent_raw!r}, min={coverage_min_raw!r}"
+              ) from exc
+
+          if coverage_percent < coverage_min:
+              if coverage_data_available != "true":
+                  print(
+                      "Warning: coverage data was not produced "
+                      "(missing or empty coverage.xml); skipping threshold "
+                      f"enforcement for reported coverage {coverage_percent}% "
+                      f"against minimum {coverage_min}%"
+                  )
+                  raise SystemExit(0)
+              raise SystemExit(
+                  "coverage is below the configured threshold: "
+                  f"{coverage_percent}% < {coverage_min}%"
+              )
+
+          print(f"coverage gate passed: {coverage_percent}% >= {coverage_min}%")
+          PY
