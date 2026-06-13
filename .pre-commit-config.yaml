@@ -22,7 +22,7 @@ repos:
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: ''
     hooks:
-    -   id: mypy
+      - id: mypy
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^(manifest.*|docs/|scripts/)
