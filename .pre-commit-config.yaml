@@ -111,10 +111,12 @@ repos:
       - id: pretty-format-json
         args:
           - --autofix
-        # manifest key order is owned by hassfest; the smellcheck baseline is
+        # manifest key order is owned by hassfest; translation file format
+        # (strings.json key order, raw UTF-8) is owned by
+        # scripts/sync_translations; the smellcheck baseline is
         # machine-generated compact JSON (pretty-printing bloats it past the
         # large-file gate).
-        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/|\.smellcheck-baseline\.json)
+        exclude: ^(custom_components/jackery_solarvault/(manifest.*|translations/)|tests/|docs/|scripts/|\.smellcheck-baseline\.json)
       - id: fix-byte-order-marker
       - id: detect-private-key
       - id: destroyed-symlinks
