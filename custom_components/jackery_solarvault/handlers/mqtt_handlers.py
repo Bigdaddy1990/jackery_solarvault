@@ -11,7 +11,7 @@ Source: coordinator.py lines 2389-3421 (Phase 5 extraction).
 from datetime import UTC, datetime
 from typing import Any
 
-from jackery_solarvault.const import (
+from ..const import (
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     DEVICE_LIFETIME_COUNTER_KEYS,
     FIELD_ACTION_ID,
@@ -44,12 +44,9 @@ from jackery_solarvault.const import (
     PACK_FIELD_LAST_SEEN_AT,
     SUBDEVICE_ONLY_PROPERTY_KEYS,
 )
-from jackery_solarvault.models.property_merge import (
-    merge_dict_values,
-    sync_property_aliases,
-)
-from jackery_solarvault.subdevices.detector import subdevice_identity_values
-from jackery_solarvault.util import safe_float
+from ..models.property_merge import merge_dict_values, sync_property_aliases
+from ..subdevices.detector import subdevice_identity_values
+from ..util import safe_float
 
 # ---------------------------------------------------------------------------
 # MQTT envelope normalization

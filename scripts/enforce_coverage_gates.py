@@ -5,7 +5,7 @@ import argparse
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sys
-from defusedxml import ElementTree as ET; from xml.etree.ElementTree import ParseError; ET.ParseError = ParseError
+from defusedxml import ElementTree as ET
 
 CRITICAL_MODULES: frozenset[str] = frozenset({
     "custom_components/jackery_solarvault/__init__.py",
