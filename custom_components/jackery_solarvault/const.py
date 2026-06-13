@@ -399,7 +399,7 @@ DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = True
 # These values match the server-side update rhythm we observed in the
 # captured traffic — polling faster yields no fresher data.
 SLOW_METRICS_INTERVAL_SEC: Final = (
-    15  # statistic + pv_trends + alarm #DNT CHANGE OR U BREAK LIVEPOLLING!
+    15  # statistic + pv_trends + alarm
 )
 PRICE_CONFIG_INTERVAL_SEC: Final = 180  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
