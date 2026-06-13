@@ -1,40 +1,40 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Esta cuenta de Jackery ya está configurada.",
-      "already_in_progress": "Ya hay un flujo de configuración en curso para esta cuenta de Jackery.",
-      "reauth_entry_missing": "No se encontró la entrada de Jackery para volver a autenticarse.",
-      "reauth_successful": "La reautenticación se completó correctamente.",
-      "reconfigure_account_mismatch": "El nuevo correo electrónico no coincide con la cuenta de Jackery configurada. Usa el correo original o elimina primero la entrada.",
-      "reconfigure_entry_missing": "No se encontró la entrada de Jackery para la reconfiguración.",
-      "reconfigure_successful": "Configuración actualizada."
+      "already_configured": "Esta cuenta de Jackery ya est\u00e1 configurada.",
+      "already_in_progress": "Ya hay un flujo de configuraci\u00f3n en curso para esta cuenta de Jackery.",
+      "reauth_entry_missing": "No se encontr\u00f3 la entrada de Jackery para volver a autenticarse.",
+      "reauth_successful": "La reautenticaci\u00f3n se complet\u00f3 correctamente.",
+      "reconfigure_account_mismatch": "El nuevo correo electr\u00f3nico no coincide con la cuenta de Jackery configurada. Usa el correo original o elimina primero la entrada.",
+      "reconfigure_entry_missing": "No se encontr\u00f3 la entrada de Jackery para la reconfiguraci\u00f3n.",
+      "reconfigure_successful": "Configuraci\u00f3n actualizada."
     },
     "error": {
-      "account_required": "La cuenta no puede estar vacía.",
+      "account_required": "La cuenta no puede estar vac\u00eda.",
       "cannot_connect": "No se pudo conectar a iot.jackeryapp.com.",
-      "invalid_auth": "Correo electrónico o contraseña no válidos."
+      "invalid_auth": "Correo electr\u00f3nico o contrase\u00f1a no v\u00e1lidos."
     },
     "step": {
       "reauth_confirm": {
         "data": {
-          "password": "Contraseña"
+          "password": "Contrase\u00f1a"
         },
-        "description": "La contraseña guardada para {username} ya no funciona. Introduce la contraseña actual para restaurar la conexión.",
+        "description": "La contrase\u00f1a guardada para {username} ya no funciona. Introduce la contrase\u00f1a actual para restaurar la conexi\u00f3n.",
         "title": "Volver a autenticar Jackery"
       },
       "reconfigure": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "enable_ble_transport": "Activar transporte BLE",
           "enable_ble_writes": "Activar escrituras BLE experimentales",
-          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energía del hogar",
-          "enable_month_statistics": "Importar estadísticas mensuales",
+          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energ\u00eda del hogar",
+          "enable_month_statistics": "Importar estad\u00edsticas mensuales",
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
-          "enable_week_statistics": "Importar estadísticas semanales",
-          "enable_year_statistics": "Importar estadísticas anuales",
-          "password": "Contraseña",
+          "enable_week_statistics": "Importar estad\u00edsticas semanales",
+          "enable_year_statistics": "Importar estad\u00edsticas anuales",
+          "password": "Contrase\u00f1a",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
           "third_party_mqtt_password": "Third-Party MQTT password",
@@ -42,20 +42,20 @@
           "third_party_mqtt_token": "Third-Party MQTT token",
           "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter",
           "third_party_mqtt_username": "Third-Party MQTT username",
-          "username": "Correo electrónico"
+          "username": "Correo electr\u00f3nico"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends no está disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagnósticos de origen.",
-          "enable_month_statistics": "Importa la carga útil del período mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "enable_derived_home_energy_fallback": "Si sys/home/trends no est\u00e1 disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagn\u00f3sticos de origen.",
+          "enable_month_statistics": "Importa la carga \u00fatil del per\u00edodo mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
-          "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "enable_week_statistics": "Importa la carga \u00fatil del per\u00edodo semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "enable_year_statistics": "Importa la carga \u00fatil del per\u00edodo anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -63,25 +63,25 @@
           "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription. Default is `homeassistant`; adjust to your broker topic as needed.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
-        "description": "Actualiza la contraseña y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID único de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
+        "description": "Actualiza la contrase\u00f1a y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID \u00fanico de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
         "title": "Reconfigurar Jackery SolarVault"
       },
       "user": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "enable_ble_transport": "Activar transporte BLE",
-          "password": "Contraseña",
-          "username": "Correo electrónico"
+          "password": "Contrase\u00f1a",
+          "username": "Correo electr\u00f3nico"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada."
         },
-        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la región y las credenciales MQTT se detectan automáticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Actívalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesión activa por cuenta. Mantén la app de Jackery cerrada en la cuenta SolarVault mientras Home Assistant deba recibir actualizaciones MQTT en vivo. Si abres la app brevemente, Home Assistant pausa las reconexiones MQTT por un corto tiempo, sigue consultando por HTTP y reanuda las actualizaciones en vivo automáticamente.",
+        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la regi\u00f3n y las credenciales MQTT se detectan autom\u00e1ticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Act\u00edvalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesi\u00f3n activa por cuenta. Mant\u00e9n la app de Jackery cerrada en la cuenta SolarVault mientras Home Assistant deba recibir actualizaciones MQTT en vivo. Si abres la app brevemente, Home Assistant pausa las reconexiones MQTT por un corto tiempo, sigue consultando por HTTP y reanuda las actualizaciones en vivo autom\u00e1ticamente.",
         "title": "Jackery SolarVault"
       }
     }
@@ -98,7 +98,7 @@
         "name": "Ethernet conectado"
       },
       "online": {
-        "name": "En línea"
+        "name": "En l\u00ednea"
       },
       "smart_plug_switch_state": {
         "name": "Estado del enchufe inteligente"
@@ -107,6 +107,69 @@
     "button": {
       "delete_storm_alert": {
         "name": "Eliminar alerta de tormenta"
+      },
+      "portable_current_charge_plan": {
+        "name": "Current charge plan"
+      },
+      "portable_get_charge_plan": {
+        "name": "Get charge plan"
+      },
+      "portable_get_electricity_data_count": {
+        "name": "Get electricity data count"
+      },
+      "portable_get_peaks_troughs": {
+        "name": "Get peaks and troughs"
+      },
+      "portable_get_power_pack_list": {
+        "name": "Get battery pack list"
+      },
+      "portable_get_wifi_config": {
+        "name": "Get Wi-Fi config"
+      },
+      "portable_power_off": {
+        "name": "Power off"
+      },
+      "portable_power_pack_blink": {
+        "name": "Blink battery pack"
+      },
+      "portable_read_device_info": {
+        "name": "Read device info"
+      },
+      "portable_read_sub_ct": {
+        "name": "Read sub-CT"
+      },
+      "portable_read_wifi_list": {
+        "name": "Read Wi-Fi list"
+      },
+      "portable_refresh_battery_packs": {
+        "name": "Refresh battery packs"
+      },
+      "portable_refresh_device_info": {
+        "name": "Refresh device info"
+      },
+      "portable_refresh_electricity_count": {
+        "name": "Refresh electricity count"
+      },
+      "portable_refresh_sub_ct": {
+        "name": "Refresh sub-CT"
+      },
+      "portable_refresh_wifi_config": {
+        "name": "Refresh Wi-Fi config"
+      },
+      "portable_refresh_wifi_list": {
+        "name": "Refresh Wi-Fi list"
+      },
+      "portable_restart": {
+        "name": "Restart portable device"
+      },
+      "portable_send_time_zone": {
+        "name": "Send time zone"
+      },
+      "portable_sync_mqtt_info": {
+        "name": "Sync MQTT info"
+      },
+      "portable_sync_time_zone": {
+        "name": "Sync time zone"
       },
       "read_custom_mode_schedule": {
         "name": "Leer horario personalizado"
@@ -121,16 +184,16 @@
         "name": "Reiniciar dispositivo"
       },
       "refresh_battery_packs": {
-        "name": "Actualizar baterías adicionales"
+        "name": "Actualizar bater\u00edas adicionales"
       },
       "refresh_device_info": {
-        "name": "Actualizar información del dispositivo"
+        "name": "Actualizar informaci\u00f3n del dispositivo"
       },
       "refresh_device_ota_version": {
-        "name": "Actualizar versión OTA del dispositivo"
+        "name": "Actualizar versi\u00f3n OTA del dispositivo"
       },
       "refresh_meter_heads": {
-        "name": "Actualizar cabezales de medición"
+        "name": "Actualizar cabezales de medici\u00f3n"
       },
       "refresh_smart_meter": {
         "name": "Actualizar medidor inteligente / CT"
@@ -142,126 +205,54 @@
         "name": "Actualizar subdispositivos combinados"
       },
       "refresh_system_info": {
-        "name": "Actualizar información del sistema"
+        "name": "Actualizar informaci\u00f3n del sistema"
       },
       "refresh_third_party_mqtt_config": {
-        "name": "Actualizar configuración MQTT de terceros"
+        "name": "Actualizar configuraci\u00f3n MQTT de terceros"
       },
       "refresh_time_zone": {
         "name": "Actualizar zona horaria"
       },
       "refresh_weather_plan": {
-        "name": "Actualizar plan meteorológico"
+        "name": "Actualizar plan meteorol\u00f3gico"
       },
       "refresh_wifi_config": {
-        "name": "Actualizar configuración Wi-Fi"
+        "name": "Actualizar configuraci\u00f3n Wi-Fi"
       },
       "refresh_wifi_list": {
         "name": "Actualizar lista Wi-Fi"
       },
       "sync_cloud_mqtt_info": {
-        "name": "Sincronizar información MQTT en la nube"
+        "name": "Sincronizar informaci\u00f3n MQTT en la nube"
       },
       "sync_time_zone": {
         "name": "Sincronizar zona horaria"
-      },
-      "portable_restart": {
-        "name": "Restart portable device"
-      },
-      "portable_power_off": {
-        "name": "Power off"
-      },
-      "portable_power_pack_blink": {
-        "name": "Blink battery pack"
-      },
-      "portable_read_device_info": {
-        "name": "Read device info"
-      },
-      "portable_read_wifi_list": {
-        "name": "Read Wi-Fi list"
-      },
-      "portable_get_power_pack_list": {
-        "name": "Get battery pack list"
-      },
-      "portable_get_electricity_data_count": {
-        "name": "Get electricity data count"
-      },
-      "portable_send_time_zone": {
-        "name": "Send time zone"
-      },
-      "portable_sync_mqtt_info": {
-        "name": "Sync MQTT info"
-      },
-      "portable_get_wifi_config": {
-        "name": "Get Wi-Fi config"
-      },
-      "portable_get_charge_plan": {
-        "name": "Get charge plan"
-      },
-      "portable_current_charge_plan": {
-        "name": "Current charge plan"
-      },
-      "portable_get_peaks_troughs": {
-        "name": "Get peaks and troughs"
-      },
-      "portable_read_sub_ct": {
-        "name": "Read sub-CT"
-      },
-      "portable_refresh_device_info": {
-        "name": "Refresh device info"
-      },
-      "portable_refresh_wifi_list": {
-        "name": "Refresh Wi-Fi list"
-      },
-      "portable_refresh_battery_packs": {
-        "name": "Refresh battery packs"
-      },
-      "portable_refresh_electricity_count": {
-        "name": "Refresh electricity count"
-      },
-      "portable_sync_time_zone": {
-        "name": "Sync time zone"
-      },
-      "portable_refresh_wifi_config": {
-        "name": "Refresh Wi-Fi config"
-      },
-      "portable_refresh_sub_ct": {
-        "name": "Refresh sub-CT"
       }
     },
     "number": {
       "default_power_set": {
-        "name": "Potencia de salida estándar"
+        "name": "Potencia de salida est\u00e1ndar"
       },
       "max_feed_grid": {
-        "name": "Potencia máxima de inyección"
+        "name": "Potencia m\u00e1xima de inyecci\u00f3n"
       },
       "max_output_power_set": {
-        "name": "Potencia máxima de salida"
+        "name": "Potencia m\u00e1xima de salida"
       },
-      "single_tariff_price_set": {
-        "name": "Precio de tarifa única"
-      },
-      "soc_charge_limit_set": {
-        "name": "Límite de carga"
-      },
-      "soc_discharge_limit_set": {
-        "name": "Límite de descarga"
-      },
-      "third_party_mqtt_port": {
-        "name": "Puerto MQTT de terceros"
-      },
-      "portable_charge_power": {
-        "name": "Charge power limit"
-      },
-      "portable_energy_storage_charge_limit": {
-        "name": "Energy storage charge limit"
+      "portable_ac_countdown": {
+        "name": "AC output countdown"
       },
       "portable_auto_shutdown_time": {
         "name": "Auto shutdown time"
       },
-      "portable_ac_countdown": {
-        "name": "AC output countdown"
+      "portable_bluetooth_sleep": {
+        "name": "Bluetooth sleep time"
+      },
+      "portable_charge_power": {
+        "name": "Charge power limit"
+      },
+      "portable_dc_car_countdown": {
+        "name": "DC car output countdown"
       },
       "portable_dc_countdown": {
         "name": "DC output countdown"
@@ -269,22 +260,31 @@
       "portable_dc_usb_countdown": {
         "name": "DC USB output countdown"
       },
-      "portable_dc_car_countdown": {
-        "name": "DC car output countdown"
+      "portable_energy_storage_charge_limit": {
+        "name": "Energy storage charge limit"
+      },
+      "portable_output_priority": {
+        "name": "Output priority mode"
       },
       "portable_output_priority_soc": {
         "name": "Output priority SOC threshold"
       },
-      "portable_bluetooth_sleep": {
-        "name": "Bluetooth sleep time"
+      "single_tariff_price_set": {
+        "name": "Precio de tarifa \u00fanica"
       },
-      "portable_output_priority": {
-        "name": "Output priority mode"
+      "soc_charge_limit_set": {
+        "name": "L\u00edmite de carga"
+      },
+      "soc_discharge_limit_set": {
+        "name": "L\u00edmite de descarga"
+      },
+      "third_party_mqtt_port": {
+        "name": "Puerto MQTT de terceros"
       }
     },
     "select": {
       "auto_off_island_mode": {
-        "name": "Autoapagado (sin conexión a red)",
+        "name": "Autoapagado (sin conexi\u00f3n a red)",
         "state": {
           "h_12": "12 h",
           "h_2": "2 h",
@@ -305,15 +305,73 @@
       "electricity_price_mode": {
         "name": "Modo de precio de electricidad",
         "state": {
-          "dynamic": "Precio dinámico de electricidad",
+          "dynamic": "Precio din\u00e1mico de electricidad",
           "single": "Tarifa fija"
         }
       },
       "electricity_price_provider": {
         "name": "Proveedor de precio de electricidad"
       },
+      "portable_ac1_priority": {
+        "name": "AC1 output priority",
+        "state": {
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
+        }
+      },
+      "portable_ac2_priority": {
+        "name": "AC2 output priority",
+        "state": {
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
+        }
+      },
+      "portable_ac_output_mode": {
+        "name": "AC output mode",
+        "state": {
+          "high-performance": "High Performance",
+          "normal": "Normal",
+          "quiet": "Quiet"
+        }
+      },
+      "portable_dc_priority": {
+        "name": "DC output priority",
+        "state": {
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
+        }
+      },
+      "portable_output_priority": {
+        "name": "Output priority",
+        "state": {
+          "battery-first": "Battery first",
+          "grid-first": "Grid first",
+          "solar-first": "Solar first"
+        }
+      },
+      "portable_power_mode": {
+        "name": "Power mode",
+        "state": {
+          "eco": "Eco",
+          "performance": "Performance",
+          "standard": "Standard"
+        }
+      },
+      "portable_ups_model": {
+        "name": "UPS model",
+        "state": {
+          "agm": "agm",
+          "custom": "Custom",
+          "gel": "gel",
+          "lifepo4": "LiFePO4",
+          "standard": "Standard"
+        }
+      },
       "storm_warning_minutes_select": {
-        "name": "Tiempo de antelación de alerta de tormenta",
+        "name": "Tiempo de antelaci\u00f3n de alerta de tormenta",
         "state": {
           "min_1020": "17 h",
           "min_1080": "18 h",
@@ -351,70 +409,12 @@
         }
       },
       "work_mode_select": {
-        "name": "Modo de uso de energía",
+        "name": "Modo de uso de energ\u00eda",
         "state": {
           "ai_smart": "Modo inteligente IA",
           "custom": "Modo personalizado",
           "self_use": "Autoconsumo",
           "tariff": "Modo tarifa"
-        }
-      },
-      "portable_ups_model": {
-        "name": "UPS model",
-        "state": {
-          "standard": "Standard",
-          "lifepo4": "LiFePO4",
-          "agm": "agm",
-          "gel": "gel",
-          "custom": "Custom"
-        }
-      },
-      "portable_power_mode": {
-        "name": "Power mode",
-        "state": {
-          "standard": "Standard",
-          "eco": "Eco",
-          "performance": "Performance"
-        }
-      },
-      "portable_ac_output_mode": {
-        "name": "AC output mode",
-        "state": {
-          "normal": "Normal",
-          "quiet": "Quiet",
-          "high-performance": "High Performance"
-        }
-      },
-      "portable_output_priority": {
-        "name": "Output priority",
-        "state": {
-          "battery-first": "Battery first",
-          "grid-first": "Grid first",
-          "solar-first": "Solar first"
-        }
-      },
-      "portable_ac1_priority": {
-        "name": "AC1 output priority",
-        "state": {
-          "battery-first": "Battery first",
-          "grid-first": "Grid first",
-          "solar-first": "Solar first"
-        }
-      },
-      "portable_ac2_priority": {
-        "name": "AC2 output priority",
-        "state": {
-          "battery-first": "Battery first",
-          "grid-first": "Grid first",
-          "solar-first": "Solar first"
-        }
-      },
-      "portable_dc_priority": {
-        "name": "DC output priority",
-        "state": {
-          "battery-first": "Battery first",
-          "grid-first": "Grid first",
-          "solar-first": "Solar first"
         }
       }
     },
@@ -422,14 +422,11 @@
       "ability_bits": {
         "name": "Indicadores de capacidad"
       },
-      "smart_mode_active": {
-        "name": "Modo inteligente activo"
+      "ac1_name": {
+        "name": "AC1 output name"
       },
-      "smart_mode_time_difference": {
-        "name": "Diferencia de tiempo del modo inteligente"
-      },
-      "tou_plan_tasks": {
-        "name": "Tareas del plan TOU"
+      "ac2_name": {
+        "name": "AC2 output name"
       },
       "ac_input_current": {
         "name": "Corriente de entrada CA"
@@ -437,11 +434,29 @@
       "ac_input_power": {
         "name": "Potencia de entrada CA"
       },
+      "ac_line1_current": {
+        "name": "Corriente de l\u00ednea CA 1"
+      },
+      "ac_line1_power": {
+        "name": "Potencia de l\u00ednea CA 1"
+      },
+      "ac_line2_current": {
+        "name": "Corriente de l\u00ednea CA 2"
+      },
+      "ac_line2_power": {
+        "name": "Potencia de l\u00ednea CA 2"
+      },
       "ac_output_apparent_power": {
         "name": "Potencia aparente de salida CA"
       },
       "ac_output_current": {
         "name": "Corriente de salida CA"
+      },
+      "ac_output_current_1": {
+        "name": "Corriente de salida CA 1"
+      },
+      "ac_output_current_2": {
+        "name": "Corriente de salida CA 2"
       },
       "ac_output_frequency": {
         "name": "Frecuencia de salida CA"
@@ -456,109 +471,133 @@
         "name": "Potencia de salida CA 2"
       },
       "ac_output_voltage": {
-        "name": "Tensión de salida CA"
+        "name": "Tensi\u00f3n de salida CA"
       },
       "activation_date": {
-        "name": "Fecha de activación"
+        "name": "Fecha de activaci\u00f3n"
       },
       "alarm_count": {
         "name": "Alarmas activas"
       },
+      "ambient_temperature": {
+        "name": "Ambient temperature"
+      },
       "auto_standby": {
-        "name": "Modo de espera automático"
+        "name": "Modo de espera autom\u00e1tico"
       },
       "auto_standby_timer": {
-        "name": "Temporizador de espera automático"
+        "name": "Temporizador de espera autom\u00e1tico"
       },
       "battery_charge_month_energy": {
-        "name": "Carga mensual de batería"
+        "name": "Carga mensual de bater\u00eda"
       },
       "battery_charge_power": {
-        "name": "Potencia de carga de la batería principal"
+        "name": "Potencia de carga de la bater\u00eda principal"
       },
       "battery_charge_week_energy": {
-        "name": "Carga semanal de batería"
+        "name": "Carga semanal de bater\u00eda"
       },
       "battery_charge_year_energy": {
-        "name": "Carga anual de batería"
+        "name": "Carga anual de bater\u00eda"
       },
       "battery_count": {
-        "name": "Número de baterías"
+        "name": "N\u00famero de bater\u00edas"
       },
       "battery_discharge_month_energy": {
-        "name": "Energía mensual de descarga de batería"
+        "name": "Energ\u00eda mensual de descarga de bater\u00eda"
       },
       "battery_discharge_power": {
-        "name": "Potencia de descarga de la batería principal"
+        "name": "Potencia de descarga de la bater\u00eda principal"
       },
       "battery_discharge_week_energy": {
-        "name": "Energía semanal de descarga de batería"
+        "name": "Energ\u00eda semanal de descarga de bater\u00eda"
       },
       "battery_discharge_year_energy": {
-        "name": "Energía anual de descarga de batería"
+        "name": "Energ\u00eda anual de descarga de bater\u00eda"
       },
       "battery_low_state": {
-        "name": "Estado de batería baja"
+        "name": "Estado de bater\u00eda baja"
       },
       "battery_net_power": {
-        "name": "Potencia neta de la batería principal"
+        "name": "Potencia neta de la bater\u00eda principal"
       },
       "battery_pack_cell_temperature": {
-        "name": "Temperatura de celda del paquete de batería"
+        "name": "Temperatura de celda del paquete de bater\u00eda"
       },
       "battery_pack_charge_power": {
-        "name": "Potencia de carga del paquete de batería"
+        "name": "Potencia de carga del paquete de bater\u00eda"
       },
       "battery_pack_communication_state": {
-        "name": "Estado de comunicación del paquete de batería"
+        "name": "Estado de comunicaci\u00f3n del paquete de bater\u00eda"
+      },
+      "battery_pack_count": {
+        "name": "Battery pack count"
       },
       "battery_pack_discharge_power": {
-        "name": "Potencia de descarga del paquete de batería"
+        "name": "Potencia de descarga del paquete de bater\u00eda"
       },
       "battery_pack_firmware_version": {
-        "name": "Versión de firmware del paquete de batería"
+        "name": "Versi\u00f3n de firmware del paquete de bater\u00eda"
       },
       "battery_pack_lifetime_charge_energy": {
-        "name": "Energía de carga total del paquete de batería"
+        "name": "Energ\u00eda de carga total del paquete de bater\u00eda"
       },
       "battery_pack_lifetime_discharge_energy": {
-        "name": "Energía de descarga total del paquete de batería"
+        "name": "Energ\u00eda de descarga total del paquete de bater\u00eda"
       },
       "battery_pack_serial_number": {
-        "name": "Número de serie del paquete de batería"
+        "name": "N\u00famero de serie del paquete de bater\u00eda"
       },
       "battery_pack_soc": {
-        "name": "SOC del paquete de batería"
+        "name": "SOC del paquete de bater\u00eda"
       },
       "battery_pack_update_status": {
-        "name": "Estado de actualización del paquete de batería"
+        "name": "Estado de actualizaci\u00f3n del paquete de bater\u00eda"
       },
       "battery_soc": {
-        "name": "Nivel total de batería"
+        "name": "Nivel total de bater\u00eda"
       },
       "battery_soc_internal": {
-        "name": "Nivel de la batería principal"
+        "name": "Nivel de la bater\u00eda principal"
       },
       "battery_stack_net_power": {
-        "name": "Potencia neta del sistema de baterías"
+        "name": "Potencia neta del sistema de bater\u00edas"
       },
       "battery_state": {
-        "name": "Estado de la batería"
+        "name": "Estado de la bater\u00eda"
       },
       "battery_temperature": {
-        "name": "Temperatura de la batería"
+        "name": "Temperatura de la bater\u00eda"
       },
       "ble_transport": {
         "name": "Transporte BLE"
       },
+      "box_mode": {
+        "name": "Box mode"
+      },
       "cell_temperature": {
-        "name": "Temperatura de celda de la batería principal"
+        "name": "Temperatura de celda de la bater\u00eda principal"
+      },
+      "charge_input_power_portable": {
+        "name": "Potencia de entrada de carga"
       },
       "charge_limit": {
-        "name": "Límite de carga"
+        "name": "L\u00edmite de carga"
       },
       "charge_plan_power": {
         "name": "Potencia del plan de carga"
+      },
+      "charge_status": {
+        "name": "Estado de carga"
+      },
+      "charge_status_code": {
+        "name": "C\u00f3digo de estado de carga"
+      },
+      "charge_status_limit": {
+        "name": "L\u00edmite de estado de carga"
+      },
+      "charge_status_type": {
+        "name": "Tipo de estado de carga"
       },
       "charging_input_power": {
         "name": "Potencia de entrada de carga"
@@ -567,10 +606,10 @@
         "name": "MQTT en la nube"
       },
       "conversion_loss_power": {
-        "name": "Potencia calculada de pérdida del inversor/conversión"
+        "name": "Potencia calculada de p\u00e9rdida del inversor/conversi\u00f3n"
       },
       "country_code": {
-        "name": "Código de país"
+        "name": "C\u00f3digo de pa\u00eds"
       },
       "ct_input_day_energy": {
         "name": "Importacion de red CT hoy"
@@ -599,20 +638,35 @@
       "ct_state": {
         "name": "Estado CT"
       },
+      "dc_output_config": {
+        "name": "DC output configuration"
+      },
       "dc_output_current": {
         "name": "Corriente de salida CC"
       },
       "dc_output_power": {
         "name": "Potencia de salida CC"
       },
+      "dc_output_type": {
+        "name": "DC output type detail"
+      },
       "dc_output_voltage": {
-        "name": "Tensión de salida CC"
+        "name": "Tensi\u00f3n de salida CC"
+      },
+      "dc_type": {
+        "name": "DC output type"
+      },
+      "dc_usb_connected": {
+        "name": "DC USB connected"
+      },
+      "dc_usb_type": {
+        "name": "DC USB type"
       },
       "default_power": {
         "name": "Potencia de carga predeterminada"
       },
       "device_activation": {
-        "name": "Activación del dispositivo"
+        "name": "Activaci\u00f3n del dispositivo"
       },
       "device_ongrid_input_month_energy": {
         "name": "Entrada mensual del dispositivo en red"
@@ -633,61 +687,61 @@
         "name": "Salida anual del dispositivo en red"
       },
       "device_pv1_day_energy": {
-        "name": "Energía diaria FV1"
+        "name": "Energ\u00eda diaria FV1"
       },
       "device_pv1_month_energy": {
-        "name": "Energía mensual FV1"
+        "name": "Energ\u00eda mensual FV1"
       },
       "device_pv1_week_energy": {
-        "name": "Energía semanal FV1"
+        "name": "Energ\u00eda semanal FV1"
       },
       "device_pv1_year_energy": {
-        "name": "Energía anual FV1"
+        "name": "Energ\u00eda anual FV1"
       },
       "device_pv2_day_energy": {
-        "name": "Energía diaria FV2"
+        "name": "Energ\u00eda diaria FV2"
       },
       "device_pv2_month_energy": {
-        "name": "Energía mensual FV2"
+        "name": "Energ\u00eda mensual FV2"
       },
       "device_pv2_week_energy": {
-        "name": "Energía semanal FV2"
+        "name": "Energ\u00eda semanal FV2"
       },
       "device_pv2_year_energy": {
-        "name": "Energía anual FV2"
+        "name": "Energ\u00eda anual FV2"
       },
       "device_pv3_day_energy": {
-        "name": "Energía diaria FV3"
+        "name": "Energ\u00eda diaria FV3"
       },
       "device_pv3_month_energy": {
-        "name": "Energía mensual FV3"
+        "name": "Energ\u00eda mensual FV3"
       },
       "device_pv3_week_energy": {
-        "name": "Energía semanal FV3"
+        "name": "Energ\u00eda semanal FV3"
       },
       "device_pv3_year_energy": {
-        "name": "Energía anual FV3"
+        "name": "Energ\u00eda anual FV3"
       },
       "device_pv4_day_energy": {
-        "name": "Energía diaria FV4"
+        "name": "Energ\u00eda diaria FV4"
       },
       "device_pv4_month_energy": {
-        "name": "Energía mensual FV4"
+        "name": "Energ\u00eda mensual FV4"
       },
       "device_pv4_week_energy": {
-        "name": "Energía semanal FV4"
+        "name": "Energ\u00eda semanal FV4"
       },
       "device_pv4_year_energy": {
-        "name": "Energía anual FV4"
+        "name": "Energ\u00eda anual FV4"
       },
       "device_today_battery_charge": {
-        "name": "Carga de batería del dispositivo hoy"
+        "name": "Carga de bater\u00eda del dispositivo hoy"
       },
       "device_today_battery_discharge": {
-        "name": "Descarga de batería del dispositivo hoy"
+        "name": "Descarga de bater\u00eda del dispositivo hoy"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Dispositivo batería→red hoy"
+        "name": "Dispositivo bater\u00eda\u2192red hoy"
       },
       "device_today_ongrid_input": {
         "name": "Entrada en red del dispositivo hoy"
@@ -696,19 +750,22 @@
         "name": "Salida en red del dispositivo hoy"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Dispositivo red→batería hoy"
+        "name": "Dispositivo red\u2192bater\u00eda hoy"
       },
       "device_today_pv_energy": {
         "name": "FV del dispositivo hoy"
       },
       "device_today_pv_to_battery": {
-        "name": "Dispositivo FV→batería hoy"
+        "name": "Dispositivo FV\u2192bater\u00eda hoy"
+      },
+      "dhg_recall": {
+        "name": "Recall DHG"
       },
       "discharge_limit": {
-        "name": "Límite de descarga"
+        "name": "L\u00edmite de descarga"
       },
       "energy_plan_power": {
-        "name": "Potencia del plan de energía"
+        "name": "Potencia del plan de energ\u00eda"
       },
       "eps_in_power": {
         "name": "Potencia de entrada EPS"
@@ -744,16 +801,25 @@
         "name": "Estado del interruptor EPS"
       },
       "error_code": {
-        "name": "Código de error"
+        "name": "C\u00f3digo de error"
       },
       "eth_port": {
         "name": "Estado del puerto Ethernet"
       },
+      "ethernet_ip": {
+        "name": "Direcci\u00f3n IP Ethernet"
+      },
+      "ethernet_mac": {
+        "name": "Direcci\u00f3n MAC Ethernet"
+      },
+      "ethernet_port": {
+        "name": "Puerto Ethernet"
+      },
       "external_pack_connected": {
-        "name": "Paquete de batería externo conectado"
+        "name": "Paquete de bater\u00eda externo conectado"
       },
       "firmware_version": {
-        "name": "Versión de firmware"
+        "name": "Versi\u00f3n de firmware"
       },
       "follow_meter_state": {
         "name": "Estado de seguimiento del medidor"
@@ -771,7 +837,7 @@
         "name": "Salida de red"
       },
       "grid_standard": {
-        "name": "Estándar de red"
+        "name": "Est\u00e1ndar de red"
       },
       "grid_state": {
         "name": "Estado de red"
@@ -780,13 +846,13 @@
         "name": "Potencia de consumo del hogar"
       },
       "home_month_energy": {
-        "name": "Energía mensual de consumo del hogar"
+        "name": "Energ\u00eda mensual de consumo del hogar"
       },
       "home_week_energy": {
-        "name": "Energía semanal de consumo del hogar"
+        "name": "Energ\u00eda semanal de consumo del hogar"
       },
       "home_year_energy": {
-        "name": "Energía anual de consumo del hogar"
+        "name": "Energ\u00eda anual de consumo del hogar"
       },
       "http_api": {
         "name": "API HTTP en la nube"
@@ -798,16 +864,19 @@
         "name": "Temperatura de entrada"
       },
       "last_offline": {
-        "name": "Última vez sin conexión"
+        "name": "\u00daltima vez sin conexi\u00f3n"
       },
       "last_online": {
-        "name": "Última vez en línea"
+        "name": "\u00daltima vez en l\u00ednea"
       },
       "last_update": {
-        "name": "Última actualización"
+        "name": "\u00daltima actualizaci\u00f3n"
       },
       "latitude": {
         "name": "Latitud"
+      },
+      "light_sensor": {
+        "name": "Light sensor"
       },
       "local_mqtt": {
         "name": "MQTT local"
@@ -816,70 +885,25 @@
         "name": "Longitud"
       },
       "mac_address": {
-        "name": "Dirección MAC"
-      },
-      "ac1_name": {
-        "name": "AC1 output name"
-      },
-      "ac2_name": {
-        "name": "AC2 output name"
-      },
-      "dc_output_config": {
-        "name": "DC output configuration"
-      },
-      "dc_type": {
-        "name": "DC output type"
-      },
-      "dc_output_type": {
-        "name": "DC output type detail"
-      },
-      "dc_usb_connected": {
-        "name": "DC USB connected"
-      },
-      "dc_usb_type": {
-        "name": "DC USB type"
-      },
-      "battery_pack_count": {
-        "name": "Battery pack count"
-      },
-      "box_mode": {
-        "name": "Box mode"
-      },
-      "light_sensor": {
-        "name": "Light sensor"
-      },
-      "sleep_mode_flag": {
-        "name": "Sleep mode flag"
-      },
-      "sltb_value": {
-        "name": "SLTB value"
-      },
-      "ambient_temperature": {
-        "name": "Ambient temperature"
-      },
-      "panel_temperature": {
-        "name": "Panel temperature"
-      },
-      "total_time": {
-        "name": "Total time"
+        "name": "Direcci\u00f3n MAC"
       },
       "max_feed_grid_read": {
-        "name": "Potencia máxima de inyección (runtime)"
+        "name": "Potencia m\u00e1xima de inyecci\u00f3n (runtime)"
       },
       "max_inverter_power": {
-        "name": "Potencia máxima del inversor"
+        "name": "Potencia m\u00e1xima del inversor"
       },
       "max_iot_num": {
-        "name": "Máx. dispositivos IoT"
+        "name": "M\u00e1x. dispositivos IoT"
       },
       "max_output_power": {
-        "name": "Potencia máxima de salida"
+        "name": "Potencia m\u00e1xima de salida"
       },
       "max_system_input_power": {
-        "name": "Potencia máxima de entrada del sistema"
+        "name": "Potencia m\u00e1xima de entrada del sistema"
       },
       "max_system_output_power": {
-        "name": "Potencia máxima de salida del sistema"
+        "name": "Potencia m\u00e1xima de salida del sistema"
       },
       "meter_head_charging_energy": {
         "name": "Energia de carga del medidor"
@@ -906,10 +930,10 @@
         "name": "Potencia de salida del medidor"
       },
       "off_grid_shutdown_state": {
-        "name": "Estado de apagado sin conexión a red"
+        "name": "Estado de apagado sin conexi\u00f3n a red"
       },
       "off_grid_time": {
-        "name": "Temporizador de apagado sin conexión a red"
+        "name": "Temporizador de apagado sin conexi\u00f3n a red"
       },
       "ongrid_state": {
         "name": "Estado conectado a red"
@@ -923,14 +947,26 @@
       "output_temperature": {
         "name": "Temperatura de salida"
       },
+      "panel_temperature": {
+        "name": "Panel temperature"
+      },
+      "power_count": {
+        "name": "Conteo de potencia"
+      },
       "power_mode": {
-        "name": "Modo de energía"
+        "name": "Modo de energ\u00eda"
+      },
+      "power_mode_battery": {
+        "name": "Modo de potencia de bater\u00eda"
+      },
+      "power_mode_portable": {
+        "name": "Modo de potencia"
       },
       "power_price": {
         "name": "Precio de electricidad"
       },
       "power_source_selector": {
-        "name": "Selector de fuente de energía"
+        "name": "Selector de fuente de energ\u00eda"
       },
       "pv1_power": {
         "name": "FV1"
@@ -945,7 +981,7 @@
         "name": "FV4"
       },
       "pv_month_energy": {
-        "name": "Energía FV mensual"
+        "name": "Energ\u00eda FV mensual"
       },
       "pv_power_total": {
         "name": "Potencia FV total"
@@ -963,10 +999,10 @@
         "name": "PV revenue yearly"
       },
       "pv_week_energy": {
-        "name": "Energía FV semanal"
+        "name": "Energ\u00eda FV semanal"
       },
       "pv_year_energy": {
-        "name": "Energía FV anual"
+        "name": "Energ\u00eda FV anual"
       },
       "raw_properties": {
         "name": "Propiedades brutas"
@@ -975,25 +1011,31 @@
         "name": "Indicador de reinicio"
       },
       "remaining_runtime": {
-        "name": "Autonomía restante"
+        "name": "Autonom\u00eda restante"
       },
       "savings_battery_loss_year_energy": {
-        "name": "Energía anual perdida del sistema de baterías"
+        "name": "Energ\u00eda anual perdida del sistema de bater\u00edas"
       },
       "savings_calculated_total": {
         "name": "Ahorro calculado"
       },
       "savings_conversion_loss_year_energy": {
-        "name": "Energía anual perdida del inversor/conversión"
+        "name": "Energ\u00eda anual perdida del inversor/conversi\u00f3n"
       },
       "savings_energy": {
-        "name": "Energía CA autoconsumida"
+        "name": "Energ\u00eda CA autoconsumida"
       },
       "savings_price": {
         "name": "Precio de ahorro"
       },
       "savings_pv_residual_year_energy": {
-        "name": "Energía FV residual anual tras autoconsumo"
+        "name": "Energ\u00eda FV residual anual tras autoconsumo"
+      },
+      "sleep_mode_flag": {
+        "name": "Sleep mode flag"
+      },
+      "sltb_value": {
+        "name": "SLTB value"
       },
       "smart_meter_apparent_power": {
         "name": "Smart meter apparent power"
@@ -1002,13 +1044,13 @@
         "name": "Smart meter communication mode"
       },
       "smart_meter_export_month_energy": {
-        "name": "Exportación mensual a red del Smart Meter"
+        "name": "Exportaci\u00f3n mensual a red del Smart Meter"
       },
       "smart_meter_export_week_energy": {
-        "name": "Exportación semanal a red del Smart Meter"
+        "name": "Exportaci\u00f3n semanal a red del Smart Meter"
       },
       "smart_meter_export_year_energy": {
-        "name": "Exportación anual a red del Smart Meter"
+        "name": "Exportaci\u00f3n anual a red del Smart Meter"
       },
       "smart_meter_frequency": {
         "name": "Smart meter frequency"
@@ -1017,46 +1059,46 @@
         "name": "Smart meter function form"
       },
       "smart_meter_gross_phase_export_power": {
-        "name": "Potencia bruta de exportación por fase del Smart Meter"
+        "name": "Potencia bruta de exportaci\u00f3n por fase del Smart Meter"
       },
       "smart_meter_gross_phase_flow_power": {
         "name": "Potencia bruta de flujo por fase del Smart Meter"
       },
       "smart_meter_gross_phase_import_power": {
-        "name": "Potencia bruta de importación por fase del Smart Meter"
+        "name": "Potencia bruta de importaci\u00f3n por fase del Smart Meter"
       },
       "smart_meter_import_month_energy": {
-        "name": "Importación mensual de red del Smart Meter"
+        "name": "Importaci\u00f3n mensual de red del Smart Meter"
       },
       "smart_meter_import_week_energy": {
-        "name": "Importación semanal de red del Smart Meter"
+        "name": "Importaci\u00f3n semanal de red del Smart Meter"
       },
       "smart_meter_import_year_energy": {
-        "name": "Importación anual de red del Smart Meter"
+        "name": "Importaci\u00f3n anual de red del Smart Meter"
       },
       "smart_meter_ip_address": {
         "name": "Smart meter IP address"
       },
       "smart_meter_lifetime_export_energy": {
-        "name": "Exportación acumulada a red del Smart Meter"
+        "name": "Exportaci\u00f3n acumulada a red del Smart Meter"
       },
       "smart_meter_lifetime_import_energy": {
-        "name": "Importación acumulada de red del Smart Meter"
+        "name": "Importaci\u00f3n acumulada de red del Smart Meter"
       },
       "smart_meter_mac_address": {
         "name": "Smart meter MAC address"
       },
       "smart_meter_net_export_power": {
-        "name": "Potencia neta de exportación del Smart Meter"
+        "name": "Potencia neta de exportaci\u00f3n del Smart Meter"
       },
       "smart_meter_net_import_power": {
-        "name": "Potencia neta de importación del Smart Meter"
+        "name": "Potencia neta de importaci\u00f3n del Smart Meter"
       },
       "smart_meter_panel_charging_energy": {
-        "name": "Energía de carga del panel del Smart Meter"
+        "name": "Energ\u00eda de carga del panel del Smart Meter"
       },
       "smart_meter_panel_discharging_energy": {
-        "name": "Energía de descarga del panel del Smart Meter"
+        "name": "Energ\u00eda de descarga del panel del Smart Meter"
       },
       "smart_meter_phase_1_apparent_power": {
         "name": "Smart meter phase 1 apparent power"
@@ -1065,10 +1107,10 @@
         "name": "Smart meter phase 1 current"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "Exportación acumulada a red fase 1 del Smart Meter"
+        "name": "Exportaci\u00f3n acumulada a red fase 1 del Smart Meter"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "Importación acumulada de red fase 1 del Smart Meter"
+        "name": "Importaci\u00f3n acumulada de red fase 1 del Smart Meter"
       },
       "smart_meter_phase_1_power": {
         "name": "Potencia fase 1 del Smart Meter"
@@ -1089,10 +1131,10 @@
         "name": "Smart meter phase 2 current"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "Exportación acumulada a red fase 2 del Smart Meter"
+        "name": "Exportaci\u00f3n acumulada a red fase 2 del Smart Meter"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "Importación acumulada de red fase 2 del Smart Meter"
+        "name": "Importaci\u00f3n acumulada de red fase 2 del Smart Meter"
       },
       "smart_meter_phase_2_power": {
         "name": "Potencia fase 2 del Smart Meter"
@@ -1113,10 +1155,10 @@
         "name": "Smart meter phase 3 current"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "Exportación acumulada a red fase 3 del Smart Meter"
+        "name": "Exportaci\u00f3n acumulada a red fase 3 del Smart Meter"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "Importación acumulada de red fase 3 del Smart Meter"
+        "name": "Importaci\u00f3n acumulada de red fase 3 del Smart Meter"
       },
       "smart_meter_phase_3_power": {
         "name": "Potencia fase 3 del Smart Meter"
@@ -1142,14 +1184,20 @@
       "smart_meter_voltage": {
         "name": "Smart meter voltage"
       },
+      "smart_mode_active": {
+        "name": "Modo inteligente activo"
+      },
+      "smart_mode_time_difference": {
+        "name": "Diferencia de tiempo del modo inteligente"
+      },
       "smart_plug_communication_mode": {
         "name": "Smart plug communication mode"
       },
       "smart_plug_communication_state": {
-        "name": "Estado de comunicación del enchufe inteligente"
+        "name": "Estado de comunicaci\u00f3n del enchufe inteligente"
       },
       "smart_plug_firmware_version": {
-        "name": "Versión de firmware del enchufe inteligente"
+        "name": "Versi\u00f3n de firmware del enchufe inteligente"
       },
       "smart_plug_input_power": {
         "name": "Potencia de entrada del enchufe inteligente"
@@ -1179,16 +1227,16 @@
         "name": "Energia total del enchufe inteligente"
       },
       "soc_charge_limit": {
-        "name": "Límite de carga"
+        "name": "L\u00edmite de carga"
       },
       "soc_discharge_limit": {
-        "name": "Límite de descarga"
+        "name": "L\u00edmite de descarga"
       },
       "stack_in_power": {
-        "name": "Potencia de carga del sistema de baterías"
+        "name": "Potencia de carga del sistema de bater\u00edas"
       },
       "stack_out_power": {
-        "name": "Potencia de descarga del sistema de baterías"
+        "name": "Potencia de descarga del sistema de bater\u00edas"
       },
       "standby_power": {
         "name": "Potencia en espera"
@@ -1197,7 +1245,7 @@
         "name": "Alerta de tormenta habilitada"
       },
       "storm_warning_minutes": {
-        "name": "Tiempo de antelación de alerta de tormenta"
+        "name": "Tiempo de antelaci\u00f3n de alerta de tormenta"
       },
       "system_state": {
         "name": "Estado del sistema"
@@ -1227,13 +1275,19 @@
         "name": "Salida diaria a red (nube de Jackery)"
       },
       "total_carbon_saved": {
-        "name": "CO₂ total ahorrado"
+        "name": "CO\u2082 total ahorrado"
       },
       "total_generation": {
-        "name": "Producción FV total"
+        "name": "Producci\u00f3n FV total"
       },
       "total_revenue": {
         "name": "Ahorro total de la app"
+      },
+      "total_time": {
+        "name": "Total time"
+      },
+      "tou_plan_tasks": {
+        "name": "Tareas del plan TOU"
       },
       "ups_mode": {
         "name": "Modo UPS"
@@ -1244,86 +1298,32 @@
       "usb_a2_power": {
         "name": "Potencia USB-A2"
       },
+      "usb_a3_power": {
+        "name": "Potencia USB-A3"
+      },
       "usb_c1_power": {
         "name": "Potencia USB-C1"
       },
       "usb_c2_power": {
         "name": "Potencia USB-C2"
       },
-      "usb_a3_power": {
-        "name": "Potencia USB-A3"
-      },
       "usb_c3_power": {
         "name": "Potencia USB-C3"
       },
-      "ac_line1_current": {
-        "name": "Corriente de línea CA 1"
-      },
-      "ac_line1_power": {
-        "name": "Potencia de línea CA 1"
-      },
-      "ac_line2_current": {
-        "name": "Corriente de línea CA 2"
-      },
-      "ac_line2_power": {
-        "name": "Potencia de línea CA 2"
-      },
-      "ac_output_current_1": {
-        "name": "Corriente de salida CA 1"
-      },
-      "ac_output_current_2": {
-        "name": "Corriente de salida CA 2"
-      },
-      "charge_input_power_portable": {
-        "name": "Potencia de entrada de carga"
-      },
-      "charge_status": {
-        "name": "Estado de carga"
-      },
-      "charge_status_code": {
-        "name": "Código de estado de carga"
-      },
-      "charge_status_limit": {
-        "name": "Límite de estado de carga"
-      },
-      "charge_status_type": {
-        "name": "Tipo de estado de carga"
-      },
-      "power_count": {
-        "name": "Conteo de potencia"
-      },
-      "power_mode_portable": {
-        "name": "Modo de potencia"
-      },
-      "power_mode_battery": {
-        "name": "Modo de potencia de batería"
-      },
-      "dhg_recall": {
-        "name": "Recall DHG"
-      },
-      "ethernet_ip": {
-        "name": "Dirección IP Ethernet"
-      },
-      "ethernet_port": {
-        "name": "Puerto Ethernet"
-      },
-      "ethernet_mac": {
-        "name": "Dirección MAC Ethernet"
-      },
       "weather_plan": {
-        "name": "Plan meteorológico"
+        "name": "Plan meteorol\u00f3gico"
       },
       "wifi_ip": {
-        "name": "Dirección IP"
+        "name": "Direcci\u00f3n IP"
       },
       "wifi_name": {
         "name": "Nombre WiFi"
       },
       "wifi_signal": {
-        "name": "Señal WiFi"
+        "name": "Se\u00f1al WiFi"
       },
       "wifi_signal_portable": {
-        "name": "Señal WiFi"
+        "name": "Se\u00f1al WiFi"
       },
       "wifi_ssid": {
         "name": "SSID WiFi"
@@ -1346,7 +1346,46 @@
         "name": "Seguir Smart Meter"
       },
       "off_grid_shutdown": {
-        "name": "Autoapagado (modo sin conexión a red)"
+        "name": "Autoapagado (modo sin conexi\u00f3n a red)"
+      },
+      "portable_ac240_output": {
+        "name": "AC 240V output"
+      },
+      "portable_ac_output": {
+        "name": "AC output"
+      },
+      "portable_car_output": {
+        "name": "DC car output"
+      },
+      "portable_dc_car_output": {
+        "name": "DC car output"
+      },
+      "portable_dc_output": {
+        "name": "DC output"
+      },
+      "portable_dc_usb_output": {
+        "name": "DC USB output"
+      },
+      "portable_discharge_memory": {
+        "name": "Discharge memory"
+      },
+      "portable_energy_saving": {
+        "name": "Energy saving"
+      },
+      "portable_light": {
+        "name": "Light"
+      },
+      "portable_output_priority_switch": {
+        "name": "Output priority"
+      },
+      "portable_screen": {
+        "name": "Screen"
+      },
+      "portable_super_charge": {
+        "name": "Super charge"
+      },
+      "portable_usb_output": {
+        "name": "DC USB output"
       },
       "smart_plug_priority_enabled": {
         "name": "Prioridad enchufe inteligente"
@@ -1362,45 +1401,6 @@
       },
       "third_party_mqtt_enable": {
         "name": "Bridge MQTT de terceros"
-      },
-      "portable_dc_output": {
-        "name": "DC output"
-      },
-      "portable_dc_usb_output": {
-        "name": "DC USB output"
-      },
-      "portable_dc_car_output": {
-        "name": "DC car output"
-      },
-      "portable_ac_output": {
-        "name": "AC output"
-      },
-      "portable_ac240_output": {
-        "name": "AC 240V output"
-      },
-      "portable_light": {
-        "name": "Light"
-      },
-      "portable_screen": {
-        "name": "Screen"
-      },
-      "portable_super_charge": {
-        "name": "Super charge"
-      },
-      "portable_energy_saving": {
-        "name": "Energy saving"
-      },
-      "portable_output_priority_switch": {
-        "name": "Output priority"
-      },
-      "portable_discharge_memory": {
-        "name": "Discharge memory"
-      },
-      "portable_car_output": {
-        "name": "DC car output"
-      },
-      "portable_usb_output": {
-        "name": "DC USB output"
       }
     },
     "text": {
@@ -1429,7 +1429,7 @@
       "message": "No se pudo eliminar la alerta de tormenta {alert_id} para el dispositivo {device_id}: {error}"
     },
     "dynamic_tariff_unavailable": {
-      "message": "La tarifa dinámica no está disponible para {entity} en el dispositivo {device_id}. Espera la siguiente actualización o elige primero un proveedor de precio eléctrico."
+      "message": "La tarifa din\u00e1mica no est\u00e1 disponible para {entity} en el dispositivo {device_id}. Espera la siguiente actualizaci\u00f3n o elige primero un proveedor de precio el\u00e9ctrico."
     },
     "entity_action_failed": {
       "message": "No se pudo actualizar {entity} para el dispositivo {device_id}: {error}"
@@ -1441,16 +1441,16 @@
       "message": "{entity} para el dispositivo {device_id} debe estar entre {min} y {max}"
     },
     "invalid_select_option": {
-      "message": "{option} no es una opción válida para {entity} en el dispositivo {device_id}"
+      "message": "{option} no es una opci\u00f3n v\u00e1lida para {entity} en el dispositivo {device_id}"
     },
     "invalid_text_value": {
-      "message": "{entity} para el dispositivo {device_id} no puede estar vacío"
+      "message": "{entity} para el dispositivo {device_id} no puede estar vac\u00edo"
     },
     "missing_system_id": {
       "message": "No se puede actualizar el dispositivo {device_id}: falta systemId"
     },
     "mqtt_command_failed": {
-      "message": "El comando MQTT de Jackery falló ({error}). Último error MQTT: {mqtt_last_error}"
+      "message": "El comando MQTT de Jackery fall\u00f3 ({error}). \u00daltimo error MQTT: {mqtt_last_error}"
     },
     "mqtt_missing_device_sn": {
       "message": "No se puede enviar el comando MQTT de Jackery para {device_id}: falta deviceSn"
@@ -1462,7 +1462,7 @@
       "message": "No se pudo consultar la configuracion MQTT de terceros para el dispositivo {device_id}: {error}"
     },
     "refresh_weather_plan_failed": {
-      "message": "No se pudo actualizar el plan meteorológico para el dispositivo {device_id}: {error}"
+      "message": "No se pudo actualizar el plan meteorol\u00f3gico para el dispositivo {device_id}: {error}"
     },
     "rename_system_failed": {
       "message": "No se pudo cambiar el nombre del sistema Jackery {system_id}: {error}"
@@ -1479,19 +1479,19 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery devolvió estadísticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera métrica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuración de payload jackery_solarvault_payload_debug.jsonl y los diagnósticos para comparar valores brutos, series de gráficos analizadas y secciones de origen documentadas en docs/PROTOCOL.md (§2 endpoints HTTP, §8 prioridad de fuentes de datos).\n\nConfirma para forzar una actualización desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integración con el volcado de diagnóstico.",
-            "title": "Forzar actualización de la nube de Jackery"
+            "description": "Jackery devolvi\u00f3 estad\u00edsticas contradictorias de la app/nube. Se detectaron {count} advertencia(s). Primera m\u00e9trica afectada: {metric}. Ejemplos: {examples}. Los estados de las entidades no se reparan silenciosamente; activa el logger custom_components.jackery_solarvault.payload_debug=debug y usa el registro de depuraci\u00f3n de payload jackery_solarvault_payload_debug.jsonl y los diagn\u00f3sticos para comparar valores brutos, series de gr\u00e1ficos analizadas y secciones de origen documentadas en docs/PROTOCOL.md (\u00a72 endpoints HTTP, \u00a78 prioridad de fuentes de datos).\n\nConfirma para forzar una actualizaci\u00f3n desde la nube de Jackery. Las incoherencias transitorias desaparecen cuando llega un payload nuevo y coherente. Si la advertencia vuelve a aparecer, abre una incidencia en el rastreador de la integraci\u00f3n con el volcado de diagn\u00f3stico.",
+            "title": "Forzar actualizaci\u00f3n de la nube de Jackery"
           }
         }
       },
-      "title": "Las estadísticas de la app de Jackery son incoherentes"
+      "title": "Las estad\u00edsticas de la app de Jackery son incoherentes"
     },
     "device_not_activated": {
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "El dispositivo Jackery {device_id} reporta activated=0 en el sistema de nube. Esto significa que el dispositivo no ha sido completamente activado a través de la aplicación móvil Jackery. Los endpoints de tendencias, estadísticas e historial del lado de la nube devolverán datos vacíos/ceros hasta que se complete la activación.\n\nPara resolver esto:\n1. Abra la aplicación móvil Jackery\n2. Asegúrese de que el dispositivo esté registrado y activado en su cuenta de Jackery\n3. Confirme que el dispositivo muestra 'En línea' en la aplicación\n\nDespués de la activación, confirme a continuación para forzar una actualización. El problema de reparación se eliminará una vez que el dispositivo reporte activated=1.",
-            "title": "Forzar actualización de la nube de Jackery"
+            "description": "El dispositivo Jackery {device_id} reporta activated=0 en el sistema de nube. Esto significa que el dispositivo no ha sido completamente activado a trav\u00e9s de la aplicaci\u00f3n m\u00f3vil Jackery. Los endpoints de tendencias, estad\u00edsticas e historial del lado de la nube devolver\u00e1n datos vac\u00edos/ceros hasta que se complete la activaci\u00f3n.\n\nPara resolver esto:\n1. Abra la aplicaci\u00f3n m\u00f3vil Jackery\n2. Aseg\u00farese de que el dispositivo est\u00e9 registrado y activado en su cuenta de Jackery\n3. Confirme que el dispositivo muestra 'En l\u00ednea' en la aplicaci\u00f3n\n\nDespu\u00e9s de la activaci\u00f3n, confirme a continuaci\u00f3n para forzar una actualizaci\u00f3n. El problema de reparaci\u00f3n se eliminar\u00e1 una vez que el dispositivo reporte activated=1.",
+            "title": "Forzar actualizaci\u00f3n de la nube de Jackery"
           }
         }
       },
@@ -1503,15 +1503,15 @@
       "init": {
         "data": {
           "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_savings_detail_sensors": "Crear sensores de detalle del c\u00e1lculo de ahorro",
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "enable_ble_transport": "Activar transporte BLE",
           "enable_ble_writes": "Activar escrituras BLE experimentales",
-          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energía del hogar",
-          "enable_month_statistics": "Importar estadísticas mensuales",
-          "enable_unredacted_diagnostics": "Activar diagnóstico de desarrollo sin redactar",
-          "enable_week_statistics": "Importar estadísticas semanales",
-          "enable_year_statistics": "Importar estadísticas anuales",
+          "enable_derived_home_energy_fallback": "Permitir fallback derivado de energ\u00eda del hogar",
+          "enable_month_statistics": "Importar estad\u00edsticas mensuales",
+          "enable_unredacted_diagnostics": "Activar diagn\u00f3stico de desarrollo sin redactar",
+          "enable_week_statistics": "Importar estad\u00edsticas semanales",
+          "enable_year_statistics": "Importar estad\u00edsticas anuales",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
           "third_party_mqtt_password": "Third-Party MQTT password",
@@ -1521,17 +1521,17 @@
           "third_party_mqtt_username": "Third-Party MQTT username"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la bater\u00eda principal menos descarga, carga del sistema/conjunto de bater\u00edas menos descarga y entrada de red menos salida. Estos sensores son \u00fatiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequ\u00edvocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el c\u00e1lculo de ahorro: ahorro calculado, energ\u00eda CA autoconsumida, precio, energ\u00eda perdida del sistema de bater\u00edas, energ\u00eda perdida del inversor/conversi\u00f3n, excedente FV tras el autoconsumo y potencia instant\u00e1nea calculada de p\u00e9rdida del inversor/conversi\u00f3n. Desactivados de forma predeterminada porque son valores intermedios de diagn\u00f3stico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usa los valores de fase del Smart Meter m\u00e1s la entrada/salida de red de Jackery. Desact\u00edvalo si solo quieres los valores brutos de Jackery.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_ble_writes": "Permite escrituras locales experimentales de comandos BLE cuando el transporte BLE esta conectado. Desactivado de forma predeterminada; usalo solo para probar control directo de SolarVault.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends no está disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagnósticos de origen.",
-          "enable_month_statistics": "Importa la carga útil del período mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_unredacted_diagnostics": "Desactiva la redacción en la exportación de diagnóstico y el JSONL de depuración de payload para pruebas locales. Expone credenciales, números de serie, IDs de dispositivo, temas MQTT y valores bluetoothKey. Desactívalo antes de compartir archivos.",
-          "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "enable_derived_home_energy_fallback": "Si sys/home/trends no est\u00e1 disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagn\u00f3sticos de origen.",
+          "enable_month_statistics": "Importa la carga \u00fatil del per\u00edodo mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "enable_unredacted_diagnostics": "Desactiva la redacci\u00f3n en la exportaci\u00f3n de diagn\u00f3stico y el JSONL de depuraci\u00f3n de payload para pruebas locales. Expone credenciales, n\u00fameros de serie, IDs de dispositivo, temas MQTT y valores bluetoothKey. Desact\u00edvalo antes de compartir archivos.",
+          "enable_week_statistics": "Importa la carga \u00fatil del per\u00edodo semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "enable_year_statistics": "Importa la carga \u00fatil del per\u00edodo anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -1539,21 +1539,21 @@
           "third_party_mqtt_topic_filter": "MQTT topic filter for local listener subscription. Default is `homeassistant`; adjust to your broker topic as needed.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
-        "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usan la potencia neta del Smart Meter más la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
+        "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usan la potencia neta del Smart Meter m\u00e1s la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",
         "title": "Opciones de Jackery"
       }
     }
   },
   "services": {
     "delete_storm_alert": {
-      "description": "Elimina una alerta meteorológica o de tormenta específica por ID de alerta mediante MQTT.",
+      "description": "Elimina una alerta meteorol\u00f3gica o de tormenta espec\u00edfica por ID de alerta mediante MQTT.",
       "fields": {
         "alert_id": {
-          "description": "Identificador de alerta de los atributos de diagnóstico del plan meteorológico, normalmente storm[].alertId.",
+          "description": "Identificador de alerta de los atributos de diagn\u00f3stico del plan meteorol\u00f3gico, normalmente storm[].alertId.",
           "name": "ID de alerta"
         },
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en los diagnósticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambi\u00e9n pueden pasar directamente el ID num\u00e9rico del dispositivo Jackery (visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de dispositivo"
         }
       },
@@ -1570,31 +1570,31 @@
       "name": "Consultar configuracion MQTT de terceros"
     },
     "refresh_weather_plan": {
-      "description": "Consulta el plan meteorológico y de tormentas actual del dispositivo. La respuesta se expone en los atributos del sensor de diagnóstico Plan meteorológico.",
+      "description": "Consulta el plan meteorol\u00f3gico y de tormentas actual del dispositivo. La respuesta se expone en los atributos del sensor de diagn\u00f3stico Plan meteorol\u00f3gico.",
       "fields": {
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en los diagnósticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambi\u00e9n pueden pasar directamente el ID num\u00e9rico del dispositivo Jackery (visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de dispositivo"
         }
       },
-      "name": "Actualizar plan meteorológico y de tormentas"
+      "name": "Actualizar plan meteorol\u00f3gico y de tormentas"
     },
     "rename_system": {
-      "description": "Cambia el nombre de un sistema Jackery SolarVault mediante la API de la nube de Jackery. El nombre se muestra en la app de Jackery y en la información del dispositivo de Home Assistant.",
+      "description": "Cambia el nombre de un sistema Jackery SolarVault mediante la API de la nube de Jackery. El nombre se muestra en la app de Jackery y en la informaci\u00f3n del dispositivo de Home Assistant.",
       "fields": {
         "new_name": {
           "description": "Nuevo nombre visible, de 1 a 64 caracteres.",
           "name": "Nuevo nombre"
         },
         "system_id": {
-          "description": "ID numérico del sistema Jackery. Está visible en los diagnósticos bajo raw_api.system_list_response.data[].id.",
+          "description": "ID num\u00e9rico del sistema Jackery. Est\u00e1 visible en los diagn\u00f3sticos bajo raw_api.system_list_response.data[].id.",
           "name": "ID del sistema"
         }
       },
       "name": "Cambiar nombre del sistema SolarVault"
     },
     "send_ble_command": {
-      "description": "Envía un frame binario BLE experimental al dispositivo seleccionado. Requiere transporte BLE, escrituras BLE y una conexión BLE activa.",
+      "description": "Env\u00eda un frame binario BLE experimental al dispositivo seleccionado. Requiere transporte BLE, escrituras BLE y una conexi\u00f3n BLE activa.",
       "fields": {
         "ack_timeout": {
           "description": "Cuantos segundos esperar una notificacion del dispositivo tras la escritura. Se ignora cuando \"Esperar ACK\" esta desactivado.",
@@ -1609,7 +1609,7 @@
           "name": "Comando"
         },
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery.",
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones tambi\u00e9n pueden pasar directamente el ID num\u00e9rico del dispositivo Jackery.",
           "name": "ID de dispositivo"
         },
         "flags": {
