@@ -16,7 +16,10 @@ import re
 from unittest.mock import MagicMock
 
 from annotatedyaml._vendor import yaml  # noqa: PLC2701
-from annotatedyaml._vendor.yaml import loader as _loader  # noqa: PLC2701
+from annotatedyaml._vendor.yaml import (  # noqa: PLC2701
+    load as _yaml_load,
+    loader as _loader,
+)
 from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
     ConstructorError,
     FullConstructor,
@@ -24,6 +27,12 @@ from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
 )
 from annotatedyaml._vendor.yaml.nodes import ScalarNode  # noqa: PLC2701
 import pytest
+
+
+def _load_with_loader(stream: str, loader: type[object]) -> object:
+    """Load test YAML through a specific vendored loader API under test."""
+    return _yaml_load(stream, Loader=loader)  # nosec B506
+
 
 # ---------------------------------------------------------------------------
 # warnings() stub
@@ -82,7 +91,7 @@ class TestAddConstructor:
         assert tag in _loader.UnsafeLoader.yaml_constructors
 
         # Functional check: loading a node with this tag returns the sentinel
-        result = yaml.load(f"{tag} value", Loader=_loader.Loader)
+        result = _load_with_loader(f"{tag} value", _loader.Loader)
         assert result is sentinel
 
     def test_add_constructor_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
@@ -117,7 +126,7 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, my_constructor, Loader=None)
 
-        result = yaml.load(f"{tag} anything", Loader=_loader.Loader)
+        result = _load_with_loader(f"{tag} anything", _loader.Loader)
         assert result is expected
 
     def test_add_constructor_specific_loader_end_to_end(self) -> None:  # noqa: PLR6301
@@ -130,7 +139,7 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, lambda loader, node: return_value, Loader=MyLoader)
 
-        result = yaml.load(f"{tag} whatever", Loader=MyLoader)
+        result = _load_with_loader(f"{tag} whatever", MyLoader)
         assert result is return_value
 
 
@@ -180,7 +189,7 @@ class TestAddMultiConstructor:
             return f"value:{suffix}"
 
         yaml.add_multi_constructor(prefix, multi_fn, Loader=None)
-        result = yaml.load(f"{prefix}mysuffix value", Loader=_loader.Loader)
+        result = _load_with_loader(f"{prefix}mysuffix value", _loader.Loader)
         assert "mysuffix" in results
         assert result == "value:mysuffix"
 
@@ -555,7 +564,7 @@ class TestYAMLObjectMetaclass:
         serialized = yaml.dump(p)
         assert "!test_point_metaclass_unique_7f4b" in serialized
 
-        loaded = yaml.load(serialized, Loader=yaml.Loader)
+        loaded = _load_with_loader(serialized, yaml.Loader)
         assert isinstance(loaded, Point)
         assert loaded.x == pytest.approx(1.5)
         assert loaded.y == pytest.approx(2.5)
