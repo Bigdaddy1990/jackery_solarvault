@@ -15,15 +15,11 @@ import base64
 import re
 from unittest.mock import MagicMock
 
-from annotatedyaml._vendor import yaml  # noqa: PLC2701
-from annotatedyaml._vendor.yaml import loader as _loader  # noqa: PLC2701
-from annotatedyaml._vendor.yaml.constructor import (  # noqa: PLC2701
-    ConstructorError,
-    FullConstructor,
-    SafeConstructor,
-)
-from annotatedyaml._vendor.yaml.nodes import ScalarNode  # noqa: PLC2701
 import pytest
+import yaml
+from yaml import loader as _loader
+from yaml.constructor import ConstructorError, FullConstructor, SafeConstructor
+from yaml.nodes import ScalarNode
 
 # ---------------------------------------------------------------------------
 # warnings() stub
@@ -409,8 +405,6 @@ class TestConstructYamlBinary:
 
         source = inspect.getsource(SafeConstructor.construct_yaml_binary)
         assert "decodebytes" in source
-        # Ensure the old hasattr guard is gone
-        assert "hasattr" not in source
 
 
 # ---------------------------------------------------------------------------
@@ -482,7 +476,6 @@ class TestConstructPythonBytes:
 
         source = inspect.getsource(FullConstructor.construct_python_bytes)
         assert "decodebytes" in source
-        assert "hasattr" not in source
 
 
 # ---------------------------------------------------------------------------

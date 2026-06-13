@@ -2,8 +2,7 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import BaseHTTPMixin
-from jackery_solarvault.const import (
+from ...const import (
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_DATE_TYPE,
@@ -39,7 +38,8 @@ from jackery_solarvault.const import (
     SYMMETRY_STAT_PATH,
     SYSTEM_STATISTIC_PATH,
 )
-from jackery_solarvault.util import app_period_date_bounds
+from ...util import app_period_date_bounds
+from .._http import BaseHTTPMixin
 
 
 class StatisticsEndpointMixin(BaseHTTPMixin):

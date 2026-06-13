@@ -121,7 +121,7 @@ DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = (
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Safe narrow default from app traces / user reports. Still configurable.
 # Broad wildcards (for example ``#``) remain blocked separately.
-DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
+DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = ""
 
 # HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
