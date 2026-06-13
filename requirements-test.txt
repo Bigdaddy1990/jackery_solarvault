@@ -7,7 +7,7 @@ annotatedyaml>=1.0.2
 astral>=2.2
 attrs>=17.3.0
 autotyping>=24.9.0
-coverage[toml]==7.14.0
+coverage[toml]>=7.14.0
 defusedxml>=0.7.1
 hypothesis>=6.155.2
 ifaddr>=0.2.0
@@ -18,6 +18,7 @@ mypy>=2.1.0
 numpy>=2.3.2
 packaging>=23.1
 pip>=24.2
+pydantic
 pylint>=4.0.5
 pytest>=9.0.3
 pytest-asyncio>=1.3.0
