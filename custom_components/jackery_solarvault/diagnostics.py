@@ -7,12 +7,14 @@ from homeassistant.components.diagnostics import async_redact_data
 
 from .client.local_mqtt import _local_mqtt_client
 from .const import (
+    CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
     CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
@@ -205,7 +207,7 @@ def _local_mqtt_diagnostics(
         dict[str, Any]: Diagnostics block as described above — either the client's diagnostics snapshot or a structured dictionary reflecting enabled state, reason, and configured local MQTT details.
     """
     enabled = config_entry_bool_option(
-        entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
+        entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE
     )
     host = config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "").strip()
     port = str(

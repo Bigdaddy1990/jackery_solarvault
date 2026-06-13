@@ -405,6 +405,7 @@ def merge_battery_pack_lifetime_from_ble(
     sn = body.get(FIELD_DEVICE_SN)
     if not sn:
         return False
+    sn_str = str(sn).strip()
     packs = updated.get("batteryPacks")
     if not isinstance(packs, list):
         return False
@@ -421,10 +422,11 @@ def merge_battery_pack_lifetime_from_ble(
         if not isinstance(pack, dict):
             merged_packs.append(pack)
             continue
-        pack_sn = (
+        pack_sn_raw = (
             pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
         )
-        if pack_sn != sn:
+        pack_sn = str(pack_sn_raw).strip() if pack_sn_raw is not None else None
+        if pack_sn != sn_str:
             merged_packs.append(pack)
             continue
         matched = True
@@ -446,7 +448,7 @@ def merge_battery_pack_lifetime_from_ble(
     # present in the MQTT/HTTP pack list. Create a minimal pack so
     # lifetime entities do not stay unrouted forever.
     minimal_pack: dict[str, Any] = {
-        FIELD_DEVICE_SN: sn,
+        FIELD_DEVICE_SN: sn_str,
         FIELD_DEV_TYPE: body.get(FIELD_DEV_TYPE),
         FIELD_SUB_TYPE: body.get(FIELD_SUB_TYPE),
         PACK_FIELD_LAST_SEEN_AT: datetime.now(UTC).isoformat(),

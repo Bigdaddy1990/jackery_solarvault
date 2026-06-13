@@ -215,7 +215,7 @@ def merge_shelly_cloud_item(  # noqa: PLR0911
         return True
     for bucket, merger in (
         (PAYLOAD_SMART_PLUGS, merge_smart_plug_lists),
-        (PAYLOAD_METER_HEADS, merge_subdevice_lists_by_sn),
+        (PAYLOAD_METER_HEADS, merge_subdevice_list_by_identity),
     ):
         items = entry.get(bucket)
         if not isinstance(items, list):

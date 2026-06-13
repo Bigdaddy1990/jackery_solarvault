@@ -1,5 +1,7 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 from datetime import UTC, datetime
@@ -549,15 +551,16 @@ class JackeryMqttPushClient:
         if hasattr(ssl, "TLSVersion"):
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
 
-        strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
-        if (
-            isinstance(strict_flag, int)
-            and hasattr(ctx, "verify_flags")
-            and ctx.verify_flags & strict_flag
-        ):
-            ctx.verify_flags &= ~strict_flag
-            self._tls_x509_strict_disabled = True
-            source_parts.append("x509_strict_disabled")
+        if self._enable_tls_x509_relaxation:
+            strict_flag = getattr(ssl, "VERIFY_X509_STRICT", None)
+            if (
+                isinstance(strict_flag, int)
+                and hasattr(ctx, "verify_flags")
+                and ctx.verify_flags & strict_flag
+            ):
+                ctx.verify_flags &= ~strict_flag
+                self._tls_x509_strict_disabled = True
+                source_parts.append("x509_strict_disabled")
 
         self._tls_certificate_source = "+".join(source_parts)
 

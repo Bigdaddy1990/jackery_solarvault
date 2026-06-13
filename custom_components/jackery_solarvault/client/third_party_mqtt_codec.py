@@ -203,11 +203,12 @@ def decode_third_party_mqtt_config_body(
 
     decoded_any = False
     failed_fields: list[str] = []
-    for key in (
+    credential_keys = (
         FIELD_THIRD_PARTY_MQTT_USERNAME,
         FIELD_THIRD_PARTY_MQTT_PASSWORD,
         FIELD_THIRD_PARTY_MQTT_TOKEN,
-    ):
+    )
+    for key in credential_keys:
         value = body.get(key)
         if not isinstance(value, str) or not value:
             continue
@@ -218,7 +219,9 @@ def decode_third_party_mqtt_config_body(
             continue
         decoded_any = True
 
-    config["_ha_plaintext"] = decoded_any
+    # Only mark as plaintext if ALL credential fields were successfully decoded
+    all_decoded = decoded_any and not failed_fields
+    config["_ha_plaintext"] = all_decoded
     if failed_fields:
         config["_decode_failed_fields"] = failed_fields
     return config
@@ -253,11 +256,12 @@ def third_party_mqtt_config_plaintext(
                 if current.get(key) is not None:
                     config[key] = current[key]
             if current.get("_ha_plaintext") is True:
+                failed = set(current.get("_decode_failed_fields", []))
                 for key in (
                     FIELD_THIRD_PARTY_MQTT_USERNAME,
                     FIELD_THIRD_PARTY_MQTT_PASSWORD,
                     FIELD_THIRD_PARTY_MQTT_TOKEN,
                 ):
-                    if current.get(key) is not None:
+                    if key not in failed and current.get(key) is not None:
                         config[key] = current[key]
     return config

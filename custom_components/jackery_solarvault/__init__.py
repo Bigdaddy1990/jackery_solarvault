@@ -715,7 +715,7 @@ async def _async_start_local_mqtt(
         if isinstance(stashed, dict) and stashed.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
             stashed.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
 
-    entry.async_on_unload(_async_stop_local_mqtt)
+    entry.async_on_unload(lambda: hass.async_create_task(_async_stop_local_mqtt()))
     await client.async_start()
 
 
