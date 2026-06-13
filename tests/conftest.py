@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True)  # noqa: RUF076
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
