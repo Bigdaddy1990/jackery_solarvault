@@ -74,4 +74,4 @@ jobs:
       - name: Install Home Assistant test dependencies
         run: python -m pip install -r requirements-test.txt
       - name: Run HA fixture tests
-        run: pytest -q -p no:cacheprovider -c pytest-ha.ini tests/ha
+        run: pytest -q -p no:cacheprovider -c
