@@ -14,7 +14,7 @@ class Composer:  # noqa: D101
         """Initialize the composer and its anchor registry.
 
         Creates self.anchors, a dictionary that maps anchor names (strings) to composed node objects used to resolve aliases during document composition.
-        """  # noqa: E501
+        """
         self.anchors = {}
 
     def check_node(self) -> bool:
@@ -25,7 +25,7 @@ class Composer:  # noqa: D101
 
         Returns:
             `true` if the stream has not reached a `StreamEndEvent` (another document is available), `false` otherwise.
-        """  # noqa: E501
+        """
         if self.check_event(StreamStartEvent):  # noqa: F405
             self.get_event()
 
@@ -38,7 +38,7 @@ class Composer:  # noqa: D101
 
         Returns:
             node (Node | None): The composed document root node, or None when no further documents are available.
-        """  # noqa: E501
+        """
         if not self.check_event(StreamEndEvent):  # noqa: F405
             return self.compose_document()
         return None
@@ -54,7 +54,7 @@ class Composer:  # noqa: D101
 
         Raises:
             ComposerError: If more than one document is found in the stream.
-        """  # noqa: E501
+        """
         self.get_event()
 
         # Compose a document if the stream is not empty.
@@ -85,7 +85,7 @@ class Composer:  # noqa: D101
 
         Returns:
             The root node of the composed document.
-        """  # noqa: E501
+        """
         self.get_event()
 
         # Compose the root node.
@@ -109,7 +109,7 @@ class Composer:  # noqa: D101
 
         Raises:
             ComposerError: If an alias refers to an undefined anchor or if an anchor is defined more than once.
-        """  # noqa: E501
+        """
         if self.check_event(AliasEvent):  # noqa: F405
             event = self.get_event()
             anchor = event.anchor
@@ -145,7 +145,7 @@ class Composer:  # noqa: D101
 
         Returns:
             ScalarNode: The composed scalar node with its tag resolved when the event tag is `None` or `"!"`.
-        """  # noqa: E501
+        """
         event = self.get_event()
         tag = event.tag
         if tag is None or tag == "!":
@@ -167,7 +167,7 @@ class Composer:  # noqa: D101
 
         Returns:
             SequenceNode: The composed sequence node containing its children and end mark.
-        """  # noqa: E501
+        """
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":
@@ -195,7 +195,7 @@ class Composer:  # noqa: D101
 
         Returns:
             MappingNode: The composed mapping node whose `value` is a list of (key_node, value_node) pairs.
-        """  # noqa: E501
+        """
         start_event = self.get_event()
         tag = start_event.tag
         if tag is None or tag == "!":
@@ -209,7 +209,7 @@ class Composer:  # noqa: D101
             # key_event = self.peek_event()
             item_key = self.compose_node(node, None)
             # if item_key in node.value:
-            #    raise ComposerError("while composing a mapping", start_event.start_mark,  # noqa: E501
+            #    raise ComposerError("while composing a mapping", start_event.start_mark,
             #            "found duplicate key", key_event.start_mark)
             item_value = self.compose_node(node, item_key)
             # node.value[item_key] = item_value

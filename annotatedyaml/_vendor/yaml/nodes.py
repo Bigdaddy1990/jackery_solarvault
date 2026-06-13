@@ -20,7 +20,7 @@ class Node:  # noqa: D100, D101
 
         Returns:
             A string formatted as ClassName(tag=<tag_repr>, value=<value_repr>).
-        """  # noqa: E501
+        """
         value = self.value
         # if isinstance(value, list):
         #    if len(value) == 0:
@@ -50,7 +50,7 @@ class ScalarNode(Node):  # noqa: D101
                 start_mark: Optional parse location for the start of the scalar or None.
                 end_mark: Optional parse location for the end of the scalar or None.
                 style: Optional scalar style indicator (e.g., plain, single-quoted, double-quoted) or None.
-        """  # noqa: E501
+        """
         self.tag = tag
         self.value = value
         self.start_mark = start_mark
@@ -75,7 +75,7 @@ class CollectionNode(Node):  # noqa: D101
             start_mark: Optional source location marking the start of the node.
             end_mark: Optional source location marking the end of the node.
             flow_style: Optional flow-style indicator: `True` for flow form, `False` for block form, or `None` to keep the original/unspecified style.
-        """  # noqa: E501
+        """
         self.tag = tag
         self.value = value
         self.start_mark = start_mark

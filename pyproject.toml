@@ -369,7 +369,7 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415", "TID252"]
+ignore = ["PLC0415", "TID252", "E501", "PLW0717"]
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -384,6 +384,8 @@ max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
+"**/client/api.py" = ["F821", "E402"]  # debug pkcs7 pad test + mid-file imports
+"**/client/_endpoints/*.py" = ["PLR0904"]  # domain mixins have many public methods
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
