@@ -547,7 +547,7 @@ class BaseHTTPMixin:
                     body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, body
 
-        if self._is_token_expired_response(status, data):
+        if self._is_token_expired_response(status, data):  # noqa: F821
             _LOGGER.info("Jackery token expired — re-login for GET %s", path)
             self._auth_retries += 1
             self._token = None
@@ -556,9 +556,9 @@ class BaseHTTPMixin:
                     await self.async_login()
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_GET} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
-            ) from err
-        if self._is_token_expired_response(status, data):
+                f"{type(err).__name__}: {err or '(no message)'}"  # noqa: F821
+            ) from err  # noqa: F821
+        if self._is_token_expired_response(status, data):  # noqa: F821
             _LOGGER.info("Jackery token expired — re-login for GET %s", path)
             self._auth_retries += 1
             async with self._lock:

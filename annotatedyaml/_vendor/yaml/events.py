@@ -17,7 +17,7 @@ class Event:  # noqa: D101
 
         Returns:
             representation (str): String in the form `ClassName(key=value, ...)` containing only attributes that exist on the instance.
-        """  # noqa: E501
+        """
         attributes = [
             key for key in ["anchor", "tag", "implicit", "value"] if hasattr(self, key)
         ]
@@ -58,7 +58,7 @@ class CollectionStartEvent(NodeEvent):  # noqa: D101
             start_mark: Optional start position metadata for the event.
             end_mark: Optional end position metadata for the event.
             flow_style: `True` to request flow style, `False` to request block style, or `None` if unspecified.
-        """  # noqa: E501
+        """
         self.anchor = anchor
         self.tag = tag
         self.implicit = implicit
@@ -82,7 +82,7 @@ class StreamStartEvent(Event):  # noqa: D101
             start_mark: Optional start position marker associated with the event.
             end_mark: Optional end position marker associated with the event.
             encoding: Optional name of the stream's text encoding (e.g., "utf-8").
-        """  # noqa: E501
+        """
         self.start_mark = start_mark
         self.end_mark = end_mark
         self.encoding = encoding
@@ -109,7 +109,7 @@ class DocumentStartEvent(Event):  # noqa: D101
             explicit: `True` if the document start marker (`---`) was present, `False` or `None` otherwise.
             version: YAML version tuple (e.g., `(major, minor)`) or `None` if unspecified.
             tags: Mapping of tag handles to tag prefixes, or `None` if no tag directives are present.
-        """  # noqa: E501
+        """
         self.start_mark = start_mark
         self.end_mark = end_mark
         self.explicit = explicit
@@ -125,7 +125,7 @@ class DocumentEndEvent(Event):  # noqa: D101
             start_mark: Optional start position metadata for the event.
             end_mark: Optional end position metadata for the event.
             explicit (bool | None): `True` if the document end marker was explicit, `False` if it was implicit, or `None` if unspecified.
-        """  # noqa: E501
+        """
         self.start_mark = start_mark
         self.end_mark = end_mark
         self.explicit = explicit
@@ -156,7 +156,7 @@ class ScalarEvent(NodeEvent):  # noqa: D101
             start_mark: Optional start position mark for the node.
             end_mark: Optional end position mark for the node.
             style: Optional scalar presentation style (e.g., plain, single-quoted, double-quoted, literal).
-        """  # noqa: E501
+        """
         self.anchor = anchor
         self.tag = tag
         self.implicit = implicit
