@@ -127,7 +127,7 @@ class _AuthApi:
 
         Raises:
             JackeryAuthError: If the request fails due to authentication (invalid or expired credentials).
-        """  # noqa: E501
+        """
         raise JackeryAuthError("invalid token")  # noqa: TRY003
 
 
@@ -320,7 +320,7 @@ async def test_rename_service_rejects_direct_invalid_system_id(
 
         Raises:
             AssertionError: Always raised with message "invalid system_id must stop before coordinator lookup".
-        """  # noqa: E501
+        """
         raise AssertionError("invalid system_id must stop before coordinator lookup")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_coordinator_for_system", _fail_coordinator_lookup)
@@ -395,7 +395,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
 
             Raises:
                 HomeAssistantError: If the MQTT command fails for the device (message includes the device_id).
-            """  # noqa: E501
+            """
             raise HomeAssistantError(f"MQTT command failed for {device_id}")  # noqa: TRY003
 
     monkeypatch.setattr(
@@ -440,7 +440,7 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
         """Stub resolver used in tests to ensure device-id validation halts before registry lookup.
 
         Always raises an AssertionError with the message "invalid device_id must stop before registry lookup" when invoked.
-        """  # noqa: E501
+        """
         raise AssertionError("invalid device_id must stop before registry lookup")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", _fail_resolve)
@@ -471,7 +471,7 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator should not be reached for invalid input.
-            """  # noqa: E501
+            """
             raise AssertionError("blank alert_id must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -521,7 +521,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # noqa: E501
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -587,7 +587,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # noqa: E501
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -644,7 +644,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
 
             Raises:
                 AssertionError: with message "non-text credentials must stop before coordinator call"
-            """  # noqa: E501
+            """
             raise AssertionError(  # noqa: TRY003
                 "non-text credentials must stop before coordinator call"
             )
@@ -685,7 +685,7 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
             """Apply third-party MQTT configuration to the coordinator.
 
             Test-only stub: raises AssertionError if invoked to assert that input validation prevented the coordinator from being called.
-            """  # noqa: E501
+            """
             raise AssertionError("invalid boolean must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -735,7 +735,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
 
             Raises:
                 AssertionError: In the test stub, always raised to indicate the coordinator should not be called.
-            """  # noqa: E501
+            """
             raise AssertionError("invalid port must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -813,7 +813,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
 
             Returns:
                 None
-            """  # noqa: E501
+            """
             raise AssertionError("blank IP must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -909,7 +909,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
 
             Returns:
                 bool: `True` if the command was accepted, `False` otherwise.
-            """  # noqa: E501
+            """
             self.calls.append({
                 "device_id": device_id,
                 "cmd": cmd,
@@ -954,7 +954,7 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
 
             Returns:
                 bool: `True` if the device acknowledged the command, `False` otherwise.
-            """  # noqa: E501
+            """
             raise AssertionError("invalid boolean must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -1003,7 +1003,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     Parameters:
         body (object): The raw `body` value passed to the service; must be a non-JSON-native case to trigger validation.
         expected_error (str): The exact error message expected in the service error translation placeholders.
-    """  # noqa: E501
+    """
 
     class _BleCoordinator:
         async def async_send_ble_command(self, *args: object) -> bool:  # noqa: PLR6301
@@ -1014,7 +1014,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
 
             Returns:
                 bool: `True` if the BLE command succeeded, `False` otherwise.
-            """  # noqa: E501
+            """
             raise AssertionError("invalid body must stop before coordinator call")  # noqa: TRY003
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -1111,7 +1111,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator method should not be called during validation tests.
-            """  # noqa: E501
+            """
             raise AssertionError(  # noqa: TRY003
                 "invalid ack_timeout must stop before coordinator call"
             )

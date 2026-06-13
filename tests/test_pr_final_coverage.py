@@ -8,7 +8,7 @@ Covers:
   when the coordinator raises a HomeAssistantError that already carries a
   translation_key, it must propagate unchanged rather than being wrapped.
 - async_setup: global setup must return True (it only registers services).
-- QUERY_BUTTON_DESCRIPTIONS count: must be exactly 14 (regression pin).
+- QUERY_BUTTON_DESCRIPTIONS count: must be exactly 28 (14 SolarVault + 14 portable, regression pin).
 - _storm_alert_id: integer 0 alertId is distinct from empty string and None.
 - _legacy_suffix_matches: boundary — suffix with trailing underscore before
   a digits-only head is accepted; a head with trailing non-digit is rejected.
@@ -96,7 +96,7 @@ class TestDeleteStormAlertButtonAvailable:
     def test_available_is_true_when_alert_exists_and_coordinator_healthy(  # noqa: PLR6301
         self,
     ) -> None:
-        """Available must be True when the alert is present and coordinator is healthy."""  # noqa: E501
+        """Available must be True when the alert is present and coordinator is healthy."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -145,12 +145,12 @@ class TestDeleteStormAlertButtonAvailable:
 
 
 class TestTranslatedHomeAssistantErrorReRaise:
-    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""  # noqa: E501
+    """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""
 
     async def test_reboot_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
@@ -173,7 +173,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_refresh_weather_plan_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
@@ -196,7 +196,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_read_schedule_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
@@ -226,7 +226,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_delete_storm_alert_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -249,7 +249,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
     async def test_query_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""  # noqa: E501
+        """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButton,
             JackeryQueryButtonDescription,
@@ -344,15 +344,15 @@ class TestAsyncSetup:
 # ---------------------------------------------------------------------------
 
 
-def test_query_button_descriptions_count_is_14() -> None:
-    """QUERY_BUTTON_DESCRIPTIONS must contain exactly 14 entries (regression pin).
+def test_query_button_descriptions_count_is_28() -> None:
+    """QUERY_BUTTON_DESCRIPTIONS must contain exactly 28 entries (regression pin).
 
-    The PR introduced 14 documented app-command buttons. This test pins the count
-    so that accidental additions or deletions are caught immediately.
+    14 SolarVault app-command buttons plus 14 portable/Explorer powerstation buttons.
+    This test pins the count so that accidental additions or deletions are caught immediately.
     """
     from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTIONS  # noqa: I001
 
-    assert len(QUERY_BUTTON_DESCRIPTIONS) == 14  # noqa: PLR2004
+    assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004
 
 
 def test_query_button_descriptions_unique_action_ids() -> None:
@@ -498,7 +498,7 @@ def test_legacy_suffix_matches_prevents_current_entity_deletion_regression() -> 
 
 
 async def test_async_unload_entry_returns_false_when_unload_platforms_fails() -> None:
-    """async_unload_entry must return False when async_unload_platforms returns False."""  # noqa: E501
+    """async_unload_entry must return False when async_unload_platforms returns False."""
     from custom_components.jackery_solarvault import async_unload_entry
 
     hass = MagicMock()
@@ -598,7 +598,7 @@ def test_blocked_topic_filters_scoped_topic_not_blocked() -> None:
 
 
 async def test_read_schedule_button_wraps_untranslated_ha_error() -> None:
-    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""  # noqa: E501
+    """HomeAssistantError without translation_key must be wrapped in entity_action_failed."""
     from custom_components.jackery_solarvault.button import JackeryReadScheduleButton  # noqa: I001
     from homeassistant.exceptions import HomeAssistantError
 

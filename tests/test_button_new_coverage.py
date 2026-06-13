@@ -13,7 +13,7 @@ Covers:
 - JackeryReadScheduleButton.extra_state_attributes: taskType, optional deviceSn
 - JackeryRefreshWeatherPlanButton: translation_key and icon
 - _raise_action_error: raises HomeAssistantError with correct fields
-"""  # noqa: E501
+"""
 
 import math
 from unittest.mock import AsyncMock, MagicMock
@@ -242,7 +242,7 @@ class TestSmartPlugDeviceSn:
         assert fn(plug) == "SN002"
 
     def test_returns_none_when_device_sn_is_empty_string(self) -> None:  # noqa: PLR6301
-        """Empty deviceSn falls back to devSn because `or` treats empty string as falsy."""  # noqa: E501
+        """Empty deviceSn falls back to devSn because `or` treats empty string as falsy."""
         fn = _get_smart_plug_device_sn()
         plug = {"deviceSn": "", "devSn": "SN002"}
         assert fn(plug) == "SN002"
@@ -352,12 +352,12 @@ class TestQueryButtonDescriptions:
         assert isinstance(QUERY_BUTTON_DESCRIPTIONS, tuple)
 
     def test_has_expected_count(self) -> None:  # noqa: PLR6301
-        """Must have exactly 14 descriptions as implemented."""
+        """Must have exactly 28 descriptions (14 SolarVault + 14 portable)."""
         from custom_components.jackery_solarvault.button import (
             QUERY_BUTTON_DESCRIPTIONS,
         )
 
-        assert len(QUERY_BUTTON_DESCRIPTIONS) == 14  # noqa: PLR2004
+        assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004
 
     def test_all_entries_are_query_button_descriptions(self) -> None:  # noqa: PLR6301
         """All entries must be JackeryQueryButtonDescription instances."""
@@ -614,7 +614,7 @@ class TestJackeryQueryButton:
         assert btn._attr_icon == "mdi:custom-icon"  # noqa: SLF001
 
     def test_raise_action_error_raises_homeassistant_error(self) -> None:  # noqa: PLR6301
-        """_raise_action_error must raise HomeAssistantError with entity_action_failed."""  # noqa: E501
+        """_raise_action_error must raise HomeAssistantError with entity_action_failed."""
         from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_query_button()
@@ -623,7 +623,7 @@ class TestJackeryQueryButton:
         assert exc_info.value.translation_key == "entity_action_failed"
 
     def test_raise_action_error_includes_error_in_placeholders(self) -> None:  # noqa: PLR6301
-        """_raise_action_error must include the error string in translation_placeholders."""  # noqa: E501
+        """_raise_action_error must include the error string in translation_placeholders."""
         from homeassistant.exceptions import HomeAssistantError
 
         btn = _make_query_button()
@@ -784,7 +784,7 @@ class TestJackeryDeleteStormAlertButton:
         assert attrs[FIELD_ALERT_ID] == "my-alert-id"
 
     def test_extra_state_attributes_includes_optional_fields_when_present(self) -> None:  # noqa: PLR6301
-        """Optional fields (startTs, endTs, status, manual) must appear when in alert."""  # noqa: E501
+        """Optional fields (startTs, endTs, status, manual) must appear when in alert."""
         from custom_components.jackery_solarvault.const import (
             FIELD_END_TS,
             FIELD_MANUAL,
@@ -813,7 +813,7 @@ class TestJackeryDeleteStormAlertButton:
         assert attrs.get(FIELD_MANUAL) is True
 
     def test_extra_state_attributes_omits_optional_fields_when_absent(self) -> None:  # noqa: PLR6301
-        """Optional fields must be absent from extra_state_attributes when not in alert."""  # noqa: E501
+        """Optional fields must be absent from extra_state_attributes when not in alert."""
         from custom_components.jackery_solarvault.const import (
             FIELD_END_TS,
             FIELD_MANUAL,
@@ -871,7 +871,7 @@ class TestJackeryDeleteStormAlertButton:
             await btn.async_press()
 
     async def test_async_press_wraps_runtime_error(self) -> None:  # noqa: PLR6301
-        """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""  # noqa: E501
+        """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
@@ -995,7 +995,7 @@ class TestJackeryReadScheduleButton:
         assert exc_info.value.translation_key == "entity_action_failed"
 
     async def test_async_press_calls_read_schedule_and_refresh(self) -> None:  # noqa: PLR6301
-        """async_press must call async_read_device_schedule and async_request_refresh."""  # noqa: E501
+        """async_press must call async_read_device_schedule and async_request_refresh."""
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
@@ -1118,7 +1118,7 @@ class TestJackeryRefreshWeatherPlanButton:
             await btn.async_press()
 
     async def test_async_press_wraps_generic_exception(self) -> None:  # noqa: PLR6301
-        """Generic exception from async_press must be wrapped into HomeAssistantError."""  # noqa: E501
+        """Generic exception from async_press must be wrapped into HomeAssistantError."""
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )

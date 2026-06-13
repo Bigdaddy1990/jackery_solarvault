@@ -11,7 +11,7 @@ The assert change means:
     not RuntimeError.
 
 These tests pin the new behaviour and guard against regressions.
-"""  # noqa: E501
+"""
 
 import pytest
 
@@ -104,7 +104,7 @@ def test_build_binary_frame_header_length_is_correct_via_assert() -> None:
     """
     # Build a valid frame and parse its first 16 bytes manually.
     plain = build_binary_frame(cmd=107, body=b"hello", frame_index=2, chunk_count=3)
-    # Layout: magic(2) + version(2) + idx(2) + cnt(2) + flags(2) + cmd(2) + marker(2) + len(2)  # noqa: E501
+    # Layout: magic(2) + version(2) + idx(2) + cnt(2) + flags(2) + cmd(2) + marker(2) + len(2)
     # = 16 bytes before body.
     assert plain[:2] == b"\xdf\xed"
     # body starts at offset 16, trailer at 16 + len(body).
@@ -128,7 +128,7 @@ def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
     """build_binary_frame + encrypt_binary_notify + decrypt_binary_notify must round-trip.
 
     Pins the symmetry that the PR did not break despite the assert change.
-    """  # noqa: E501
+    """
     import base64
 
     from custom_components.jackery_solarvault.client.ble import (

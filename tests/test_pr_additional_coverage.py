@@ -17,7 +17,7 @@ Covers gaps not addressed by the existing PR test files:
 
 If local_mqtt/__init__ import fails, tests skip with an explicit message so
 syntax/dependency regressions are obvious.
-"""  # noqa: E501
+"""
 
 import asyncio
 from typing import Any
@@ -657,7 +657,7 @@ def test_rsa_pkcs1v15_encrypt_empty_plaintext_succeeds() -> None:
 
 
 def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
-    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""  # noqa: E501
+    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""
     key_b64 = _make_rsa_public_key_b64()
     c1 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
     c2 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
@@ -707,7 +707,7 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
 
 @_skip_local_mqtt
 def test_handle_connect_failure_sets_connected_event_and_marks_not_connected() -> None:
-    """After _handle_connect_failure, both is_connected and the event must be in sync."""  # noqa: E501
+    """After _handle_connect_failure, both is_connected and the event must be in sync."""
     client = _make_client()
     client._connected = True  # simulate was connected  # noqa: SLF001
     client._connected_event.clear()  # noqa: SLF001

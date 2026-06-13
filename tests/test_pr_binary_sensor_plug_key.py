@@ -119,8 +119,8 @@ def test_unique_id_stable_across_index_changes() -> None:
         plug_sn=plug_sn, plug_index=2, dev_id=dev_id, plug_key=plug_key_b
     )
 
-    # Because same SN drives both keys, both unique_ids contain the same SN-derived part.  # noqa: E501
-    # The stable key for the same SN must be identical (index falls back only if SN is empty).  # noqa: E501
+    # Because same SN drives both keys, both unique_ids contain the same SN-derived part.
+    # The stable key for the same SN must be identical (index falls back only if SN is empty).
     assert plug_key_a == plug_key_b  # both use serial "STABLE-SN"
     assert sensor_a.unique_id == sensor_b.unique_id
 
@@ -286,7 +286,7 @@ def test_stable_subdevice_key_uses_fallback_index_for_none_identity() -> None:
 
 
 def test_stable_subdevice_key_uses_fallback_index_for_empty_identity() -> None:
-    """When identity is an empty string, stable_subdevice_key falls back to the index."""  # noqa: E501
+    """When identity is an empty string, stable_subdevice_key falls back to the index."""
     key = stable_subdevice_key("smart_plug", "", 5)
     assert "5" in key
 
