@@ -19,8 +19,8 @@ repos:
       - id: pyupgrade
         args:
           - --py314-plus
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: ''
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 2.2.0+dev
     hooks:
       - id: mypy
         args: [--strict, --ignore-missing-imports]
