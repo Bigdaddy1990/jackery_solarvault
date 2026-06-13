@@ -69,8 +69,6 @@ except ImportError:  # pragma: no cover - optional test dependency
         )
 
 
-from homeassistant.components import bluetooth
-
 from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY  # noqa: RUF100, TID252
 from ..util import first_nonblank_int  # noqa: RUF100, TID252
 from . import ble
@@ -405,7 +403,7 @@ class JackeryBleListener:
         except asyncio.CancelledError:  # noqa: TRY203
             raise
 
-    async def async_send_command(  # noqa: PLR0912, PLR0913
+    async def async_send_command(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         device_id: str,
         *,
@@ -492,6 +490,10 @@ class JackeryBleListener:
                     ),
                     timeout=timeout_sec,
                 )
+        except asyncio.CancelledError:
+            if pending is not None:
+                self._discard_pending_ack(device_id, pending)
+            raise
         except TimeoutError as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
@@ -514,6 +516,9 @@ class JackeryBleListener:
                 await asyncio.wait_for(
                     asyncio.shield(pending.future), timeout=ack_timeout_sec
                 )
+            except asyncio.CancelledError:
+                self._discard_pending_ack(device_id, pending)
+                raise
             except TimeoutError as err:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
@@ -627,6 +632,8 @@ class JackeryBleListener:
             "service_uuid": ble.BLE_SERVICE_UUID,
             "manufacturer_id": ble.BLE_MANUFACTURER_ID,
         }
+        from homeassistant.components import bluetooth
+
         unregister = bluetooth.async_register_callback(
             self._hass,
             self._on_advertisement,
@@ -788,6 +795,8 @@ class JackeryBleListener:
         stats = self.stats_for(device_id)
         try:
             while not self._stop_event.is_set():
+                from homeassistant.components import bluetooth
+
                 ble_device = bluetooth.async_ble_device_from_address(
                     self._hass, address, connectable=True
                 )

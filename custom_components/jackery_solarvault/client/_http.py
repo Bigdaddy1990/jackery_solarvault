@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from jackery_solarvault.const import (
+from ..const import (
     APP_REQUEST_META,
     APP_VERSION,
     APP_VERSION_CODE,
@@ -44,8 +44,7 @@ from jackery_solarvault.const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from jackery_solarvault.util import chart_series_debug
-
+from ..util import chart_series_debug
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
@@ -86,7 +85,7 @@ def _write_accepted(data: dict[str, Any]) -> bool:
     Returns:
         True if the response's `data` field is not explicitly `False`, False otherwise.
     """
-    from jackery_solarvault.util import safe_bool
+    from ..util import safe_bool
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -576,6 +575,11 @@ class BaseHTTPMixin:
                     f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
+        if FIELD_RAW_TEXT in data:
+            raise JackeryApiError(  # noqa: TRY003
+                f"{HTTP_METHOD_GET} {path} returned invalid JSON: "
+                f"{data[FIELD_RAW_TEXT]!r}"
+            )
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_GET, path, status, data)

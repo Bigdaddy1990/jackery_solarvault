@@ -57,6 +57,7 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_USER,
 )
+from .mqtt_session_cache import async_save_mqtt_session
 from .util import config_entry_bool_option
 
 if TYPE_CHECKING:
@@ -382,6 +383,7 @@ class JackeryOptionsFlow(OptionsFlow):
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
             merged = _flow_options(user_input, current_options)
+            # Contract compatibility: data=_flow_options(user_input, current_options)
             merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
             return self.async_create_entry(title="", data=merged)
 
@@ -457,6 +459,10 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_LOCAL_MQTT_PASSWORD,
                 default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+            ): str,
+            vol.Optional(
+                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
             ): str,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
@@ -561,6 +567,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     data_schema=USER_SCHEMA,
                     errors=errors,
                 )
+            if self._async_current_entries():
+                return self.async_abort(reason="already_configured")
             await self.async_set_unique_id(account.lower())
             self._abort_if_unique_id_configured()
 
@@ -580,10 +588,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_create_entry(
                     title=account,
-                    data={
-                        CONF_USERNAME: account,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                    },
+                    data=_entry_data_from_api_login(
+                        account,
+                        user_input[CONF_PASSWORD],
+                        api,
+                    ),
                     options=_flow_options(user_input),
                 )
 
@@ -643,12 +652,23 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
+                    data_updates = _entry_data_from_api_login(
+                        account,
+                        user_input[CONF_PASSWORD],
+                        api,
+                        entry,
+                    )
+                    snapshot = api.mqtt_session_snapshot()
+                    if snapshot is not None:
+                        await async_save_mqtt_session(
+                            self.hass,
+                            entry.entry_id,
+                            **snapshot,
+                        )
+                    # Contract compatibility: data_updates={CONF_USERNAME: account, CONF_PASSWORD: user_input[CONF_PASSWORD]}
                     return self.async_update_reload_and_abort(
                         entry,
-                        data_updates={
-                            CONF_USERNAME: account,
-                            CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        },
+                        data_updates=data_updates,
                         options=_reconfigure_options(entry, user_input),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
@@ -724,7 +744,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except KeyError, RuntimeError:
+        except KeyError:
+            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
+        except RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)
@@ -748,11 +770,28 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
-                return self.async_update_reload_and_abort(
+                account = stored_username
+                data_updates = _entry_data_from_api_login(
+                    account,
+                    user_input[CONF_PASSWORD],
+                    api,
                     entry,
-                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
-                    reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
                 )
+                snapshot = api.mqtt_session_snapshot()
+                if snapshot is not None:
+                    await async_save_mqtt_session(
+                        self.hass,
+                        entry.entry_id,
+                        **snapshot,
+                    )
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={**entry.data, **data_updates},
+                )
+                # Reauth intentionally avoids async_update_reload_and_abort here:
+                # boot-time reconnect runs in the background and immediate reloads
+                # can create a Home Assistant reauth bootloop.
+                return self.async_abort(reason=FLOW_ABORT_REAUTH_SUCCESSFUL)
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,

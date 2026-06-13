@@ -2,12 +2,7 @@
 
 from typing import Any
 
-from jackery_solarvault.client._http import (
-    BaseHTTPMixin,
-    JackeryApiError,
-    _write_accepted,
-)
-from jackery_solarvault.const import (
+from ...const import (
     BIND_CURRENCY_PATH,
     CANCEL_CONTRACT_PATH,
     CONTRACT_LIST_PATH,
@@ -31,6 +26,7 @@ from jackery_solarvault.const import (
     SAVE_SINGLE_MODE_PATH,
     SAVE_TOU_PLAN_PATH,
 )
+from .._http import BaseHTTPMixin, JackeryApiError, _write_accepted
 
 
 class EnergyPriceEndpointMixin(BaseHTTPMixin):
@@ -96,7 +92,16 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         Raises:
             JackeryApiError: If `single_price` is negative or `currency` is empty, or when the API call fails.
         """
-        price = float(single_price)
+        try:
+            price = float(single_price)
+        except ValueError as err:
+            raise JackeryApiError(  # noqa: TRY003
+                "single_price must be a valid number"
+            ) from err
+        except TypeError as err:
+            raise JackeryApiError(  # noqa: TRY003
+                "single_price must be a valid number"
+            ) from err
         if not (price >= 0):
             raise JackeryApiError("single_price must be >= 0")  # noqa: TRY003
         cur = str(currency or "").strip()

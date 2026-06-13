@@ -7,17 +7,7 @@ from typing import Any
 
 import aiohttp
 
-from jackery_solarvault.client._crypto import (
-    _aes_cbc_encrypt,
-    _aes_ecb_encrypt,
-    _rsa_pkcs1v15_encrypt,
-)
-from jackery_solarvault.client._http import (
-    BaseHTTPMixin,
-    JackeryApiError,
-    JackeryAuthError,
-)
-from jackery_solarvault.const import (
+from ...const import (
     AES_KEY,
     BASE_URL,
     CANCEL_ACCOUNT_PATH,
@@ -58,6 +48,8 @@ from jackery_solarvault.const import (
     USER_INFO_PATH,
     VERIFY_CODE_PATH,
 )
+from .._crypto import _aes_cbc_encrypt, _aes_ecb_encrypt, _rsa_pkcs1v15_encrypt
+from .._http import BaseHTTPMixin, JackeryApiError, JackeryAuthError
 
 
 class AuthEndpointMixin(BaseHTTPMixin):
@@ -126,7 +118,6 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
             ) from err
 
-        self.last_login_response = dict(data)
         await self._emit_payload_debug(
             self._http_payload_debug(
                 method=HTTP_METHOD_POST,
@@ -142,12 +133,17 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
             )
 
+        self.last_login_response = dict(data)
         token = data.get(FIELD_TOKEN) or ""
         if not token:
             raise JackeryAuthError("Login succeeded but no token returned")  # noqa: TRY003
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
+        if not isinstance(payload, dict):
+            raise JackeryApiError(  # noqa: TRY003
+                f"Login returned data {type(payload).__name__}, expected object"
+            )
         self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id

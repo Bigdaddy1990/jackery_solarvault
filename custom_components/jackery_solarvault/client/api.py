@@ -12,7 +12,11 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ._crypto import encrypt_mqtt_body  # noqa: F401  — public re-export
+from ._crypto import (  # noqa: F401  — public re-export
+    _generate_udid,
+    _rsa_pkcs1v15_encrypt,
+    encrypt_mqtt_body,
+)
 from ._endpoints.accessories import AccessoriesEndpointMixin
 from ._endpoints.auth import AuthEndpointMixin
 from ._endpoints.device import DeviceEndpointMixin
