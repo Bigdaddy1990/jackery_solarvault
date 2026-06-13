@@ -282,8 +282,7 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
-
+        from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
         try:
             while not self._stop_event.is_set():
                 try:
