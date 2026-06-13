@@ -239,9 +239,11 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: The matching smart-plug payload dictionary, or an empty dict if no matching plug is found.
         """
-        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
-            if smart_plug_serial(plug) == self._plug_sn:
-                return plug
+        payload = self._payload
+        if payload:
+            for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
+                if smart_plug_serial(plug) == self._plug_sn:
+                    return plug
         return {}
 
     @property
