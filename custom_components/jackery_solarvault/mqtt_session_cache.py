@@ -14,17 +14,21 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
-from typing import Any
-from typing import Final
 
-from homeassistant.core import HomeAssistant
+from typing import TYPE_CHECKING, Any, Final
+
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
-from .const import MQTT_SESSION_MAC_ID
-from .const import MQTT_SESSION_MAC_ID_SOURCE
-from .const import MQTT_SESSION_SEED_B64
-from .const import MQTT_SESSION_USER_ID
+from .const import (
+    DOMAIN,
+    MQTT_SESSION_MAC_ID,
+    MQTT_SESSION_MAC_ID_SOURCE,
+    MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_USER_ID,
+)
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
@@ -33,23 +37,21 @@ _KEY_CACHED_AT: Final = "cached_at"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Get the Home Assistant Store used to persist the MQTT session cache.
+    """Get the Store configured for persisting the MQTT session cache.
 
-    @returns Store[dict[str, Any]]: A configured Home Assistant `Store` instance using the module's storage key and version for MQTT session cache persistence.
+    Returns:
+        A Store[dict[str, Any]] configured with the module's storage key and storage version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
-async def async_load_mqtt_session(
-    hass: HomeAssistant,
-    entry_id: str,
+async def async_load_mqtt_session(  # noqa: PLR0911
+    hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """Return cached MQTT session fields for ``entry_id`` or ``None``.
+    """Load cached MQTT session credentials for the specified config entry from persistent storage.
 
-    The returned dict contains string-typed values for ``user_id``, ``seed_b64``
-    and ``mac_id`` plus optional ``mac_id_source``. Returns ``None`` when any
-    of the three mandatory fields is missing — partial cache rows are not
-    useful because the AES password derivation needs all three.
+    Returns:
+        dict[str, str] | None: A mapping containing the keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present. Returns `None` if the stored data is missing, malformed, or any required field is missing or empty.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -80,7 +82,7 @@ async def async_load_mqtt_session(
     return result
 
 
-async def async_save_mqtt_session(
+async def async_save_mqtt_session(  # noqa: PLR0913
     hass: HomeAssistant,
     entry_id: str,
     *,
@@ -90,10 +92,15 @@ async def async_save_mqtt_session(
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """Persist the MQTT session fields for ``entry_id``.
+    """Persist MQTT session fields for a config entry, overwriting any existing cached row.
 
-    A subsequent successful login that returns different credentials overwrites
-    the row; this is the same shape the in-memory ``JackeryApi`` fields take.
+    Parameters:
+        entry_id: Config entry identifier to associate with the cached session.
+        user_id: `userId` returned by the Jackery cloud used as the MQTT client identifier/username.
+        seed_b64: Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
+        mac_id: `macId` broker session identifier.
+        mac_id_source: Optional human-readable source or provenance of `mac_id`.
+        cached_at: Optional UNIX timestamp (seconds) when the session was cached.
     """
     store = _store(hass)
     data = await store.async_load()
@@ -117,10 +124,9 @@ async def async_save_mqtt_session(
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the cached MQTT session for ``entry_id``.
+    """Remove the cached MQTT session row for the given config entry.
 
-    Called after the broker explicitly rejects cached credentials so the next
-    setup pass forces a fresh login instead of replaying stale values.
+    Performs no action if the storage layout or the entry's row does not exist.
     """
     store = _store(hass)
     data = await store.async_load()
