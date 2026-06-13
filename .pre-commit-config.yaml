@@ -20,7 +20,7 @@ repos:
         args:
           - --py314-plus
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
+    rev: v1.14.1
     hooks:
       - id: mypy
         # Deferred quality gate (AGENTS.md note 2026-06-06, BUG_LIST.md §9):
@@ -49,7 +49,7 @@ repos:
           - --show-fixes
           - --unsafe-fixes
           - --preview
-          - --target-version=py314
+          - --target-version py314
           - --extend-select=RUF100
           - --output-format=github
         types_or:
