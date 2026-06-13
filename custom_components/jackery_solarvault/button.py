@@ -1172,9 +1172,11 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
         Returns:
             dict: The matching alert dictionary, or an empty dict if no matching alert is present.
         """
-        for alert in _storm_alerts(self._payload.get(PAYLOAD_WEATHER_PLAN)):
-            if _storm_alert_id(alert) == self._alert_id:
-                return alert
+        payload = self._payload
+        if payload:
+            for alert in _storm_alerts(payload.get(PAYLOAD_WEATHER_PLAN)):
+                if _storm_alert_id(alert) == self._alert_id:
+                    return alert
         return {}
 
     @property
