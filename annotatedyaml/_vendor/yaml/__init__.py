@@ -145,36 +145,39 @@ def load_all(stream, Loader):  # noqa: ANN001, ANN201, N803
 
 
 def full_load(stream):  # noqa: ANN001, ANN201
-    """Parse the first YAML document in a stream and construct its corresponding Python object, resolving all YAML tags except those considered unsafe for untrusted input.
+    """Parse one YAML document and construct its Python object.
+
+    Resolves YAML tags except those considered unsafe for untrusted input.
 
     Parameters:
         stream: A text or binary stream containing one or more YAML documents.
 
     Returns:
         The Python object produced from the first YAML document in the stream.
-    """  # noqa: E501
+    """
     return load(stream, FullLoader)  # noqa: F405
 
 
 def full_load_all(stream):  # noqa: ANN001, ANN201
     """Yield Python objects for each YAML document in a stream using the FullLoader.
 
-    The FullLoader resolves YAML tags while avoiding tag handlers that are unsafe for untrusted input.
+    The FullLoader resolves YAML tags while avoiding tag handlers that are
+    unsafe for untrusted input.
 
     Returns:
         iterator: Yields the Python object produced for each document in the stream.
-    """  # noqa: E501
+    """
     return load_all(stream, FullLoader)  # noqa: F405
 
 
 def safe_load(stream):  # noqa: ANN001, ANN201
-    """Parse the first YAML document from a stream and produce the corresponding Python object.
+    """Parse one YAML document from a stream.
 
     This loader resolves only basic YAML tags and is safe for untrusted input.
 
     Returns:
         The Python object constructed from the first YAML document in `stream`.
-    """  # noqa: E501
+    """
     return load(stream, SafeLoader)  # noqa: F405
 
 
@@ -184,19 +187,20 @@ def safe_load_all(stream):  # noqa: ANN001, ANN201
     Only basic YAML tags are resolved; safe for untrusted input.
 
     Returns:
-        iterator: An iterator that yields the Python object for each document in the stream.
-    """  # noqa: E501
+        iterator: Yields the Python object for each document in the stream.
+    """
     return load_all(stream, SafeLoader)  # noqa: F405
 
 
 def unsafe_load(stream):  # noqa: ANN001, ANN201
     """Parse the first YAML document from a stream.
 
-    Resolves all YAML tags, including those that may be unsafe when processing untrusted input.
+    Resolves all YAML tags, including those that may be unsafe when processing
+    untrusted input.
 
     Returns:
         The Python object represented by the first document.
-    """  # noqa: E501
+    """
     return load(stream, UnsafeLoader)  # noqa: F405
 
 
@@ -223,7 +227,8 @@ def emit(  # noqa: ANN201, PLR0913, PLR0917
 
     Parameters:
         events (iterable): An iterable of YAML event objects to emit.
-        stream (IO[str] | None): Destination text stream. If `None`, an in-memory string buffer is used and its value is returned.
+        stream (IO[str] | None): Destination text stream. If `None`, an
+            in-memory string buffer is used and its value is returned.
         Dumper (class): Dumper class to instantiate for emitting events.
         canonical (bool | None): Whether to use canonical output style.
         indent (int | None): Indentation level for nested structures.
@@ -233,7 +238,7 @@ def emit(  # noqa: ANN201, PLR0913, PLR0917
 
     Returns:
         str | None: The produced YAML string if `stream` was `None`, otherwise `None`.
-    """  # noqa: E501
+    """
     getvalue = None
     if stream is None:
         stream = io.StringIO()
@@ -273,11 +278,13 @@ def serialize_all(  # noqa: ANN201, PLR0913, PLR0917
 ):
     """Serialize a sequence of representation nodes into a YAML stream.
 
-    When `stream` is provided, the serialized YAML is written to it. When `stream` is None, the function returns the produced content: a `str` if `encoding` is None, otherwise `bytes`.
+    When `stream` is provided, the serialized YAML is written to it. Otherwise,
+    the produced content is returned as `str` or `bytes`.
 
     Parameters:
-        nodes: A sequence of YAML representation nodes to serialize (document root nodes).
-        stream: An IO-like object to write the serialized YAML to. If `None`, an in-memory buffer is used and its value is returned.
+        nodes: YAML representation nodes to serialize (document root nodes).
+        stream: IO-like object to write YAML to. If `None`, an in-memory buffer
+            is used and its value is returned.
         Dumper: Dumper class to perform serialization (defaults to module `Dumper`).
         canonical: If True, produce canonical YAML form.
         indent: Indentation level to use for nested structures.
@@ -291,8 +298,9 @@ def serialize_all(  # noqa: ANN201, PLR0913, PLR0917
         tags: Optional mapping of tag handles to URIs for tag directives in the output.
 
     Returns:
-        `str` if `stream` is None and `encoding` is None, `bytes` if `stream` is None and `encoding` is provided, `None` if a `stream` was supplied.
-    """  # noqa: E501
+        `str` if `stream` is None and `encoding` is None, `bytes` if
+        `encoding` is provided, or `None` if a `stream` was supplied.
+    """
     getvalue = None
     if stream is None:
         stream = io.StringIO() if encoding is None else io.BytesIO()
