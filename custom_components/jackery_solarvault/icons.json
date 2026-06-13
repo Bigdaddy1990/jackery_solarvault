@@ -18,5 +18,132 @@
     "set_third_party_mqtt_config": {
       "service": "mdi:message-cog"
     }
+  },
+  "entity": {
+    "button": {
+      "portable_restart": {
+        "default": "mdi:restart"
+      },
+      "portable_power_off": {
+        "default": "mdi:power"
+      },
+      "portable_power_pack_blink": {
+        "default": "mdi:led-outline"
+      },
+      "portable_read_device_info": {
+        "default": "mdi:information-outline"
+      },
+      "portable_read_wifi_list": {
+        "default": "mdi:wifi"
+      },
+      "portable_get_power_pack_list": {
+        "default": "mdi:battery"
+      },
+      "portable_get_electricity_data_count": {
+        "default": "mdi:counter"
+      },
+      "portable_send_time_zone": {
+        "default": "mdi:clock-outline"
+      },
+      "portable_sync_mqtt_info": {
+        "default": "mdi:message-text-clock"
+      },
+      "portable_get_wifi_config": {
+        "default": "mdi:wifi-cog"
+      },
+      "portable_get_charge_plan": {
+        "default": "mdi:calendar-clock"
+      },
+      "portable_current_charge_plan": {
+        "default": "mdi:calendar-check"
+      },
+      "portable_get_peaks_troughs": {
+        "default": "mdi:chart-line"
+      },
+      "portable_read_sub_ct": {
+        "default": "mdi:transmission-tower"
+      }
+    },
+    "switch": {
+      "portable_dc_output": {
+        "default": "mdi:current-dc"
+      },
+      "portable_dc_usb_output": {
+        "default": "mdi:usb-port"
+      },
+      "portable_dc_car_output": {
+        "default": "mdi:car-electric"
+      },
+      "portable_ac_output": {
+        "default": "mdi:current-ac"
+      },
+      "portable_ac240_output": {
+        "default": "mdi:current-ac"
+      },
+      "portable_light": {
+        "default": "mdi:lightbulb"
+      },
+      "portable_screen": {
+        "default": "mdi:monitor"
+      },
+      "portable_super_charge": {
+        "default": "mdi:battery-charging-fast"
+      },
+      "portable_energy_saving": {
+        "default": "mdi:leaf"
+      },
+      "portable_output_priority_switch": {
+        "default": "mdi:sort-bool-descending"
+      },
+      "portable_discharge_memory": {
+        "default": "mdi:memory"
+      }
+    },
+    "number": {
+      "portable_charge_power": {
+        "default": "mdi:battery-charging-wireless"
+      },
+      "portable_energy_storage_charge_limit": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "portable_auto_shutdown_time": {
+        "default": "mdi:timer-cog"
+      },
+      "portable_ac_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_dc_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_dc_usb_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_dc_car_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_output_priority_soc": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_bluetooth_sleep": {
+        "default": "mdi:bluetooth"
+      },
+      "portable_output_priority": {
+        "default": "mdi:sort-bool-descending"
+      }
+    },
+    "select": {
+      "portable_ups_model": {
+        "default": "mdi:battery-charging-outline"
+      },
+      "portable_power_mode": {
+        "default": "mdi:flash"
+      },
+      "portable_ac_output_mode": {
+        "default": "mdi:current-ac"
+      },
+      "portable_output_priority": {
+        "default": "mdi:sort-bool-descending"
+      }
+    }
   }
 }

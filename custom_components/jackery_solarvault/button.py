@@ -12,6 +12,20 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from .const import (
     ACTION_ID_GET_DEVICE_OTA_VERSION,
     ACTION_ID_GET_TIME_ZONE,
+    ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN,
+    ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
+    ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
+    ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
+    ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
+    ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
+    ACTION_ID_PORTABLE_POWER_OFF,
+    ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+    ACTION_ID_PORTABLE_READ_DEVICE_INFO,
+    ACTION_ID_PORTABLE_READ_SUB_CT,
+    ACTION_ID_PORTABLE_READ_WIFI_LIST,
+    ACTION_ID_PORTABLE_RESTART,
+    ACTION_ID_PORTABLE_SEND_TIME_ZONE,
+    ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
     ACTION_ID_QUERY_COMBINE_DATA,
     ACTION_ID_QUERY_DEVICE_PROPERTY,
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -50,9 +64,12 @@ from .const import (
     MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_QUERY_COMBINE_DATA,
+    MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
     MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
+    MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
     MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
     MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
     MQTT_MESSAGE_QUERY_WIFI_CONFIG,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SMART_PLUGS,
@@ -233,6 +250,180 @@ async def _query_subdevice_combo(
     await coordinator.async_query_subdevice_combo(device_id)
 
 
+# --- Portable / Explorer powerstation actions --------------------------------
+
+async def _portable_restart(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Restart a portable Explorer device (msgId=45, bleMsgType=96)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_RESTART,
+        cmd=45,
+        body_fields={FIELD_REBOOT: 1},
+    )
+
+
+async def _portable_power_off(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Power off a portable Explorer device (msgId=46, bleMsgType=97)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_POWER_OFF,
+        cmd=46,
+        body_fields={FIELD_REBOOT: 2},
+    )
+
+
+async def _portable_power_pack_blink(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Blink the power pack LEDs on a portable device (msgId=39, bleMsgType=98)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+        cmd=39,
+        body_fields={},
+    )
+
+
+async def _portable_read_device_info(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable device info (msgId=6, bleMsgType=3)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
+        cmd=6,
+        body_fields={},
+    )
+
+
+async def _portable_read_wifi_list(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable WiFi list (msgId=5, bleMsgType=1)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_READ_WIFI_LIST,
+        cmd=5,
+        body_fields={},
+    )
+
+
+async def _portable_get_power_pack_list(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable battery pack list (msgId=8, bleMsgType=6)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
+        cmd=8,
+        body_fields={},
+    )
+
+
+async def _portable_get_electricity_data_count(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable electricity data count (msgId=9, bleMsgType=7)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
+        cmd=9,
+        body_fields={},
+    )
+
+
+async def _portable_send_time_zone(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Send timezone to portable device (msgId=25, bleMsgType=8)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_SEND_TIME_ZONE,
+        cmd=25,
+        body_fields={},
+    )
+
+
+async def _portable_sync_mqtt_info(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Sync MQTT connection info on portable device (msgId=50, bleMsgType=99)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
+        cmd=50,
+        body_fields={},
+    )
+
+
+async def _portable_get_wifi_config(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable WiFi config (msgId=52, bleMsgType=124)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
+        cmd=52,
+        body_fields={},
+    )
+
+
+async def _portable_get_charge_plan(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable charge/discharge plan (msgId=26)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
+        cmd=26,
+        body_fields={},
+        message_type=MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
+    )
+
+
+async def _portable_current_charge_plan(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable current charge/discharge plan (msgId=30)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN,
+        cmd=30,
+        body_fields={},
+        message_type=MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
+    )
+
+
+async def _portable_get_peaks_troughs(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable TOU peaks/troughs schedule (msgId=43)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
+        cmd=43,
+        body_fields={},
+        message_type=MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
+    )
+
+
+async def _portable_read_sub_ct(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> None:
+    """Query portable sub-device CT (msgId=51, bleMsgType=110)."""
+    await coordinator.async_send_portable_command(
+        device_id,
+        action_id=ACTION_ID_PORTABLE_READ_SUB_CT,
+        cmd=51,
+        body_fields={},
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    )
+
+
 QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
     JackeryQueryButtonDescription(
         key="refresh_system_info",
@@ -364,6 +555,133 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action_id=ACTION_ID_SUBDEVICE_3037,
         cmd=MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
         dev_type=SUBDEVICE_DEV_TYPE_COMBO,
+    ),
+    # --- Portable / Explorer powerstation buttons ---
+    JackeryQueryButtonDescription(
+        key="portable_restart",
+        translation_key="portable_restart",
+        icon="mdi:restart",
+        action=_portable_restart,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_RESTART,
+        cmd=45,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_power_off",
+        translation_key="portable_power_off",
+        icon="mdi:power",
+        action=_portable_power_off,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_POWER_OFF,
+        cmd=46,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_power_pack_blink",
+        translation_key="portable_power_pack_blink",
+        icon="mdi:led-outline",
+        action=_portable_power_pack_blink,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+        cmd=39,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_device_info",
+        translation_key="portable_refresh_device_info",
+        icon="mdi:database-refresh",
+        action=_portable_read_device_info,
+        message_type=MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
+        action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
+        cmd=6,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_wifi_list",
+        translation_key="portable_refresh_wifi_list",
+        icon="mdi:wifi-refresh",
+        action=_portable_read_wifi_list,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_READ_WIFI_LIST,
+        cmd=5,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_battery_packs",
+        translation_key="portable_refresh_battery_packs",
+        icon="mdi:battery-sync",
+        action=_portable_get_power_pack_list,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
+        cmd=8,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_electricity_count",
+        translation_key="portable_refresh_electricity_count",
+        icon="mdi:counter",
+        action=_portable_get_electricity_data_count,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
+        cmd=9,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_sync_time_zone",
+        translation_key="portable_sync_time_zone",
+        icon="mdi:clock-check",
+        action=_portable_send_time_zone,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_SEND_TIME_ZONE,
+        cmd=25,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_sync_mqtt_info",
+        translation_key="portable_sync_mqtt_info",
+        icon="mdi:cloud-sync",
+        action=_portable_sync_mqtt_info,
+        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
+        cmd=50,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_wifi_config",
+        translation_key="portable_refresh_wifi_config",
+        icon="mdi:wifi-cog",
+        action=_portable_get_wifi_config,
+        message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
+        action_id=ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
+        cmd=52,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_get_charge_plan",
+        translation_key="portable_get_charge_plan",
+        icon="mdi:battery-clock",
+        action=_portable_get_charge_plan,
+        message_type=MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
+        action_id=ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
+        cmd=26,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_current_charge_plan",
+        translation_key="portable_current_charge_plan",
+        icon="mdi:clock-outline",
+        action=_portable_current_charge_plan,
+        message_type=MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
+        action_id=ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN,
+        cmd=30,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_get_peaks_troughs",
+        translation_key="portable_get_peaks_troughs",
+        icon="mdi:chart-line",
+        action=_portable_get_peaks_troughs,
+        message_type=MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
+        action_id=ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
+        cmd=43,
+    ),
+    JackeryQueryButtonDescription(
+        key="portable_refresh_sub_ct",
+        translation_key="portable_refresh_sub_ct",
+        icon="mdi:meter-electric",
+        action=_portable_read_sub_ct,
+        message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        action_id=ACTION_ID_PORTABLE_READ_SUB_CT,
+        cmd=51,
     ),
 )
 

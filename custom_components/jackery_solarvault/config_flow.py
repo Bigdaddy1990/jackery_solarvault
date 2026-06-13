@@ -611,7 +611,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -724,7 +724,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except (KeyError, RuntimeError):
+        except KeyError, RuntimeError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)

@@ -195,6 +195,107 @@ async def _set_third_party_mqtt_enabled(
     )
 
 
+# --- Portable / Explorer powerstation switch setters -------------------------
+
+async def _set_portable_dc_output(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the DC output on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=10, field="odc", enabled=value
+    )
+
+
+async def _set_portable_dc_usb_output(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the USB output on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=11, field="usba1", enabled=value
+    )
+
+
+async def _set_portable_dc_car_output(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the car (DC cigarette) output on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=12, field="idc", enabled=value
+    )
+
+
+async def _set_portable_ac_output(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the AC output on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=13, field="oac", enabled=value
+    )
+
+
+async def _set_portable_ac240_output(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the AC240 output on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=14, field="oac2", enabled=value
+    )
+
+
+async def _set_portable_light(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the LED light on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=17, field="lm", enabled=value
+    )
+
+
+async def _set_portable_screen(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the display screen on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=18, field="ss", enabled=value
+    )
+
+
+async def _set_portable_super_charge(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Enable/disable super charge mode on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=23, field="sfc", enabled=value
+    )
+
+
+async def _set_portable_energy_saving(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Enable/disable energy saving mode on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=20, field="ec", enabled=value
+    )
+
+
+async def _set_portable_output_priority_switch(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Toggle the output priority switch on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=47, field="pss", enabled=value
+    )
+
+
+async def _set_portable_discharge_memory(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    """Enable/disable discharge memory on a portable Explorer device."""
+    await coord.async_portable_toggle_output(
+        dev_id, action_id=53, field="dl", enabled=value
+    )
+
+
 _smart_plug_serial = smart_plug_serial
 
 
@@ -265,6 +366,95 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         source_keys=(FIELD_THIRD_PARTY_MQTT_ENABLE,),
         source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
         setter=_set_third_party_mqtt_enabled,
+    ),
+    # --- Portable / Explorer powerstation switches ---
+    JackerySwitchDescription(
+        key="portable_dc_output",
+        translation_key="portable_dc_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-plug",
+        source_keys=("odc",),
+        setter=_set_portable_dc_output,
+    ),
+    JackerySwitchDescription(
+        key="portable_usb_output",
+        translation_key="portable_usb_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:usb",
+        source_keys=("usba1",),
+        setter=_set_portable_dc_usb_output,
+    ),
+    JackerySwitchDescription(
+        key="portable_car_output",
+        translation_key="portable_car_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:car",
+        source_keys=("idc",),
+        setter=_set_portable_dc_car_output,
+    ),
+    JackerySwitchDescription(
+        key="portable_ac_output",
+        translation_key="portable_ac_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-plug-battery",
+        source_keys=("oac",),
+        setter=_set_portable_ac_output,
+    ),
+    JackerySwitchDescription(
+        key="portable_ac240_output",
+        translation_key="portable_ac240_output",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:power-plug-battery",
+        source_keys=("oac2",),
+        setter=_set_portable_ac240_output,
+    ),
+    JackerySwitchDescription(
+        key="portable_light",
+        translation_key="portable_light",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:lightbulb",
+        source_keys=("lm",),
+        setter=_set_portable_light,
+    ),
+    JackerySwitchDescription(
+        key="portable_screen",
+        translation_key="portable_screen",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:monitor",
+        source_keys=("ss",),
+        setter=_set_portable_screen,
+    ),
+    JackerySwitchDescription(
+        key="portable_super_charge",
+        translation_key="portable_super_charge",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:flash",
+        source_keys=("sfc",),
+        setter=_set_portable_super_charge,
+    ),
+    JackerySwitchDescription(
+        key="portable_energy_saving",
+        translation_key="portable_energy_saving",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:leaf",
+        source_keys=("ec",),
+        setter=_set_portable_energy_saving,
+    ),
+    JackerySwitchDescription(
+        key="portable_output_priority_switch",
+        translation_key="portable_output_priority_switch",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:sort-bool-descending",
+        source_keys=("pss",),
+        setter=_set_portable_output_priority_switch,
+    ),
+    JackerySwitchDescription(
+        key="portable_discharge_memory",
+        translation_key="portable_discharge_memory",
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:battery-arrow-down",
+        source_keys=("dl",),
+        setter=_set_portable_discharge_memory,
     ),
 )
 

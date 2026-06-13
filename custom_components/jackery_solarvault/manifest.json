@@ -19,6 +19,7 @@
     "@Bigdaddy1990"
   ],
   "config_flow": true,
+  "single_config_entry": true,
   "dependencies": [],
   "dhcp": [
     {

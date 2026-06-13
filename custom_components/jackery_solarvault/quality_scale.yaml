@@ -121,6 +121,11 @@ rules:
       removes packs that have been silent past BATTERY_PACK_STALE_THRESHOLD_SEC (30
       days). Stale-helper cleanup runs at startup. Stale-pack count is exposed in
       diagnostics.'
+  docs-diagnostics:
+    status: done
+    comment: docs/diagnostics.md documents the diagnostics payload structure including
+      rejection_metrics and schema_version. diagnostics.py implements both config-entry
+      and per-device diagnostics with redacted sensitive fields.
   async-dependency: done
   inject-websession:
     status: exempt

@@ -244,3 +244,11 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
                     return True
                 return parsed_online
         return self._device_id in (self.coordinator.data or {})
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to Home Assistant."""
+        await super().async_added_to_hass()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity is about to be removed from Home Assistant."""
+        await super().async_will_remove_from_hass()

@@ -10,8 +10,6 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
-from __future__ import annotations  # noqa: TID251
-
 from dataclasses import dataclass, field
 import logging
 import re
@@ -38,12 +36,14 @@ from .const import (
     FIELD_OFF_GRID_DOWN_TIME,
     FIELD_OFF_GRID_TIME,
     FIELD_PLATFORM_COMPANY_ID,
+    FIELD_PM,
     FIELD_PRICE_MODE,
     FIELD_SCHE_PHASE,
     FIELD_SINGLE_PRICE,
     FIELD_STORM,
     FIELD_SYSTEM_REGION,
     FIELD_TEMP_UNIT,
+    FIELD_UPS,
     FIELD_WORK_MODEL,
     FIELD_WPC,
     FIELD_WPS,
@@ -600,6 +600,174 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Portable / Explorer powerstation select helpers
+# ---------------------------------------------------------------------------
+
+# UPS model options (field "ups", msgId=24)
+_UPS_MODEL_OPTIONS: dict[int, str] = {
+    0: "Standard",
+    1: "LiFePO4",
+    2: "AGM",
+    3: "Gel",
+    4: "Custom",
+}
+_OPTION_TO_UPS_MODEL: dict[str, int] = {v: k for k, v in _UPS_MODEL_OPTIONS.items()}
+
+
+def _portable_ups_model_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get(FIELD_UPS))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _UPS_MODEL_OPTIONS.get(raw)
+
+
+async def _portable_ups_model_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_UPS_MODEL:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=24,
+        field=FIELD_UPS,
+        value=_OPTION_TO_UPS_MODEL[option],
+    )
+
+
+# Power mode options (field "pm", msgId=32)
+_POWER_MODE_OPTIONS: dict[int, str] = {
+    0: "Standard",
+    1: "Eco",
+    2: "Performance",
+}
+_OPTION_TO_POWER_MODE: dict[str, int] = {v: k for k, v in _POWER_MODE_OPTIONS.items()}
+
+
+def _portable_power_mode_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get(FIELD_PM))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _POWER_MODE_OPTIONS.get(raw)
+
+
+async def _portable_power_mode_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_POWER_MODE:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=32,
+        field=FIELD_PM,
+        value=_OPTION_TO_POWER_MODE[option],
+    )
+
+
+# AC output mode options (field "acmode", msgId=40)
+_AC_OUTPUT_MODE_OPTIONS: dict[int, str] = {
+    0: "Normal",
+    1: "Quiet",
+    2: "High Performance",
+}
+_OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {v: k for k, v in _AC_OUTPUT_MODE_OPTIONS.items()}
+
+
+def _portable_ac_output_mode_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("acmode"))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _AC_OUTPUT_MODE_OPTIONS.get(raw)
+
+
+async def _portable_ac_output_mode_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_AC_OUTPUT_MODE:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=40,
+        field="acmode",
+        value=_OPTION_TO_AC_OUTPUT_MODE[option],
+    )
+
+
+# Output priority options (field "outPrio", msgId=48)
+_OUTPUT_PRIORITY_OPTIONS: dict[int, str] = {
+    0: "Battery First",
+    1: "Grid First",
+    2: "Solar First",
+}
+_OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {v: k for k, v in _OUTPUT_PRIORITY_OPTIONS.items()}
+
+
+def _portable_output_priority_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("outPrio"))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+
+
+async def _portable_output_priority_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_OUTPUT_PRIORITY:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=48,
+        field="outPrio",
+        value=_OPTION_TO_OUTPUT_PRIORITY[option],
+    )
+
+
+def _portable_ac1_priority_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("oac1Prio"))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+
+
+async def _portable_ac1_priority_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_OUTPUT_PRIORITY:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=49,
+        field="oac1Prio",
+        value=_OPTION_TO_OUTPUT_PRIORITY[option],
+    )
+
+
+def _portable_ac2_priority_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("oac2Prio"))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+
+
+async def _portable_ac2_priority_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_OUTPUT_PRIORITY:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=49,
+        field="oac2Prio",
+        value=_OPTION_TO_OUTPUT_PRIORITY[option],
+    )
+
+
+def _portable_dc_priority_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("odcPrio"))  # noqa: SLF001
+    if raw is None:
+        return None
+    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+
+
+async def _portable_dc_priority_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_OUTPUT_PRIORITY:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # noqa: SLF001
+        action_id=49,
+        field="odcPrio",
+        value=_OPTION_TO_OUTPUT_PRIORITY[option],
+    )
+
+
+# ---------------------------------------------------------------------------
 # Description registry
 # ---------------------------------------------------------------------------
 
@@ -661,6 +829,63 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         options=list(_CT_PHASE_TO_OPTION.values()),
         current_fn=_ct_phase_current,
         select_fn=_ct_phase_select,
+    ),
+    # --- Portable / Explorer powerstation selects ---
+    JackerySelectDescription(
+        key="portable_ups_model",
+        translation_key="portable_ups_model",
+        icon="mdi:battery-charging-outline",
+        options=list(_OPTION_TO_UPS_MODEL.keys()),
+        current_fn=_portable_ups_model_current,
+        select_fn=_portable_ups_model_select,
+    ),
+    JackerySelectDescription(
+        key="portable_power_mode",
+        translation_key="portable_power_mode",
+        icon="mdi:flash",
+        options=list(_OPTION_TO_POWER_MODE.keys()),
+        current_fn=_portable_power_mode_current,
+        select_fn=_portable_power_mode_select,
+    ),
+    JackerySelectDescription(
+        key="portable_ac_output_mode",
+        translation_key="portable_ac_output_mode",
+        icon="mdi:current-ac",
+        options=list(_OPTION_TO_AC_OUTPUT_MODE.keys()),
+        current_fn=_portable_ac_output_mode_current,
+        select_fn=_portable_ac_output_mode_select,
+    ),
+    JackerySelectDescription(
+        key="portable_output_priority",
+        translation_key="portable_output_priority",
+        icon="mdi:sort-bool-descending",
+        options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
+        current_fn=_portable_output_priority_current,
+        select_fn=_portable_output_priority_select,
+    ),
+    JackerySelectDescription(
+        key="portable_ac1_priority",
+        translation_key="portable_ac1_priority",
+        icon="mdi:current-ac",
+        options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
+        current_fn=_portable_ac1_priority_current,
+        select_fn=_portable_ac1_priority_select,
+    ),
+    JackerySelectDescription(
+        key="portable_ac2_priority",
+        translation_key="portable_ac2_priority",
+        icon="mdi:current-ac",
+        options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
+        current_fn=_portable_ac2_priority_current,
+        select_fn=_portable_ac2_priority_select,
+    ),
+    JackerySelectDescription(
+        key="portable_dc_priority",
+        translation_key="portable_dc_priority",
+        icon="mdi:current-dc",
+        options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
+        current_fn=_portable_dc_priority_current,
+        select_fn=_portable_dc_priority_select,
     ),
 )
 

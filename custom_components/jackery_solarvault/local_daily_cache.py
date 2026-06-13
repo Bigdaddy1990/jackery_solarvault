@@ -23,12 +23,14 @@ and is stored under HA's standard :class:`Store`.
 
 
 from typing import TYPE_CHECKING, Any, Final
+import json
 
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from datetime import date
 
     from homeassistant.core import HomeAssistant
@@ -278,11 +280,22 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
     return day if isinstance(day, str) else None
 
 
+def local_daily_signature(snapshots: Mapping[str, Any]) -> str:
+    """Return a stable string signature for the snapshot map.
+
+    Used to decide whether the persistent cache needs a Store write at
+    the end of an update cycle -- only re-persist when the day rolled over
+    or a new metric anchor appeared.
+    """
+    return json.dumps(snapshots, sort_keys=True, default=str)
+
+
 __all__ = [
     "async_load_daily_cache",
     "async_save_daily_cache",
     "daily_delta",
     "is_new_day",
+    "local_daily_signature",
     "refresh_snapshot",
     "snapshot_day",
 ]

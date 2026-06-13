@@ -29,6 +29,8 @@ from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_HOST,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
     CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -41,6 +43,7 @@ from .const import (
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
@@ -326,10 +329,14 @@ async def _async_start_local_mqtt(
     failures here never block setup (AGENTS.md §3.3).
     """
     if not config_entry_bool_option(
+        entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE
+    ) and not config_entry_bool_option(
         entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
     ):
         return
-    host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
+    host = config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "").strip()
+    if not host:
+        host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
     if not host:
         return
     topic_filter = config_entry_str_option(
@@ -663,7 +670,6 @@ async def _async_update_listener(
         return
 
     if isinstance(coordinator, JackerySolarVaultCoordinator):
-        coordinator.apply_options_in_place(new_options)
         await coordinator.async_request_refresh()
 
 

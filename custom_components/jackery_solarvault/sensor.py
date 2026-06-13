@@ -95,6 +95,7 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfReactivePower,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -169,16 +170,32 @@ from .const import (
     DEFAULT_STORM_WARNING_MINUTES,
     DOMAIN,
     FIELD_ABILITY,
+    FIELD_ACMODE,
+    FIELD_ACOHZ,
+    FIELD_ACOV,
+    FIELD_ACPS,
+    FIELD_AST,
     FIELD_BAT_IN_PW,
     FIELD_BAT_NUM,
     FIELD_BAT_OUT_PW,
     FIELD_BAT_SOC,
     FIELD_BAT_STATE,
+    FIELD_BC,
+    FIELD_BLS,
+    FIELD_BOX,
+    FIELD_BPC,
+    FIELD_BT,
     FIELD_CELL_TEMP,
     FIELD_CHARGE_PLAN_PW,
     FIELD_CHARGING_ENERGY,
+    FIELD_CIP,
+    FIELD_CL,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
+    FIELD_CS,
+    FIELD_CSC,
+    FIELD_CSL,
+    FIELD_CST,
     FIELD_CT_APPARENT_POWER,
     FIELD_CT_APPARENT_POWER1,
     FIELD_CT_APPARENT_POWER2,
@@ -219,9 +236,13 @@ from .const import (
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,
+    FIELD_DHG_RECALL,
     FIELD_DISCHARGING_ENERGY,
+    FIELD_DL,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_EC,
+    FIELD_EIP,
+    FIELD_EMAC,
     FIELD_ENERGY_PLAN_PW,
     FIELD_ETH_PORT,
     FIELD_FOLLOW_METER,
@@ -232,6 +253,8 @@ from .const import (
     FIELD_GRID_STATE,
     FIELD_GRID_STATE_ALT,
     FIELD_HOME_LOAD_PW,
+    FIELD_IAC,
+    FIELD_IACPW,
     FIELD_IN_EGY,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
@@ -240,6 +263,7 @@ from .const import (
     FIELD_IS_AUTO_STANDBY,
     FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_IS_FOLLOW_METER_PW,
+    FIELD_IS_PACK_CONNECT,
     FIELD_IT,
     FIELD_LATITUDE,
     FIELD_LOAD_PW,
@@ -252,7 +276,26 @@ from .const import (
     FIELD_MAX_SYS_OUT_PW,
     FIELD_MINS_INTERVAL,
     FIELD_MODEL,
+    FIELD_MODEL_CODE,
     FIELD_MODEL_NAME,
+    FIELD_OAC,
+    FIELD_OAC1_NAME,
+    FIELD_OAC2,
+    FIELD_OAC2_NAME,
+    FIELD_OACL1,
+    FIELD_OACL1_PW,
+    FIELD_OACL2,
+    FIELD_OACL2_PW,
+    FIELD_OACPW,
+    FIELD_OACT,
+    FIELD_OACT1,
+    FIELD_OACT2,
+    FIELD_ODCC,
+    FIELD_ODCCT,
+    FIELD_ODCT,
+    FIELD_ODCU,
+    FIELD_ODCUT,
+    FIELD_ODC_PORT,
     FIELD_OFF_GRID_AUTO_OFF_TIME,
     FIELD_OFF_GRID_DOWN,
     FIELD_OFF_GRID_DOWN_TIME,
@@ -266,6 +309,11 @@ from .const import (
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
     FIELD_OUT_PW,
+    FIELD_PAL,
+    FIELD_PC,
+    FIELD_PM,
+    FIELD_PMB,
+    FIELD_PSS,
     FIELD_PV1,
     FIELD_PV2,
     FIELD_PV3,
@@ -274,7 +322,9 @@ from .const import (
     FIELD_RB,
     FIELD_REBOOT,
     FIELD_SCAN_NAME,
+    FIELD_SFC,
     FIELD_SINGLE_PRICE,
+    FIELD_SLTB,
     FIELD_SN,
     FIELD_SOC,
     FIELD_SOCKET_LAST_UPDATE_TS,
@@ -294,15 +344,25 @@ from .const import (
     FIELD_SW_EPS_OUT_PW,
     FIELD_SW_EPS_STATE,
     FIELD_SYS_SWITCH,
+    FIELD_TA,
     FIELD_TARGET_MODULE_VERSION,
     FIELD_TARGET_VERSION,
     FIELD_TEMP_UNIT,
     FIELD_TODAY_ENERGY,
     FIELD_TOTAL_ENERGY,
+    FIELD_TP,
+    FIELD_TT,
     FIELD_TYPE_NAME,
     FIELD_UPDATE_CONTENT,
     FIELD_UPDATE_STATUS,
     FIELD_UPGRADE_TYPE,
+    FIELD_UPS,
+    FIELD_USBA1,
+    FIELD_USBA2,
+    FIELD_USBA3,
+    FIELD_USBC1,
+    FIELD_USBC2,
+    FIELD_USBC3,
     FIELD_VERSION,
     FIELD_WIP,
     FIELD_WNAME,
@@ -310,6 +370,7 @@ from .const import (
     FIELD_WPC,
     FIELD_WPS,
     FIELD_WSIG,
+    FIELD_WSS,
     MANUFACTURER,
     PAYLOAD_ALARM,
     PAYLOAD_BATTERY_PACKS,
@@ -324,12 +385,17 @@ from .const import (
     PAYLOAD_PRICE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_PV_TRENDS,
+    PAYLOAD_SMART_MODE,
     PAYLOAD_SMART_PLUGS,
     PAYLOAD_STATISTIC,
     PAYLOAD_TASK_PLAN,
+    PAYLOAD_TOU_SCHEDULE,
     PAYLOAD_WEATHER_PLAN,
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
+    UNRECORDED_ATTRS_CLOUD_MQTT,
+    UNRECORDED_ATTRS_HTTP_API,
+    UNRECORDED_ATTRS_LOCAL_MQTT,
 )
 from .entity import JackeryEntity
 from .util import (
@@ -424,7 +490,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
         try:
             return round(float(value) / divisor, 2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     return _f
@@ -512,6 +578,7 @@ class JackerySensorDescription(SensorEntityDescription):
     getter: Callable[[dict[str, Any]], Any]
     transform: Callable[[Any], Any] = _identity
     fallbacks: tuple[Callable[[dict[str, Any]], Any], ...] = ()
+    value_map: dict[int, str] | None = None
 
 
 def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
@@ -834,6 +901,27 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ethernet_ip",
+        translation_key="ethernet_ip",
+        getter=_prop(FIELD_EIP),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:ethernet",
+    ),
+    JackerySensorDescription(
+        key="ethernet_port",
+        translation_key="ethernet_port",
+        getter=_prop(FIELD_ETH_PORT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:ethernet",
+    ),
+    JackerySensorDescription(
+        key="ethernet_mac",
+        translation_key="ethernet_mac",
+        getter=_prop(FIELD_EMAC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:ethernet",
     ),
     JackerySensorDescription(
         key="battery_count",
@@ -2131,6 +2219,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         section=PAYLOAD_PRICE,
         transform=safe_float,
         entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
         icon="mdi:currency-eur",
     ),
     # --- PROTOCOL.md §2: dated day-period totals --------------------
@@ -2245,6 +2335,586 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Smart Mode / AI Schedule / TOU Plan sensors
+# ---------------------------------------------------------------------------
+
+SMART_MODE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="smart_mode_active",
+        translation_key="smart_mode_active",
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_SMART_MODE) or {}).get("isActive")
+        ),
+        value_map={0: "inactive", 1: "active"},
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="smart_mode_time_difference",
+        translation_key="smart_mode_time_difference",
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_SMART_MODE) or {}).get("timeDifference")
+        ),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+TOU_PLAN_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="tou_plan_tasks",
+        translation_key="tou_plan_tasks",
+        getter=lambda pl: (
+            (pl.get(PAYLOAD_TOU_SCHEDULE) or {}).get("tasks")
+        ),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
+PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    # --- AC Input ---
+    JackerySensorDescription(
+        key="ac_input_current",
+        translation_key="ac_input_current",
+        getter=_prop(FIELD_IAC),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_input_power",
+        translation_key="ac_input_power",
+        getter=_prop(FIELD_IACPW),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="charging_input_power",
+        translation_key="charging_input_power",
+        getter=_prop(FIELD_CIP),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        icon="mdi:car-battery",
+    ),
+    # --- AC Output ---
+    JackerySensorDescription(
+        key="ac_output_voltage",
+        translation_key="ac_output_voltage",
+        getter=_prop(FIELD_ACOV),
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_frequency",
+        translation_key="ac_output_frequency",
+        getter=_prop(FIELD_ACOHZ),
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_apparent_power",
+        translation_key="ac_output_apparent_power",
+        getter=_prop(FIELD_ACPS),
+        device_class=SensorDeviceClass.APPARENT_POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfApparentPower.VOLT_AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_power",
+        translation_key="ac_output_power",
+        getter=_prop_any(FIELD_OACPW, FIELD_OAC),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="ac_output_power_2",
+        translation_key="ac_output_power_2",
+        getter=_prop(FIELD_OAC2),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_current",
+        translation_key="ac_output_current",
+        getter=_prop(FIELD_OACT),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_mode",
+        translation_key="ac_output_mode",
+        getter=_prop(FIELD_ACMODE),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- DC Output ---
+    JackerySensorDescription(
+        key="dc_output_power",
+        translation_key="dc_output_power",
+        getter=_prop(FIELD_ODC_PORT),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="dc_output_current",
+        translation_key="dc_output_current",
+        getter=_prop(FIELD_ODCC),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dc_output_voltage",
+        translation_key="dc_output_voltage",
+        getter=_prop(FIELD_ODCU),
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- USB Ports ---
+    JackerySensorDescription(
+        key="usb_a1_power",
+        translation_key="usb_a1_power",
+        getter=_prop(FIELD_USBA1),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="usb_a2_power",
+        translation_key="usb_a2_power",
+        getter=_prop(FIELD_USBA2),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="usb_c1_power",
+        translation_key="usb_c1_power",
+        getter=_prop(FIELD_USBC1),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="usb_c2_power",
+        translation_key="usb_c2_power",
+        getter=_prop(FIELD_USBC2),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="usb_a3_power",
+        translation_key="usb_a3_power",
+        getter=_prop(FIELD_USBA3),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="usb_c3_power",
+        translation_key="usb_c3_power",
+        getter=_prop(FIELD_USBC3),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- AC Line Currents/Powers ---
+    JackerySensorDescription(
+        key="ac_line1_current",
+        translation_key="ac_line1_current",
+        getter=_prop(FIELD_OACL1),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_line1_power",
+        translation_key="ac_line1_power",
+        getter=_prop(FIELD_OACL1_PW),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_line2_current",
+        translation_key="ac_line2_current",
+        getter=_prop(FIELD_OACL2),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_line2_power",
+        translation_key="ac_line2_power",
+        getter=_prop(FIELD_OACL2_PW),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_current_1",
+        translation_key="ac_output_current_1",
+        getter=_prop(FIELD_OACT1),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac_output_current_2",
+        translation_key="ac_output_current_2",
+        getter=_prop(FIELD_OACT2),
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Charge Status ---
+    JackerySensorDescription(
+        key="charge_input_power_portable",
+        translation_key="charge_input_power_portable",
+        getter=_prop(FIELD_CIP),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="charge_status",
+        translation_key="charge_status",
+        getter=_prop(FIELD_CS),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="charge_status_code",
+        translation_key="charge_status_code",
+        getter=_prop(FIELD_CSC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="charge_status_limit",
+        translation_key="charge_status_limit",
+        getter=_prop(FIELD_CSL),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="charge_status_type",
+        translation_key="charge_status_type",
+        getter=_prop(FIELD_CST),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Power / Config ---
+    JackerySensorDescription(
+        key="power_count",
+        translation_key="power_count",
+        getter=_prop(FIELD_PC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="power_mode_portable",
+        translation_key="power_mode_portable",
+        getter=_prop(FIELD_PM),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="power_mode_battery",
+        translation_key="power_mode_battery",
+        getter=_prop(FIELD_PMB),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dhg_recall",
+        translation_key="dhg_recall",
+        getter=_prop(FIELD_DHG_RECALL),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Temperatures ---
+    JackerySensorDescription(
+        key="input_temperature",
+        translation_key="input_temperature",
+        getter=_prop(FIELD_IT),
+        transform=_div(10),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    JackerySensorDescription(
+        key="output_temperature",
+        translation_key="output_temperature",
+        getter=_prop(FIELD_OT),
+        transform=_div(10),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    JackerySensorDescription(
+        key="battery_temperature",
+        translation_key="battery_temperature",
+        getter=_prop(FIELD_BT),
+        transform=_div(10),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+    ),
+    # --- Power / Status ---
+    JackerySensorDescription(
+        key="input_power_portable",
+        translation_key="input_power_portable",
+        getter=_prop(FIELD_IP),
+        fallbacks=(_prop(FIELD_IACPW),),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="output_power_portable",
+        translation_key="output_power_portable",
+        getter=_prop(FIELD_OP),
+        fallbacks=(_prop(FIELD_OACPW),),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        key="error_code",
+        translation_key="error_code",
+        getter=_prop(FIELD_EC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="remaining_runtime",
+        translation_key="remaining_runtime",
+        getter=_prop(FIELD_RB),
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="battery_count",
+        translation_key="battery_count",
+        getter=_prop(FIELD_BC),
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="battery_low_state",
+        translation_key="battery_low_state",
+        getter=_prop(FIELD_BLS),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="charge_limit",
+        translation_key="charge_limit",
+        getter=_prop(FIELD_CL),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="discharge_limit",
+        translation_key="discharge_limit",
+        getter=_prop(FIELD_DL),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="power_mode",
+        translation_key="power_mode",
+        getter=_prop(FIELD_PM),
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="power_source_selector",
+        translation_key="power_source_selector",
+        getter=_prop(FIELD_PSS),
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="ups_mode",
+        translation_key="ups_mode",
+        getter=_prop(FIELD_UPS),
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="wifi_switch_status",
+        translation_key="wifi_switch_status",
+        getter=_prop(FIELD_WSS),
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="auto_standby_timer",
+        translation_key="auto_standby_timer",
+        getter=_prop(FIELD_AST),
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    JackerySensorDescription(
+        key="external_pack_connected",
+        translation_key="external_pack_connected",
+        getter=_prop(FIELD_IS_PACK_CONNECT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Network (Diagnostic) ---
+    JackerySensorDescription(
+        key="wifi_signal_portable",
+        translation_key="wifi_signal",
+        getter=_prop(FIELD_WSIG),
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="wifi_ssid",
+        translation_key="wifi_ssid",
+        getter=_prop(FIELD_WNAME),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="wifi_ip",
+        translation_key="wifi_ip",
+        getter=_prop(FIELD_WIP),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="mac_address",
+        translation_key="mac_address",
+        getter=_prop(FIELD_MAC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Portable AC Output Config ---
+    JackerySensorDescription(
+        key="ac1_name",
+        translation_key="ac1_name",
+        getter=_prop(FIELD_OAC1_NAME),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ac2_name",
+        translation_key="ac2_name",
+        getter=_prop(FIELD_OAC2_NAME),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Portable DC Output Config ---
+    JackerySensorDescription(
+        key="dc_output_config",
+        translation_key="dc_output_config",
+        getter=_prop(FIELD_ODCC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dc_type",
+        translation_key="dc_type",
+        getter=_prop(FIELD_ODCCT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dc_output_type",
+        translation_key="dc_output_type",
+        getter=_prop(FIELD_ODCT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dc_usb_connected",
+        translation_key="dc_usb_connected",
+        getter=_prop(FIELD_ODCU),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="dc_usb_type",
+        translation_key="dc_usb_type",
+        getter=_prop(FIELD_ODCUT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # --- Portable Status/Misc ---
+    JackerySensorDescription(
+        key="battery_pack_count",
+        translation_key="battery_pack_count",
+        getter=_prop(FIELD_BPC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="box_mode",
+        translation_key="box_mode",
+        getter=_prop(FIELD_BOX),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="light_sensor",
+        translation_key="light_sensor",
+        getter=_prop(FIELD_PAL),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="sleep_mode_flag",
+        translation_key="sleep_mode_flag",
+        getter=_prop(FIELD_SFC),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="sltb_value",
+        translation_key="sltb_value",
+        getter=_prop(FIELD_SLTB),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="ambient_temperature",
+        translation_key="ambient_temperature",
+        getter=_prop(FIELD_TA),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="panel_temperature",
+        translation_key="panel_temperature",
+        getter=_prop(FIELD_TP),
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="total_time",
+        translation_key="total_time",
+        getter=_prop(FIELD_TT),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
+
 SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
     JackerySavingsDetailSensorDescription, ...
 ] = (
@@ -2288,6 +2958,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         translation_key="savings_conversion_loss_year_energy",
         path=("source_energy", "conversion_loss_year_kwh"),
         device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:transmission-tower-off",
     ),
@@ -2296,6 +2967,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         translation_key="savings_pv_residual_year_energy",
         path=("source_energy", "pv_residual_after_self_consumption_year_kwh"),
         device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant-outline",
     ),
@@ -3259,6 +3931,20 @@ async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
             for desc in SENSOR_DESCRIPTIONS:
                 _append_unique(entities, JackerySensor(coordinator, dev_id, desc))
 
+            # PortableBody sensors — gated on model code 3002
+            model_code = str(props.get(FIELD_MODEL_CODE) or "")
+            if model_code == "3002":
+                for desc in PORTABLE_SENSOR_DESCRIPTIONS:
+                    _append_unique(entities, JackerySensor(coordinator, dev_id, desc))
+
+            # Smart Mode / AI Schedule sensors (home systems)
+            for desc in SMART_MODE_SENSOR_DESCRIPTIONS:
+                _append_unique(entities, JackerySensor(coordinator, dev_id, desc))
+
+            # TOU Plan sensors (home systems)
+            for desc in TOU_PLAN_SENSOR_DESCRIPTIONS:
+                _append_unique(entities, JackerySensor(coordinator, dev_id, desc))
+
             # Statistic / price / device_statistic sensors. Create app statistic
             # entities only when the corresponding app payload contains a usable
             # value; this avoids permanent "unknown" entities from empty/unsupported
@@ -3494,7 +4180,12 @@ class JackerySensor(JackeryEntity, SensorEntity):
                     break
         if raw is None:
             return None
-        return self.entity_description.transform(raw)
+        value = self.entity_description.transform(raw)
+        if self.entity_description.value_map is not None:
+            mapped = self.entity_description.value_map.get(value)
+            if mapped is not None:
+                return mapped
+        return value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -4542,6 +5233,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         self.entity_description = description
         self._cached_native_value: Any = None
         self._cached_attrs: dict[str, Any] = {}
+        self._last_known_value: float | None = None
 
     @staticmethod
     def _directional_value(
@@ -4687,7 +5379,17 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             self._cached_native_value = None
             self._cached_attrs = {}
             return
-        self._cached_native_value = self._value_from_ct(ct)
+        value = self._value_from_ct(ct)
+        if (
+            self.entity_description.state_class == SensorStateClass.TOTAL_INCREASING
+            and isinstance(value, (int, float))
+            and self._last_known_value is not None
+            and value < self._last_known_value
+        ):
+            value = self._last_known_value
+        if isinstance(value, (int, float)):
+            self._last_known_value = value
+        self._cached_native_value = value
         self._cached_attrs = self._attrs_from_ct(ct)
 
     @callback
@@ -4873,6 +5575,7 @@ class JackeryHttpApiSensor(JackeryEntity, SensorEntity):
     _attr_icon = "mdi:cloud"
     _attr_entity_registry_enabled_default = False
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_unrecorded_attributes = UNRECORDED_ATTRS_HTTP_API
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
@@ -4908,6 +5611,7 @@ class JackeryCloudMqttSensor(JackeryEntity, SensorEntity):
     _attr_icon = "mdi:cloud-sync"
     _attr_entity_registry_enabled_default = False
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_unrecorded_attributes = UNRECORDED_ATTRS_CLOUD_MQTT
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
@@ -4943,6 +5647,7 @@ class JackeryLocalMqttSensor(JackeryEntity, SensorEntity):
     _attr_icon = "mdi:lan"
     _attr_entity_registry_enabled_default = False
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_unrecorded_attributes = UNRECORDED_ATTRS_LOCAL_MQTT
 
     def __init__(
         self, coordinator: JackerySolarVaultCoordinator, device_id: str
@@ -5430,7 +6135,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except (TypeError, ValueError, OSError):
+        except TypeError, ValueError, OSError:
             return None
 
 

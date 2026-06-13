@@ -254,6 +254,98 @@ async def _set_third_party_mqtt_port(
     )
 
 
+# --- Portable / Explorer powerstation number setters ---
+
+async def _set_portable_charge_power(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the charge power limit on a portable Explorer device (msgId=38)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=38, field="rc", value=int(value)
+    )
+
+
+async def _set_portable_energy_storage_charge_limit(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the energy storage charge limit on a portable Explorer device (msgId=31)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=31, field="cl", value=int(value)
+    )
+
+
+async def _set_portable_auto_shutdown_time(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the auto-shutdown time on a portable Explorer device (msgId=19)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=19, field="dt", value=int(value)
+    )
+
+
+async def _set_portable_ac_countdown(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the AC output countdown on a portable Explorer device (msgId=34)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=34, field="acdt", value=int(value)
+    )
+
+
+async def _set_portable_dc_countdown(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the DC output countdown on a portable Explorer device (msgId=35)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=35, field="odct", value=int(value)
+    )
+
+
+async def _set_portable_dc_usb_countdown(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the DC USB output countdown on a portable Explorer device (msgId=36)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=36, field="odcu", value=int(value)
+    )
+
+
+async def _set_portable_dc_car_countdown(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the DC car output countdown on a portable Explorer device (msgId=37)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=37, field="idc", value=int(value)
+    )
+
+
+async def _set_portable_output_priority_soc(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the output priority SOC threshold on a portable Explorer device (msgId=49)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=49, field="pss", value=int(value)
+    )
+
+
+async def _set_portable_bluetooth_sleep(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the Bluetooth module sleep time on a portable Explorer device (msgId=44)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=44, field="ast", value=int(value)
+    )
+
+
+async def _set_portable_output_priority(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    """Set the output priority mode on a portable Explorer device (msgId=48)."""
+    await coord.async_portable_set_number(
+        dev_id, action_id=48, field="outPrio", value=int(value)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Dynamic-value helpers
 # ---------------------------------------------------------------------------
@@ -433,6 +525,131 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_third_party_mqtt_port,
         integer_value=True,
         display_precision=0,
+    ),
+    # --- Portable / Explorer powerstation numbers ---
+    JackeryNumberDescription(
+        key="portable_charge_power",
+        translation_key="portable_charge_power",
+        device_class=NumberDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        mode=NumberMode.SLIDER,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:battery-charging-wireless",
+        native_min_value=0,
+        native_max_value=2000,
+        native_step=100,
+        source_keys=("rc",),
+        setter=_set_portable_charge_power,
+    ),
+    JackeryNumberDescription(
+        key="portable_energy_storage_charge_limit",
+        translation_key="portable_energy_storage_charge_limit",
+        native_unit_of_measurement=PERCENTAGE,
+        mode=NumberMode.SLIDER,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:battery-arrow-up",
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        source_keys=("cl",),
+        setter=_set_portable_energy_storage_charge_limit,
+    ),
+    JackeryNumberDescription(
+        key="portable_auto_shutdown_time",
+        translation_key="portable_auto_shutdown_time",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer-cog",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("dt",),
+        setter=_set_portable_auto_shutdown_time,
+    ),
+    JackeryNumberDescription(
+        key="portable_ac_countdown",
+        translation_key="portable_ac_countdown",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("acdt",),
+        setter=_set_portable_ac_countdown,
+    ),
+    JackeryNumberDescription(
+        key="portable_dc_countdown",
+        translation_key="portable_dc_countdown",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("odct",),
+        setter=_set_portable_dc_countdown,
+    ),
+    JackeryNumberDescription(
+        key="portable_dc_usb_countdown",
+        translation_key="portable_dc_usb_countdown",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("odcu",),
+        setter=_set_portable_dc_usb_countdown,
+    ),
+    JackeryNumberDescription(
+        key="portable_dc_car_countdown",
+        translation_key="portable_dc_car_countdown",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:timer",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("idc",),
+        setter=_set_portable_dc_car_countdown,
+    ),
+    JackeryNumberDescription(
+        key="portable_output_priority_soc",
+        translation_key="portable_output_priority_soc",
+        native_unit_of_measurement=PERCENTAGE,
+        mode=NumberMode.SLIDER,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:battery-arrow-down",
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        source_keys=("pss",),
+        setter=_set_portable_output_priority_soc,
+    ),
+    JackeryNumberDescription(
+        key="portable_bluetooth_sleep",
+        translation_key="portable_bluetooth_sleep",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:bluetooth",
+        native_min_value=0,
+        native_max_value=1440,
+        native_step=1,
+        source_keys=("ast",),
+        setter=_set_portable_bluetooth_sleep,
+    ),
+    JackeryNumberDescription(
+        key="portable_output_priority",
+        translation_key="portable_output_priority",
+        mode=NumberMode.BOX,
+        entity_category=EntityCategory.CONFIG,
+        icon="mdi:sort-bool-descending",
+        native_min_value=0,
+        native_max_value=10,
+        native_step=1,
+        source_keys=("outPrio",),
+        setter=_set_portable_output_priority,
     ),
 )
 

@@ -620,10 +620,8 @@ class JackeryBleListener:
 
         Parameters:
             device_ids (list[str]): Device identifiers for startup logging (no eager connection attempts are performed).
-        """  # noqa: E501
+        """
         self._stop_event.clear()
-
-        from homeassistant.components import bluetooth
 
         matcher: BluetoothCallbackMatcher = {
             "service_uuid": ble.BLE_SERVICE_UUID,
@@ -787,8 +785,6 @@ class JackeryBleListener:
         """Maintain a GATT session for one device, reconnecting on drop."""
         from bleak import BleakClient
 
-        from homeassistant.components import bluetooth
-
         stats = self.stats_for(device_id)
         try:
             while not self._stop_event.is_set():
@@ -935,7 +931,7 @@ class JackeryBleListener:
         Updates the device's statistics with the current disconnect timestamp and emits a debug log.
         Parameters:
                 device_id (str): Identifier of the Jackery device whose disconnect is being recorded.
-        """ # noqa: E501
+        """
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         _LOGGER.debug("Jackery BLE %s: peripheral disconnected", device_id)
@@ -964,7 +960,7 @@ class JackeryBleListener:
         key = self._key_resolver(device_id)
         if key is None:
             decode_error = "no bluetoothKey for device"
-            missing_key_logged = getattr(self, "_missing_key_logged", set())
+            missing_key_logged: set[str] = getattr(self, "_missing_key_logged", set())
             if device_id not in missing_key_logged:
                 missing_key_logged.add(device_id)
                 self._missing_key_logged = missing_key_logged

@@ -2,6 +2,7 @@
   "config": {
     "abort": {
       "already_configured": "This Jackery account is already configured.",
+      "already_in_progress": "A configuration flow for this Jackery account is already in progress.",
       "reauth_entry_missing": "The Jackery entry for re-authentication was not found.",
       "reauth_successful": "Re-authentication was successful.",
       "reconfigure_account_mismatch": "The new email does not match the configured Jackery account. Use the original email or remove the entry first.",
@@ -54,7 +55,7 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -163,6 +164,69 @@
       },
       "sync_time_zone": {
         "name": "Sync time zone"
+      },
+      "portable_restart": {
+        "name": "Restart portable device"
+      },
+      "portable_power_off": {
+        "name": "Power off"
+      },
+      "portable_power_pack_blink": {
+        "name": "Blink battery pack"
+      },
+      "portable_read_device_info": {
+        "name": "Read device info"
+      },
+      "portable_read_wifi_list": {
+        "name": "Read Wi-Fi list"
+      },
+      "portable_get_power_pack_list": {
+        "name": "Get battery pack list"
+      },
+      "portable_get_electricity_data_count": {
+        "name": "Get electricity data count"
+      },
+      "portable_send_time_zone": {
+        "name": "Send time zone"
+      },
+      "portable_sync_mqtt_info": {
+        "name": "Sync MQTT info"
+      },
+      "portable_get_wifi_config": {
+        "name": "Get Wi-Fi config"
+      },
+      "portable_get_charge_plan": {
+        "name": "Get charge plan"
+      },
+      "portable_current_charge_plan": {
+        "name": "Current charge plan"
+      },
+      "portable_get_peaks_troughs": {
+        "name": "Get peaks and troughs"
+      },
+      "portable_read_sub_ct": {
+        "name": "Read sub-CT"
+      },
+      "portable_refresh_device_info": {
+        "name": "Refresh device info"
+      },
+      "portable_refresh_wifi_list": {
+        "name": "Refresh Wi-Fi list"
+      },
+      "portable_refresh_battery_packs": {
+        "name": "Refresh battery packs"
+      },
+      "portable_refresh_electricity_count": {
+        "name": "Refresh electricity count"
+      },
+      "portable_sync_time_zone": {
+        "name": "Sync time zone"
+      },
+      "portable_refresh_wifi_config": {
+        "name": "Refresh Wi-Fi config"
+      },
+      "portable_refresh_sub_ct": {
+        "name": "Refresh sub-CT"
       }
     },
     "number": {
@@ -186,6 +250,36 @@
       },
       "third_party_mqtt_port": {
         "name": "Third-Party MQTT port"
+      },
+      "portable_charge_power": {
+        "name": "Charge power limit"
+      },
+      "portable_energy_storage_charge_limit": {
+        "name": "Energy storage charge limit"
+      },
+      "portable_auto_shutdown_time": {
+        "name": "Auto shutdown time"
+      },
+      "portable_ac_countdown": {
+        "name": "AC output countdown"
+      },
+      "portable_dc_countdown": {
+        "name": "DC output countdown"
+      },
+      "portable_dc_usb_countdown": {
+        "name": "DC USB output countdown"
+      },
+      "portable_dc_car_countdown": {
+        "name": "DC car output countdown"
+      },
+      "portable_output_priority_soc": {
+        "name": "Output priority SOC threshold"
+      },
+      "portable_bluetooth_sleep": {
+        "name": "Bluetooth sleep time"
+      },
+      "portable_output_priority": {
+        "name": "Output priority mode"
       }
     },
     "select": {
@@ -264,11 +358,105 @@
           "self_use": "Self-consumption",
           "tariff": "Tariff mode"
         }
+      },
+      "portable_ups_model": {
+        "name": "UPS model",
+        "state": {
+          "Standard": "Standard",
+          "LiFePO4": "LiFePO4",
+          "AGM": "AGM",
+          "Gel": "Gel",
+          "Custom": "Custom"
+        }
+      },
+      "portable_power_mode": {
+        "name": "Power mode",
+        "state": {
+          "Standard": "Standard",
+          "Eco": "Eco",
+          "Performance": "Performance"
+        }
+      },
+      "portable_ac_output_mode": {
+        "name": "AC output mode",
+        "state": {
+          "Normal": "Normal",
+          "Quiet": "Quiet",
+          "High Performance": "High Performance"
+        }
+      },
+      "portable_output_priority": {
+        "name": "Output priority",
+        "state": {
+          "Battery First": "Battery first",
+          "Grid First": "Grid first",
+          "Solar First": "Solar first"
+        }
+      },
+      "portable_ac1_priority": {
+        "name": "AC1 output priority",
+        "state": {
+          "Battery First": "Battery first",
+          "Grid First": "Grid first",
+          "Solar First": "Solar first"
+        }
+      },
+      "portable_ac2_priority": {
+        "name": "AC2 output priority",
+        "state": {
+          "Battery First": "Battery first",
+          "Grid First": "Grid first",
+          "Solar First": "Solar first"
+        }
+      },
+      "portable_dc_priority": {
+        "name": "DC output priority",
+        "state": {
+          "Battery First": "Battery first",
+          "Grid First": "Grid first",
+          "Solar First": "Solar first"
+        }
       }
     },
     "sensor": {
       "ability_bits": {
         "name": "Capability flags"
+      },
+      "smart_mode_active": {
+        "name": "Smart mode active"
+      },
+      "smart_mode_time_difference": {
+        "name": "Smart mode time difference"
+      },
+      "tou_plan_tasks": {
+        "name": "TOU plan tasks"
+      },
+      "ac_input_current": {
+        "name": "AC input current"
+      },
+      "ac_input_power": {
+        "name": "AC input power"
+      },
+      "ac_output_apparent_power": {
+        "name": "AC output apparent power"
+      },
+      "ac_output_current": {
+        "name": "AC output current"
+      },
+      "ac_output_frequency": {
+        "name": "AC output frequency"
+      },
+      "ac_output_mode": {
+        "name": "AC output mode"
+      },
+      "ac_output_power": {
+        "name": "AC output power"
+      },
+      "ac_output_power_2": {
+        "name": "AC output power 2"
+      },
+      "ac_output_voltage": {
+        "name": "AC output voltage"
       },
       "activation_date": {
         "name": "Activation date"
@@ -278,6 +466,9 @@
       },
       "auto_standby": {
         "name": "Auto standby mode"
+      },
+      "auto_standby_timer": {
+        "name": "Auto standby timer"
       },
       "battery_charge_month_energy": {
         "name": "Monthly battery charge"
@@ -305,6 +496,9 @@
       },
       "battery_discharge_year_energy": {
         "name": "Battery discharge yearly energy"
+      },
+      "battery_low_state": {
+        "name": "Battery low state"
       },
       "battery_net_power": {
         "name": "Main battery net power"
@@ -351,14 +545,23 @@
       "battery_state": {
         "name": "Battery state"
       },
+      "battery_temperature": {
+        "name": "Battery temperature"
+      },
       "ble_transport": {
         "name": "BLE transport"
       },
       "cell_temperature": {
         "name": "Main battery cell temperature"
       },
+      "charge_limit": {
+        "name": "Charge limit"
+      },
       "charge_plan_power": {
         "name": "Charge plan power"
+      },
+      "charging_input_power": {
+        "name": "Charging input power"
       },
       "cloud_mqtt": {
         "name": "Cloud MQTT"
@@ -395,6 +598,15 @@
       },
       "ct_state": {
         "name": "CT state"
+      },
+      "dc_output_current": {
+        "name": "DC output current"
+      },
+      "dc_output_power": {
+        "name": "DC output power"
+      },
+      "dc_output_voltage": {
+        "name": "DC output voltage"
       },
       "default_power": {
         "name": "Default load power"
@@ -475,7 +687,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery\u2192on-grid today"
+        "name": "Device battery→on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -484,13 +696,16 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid\u2192battery today"
+        "name": "Device on-grid→battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV\u2192battery today"
+        "name": "Device PV→battery today"
+      },
+      "discharge_limit": {
+        "name": "Discharge limit"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -528,8 +743,14 @@
       "eps_switch_state": {
         "name": "EPS switch state"
       },
+      "error_code": {
+        "name": "Error code"
+      },
       "eth_port": {
         "name": "Ethernet port state"
+      },
+      "external_pack_connected": {
+        "name": "External battery pack connected"
       },
       "firmware_version": {
         "name": "Firmware version"
@@ -570,6 +791,12 @@
       "http_api": {
         "name": "HTTP API cloud"
       },
+      "input_power_portable": {
+        "name": "Total input power"
+      },
+      "input_temperature": {
+        "name": "Input temperature"
+      },
       "last_offline": {
         "name": "Last offline"
       },
@@ -590,6 +817,51 @@
       },
       "mac_address": {
         "name": "MAC address"
+      },
+      "ac1_name": {
+        "name": "AC1 output name"
+      },
+      "ac2_name": {
+        "name": "AC2 output name"
+      },
+      "dc_output_config": {
+        "name": "DC output configuration"
+      },
+      "dc_type": {
+        "name": "DC output type"
+      },
+      "dc_output_type": {
+        "name": "DC output type detail"
+      },
+      "dc_usb_connected": {
+        "name": "DC USB connected"
+      },
+      "dc_usb_type": {
+        "name": "DC USB type"
+      },
+      "battery_pack_count": {
+        "name": "Battery pack count"
+      },
+      "box_mode": {
+        "name": "Box mode"
+      },
+      "light_sensor": {
+        "name": "Light sensor"
+      },
+      "sleep_mode_flag": {
+        "name": "Sleep mode flag"
+      },
+      "sltb_value": {
+        "name": "SLTB value"
+      },
+      "ambient_temperature": {
+        "name": "Ambient temperature"
+      },
+      "panel_temperature": {
+        "name": "Panel temperature"
+      },
+      "total_time": {
+        "name": "Total time"
       },
       "max_feed_grid_read": {
         "name": "Max feed-in power (runtime)"
@@ -645,8 +917,20 @@
       "other_load_power": {
         "name": "Other load power"
       },
+      "output_power_portable": {
+        "name": "Total output power"
+      },
+      "output_temperature": {
+        "name": "Output temperature"
+      },
+      "power_mode": {
+        "name": "Power mode"
+      },
       "power_price": {
         "name": "Power price"
+      },
+      "power_source_selector": {
+        "name": "Power source selector"
       },
       "pv1_power": {
         "name": "PV1"
@@ -689,6 +973,9 @@
       },
       "reboot_flag": {
         "name": "Reboot flag"
+      },
+      "remaining_runtime": {
+        "name": "Remaining runtime"
       },
       "savings_battery_loss_year_energy": {
         "name": "Battery system loss yearly energy"
@@ -940,13 +1227,88 @@
         "name": "Daily on-grid output (Jackery cloud)"
       },
       "total_carbon_saved": {
-        "name": "Total CO\u2082 saved"
+        "name": "Total CO₂ saved"
       },
       "total_generation": {
         "name": "PV yield total"
       },
       "total_revenue": {
         "name": "App total savings"
+      },
+      "ups_mode": {
+        "name": "UPS mode"
+      },
+      "usb_a1_power": {
+        "name": "USB-A1 power"
+      },
+      "usb_a2_power": {
+        "name": "USB-A2 power"
+      },
+      "usb_c1_power": {
+        "name": "USB-C1 power"
+      },
+      "usb_c2_power": {
+        "name": "USB-C2 power"
+      },
+      "usb_a3_power": {
+        "name": "USB-A3 power"
+      },
+      "usb_c3_power": {
+        "name": "USB-C3 power"
+      },
+      "ac_line1_current": {
+        "name": "AC line 1 current"
+      },
+      "ac_line1_power": {
+        "name": "AC line 1 power"
+      },
+      "ac_line2_current": {
+        "name": "AC line 2 current"
+      },
+      "ac_line2_power": {
+        "name": "AC line 2 power"
+      },
+      "ac_output_current_1": {
+        "name": "AC output current 1"
+      },
+      "ac_output_current_2": {
+        "name": "AC output current 2"
+      },
+      "charge_input_power_portable": {
+        "name": "Charge input power"
+      },
+      "charge_status": {
+        "name": "Charge status"
+      },
+      "charge_status_code": {
+        "name": "Charge status code"
+      },
+      "charge_status_limit": {
+        "name": "Charge status limit"
+      },
+      "charge_status_type": {
+        "name": "Charge status type"
+      },
+      "power_count": {
+        "name": "Power count"
+      },
+      "power_mode_portable": {
+        "name": "Power mode"
+      },
+      "power_mode_battery": {
+        "name": "Power mode battery"
+      },
+      "dhg_recall": {
+        "name": "DHG recall"
+      },
+      "ethernet_ip": {
+        "name": "Ethernet IP address"
+      },
+      "ethernet_port": {
+        "name": "Ethernet port"
+      },
+      "ethernet_mac": {
+        "name": "Ethernet MAC address"
       },
       "weather_plan": {
         "name": "Weather plan"
@@ -959,6 +1321,15 @@
       },
       "wifi_signal": {
         "name": "WiFi signal"
+      },
+      "wifi_signal_portable": {
+        "name": "WiFi signal"
+      },
+      "wifi_ssid": {
+        "name": "WiFi SSID"
+      },
+      "wifi_switch_status": {
+        "name": "WiFi switch status"
       },
       "work_mode": {
         "name": "Work mode"
@@ -991,6 +1362,45 @@
       },
       "third_party_mqtt_enable": {
         "name": "Third-Party MQTT bridge"
+      },
+      "portable_dc_output": {
+        "name": "DC output"
+      },
+      "portable_dc_usb_output": {
+        "name": "DC USB output"
+      },
+      "portable_dc_car_output": {
+        "name": "DC car output"
+      },
+      "portable_ac_output": {
+        "name": "AC output"
+      },
+      "portable_ac240_output": {
+        "name": "AC 240V output"
+      },
+      "portable_light": {
+        "name": "Light"
+      },
+      "portable_screen": {
+        "name": "Screen"
+      },
+      "portable_super_charge": {
+        "name": "Super charge"
+      },
+      "portable_energy_saving": {
+        "name": "Energy saving"
+      },
+      "portable_output_priority_switch": {
+        "name": "Output priority"
+      },
+      "portable_discharge_memory": {
+        "name": "Discharge memory"
+      },
+      "portable_car_output": {
+        "name": "DC car output"
+      },
+      "portable_usb_output": {
+        "name": "DC USB output"
       }
     },
     "text": {
@@ -1069,7 +1479,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (\u00a72 HTTP endpoints, \u00a78 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (§2 HTTP endpoints, §8 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
             "title": "Force a Jackery cloud refresh"
           }
         }
@@ -1121,7 +1531,7 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
