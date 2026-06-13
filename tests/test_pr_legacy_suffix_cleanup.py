@@ -12,14 +12,11 @@ Covers:
 All tests use lightweight stubs so no HA fixtures are required.
 """
 
-import asyncio
 import os
-import tempfile
 from pathlib import Path
+import tempfile
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.jackery_solarvault import (
     _async_call_if_present,  # noqa: PLC2701
@@ -32,7 +29,6 @@ from custom_components.jackery_solarvault import (
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
-
 
 # ---------------------------------------------------------------------------
 # _legacy_suffix_matches
@@ -143,7 +139,7 @@ class TestAsyncCallIfPresent:
         called: list[str] = []
 
         class _Obj:
-            async def my_method(self) -> None:  # noqa: RUF029
+            async def my_method(self) -> None:
                 called.append("called")
 
         await _async_call_if_present(_Obj(), "my_method")
@@ -513,7 +509,7 @@ class TestLoadDotenvIfPresent:
                 os.environ.pop(k, None)
 
     async def test_does_not_overwrite_existing_env_var(self) -> None:  # noqa: PLR6301
-        """setdefault semantics: existing env vars must not be overwritten."""
+        """Setdefault semantics: existing env vars must not be overwritten."""
         key = "JACKERY_EXISTING_KEY_PERSIST"
         os.environ[key] = "original_value"
         try:

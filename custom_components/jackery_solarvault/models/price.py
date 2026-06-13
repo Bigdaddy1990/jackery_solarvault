@@ -14,12 +14,11 @@ from jackery_solarvault.const import (
 
 
 def valid_price_sources(sources: object) -> list[dict[str, Any]]:
-    """
-    Filter a collection to dictionaries that contain a platform company ID and a region.
-    
+    """Filter a collection to dictionaries that contain a platform company ID and a region.
+
     Parameters:
         sources (object): The value to filter; expected to be a list of dictionaries. Non-list inputs result in an empty list.
-    
+
     Returns:
         list[dict[str, Any]]: The subset of input dictionaries that include a non-empty platform company ID and a non-empty region field.
     """
@@ -38,16 +37,15 @@ def valid_price_sources(sources: object) -> list[dict[str, Any]]:
 
 
 def source_regions(source: dict[str, Any]) -> list[str]:
-    """
-    Extracts and normalizes region tokens from a price source's region field.
-    
+    """Extracts and normalizes region tokens from a price source's region field.
+
     Reads the value from FIELD_SYSTEM_REGION or, if absent/empty, FIELD_COUNTRY, splits a comma-separated string into parts, trims whitespace, and returns only non-empty tokens.
-    
+
     Parameters:
         source (dict[str, Any]): Mapping representing a price source; the function looks up `FIELD_SYSTEM_REGION` then `FIELD_COUNTRY` for the raw region value.
-    
+
     Returns:
-        list[str]: A list of trimmed, non-empty region strings.  
+        list[str]: A list of trimmed, non-empty region strings.
     """
     raw = source.get(FIELD_SYSTEM_REGION) or source.get(FIELD_COUNTRY)
     if raw in {None, ""}:

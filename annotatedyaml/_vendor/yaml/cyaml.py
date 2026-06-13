@@ -19,9 +19,8 @@ from .serializer import *  # noqa: F403
 
 class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Initialize the C-accelerated base YAML loader using the given input stream.
-        
+        """Initialize the C-accelerated base YAML loader using the given input stream.
+
         Parameters:
             stream: YAML input source — a text string, bytes, or a file-like object that yields YAML content.
         """
@@ -32,9 +31,8 @@ class CBaseLoader(CParser, BaseConstructor, BaseResolver):  # noqa: D101, F405
 
 class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Construct a safe C-accelerated YAML loader for the given input stream.
-        
+        """Construct a safe C-accelerated YAML loader for the given input stream.
+
         Parameters:
             stream: YAML input to parse — typically a file-like object, str, or bytes containing YAML content.
         """
@@ -45,9 +43,8 @@ class CSafeLoader(CParser, SafeConstructor, Resolver):  # noqa: D101, F405
 
 class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Create a C-accelerated loader that performs full construction and tag resolution for the given YAML input.
-        
+        """Create a C-accelerated loader that performs full construction and tag resolution for the given YAML input.
+
         Parameters:
             stream: YAML input source (text, bytes, or a file-like object) to be parsed.
         """
@@ -58,9 +55,8 @@ class CFullLoader(CParser, FullConstructor, Resolver):  # noqa: D101, F405
 
 class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Initialize the loader to parse `stream` and construct Python objects using unsafe construction rules.
-        
+        """Initialize the loader to parse `stream` and construct Python objects using unsafe construction rules.
+
         Parameters:
             stream: A text or binary file-like object or a string containing YAML content to be loaded.
         """
@@ -71,9 +67,8 @@ class CUnsafeLoader(CParser, UnsafeConstructor, Resolver):  # noqa: D101, F405
 
 class CLoader(CParser, Constructor, Resolver):  # noqa: D101, F405
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Initialize the C-backed YAML loader with parsing, construction, and resolution components.
-        
+        """Initialize the C-backed YAML loader with parsing, construction, and resolution components.
+
         Parameters:
             stream: A text or binary stream or a path-like object providing YAML content.
         """

@@ -22,15 +22,14 @@ class PushEndpointMixin(BaseHTTPMixin):
         page_no: int = 1,
         page_size: int = 20,
     ) -> list[dict[str, Any]]:
-        """
-        Retrieve a paginated list of push notifications.
-        
+        """Retrieve a paginated list of push notifications.
+
         Parameters:
             current_time (int): Current timestamp in milliseconds (Unix ms) used for server-side filtering.
             device_sn (str): Device serial number to filter notifications; empty string for no filtering.
             page_no (int): 1-based page number to retrieve.
             page_size (int): Number of items per page.
-        
+
         Returns:
             list[dict[str, Any]]: List of notification entries represented as dictionaries.
         """
@@ -44,9 +43,8 @@ class PushEndpointMixin(BaseHTTPMixin):
         return self._payload_list(data, NOTIFY_LIST_PATH)
 
     async def async_get_unread_count(self) -> dict[str, Any]:
-        """
-        Retrieve unread notification counts.
-        
+        """Retrieve unread notification counts.
+
         Returns:
             dict[str, Any]: Mapping of unread count fields from the response (for example, total unread count and related metadata).
         """
@@ -54,12 +52,11 @@ class PushEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, UNREAD_COUNT_PATH)
 
     async def async_set_push_config(self, *, set: str) -> dict[str, Any]:
-        """
-        Set the device's push configuration on the server.
-        
+        """Set the device's push configuration on the server.
+
         Parameters:
             set (str): Configuration payload string to apply.
-        
+
         Returns:
             dict[str, Any]: Response data returned by the backend.
         """

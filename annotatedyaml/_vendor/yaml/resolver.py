@@ -20,9 +20,8 @@ class BaseResolver:  # noqa: D101
     yaml_path_resolvers = {}  # noqa: RUF012
 
     def __init__(self) -> None:
-        """
-        Initialize instance stacks used for experimental path-based tag resolution.
-        
+        """Initialize instance stacks used for experimental path-based tag resolution.
+
         Creates two empty stacks:
         - resolver_exact_paths: per-depth dictionaries mapping resolver patterns to tags for exact matches.
         - resolver_prefix_paths: per-depth lists of resolver pattern candidates used while traversing the node tree.
@@ -179,16 +178,15 @@ class BaseResolver:  # noqa: D101
         current_node,  # noqa: ANN001
         current_index,  # noqa: ANN001
     ) -> bool | None:
-        """
-        Check whether the resolver path element at the given depth matches the current node and index.
-        
+        """Check whether the resolver path element at the given depth matches the current node and index.
+
         Parameters:
             depth (int): 1-based traversal depth selecting which (node_check, index_check) pair to evaluate.
             path (Sequence[Tuple[Any, Any]]): Compiled resolver path where each element is (node_check, index_check).
             kind (type | None): Expected node kind for the overall resolver; accepted but not used by this check.
             current_node (Node): Node at the current traversal position.
             current_index (int | ScalarNode | None): Mapping key, sequence index, or `None` when not applicable.
-        
+
         Returns:
             True if both the node and index satisfy the path element's checks, `None` otherwise.
         """

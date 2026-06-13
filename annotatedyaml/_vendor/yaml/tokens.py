@@ -31,9 +31,8 @@ class DirectiveToken(Token):  # noqa: D101
     id = "<directive>"
 
     def __init__(self, name, value, start_mark, end_mark) -> None:  # noqa: ANN001
-        """
-        Initialize the token with a directive name, its raw value, and optional source location marks.
-        
+        """Initialize the token with a directive name, its raw value, and optional source location marks.
+
         Parameters:
             name (str): Directive name, e.g. "YAML" or "TAG".
             value (str): Directive value as it appears in the source.
@@ -58,9 +57,8 @@ class StreamStartToken(Token):  # noqa: D101
     id = "<stream start>"
 
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """
-        Initialize a StreamStartToken with optional source location marks and an optional encoding.
-        
+        """Initialize a StreamStartToken with optional source location marks and an optional encoding.
+
         Parameters:
             start_mark: Start location mark for the token, or None.
             end_mark: End location mark for the token, or None.
@@ -171,9 +169,8 @@ class ScalarToken(Token):  # noqa: D101
     id = "<scalar>"
 
     def __init__(self, value, plain, start_mark, end_mark, style=None) -> None:  # noqa: ANN001
-        """
-        Create a scalar token with its textual value, plain-flag, source start/end marks, and optional style.
-        
+        """Create a scalar token with its textual value, plain-flag, source start/end marks, and optional style.
+
         Parameters:
             value: The scalar content.
             plain: True if the scalar is plain (unquoted), False otherwise.

@@ -78,12 +78,11 @@ class JackeryApiError(JackeryError):
 
 
 def _write_accepted(data: dict[str, Any]) -> bool:
-    """
-    Determines whether a write response from the API should be treated as accepted.
-    
+    """Determines whether a write response from the API should be treated as accepted.
+
     Parameters:
         data (dict): Parsed JSON response; inspected for the top-level `data` field.
-    
+
     Returns:
         `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
     """
@@ -109,9 +108,8 @@ class BaseHTTPMixin:
     # ``AuthEndpointMixin``.  The concrete class ``JackeryApi`` always
     # combines both via multiple inheritance.
     async def async_login(self) -> str:
-        """
-        Perform an authentication flow and produce a session token for use in API requests.
-        
+        """Perform an authentication flow and produce a session token for use in API requests.
+
         Returns:
             token (str): Session token string to include in authenticated request headers.
         """
@@ -302,13 +300,12 @@ class BaseHTTPMixin:
         return None
 
     def _is_token_expired_response(self, status: int, data: object) -> bool:
-        """
-        Detects whether an API response indicates the authentication token has expired.
-        
+        """Detects whether an API response indicates the authentication token has expired.
+
         Parameters:
             status (int): HTTP status code from the response.
             data (object): Parsed response body; expected to be a dict containing backend fields like `code` or `msg`.
-        
+
         Returns:
             True if the response indicates the token has expired, False otherwise.
         """
@@ -362,13 +359,12 @@ class BaseHTTPMixin:
         )
 
     def _is_auth_failure_response(self, status: int, data: object) -> bool:
-        """
-        Determine whether an HTTP response indicates an authentication or authorization failure that should trigger re-authentication.
-        
+        """Determine whether an HTTP response indicates an authentication or authorization failure that should trigger re-authentication.
+
         Parameters:
             status (int): HTTP status code of the response.
             data (object): Parsed response payload (typically a dict) or raw response content.
-        
+
         Returns:
             bool: `True` if the response indicates an authentication or authorization failure, `False` otherwise.
         """
@@ -385,9 +381,8 @@ class BaseHTTPMixin:
 
     @staticmethod
     def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
-        """
-        Builds a concise authorization-failure message for an HTTP request.
-        
+        """Builds a concise authorization-failure message for an HTTP request.
+
         Returns:
             str: Formatted message containing the HTTP method, request path, status code,
             backend `code` value, and the backend message/error text.
@@ -433,11 +428,10 @@ class BaseHTTPMixin:
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """
-        Construct a structured debug event describing an HTTP request/response for payload debugging.
-        
+        """Construct a structured debug event describing an HTTP request/response for payload debugging.
+
         The event contains method, path, params, request_body, status, response, and response_data_type; when the response payload supports chart debugging, includes a `chart_series_debug` entry.
-        
+
         Returns:
             dict[str, Any]: A mapping representing the debug event suitable for redaction and emission.
         """
@@ -460,11 +454,10 @@ class BaseHTTPMixin:
     # --- payload normalization -----------------------------------------------
     @staticmethod
     def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
-        """
-        Normalize the API response's `data` field into a dict payload.
-        
+        """Normalize the API response's `data` field into a dict payload.
+
         If `FIELD_DATA` contains a dict that dict is returned. If `FIELD_DATA` is `None`, an empty dict is returned. For any other value an empty dict is returned and a warning is emitted.
-        
+
         Returns:
             dict: The payload dict from `FIELD_DATA` when present and a dict, otherwise an empty dict.
         """
@@ -482,17 +475,16 @@ class BaseHTTPMixin:
 
     @staticmethod
     def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
-        """
-        Return the list of dictionary items contained in the response payload.
-        
+        """Return the list of dictionary items contained in the response payload.
+
         If the response's FIELD_DATA is a list, returns only elements that are dictionaries.
         If FIELD_DATA is None, returns an empty list. For any other payload shape, logs a warning
         including `path` and returns an empty list.
-        
+
         Parameters:
             data (dict[str, Any]): Parsed API response object.
             path (str): Request path used in warning messages when the payload shape is unexpected.
-        
+
         Returns:
             list[dict[str, Any]]: The list of dictionary items from the payload, or an empty list.
         """
@@ -513,13 +505,12 @@ class BaseHTTPMixin:
         items: list[dict[str, Any]],
         device_sn: str,
     ) -> dict[str, Any]:
-        """
-        Select the OTA update entry matching the given device serial number.
-        
+        """Select the OTA update entry matching the given device serial number.
+
         Parameters:
             items (list[dict[str, Any]]): List of OTA item dictionaries.
             device_sn (str): Device serial number to match.
-        
+
         Returns:
             dict[str, Any]: The matching item; if none match returns the first item when available, otherwise an empty dict.
         """
@@ -537,15 +528,14 @@ class BaseHTTPMixin:
         params: dict[str, str],
         payload_request: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """
-        Add request context metadata to an API response for diagnostics.
-        
+        """Add request context metadata to an API response for diagnostics.
+
         Parameters:
             data (dict[str, Any]): Parsed response object to copy and annotate.
             path (str): Request path to record under request metadata.
             params (dict[str, str]): Request query parameters to record under request metadata.
             payload_request (dict[str, str] | None): Optional metadata to insert into the payload object (the response's `FIELD_DATA`) if it is a dict.
-        
+
         Returns:
             dict[str, Any]: A copy of `data` with `APP_REQUEST_META` ensured at the top level (containing `path` and `params`), and with `APP_REQUEST_META` added to the payload dict when `payload_request` is provided.
         """
@@ -585,11 +575,10 @@ class BaseHTTPMixin:
         effective_timeout = request_timeout or REQUEST_TIMEOUT_SEC
 
         async def _do() -> tuple[int, dict]:
-            """
-            Perform an HTTP GET request and parse the response into a status code and response body.
-            
+            """Perform an HTTP GET request and parse the response into a status code and response body.
+
             Attempts to decode the response as JSON; if decoding fails, captures the response text truncated to HTTP_RAW_TEXT_LIMIT under FIELD_RAW_TEXT.
-            
+
             Returns:
                 tuple[int, dict]: A pair of the HTTP status code and the parsed response body (JSON object or a dict containing `FIELD_RAW_TEXT` on decode failure).
             """
@@ -669,12 +658,11 @@ class BaseHTTPMixin:
 
     # --- generic PUT with auto re-login ------------------------------------
     async def _put_json(self, path: str, payload: dict) -> dict:
-        """
-        Send a JSON PUT request to the given API path and return the parsed response; if the token is expired the method will re-authenticate and retry the request once.
-        
+        """Send a JSON PUT request to the given API path and return the parsed response; if the token is expired the method will re-authenticate and retry the request once.
+
         Returns:
             dict: Parsed JSON response from the API.
-        
+
         Raises:
             JackeryAuthError: When the response indicates an authentication or authorization failure.
             JackeryApiError: On network/request failures, timeouts, non-200 HTTP status, or backend error codes.
@@ -683,9 +671,8 @@ class BaseHTTPMixin:
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """
-            Build HTTP headers for JSON requests, including authentication headers when available.
-            
+            """Build HTTP headers for JSON requests, including authentication headers when available.
+
             Returns:
                 dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
             """
@@ -694,9 +681,8 @@ class BaseHTTPMixin:
             return headers
 
         async def _do() -> tuple[int, dict]:
-            """
-            Perform an HTTP PUT to the prepared URL and return the response status and parsed body.
-            
+            """Perform an HTTP PUT to the prepared URL and return the response status and parsed body.
+
             Returns:
             	A tuple (status, body) where `status` is the HTTP status code and `body` is the parsed JSON response when available; if the response cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to HTTP_RAW_TEXT_LIMIT.
             """
@@ -789,9 +775,8 @@ class BaseHTTPMixin:
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """
-            Constructs HTTP request headers for form-encoded requests, including the form Content-Type and the current authentication token when available.
-            
+            """Constructs HTTP request headers for form-encoded requests, including the form Content-Type and the current authentication token when available.
+
             Returns:
                 dict[str, str]: Mapping of header names to values for a form POST request; includes the authentication token header if the client has one.
             """
@@ -802,11 +787,10 @@ class BaseHTTPMixin:
         body = {k: str(v) for k, v in fields.items()}
 
         async def _do() -> tuple[int, dict]:
-            """
-            Send a POST request to the prepared URL and return the HTTP status and parsed response payload.
-            
+            """Send a POST request to the prepared URL and return the HTTP status and parsed response payload.
+
             Attempts to parse the response body as JSON. If JSON parsing or content-type decoding fails, returns a dictionary containing the response text truncated to HTTP_RAW_TEXT_LIMIT under the key `FIELD_RAW_TEXT`.
-            
+
             Returns:
                 tuple[int, dict]: A pair of (HTTP status code, parsed response). The response dict is either the decoded JSON object or `{FIELD_RAW_TEXT: <truncated text>}` on parse failure.
             """
@@ -884,13 +868,12 @@ class BaseHTTPMixin:
 
     # --- JSON POST with auto re-login --------------------------------------
     async def _post_json(self, path: str, payload: dict[str, Any]) -> dict:
-        """
-        Send a JSON POST to the Jackery API and return the parsed response, retrying once after an automatic re-login if the token is expired.
-        
+        """Send a JSON POST to the Jackery API and return the parsed response, retrying once after an automatic re-login if the token is expired.
+
         Parameters:
         	path (str): Request path appended to the base API URL.
         	payload (dict[str, Any]): JSON-serializable request body.
-        
+
         Returns:
         	response (dict): Parsed response object from the API.
         """
@@ -898,9 +881,8 @@ class BaseHTTPMixin:
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """
-            Build HTTP headers for JSON requests, including authentication headers when available.
-            
+            """Build HTTP headers for JSON requests, including authentication headers when available.
+
             Returns:
                 dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
             """
@@ -909,9 +891,8 @@ class BaseHTTPMixin:
             return headers
 
         async def _do() -> tuple[int, dict]:
-            """
-            Send the POST request to the given URL with the prepared JSON payload and return the HTTP status and parsed response.
-            
+            """Send the POST request to the given URL with the prepared JSON payload and return the HTTP status and parsed response.
+
             Returns:
                 tuple[int, dict]: A pair of (status, data) where `status` is the HTTP status code and `data` is the parsed JSON response when parsing succeeds. If the response cannot be parsed as JSON, `data` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to `HTTP_RAW_TEXT_LIMIT`.
             """
@@ -1008,9 +989,8 @@ class BaseHTTPMixin:
         mac_id: str,
         mac_id_source: str | None = None,
     ) -> None:
-        """
-        Restore MQTT session fields from cached values.
-        
+        """Restore MQTT session fields from cached values.
+
         Parameters:
             user_id (str): MQTT user identifier; falsy values are stored as None.
             seed_b64 (str): Base64-encoded MQTT seed; falsy values are stored as None.
@@ -1024,9 +1004,8 @@ class BaseHTTPMixin:
             self._mqtt_mac_id_source = mac_id_source
 
     def mqtt_session_snapshot(self) -> dict[str, str] | None:
-        """
-        Return a serializable snapshot of the current MQTT session for persistence or None if incomplete.
-        
+        """Return a serializable snapshot of the current MQTT session for persistence or None if incomplete.
+
         Returns:
             snapshot (dict[str, str] | None): A dict containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, `MQTT_SESSION_MAC_ID`, and `MQTT_SESSION_MAC_ID_SOURCE` when all required fields are present, otherwise `None`.
         """

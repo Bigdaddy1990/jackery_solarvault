@@ -108,9 +108,8 @@ async def _load_dotenv_if_present(hass_config_path: Path) -> None:
     env_file = hass_config_path / ".env"
 
     def _read_env_sync() -> str | None:
-        """
-        Read the .env file content if present.
-        
+        """Read the .env file content if present.
+
         Returns:
             str: The file contents decoded as UTF-8 if the .env file exists and is readable.
             None: If the file does not exist or cannot be read.
@@ -153,17 +152,16 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """
-    Perform global integration setup for Jackery SolarVault.
-    
+    """Perform global integration setup for Jackery SolarVault.
+
     If a .env file exists in Home Assistant's config directory, load any environment
     variables prefixed with `JACKERY_` into the process environment. Register
     integration-level services.
-    
+
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
         config (dict): Configuration passed by Home Assistant (unused).
-    
+
     Returns:
         True on successful setup.
     """
@@ -175,9 +173,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 def _async_clean_legacy_entities(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> None:
-    """
-    Remove entity-registry entries that are obsolete or disabled by the entry's options.
-    
+    """Remove entity-registry entries that are obsolete or disabled by the entry's options.
+
     This scans and removes stale energy helper entities and legacy sensors/binary sensors whose unique IDs match known legacy suffixes. Sensors associated with optional features are removed when the corresponding config entry option is disabled. The function performs in-place removals in Home Assistant's entity registry.
     """
     _async_remove_stale_energy_helpers(hass)
@@ -243,14 +240,13 @@ def _async_clean_legacy_entities(
 async def _async_authenticate(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryApi:
-    """
-    Authenticate with the Jackery cloud and return a configured API client for the given entry.
-    
+    """Authenticate with the Jackery cloud and return a configured API client for the given entry.
+
     If a cached MQTT session exists it will be hydrated into the returned client before attempting cloud login. If cloud login succeeds the client will be authenticated; transient cloud errors are logged but do not prevent returning a client configured from cache. Invalid credentials trigger the Home Assistant re-auth flow.
-    
+
     Returns:
         JackeryApi: Configured API client for the entry; authenticated if login succeeded.
-    
+
     Raises:
         ConfigEntryAuthFailed: If the provided credentials are rejected by the cloud.
     """
@@ -301,12 +297,11 @@ _STARTUP_TASK_RUNTIME_KEY = "startup_task"
 
 
 def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:
-    """
-    Validate and extract a bootstrap MQTT session snapshot from a config entry's data.
-    
+    """Validate and extract a bootstrap MQTT session snapshot from a config entry's data.
+
     Parameters:
     	entry (ConfigEntry): Config entry whose data may contain an `ENTRY_BOOTSTRAP_MQTT_SESSION` mapping.
-    
+
     Returns:
     	dict[str, str]: Validated snapshot containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`, and optionally `MQTT_SESSION_MAC_ID_SOURCE`, or `None` if the snapshot is missing or any required field is absent/invalid.
     """
@@ -331,13 +326,12 @@ def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:
 
 
 def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
-    """
-    Get or create the mutable runtime data bucket for a config entry stored in hass.data under the integration domain.
-    
+    """Get or create the mutable runtime data bucket for a config entry stored in hass.data under the integration domain.
+
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
         entry (ConfigEntry): The config entry whose runtime bucket is requested.
-    
+
     Returns:
         dict[str, Any]: The dictionary stored at hass.data[DOMAIN][entry.entry_id]; created and inserted if it did not already exist.
     """
@@ -352,9 +346,8 @@ def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, 
 def _entry_startup_task(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> asyncio.Task[Any] | None:
-    """
-    Get the background startup task registered for the given config entry.
-    
+    """Get the background startup task registered for the given config entry.
+
     Returns:
         The asyncio.Task instance for the entry's startup task, or `None` if no task is registered or the runtime bucket is missing/invalid.
     """
@@ -379,9 +372,8 @@ async def _async_cancel_startup_task(hass: HomeAssistant, entry: ConfigEntry) ->
 
 
 async def _async_call_if_present(obj: object, name: str) -> None:
-    """
-    Call and await the attribute named by `name` on `obj` if it exists and is callable.
-    
+    """Call and await the attribute named by `name` on `obj` if it exists and is callable.
+
     Parameters:
         obj (object): The object to inspect for the attribute.
         name (str): The attribute name to call. The attribute will be invoked with no arguments;
@@ -421,17 +413,16 @@ async def _async_authenticate_api_layer(
     entry: ConfigEntry,
     api: JackeryApi,
 ) -> None:
-    """
-    Authenticate the cloud API layer and persist an updated MQTT session snapshot when appropriate.
-    
+    """Authenticate the cloud API layer and persist an updated MQTT session snapshot when appropriate.
+
     Primes the API with any bootstrap or cached MQTT session, performs an HTTP login, and, after a successful login,
     saves the API's current MQTT session snapshot to persistent storage if it differs from the cached or bootstrap snapshot.
-    
+
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
         entry (ConfigEntry): Configuration entry for the integration.
         api (JackeryApi): API client instance to authenticate and hydrate.
-    
+
     Raises:
         ConfigEntryAuthFailed: If the Jackery credentials are rejected (triggers re-auth flow).
     """
@@ -468,9 +459,8 @@ def _defer_coordinator_auth_failure(
     coordinator: JackerySolarVaultCoordinator,
     err: ConfigEntryAuthFailed,
 ) -> None:
-    """
-    Record an authentication failure on the coordinator for later background handling.
-    
+    """Record an authentication failure on the coordinator for later background handling.
+
     Parameters:
         coordinator: Coordinator that will store the deferred auth failure and message.
         err: The ConfigEntryAuthFailed exception to record.
@@ -482,11 +472,10 @@ def _defer_coordinator_auth_failure(
 async def _async_discover_with_cache_fallback(
     coordinator: JackerySolarVaultCoordinator,
 ) -> bool:
-    """
-    Run discovery on the coordinator, falling back to a cached discovery snapshot if discovery fails.
-    
+    """Run discovery on the coordinator, falling back to a cached discovery snapshot if discovery fails.
+
     If discovery raises a ConfigEntryAuthFailed, the authentication failure is deferred and startup should stop. If discovery raises an UpdateFailed and a cached discovery snapshot exists, that snapshot is injected so transports that depend on discovery can still start.
-    
+
     Returns:
         bool: `True` if discovery succeeded or startup may continue; `False` if authentication failed and startup must stop.
     """
@@ -513,11 +502,10 @@ def _handle_refresh_startup_result(
     coordinator: JackerySolarVaultCoordinator,
     result: BaseException | object,
 ) -> None:
-    """
-    Process the coordinator's initial HTTP refresh result performed during startup.
-    
+    """Process the coordinator's initial HTTP refresh result performed during startup.
+
     If `result` is a `ConfigEntryAuthFailed`, the coordinator's auth failure is deferred. If `result` is a `UpdateFailed` and the coordinator has a cached discovery snapshot, that cached payload is applied so transports can proceed. If `result` is any other exception, a warning is logged. If `result` is not an exception, no action is taken.
-    
+
     Parameters:
         coordinator: The coordinator instance whose state may be updated or where auth failures are deferred.
         result: The value or exception produced by the coordinator's first refresh attempt.
@@ -546,9 +534,8 @@ def _handle_optional_startup_result(
     *,
     label: str,
 ) -> None:
-    """
-    Process a non-critical startup-task result, deferring auth failures or logging other exceptions.
-    
+    """Process a non-critical startup-task result, deferring auth failures or logging other exceptions.
+
     Parameters:
         coordinator (JackerySolarVaultCoordinator): Coordinator instance used to record or defer auth failures.
         result (BaseException | object): The outcome from a parallel startup task; may be an exception.
@@ -565,9 +552,8 @@ async def _async_finish_entry_startup(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """
-    Complete the entry's background startup sequence for API/cloud and local transports.
-    
+    """Complete the entry's background startup sequence for API/cloud and local transports.
+
     Performs API/cloud authentication (defers coordinator auth failure on auth errors), attempts discovery with cache fallback, runs optional state/load hooks, and concurrently starts the first data refresh plus MQTT, HA-MQTT listener, direct local MQTT listener, and BLE transport. Non-fatal transport failures are logged/handled by the coordinator and do not block overall entry startup. After transports are started it triggers statistics imports and schedules applying local MQTT configuration to devices. Always removes the per-entry startup task reference from the runtime bucket on exit.
     """
     try:
@@ -625,9 +611,8 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 def _local_mqtt_client(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
-    """
-    Get the per-entry local MQTT client stored in hass.data for the given config entry, if present.
-    
+    """Get the per-entry local MQTT client stored in hass.data for the given config entry, if present.
+
     Returns:
         The JackeryLocalMqttClient for the entry, or `None` if no client is stored or the stored value is not a `JackeryLocalMqttClient`.
     """
@@ -696,9 +681,8 @@ async def _async_start_local_mqtt(
         data: dict[str, Any] | None,
         _raw_bytes: bytes,
     ) -> None:
-        """
-        Dispatches a parsed local MQTT JSON message to the coordinator.
-        
+        """Dispatches a parsed local MQTT JSON message to the coordinator.
+
         Parameters:
         	topic (str): MQTT topic the message was received on.
         	data (dict[str, Any] | None): Parsed JSON payload to route; if `None`, the message is ignored.
@@ -721,9 +705,8 @@ async def _async_start_local_mqtt(
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
 
     async def _async_stop_local_mqtt() -> None:
-        """
-        Stop the stored per-entry local MQTT client and remove its runtime reference if it matches.
-        
+        """Stop the stored per-entry local MQTT client and remove its runtime reference if it matches.
+
         If stopping the client raises any exception, the exception is suppressed and the runtime reference removal is attempted regardless.
         """
         with contextlib.suppress(Exception):
@@ -837,15 +820,14 @@ _LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
-    """
-    Check whether a unique id consists of a legacy device head immediately followed by the given suffix.
-    
+    """Check whether a unique id consists of a legacy device head immediately followed by the given suffix.
+
     A legacy device head is either `<digits>` or `<digits>_battery_pack_<digits>`.
-    
+
     Parameters:
         uid (str): The unique id to test.
         key_suffix (str): The suffix to anchor to the legacy head.
-    
+
     Returns:
         bool: `True` if `uid` equals a legacy head concatenated with `key_suffix`, `False` otherwise.
     """
@@ -962,11 +944,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
 async def async_remove_config_entry_device(  # noqa: RUF029
     hass: HomeAssistant, entry: JackeryConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:
-    """
-    Allow a user to remove a device from the config entry.
-    
+    """Allow a user to remove a device from the config entry.
+
     If the device still exists in the Jackery account, the integration's coordinator may rediscover it on the next poll; permitting removal here only affects the Home Assistant device registry entry.
-    
+
     Returns:
         True if removal is allowed, False to prevent removal.
     """

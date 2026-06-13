@@ -12,8 +12,6 @@ This test file covers:
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from custom_components.jackery_solarvault.button import (
     QUERY_BUTTON_DESCRIPTIONS,
     JackeryQueryButton,
@@ -293,10 +291,10 @@ class TestPortableButtonActions:
 
     async def test_portable_restart_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_restart action must call async_send_portable_command on the coordinator."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_restart,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_RESTART,
             FIELD_REBOOT,
         )
@@ -315,10 +313,10 @@ class TestPortableButtonActions:
 
     async def test_portable_power_off_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_power_off action must call async_send_portable_command on the coordinator."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_power_off,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_POWER_OFF,
             FIELD_REBOOT,
         )
@@ -337,10 +335,10 @@ class TestPortableButtonActions:
 
     async def test_portable_power_pack_blink_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_power_pack_blink action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_power_pack_blink,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_POWER_PACK_BLINK,
         )
 
@@ -358,10 +356,10 @@ class TestPortableButtonActions:
 
     async def test_portable_read_device_info_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_read_device_info action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_read_device_info,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_READ_DEVICE_INFO,
         )
 
@@ -379,10 +377,10 @@ class TestPortableButtonActions:
 
     async def test_portable_get_charge_plan_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_get_charge_plan action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_get_charge_plan,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
             MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
         )
@@ -402,10 +400,10 @@ class TestPortableButtonActions:
 
     async def test_portable_sync_mqtt_info_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_sync_mqtt_info action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.button import (
             _portable_sync_mqtt_info,  # noqa: PLC2701
         )
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
         )
 
@@ -438,7 +436,7 @@ class TestJackeryQueryButtonWithPortableDescriptions:
 
     def test_portable_restart_button_has_correct_message_type(self) -> None:
         """JackeryQueryButton with portable_restart description must have DEVICE_PROPERTY_CHANGE message type."""
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import (
             MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         )
 
@@ -446,12 +444,12 @@ class TestJackeryQueryButtonWithPortableDescriptions:
         coordinator = self._make_coordinator()
         btn = JackeryQueryButton(coordinator, "dev123", description=desc)
         attrs = btn.extra_state_attributes
-        from custom_components.jackery_solarvault.const import FIELD_MESSAGE_TYPE  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_MESSAGE_TYPE
         assert attrs[FIELD_MESSAGE_TYPE] == MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE
 
     def test_portable_restart_button_has_no_dev_type_in_attrs(self) -> None:
         """JackeryQueryButton with portable description must NOT include devType in attrs."""
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
 
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
         coordinator = self._make_coordinator()
@@ -461,7 +459,7 @@ class TestJackeryQueryButtonWithPortableDescriptions:
 
     def test_portable_restart_button_cmd_is_in_attrs(self) -> None:
         """JackeryQueryButton with portable_restart must include cmd=45 in extra_state_attributes."""
-        from custom_components.jackery_solarvault.const import FIELD_CMD  # noqa: PLC0415
+        from custom_components.jackery_solarvault.const import FIELD_CMD
 
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
         coordinator = self._make_coordinator()

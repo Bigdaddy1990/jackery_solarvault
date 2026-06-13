@@ -60,11 +60,10 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         return data.get(FIELD_DATA)
 
     async def async_get_system_statistic(self, system_id: str | int) -> dict:
-        """
-        Retrieve system KPI statistics (today and total values) for the given system.
-        
+        """Retrieve system KPI statistics (today and total values) for the given system.
+
         Stores the raw backend response in `self.last_statistic_response`.
-        
+
         Returns:
             dict: Normalized payload containing keys such as `todayLoad`, `todayBatteryDisChg`,
             `todayBatteryChg`, `todayGeneration`, `totalGeneration`, `totalRevenue`,
@@ -84,15 +83,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict:
-        """
-        Fetches PV production trend data for a system over a specified period.
-        
+        """Fetches PV production trend data for a system over a specified period.
+
         Parameters:
             system_id (str | int): System identifier used in the request.
             date_type (str): Period granularity (e.g., "day", "month"); used to compute date bounds.
             begin_date (str | None): Start date in ISO format; when None the start is computed from `date_type`.
             end_date (str | None): End date in ISO format; when None the end is computed from `date_type`.
-        
+
         Returns:
             dict: Normalized payload dictionary from the backend; may be empty. If non-empty, the payload will include `APP_REQUEST_META` containing the request parameters (excluding `systemId`).
         """
@@ -117,14 +115,13 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         return payload
 
     async def async_get_device_statistic(self, device_id: str | int) -> dict:
-        """
-        Get current-day energy-flow statistics for the specified device.
-        
+        """Get current-day energy-flow statistics for the specified device.
+
         The result maps metric keys to numeric string values representing kilowatt-hours (kWh). Available keys vary by device and backend; examples include `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`.
-        
+
         Parameters:
             device_id (str | int): Device identifier (`deviceId`) to query.
-        
+
         Returns:
             dict: Mapping from metric key (str) to its value as a string in kWh.
         """
@@ -224,15 +221,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Retrieve battery statistics for a single device.
-        
+        """Retrieve battery statistics for a single device.
+
         Parameters:
             device_id (str | int): Device identifier.
             date_type (str): Period granularity (e.g., `DATE_TYPE_DAY`). Defaults to daily.
             begin_date (str | None): Optional ISO date (YYYY-MM-DD) for the period start.
             end_date (str | None): Optional ISO date (YYYY-MM-DD) for the period end.
-        
+
         Returns:
             dict[str, Any]: Normalized payload dictionary containing battery statistics; empty dict if no data.
         """
@@ -300,15 +296,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Retrieve EPS (off-grid) energy input/output statistics for a device over a specified period.
-        
+        """Retrieve EPS (off-grid) energy input/output statistics for a device over a specified period.
+
         Parameters:
             device_id (str | int): Device identifier (id or serial) to query.
             date_type (str): Period granularity (e.g., "day"); defaults to DATE_TYPE_DAY.
             begin_date (str | None): Optional ISO date string for period start.
             end_date (str | None): Optional ISO date string for period end.
-        
+
         Returns:
             dict: Parsed backend payload containing aggregates (e.g., `totalInEpsEnergy`, `totalOutEpsEnergy`) and time-series arrays (`x`, `y`, `y1`, `y2`); may include an `APP_REQUEST_META` dict with request parameters.
         """
@@ -357,12 +352,11 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         self,
         device_id: str | int,
     ) -> dict[str, Any]:
-        """
-        Retrieve smart-meter (CT accessory) panel totals for the specified device.
-        
+        """Retrieve smart-meter (CT accessory) panel totals for the specified device.
+
         Parameters:
             device_id (str | int): Smart-meter / CT accessory `deviceId` (not the SolarVault main deviceId).
-        
+
         Returns:
             dict[str, Any]: Parsed payload containing the meter panel totals.
         """
@@ -423,15 +417,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict:
-        """
-        Retrieve the home energy consumption breakdown for a system over a specified period.
-        
+        """Retrieve the home energy consumption breakdown for a system over a specified period.
+
         Parameters:
             system_id (str | int): Identifier of the system to query.
             date_type (str): Period granularity (e.g., day, month).
             begin_date (str | None): Start date for the period (optional).
             end_date (str | None): End date for the period (optional).
-        
+
         Returns:
             dict: Normalized payload containing the home consumption breakdown; may be empty if no data is available.
         """
@@ -505,9 +498,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         end_date: str | None = None,
         system_id: str | int | None = None,
     ) -> dict[str, Any]:
-        """
-        Fetch period-based statistics for the given endpoint and return the normalized payload.
-        
+        """Fetch period-based statistics for the given endpoint and return the normalized payload.
+
         Parameters:
         	path (str): API endpoint path to query.
         	device_id (str | int | None): Optional device identifier to include as `deviceId` in the request.
@@ -515,7 +507,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         	begin_date (str | None): Optional start date for the period; computed if None.
         	end_date (str | None): Optional end date for the period; computed if None.
         	system_id (str | int | None): Optional system identifier to include as `systemId` in the request.
-        
+
         Returns:
         	dict[str, Any]: Normalized payload dictionary extracted from the endpoint response.
         """
@@ -542,15 +534,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Retrieve charge and discharge symmetry statistics for a device.
-        
+        """Retrieve charge and discharge symmetry statistics for a device.
+
         Parameters:
         	device_sn (str): Device serial number.
         	date_type (str): Period granularity (e.g., "day").
         	begin_date (str | None): Start date for the period; computed if None.
         	end_date (str | None): End date for the period; computed if None.
-        
+
         Returns:
         	dict[str, Any]: Normalized symmetry statistics payload.
         """
@@ -569,14 +560,13 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """
-        Retrieve cutoff (power outage) statistics for a device over a period.
-        
+        """Retrieve cutoff (power outage) statistics for a device over a period.
+
         Parameters:
             device_sn (str): Device serial number.
             begin_date (str | None): Start date for the period; computed if None.
             end_date (str | None): End date for the period; computed if None.
-        
+
         Returns:
             dict[str, Any]: Dictionary containing cutoff statistics for the requested period.
         """
@@ -593,12 +583,11 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         *,
         device_id: str | int,
     ) -> dict[str, Any]:
-        """
-        Fetches state-of-charge (SOC) statistics for a device.
-        
+        """Fetches state-of-charge (SOC) statistics for a device.
+
         Parameters:
             device_id (str | int): Device identifier.
-        
+
         Returns:
             dict[str, Any]: Normalized SOC statistics payload.
         """
@@ -612,12 +601,11 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         *,
         device_sn: str,
     ) -> dict[str, Any]:
-        """
-        Retrieve carbon offset statistics for the specified device.
-        
+        """Retrieve carbon offset statistics for the specified device.
+
         Parameters:
             device_sn (str): Device serial number.
-        
+
         Returns:
             dict[str, Any]: Normalized carbon statistics payload.
         """
@@ -631,12 +619,11 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         *,
         device_id: str | int,
     ) -> dict[str, Any]:
-        """
-        Retrieve profit and revenue statistics for a device.
-        
+        """Retrieve profit and revenue statistics for a device.
+
         Parameters:
             device_id (str | int): Device identifier.
-        
+
         Returns:
             dict[str, Any]: Profit statistics payload.
         """
@@ -654,16 +641,15 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         end_date: str | None = None,
         key: str = "",
     ) -> dict[str, Any]:
-        """
-        Fetch box electricity statistics for a device.
-        
+        """Fetch box electricity statistics for a device.
+
         Parameters:
             device_sn (str): Device serial number.
             date_type (str): Period granularity (e.g., "day", "month").
             begin_date (str | None): Start date; computed if None.
             end_date (str | None): End date; computed if None.
             key (str): Optional stat key filter; included in the request only if non-empty.
-        
+
         Returns:
             dict[str, Any]: Normalized payload containing the box statistics.
         """
@@ -686,12 +672,11 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         *,
         system_id: str | int,
     ) -> dict[str, Any]:
-        """
-        Retrieve the AI smart schedule prediction for the specified system.
-        
+        """Retrieve the AI smart schedule prediction for the specified system.
+
         Parameters:
             system_id: Identifier of the system to retrieve the prediction for.
-        
+
         Returns:
             dict: Smart schedule prediction payload returned by the backend.
         """

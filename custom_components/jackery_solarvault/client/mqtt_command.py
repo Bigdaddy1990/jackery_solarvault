@@ -33,19 +33,18 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd input
-    """
-    Coerce an arbitrary command value into an integer suitable for transport.
-    
+    """Coerce an arbitrary command value into an integer suitable for transport.
+
     Parameters:
         cmd (Any): Input command. Accepted forms:
             - int
             - float that is finite and has no fractional part
             - str containing a base-10 integer or a finite integral float (e.g., "107" or "107.0")
           The following are rejected: booleans, NaN/inf, empty strings, and values with a fractional component.
-    
+
     Returns:
         int: The coerced integer command.
-    
+
     Raises:
         ValueError: If the input cannot be converted to an integer.
     """
@@ -80,18 +79,17 @@ def coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd inpu
 def command_body_for_transport(
     body_fields: dict[str, Any], *, cmd: object
 ) -> dict[str, Any]:
-    """
-    Create the command body dictionary used by MQTT and BLE transports.
-    
+    """Create the command body dictionary used by MQTT and BLE transports.
+
     The provided `body_fields` are copied and returned with an added "cmd" entry only when `cmd` can be coerced to an integer greater than zero.
-    
+
     Parameters:
         body_fields (dict[str, Any]): Base fields to include in the returned body.
         cmd (object): Value to coerce to an integer and include as "cmd" when greater than zero.
-    
+
     Returns:
         dict[str, Any]: A dictionary containing the combined command body; includes "cmd" only if the coerced value is > 0.
-    
+
     Raises:
         ValueError: If `cmd` cannot be coerced to a valid integer.
     """
@@ -221,13 +219,12 @@ async def publish_mqtt_command(  # noqa: PLR0913
 
 
 def _raise_config_entry_auth_failed(message: str, err: Exception) -> None:
-    """
-    Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are invalid.
-    
+    """Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are invalid.
+
     Parameters:
         message (str): Human-readable error message to attach to the raised exception.
         err (Exception): Original exception to chain as the cause.
-    
+
     Raises:
         ConfigEntryAuthFailed: Always raised with `message` and chained from `err`.
     """

@@ -70,18 +70,17 @@ class ShellyEndpointMixin(BaseHTTPMixin):
         function: str,
         control_allowed: bool = True,
     ) -> bool:
-        """
-        Send a control command to a Shelly device.
-        
+        """Send a control command to a Shelly device.
+
         Parameters:
             device_id (str | int): Identifier of the Shelly device to control.
             action (str): Action name to perform as provided by the Shelly app.
             function (str): Function name associated with the action as provided by the Shelly app.
             control_allowed (bool): If `False`, the call will raise a `JackeryApiError` and no request will be sent.
-        
+
         Returns:
             bool: `true` if the backend indicates the control request was accepted, `false` otherwise.
-        
+
         Raises:
             JackeryApiError: If `control_allowed` is `False`.
         """

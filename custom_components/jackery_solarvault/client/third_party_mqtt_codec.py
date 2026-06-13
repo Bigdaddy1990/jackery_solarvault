@@ -80,9 +80,8 @@ def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
 
 def generate_third_party_mqtt_token() -> str:
-    """
-    Generate a 9-digit numeric token used as the app fallback token.
-    
+    """Generate a 9-digit numeric token used as the app fallback token.
+
     Returns:
         str: A 9-character string consisting only of decimal digits (0–9).
     """
@@ -93,9 +92,8 @@ def third_party_mqtt_config_from_options(
     options: dict[str, Any],
     generated_token: str | None,
 ) -> dict[str, Any]:
-    """
-    Build a device-ready app field mapping for ThirdPartMQTTConfig from Home Assistant options.
-    
+    """Build a device-ready app field mapping for ThirdPartMQTTConfig from Home Assistant options.
+
     Selects the token from options (trimmed); if that token is empty and `generated_token`
     is provided, uses `generated_token`. Maps option values into app fields:
     - enable: `1` if configured truthy, else `0`
@@ -103,11 +101,11 @@ def third_party_mqtt_config_from_options(
     - port: integer (defaults if absent/falsey)
     - username/password: strings (empty if absent/falsey)
     - token: selected token
-    
+
     Parameters:
         options (dict[str, Any]): Home Assistant config-entry options.
         generated_token (str | None): Fallback token to use when the configured token is empty.
-    
+
     Returns:
         dict[str, Any]: Mapping of app field constants to values ready for publishing to the device.
     """
@@ -149,19 +147,18 @@ def stable_third_party_mqtt_token(
     token: str,
     generated_token: str | None,
 ) -> tuple[str, bool, str | None]:
-    """
-    Normalize and validate a ThirdParty MQTT token and determine whether a generated token should be used.
-    
+    """Normalize and validate a ThirdParty MQTT token and determine whether a generated token should be used.
+
     Parameters:
     	token (str): Candidate token value; will be coerced to string and stripped of surrounding whitespace.
     	generated_token (str | None): Previously generated 9-digit token, or `None` if none exists.
-    
+
     Returns:
-    	(token_str (str), use_generated (bool), new_generated_token (str | None)): 
+    	(token_str (str), use_generated (bool), new_generated_token (str | None)):
     		- token_str: The 9-digit token to use.
     		- use_generated: `True` if the chosen token is (or should be treated as) a generated token, `False` if it is a valid user-provided token.
     		- new_generated_token: The newly generated token when one was created, otherwise `None`.
-    
+
     Raises:
     	ValueError: If a provided non-empty token is not exactly nine decimal digits.
     """
@@ -186,16 +183,15 @@ def decode_third_party_mqtt_config_body(
     body: dict[str, Any],
     bluetooth_key: bytes | None,
 ) -> dict[str, Any]:
-    """
-    Decode encrypted credential fields in a ThirdPartMQTTConfig body and return a new dict containing plaintext values and decode metadata.
-    
+    """Decode encrypted credential fields in a ThirdPartMQTTConfig body and return a new dict containing plaintext values and decode metadata.
+
     When `bluetooth_key` is None the returned dict will have `_ha_plaintext = False` and `_decode_error = "missing_bluetooth_key"`.
     If `bluetooth_key` is provided, the function attempts to decode the username, password, and token fields (when present as non-empty strings). Successfully decoded fields replace the original values; fields that fail to decode are listed in `_decode_failed_fields`. The `_ha_plaintext` flag is `True` if any field was decoded, `False` otherwise.
-    
+
     Parameters:
         body (dict[str, Any]): The input config/body to decode; not mutated.
         bluetooth_key (bytes | None): 16-byte AES key/IV used to decode fields, or `None` to indicate decoding cannot be performed.
-    
+
     Returns:
         dict[str, Any]: A new dict copying `body` with decoded credential fields (when decoded) and metadata keys `_ha_plaintext`, and either `_decode_failed_fields` or `_decode_error` as described above.
     """
@@ -233,16 +229,15 @@ def third_party_mqtt_config_plaintext(
     generated_token: str | None,
     device_data: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """
-    Build a plaintext ThirdPartMQTTConfig dictionary by merging HA options with device-reported values.
-    
+    """Build a plaintext ThirdPartMQTTConfig dictionary by merging HA options with device-reported values.
+
     Starts from the config derived from `options` and `generated_token`. If `device_data` contains a `PAYLOAD_THIRD_PARTY_MQTT_CONFIG` mapping, values for enable, IP, and port present in the device payload overwrite the corresponding entries. If that device payload has `_ha_plaintext` set to `True`, present credential fields (username, password, token) also overwrite the config. Inputs are not mutated.
-    
+
     Parameters:
         options (dict[str, Any]): Home Assistant option values used to build the base config.
         generated_token (str | None): A pre-generated 9-digit token to use when the options token is empty.
         device_data (dict[str, Any] | None): Device GET payload that may contain the current ThirdPartMQTTConfig.
-    
+
     Returns:
         dict[str, Any]: The merged plaintext ThirdPartMQTTConfig ready for entity setters.
     """

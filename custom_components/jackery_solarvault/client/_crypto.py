@@ -19,13 +19,12 @@ from jackery_solarvault.const import MQTT_MAC_ID_PREFIX
 
 
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
-    """
-    Encrypt plaintext using AES-128 in ECB mode with PKCS7 padding.
-    
+    """Encrypt plaintext using AES-128 in ECB mode with PKCS7 padding.
+
     Parameters:
         plaintext (bytes): Data to be encrypted.
         key (bytes): AES key; must be 16 bytes for AES-128.
-    
+
     Returns:
         bytes: Ciphertext resulting from AES-128-ECB encryption of the padded plaintext.
     """

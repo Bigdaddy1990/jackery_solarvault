@@ -49,9 +49,8 @@ class CollectionStartEvent(NodeEvent):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         flow_style=None,  # noqa: ANN001
     ) -> None:
-        """
-        Initialize a collection-start event with anchor, tag, implicitness, optional position marks, and flow style.
-        
+        """Initialize a collection-start event with anchor, tag, implicitness, optional position marks, and flow style.
+
         Parameters:
             anchor: Anchor name for the collection, or None if there is no anchor.
             tag: Tag for the collection, or None if not provided.
@@ -77,9 +76,8 @@ class CollectionEndEvent(Event):  # noqa: D101
 
 class StreamStartEvent(Event):  # noqa: D101
     def __init__(self, start_mark=None, end_mark=None, encoding=None) -> None:  # noqa: ANN001
-        """
-        Initialize a StreamStartEvent with optional source position markers and an optional stream encoding.
-        
+        """Initialize a StreamStartEvent with optional source position markers and an optional stream encoding.
+
         Parameters:
             start_mark: Optional start position marker associated with the event.
             end_mark: Optional end position marker associated with the event.
@@ -103,9 +101,8 @@ class DocumentStartEvent(Event):  # noqa: D101
         version=None,  # noqa: ANN001
         tags=None,  # noqa: ANN001
     ) -> None:
-        """
-        Create a DocumentStartEvent containing optional position metadata, explicitness, version, and tag directives.
-        
+        """Create a DocumentStartEvent containing optional position metadata, explicitness, version, and tag directives.
+
         Parameters:
             start_mark: Mark object for the event's start position, or None.
             end_mark: Mark object for the event's end position, or None.
@@ -122,9 +119,8 @@ class DocumentStartEvent(Event):  # noqa: D101
 
 class DocumentEndEvent(Event):  # noqa: D101
     def __init__(self, start_mark=None, end_mark=None, explicit=None) -> None:  # noqa: ANN001
-        """
-        Create a DocumentEndEvent with optional start/end source position marks and explicitness.
-        
+        """Create a DocumentEndEvent with optional start/end source position marks and explicitness.
+
         Parameters:
             start_mark: Optional start position metadata for the event.
             end_mark: Optional end position metadata for the event.
@@ -150,9 +146,8 @@ class ScalarEvent(NodeEvent):  # noqa: D101
         end_mark=None,  # noqa: ANN001
         style=None,  # noqa: ANN001
     ) -> None:
-        """
-        Create a ScalarEvent representing a scalar node with optional source position, tag resolution, and presentation style.
-        
+        """Create a ScalarEvent representing a scalar node with optional source position, tag resolution, and presentation style.
+
         Parameters:
             anchor: Anchor identifier for the node, or None.
             tag: The node's tag, or None.

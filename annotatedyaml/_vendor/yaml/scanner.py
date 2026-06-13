@@ -136,14 +136,13 @@ class Scanner:  # noqa: D101, PLR0904
 
     def check_token(self, *choices) -> bool:  # noqa: ANN002
         # Check if the next token is one of the given types.
-        """
-        Check whether the next queued token matches any of the provided token classes.
-        
+        """Check whether the next queued token matches any of the provided token classes.
+
         If no choices are given, the method only checks that a token is available.
-        
+
         Parameters:
             choices: One or more token classes to test against the next queued token.
-        
+
         Returns:
             `True` if a token is available and, when choices are provided, the next token is an instance of any given class, `False` otherwise.
         """
@@ -190,9 +189,8 @@ class Scanner:  # noqa: D101, PLR0904
     # Private methods.
 
     def need_more_tokens(self) -> bool | None:
-        """
-        Determine whether the scanner must fetch additional tokens to continue tokenization.
-        
+        """Determine whether the scanner must fetch additional tokens to continue tokenization.
+
         Returns:
             `False` if the stream is finished, `True` if more tokens are required because the token buffer is empty or a pending simple-key candidate must be resolved, `None` if there is currently no need to fetch more tokens.
         """
@@ -332,9 +330,8 @@ class Scanner:  # noqa: D101, PLR0904
         #       return None
         #   return self.possible_simple_keys[
         #           min(self.possible_simple_keys.keys())].token_number
-        """
-        Get the token number of the earliest pending simple-key candidate.
-        
+        """Get the token number of the earliest pending simple-key candidate.
+
         Returns:
             The smallest `token_number` among saved simple-key candidates, or `None` if no candidates exist.
         """
@@ -464,12 +461,11 @@ class Scanner:  # noqa: D101, PLR0904
 
     def add_indent(self, column) -> bool:  # noqa: ANN001
         # Check if we need to increase indentation.
-        """
-        Set the current block indentation to the given column when it is greater than the current indent.
-        
+        """Set the current block indentation to the given column when it is greater than the current indent.
+
         Parameters:
             column (int): Candidate column index (in character cells) to use as the new indentation level.
-        
+
         Returns:
             True if the indentation was increased to `column`, False otherwise.
         """
@@ -497,9 +493,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_stream_end(self) -> None:
         # Set the current indentation to -1.
-        """
-        Finalize scanning and emit a STREAM-END token.
-        
+        """Finalize scanning and emit a STREAM-END token.
+
         Clear indentation and simple-key state, append a StreamEndToken at the current mark, and mark the scanner as finished.
         """
         self.unwind_indent(-1)
@@ -520,9 +515,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_directive(self) -> None:
         # Set the current indentation to -1.
-        """
-        Handle a YAML directive at the current position and enqueue the resulting DirectiveToken.
-        
+        """Handle a YAML directive at the current position and enqueue the resulting DirectiveToken.
+
         Unwind block indentation to the base level, clear any pending simple-key candidate, disable simple-key recognition, scan the directive, and append the produced DirectiveToken to the token buffer.
         """
         self.unwind_indent(-1)
@@ -547,11 +541,10 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_document_indicator(self, TokenClass) -> None:  # noqa: ANN001, N803
         # Set the current indentation to -1.
-        """
-        Handle a YAML document indicator ('---' or '...') by resetting indentation and simple-key state and enqueuing the corresponding document token.
-        
+        """Handle a YAML document indicator ('---' or '...') by resetting indentation and simple-key state and enqueuing the corresponding document token.
+
         Consumes the three-character indicator and appends an instance of `TokenClass` constructed with the start and end marks that surround the indicator.
-        
+
         Parameters:
             TokenClass (type): Token class to instantiate for the indicator token (called as `TokenClass(start_mark, end_mark)`).
         """
@@ -569,15 +562,11 @@ class Scanner:  # noqa: D101, PLR0904
         self.tokens.append(TokenClass(start_mark, end_mark))
 
     def fetch_flow_sequence_start(self) -> None:
-        """
-        Begin a flow sequence by entering flow context and enqueueing a FlowSequenceStartToken.
-        """
+        """Begin a flow sequence by entering flow context and enqueueing a FlowSequenceStartToken."""
         self.fetch_flow_collection_start(FlowSequenceStartToken)  # noqa: F405
 
     def fetch_flow_mapping_start(self) -> None:
-        """
-        Mark the start of a flow-style mapping ('{').
-        """  # noqa: D205
+        """Mark the start of a flow-style mapping ('{')."""
         self.fetch_flow_collection_start(FlowMappingStartToken)  # noqa: F405
 
     def fetch_flow_collection_start(self, TokenClass) -> None:  # noqa: ANN001, N803
@@ -608,9 +597,8 @@ class Scanner:  # noqa: D101, PLR0904
         self.fetch_flow_collection_end(FlowSequenceEndToken)  # noqa: F405
 
     def fetch_flow_mapping_end(self) -> None:
-        """
-        End the current flow mapping and enqueue its end token.
-        
+        """End the current flow mapping and enqueue its end token.
+
         Consumes the closing flow-mapping delimiter and appends a FlowMappingEndToken to the scanner's token buffer.
         """
         self.fetch_flow_collection_end(FlowMappingEndToken)  # noqa: F405
@@ -638,9 +626,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_flow_entry(self) -> None:
         # Simple keys are allowed after ','.
-        """
-        Handle a flow entry separator and enqueue a FlowEntryToken.
-        
+        """Handle a flow entry separator and enqueue a FlowEntryToken.
+
         Enables simple-key recognition, clears any pending possible simple key for the current flow level, consumes the ',' separator, and appends a FlowEntryToken to the token queue.
         """
         self.allow_simple_key = True
@@ -656,11 +643,10 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_block_entry(self) -> None:
         # Block context needs additional checks.
-        """
-        Handle a block sequence entry indicator (`-`) at the current scanner position.
-        
+        """Handle a block sequence entry indicator (`-`) at the current scanner position.
+
         Validate that a sequence entry is allowed in the current block context and, if so, optionally start a new block sequence by emitting a BlockSequenceStartToken. After consuming the indicator, allow simple keys at the following position, clear any pending simple-key candidate for the current flow level, and append a BlockEntryToken.
-        
+
         Raises:
             ScannerError: If sequence entries are not allowed at the current position.
         """
@@ -792,9 +778,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_alias(self) -> None:
         # ALIAS could be a simple key.
-        """
-        Record a possible simple key, scan an alias, and append an AliasToken to the token buffer.
-        
+        """Record a possible simple key, scan an alias, and append an AliasToken to the token buffer.
+
         If a simple key may start at the current position, save it; then disable simple-key recognition and append the scanned AliasToken.
         """
         self.save_possible_simple_key()
@@ -859,9 +844,7 @@ class Scanner:  # noqa: D101, PLR0904
         self.tokens.append(self.scan_block_scalar(style))
 
     def fetch_single(self) -> None:
-        """
-        Produce a ScalarToken for a single-quoted flow scalar and enqueue it in the scanner's token buffer.
-        """
+        """Produce a ScalarToken for a single-quoted flow scalar and enqueue it in the scanner's token buffer."""
         self.fetch_flow_scalar(style="'")
 
     def fetch_double(self) -> None:
@@ -885,9 +868,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def fetch_plain(self) -> None:
         # A plain scalar could be a simple key.
-        """
-        Consume a plain scalar and append the resulting ScalarToken to the token buffer.
-        
+        """Consume a plain scalar and append the resulting ScalarToken to the token buffer.
+
         Records a possible simple-key candidate at the current position and disables simple-key recognition for subsequent characters; scan_plain() may re-enable simple-key recognition if the scalar ends at a line start.
         """
         self.save_possible_simple_key()
@@ -968,9 +950,8 @@ class Scanner:  # noqa: D101, PLR0904
 
     def check_value(self) -> bool:
         # VALUE(flow context):  ':'
-        """
-        Determine whether a ':' at the current position is a valid mapping value indicator in the current scanner context.
-        
+        """Determine whether a ':' at the current position is a valid mapping value indicator in the current scanner context.
+
         Returns:
             True if ':' is a value indicator here, False otherwise. In flow context this is always True. In block context it is True only when the following character is end-of-stream, a space, a tab, or a line break (CR, LF, NEL, LS, PS).
         """
@@ -1031,9 +1012,8 @@ class Scanner:  # noqa: D101, PLR0904
         # We also need to add the check for `allow_simple_keys == True` to
         # `unwind_indent` before issuing BLOCK-END.
         # Scanners for block, flow, and plain scalars need to be modified.
-        """
-        Advance the scanner to the next non-space, non-comment, non-line-break character.
-        
+        """Advance the scanner to the next non-space, non-comment, non-line-break character.
+
         If the stream starts with a UTF-8 byte order mark (U+FEFF) it is consumed; then spaces and comments (from `#` to the line break) are skipped and normalized line breaks are consumed. When a line break is consumed in block context (flow level == 0), `allow_simple_key` is set to True. Stops with the scanner positioned at the first character that can start a token or at end-of-stream.
         """
         if self.index == 0 and self.peek() == "\ufeff":
@@ -1118,15 +1098,14 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_yaml_directive_value(self, start_mark):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Parse the value of a %YAML directive and return its major and minor version numbers.
-        
+        """Parse the value of a %YAML directive and return its major and minor version numbers.
+
         Parameters:
             start_mark: Mark object pointing to the directive start for error reporting.
-        
+
         Returns:
             tuple: (major, minor) integers representing the YAML version.
-        
+
         Raises:
             ScannerError: If the directive value is not a valid 'major.minor' form or is terminated incorrectly.
         """
@@ -1201,15 +1180,14 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_tag_directive_handle(self, start_mark):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Parse a tag directive handle and require a single space immediately after it.
-        
+        """Parse a tag directive handle and require a single space immediately after it.
+
         Parameters:
             start_mark: Mark where scanning of the directive began.
-        
+
         Returns:
             handle (str): The parsed tag directive handle.
-        
+
         Raises:
             ScannerError: If the character following the handle is not a single space.
         """
@@ -1226,15 +1204,14 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_tag_directive_prefix(self, start_mark):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Parse a TAG directive's URI prefix and ensure it is followed by a valid terminator.
-        
+        """Parse a TAG directive's URI prefix and ensure it is followed by a valid terminator.
+
         Parameters:
             start_mark: Mark at the start of the directive for error context.
-        
+
         Returns:
             prefix (str): The parsed tag URI prefix.
-        
+
         Raises:
             ScannerError: If the character immediately following the URI is not a valid terminator (space, line break, NEL, U+2028/U+2029, or end-of-stream).
         """
@@ -1285,17 +1262,16 @@ class Scanner:  # noqa: D101, PLR0904
         # and
         #   [ *alias , "value" ]
         # Therefore we restrict aliases to numbers and ASCII letters.
-        """
-        Parse an anchor or alias at the current scanner position.
-        
+        """Parse an anchor or alias at the current scanner position.
+
         Consumes the anchor ('&') or alias ('*') indicator, reads an identifier composed of ASCII letters, digits, '-' or '_', validates that an identifier was found and that it is terminated by a YAML delimiter, and returns a token for the identifier.
-        
+
         Parameters:
             TokenClass (type): Token class used to construct the resulting token.
-        
+
         Returns:
             TokenClass: A token instance containing the parsed identifier and its start and end marks.
-        
+
         Raises:
             ScannerError: If no identifier follows the indicator or if the identifier is not properly terminated by a valid YAML delimiter.
         """
@@ -1330,14 +1306,13 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_tag(self):  # noqa: ANN201
         # See the specification for details.
-        """
-        Parse a YAML tag at the current scanner position and produce a TagToken.
-        
+        """Parse a YAML tag at the current scanner position and produce a TagToken.
+
         Supports the three YAML tag forms: <...>, a bare '!' and '!handle!suffix'. Consumes and validates the tag text and returns a TagToken whose `value` is a `(handle, suffix)` tuple; `handle` is the tag handle or `'!'` when no explicit handle is present, and `suffix` is the tag URI or `'!'` for a bare `!` tag.
-        
+
         Returns:
             TagToken: A token with `value` equal to `(handle, suffix)`.
-        
+
         Raises:
             ScannerError: If the tag is malformed or not properly terminated.
         """
@@ -1582,17 +1557,16 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_block_scalar_breaks(self, indent):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Collect normalized line breaks from a block scalar up to the specified indentation.
-        
+        """Collect normalized line breaks from a block scalar up to the specified indentation.
+
         Consumes optional leading spaces (up to `indent`), then repeatedly consumes and normalizes successive line breaks,
         collecting each normalized break. After each break it skips spaces up to `indent`. Stops when the next character
         is not a line break. The returned mark corresponds to the scanner position after the last consumed break
         or after the initial space-skipping when no breaks were found.
-        
+
         Parameters:
             indent (int): Column indentation limit; spaces are skipped only while the current column is less than this value.
-        
+
         Returns:
             (list[str], Mark): A tuple where the first element is the list of normalized line-break strings collected,
             and the second element is the mark at the scanner position after the last consumed break.
@@ -1730,18 +1704,17 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_flow_scalar_spaces(self, double, start_mark):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Consume whitespace and normalized line-break fragments that follow a non-space run inside a flow (quoted) scalar.
-        
+        """Consume whitespace and normalized line-break fragments that follow a non-space run inside a flow (quoted) scalar.
+
         When spaces or tabs are followed by a line break, the line break is normalized via scan_line_break() and subsequent folded/continuation breaks are collected via scan_flow_scalar_breaks(double, start_mark); the function returns the appropriate normalized fragments (a line-break token, a single space for folded newlines, and/or collected break chunks). If no line break follows, the contiguous whitespace string is returned as a single chunk.
-        
+
         Parameters:
             double (bool): True when scanning a double-quoted scalar; forwarded to break-scanning behavior.
             start_mark (Mark): Mark for the start of the scalar used in error messages.
-        
+
         Returns:
             list[str]: A list of whitespace and/or normalized line-break fragments to append to the scalar content.
-        
+
         Raises:
             ScannerError: If the stream ends unexpectedly while scanning the quoted scalar.
         """
@@ -1773,15 +1746,14 @@ class Scanner:  # noqa: D101, PLR0904
 
     def scan_flow_scalar_breaks(self, double, start_mark):  # noqa: ANN001, ANN201
         # See the specification for details.
-        """
-        Collect normalized line-break chunks that appear inside a quoted (flow) scalar.
-        
+        """Collect normalized line-break chunks that appear inside a quoted (flow) scalar.
+
         Scans consecutive optional spaces/tabs and normalized line breaks, collecting each normalized line-break chunk until a non-space, non-line-break character is reached. Raises ScannerError with the provided start_mark if a YAML document separator (`---` or `...`) is encountered at the current position followed by a valid separator character.
-        
+
         Parameters:
             double (bool): True when scanning a double-quoted scalar, False for single-quoted.
             start_mark (Mark): Mark of the scalar start for error reporting.
-        
+
         Returns:
             list[str]: Collected normalized line-break chunks.
         """
@@ -1812,11 +1784,10 @@ class Scanner:  # noqa: D101, PLR0904
         #   plain scalars in the flow context cannot contain ',' or '?'.
         # We also keep track of the `allow_simple_key` flag here.
         # Indentation rules are loosed for the flow context.
-        """
-        Scan a plain (unquoted) scalar starting at the current scanner position.
-        
+        """Scan a plain (unquoted) scalar starting at the current scanner position.
+
         Scans consecutive non-delimiter characters according to YAML plain-scalar rules, honoring differences between block and flow contexts (flow context disallows additional characters such as ',' and '?'). Updates the scanner's simple-key allowance while scanning and stops at comments, line/indentation boundaries, or token-delimiting characters.
-        
+
         Returns:
             ScalarToken: The plain-style scalar token containing the scanned string and its start and end marks.
         """
@@ -1867,15 +1838,14 @@ class Scanner:  # noqa: D101, PLR0904
         # See the specification for details.
         # The specification is really confusing about tabs in plain scalars.
         # We just forbid them completely. Do not use tabs in YAML!
-        """
-        Parse spaces following a plain scalar and return consumed whitespace and normalized line-break chunks, or signal scalar termination.
-        
+        """Parse spaces following a plain scalar and return consumed whitespace and normalized line-break chunks, or signal scalar termination.
+
         After consuming contiguous spaces, this inspects an optional following line break. If a document separator (`---` or `...`) begins at the next non-space position, the plain scalar must terminate and the function returns `None`. Otherwise the function returns a list of string chunks containing consumed spaces and/or normalized line breaks according to YAML folding rules.
-        
+
         Parameters:
             indent (int): Column threshold used to decide whether the scalar may continue across a line break.
             start_mark: Marker for the start of the scalar, used for contextual error reporting.
-        
+
         Returns:
             list: A list of string chunks representing consumed spaces and/or normalized line breaks, or
             None if the plain scalar must end (for example when a document separator follows).
@@ -1919,18 +1889,17 @@ class Scanner:  # noqa: D101, PLR0904
         # See the specification for details.
         # For some strange reasons, the specification does not allow '_' in
         # tag handles. I have allowed it anyway.
-        """
-        Parse a tag handle at the current position and return the consumed text.
-        
+        """Parse a tag handle at the current position and return the consumed text.
+
         Parses a tag handle that starts with `!` and, if present, ends with a terminating `!`. Advances the scanner past the consumed characters.
-        
+
         Parameters:
             name (str): Context name used in error messages (e.g., "tag directive").
             start_mark (Mark): Mark used for error reporting if a parsing error occurs.
-        
+
         Returns:
             str: The consumed tag handle text, including the leading `!` and the trailing `!` when present.
-        
+
         Raises:
             ScannerError: If the current character is not `!`, or if a handle is started but not terminated by a closing `!`.
         """

@@ -37,12 +37,11 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     """Energy price, tariff, and dynamic-pricing endpoint methods."""
 
     async def async_get_power_price(self, system_id: str | int) -> dict:
-        """
-        Retrieve the power price (tariff) configuration for a given system.
-        
+        """Retrieve the power price (tariff) configuration for a given system.
+
         Parameters:
             system_id (str | int): Identifier of the system to query.
-        
+
         Returns:
             dict: The payload dictionary containing the power price / tariff configuration.
         """
@@ -55,15 +54,14 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_get_price_sources(
         self, system_id: str | int
     ) -> list[dict[str, Any]]:
-        """
-        Retrieve available dynamic-price providers for a system.
-        
+        """Retrieve available dynamic-price providers for a system.
+
         Parameters:
             system_id (str | int): System identifier sent as the `systemId` query parameter.
-        
+
         Returns:
             list[dict[str, Any]]: A list of provider objects. Each object contains `platformCompanyId`, `cid`, `country`, `companyName`, and `loginAllowed`.
-        
+
         Side effects:
             Stores the raw HTTP response on `self.last_price_sources_response`.
         """
@@ -143,17 +141,16 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         platform_company_id: int,
         system_region: str,
     ) -> bool:
-        """
-        Enable or update dynamic pricing mode for a system.
-        
+        """Enable or update dynamic pricing mode for a system.
+
         Parameters:
             system_id: Identifier of the target system.
             platform_company_id: Platform company identifier required by the API; must be an integer-valued number.
             system_region: Region code for the system; must be a non-empty string.
-        
+
         Returns:
             `true` if the change was accepted by the server, `false` otherwise.
-        
+
         Raises:
             JackeryApiError: If `platform_company_id` is not an integer-valued number or if `system_region` is empty.
         """
@@ -184,9 +181,8 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_get_dynamic_price_login_url(
         self, *, platform_company_id: int, system_id: str | int
     ) -> dict[str, Any]:
-        """
-        Return the login URL payload for the dynamic pricing platform.
-        
+        """Return the login URL payload for the dynamic pricing platform.
+
         Returns:
             dict: Payload containing the login URL and related metadata.
         """
@@ -197,9 +193,8 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, DYNAMIC_PRICE_LOGIN_URL_PATH)
 
     async def async_get_device_currency(self, device_id: str | int) -> dict[str, Any]:
-        """
-        Get the currency configuration for a device.
-        
+        """Get the currency configuration for a device.
+
         Returns:
             dict[str, Any]: The currency configuration payload for the device.
         """
@@ -216,15 +211,14 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         platform_company_id: int,
         system_id: str | int,
     ) -> dict[str, Any]:
-        """
-        Save a contract authorization record for dynamic pricing.
-        
+        """Save a contract authorization record for dynamic pricing.
+
         Parameters:
             contract_id (str): Identifier of the contract to save.
             custom_id (str): Client/custom identifier associated with the contract.
             platform_company_id (int): Platform company identifier used by the dynamic-pricing service.
             system_id (str | int): System identifier; will be converted to a string in the request payload.
-        
+
         Returns:
             dict[str, Any]: The JSON response returned by the API.
         """
@@ -241,13 +235,12 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_get_contract_list(
         self, *, customer_number: str, platform_company_id: int
     ) -> list[dict[str, Any]]:
-        """
-        Retrieve the list of available dynamic-pricing contracts for a customer.
-        
+        """Retrieve the list of available dynamic-pricing contracts for a customer.
+
         Parameters:
             customer_number (str): Customer number used to query contracts.
             platform_company_id (int): Platform company identifier that scopes the contract list.
-        
+
         Returns:
             list[dict[str, Any]]: Contract objects extracted from the response payload.
         """
@@ -263,13 +256,12 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_cancel_contract_auth(
         self, *, platform_company_id: int, system_id: str | int
     ) -> dict[str, Any]:
-        """
-        Cancel an existing contract authorization for the given platform company and system.
-        
+        """Cancel an existing contract authorization for the given platform company and system.
+
         Parameters:
             platform_company_id (int): Identifier of the platform company owning the contract.
             system_id (str | int): Identifier of the target system; will be sent as a string.
-        
+
         Returns:
             dict[str, Any]: Parsed JSON response from the cancel contract API.
         """
@@ -282,9 +274,8 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_get_dynamic_price(self, system_id: str | int) -> dict[str, Any]:
-        """
-        Fetch dynamic pricing configuration for the given system.
-        
+        """Fetch dynamic pricing configuration for the given system.
+
         Returns:
             dict: The dynamic pricing configuration payload extracted from the service response.
         """
@@ -294,12 +285,11 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, DYNAMIC_PRICE_PATH)
 
     async def async_save_location_id(self, *, connect_token: str) -> dict[str, Any]:
-        """
-        Save Flatpeak location ID using the provided connect token.
-        
+        """Save Flatpeak location ID using the provided connect token.
+
         Parameters:
             connect_token (str): Flatpeak connect token used to save/associate the location ID.
-        
+
         Returns:
             dict[str, Any]: Parsed JSON response from the API.
         """
@@ -310,13 +300,12 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_save_tou_plan(
         self, *, device_id: str | int, tasks: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """
-        Save a Time-of-Use (TOU) schedule for a device.
-        
+        """Save a Time-of-Use (TOU) schedule for a device.
+
         Parameters:
             device_id (str | int): Device identifier to which the TOU plan will be applied.
             tasks (list[dict[str, Any]]): List of TOU task objects formatted for the API.
-        
+
         Returns:
             dict[str, Any]: Parsed JSON response from the API.
         """
@@ -326,9 +315,8 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_query_tou_plan(self, *, device_id: str | int) -> dict[str, Any]:
-        """
-        Retrieve the Time-of-Use (TOU) schedule for the given device.
-        
+        """Retrieve the Time-of-Use (TOU) schedule for the given device.
+
         Returns:
             dict: The TOU schedule payload returned by the API.
         """
@@ -338,9 +326,8 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, QUERY_TOU_PLAN_PATH)
 
     async def async_get_currency_list(self) -> list[dict[str, Any]]:
-        """
-        Retrieve the list of available currencies.
-        
+        """Retrieve the list of available currencies.
+
         Returns:
             list[dict[str, Any]]: The list of currency records extracted from the API payload.
         """
@@ -350,14 +337,13 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
     async def async_bind_currency(
         self, *, currency: str, device_id: str | int, system_id: str | int
     ) -> dict[str, Any]:
-        """
-        Bind a currency to a specific device and system.
-        
+        """Bind a currency to a specific device and system.
+
         Parameters:
             currency (str): Currency code or identifier to bind.
             device_id (str | int): Device identifier; will be sent as a string.
             system_id (str | int): System identifier; will be sent as a string.
-        
+
         Returns:
             dict: Server response JSON.
         """

@@ -22,14 +22,13 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_get_accessories(
         self, *, devices: str, id: str | int, parent_device_id: str | int
     ) -> dict[str, Any]:
-        """
-        Fetch accessories data for the specified device(s).
-        
+        """Fetch accessories data for the specified device(s).
+
         Parameters:
             devices: Comma-separated device identifiers to include in the query.
             id: Identifier sent as the request `id` parameter.
             parent_device_id: Identifier sent as the request `parentDeviceId` parameter.
-        
+
         Returns:
             dict: The accessories payload returned by the backend.
         """
@@ -44,12 +43,11 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, ACCESSORIES_PATH)
 
     async def async_check_accessories_exist(self, *, devices: str) -> dict[str, Any]:
-        """
-        Determine accessory existence for the specified device IDs.
-        
+        """Determine accessory existence for the specified device IDs.
+
         Parameters:
             devices (str): Comma-separated device IDs to check.
-        
+
         Returns:
             dict[str, Any]: Mapping of each device ID to the existence information returned by the backend.
         """
@@ -59,12 +57,11 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_get_accessories_list(
         self, device_id: str | int
     ) -> list[dict[str, Any]]:
-        """
-        List accessories for a device.
-        
+        """List accessories for a device.
+
         Parameters:
             device_id (str | int): Identifier of the device whose accessories will be listed.
-        
+
         Returns:
             list[dict[str, Any]]: List of accessory entries as dictionaries from the API response.
         """
@@ -76,13 +73,12 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_set_accessories_name(
         self, *, device_name: str, id: str | int
     ) -> dict[str, Any]:
-        """
-        Set the display name for an accessory.
-        
+        """Set the display name for an accessory.
+
         Parameters:
             device_name (str): New accessory name.
             id (str | int): Accessory identifier; will be sent as a string.
-        
+
         Returns:
             dict: JSON response from the backend.
         """
@@ -94,12 +90,11 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_check_jackery_accessories_exist(
         self, *, device_sn_infos: str
     ) -> dict[str, Any]:
-        """
-        Determine whether Jackery accessories exist for the provided device serial numbers.
-        
+        """Determine whether Jackery accessories exist for the provided device serial numbers.
+
         Parameters:
             device_sn_infos (str): Device serial number info string as accepted by the API.
-        
+
         Returns:
             dict: The API response payload for the existence check.
         """
@@ -120,14 +115,13 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_get_sub_shadow(
         self, *, dev_type: str, device_sn: str, sub_device_sn: str
     ) -> dict[str, Any]:
-        """
-        Retrieve the property shadow for a sub-device.
-        
+        """Retrieve the property shadow for a sub-device.
+
         Parameters:
             dev_type (str): Device type identifier.
             device_sn (str): Parent device serial number.
             sub_device_sn (str): Sub-device serial number.
-        
+
         Returns:
             dict[str, Any]: Shadow payload for the specified sub-device.
         """
@@ -144,13 +138,12 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
     async def async_get_system_shadow(
         self, *, device_sn: str, diy_sn: str
     ) -> dict[str, Any]:
-        """
-        Retrieve the system property shadow for a device.
-        
+        """Retrieve the system property shadow for a device.
+
         Parameters:
             device_sn (str): Device serial number.
             diy_sn (str): DIY device serial number.
-        
+
         Returns:
             dict[str, Any]: System shadow data.
         """

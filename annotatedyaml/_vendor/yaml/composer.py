@@ -11,20 +11,18 @@ class ComposerError(MarkedYAMLError):  # noqa: D101
 
 class Composer:  # noqa: D101
     def __init__(self) -> None:
-        """
-        Initialize the Composer and its anchor registry.
-        
+        """Initialize the Composer and its anchor registry.
+
         Creates self.anchors as a dict mapping anchor names to composed node objects for resolving aliases during document composition.
         """
         self.anchors = {}
 
     def check_node(self) -> bool:
         # Drop the STREAM-START event.
-        """
-        Indicates whether another document is available in the event stream.
-        
+        """Indicates whether another document is available in the event stream.
+
         If a leading StreamStartEvent is present, it is consumed.
-        
+
         Returns:
             True if the stream has not reached a StreamEndEvent (another document is available), False otherwise.
         """
@@ -100,16 +98,15 @@ class Composer:  # noqa: D101
         return node
 
     def compose_node(self, parent, index):  # noqa: ANN001, ANN201
-        """
-        Compose a node from the upcoming parser events, resolving anchors and aliases.
-        
+        """Compose a node from the upcoming parser events, resolving anchors and aliases.
+
         Parameters:
             parent: The parent node used to provide resolver context, or `None` if there is no parent.
             index: The index (position) within the parent used to provide resolver context, or `None` when not applicable.
-        
+
         Returns:
             node: The composed `ScalarNode`, `SequenceNode`, or `MappingNode`, or an existing node referenced by an alias.
-        
+
         Raises:
             ComposerError: If an alias refers to an undefined anchor or if an anchor is defined more than once.
         """
@@ -141,12 +138,11 @@ class Composer:  # noqa: D101
         return node
 
     def compose_scalar_node(self, anchor):  # noqa: ANN001, ANN201
-        """
-        Compose a ScalarNode from the next scalar event and register it under `anchor` if provided.
-        
+        """Compose a ScalarNode from the next scalar event and register it under `anchor` if provided.
+
         Parameters:
             anchor (str | None): Anchor name to register the created node under, or `None` to skip registration.
-        
+
         Returns:
             ScalarNode: The composed scalar node. If the event tag is `None` or `"!"`, the node's tag is resolved before construction.
         """
@@ -162,14 +158,13 @@ class Composer:  # noqa: D101
         return node
 
     def compose_sequence_node(self, anchor):  # noqa: ANN001, ANN201
-        """
-        Compose and return a SequenceNode for the next YAML sequence in the event stream.
-        
+        """Compose and return a SequenceNode for the next YAML sequence in the event stream.
+
         If the sequence start event does not specify a tag, the resolver determines the node's tag. If `anchor` is provided, the composed node is registered under that anchor; the node's children are composed from subsequent events and its end mark is set from the sequence end event.
-        
+
         Parameters:
             anchor (str | None): Anchor name to associate with the created node, or None if no anchor.
-        
+
         Returns:
             SequenceNode: The composed sequence node containing its child nodes and end mark.
         """

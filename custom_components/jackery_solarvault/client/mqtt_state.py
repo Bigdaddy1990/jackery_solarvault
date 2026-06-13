@@ -34,12 +34,11 @@ MQTT_TRANSIENT_BACKOFF_STEPS_SEC: tuple[int, ...] = (
 
 
 def is_mqtt_auth_failure(message: object) -> bool:
-    """
-    Determine whether the given message indicates a broker-side MQTT credential rejection.
-    
+    """Determine whether the given message indicates a broker-side MQTT credential rejection.
+
     Parameters:
         message (object): An object convertible to text (e.g., an exception or log string) to be inspected for known broker rejection patterns.
-    
+
     Returns:
         True if the text of `message` matches known broker credential-rejection indicators, False otherwise.
     """
@@ -57,12 +56,11 @@ def is_mqtt_auth_failure(message: object) -> bool:
 
 
 def is_transient_connect_failure(message: object) -> bool:
-    """
-    Detect whether an MQTT connection failure message indicates a transient network or server issue.
-    
+    """Detect whether an MQTT connection failure message indicates a transient network or server issue.
+
     Checks the message text for known transient indicators such as "connect rc=133", "server unavailable",
     "connection refused", "connection timed out", or the word "unknown".
-    
+
     Returns:
         `true` if the message indicates a transient connect failure, `false` otherwise.
     """
@@ -77,12 +75,11 @@ def is_transient_connect_failure(message: object) -> bool:
 
 
 def mqtt_connect_failure_signature(message: object) -> str:
-    """
-    Create a short, stable signature string from an MQTT/setup error message for backoff deduplication.
-    
+    """Create a short, stable signature string from an MQTT/setup error message for backoff deduplication.
+
     Parameters:
         message (object): Error text or object convertible to string describing the connect/setup failure.
-    
+
     Returns:
         signature (str): A normalized signature:
             - "tls_missing_authority_key_identifier" for messages containing "Missing Authority Key Identifier".
@@ -110,11 +107,10 @@ class MqttConnectionManager:
     """
 
     def __init__(self) -> None:
-        """
-        Initialize MQTT connection state tracker.
-        
+        """Initialize MQTT connection state tracker.
+
         Tracks connection fingerprint, reconnect/backoff timers and steps, auth-failure state, pause windows for app-conflict handling, and a flag for whether a generated MAC warning was logged.
-        
+
         Attributes:
             fingerprint (tuple[str|None, str|None, str|None] | None): Last known connection fingerprint (client_id, host, session or similar).
             generated_mac_warning_logged (bool): Whether a generated MAC warning has been logged.
@@ -141,20 +137,18 @@ class MqttConnectionManager:
     # ------------------------------------------------------------------
 
     def backoff_remaining(self) -> int:
-        """
-        Return the number of seconds remaining in the Cloud-MQTT reconnect backoff window.
-        
+        """Return the number of seconds remaining in the Cloud-MQTT reconnect backoff window.
+
         Returns:
             int: Seconds remaining until backoff expires, or 0 if no backoff is active.
         """
         return max(0, int(self.backoff_until_monotonic - time.monotonic()))
 
     def note_connect_failure(self, message: object) -> None:
-        """
-        Enter or extend the Cloud-MQTT reconnect backoff window after a setup or connect failure.
-        
+        """Enter or extend the Cloud-MQTT reconnect backoff window after a setup or connect failure.
+
         Selects a transient or permanent backoff sequence based on the provided error message, advances the backoff step when the failure signature repeats (or resets it when the signature changes), sets the next backoff expiry (monotonic timestamp), and logs the resulting pause duration and failure signature.
-        
+
         Parameters:
             message (object): Error or diagnostic text/object used to derive a normalized failure signature and to classify the failure as transient or permanent.
         """
@@ -200,11 +194,10 @@ class MqttConnectionManager:
         *,
         streak: int | None = None,
     ) -> None:
-        """
-        Pause MQTT reconnect attempts for a fixed app-conflict window after the broker rejects credentials.
-        
+        """Pause MQTT reconnect attempts for a fixed app-conflict window after the broker rejects credentials.
+
         This sets a pause window during which reconnect attempts are suppressed (HTTP polling is expected to remain active) and increments the internal app-conflict pause cycle counter. If a pause is already active, this call does nothing.
-        
+
         Parameters:
             message (object): The broker rejection message or diagnostic text used for logging.
             streak (int | None): Consecutive authentication failure count, if known; used only for logging.
@@ -234,16 +227,15 @@ class MqttConnectionManager:
         *,
         force: bool = False,
     ) -> bool:
-        """
-        Decides whether a reconnect attempt should be skipped.
-        
+        """Decides whether a reconnect attempt should be skipped.
+
         Performs checks for a matching connection fingerprint, an app-conflict pause window, active backoff, and a short reconnect throttle; a matching started-and-connected client or any active pause/backoff/throttle causes the reconnect to be skipped unless overridden.
-        
+
         Parameters:
             mqtt: The MQTT client instance (or None) used to determine started/connected state.
             current_fingerprint: The fingerprint tuple for the currently available connection; compared to the manager's stored fingerprint to detect changes.
             force: If True, bypasses the fast-path fingerprint match and the throttle check.
-        
+
         Returns:
             True if the coordinator should not attempt a reconnect now, False otherwise.
         """
@@ -309,9 +301,8 @@ class MqttConnectionManager:
         return False
 
     def record_connect_attempt(self) -> None:
-        """
-        Record the monotonic timestamp of the most recent MQTT connection attempt.
-        
+        """Record the monotonic timestamp of the most recent MQTT connection attempt.
+
         Updates the manager's last_connect_attempt to the current monotonic time.
         """
         self.last_connect_attempt = time.monotonic()
@@ -321,9 +312,8 @@ class MqttConnectionManager:
         mqtt: JackeryMqttPushClient | None,
         current_fingerprint: tuple[str | None, str | None, str | None] | None,
     ) -> None:
-        """
-        Record a successful MQTT connection by updating the stored fingerprint and clearing any connect backoff.
-        
+        """Record a successful MQTT connection by updating the stored fingerprint and clearing any connect backoff.
+
         Parameters:
             mqtt (JackeryMqttPushClient | None): The MQTT client that succeeded; if None, no state is changed.
             current_fingerprint (tuple[str | None, str | None, str | None] | None): Fingerprint tuple to store as the last successful connection.
@@ -337,11 +327,10 @@ class MqttConnectionManager:
         mqtt: JackeryMqttPushClient | None,
         error: object,
     ) -> None:
-        """
-        Classify a connection error and trigger either an auth-failure pause or a connect backoff.
-        
+        """Classify a connection error and trigger either an auth-failure pause or a connect backoff.
+
         If the provided MQTT client exposes a stored "last_error" in its diagnostics, that value is preferred for classification. If the error (or last_error) indicates broker-side credential rejection, schedule an app-conflict pause via pause_after_auth_failure and pass the client's consecutive_auth_failures as the streak. Otherwise, record the failure for backoff using note_connect_failure. If `mqtt` is None, no action is taken.
-        
+
         Parameters:
             mqtt: MQTT client whose diagnostics and consecutive_auth_failures are consulted; may be None.
             error: The error object or message to classify (used when diagnostics do not provide a last_error).
@@ -360,11 +349,10 @@ class MqttConnectionManager:
         mqtt: JackeryMqttPushClient | None,
         message: str,
     ) -> None:
-        """
-        Handle a background MQTT authentication failure by pausing reconnects or deferring reauthentication.
-        
+        """Handle a background MQTT authentication failure by pausing reconnects or deferring reauthentication.
+
         If the message indicates broker-side credential rejection, start an app-conflict pause window (using the client's consecutive auth-failure streak when available). Otherwise store the failure message so a reauthentication will be triggered on the next refresh and emit a warning.
-        
+
         Parameters:
             mqtt (JackeryMqttPushClient | None): The MQTT client instance, or None if unavailable.
             message (str): The authentication failure message text to inspect and store.

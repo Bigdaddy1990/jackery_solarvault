@@ -40,11 +40,10 @@ class Serializer:  # noqa: D101
         self.closed = None
 
     def open(self) -> None:
-        """
-        Start a YAML stream by opening the serializer.
-        
+        """Start a YAML stream by opening the serializer.
+
         Emits a StreamStartEvent with the configured encoding and marks the serializer as opened.
-        
+
         Raises:
             SerializerError: If the serializer has already been opened ("serializer is already opened")
                 or if it has been closed ("serializer is closed").
@@ -104,11 +103,10 @@ class Serializer:  # noqa: D101
         self.last_anchor_id = 0
 
     def anchor_node(self, node) -> None:  # noqa: ANN001
-        """
-        Register a node and its descendants in the serializer's anchor table, assigning a generated anchor when the same node is encountered more than once.
-        
+        """Register a node and its descendants in the serializer's anchor table, assigning a generated anchor when the same node is encountered more than once.
+
         This updates the serializer's anchor mapping so each visited node has an entry (initially `None`); if a node is seen again, a unique anchor string is generated and stored for that node. Sequence and mapping children are traversed recursively.
-        
+
         Parameters:
             node (ScalarNode | SequenceNode | MappingNode): The root node to register; child nodes are processed recursively for sequences and mappings.
         """
@@ -126,12 +124,11 @@ class Serializer:  # noqa: D101
                     self.anchor_node(value)
 
     def generate_anchor(self, node):  # noqa: ANN001, ANN201
-        """
-        Generate a unique anchor identifier for the given node.
-        
+        """Generate a unique anchor identifier for the given node.
+
         Parameters:
             node: The node to associate with the generated anchor.
-        
+
         Returns:
             str: Anchor string formatted using ANCHOR_TEMPLATE with a monotonically increasing numeric id (e.g., "id001").
         """

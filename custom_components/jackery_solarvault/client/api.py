@@ -66,9 +66,8 @@ class JackeryApi(
         mqtt_mac_id: str | None = None,
         region_code: str | None = None,
     ) -> None:
-        """
-        Create and initialize a JackeryApi client instance.
-        
+        """Create and initialize a JackeryApi client instance.
+
         Parameters:
             session: aiohttp ClientSession used for HTTP requests.
             account: Account identifier used for authentication.

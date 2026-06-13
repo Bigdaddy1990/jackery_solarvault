@@ -99,9 +99,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     def _append_unique(
         entities: list[BinarySensorEntity], entity: BinarySensorEntity
     ) -> None:
-        """
-        Append a binary sensor entity to a list if its unique ID has not been recorded.
-        
+        """Append a binary sensor entity to a list if its unique ID has not been recorded.
+
         Parameters:
             entities (list[BinarySensorEntity]): Target list to which the entity will be appended when its unique ID is new.
             entity (BinarySensorEntity): Binary sensor entity whose unique ID will be checked and recorded.
@@ -111,15 +110,14 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         )
 
     def _collect_entities() -> list[BinarySensorEntity]:
-        """
-        Builds binary sensor entities for each device and its smart plugs from the coordinator payload.
-        
+        """Builds binary sensor entities for each device and its smart plugs from the coordinator payload.
+
         Creates one JackeryBinarySensor for each description in BINARY_DESCRIPTIONS and one
         JackerySmartPlugStateBinarySensor for each smart plug that exposes a serial number.
         Smart-plug entities receive a stable 1-based `plug_index` and a deterministic
         `plug_key` derived from the plug serial and index to preserve entity identity when
         the payload order changes.
-        
+
         Returns:
             list[BinarySensorEntity]: List of constructed BinarySensorEntity instances ready to be added.
         """
@@ -213,16 +211,15 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         plug_sn: str,
         plug_key: str,
     ) -> None:
-        """
-        Binary sensor for a specific smart plug's switch state.
-        
+        """Binary sensor for a specific smart plug's switch state.
+
         Parameters:
             coordinator: Coordinator providing device payloads and updates.
             device_id: Identifier of the parent device this plug belongs to.
             plug_index (int): 1-based index of the plug within the device's sorted smart-plug list.
             plug_sn (str): Serial number of the smart plug used to locate the plug in coordinator payloads.
             plug_key (str): Stable subdevice key used to form the entity's internal unique key and device identity.
-        
+
         Notes:
             Builds and stores the plug's `device_info` at construction so the device registry can use it when the entity is added.
         """
@@ -255,9 +252,8 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """
-        Report whether the smart plug is currently providing power.
-        
+        """Report whether the smart plug is currently providing power.
+
         Returns:
             `True` if the plug reports an active output, `False` if it reports an inactive output, `None` if the state is unavailable.
         """

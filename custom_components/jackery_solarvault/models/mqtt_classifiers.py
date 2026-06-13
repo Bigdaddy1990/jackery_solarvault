@@ -43,11 +43,10 @@ def is_alarm_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether an MQTT message represents an alarm or alert.
-    
+    """Determine whether an MQTT message represents an alarm or alert.
+
     Checks the message type, action ID, and the command field in `body` for known alarm/alert indicators.
-    
+
     Returns:
         `true` if the message is an alarm or alert, `false` otherwise.
     """
@@ -63,14 +62,13 @@ def is_third_party_mqtt_config_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether an MQTT message represents a third-party MQTT configuration operation.
-    
+    """Determine whether an MQTT message represents a third-party MQTT configuration operation.
+
     Parameters:
         msg_type (str | None): The message type to check.
         action_id (int | None): The numeric action identifier to check.
         body (dict[str, Any]): The message payload; the function checks `body.get(FIELD_CMD)` for command matching.
-    
+
     Returns:
         True if the message type, action id, or `body[FIELD_CMD]` indicates a third-party MQTT config request or query, False otherwise.
     """
@@ -98,9 +96,8 @@ def is_wifi_config_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether the MQTT message represents a WiFi configuration query.
-    
+    """Determine whether the MQTT message represents a WiFi configuration query.
+
     Returns:
         `true` if the message is a WiFi config query, `false` otherwise.
     """
@@ -115,13 +112,12 @@ def is_wifi_list_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether the MQTT message requests the WiFi list.
-    
+    """Determine whether the MQTT message requests the WiFi list.
+
     Parameters:
         action_id (int | None): Action identifier from the message header; may match ACTION_ID_READ_WIFI_LIST.
         body (dict[str, Any]): Message payload; may contain a command under FIELD_CMD.
-    
+
     Returns:
         true if the message requests a WiFi list, false otherwise.
     """
@@ -135,13 +131,12 @@ def is_time_zone_config_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Identify MQTT messages that request or provide the device time zone.
-    
+    """Identify MQTT messages that request or provide the device time zone.
+
     Parameters:
         action_id (int | None): Message action identifier that may indicate a time zone get/send.
         body (dict[str, Any]): Message payload; `FIELD_CMD` may contain the command key.
-    
+
     Returns:
         True if the message is a time zone get or send command, False otherwise.
     """
@@ -155,9 +150,8 @@ def is_grid_standard_sync_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether the MQTT message represents a grid standard synchronization.
-    
+    """Determine whether the MQTT message represents a grid standard synchronization.
+
     @returns
         `true` if the message represents a grid standard sync, `false` otherwise.
     """
@@ -171,13 +165,12 @@ def is_mqtt_connect_info_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether a message requests or synchronizes MQTT connection information.
-    
+    """Determine whether a message requests or synchronizes MQTT connection information.
+
     Parameters:
         action_id (int | None): Numeric action identifier from the message metadata; may be None.
         body (dict[str, Any]): Message body; the function checks the value under `FIELD_CMD`.
-    
+
     Returns:
         bool: `True` if `action_id` equals `ACTION_ID_SYNC_MQTT_CONNECT_INFO` or `body.get(FIELD_CMD)` equals `MQTT_CMD_SYNC_MQTT_CONNECT_INFO`, `False` otherwise.
     """
@@ -191,13 +184,12 @@ def is_device_ota_version_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """
-    Determine whether the MQTT message requests the device OTA version.
-    
+    """Determine whether the MQTT message requests the device OTA version.
+
     Parameters:
         action_id (int | None): Numeric action identifier from the MQTT message.
         body (dict[str, Any]): Message payload; may contain a command under FIELD_CMD.
-    
+
     Returns:
         bool: `true` if the message is a device OTA version query, `false` otherwise.
     """

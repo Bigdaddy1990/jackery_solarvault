@@ -66,11 +66,10 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     """Device, system, battery, OTA, and location endpoint methods."""
 
     async def async_get_system_list(self) -> list[dict[str, Any]]:
-        """
-        Fetch the list of systems and their devices from the cloud.
-        
+        """Fetch the list of systems and their devices from the cloud.
+
         May update the client's inferred region code from the first system that contains a non-empty `countryCode`.
-        
+
         Returns:
             list[dict]: System objects returned by the backend (each typically includes fields like `id`, `systemName`, `devices`, `countryCode`, etc.).
         """
@@ -81,12 +80,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         return systems
 
     async def async_get_device_property(self, device_id: str | int) -> dict:
-        """
-        Retrieve the device properties for a given device identifier.
-        
+        """Retrieve the device properties for a given device identifier.
+
         Parameters:
             device_id (str | int): Device identifier; it will be converted to a string for the request.
-        
+
         Returns:
             dict: Device properties dictionary extracted from the response; an empty dict if the response payload is missing or not a dict.
         """
@@ -190,11 +188,10 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         return []
 
     async def async_get_ota_info(self, device_sn: str) -> dict:
-        """
-        Retrieve OTA information for the device identified by device_sn.
-        
+        """Retrieve OTA information for the device identified by device_sn.
+
         Normalizes several backend response shapes and selects the OTA entry that matches the given device serial number.
-        
+
         Returns:
             dict: OTA information object for the device, or an empty dict if no suitable item is found.
         """
@@ -266,15 +263,14 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         guid: str,
         timezone_offset: int = 0,
     ) -> dict[str, Any]:
-        """
-        Bind a device to the user's account.
-        
+        """Bind a device to the user's account.
+
         Parameters:
             bind_key (str): Bind key from the device QR code or sticker.
             dev_id (str): Device identifier.
             guid (str): Unique device GUID.
             timezone_offset (int): Timezone offset in seconds.
-        
+
         Returns:
             dict: Raw backend response data.
         """
@@ -289,12 +285,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_unbind_device(self, device_id: str | int) -> dict[str, Any]:
-        """
-        Unbind a device from the account.
-        
+        """Unbind a device from the account.
+
         Parameters:
             device_id (str | int): Identifier of the device to unbind.
-        
+
         Returns:
             dict[str, Any]: Backend response data.
         """
@@ -335,9 +330,8 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_get_device_shared_list(self) -> list[dict[str, Any]]:
-        """
-        Return the list of devices shared with the current account.
-        
+        """Return the list of devices shared with the current account.
+
         Returns:
             list[dict[str, Any]]: Shared device entries as extracted from the backend payload.
         """
@@ -347,13 +341,12 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_get_device_shared_managers(
         self, *, bind_user_id: str, level: int = 0
     ) -> list[dict[str, Any]]:
-        """
-        Return the list of managers for a shared device binding.
-        
+        """Return the list of managers for a shared device binding.
+
         Parameters:
             bind_user_id (str): User ID that owns the binding.
             level (int): Share level filter; only managers at this level are returned.
-        
+
         Returns:
             list[dict[str, Any]]: List of manager entries as dictionaries.
         """
@@ -383,13 +376,12 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_remove_all_shared_access(
         self, *, bind_user_id: str, level: int = 0
     ) -> dict[str, Any]:
-        """
-        Remove all shared access entries for a user at the specified share level.
-        
+        """Remove all shared access entries for a user at the specified share level.
+
         Parameters:
             bind_user_id (str): ID of the user whose shared access entries will be removed.
             level (int): Share level to remove (defaults to 0).
-        
+
         Returns:
             dict: Backend response data.
         """
@@ -401,14 +393,13 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_check_system_bound(
         self, *, bind_key: str, device_sn: str, guid: str
     ) -> dict[str, Any]:
-        """
-        Determine whether a system identified by the provided bind key, serial number, and GUID is already bound.
-        
+        """Determine whether a system identified by the provided bind key, serial number, and GUID is already bound.
+
         Parameters:
             bind_key (str): Device bind key.
             device_sn (str): Device serial number.
             guid (str): Device GUID.
-        
+
         Returns:
             dict: Backend response data from the system existence endpoint.
         """
@@ -418,12 +409,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:
-        """
-        Create or configure a system using backend-provided parameters.
-        
+        """Create or configure a system using backend-provided parameters.
+
         Parameters:
             **kwargs: Arbitrary keyword arguments forwarded directly to the backend API as the system creation/configuration payload.
-        
+
         Returns:
             dict[str, Any]: The backend response data.
         """
@@ -432,13 +422,12 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_modify_device_name(
         self, *, device_name: str, id: str | int
     ) -> dict[str, Any]:
-        """
-        Set the device's display name.
-        
+        """Set the device's display name.
+
         Parameters:
             device_name (str): New device name.
             id (str | int): Device identifier; converted to string for the request.
-        
+
         Returns:
             dict[str, Any]: Response data from the backend.
         """
@@ -497,12 +486,11 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_get_ble_ota_versions(self, version_list: str) -> dict[str, Any]:
-        """
-        Retrieve available BLE OTA versions for the specified version list.
-        
+        """Retrieve available BLE OTA versions for the specified version list.
+
         Parameters:
             version_list (str): Version list query parameter as a raw string.
-        
+
         Returns:
             dict[str, Any]: Backend response data containing OTA version information.
         """
@@ -516,15 +504,14 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         target_firmware_ids: str,
         target_version_id: str,
     ) -> dict[str, Any]:
-        """
-        Initiates an OTA firmware update for a device or its sub-device.
-        
+        """Initiates an OTA firmware update for a device or its sub-device.
+
         Parameters:
             device_sn (str): Device serial number.
             sub_device_sn (str): Sub-device serial number; use an empty string for the main device.
             target_firmware_ids (str): Comma-separated target firmware IDs or identifier accepted by the backend.
             target_version_id (str): Target firmware version ID.
-        
+
         Returns:
             dict: Backend response data.
         """
@@ -541,13 +528,12 @@ class DeviceEndpointMixin(BaseHTTPMixin):
     async def async_get_charge_report(
         self, *, device_sn: str, page_index: int = 1
     ) -> dict[str, Any]:
-        """
-        Fetch charge report history for a device.
-        
+        """Fetch charge report history for a device.
+
         Parameters:
             device_sn: Device serial number.
             page_index: Page number, starting at 1.
-        
+
         Returns:
             dict: Charge report payload for the requested page, or an empty dict if no payload is present.
         """

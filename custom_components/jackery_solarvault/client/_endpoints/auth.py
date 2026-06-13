@@ -166,16 +166,15 @@ class AuthEndpointMixin(BaseHTTPMixin):
         return token
 
     async def async_get_mqtt_credentials(self) -> dict[str, str]:
-        """
-        Construct MQTT connection credentials from the active authenticated session.
-        
+        """Construct MQTT connection credentials from the active authenticated session.
+
         Returns:
             dict[str, str]: Mapping with keys:
                 - ``clientId``: MQTT client identifier composed from the login user id and client suffix.
                 - ``username``: MQTT username composed from the login user id and MAC id.
                 - ``password``: Base64-encoded AES-CBC encryption of ``username`` using the login-provided seed.
                 - ``userId``: MQTT user id from the login response.
-        
+
         Raises:
             JackeryAuthError: If the session is missing required MQTT fields, if the MQTT seed is not valid base64, or if the decoded seed is not exactly 32 bytes.
         """
@@ -215,9 +214,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
     @property
     def mqtt_fingerprint(self) -> tuple[str | None, str | None, str | None]:
-        """
-        Current MQTT fingerprint identifying the session's MQTT credentials.
-        
+        """Current MQTT fingerprint identifying the session's MQTT credentials.
+
         Returns:
             tuple[str | None, str | None, str | None]: `(user_id, mac_id, seed_b64)` where
                 `user_id` is the MQTT user identifier or `None`,
@@ -228,9 +226,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """
-        Identify the source of the current MQTT MAC ID.
-        
+        """Identify the source of the current MQTT MAC ID.
+
         Returns:
             source (str): A string describing how the MQTT MAC ID was obtained (for example, the provider or method).
         """
@@ -238,9 +235,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
     @property
     def mqtt_mac_id(self) -> str | None:
-        """
-        Get the MQTT MAC ID for the current session.
-        
+        """Get the MQTT MAC ID for the current session.
+
         Returns:
             str | None: The MQTT MAC ID as a string, or None if no MAC ID is available.
         """
@@ -248,9 +244,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
     @property
     def region_code(self) -> str | None:
-        """
-        Return the region code used for HTTP login calls.
-        
+        """Return the region code used for HTTP login calls.
+
         Returns:
             str | None: The pinned region code, or None if none is set.
         """
@@ -266,15 +261,14 @@ class AuthEndpointMixin(BaseHTTPMixin):
         region_code: str,
         verification_code: str,
     ) -> dict[str, Any]:
-        """
-        Create a new Jackery account using the provided email, password, region code, and verification code.
-        
+        """Create a new Jackery account using the provided email, password, region code, and verification code.
+
         Parameters:
             email (str): Email address for the new account.
             password (str): Desired account password.
             region_code (str): Region or country code to register the account under.
             verification_code (str): Verification code sent to the email.
-        
+
         Returns:
             dict[str, Any]: Decoded backend response payload.
         """
@@ -378,12 +372,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_update_user_info(self, *, nick_name: str) -> dict[str, Any]:
-        """
-        Update the user's display name.
-        
+        """Update the user's display name.
+
         Parameters:
             nick_name (str): New display name; sent to the backend as the `nickName` field.
-        
+
         Returns:
             dict[str, Any]: Decoded backend response data.
         """
@@ -401,9 +394,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
         return await self._post_json(UPLOAD_HEADIMG_PATH, {"image": image})
 
     async def async_get_user_info(self) -> dict[str, Any]:
-        """
-        Return the decoded backend payload for the current user's profile.
-        
+        """Return the decoded backend payload for the current user's profile.
+
         Returns:
             dict[str, Any]: User profile data as returned by the backend.
         """
@@ -413,9 +405,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
     async def async_cancel_account(
         self, *, email: str, verification_code: str
     ) -> dict[str, Any]:
-        """
-        Cancel the authenticated user's account using a verification code.
-        
+        """Cancel the authenticated user's account using a verification code.
+
         Returns:
             dict: Backend response payload.
         """
@@ -425,12 +416,11 @@ class AuthEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_update_register_id(self, *, register_id: str) -> dict[str, Any]:
-        """
-        Update the push notification registration ID for the authenticated account.
-        
+        """Update the push notification registration ID for the authenticated account.
+
         Parameters:
             register_id (str): Push notification registration token to associate with the account.
-        
+
         Returns:
             dict: Backend response payload.
         """

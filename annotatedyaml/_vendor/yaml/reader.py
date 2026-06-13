@@ -85,11 +85,10 @@ class Reader:  # noqa: D101
     # Yeah, it's ugly and slow.
 
     def __init__(self, stream) -> None:  # noqa: ANN001
-        """
-        Initialize the Reader for a Unicode string, a bytes object, or a file-like stream.
-        
+        """Initialize the Reader for a Unicode string, a bytes object, or a file-like stream.
+
         Sets up internal buffers, encoding detection/decoder selection, and position-tracking state appropriate for the provided input so the reader can produce a normalized Unicode buffer for parsing.
-        
+
         Parameters:
             stream (str | bytes | file-like): Source to read from. If a `str`, the text is used directly as the reader input. If `bytes`, the raw byte buffer is stored and encoding detection is performed. Otherwise `stream` is treated as a file-like object expected to support `read`, and the reader will consume raw bytes from it and detect/initialize decoding.
         """
@@ -138,12 +137,11 @@ class Reader:  # noqa: D101
             return self.buffer[self.pointer + index]
 
     def prefix(self, length=1):  # noqa: ANN001, ANN201
-        """
-        Get the next substring from the unread buffer without advancing the reader.
-        
+        """Get the next substring from the unread buffer without advancing the reader.
+
         Parameters:
             length (int): Number of characters to include; ensures at least this many characters are available before slicing.
-        
+
         Returns:
             str: Substring of length `length` starting at the current unread buffer position.
         """
@@ -152,11 +150,10 @@ class Reader:  # noqa: D101
         return self.buffer[self.pointer : self.pointer + length]
 
     def forward(self, length=1) -> None:  # noqa: ANN001
-        """
-        Advance the reader's position by the specified number of characters.
-        
+        r"""Advance the reader's position by the specified number of characters.
+
         Updates internal state: `pointer`, `index`, `line`, and `column`. Newline characters ("\n", "\x85", "\u2028", "\u2029") and carriage returns not followed by "\n" increment `line` and reset `column` to 0. The zero-width BOM ("\ufeff") does not increment `column`.
-        
+
         Parameters:
             length (int): Number of characters to consume from the buffer.
         """
@@ -190,9 +187,8 @@ class Reader:  # noqa: D101
         return Mark(self.name, self.index, self.line, self.column, None, None)
 
     def determine_encoding(self) -> None:
-        """
-        Detect and configure the input stream's text encoding based on an initial BOM or UTF-8 fallback.
-        
+        """Detect and configure the input stream's text encoding based on an initial BOM or UTF-8 fallback.
+
         Reads enough initial raw bytes to detect a UTF-16 little-endian or big-endian BOM, sets the decoder and `encoding` accordingly (defaults to "utf-8" if no BOM is present), and ensures the Unicode buffer contains at least one decoded character.
         """
         while not self.eof and (self.raw_buffer is None or len(self.raw_buffer) < 2):  # noqa: PLR2004
@@ -278,9 +274,8 @@ class Reader:  # noqa: D101
                 break
 
     def update_raw(self, size=4096) -> None:  # noqa: ANN001
-        """
-        Read up to `size` bytes from the underlying stream and append them to the internal raw byte buffer.
-        
+        """Read up to `size` bytes from the underlying stream and append them to the internal raw byte buffer.
+
         Parameters:
             size (int): Maximum number of bytes to read from the stream (default 4096).
         """
