@@ -336,7 +336,7 @@ def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
 
 
 def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -> None:
-    """Implement test jackery corrected home consumption requires ct for fallback formula."""  # noqa: E501
+    """Implement test jackery corrected home consumption requires ct for fallback formula."""
     assert (
         util.jackery_corrected_home_consumption_power({}, {"outGridSidePw": 70}) is None
     )
@@ -344,7 +344,7 @@ def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -
 
 
 def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -> None:
-    """Implement test period trend totals use same chart series logic for week month year."""  # noqa: E501
+    """Implement test period trend totals use same chart series logic for week month year."""
     week = {"totalHomeEgy": "999", "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.42, 0.0]}
     month = {"totalHomeEgy": "999", "y": [15.53, 0.42] + [0.0] * 29}
     year = {"totalHomeEgy": "999", "y": [0.0, 0.0, 0.0, 0.0, 15.95] + [0.0] * 7}
@@ -363,7 +363,7 @@ def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -
 def test_period_trend_entities_can_be_created_from_series_without_server_total() -> (
     None
 ):
-    """Implement test period trend entities can be created from series without server total."""  # noqa: E501
+    """Implement test period trend entities can be created from series without server total."""
     source = {"y": [0.0, 1.25, None, 2.75]}
 
     assert util.trend_payload_has_value(source, "home_trends_month", "totalHomeEgy")
@@ -736,10 +736,10 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
     assert warnings[0].total_method == "chart_series_sum"
 
 
-def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (  # noqa: E501
+def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (
     None
 ):
-    """Implement test app data quality does not warn month less than week across month boundary."""  # noqa: E501
+    """Implement test app data quality does not warn month less than week across month boundary."""
     payload = {
         "device_home_stat_week": {
             "unit": "kWh",
@@ -784,7 +784,7 @@ def test_app_data_quality_ignores_missing_day_total() -> None:
 
 
 def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() -> None:
-    """Implement test app data quality warns when lifetime generation is lower than year."""  # noqa: E501
+    """Implement test app data quality warns when lifetime generation is lower than year."""
     payload = {
         "statistic": {"totalGeneration": "41.31"},
         "device_pv_stat_year": {
@@ -842,7 +842,7 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
 
 
 def test_data_quality_warning_format_includes_request_ranges_when_available() -> None:
-    """Implement test data quality warning format includes request ranges when available."""  # noqa: E501
+    """Implement test data quality warning format includes request ranges when available."""
     warning = util.AppDataQualityWarning(
         level="warning",
         reason="year_less_than_week",
@@ -1152,7 +1152,7 @@ def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
     assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]
     assert (
         payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_matches_pv_revenue_not_savings"  # has_prior_lifetime_gen=False for this test  # noqa: E501
+        == "cloud_total_matches_pv_revenue_not_savings"  # has_prior_lifetime_gen=False for this test
     )
 
 
@@ -1257,7 +1257,7 @@ def test_device_year_compact_bucket_expands_previous_and_current_months() -> Non
 
     Raw series ``[0,0,0,0,"13.26",0,...]`` is published as
     ``[0,0,0,13,0.26,0,...]`` (April=13, May=0.26).
-    """  # noqa: E501
+    """
     source = {
         "unit": "kWh",
         # The documented year total proves compact encoding is in effect.

@@ -21,7 +21,7 @@ Covers:
 - JackeryDeleteStormAlertButton: HomeAssistantError with translation_key passes through
 - JackeryRefreshWeatherPlanButton: HomeAssistantError with translation_key passes through
 - JackeryReadScheduleButton: HomeAssistantError with translation_key passes through
-"""  # noqa: E501
+"""
 
 import asyncio
 import logging
@@ -102,7 +102,7 @@ class TestAsyncFinishEntryStartupAuthFailure:
     """Tests for _async_finish_entry_startup when auth layer rejects credentials."""
 
     async def test_auth_failure_stored_on_coordinator(self) -> None:  # noqa: PLR6301
-        """ConfigEntryAuthFailed from _async_authenticate_api_layer must be stored on the coordinator."""  # noqa: E501
+        """ConfigEntryAuthFailed from _async_authenticate_api_layer must be stored on the coordinator."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
         hass = _FakeHass()
@@ -128,7 +128,7 @@ class TestAsyncFinishEntryStartupAuthFailure:
         assert coordinator._mqtt_auth_failure_message is not None  # noqa: SLF001
 
     async def test_auth_failure_returns_early(self) -> None:  # noqa: PLR6301
-        """When auth fails, _async_finish_entry_startup must return early without calling async_discover."""  # noqa: E501
+        """When auth fails, _async_finish_entry_startup must return early without calling async_discover."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
         hass = _FakeHass()
@@ -157,7 +157,7 @@ class TestAsyncFinishEntryStartupDiscovery:
     async def test_discovery_update_failed_with_cached_snapshot_sets_data(  # noqa: PLR6301
         self,
     ) -> None:
-        """When discovery raises UpdateFailed and a cached snapshot exists, coordinator data is set."""  # noqa: E501
+        """When discovery raises UpdateFailed and a cached snapshot exists, coordinator data is set."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
         hass = _FakeHass()
@@ -185,7 +185,7 @@ class TestAsyncFinishEntryStartupDiscovery:
         coordinator.async_set_updated_data.assert_called_once_with(cached)
 
     async def test_discovery_auth_failed_stored_on_coordinator(self) -> None:  # noqa: PLR6301
-        """When discovery raises ConfigEntryAuthFailed, it is stored on the coordinator."""  # noqa: E501
+        """When discovery raises ConfigEntryAuthFailed, it is stored on the coordinator."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
         hass = _FakeHass()
@@ -220,7 +220,7 @@ class TestAsyncFinishEntryStartupGatherResults:
     async def test_mqtt_auth_failed_defers_background_auth_failure(  # noqa: PLR6301
         self,
     ) -> None:
-        """When mqtt_result is ConfigEntryAuthFailed, _defer_background_auth_failure is called."""  # noqa: E501
+        """When mqtt_result is ConfigEntryAuthFailed, _defer_background_auth_failure is called."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
         hass = _FakeHass()
@@ -316,7 +316,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         assert "HA-MQTT listener could not start" in caplog.text
 
     async def test_refresh_failed_with_cached_snapshot_sets_data(self) -> None:  # noqa: PLR6301
-        """When first refresh fails with UpdateFailed and cached snapshot exists, coordinator data is set."""  # noqa: E501
+        """When first refresh fails with UpdateFailed and cached snapshot exists, coordinator data is set."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
         hass = _FakeHass()
@@ -341,7 +341,7 @@ class TestAsyncFinishEntryStartupGatherResults:
     async def test_refresh_failed_without_cached_snapshot_logs_warning(  # noqa: PLR6301
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """When first refresh fails with UpdateFailed and no cached snapshot, a warning is logged."""  # noqa: E501
+        """When first refresh fails with UpdateFailed and no cached snapshot, a warning is logged."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
         hass = _FakeHass()
@@ -377,7 +377,7 @@ class TestAsyncFinishEntryStartupFinally:
     """Tests that the finally block cleans up the startup task key."""
 
     async def test_finally_removes_startup_task_key_on_success(self) -> None:  # noqa: PLR6301
-        """The startup_task key must be removed from hass.data after successful startup."""  # noqa: E501
+        """The startup_task key must be removed from hass.data after successful startup."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="entry-finally-ok")
         coordinator = _make_coordinator_stub()
@@ -465,7 +465,7 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
     async def test_homeassistant_error_with_translation_key_is_reraised(
         self,
     ) -> None:
-        """HomeAssistantError that already has a translation_key must pass through unchanged."""  # noqa: E501
+        """HomeAssistantError that already has a translation_key must pass through unchanged."""
         from homeassistant.exceptions import HomeAssistantError
 
         original_error = HomeAssistantError(
@@ -487,7 +487,7 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
     async def test_homeassistant_error_without_translation_key_is_wrapped(
         self,
     ) -> None:
-        """HomeAssistantError without a translation_key must be wrapped into entity_action_failed."""  # noqa: E501
+        """HomeAssistantError without a translation_key must be wrapped into entity_action_failed."""
         from homeassistant.exceptions import HomeAssistantError
 
         async def _action(coordinator: Any, device_id: str) -> None:  # noqa: ANN401, RUF029
@@ -555,7 +555,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
     async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
         self,
     ) -> None:
-        """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""  # noqa: E501
+        """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""
         from custom_components.jackery_solarvault.button import JackeryRebootButton  # noqa: I001
         from homeassistant.exceptions import HomeAssistantError
 
@@ -579,7 +579,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
 
 
 class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
-    """Tests for HomeAssistantError handling in JackeryDeleteStormAlertButton.async_press."""  # noqa: E501
+    """Tests for HomeAssistantError handling in JackeryDeleteStormAlertButton.async_press."""
 
     async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
         self,
@@ -613,7 +613,7 @@ class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
 
 
 class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
-    """Tests for HomeAssistantError handling in JackeryRefreshWeatherPlanButton.async_press."""  # noqa: E501
+    """Tests for HomeAssistantError handling in JackeryRefreshWeatherPlanButton.async_press."""
 
     async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
         self,
@@ -647,7 +647,7 @@ class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
 
 
 class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
-    """Tests for HomeAssistantError handling in JackeryReadScheduleButton.async_press."""  # noqa: E501
+    """Tests for HomeAssistantError handling in JackeryReadScheduleButton.async_press."""
 
     async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
         self,
@@ -684,7 +684,7 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
     async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
         self,
     ) -> None:
-        """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""  # noqa: E501
+        """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
@@ -748,7 +748,7 @@ def test_storm_alert_id_with_integer_zero_returns_string_zero() -> None:
 
 
 def test_storm_alert_id_with_false_alertid_returns_string_false() -> None:
-    """_storm_alert_id with alertId=False must return 'False' (bool is not None or '')."""  # noqa: E501
+    """_storm_alert_id with alertId=False must return 'False' (bool is not None or '')."""
     from custom_components.jackery_solarvault.button import (
         _storm_alert_id,  # noqa: PLC2701
     )
@@ -816,7 +816,7 @@ def test_legacy_suffix_matches_battery_pack_large_index() -> None:
 
 
 def test_legacy_suffix_matches_empty_suffix_always_false() -> None:
-    """An empty suffix must never match (head would be full uid, which contains non-digits if uid does)."""  # noqa: E501
+    """An empty suffix must never match (head would be full uid, which contains non-digits if uid does)."""
     from custom_components.jackery_solarvault import (
         _legacy_suffix_matches,  # noqa: PLC2701
     )
@@ -864,7 +864,7 @@ def test_client_init_getattr_uses_import_module() -> None:
 
     The PR changed the implementation from a direct inline import to importlib.import_module.
     We verify the behavior is equivalent: the class is loaded lazily and is correct.
-    """  # noqa: E501
+    """
     import custom_components.jackery_solarvault.client as client_pkg
     from custom_components.jackery_solarvault.client.mqtt_push import (
         JackeryMqttPushClient as DirectClass,
@@ -875,7 +875,7 @@ def test_client_init_getattr_uses_import_module() -> None:
 
 
 def test_client_init_getattr_raises_attribute_error_for_unknown() -> None:
-    """__getattr__ must raise AttributeError for names other than JackeryMqttPushClient."""  # noqa: E501
+    """__getattr__ must raise AttributeError for names other than JackeryMqttPushClient."""
     import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError, match="NonExistent"):

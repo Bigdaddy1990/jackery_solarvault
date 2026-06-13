@@ -28,7 +28,7 @@ class TestClientPackageGetattr:
     """Tests for the PEP 562 __getattr__ in client/__init__.py."""
 
     def test_jackery_mqtt_push_client_is_accessible(self) -> None:  # noqa: PLR6301
-        """JackeryMqttPushClient must be retrievable via the client package namespace."""  # noqa: E501
+        """JackeryMqttPushClient must be retrievable via the client package namespace."""
         # This exercises the __getattr__ path in client/__init__.py
         cls = client_pkg.JackeryMqttPushClient
         # Must be a class, not None or a sentinel
@@ -73,7 +73,7 @@ class TestClientPackageGetattr:
         assert JackeryError is not None
 
     def test_getattr_called_multiple_times_returns_same_class(self) -> None:  # noqa: PLR6301
-        """Multiple calls for JackeryMqttPushClient must return the same class object."""  # noqa: E501
+        """Multiple calls for JackeryMqttPushClient must return the same class object."""
         cls1 = client_pkg.JackeryMqttPushClient
         cls2 = client_pkg.JackeryMqttPushClient
         assert cls1 is cls2
@@ -102,7 +102,7 @@ def _make_api(
 
 
 class TestJackeryApiTransportCounters:
-    """Tests for the transport diagnostic counter attributes added to JackeryApi.__init__."""  # noqa: E501
+    """Tests for the transport diagnostic counter attributes added to JackeryApi.__init__."""
 
     def test_requests_total_initialises_to_zero(self) -> None:  # noqa: PLR6301
         """_requests_total must start at 0 after construction."""
@@ -177,12 +177,12 @@ class TestJackeryApiTransportCounters:
         assert api._mqtt_mac_id is None  # noqa: SLF001
 
     def test_configured_mqtt_mac_id_stored(self) -> None:  # noqa: PLR6301
-        """An explicitly provided mqtt_mac_id must be stored as _mqtt_mac_id_configured."""  # noqa: E501
+        """An explicitly provided mqtt_mac_id must be stored as _mqtt_mac_id_configured."""
         api = _make_api(mqtt_mac_id="2abcdef1234567890")
         assert api._mqtt_mac_id_configured == "2abcdef1234567890"  # noqa: SLF001
 
     def test_all_required_diagnostics_buffers_initialised(self) -> None:  # noqa: PLR6301
-        """All documented diagnostics buffer attributes must be present after __init__."""  # noqa: E501
+        """All documented diagnostics buffer attributes must be present after __init__."""
         api = _make_api()
         assert api.last_login_response is None
         assert api.last_system_list_response is None

@@ -157,7 +157,7 @@ def test_construction_initial_counters_are_zero() -> None:
 
 
 def test_construction_default_topic_filter_is_empty() -> None:
-    """Default topic filter is empty so the listener stays disabled unless configured."""  # noqa: E501
+    """Default topic filter is empty so the listener stays disabled unless configured."""
     client = _make_client()
     assert client._topic_filter == LOCAL_MQTT_DEFAULT_TOPIC  # noqa: SLF001
     assert client._topic_filter == ""  # noqa: PLC1901, SLF001
@@ -274,7 +274,7 @@ def test_handle_disconnect_error_when_was_connected_says_disconnect() -> None:
 
 
 def test_handle_disconnect_error_when_not_yet_connected_says_connect_failed() -> None:
-    """If the client had not connected, the error message starts with 'connect failed:'."""  # noqa: E501
+    """If the client had not connected, the error message starts with 'connect failed:'."""
     client = _make_client()
     client._handle_disconnect_error("refused", was_connected=False)  # noqa: SLF001
     assert client._last_error is not None  # noqa: SLF001

@@ -208,7 +208,7 @@ class TestEntryBootstrapMqttSession:
         assert result[MQTT_SESSION_MAC_ID_SOURCE] == "configured"
 
     def test_omits_mac_id_source_when_empty_string(self) -> None:  # noqa: PLR6301
-        """Omits MQTT_SESSION_MAC_ID_SOURCE from the snapshot when it is an empty string."""  # noqa: E501
+        """Omits MQTT_SESSION_MAC_ID_SOURCE from the snapshot when it is an empty string."""
         entry = _FakeEntry(
             data={
                 ENTRY_BOOTSTRAP_MQTT_SESSION: {
@@ -488,7 +488,7 @@ class TestAsyncStartLocalMqttNewKeys:
         assert "local_mqtt_client" not in bucket
 
     async def test_enabled_with_valid_host_and_filter_creates_client(self) -> None:  # noqa: PLR6301
-        """CONF_LOCAL_MQTT_ENABLE=True with a valid host and topic filter must create the client."""  # noqa: E501
+        """CONF_LOCAL_MQTT_ENABLE=True with a valid host and topic filter must create the client."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
             enable=True,
@@ -520,7 +520,7 @@ class TestAsyncStartLocalMqttNewKeys:
         assert "local_mqtt_client" not in bucket
 
     async def test_whitespace_only_host_prevents_client_creation(self) -> None:  # noqa: PLR6301
-        """A whitespace-only CONF_LOCAL_MQTT_HOST must be stripped and treated as empty."""  # noqa: E501
+        """A whitespace-only CONF_LOCAL_MQTT_HOST must be stripped and treated as empty."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=True, host="   ")
         coordinator = MagicMock()
@@ -624,7 +624,7 @@ class TestAsyncStartLocalMqttNewKeys:
         assert client._topic_filter == "sv3pro/+/status"  # noqa: SLF001
 
     async def test_sink_forwards_non_none_data_to_coordinator(self) -> None:  # noqa: PLR6301
-        """The sink function must call coordinator.async_handle_local_mqtt_message for non-None data."""  # noqa: E501
+        """The sink function must call coordinator.async_handle_local_mqtt_message for non-None data."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
             enable=True, host="192.168.1.200", topic_filter="jackery/+/data"
@@ -724,7 +724,7 @@ class TestAsyncAuthenticateApiLayer:
     async def test_raises_config_entry_auth_failed_on_jackery_auth_error(  # noqa: PLR6301
         self,
     ) -> None:
-        """JackeryAuthError from async_login must be re-raised as ConfigEntryAuthFailed."""  # noqa: E501
+        """JackeryAuthError from async_login must be re-raised as ConfigEntryAuthFailed."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
         )
@@ -781,7 +781,7 @@ class TestAsyncAuthenticateApiLayer:
             await _async_authenticate_api_layer(hass, entry, api)
 
     async def test_saves_new_mqtt_session_after_successful_login(self) -> None:  # noqa: PLR6301
-        """After a successful login, a changed MQTT session snapshot must be persisted."""  # noqa: E501
+        """After a successful login, a changed MQTT session snapshot must be persisted."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
         )

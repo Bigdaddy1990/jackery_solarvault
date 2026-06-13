@@ -164,7 +164,7 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
 
         Raises:
             AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
-        """  # noqa: E501
+        """
         raise AssertionError("invalid tariff input must stop before HTTP post")  # noqa: TRY003
 
     api._post_form = _post_form  # noqa: SLF001
