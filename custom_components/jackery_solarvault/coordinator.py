@@ -78,7 +78,11 @@ from .stats import (
     parse_statistics_backfill_date,
     stat_row_start,
     statistics_current_year_recovery_needed,
-    statistics_http_backfill_dates,
+)
+from .handlers.ble_handlers import (
+    async_send_ble_command as _ble_async_send_ble_command,
+    async_start_ble_transport as _ble_async_start_ble_transport,
+    ble_observations as _ble_observations,
 )
 from .handlers.mqtt_handlers import (
     app_period_section as _app_period_section_fn,
@@ -100,6 +104,11 @@ from .models.shelly_cloud import (
     shelly_cloud_device_ids as _shelly_cloud_device_ids_fn,
     shelly_cloud_device_matches_entry as _shelly_cloud_device_matches_entry_fn,
 )
+from .stats.backfill import (
+    apply_year_month_backfill,
+    statistics_http_backfill_dates,
+)
+from .stats.validators import verify_and_backfill
 from .subdevices.detector import (
     battery_packs_from_source,
     battery_packs_need_query,
@@ -516,7 +525,6 @@ from .util import (
     app_period_request_kwargs,
     app_year_request_kwargs,
     append_payload_debug_line,
-    apply_year_month_backfill,
     chart_series_debug,
     day_power_energy_points,
     day_power_series_key,
@@ -529,7 +537,6 @@ from .util import (
     safe_float,
     trend_series_points,
     utc_now,
-    verify_and_backfill,
     year_payload_appears_current_month_only,
 )
 
@@ -1326,6 +1333,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
+        """Send a command through the extracted BLE handler."""
+        return await _ble_async_send_ble_command(
+            self,
+            device_id,
+            cmd=cmd,
+            body=body,
+            flags=flags,
+            wait_for_ack=wait_for_ack,
+            ack_timeout_sec=ack_timeout_sec,
+            ack_cmds=ack_cmds,
+            mtu_override=mtu_override,
+        )
+
+    async def _async_send_ble_command_impl(  # noqa: PLR0913
+        self,
+        device_id: str,
+        *,
+        cmd: int,
+        body: dict[str, Any] | bytes,
+        flags: int = 0,
+        wait_for_ack: bool = False,
+        ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
+        ack_cmds: tuple[int, ...] | None = None,
+        mtu_override: int | None = None,
+    ) -> bool:
         """Send a single command frame to the device over BLE (experimental).
 
         Accepts the same ``cmd``/body shape as the MQTT setter pipeline:
@@ -1363,6 +1395,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return bool(sent)
 
     def ble_observations(self) -> dict[str, Any]:
+        """Return BLE diagnostics through the extracted BLE handler."""
+        return _ble_observations(self)
+
+    def _ble_observations_impl(self) -> dict[str, Any]:
         """Return a JSON-friendly snapshot of the BLE listener stats.
 
         Used by diagnostics + the optional BLE-status sensor. Returns an
@@ -1539,7 +1575,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "library": snap.get("library"),
         }
 
-    async def async_start_ble_transport(self) -> None:  # noqa: PLR0915
+    async def async_start_ble_transport(self) -> None:
+        """Start BLE transport through the extracted BLE handler."""
+        await _ble_async_start_ble_transport(self)
+
+    async def _async_start_ble_transport_impl(self) -> None:  # noqa: PLR0915
         """Start the optional BLE listener if the config-entry option is set.
 
         Safe to call repeatedly; only the first call attaches a listener.
