@@ -8,6 +8,7 @@ import re
 import sys
 import types
 
+import pytest
 import yaml
 
 CUSTOM_COMPONENT = pathlib.Path("custom_components/jackery_solarvault")
@@ -2589,6 +2590,39 @@ def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> Non
     assert '"kind": "http"' in api_source
     assert '"kind": "mqtt"' in coordinator_source
     assert "append_payload_debug_line" in coordinator_source
+
+
+def test_payload_debug_sync_file_io_is_guarded_and_offloaded() -> None:
+    """Runtime payload-debug callers must not do direct sync file I/O."""
+    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert "def _guard_payload_debug_sync_file_io" in util_source
+    assert "asyncio.get_running_loop()" in util_source
+    assert "caller: {caller_path}" in util_source
+    assert "_guard_payload_debug_sync_file_io()" in util_source
+
+    debug_call = coordinator_source.split("path = self.hass.config.path", 1)[1].split(
+        "async def async_discover",
+        1,
+    )[0]
+    assert "await self.hass.async_add_executor_job(" in debug_call
+    assert "append_payload_debug_line" in debug_call
+
+
+@pytest.mark.asyncio
+async def test_payload_debug_line_rejects_direct_event_loop_file_io(tmp_path) -> None:
+    """Guard direct async runtime calls before any sync file operation."""
+    from custom_components.jackery_solarvault.util import append_payload_debug_line
+
+    path = tmp_path / "payload-debug.jsonl"
+
+    with pytest.raises(RuntimeError, match="async_add_executor_job|to_thread"):
+        append_payload_debug_line(path, {"kind": "test"})
+
+    assert not path.exists()
 
 
 def test_local_helper_calls_match_their_declared_arity() -> None:
