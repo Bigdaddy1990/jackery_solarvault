@@ -1,0 +1,57 @@
+
+[_validate_key_len] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+
+[aes_decrypt] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
+
+[aes_encrypt] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
+
+[build_binary_frame] adopted=LIVE
+   CODE <pre_transfer>: def build_binary_frame(  # noqa: PLR0913
+
+[build_plaintext_frame] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError("chunk_payload must serialise to an even hex length")  # noqa: TRY003
+
+[chunk_size_for_mtu] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+
+[decrypt_binary_notify] adopted=pre_transfer
+   doc  <01.06\custom_components\jackery_solarvault\client\ble.py>: pass
+   CODE <01.06\custom_components\jackery_solarvault\client\ble.py>: raise ValueError(f"notify too short: {len(raw)} bytes")
+   doc  <01.06\custom_components\jackery_solarvault\client\ble.py>: # We do not refuse parsing on mismatch, but the caller's debug
+   doc  <01.06\custom_components\jackery_solarvault\client\ble.py>: # log will surface unexpected values for analysis.
+   doc  <01.06\custom_components\jackery_solarvault\client\ble.py>: # Soft assertion — every frame seen so far carries 0x0064 here.
+   CODE <01.06\custom_components\jackery_solarvault\client\ble.py>: raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
+   CODE <01.06\custom_components\jackery_solarvault\client\ble.py>: raise ValueError(
+   CODE <25.05.v2\client\ble.py [ancient]>: body = plaintext[
+   doc  <25.05.v2\client\ble.py [ancient]>: _BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length
+   CODE <25.05.v2\client\ble.py [ancient]>: f"unexpected payload marker {plaintext[12:14].hex()!r}"
+   doc  <25.05.v2\client\ble.py [ancient]>: + body_length : _BINARY_FRAME_HEADER_LEN
+   doc  <25.05.v2\client\ble.py [ancient]>: _BINARY_FRAME_HEADER_LEN
+
+[decrypt_frame] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError("plaintext too short to carry random tag + CRC")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError("ciphertext blob too short")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+
+[hex16] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(f"hex16: {value} does not fit into 16 bits")  # noqa: TRY003
+   CODE <pre_transfer>: if not 0 <= value <= 0xFFFF:  # noqa: PLR2004
+
+[hex_encode] adopted=pre_transfer
+   doc  <1\client\ble.py>: """Upper-case hex encode a byte string (no separators, no prefix)."""
+
+[parse_hex16] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\client\ble.py>: raise ValueError("parse_hex16: expected hex chars") from err
+   CODE <01.06\custom_components\jackery_solarvault\client\ble.py>: raise ValueError(
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\ble.py>: raise ValueError(f"parse_hex16: expected hex chars, got {text!r}") from err
+   doc  <1\client\ble.py>: """Parse a 4-character hex string back to an int. Inverse of :func:`hex16`."""
+
+[parse_plaintext_frame] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(f"unexpected payload marker {marker!r}")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError(f"unexpected protocol version {version!r}")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError("frame too short")  # noqa: TRY003

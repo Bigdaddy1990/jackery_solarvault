@@ -1,0 +1,46 @@
+
+[JackeryBinarySensor] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py
+   CODE <01.06\custom_components\jackery_solarvault\binary_sensor.py>: bool | None: `True` if the sensor is on, `False` if the sensor is off, `None` if the state is unknow
+   doc  <01.06\custom_components\jackery_solarvault\binary_sensor.py>: """Determine whether the binary sensor is currently active.
+   doc  <01.06\custom_components\jackery_solarvault\binary_sensor.py>: Returns:
+
+[JackerySmartPlugStateBinarySensor] adopted=LIVE
+   doc  <1\binary_sensor.py>: """Return diagnostic attributes for the smart-plug state."""
+   doc  <1\binary_sensor.py>: super().__init__(
+   doc  <1\binary_sensor.py>: coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
+   doc  <1\binary_sensor.py>: """Initialise the entity from the coordinator, sorted index and serial."""
+   CODE <1\binary_sensor.py>: plug_index, self._plug
+   doc  <1\binary_sensor.py>: """Return True when the smart plug reports an active output."""
+
+[__init__] adopted=LIVE
+   doc  <1\binary_sensor.py>: super().__init__(
+   doc  <1\binary_sensor.py>: coordinator, device_id, f"smart_plug_{plug_index}_switch_state"
+   doc  <1\binary_sensor.py>: """Initialise the entity from the coordinator, sorted index and serial."""
+   CODE <1\binary_sensor.py>: plug_index, self._plug
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: self._attr_entity_registry_enabled_default = (
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: """Initialise the entity from the coordinator and description."""
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: description: JackeryBinaryDescription,
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: and description.entity_category != EntityCategory.DIAGNOSTIC
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: super().__init__(coordinator, device_id, description.key)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: description.entity_registry_enabled_default
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: self.entity_description = description
+
+[_add_new_entities] adopted=LIVE
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: @callback
+
+[_collect_entities] adopted=LIVE
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: @callback
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: for dev_id, _payload in (coordinator.data or {}).items():
+
+[async_setup_entry] adopted=LIVE
+   CODE <1\binary_sensor.py>: async def async_setup_entry(
+   CODE <pre_transfer>: async def async_setup_entry(  # noqa: RUF029 - HA platform hook must stay async.
+
+[extra_state_attributes] adopted=LIVE
+   doc  <1\binary_sensor.py>: """Return diagnostic attributes for the smart-plug state."""
+
+[is_on] adopted=LIVE
+   doc  <1\binary_sensor.py>: """Return True when the smart plug reports an active output."""
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: self.entity_description.getter(self._properties, self._device_meta)
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: return safe_bool(
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\binary_sensor.py [ancient]>: """Return True when the entity is on."""

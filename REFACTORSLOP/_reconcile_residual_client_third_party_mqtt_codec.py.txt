@@ -1,0 +1,15 @@
+
+[decode_third_party_mqtt_field] adopted=pre_transfer
+   CODE <02.06\custom_components\jackery_solarvault\client\third_party_mqtt_codec.py>: except (ValueError, UnicodeDecodeError) as err:
+   CODE <02.06\custom_components\jackery_solarvault\client\third_party_mqtt_codec.py>: ciphertext = base64.b64decode(value)
+   CODE <02.06\custom_components\jackery_solarvault\client\third_party_mqtt_codec.py>: plaintext = aes_decrypt(ciphertext, bluetooth_key, bluetooth_key)
+   CODE <02.06\custom_components\jackery_solarvault\client\third_party_mqtt_codec.py>: raise ValueError("invalid app-encoded third-party MQTT field") from err
+   CODE <02.06\custom_components\jackery_solarvault\client\third_party_mqtt_codec.py>: raise ValueError(
+
+[encode_third_party_mqtt_field] adopted=LIVE
+   CODE <pre_transfer>: iv = secrets.token_bytes(BLE_AES_IV_LEN)
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+   doc  <pre_transfer>: is generated per call so repeated secrets do not produce repeated ciphertext.
+   CODE <pre_transfer>: return base64.b64encode(iv + ciphertext).decode("ascii")
+   CODE <pre_transfer>: ciphertext = aes_encrypt(value.encode("utf-8"), bluetooth_key, iv)
+   CODE <pre_transfer>: The wire envelope is ``iv || ciphertext`` encoded with Base64. A fresh IV
