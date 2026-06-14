@@ -398,6 +398,10 @@ from .const import (
     UNRECORDED_ATTRS_LOCAL_MQTT,
 )
 from .entity import JackeryEntity
+from .entity_contract import (
+    DEFAULT_LIVE_SOURCES,
+    DEFAULT_NULL_SEMANTICS,
+)
 from .util import (
     append_unique_entity,
     calculated_smart_meter_power,
@@ -581,6 +585,11 @@ class JackerySensorDescription(SensorEntityDescription):
     transform: Callable[[Any], Any] = _identity
     fallbacks: tuple[Callable[[dict[str, Any]], Any], ...] = ()
     value_map: dict[int, str] | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
@@ -1200,6 +1209,11 @@ class JackeryStatSensorDescription(SensorEntityDescription):
     section: str = PAYLOAD_STATISTIC  # statistic | price | system
     fallback_sources: tuple[tuple[str, str], ...] = ()
     reset_period: StatResetPeriod | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _period_from_stat_description(
@@ -1224,6 +1238,11 @@ class JackeryBatteryPackSensorDescription(SensorEntityDescription):
 
     field: str
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1238,6 +1257,11 @@ class JackerySmartPlugSensorDescription(SensorEntityDescription):
     field: str
     transform: Callable[[Any], Any] = _identity
     reset_period: StatResetPeriod | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1251,6 +1275,11 @@ class JackeryMeterHeadSensorDescription(SensorEntityDescription):
 
     field: str
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1264,6 +1293,11 @@ class JackerySmartMeterSensorDescription(SensorEntityDescription):
     sum_fields: tuple[str, ...] = ()
     negative_sum_fields: tuple[str, ...] = ()
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1272,6 +1306,11 @@ class JackerySavingsDetailSensorDescription(SensorEntityDescription):
 
     path: tuple[str, ...]
     transform: Callable[[Any], Any] = safe_float
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _external_chart_metric_key(section: str, stat_key: str) -> str | None:
