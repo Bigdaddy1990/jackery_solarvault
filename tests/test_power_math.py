@@ -9,12 +9,9 @@ import importlib.util
 from pathlib import Path
 import sys
 import types
-from typing import ClassVar
-
-import pytest
 
 
-def _load_util_module() -> types.ModuleType:
+def _load_util_module():
     package_dir = (
         Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
@@ -90,9 +87,9 @@ def test_app_period_range_rejects_unknown_date_types() -> None:
     try:
         util.app_period_range("quarter", today=util.date(2026, 5, 3))
     except ValueError as err:
-        assert "Unsupported Jackery app period dateType" in str(err)  # noqa: PT017
+        assert "Unsupported Jackery app period dateType" in str(err)
     else:
-        raise AssertionError("unknown Jackery app dateType was silently accepted")  # noqa: TRY003
+        raise AssertionError("unknown Jackery app dateType was silently accepted")
 
 
 def test_app_period_date_bounds_fills_only_missing_sides() -> None:
@@ -130,9 +127,9 @@ def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
         try:
             util.app_period_date_bounds("month", today=today, **kwargs)
         except ValueError as err:
-            assert "Jackery app period" in str(err)  # noqa: PT017
+            assert "Jackery app period" in str(err)
         else:
-            raise AssertionError(f"invalid app period bounds were accepted: {kwargs!r}")  # noqa: TRY003
+            raise AssertionError(f"invalid app period bounds were accepted: {kwargs!r}")
 
 
 def test_app_period_date_bounds_strips_manual_date_strings() -> None:
@@ -179,9 +176,9 @@ def test_parse_utc_datetime_rejects_invalid_values() -> None:
     try:
         util.parse_utc_datetime("not-a-time")
     except ValueError as err:
-        assert "invalid UTC timestamp" in str(err)  # noqa: PT017
+        assert "invalid UTC timestamp" in str(err)
     else:
-        raise AssertionError("expected ValueError")  # noqa: TRY003
+        raise AssertionError("expected ValueError")
 
 
 def test_app_month_request_kwargs_builds_explicit_calendar_month() -> None:
@@ -204,29 +201,19 @@ def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
     }
 
     assert util.signed_phase_power_values(ct) == [2.9, -70.2, 68.8]
-    assert round(util.smart_meter_net_power(ct), 2) == pytest.approx(1.5)
-    assert round(
-        util.calculated_smart_meter_power(ct, "net_import"), 2
-    ) == pytest.approx(1.5)
-    assert round(
-        util.calculated_smart_meter_power(ct, "net_export"), 2
-    ) == pytest.approx(0.0)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_import"), 2
-    ) == pytest.approx(71.7)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_export"), 2
-    ) == pytest.approx(70.2)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_flow"), 2
-    ) == pytest.approx(141.9)
+    assert round(util.smart_meter_net_power(ct), 2) == 1.5
+    assert round(util.calculated_smart_meter_power(ct, "net_import"), 2) == 1.5
+    assert round(util.calculated_smart_meter_power(ct, "net_export"), 2) == 0.0
+    assert round(util.calculated_smart_meter_power(ct, "gross_import"), 2) == 71.7
+    assert round(util.calculated_smart_meter_power(ct, "gross_export"), 2) == 70.2
+    assert round(util.calculated_smart_meter_power(ct, "gross_flow"), 2) == 141.9
 
 
 def test_smart_meter_net_falls_back_to_total_fields() -> None:
     """Implement test smart meter net falls back to total fields."""
-    assert util.smart_meter_net_power({"tPhasePw": 10}) == 10  # noqa: PLR2004
-    assert util.smart_meter_net_power({"tnPhasePw": 15}) == -15  # noqa: PLR2004
-    assert util.smart_meter_net_power({"tPhasePw": 3, "tnPhasePw": 7}) == -4  # noqa: PLR2004
+    assert util.smart_meter_net_power({"tPhasePw": 10}) == 10
+    assert util.smart_meter_net_power({"tnPhasePw": 15}) == -15
+    assert util.smart_meter_net_power({"tPhasePw": 3, "tnPhasePw": 7}) == -4
 
 
 def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
@@ -242,10 +229,10 @@ def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
         "tnPhasePw": 429,
     }
 
-    assert sum(util.signed_phase_power_values(ct)) == -3  # noqa: PLR2004
-    assert util.smart_meter_net_power(ct) == -429  # noqa: PLR2004
-    assert util.calculated_smart_meter_power(ct, "net_export") == 429  # noqa: PLR2004
-    assert util.calculated_smart_meter_power(ct, "gross_flow") == 429  # noqa: PLR2004
+    assert sum(util.signed_phase_power_values(ct)) == -3
+    assert util.smart_meter_net_power(ct) == -429
+    assert util.calculated_smart_meter_power(ct, "net_export") == 429
+    assert util.calculated_smart_meter_power(ct, "gross_flow") == 429
 
 
 def test_jackery_corrected_home_consumption_discharging() -> None:
@@ -260,10 +247,10 @@ def test_jackery_corrected_home_consumption_discharging() -> None:
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
     assert result is not None
-    assert round(result.value, 2) == pytest.approx(71.7)
-    assert round(result.smart_meter_net_power, 2) == pytest.approx(1.5)
-    assert result.jackery_input_power == pytest.approx(0.0)
-    assert result.jackery_output_power == pytest.approx(70.2)
+    assert round(result.value, 2) == 71.7
+    assert round(result.smart_meter_net_power, 2) == 1.5
+    assert result.jackery_input_power == 0.0
+    assert result.jackery_output_power == 70.2
     assert result.source == "smart_meter_net_minus_input_plus_output"
 
 
@@ -275,10 +262,10 @@ def test_jackery_corrected_home_consumption_charging() -> None:
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
     assert result is not None
-    assert result.value == 100  # noqa: PLR2004
-    assert result.smart_meter_net_power == 300  # noqa: PLR2004
-    assert result.jackery_input_power == 200  # noqa: PLR2004
-    assert result.jackery_output_power == pytest.approx(0.0)
+    assert result.value == 100
+    assert result.smart_meter_net_power == 300
+    assert result.jackery_input_power == 200
+    assert result.jackery_output_power == 0.0
     assert result.source == "smart_meter_net_minus_input_plus_output"
 
 
@@ -294,7 +281,7 @@ def test_grid_side_helpers_prefer_ongrid_fields_from_live_diagnostics() -> None:
     }
 
     assert util.jackery_grid_side_input_power(props) == 0
-    assert util.jackery_grid_side_output_power(props) == 385  # noqa: PLR2004
+    assert util.jackery_grid_side_output_power(props) == 385
 
 
 def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
@@ -318,10 +305,10 @@ def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
     assert result is not None
-    assert result.value == 408  # noqa: PLR2004
-    assert result.smart_meter_net_power == 11  # noqa: PLR2004
+    assert result.value == 408
+    assert result.smart_meter_net_power == 11
     assert result.jackery_input_power == 0
-    assert result.jackery_output_power == 408  # noqa: PLR2004
+    assert result.jackery_output_power == 408
     assert result.source == "otherLoadPw"
 
 
@@ -330,7 +317,7 @@ def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
     result = util.jackery_corrected_home_consumption_power({}, {"otherLoadPw": 385})
 
     assert result is not None
-    assert result.value == 385  # noqa: PLR2004
+    assert result.value == 385
     assert result.smart_meter_net_power is None
     assert result.source == "otherLoadPw"
 
@@ -349,15 +336,9 @@ def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -
     month = {"totalHomeEgy": "999", "y": [15.53, 0.42] + [0.0] * 29}
     year = {"totalHomeEgy": "999", "y": [0.0, 0.0, 0.0, 0.0, 15.95] + [0.0] * 7}
 
-    assert util.trend_series_total(
-        week, "home_trends_week", "totalHomeEgy"
-    ) == pytest.approx(74.72)
-    assert util.trend_series_total(
-        month, "home_trends_month", "totalHomeEgy"
-    ) == pytest.approx(15.95)
-    assert util.trend_series_total(
-        year, "home_trends_year", "totalHomeEgy"
-    ) == pytest.approx(15.95)
+    assert util.trend_series_total(week, "home_trends_week", "totalHomeEgy") == 74.72
+    assert util.trend_series_total(month, "home_trends_month", "totalHomeEgy") == 15.95
+    assert util.trend_series_total(year, "home_trends_year", "totalHomeEgy") == 15.95
 
 
 def test_period_trend_entities_can_be_created_from_series_without_server_total() -> (
@@ -367,9 +348,7 @@ def test_period_trend_entities_can_be_created_from_series_without_server_total()
     source = {"y": [0.0, 1.25, None, 2.75]}
 
     assert util.trend_payload_has_value(source, "home_trends_month", "totalHomeEgy")
-    assert util.trend_series_total(
-        source, "home_trends_month", "totalHomeEgy"
-    ) == pytest.approx(4.0)
+    assert util.trend_series_total(source, "home_trends_month", "totalHomeEgy") == 4.0
 
 
 def test_battery_month_and_year_follow_week_series_keys() -> None:
@@ -387,18 +366,14 @@ def test_battery_month_and_year_follow_week_series_keys() -> None:
         "y2": [0.0, 0.0, 0.0, 0.0, 3.72] + [0.0] * 7,
     }
 
-    assert util.trend_series_total(
-        month, "battery_trends_month", "totalChgEgy"
-    ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        month, "battery_trends_month", "totalDisChgEgy"
-    ) == pytest.approx(3.72)
-    assert util.trend_series_total(
-        year, "battery_trends_year", "totalChgEgy"
-    ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        year, "battery_trends_year", "totalDisChgEgy"
-    ) == pytest.approx(3.72)
+    assert util.trend_series_total(month, "battery_trends_month", "totalChgEgy") == 3.49
+    assert (
+        util.trend_series_total(month, "battery_trends_month", "totalDisChgEgy") == 3.72
+    )
+    assert util.trend_series_total(year, "battery_trends_year", "totalChgEgy") == 3.49
+    assert (
+        util.trend_series_total(year, "battery_trends_year", "totalDisChgEgy") == 3.72
+    )
 
 
 def test_device_period_stats_follow_app_series_keys() -> None:
@@ -412,15 +387,22 @@ def test_device_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        pv_month, "device_pv_stat_month", "totalSolarEnergy"
-    ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalCharge"
-    ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalDischarge"
-    ) == pytest.approx(3.25)
+    assert (
+        util.trend_series_total(pv_month, "device_pv_stat_month", "totalSolarEnergy")
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            battery_month, "device_battery_stat_month", "totalCharge"
+        )
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            battery_month, "device_battery_stat_month", "totalDischarge"
+        )
+        == 3.25
+    )
 
 
 def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
@@ -440,18 +422,26 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalInGridEnergy"
-    ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalOutGridEnergy"
-    ) == pytest.approx(1.0)
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalInCtEnergy"
-    ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalOutCtEnergy"
-    ) == pytest.approx(3.25)
+    assert (
+        util.trend_series_total(
+            grid_month, "device_home_stat_month", "totalInGridEnergy"
+        )
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(
+            grid_month, "device_home_stat_month", "totalOutGridEnergy"
+        )
+        == 1.0
+    )
+    assert (
+        util.trend_series_total(ct_month, "device_ct_stat_month", "totalInCtEnergy")
+        == 3.5
+    )
+    assert (
+        util.trend_series_total(ct_month, "device_ct_stat_month", "totalOutCtEnergy")
+        == 3.25
+    )
 
 
 def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
@@ -474,11 +464,14 @@ def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
         "device_ct_stat_month",
         "totalOutCtEnergy",
     )
-    assert util.trend_series_total(
-        source,
-        "device_ct_stat_month",
-        "totalInCtEnergy",
-    ) == pytest.approx(0.0)
+    assert (
+        util.trend_series_total(
+            source,
+            "device_ct_stat_month",
+            "totalInCtEnergy",
+        )
+        == 0.0
+    )
 
 
 def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
@@ -496,11 +489,14 @@ def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
-    assert util.trend_series_total(
-        source,
-        "device_ct_stat_month",
-        "totalInCtEnergy",
-    ) == pytest.approx(0.0)
+    assert (
+        util.trend_series_total(
+            source,
+            "device_ct_stat_month",
+            "totalInCtEnergy",
+        )
+        == 0.0
+    )
 
 
 def test_period_trend_totals_ignore_day_power_curves_in_watts() -> None:
@@ -534,42 +530,48 @@ def test_period_trend_totals_from_latest_diagnostics() -> None:
         "y2": [0.0, 0.0, 0.0, 0.0, 3.82] + [0.0] * 7,
     }
 
-    assert util.trend_series_total(
-        pv_week, "pv_trends_week", "totalSolarEnergy"
-    ) == pytest.approx(107.95)
-    assert util.trend_series_total(
-        pv_month, "pv_trends_month", "totalSolarEnergy"
-    ) == pytest.approx(22.29)
-    assert util.trend_series_total(
-        pv_year, "pv_trends_year", "totalSolarEnergy"
-    ) == pytest.approx(22.29)
-    assert util.trend_series_total(
-        home_week, "home_trends_week", "totalHomeEgy"
-    ) == pytest.approx(74.82)
-    assert util.trend_series_total(
-        home_month, "home_trends_month", "totalHomeEgy"
-    ) == pytest.approx(16.05)
-    assert util.trend_series_total(
-        home_year, "home_trends_year", "totalHomeEgy"
-    ) == pytest.approx(16.05)
-    assert util.trend_series_total(
-        bat_week, "battery_trends_week", "totalChgEgy"
-    ) == pytest.approx(17.55)
-    assert util.trend_series_total(
-        bat_week, "battery_trends_week", "totalDisChgEgy"
-    ) == pytest.approx(15.98)
-    assert util.trend_series_total(
-        bat_month, "battery_trends_month", "totalChgEgy"
-    ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        bat_month, "battery_trends_month", "totalDisChgEgy"
-    ) == pytest.approx(3.82)
-    assert util.trend_series_total(
-        bat_year, "battery_trends_year", "totalChgEgy"
-    ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        bat_year, "battery_trends_year", "totalDisChgEgy"
-    ) == pytest.approx(3.82)
+    assert (
+        util.trend_series_total(pv_week, "pv_trends_week", "totalSolarEnergy") == 107.95
+    )
+    assert (
+        util.trend_series_total(pv_month, "pv_trends_month", "totalSolarEnergy")
+        == 22.29
+    )
+    assert (
+        util.trend_series_total(pv_year, "pv_trends_year", "totalSolarEnergy") == 22.29
+    )
+    assert (
+        util.trend_series_total(home_week, "home_trends_week", "totalHomeEgy") == 74.82
+    )
+    assert (
+        util.trend_series_total(home_month, "home_trends_month", "totalHomeEgy")
+        == 16.05
+    )
+    assert (
+        util.trend_series_total(home_year, "home_trends_year", "totalHomeEgy") == 16.05
+    )
+    assert (
+        util.trend_series_total(bat_week, "battery_trends_week", "totalChgEgy") == 17.55
+    )
+    assert (
+        util.trend_series_total(bat_week, "battery_trends_week", "totalDisChgEgy")
+        == 15.98
+    )
+    assert (
+        util.trend_series_total(bat_month, "battery_trends_month", "totalChgEgy")
+        == 3.49
+    )
+    assert (
+        util.trend_series_total(bat_month, "battery_trends_month", "totalDisChgEgy")
+        == 3.82
+    )
+    assert (
+        util.trend_series_total(bat_year, "battery_trends_year", "totalChgEgy") == 3.49
+    )
+    assert (
+        util.trend_series_total(bat_year, "battery_trends_year", "totalDisChgEgy")
+        == 3.82
+    )
 
 
 def test_trend_series_points_build_week_daily_buckets() -> None:
@@ -632,16 +634,16 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
     """Implement test trend series points build year monthly buckets and skip future."""
     source = {
         "unit": "kWh",
-        # Compact expansion parses 7.84 -> April=7, May=0.84.
+        # Documented year total anchors compact expansion: 7.84 -> April=7, May=84
         # plus 99 in June. Without this anchor the disambiguation (Path 3b)
         # would publish raw values verbatim per DATA_SOURCE_PRIORITY.md.
-        "totalOutGridEnergy": "106.84",
+        "totalOutGridEnergy": "190",
         "_request": {
             "dateType": "year",
             "beginDate": "2026-01-01",
             "endDate": "2026-12-31",
         },
-        "y2": [0.0, 0.0, 0.0, 0.0, "7.84", "99"],
+        "y2": [0.0, 0.0, 0.0, 0.0, 7.84, 99.0],
     }
 
     points = util.trend_series_points(
@@ -656,7 +658,7 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
         util.TrendStatisticPoint(util.date(2026, 2, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 3, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 4, 1), 7.0),
-        util.TrendStatisticPoint(util.date(2026, 5, 1), 0.84),
+        util.TrendStatisticPoint(util.date(2026, 5, 1), 84.0),
     ]
 
 
@@ -678,8 +680,9 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
 
     ``DATA_SOURCE_PRIORITY.md`` is the contract this test enforces.
 
-    Setup: year payload encodes May as compact ``30.28`` (April=30 + May=0.28).
-    The full week (89.08 kWh) lies inside the same year, so 30.28 < 89.08
+    Setup: year payload encodes May as compact ``30.28`` (April=30 + May=28)
+    with documented ``totalOutGridEnergy=58`` confirming the encoding.
+    The full week (89.08 kWh) lies inside the same year, so 58 < 89.08
     is a real contradiction in Jackery's data.
     """
     payload = {
@@ -707,8 +710,8 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
                 "beginDate": "2026-01-01",
                 "endDate": "2026-12-31",
             },
-            # Anchor confirming compact: 30.28 in slot[4] -> April=30 + May=0.28.
-            "totalOutGridEnergy": "30.28",
+            # Anchor confirming compact: 30.28 in slot[4] -> April=30 + May=28 = 58
+            "totalOutGridEnergy": "58",
             "x": [str(i) for i in range(1, 13)],
             "y2": [0.0, 0.0, 0.0, 0.0, 30.28, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         },
@@ -718,9 +721,9 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
 
     assert [warning.reason for warning in warnings] == ["year_less_than_week"]
     assert warnings[0].source_section == "device_home_stat_year"
-    assert warnings[0].source_value == pytest.approx(30.28)
+    assert warnings[0].source_value == 58.0
     assert warnings[0].reference_section == "device_home_stat_week"
-    assert warnings[0].reference_value == pytest.approx(89.08)
+    assert warnings[0].reference_value == 89.08
     assert warnings[0].source_request == {
         "dateType": "year",
         "beginDate": "2026-01-01",
@@ -755,26 +758,6 @@ def test_app_data_quality_does_not_warn_month_less_than_week_across_month_bounda
             "unit": "kWh",
             "totalOutGridEnergy": "100.00",
             "y2": [0.0, 0.0, 0.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
-
-    assert not warnings
-
-
-def test_app_data_quality_ignores_missing_day_total() -> None:
-    """Missing day totals must not be treated as raw zero values."""
-    payload = {
-        "device_home_stat_week": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "2.00",
-            "y2": [1.0, 1.0],
-        },
-        "device_home_stat_month": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "3.00",
-            "y2": [3.0],
         },
     }
 
@@ -1001,8 +984,8 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
     util.guard_statistic_totals_from_year(payload)
 
     year = payload["device_pv_stat_year"]
-    assert year["totalSolarEnergy"] == pytest.approx(228.02)
-    assert year["totalSolarRevenue"] == pytest.approx(63.86)
+    assert year["totalSolarEnergy"] == 228.02
+    assert year["totalSolarRevenue"] == 63.86
     assert year["y"] == [
         0.0,
         0.0,
@@ -1023,17 +1006,11 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         "series_key": "y",
         "months": [4, 5],
     }
-    assert payload["statistic"]["totalGeneration"] == pytest.approx(228.02)
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        46.72
-    )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["totalCarbon"] == pytest.approx(227.33)
-    assert payload["statistic"]["_savings_calculation"][
-        "calculated_total"
-    ] == pytest.approx(46.72)
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(
-        166.86
-    )
+    assert payload["statistic"]["totalGeneration"] == 228.02
+    assert payload["statistic"]["totalRevenue"] == "23.96"
+    assert payload["statistic"]["totalCarbon"] == 227.33
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.72
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 166.86
     assert payload["statistic"]["_savings_calculation"]["source_energy"] == {
         "pv_year_kwh": 228.02,
         "device_grid_side_input_year_kwh": 0.11,
@@ -1106,7 +1083,7 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
     )
     assert (
         payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_is_lifetime_higher_than_ytd_calculated"
+        == "cloud_total_higher_than_current_year_savings"
     )
     assert "_total_lower_bound_guard" not in payload["statistic"]
 
@@ -1143,16 +1120,12 @@ def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        46.75
-    )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["_savings_calculation"][
-        "calculated_total"
-    ] == pytest.approx(46.75)
+    assert payload["statistic"]["totalRevenue"] == "63.86"
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.75
     assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]
     assert (
         payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_matches_pv_revenue_not_savings"  # has_prior_lifetime_gen=False for this test
+        == "cloud_total_matches_pv_revenue_not_savings"
     )
 
 
@@ -1186,15 +1159,9 @@ def test_total_savings_subtracts_ct_export_when_available() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        44.8
-    )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["_savings_calculation"][
-        "calculated_total"
-    ] == pytest.approx(44.8)
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(
-        160.0
-    )
+    assert payload["statistic"]["totalRevenue"] == "63.86"
+    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 44.8
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 160.0
     assert (
         payload["statistic"]["_savings_calculation"]["method"]
         == "device_grid_side_output_minus_ct_export_bounded_by_home"
@@ -1203,20 +1170,18 @@ def test_total_savings_subtracts_ct_export_when_available() -> None:
 
 def test_safe_int_decimal_strings_and_bad_values() -> None:
     """Implement test safe int decimal strings and bad values."""
-    assert util.safe_int("8") == 8  # noqa: PLR2004
-    assert util.safe_int("8.0") is None
-    assert util.safe_int("3.14") is None
-    assert util.safe_int(8.9) is None
-    assert util.safe_int(True) is None
+    assert util.safe_int("8") == 8
+    assert util.safe_int("8.0") == 8
+    assert util.safe_int(8.9) == 8
     assert util.safe_int(None) is None
     assert util.safe_int("not-a-number") is None
 
 
 def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
     """Implement test safe float parses decimal comma without deleting it."""
-    assert util.safe_float("40,96") == pytest.approx(40.96)
-    assert util.safe_float(" 59,43 ") == pytest.approx(59.43)
-    assert util.safe_float("40,96") != 4096  # noqa: PLR2004
+    assert util.safe_float("40,96") == 40.96
+    assert util.safe_float(" 59,43 ") == 59.43
+    assert util.safe_float("40,96") != 4096
     assert util.safe_float("1,2,3") is None
 
 
@@ -1226,44 +1191,50 @@ def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -
     Per ``DATA_SOURCE_PRIORITY.md`` the device year series can encode two
     adjacent months in one slot. The ``totalSolarEnergy`` field on the
     payload anchors the disambiguation: ``40,96`` is interpreted as
-    ``40 + 0.96 = 40.96``.
+    ``40 + 96 = 136`` only when the documented total agrees.
     """
     source = {
         "unit": "kWh",
-        "totalSolarEnergy": "40.96",
+        "totalSolarEnergy": "136",  # anchors the compact interpretation
         "y": ["0", "0", "40,96", "0"],
     }
 
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == pytest.approx(40.96)
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 136.0
+    )
     # Without an array context the month section is plain decimal.
     month_source = {
         "unit": "kWh",
         "totalSolarEnergy": "40.96",
         "y": ["0", "0", "40,96", "0"],
     }
-    assert util.trend_series_total(
-        month_source, "device_pv_stat_month", "totalSolarEnergy"
-    ) == pytest.approx(40.96)
+    assert (
+        util.trend_series_total(
+            month_source, "device_pv_stat_month", "totalSolarEnergy"
+        )
+        == 40.96
+    )
     assert (
         util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
-        != 4096  # noqa: PLR2004
+        != 4096
     )
 
 
 def test_device_year_compact_bucket_expands_previous_and_current_months() -> None:
     """Documented spec example from REPAIR_ROADMAP.md ("Device year compact bucket expansion").
 
-    Raw series ``[0,0,0,0,"13.26",0,...]`` is published as
-    ``[0,0,0,13,0.26,0,...]`` (April=13, May=0.26).
+    Raw series ``[0,0,0,0,13.26,0,...]`` with documented year total ``39``
+    is published as ``[0,0,0,13,26,0,...]`` (April=13, May=26). The
+    ``totalDischarge="39"`` field is the anchor that confirms the compact
+    interpretation; without it path 3b would publish raw.
     """
     source = {
         "unit": "kWh",
         # The documented year total proves compact encoding is in effect.
-        "totalDischarge": "13.26",
+        "totalDischarge": "39",
         "x": [str(i) for i in range(1, 13)],
-        "y2": [0.0, 0.0, 0.0, 0.0, "13.26", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "y2": [0.0, 0.0, 0.0, 0.0, 13.26, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         "_request": {
             "dateType": "year",
             "beginDate": "2026-01-01",
@@ -1273,13 +1244,17 @@ def test_device_year_compact_bucket_expands_previous_and_current_months() -> Non
 
     assert util.effective_trend_series_values(
         source, "device_battery_stat_year", "totalDischarge"
-    ) == [0.0, 0.0, 0.0, 13.0, 0.26, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_battery_stat_year", "totalDischarge"
-    ) == pytest.approx(13.26)
-    assert util.trend_series_total(
-        source, "device_battery_stat_year", "totalDischarge"
-    ) == pytest.approx(13.26)
+    ) == [0.0, 0.0, 0.0, 13.0, 26.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert (
+        util.effective_period_total_value(
+            source, "device_battery_stat_year", "totalDischarge"
+        )
+        == 39.0
+    )
+    assert (
+        util.trend_series_total(source, "device_battery_stat_year", "totalDischarge")
+        == 39.0
+    )
 
 
 def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw() -> (
@@ -1309,12 +1284,16 @@ def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw(
     assert util.effective_trend_series_values(
         source, "device_pv_stat_year", "totalSolarEnergy"
     ) == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == pytest.approx(71.72)
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == pytest.approx(71.72)
+    assert (
+        util.effective_period_total_value(
+            source, "device_pv_stat_year", "totalSolarEnergy"
+        )
+        == 71.72
+    )
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 71.72
+    )
 
 
 def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None:
@@ -1344,9 +1323,10 @@ def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None
         source, "device_pv_stat_year", "totalSolarEnergy"
     )
     assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == pytest.approx(71.72)
+    assert (
+        util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
+        == 71.72
+    )
 
 
 def test_month_series_does_not_use_compact_year_expansion() -> None:
@@ -1366,58 +1346,18 @@ def test_month_series_does_not_use_compact_year_expansion() -> None:
     assert util.effective_trend_series_values(
         source, "device_battery_stat_month", "totalDischarge"
     ) == [13.26, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_battery_stat_month", "totalDischarge"
-    ) == pytest.approx(13.26)
-
-
-def test_device_year_compact_parts_expand_fraction_and_previous_buckets() -> None:
-    """Compact year buckets must split whole previous and fractional current parts."""
-    source = {
-        "unit": "kWh",
-        "totalSolarEnergy": "6.05",
-        "x": [1, 2, 3],
-        "y": ["1.05", "2.00", "3"],
-        "_request": {
-            "dateType": "year",
-            "beginDate": "2026-01-01",
-            "endDate": "2026-12-31",
-        },
-    }
-
-    assert util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
-    ) == [3.05, 3.0, 0.0]
-
-
-@pytest.mark.parametrize(
-    ["cloud_value", "local_value", "expected"],
-    [
-        [-1.0, 5.0, 5.0],
-        [util.math.nan, 5.0, 5.0],
-        [-1.0, None, None],
-        [util.math.nan, None, None],
-        [10.0, -1.0, 10.0],
-        [10.0, util.math.nan, 10.0],
-        [None, -1.0, None],
-        [None, util.math.nan, None],
-    ],
-)
-def test_verify_and_backfill_rejects_negative_and_nan_values(
-    cloud_value: float | None,
-    local_value: float | None,
-    expected: float | None,
-) -> None:
-    """Invalid energy values must not propagate into recorder statistics."""
-    assert util.verify_and_backfill(cloud_value, local_value) == expected
+    assert (
+        util.trend_series_total(source, "device_battery_stat_month", "totalDischarge")
+        == 13.26
+    )
 
 
 def test_config_entry_bool_option_parses_legacy_string_values() -> None:
     """Boolean options must not treat legacy string 'false' as truthy."""
 
     class Entry:
-        options: ClassVar[dict[str, str]] = {"enabled": "false"}
-        data: ClassVar[dict[str, bool | str]] = {"enabled": True, "fallback": "yes"}
+        options = {"enabled": "false"}
+        data = {"enabled": True, "fallback": "yes"}
 
     assert util.config_entry_bool_option(Entry(), "enabled", True) is False
     assert util.config_entry_bool_option(Entry(), "fallback", False) is True

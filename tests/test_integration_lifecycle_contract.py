@@ -19,7 +19,7 @@ def _function_source(name: str, *, source_path: Path | None = None) -> str:
     match = re.search(
         rf"^async def {name}.*?(?=^async def |^def |^class |\Z)",
         source,
-        re.DOTALL | re.MULTILINE,
+        re.S | re.M,
     )
     assert match is not None, f"{name} not found in {path.name}"
     return match.group(0)

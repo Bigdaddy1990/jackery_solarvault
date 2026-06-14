@@ -14,7 +14,7 @@ SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 INIT_PATH = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
-API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
+API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "api.py"
 COMPONENT_PATH = ROOT / "custom_components" / "jackery_solarvault"
 
 
@@ -83,7 +83,7 @@ def _string_tuple_pairs_keyword(
             return ()
         pairs: list[tuple[str, str]] = []
         for item in value.elts:
-            if isinstance(item, ast.Tuple) and len(item.elts) == 2:  # noqa: PLR2004
+            if isinstance(item, ast.Tuple) and len(item.elts) == 2:
                 constants = _const_string_assignments(CONST_PATH)
                 left = _eval_static_string(item.elts[0], constants)
                 right = _eval_static_string(item.elts[1], constants)
@@ -186,9 +186,9 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
 
     found: dict[str, tuple[str | None, object | None]] = {}
     for call in _stat_description_calls():
-        stat_key = _const_keyword(call, "key")
-        if isinstance(stat_key, str) and stat_key in expected:
-            found[stat_key] = (
+        key = _const_keyword(call, "key")
+        if isinstance(key, str) and key in expected:
+            found[key] = (
                 _state_class_keyword(call),
                 _const_keyword(call, "reset_period"),
             )
@@ -238,25 +238,13 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
     """Implement test device day sensors fallback to day period sources."""
     metadata = _stat_description_metadata()
     expected = {
-        "device_today_pv_energy": (
-            "device_pv_stat_day",
-            (("device_statistic", "pvEgy"),),
-        ),
-        "device_today_battery_charge": (
-            "device_battery_stat_day",
-            (("device_statistic", "batChgEgy"),),
-        ),
-        "device_today_ongrid_input": (
-            "device_home_stat_day",
-            (("device_statistic", "inOngridEgy"),),
-        ),
-        "device_today_ongrid_output": (
-            "device_home_stat_day",
-            (("device_statistic", "outOngridEgy"),),
-        ),
+        "device_today_pv_energy": (("device_pv_stat_day", "totalSolarEnergy"),),
+        "device_today_battery_charge": (("device_battery_stat_day", "totalCharge"),),
+        "device_today_ongrid_input": (("device_home_stat_day", "totalInGridEnergy"),),
+        "device_today_ongrid_output": (("device_home_stat_day", "totalOutGridEnergy"),),
     }
-    for key, (primary_section, fallback) in expected.items():
-        assert metadata[key]["section"] == primary_section, key
+    for key, fallback in expected.items():
+        assert metadata[key]["section"] == "device_statistic", key
         assert metadata[key]["fallback_sources"] == fallback, key
 
     assert (
@@ -322,11 +310,9 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement
-    assert "requires explicit app ranges" in coordinator_source
-    # coordinator uses _local_today() which wraps dt_util.now() with timezone
+    assert "APP_POLLING_MQTT.md requires explicit app ranges" in coordinator_source
     assert (
-        "app_period_request_kwargs(date_type, today=self._local_today())"
+        "app_period_request_kwargs(date_type, today=dt_util.now().date())"
         in coordinator_source
     )
     assert "app_period_date_bounds(" in api_source
@@ -396,11 +382,7 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     binary_source = (COMPONENT_PATH / "binary_sensor.py").read_text(encoding="utf-8")
 
     assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source
-    # Bug #12 fix: diagnostic binary sensor visibility is now controlled by
-    # entity_registry_enabled_default directly, not the category override.
-    assert (
-        "description.entity_category != EntityCategory.DIAGNOSTIC" not in binary_source
-    )
+    assert "description.entity_category != EntityCategory.DIAGNOSTIC" in binary_source
     assert "enabled_default=pack_desc.entity_category" in sensor_source
     assert "_attr_entity_registry_enabled_default = False" in sensor_source
 
@@ -494,8 +476,8 @@ def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
     }
     assert found["savings_energy"][1] == "TOTAL"
     assert found["savings_battery_loss_year_energy"][1] == "TOTAL"
-    assert found["savings_conversion_loss_year_energy"][1] == "TOTAL"  # Bug #7 fix
-    assert found["savings_pv_residual_year_energy"][1] == "TOTAL"  # Bug #7 fix
+    assert found["savings_conversion_loss_year_energy"][1] is None
+    assert found["savings_pv_residual_year_energy"][1] is None
     assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
     assert found["savings_price"] == (None, "MEASUREMENT")
 
@@ -538,7 +520,7 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
         "total_generation": ("TOTAL_INCREASING", None),
         "total_revenue": ("TOTAL", None),
         "total_carbon_saved": ("TOTAL_INCREASING", None),
-        "power_price": ("MEASUREMENT", None),  # Bug #22: added state_class=MEASUREMENT
+        "power_price": (None, None),
     }
     calls = _stat_description_calls()
     found: dict[str, tuple[str | None, object | None]] = {}
@@ -616,12 +598,12 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
     import re
 
     flat = re.sub(r"\s+", " ", sensor_source)
-    # Three-part fix: day/week stale sensors use server_total (not 0) to avoid
-    # midnight delta bugs. Month/year sensors use None (unavailable).
-    assert "raw = server_total" in flat, "stale-period day guard must use server_total"
-    assert "DATE_TYPE_MONTH, DATE_TYPE_YEAR" in flat, (
-        "stale guard must split by period type"
+    assert ("raw = 0 if self._reset_period == DATE_TYPE_DAY else None") in flat, (
+        "daily stale-period guard does not emit a zero fallback"
     )
+    assert (
+        'attrs["stale_period_fallback"] = "zero_until_fresh_day_data"'
+    ) in sensor_source
 
 
 def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
@@ -669,7 +651,7 @@ def test_total_revenue_state_class_compatible_with_monetary_device_class() -> No
         r'key="total_revenue"'
         r"(?:(?!\n    \),).)*?"
         r"state_class=SensorStateClass\.(\w+)",
-        re.DOTALL | re.MULTILINE,
+        re.S | re.M,
     )
     match = pattern.search(sensor_source)
     assert match is not None, "total_revenue description not found"

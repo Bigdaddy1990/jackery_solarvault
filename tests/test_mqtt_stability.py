@@ -26,10 +26,7 @@ COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
 
 
 def _read(name: str) -> str:
-    path = COMPONENT / name
-    if not path.exists():
-        path = COMPONENT / "client" / name
-    return path.read_text(encoding="utf-8")
+    return (COMPONENT / name).read_text(encoding="utf-8")
 
 
 def test_mqtt_client_disables_internal_reconnect_loop() -> None:
@@ -74,7 +71,7 @@ def test_every_connect_resubscribes_all_topics() -> None:
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert runner_match is not None, "_async_run_session not found"
     body = runner_match.group(0)
@@ -94,7 +91,7 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert runner_match is not None
     body = runner_match.group(0)
@@ -113,7 +110,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     on_disc_match = re.search(
         r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert on_disc_match is not None, "_handle_disconnect_error not found"
     body = on_disc_match.group(0)
@@ -126,7 +123,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     fail_match = re.search(
         r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert fail_match is not None, "_handle_connect_failure not found"
     fail_body = fail_match.group(0)
@@ -154,7 +151,7 @@ def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> Non
     stop_match = re.search(
         r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert stop_match is not None
     body = stop_match.group(0)
@@ -203,23 +200,17 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
 
 
 def test_diagnostics_exposes_stale_subscription_signals() -> None:
-    """Diagnostics must surface ``seconds_since_last_message`` + flag.
-
-    diagnostics() delegates to diagnostics_snapshot() which contains the fields.
-    """
+    """Diagnostics must surface ``seconds_since_last_message`` + flag."""
     src = _read("mqtt_push.py")
-    # diagnostics_snapshot() is where the actual fields live
     diag_match = re.search(
-        r"def diagnostics_snapshot\(self.*?(?=\n    def |\n    @|\nclass )",
+        r"def diagnostics\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
-    assert diag_match is not None, "diagnostics_snapshot method not found"
+    assert diag_match is not None, "diagnostics method not found"
     body = diag_match.group(0)
     assert "seconds_since_last_message" in body, body
     assert "mqtt_silent_for_too_long" in body, body
-    # diagnostics() must delegate to diagnostics_snapshot()
-    assert "diagnostics_snapshot" in src
 
 
 def test_silent_threshold_constant_is_sane() -> None:
@@ -230,7 +221,7 @@ def test_silent_threshold_constant_is_sane() -> None:
     threshold = int(match.group(1))
     # Real Jackery heartbeats every ~30 s; we want to flag silence
     # well after that but before users complain about stale data.
-    assert 60 <= threshold <= 1800, threshold  # noqa: PLR2004
+    assert 60 <= threshold <= 1800, threshold
 
 
 def test_seconds_since_last_message_handles_no_messages() -> None:
@@ -243,7 +234,7 @@ def test_seconds_since_last_message_handles_no_messages() -> None:
     match = re.search(
         r"def _seconds_since_last_message\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None, "_seconds_since_last_message not found"
     body = match.group(0)
@@ -264,7 +255,7 @@ def test_silent_detector_only_active_when_connected() -> None:
     match = re.search(
         r"def _mqtt_silent_for_too_long\(self.*?(?=\n    def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None
     body = match.group(0)
@@ -331,7 +322,7 @@ def test_coordinator_refresh_does_not_suppress_reauth_failures() -> None:
     assert "async def _async_periodic_refresh" not in src
     assert "async_track_time_interval" not in src
     assert "update_interval=update_interval" in src
-    match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.DOTALL)
+    match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.S)
     assert match is not None
     body = match.group(0)
     assert "_raise_config_entry_auth_failed" in body, body
@@ -362,7 +353,7 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     runner_match = re.search(
         r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
         mqtt_src,
-        re.DOTALL,
+        re.S,
     )
     assert runner_match is not None
     body = runner_match.group(0)
@@ -379,14 +370,12 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     handler_match = re.search(
         r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
         coord_src,
-        re.DOTALL,
+        re.S,
     )
     assert handler_match is not None
     handler_body = handler_match.group(0)
     assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body
-    assert "_async_ensure_mqtt(force=True" in handler_body, (
-        handler_body
-    )  # may also have wait_connected=True
+    assert "_async_ensure_mqtt(force=True)" in handler_body, handler_body
     assert "JackeryAuthError" in handler_body, handler_body
 
 
@@ -401,35 +390,29 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     match = re.search(
         r"async def _async_update_data\(.*?(?=\n    # --)",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None
     body = match.group(0)
     assert "finally:" not in body, body
-    assert (
-        "self._last_http_refresh_completed_monotonic =" in body
-    )  # may use intermediate variable
-    # Find first assignment of _last_http_refresh_completed_monotonic
-    import re as _re
-
-    m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
-    assert m is not None
-    assignment_offset = m.start()
-    # Keepalive advance is gated by property_fetch_completed so skipped
-    # HTTP refreshes (when MQTT is live) do not advance the keepalive window.
-    assert "if property_fetch_completed:" in body, "guard missing"
-    gate_m = _re.search(r"if property_fetch_completed:", body)
-    assert gate_m is not None
-    gate_offset = gate_m.start()
-    assert assignment_offset > gate_offset, "assignment must be after gate"
+    assert "self._last_http_refresh_completed_monotonic = time.monotonic()" in body
+    assignment_offset = body.index(
+        "self._last_http_refresh_completed_monotonic = time.monotonic()"
+    )
+    skip_return_offset = body.index("return self.data or {}")
+    assert assignment_offset > skip_return_offset, body
 
     skip_match = re.search(
-        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
+        r"def _should_skip_refresh_for_live_mqtt\(self\).*?(?=\n    async def )",
         src,
-        _re.DOTALL,
+        re.S,
     )
-    assert skip_match is not None, "_should_skip_fast_property_fetch not found"
+    assert skip_match is not None
     skip_body = skip_match.group(0)
-    # Function must guard against empty data and missing MQTT
-    assert "self.data" in skip_body or "self._mqtt" in skip_body, skip_body
-    assert "return False" in skip_body, skip_body
+    assert "if not self.data:" in skip_body, skip_body
+    assert (
+        "return False"
+        in skip_body.split("if not self.data:", 1)[1].split(
+            "if self._mqtt is None:", 1
+        )[0]
+    ), skip_body

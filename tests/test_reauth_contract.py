@@ -51,7 +51,7 @@ def test_reauth_handler_updates_existing_entry_and_reloads() -> None:
     match = re.search(
         r"async def async_step_reauth_confirm.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None, "async_step_reauth_confirm not found"
     body = match.group(0)
@@ -123,13 +123,13 @@ def test_reauth_step_uses_only_password_field_not_username() -> None:
     match = re.search(
         r"async def async_step_reauth_confirm.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None
     body = match.group(0)
     assert "CONF_PASSWORD" in body, body
     # Username appears only as placeholder, not as a Required form field
-    schema_block = re.search(r"data_schema=vol\.Schema\(\{(.*?)\}\)", body, re.DOTALL)
+    schema_block = re.search(r"data_schema=vol\.Schema\(\{(.*?)\}\)", body, re.S)
     assert schema_block is not None, body
     schema_body = schema_block.group(1)
     assert "CONF_USERNAME" not in schema_body, schema_body
@@ -145,7 +145,7 @@ def test_reconfigure_preserves_stored_login_context() -> None:
     match = re.search(
         r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert match is not None, "async_step_reconfigure not found"
     body = match.group(0)
@@ -164,7 +164,7 @@ def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> N
     reconfigure = re.search(
         r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert reconfigure is not None, "async_step_reconfigure not found"
     reconfigure_body = reconfigure.group(0)
@@ -174,7 +174,7 @@ def test_reauth_and_reconfigure_reuse_stored_login_context_for_validation() -> N
     reauth = re.search(
         r"async def async_step_reauth_confirm.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert reauth is not None, "async_step_reauth_confirm not found"
     reauth_body = reauth.group(0)
@@ -197,7 +197,7 @@ def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None
     reconfigure = re.search(
         r"async def async_step_reconfigure.*?(?=\n    async def |\n    @|\nclass )",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert reconfigure is not None, "async_step_reconfigure not found"
     reconfigure_body = reconfigure.group(0)
@@ -207,7 +207,7 @@ def test_config_flow_preserves_current_options_when_fields_are_omitted() -> None
     options_flow = re.search(
         r"class JackeryOptionsFlow.*?(?=\n\nclass JackeryConfigFlow)",
         src,
-        re.DOTALL,
+        re.S,
     )
     assert options_flow is not None, "JackeryOptionsFlow not found"
     options_body = options_flow.group(0)

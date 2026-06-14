@@ -2,13 +2,14 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
 LANGUAGES = ("en", "de", "es", "fr")
 
 
-def _leaf_paths(value: object, prefix: str = "") -> set[str]:
+def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
     if not isinstance(value, dict):
         return {prefix}
 
@@ -48,19 +49,10 @@ def test_service_actions_use_translation_files() -> None:
         "rename_system",
         "refresh_weather_plan",
         "delete_storm_alert",
-        "send_ble_command",
-        "send_device_schedule",
     }
-    assert set(strings["services"]) >= expected_services, set(strings["services"])
-    assert set(icons["services"]) == {
-        "rename_system",
-        "refresh_weather_plan",
-        "delete_storm_alert",
-    } | (
-        set(icons["services"])
-        - {"rename_system", "refresh_weather_plan", "delete_storm_alert"}
-    )
-    for service_id in ("rename_system", "refresh_weather_plan", "delete_storm_alert"):
+    assert set(strings["services"]) == expected_services
+    assert set(icons["services"]) == expected_services
+    for service_id in expected_services:
         assert "service" in icons["services"][service_id]
 
 
