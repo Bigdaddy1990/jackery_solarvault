@@ -12,7 +12,7 @@ ifaddr>=0.2.0
 iniconfig>=1.0.1
 jinja2>=3.1.6
 multidict<7.0,>=4.5
-mypy>=2.1.0
+mypy
 numpy>=2.3.2
 packaging>=23.1
 pip>=24.2
