@@ -4918,8 +4918,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Send an arbitrary portable command (msg_id 1-53) via BLE-first then MQTT.
 
-        Portable commands use ``cmd=<portable_msg_id>`` directly rather than
-        the home MQTT_CMD constants.  Most portable commands transport as
+        Portable commands use ``action_id=<msgId>`` and ``cmd=<bleMsgType>``
+        from ``cmd.portable.b``.  Most portable commands transport as
         ``DevicePropertyChange`` (the ``message_type`` parameter allows overriding
         for strategy/plan commands).
         """
