@@ -20,9 +20,11 @@ repos:
         args:
           - --py314-plus
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 2.1.0
+    rev: v2.1.0  # Use the sha / tag you want to point at
     hooks:
       - id: mypy
+        # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated 
+        # virtualenv so it won't have access to those. To change the arguments, override the args as follows:
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^(manifest.*|docs/|scripts/)
