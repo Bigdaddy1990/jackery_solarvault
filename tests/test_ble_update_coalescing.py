@@ -36,4 +36,4 @@ def test_push_partial_update_is_noop_when_data_unchanged() -> None:
     assert helper is not None
     body = helper.group(0)
     assert "if self.data == new_data:" in body
-    assert "self.async_set_updated_data(new_data)" in body
+    assert "self.async_update_listeners()" in body

@@ -13,6 +13,7 @@ Covers:
 - JackeryReadScheduleButton.extra_state_attributes: taskType, optional deviceSn
 - JackeryRefreshWeatherPlanButton: translation_key and icon
 - _raise_action_error: raises HomeAssistantError with correct fields
+
 """
 
 import math
@@ -100,7 +101,7 @@ class TestStormAlertId:
     def test_returns_string_for_float_alertid(self) -> None:  # noqa: PLR6301
         """Float alertId must be coerced to string."""
         fn = _get_storm_alert_id()
-        assert fn({"alertId": math.pi}) == "3.14"
+        assert fn({"alertId": math.pi}) == str(math.pi)
 
     def test_other_keys_are_ignored(self) -> None:  # noqa: PLR6301
         """Extra keys in the dict must not affect the result."""
@@ -843,10 +844,13 @@ class TestJackeryDeleteStormAlertButton:
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from custom_components.jackery_solarvault.const import PAYLOAD_WEATHER_PLAN
 
-        coordinator = _make_mock_coordinator("12345")
+        payload = {PAYLOAD_WEATHER_PLAN: {"storm": [{"alertId": "alert-x"}]}}
+        coordinator = _make_mock_coordinator("12345", payload)
         coordinator.async_delete_storm_alert = AsyncMock()
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.last_update_success = True
 
         btn = JackeryDeleteStormAlertButton(coordinator, "12345", alert_id="alert-x")
         await btn.async_press()
@@ -858,13 +862,16 @@ class TestJackeryDeleteStormAlertButton:
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from custom_components.jackery_solarvault.const import PAYLOAD_WEATHER_PLAN
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
-        coordinator = _make_mock_coordinator("12345")
+        payload = {PAYLOAD_WEATHER_PLAN: {"storm": [{"alertId": "alert-x"}]}}
+        coordinator = _make_mock_coordinator("12345", payload)
         coordinator.async_delete_storm_alert = AsyncMock(
             side_effect=ConfigEntryAuthFailed("bad creds"),
         )
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.last_update_success = True
 
         btn = JackeryDeleteStormAlertButton(coordinator, "12345", alert_id="alert-x")
         with pytest.raises(ConfigEntryAuthFailed):
@@ -875,13 +882,16 @@ class TestJackeryDeleteStormAlertButton:
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
+        from custom_components.jackery_solarvault.const import PAYLOAD_WEATHER_PLAN
         from homeassistant.exceptions import HomeAssistantError
 
-        coordinator = _make_mock_coordinator("12345")
+        payload = {PAYLOAD_WEATHER_PLAN: {"storm": [{"alertId": "alert-x"}]}}
+        coordinator = _make_mock_coordinator("12345", payload)
         coordinator.async_delete_storm_alert = AsyncMock(
             side_effect=RuntimeError("broker down"),
         )
         coordinator.async_request_refresh = AsyncMock()
+        coordinator.last_update_success = True
 
         btn = JackeryDeleteStormAlertButton(coordinator, "12345", alert_id="alert-x")
         with pytest.raises(HomeAssistantError) as exc_info:

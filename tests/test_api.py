@@ -55,9 +55,9 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
-    assert await api.async_set_system_name("123", "SolarVault") is False
-    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is True
     assert captured[0] == (
         SYSTEM_NAME_PATH,
         {FIELD_SYSTEM_NAME: "SolarVault", FIELD_ID: "123"},

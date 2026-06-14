@@ -131,12 +131,13 @@ async def test_login_rejects_non_object_data_payload() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
-            return {
+        async def read(self) -> bytes:  # noqa: PLR6301
+            import json
+            return json.dumps({
                 FIELD_CODE: CODE_OK,
                 FIELD_TOKEN: "token",
                 FIELD_DATA: ["not", "an", "object"],
-            }
+            }).encode()
 
     class _Session:
         def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
@@ -161,8 +162,9 @@ async def test_login_rejection_does_not_update_last_success_response() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
-            return {FIELD_CODE: 401, FIELD_MSG: "invalid token"}
+        async def read(self) -> bytes:  # noqa: PLR6301
+            import json
+            return json.dumps({FIELD_CODE: 401, FIELD_MSG: "invalid token"}).encode()
 
     class _Session:
         def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
@@ -189,11 +191,8 @@ async def test_get_json_rejects_unparseable_success_body() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
-            raise ValueError("not json")  # noqa: TRY003
-
-        async def text(self) -> str:  # noqa: PLR6301
-            return "<html>maintenance</html>"
+        async def read(self) -> bytes:  # noqa: PLR6301
+            return b"<html>maintenance</html>"
 
     class _Session:
         def get(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301

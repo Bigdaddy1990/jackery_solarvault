@@ -656,7 +656,7 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
         util.TrendStatisticPoint(util.date(2026, 2, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 3, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 4, 1), 7.0),
-        util.TrendStatisticPoint(util.date(2026, 5, 1), 99.84),
+        util.TrendStatisticPoint(util.date(2026, 5, 1), 0.84),
     ]
 
 

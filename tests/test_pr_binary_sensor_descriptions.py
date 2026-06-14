@@ -102,7 +102,10 @@ class TestBinaryDescriptionsStructure:
     def test_all_entries_have_translation_key(self) -> None:  # noqa: PLR6301
         """All entries must have a non-empty translation_key."""
         for desc in BINARY_DESCRIPTIONS:
-            assert desc.translation_key and isinstance(desc.translation_key, str), (
+            assert desc.translation_key, (
+                f"Description '{desc.key}' has invalid translation_key: {desc.translation_key!r}"
+            )
+            assert isinstance(desc.translation_key, str), (
                 f"Description '{desc.key}' has invalid translation_key: {desc.translation_key!r}"
             )
 
