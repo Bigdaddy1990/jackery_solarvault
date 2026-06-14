@@ -204,9 +204,9 @@ def test_handle_message_bytearray_utf8_json_dict_is_accepted() -> None:
     """A bytearray payload with a valid UTF-8 JSON object must be parsed correctly."""
     client = _make_client()
     payload = bytearray(b'{"batSoc": 80}')
-    client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: SLF001
-    assert client._messages_dropped == 0  # noqa: SLF001
+    client._handle_message("jackery/data", payload)
+    assert client._messages_received == 1
+    assert client._messages_dropped == 0
 
 
 @_skip_local_mqtt
@@ -218,11 +218,11 @@ def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
     # type: ignore[method-assign]
-    client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
+    client._schedule_coroutine = lambda coro, label: coro.close()
     payload = bytearray(b"\xff\xfe\xfd")  # invalid UTF-8 sequence
-    client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: SLF001
-    assert client._messages_dropped == 1  # noqa: SLF001
+    client._handle_message("jackery/data", payload)
+    assert client._messages_received == 1
+    assert client._messages_dropped == 1
 
 
 @_skip_local_mqtt
@@ -234,18 +234,18 @@ def test_handle_message_bytearray_json_array_increments_dropped() -> None:
 
     client = _make_client(sink=_sink, topic_filter="jackery/#")
     # type: ignore[method-assign]
-    client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
+    client._schedule_coroutine = lambda coro, label: coro.close()
     payload = bytearray(b"[1, 2, 3]")
-    client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_dropped == 1  # noqa: SLF001
+    client._handle_message("jackery/data", payload)
+    assert client._messages_dropped == 1
 
 
 @_skip_local_mqtt
 def test_handle_message_bytearray_updates_last_topic() -> None:
     """Bytearray messages must update last_topic the same as bytes messages."""
     client = _make_client()
-    client._handle_message("some/topic", bytearray(b'{"x":1}'))  # noqa: SLF001
-    assert client._last_topic == "some/topic"  # noqa: SLF001
+    client._handle_message("some/topic", bytearray(b'{"x":1}'))
+    assert client._last_topic == "some/topic"
 
 
 @_skip_local_mqtt
@@ -257,11 +257,11 @@ def test_handle_message_bytearray_raw_bytes_forwarded_to_sink() -> None:
         received.append(raw)
 
     client = _make_client(sink=_sink)
-    client._handle_message("t", bytearray(b'{"k": 1}'))  # noqa: SLF001
+    client._handle_message("t", bytearray(b'{"k": 1}'))
     # Sink is scheduled as background task; verify it's queued (raw_bytes is bytes).
     # We verify type conversion by inspecting the bytearray → bytes path.
     # The conversion bytes(payload) in the code always produces bytes.
-    assert client._messages_received == 1  # noqa: SLF001
+    assert client._messages_received == 1
 
 
 # ===========================================================================
@@ -279,7 +279,7 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
 
     api.payload_debug_callback = _callback
     event = {"kind": "http", "path": "/test"}
-    await api._emit_payload_debug(event)  # noqa: SLF001
+    await api._emit_payload_debug(event)
     assert len(received) == 1
     assert received[0] is event
 
@@ -297,7 +297,7 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
     def factory():  # noqa: ANN202
         return {"kind": "http", "path": "/lazy"}
 
-    await api._emit_payload_debug(factory)  # noqa: SLF001
+    await api._emit_payload_debug(factory)
     assert len(received) == 1
     assert received[0] is factory
 
@@ -307,8 +307,8 @@ async def test_emit_payload_debug_noop_when_callback_is_none() -> None:
     api = JackeryApi.__new__(JackeryApi)
     api.payload_debug_callback = None
     # Must not raise regardless of input type.
-    await api._emit_payload_debug({"kind": "http"})  # noqa: SLF001
-    await api._emit_payload_debug(lambda: {"kind": "http"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "http"})
+    await api._emit_payload_debug(lambda: {"kind": "http"})
 
 
 async def test_emit_payload_debug_suppresses_callback_exception() -> None:
@@ -320,7 +320,7 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
 
     api.payload_debug_callback = _exploding_callback
     # Must not raise.
-    await api._emit_payload_debug({"kind": "test"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "test"})
 
 
 async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
@@ -332,7 +332,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
         results.append("done")
 
     api.payload_debug_callback = _async_callback
-    await api._emit_payload_debug({"kind": "async"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "async"})
     assert results == ["done"]
 
 
@@ -343,7 +343,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
 
 def test_http_payload_debug_returns_required_keys() -> None:
     """_http_payload_debug must return a dict with all mandatory keys."""
-    result = JackeryApi._http_payload_debug(  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(
         method="GET",
         path="/v1/test",
         params={"k": "v"},
@@ -369,32 +369,32 @@ def test_http_payload_debug_returns_required_keys() -> None:
 
 def test_http_payload_debug_none_params_becomes_empty_dict() -> None:
     """When params is None, the result must have an empty dict under 'params'."""
-    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")
     assert result["params"] == {}
 
 
 def test_http_payload_debug_none_body_becomes_empty_dict() -> None:
     """When body is None, 'request_body' must be an empty dict."""
-    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")
     assert result["request_body"] == {}
 
 
 def test_http_payload_debug_none_response_becomes_empty_dict() -> None:
     """When response is None, 'response' must be an empty dict."""
-    result = JackeryApi._http_payload_debug(method="GET", path="/v1/test")  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(method="GET", path="/v1/test")
     assert result["response"] == {}
 
 
 def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
     """response_data_type must name the type of response['data']."""
-    result = JackeryApi._http_payload_debug(  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": {"key": "val"}},
     )
     assert result["response_data_type"] == "dict"
 
-    result2 = JackeryApi._http_payload_debug(  # noqa: SLF001
+    result2 = JackeryApi._http_payload_debug(
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": None},
@@ -404,7 +404,7 @@ def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
 
 def test_http_payload_debug_response_data_type_for_list() -> None:
     """When data is a list, response_data_type must be 'list'."""
-    result = JackeryApi._http_payload_debug(  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": [1, 2, 3]},
@@ -428,7 +428,7 @@ async def test_async_get_device_eps_stat_without_dates_uses_defaults() -> None:
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: {"totalInEpsEnergy": "2.0"}}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     payload = await api.async_get_device_eps_stat("dev42")
 
@@ -451,7 +451,7 @@ async def test_async_get_device_eps_stat_with_month_date_type() -> None:
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     await api.async_get_device_eps_stat("dev1", date_type="month")
 
@@ -475,7 +475,7 @@ def test_diagnostics_snapshot_started_false_initially() -> None:
 def test_diagnostics_snapshot_started_true_when_runner_task_set() -> None:
     """When _runner_task is set, started must be True in the snapshot."""
     client = _make_client()
-    client._runner_task = MagicMock()  # type: ignore[assignment]  # noqa: SLF001
+    client._runner_task = MagicMock()  # type: ignore[assignment]
     snap = client.diagnostics_snapshot()
     assert snap["started"] is True
 
@@ -484,8 +484,8 @@ def test_diagnostics_snapshot_started_true_when_runner_task_set() -> None:
 def test_diagnostics_snapshot_topics_seen_count_matches_len() -> None:
     """topics_seen_count in snapshot must equal len(topics_seen)."""
     client = _make_client()
-    client._handle_message("a/b", b"{}")  # noqa: SLF001
-    client._handle_message("c/d", b"{}")  # noqa: SLF001
+    client._handle_message("a/b", b"{}")
+    client._handle_message("c/d", b"{}")
     snap = client.diagnostics_snapshot()
     assert snap["topics_seen_count"] == len(snap["topics_seen"])
     assert snap["topics_seen_count"] == 2  # noqa: PLR2004
@@ -500,8 +500,8 @@ def test_diagnostics_snapshot_messages_dropped_in_snapshot() -> None:
 
     client = _make_client(sink=_sink, topic_filter="t")
     # type: ignore[method-assign]
-    client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
-    client._handle_message("t", b"[1,2,3]")  # non-dict JSON → dropped  # noqa: SLF001
+    client._schedule_coroutine = lambda coro, label: coro.close()
+    client._handle_message("t", b"[1,2,3]")  # non-dict JSON → dropped
     snap = client.diagnostics_snapshot()
     assert snap["messages_dropped"] == 1
 
@@ -535,7 +535,7 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # Empty string username must become None (the constructor does `username or None`).
-    assert client._username is None  # noqa: SLF001
+    assert client._username is None
 
 
 @_skip_init
@@ -553,7 +553,7 @@ async def test_async_start_local_mqtt_empty_password_stored_as_none_in_client() 
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._password is None  # noqa: SLF001
+    assert client._password is None
 
 
 @_skip_init
@@ -571,8 +571,8 @@ async def test_async_start_local_mqtt_non_empty_credentials_preserved() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._username == "mqttuser"  # noqa: SLF001
-    assert client._password == "mqttpass"  # noqa: SLF001
+    assert client._username == "mqttuser"
+    assert client._password == "mqttpass"
 
 
 @_skip_init
@@ -585,7 +585,7 @@ async def test_async_start_local_mqtt_port_passed_to_client() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._port == 8883  # noqa: PLR2004, SLF001
+    assert client._port == 8883  # noqa: PLR2004
 
 
 @_skip_init
@@ -599,7 +599,7 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # The _async_start_local_mqtt strips the host before passing it.
-    assert client._host == "mqtt.local"  # noqa: SLF001
+    assert client._host == "mqtt.local"
 
 
 # ===========================================================================
@@ -681,7 +681,7 @@ async def test_async_get_today_energy_with_special_chars_in_sn() -> None:
         captured["params"] = dict(params)
         return {}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
     await api.async_get_today_energy("HR2C-0001:AB")
     assert captured["params"][FIELD_DEVICE_SN] == "HR2C-0001:AB"
 
@@ -695,7 +695,7 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
         captured["path"] = path
         return {}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
     await api.async_get_today_energy("SN001")
     assert captured["path"] == DEVICE_TODAY_ENERGY_PATH
 
@@ -709,28 +709,28 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
 def test_handle_connect_failure_sets_connected_event_and_marks_not_connected() -> None:
     """After _handle_connect_failure, both is_connected and the event must be in sync."""
     client = _make_client()
-    client._connected = True  # simulate was connected  # noqa: SLF001
-    client._connected_event.clear()  # noqa: SLF001
+    client._connected = True  # simulate was connected
+    client._connected_event.clear()
 
-    client._handle_connect_failure(3)  # noqa: SLF001
+    client._handle_connect_failure(3)
 
     assert client.is_connected is False
-    assert client._connected_event.is_set()  # noqa: SLF001
-    assert client._last_error is not None  # noqa: SLF001
-    assert "rc=3" in client._last_error  # noqa: SLF001
+    assert client._connected_event.is_set()
+    assert client._last_error is not None
+    assert "rc=3" in client._last_error
 
 
 @_skip_local_mqtt
 def test_handle_message_first_message_sets_last_message_at_and_last_topic() -> None:
     """After the first message, last_message_at and last_topic must be set."""
     client = _make_client()
-    assert client._last_message_at is None  # noqa: SLF001
-    assert client._last_topic is None  # noqa: SLF001
+    assert client._last_message_at is None
+    assert client._last_topic is None
 
-    client._handle_message("dev/props", b'{"soc": 95}')  # noqa: SLF001
+    client._handle_message("dev/props", b'{"soc": 95}')
 
-    assert client._last_message_at is not None  # noqa: SLF001
-    assert client._last_topic == "dev/props"  # noqa: SLF001
+    assert client._last_message_at is not None
+    assert client._last_topic == "dev/props"
 
 
 @_skip_local_mqtt
@@ -738,17 +738,17 @@ def test_topics_seen_set_and_list_stay_synchronized() -> None:
     """_topics_seen and _topics_seen_set must always contain the same elements."""
     client = _make_client()
     for i in range(5):
-        client._handle_message(f"topic/{i}", b"{}")  # noqa: SLF001
+        client._handle_message(f"topic/{i}", b"{}")
     # Both must have the same topics.
-    assert set(client._topics_seen) == client._topics_seen_set  # noqa: SLF001
+    assert set(client._topics_seen) == client._topics_seen_set
 
 
 @_skip_local_mqtt
 def test_diagnostics_snapshot_redacted_topics_count_matches() -> None:
     """With redact=True, the number of REDACTED entries must equal topics_seen_count."""
     client = _make_client()
-    client._handle_message("a", b"{}")  # noqa: SLF001
-    client._handle_message("b", b"{}")  # noqa: SLF001
+    client._handle_message("a", b"{}")
+    client._handle_message("b", b"{}")
     snap = client.diagnostics_snapshot(redact=True)
     assert len(snap["topics_seen"]) == snap["topics_seen_count"]
     assert all(t == REDACTED_VALUE for t in snap["topics_seen"])

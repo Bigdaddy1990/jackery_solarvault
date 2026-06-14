@@ -73,7 +73,7 @@ class _FakeHass:
         self._bg_tasks.append(task)
         return task
 
-    def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:  # noqa: ANN401, PLR6301
+    def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:  # noqa: ANN401
         return asyncio.get_event_loop().create_task(coro)
 
 
@@ -217,7 +217,7 @@ async def test_async_start_local_mqtt_does_nothing_when_disabled() -> None:
         entry.entry_id,
         {},
     ).get(_LOCAL_MQTT_RUNTIME_KEY)
-    assert not entry._unload_callbacks  # noqa: SLF001
+    assert not entry._unload_callbacks
 
 
 async def test_async_start_local_mqtt_does_nothing_when_host_is_empty() -> None:
@@ -229,7 +229,7 @@ async def test_async_start_local_mqtt_does_nothing_when_host_is_empty() -> None:
 
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
     assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
-    assert not entry._unload_callbacks  # noqa: SLF001
+    assert not entry._unload_callbacks
 
 
 async def test_async_start_local_mqtt_does_nothing_when_host_is_whitespace() -> None:
@@ -303,7 +303,7 @@ async def test_async_start_local_mqtt_registers_unload_callback() -> None:
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
         await _async_start_local_mqtt(hass, entry)
 
-    assert len(entry._unload_callbacks) == 1  # noqa: SLF001
+    assert len(entry._unload_callbacks) == 1
 
 
 async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client() -> (
@@ -328,7 +328,7 @@ async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client()
         stop_called.append(True)
 
     with patch.object(client, "async_stop", new=_fake_stop):
-        callback = entry._unload_callbacks[0]  # noqa: SLF001
+        callback = entry._unload_callbacks[0]
         await callback()
 
     assert stop_called  # stop was called
@@ -351,7 +351,7 @@ async def test_async_start_local_mqtt_unload_does_not_fail_when_stop_raises() ->
         raise RuntimeError("broker went away")  # noqa: TRY003
 
     with patch.object(client, "async_stop", new=_exploding_stop):
-        callback = entry._unload_callbacks[0]  # noqa: SLF001
+        callback = entry._unload_callbacks[0]
         # Must NOT raise.
         await callback()
 
@@ -364,7 +364,7 @@ async def test_async_start_local_mqtt_unload_does_not_remove_different_client() 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
         await _async_start_local_mqtt(hass, entry)
 
-    callback = entry._unload_callbacks[0]  # noqa: SLF001
+    callback = entry._unload_callbacks[0]
     bucket = hass.data[DOMAIN][entry.entry_id]
 
     # Replace the stored client with a different object before unload.
@@ -392,7 +392,7 @@ async def test_async_start_local_mqtt_client_id_uses_entry_id_prefix() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._client_id == f"ha-jackery-{entry_id[:8]}"  # noqa: SLF001
+    assert client._client_id == f"ha-jackery-{entry_id[:8]}"
 
 
 async def test_async_start_local_mqtt_passes_topic_filter_to_client() -> None:
@@ -408,7 +408,7 @@ async def test_async_start_local_mqtt_passes_topic_filter_to_client() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._topic_filter == "hb/app/+/device"  # noqa: SLF001
+    assert client._topic_filter == "hb/app/+/device"
 
 
 async def test_async_start_local_mqtt_second_call_is_idempotent() -> None:
@@ -427,4 +427,4 @@ async def test_async_start_local_mqtt_second_call_is_idempotent() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     # Each call registers one unload callback.
-    assert len(entry._unload_callbacks) == 2  # noqa: PLR2004, SLF001
+    assert len(entry._unload_callbacks) == 2  # noqa: PLR2004

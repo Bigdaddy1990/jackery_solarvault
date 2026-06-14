@@ -21,7 +21,7 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
     """Cancelled ACK waits must not leave stale pending-ACK records."""
 
     class _Client:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             *args: object,
             response: bool,
@@ -37,7 +37,7 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
         key_resolver=lambda _device_id: b"0123456789abcdef",
         ble_address_resolver=lambda _device_id: "00:11:22:33:44:55",
     )
-    listener._clients["dev1"] = _Client()  # noqa: SLF001
+    listener._clients["dev1"] = _Client()
 
     task = asyncio.create_task(
         listener.async_send_command(
@@ -53,4 +53,4 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    assert listener._pending_acks == {}  # noqa: SLF001
+    assert listener._pending_acks == {}

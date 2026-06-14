@@ -235,7 +235,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             FIELD_THIRD_PARTY_MQTT_USERNAME: "user",
             FIELD_THIRD_PARTY_MQTT_PASSWORD: "secret",
         }
-        await JackerySolarVaultCoordinator._async_handle_mqtt_message(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_handle_mqtt_message(
             self,
             "hb/app/user/device",
             {
@@ -253,7 +253,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         assert FIELD_THIRD_PARTY_MQTT_PORT not in entry[PAYLOAD_PROPERTIES]
         assert FIELD_THIRD_PARTY_MQTT_ENABLE not in entry[PAYLOAD_PROPERTIES]
         assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == body
-        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # noqa: SLF001
+        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}
 
     asyncio.run(_run())
 
@@ -473,7 +473,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         self._push_partial_update = _push_partial_update
         self._schedule_battery_pack_ota_enrichment = lambda _device_id: None
 
-        await JackerySolarVaultCoordinator._async_handle_mqtt_message(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_handle_mqtt_message(
             self,
             "hb/app/user/action",
             {
@@ -501,19 +501,19 @@ def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> No
         JackerySolarVaultCoordinator,
     )
 
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(
         {FIELD_ACTION_ID: "3032"},
         {},
     )
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(
         {FIELD_ACTION_ID: "3032.0"},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(
         {FIELD_ACTION_ID: True},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(
         {FIELD_ACTION_ID: float("nan")},
         {},
     )

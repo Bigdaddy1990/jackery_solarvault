@@ -130,7 +130,7 @@ def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
     plug_sn = "SN-KEY-TEST"
     plug_key = stable_subdevice_key("smart_plug", plug_sn, 1)
     sensor = _plug_sensor(plug_sn=plug_sn, plug_index=1, plug_key=plug_key)
-    assert sensor._plug_key == plug_key  # noqa: SLF001
+    assert sensor._plug_key == plug_key
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ def test_plug_lookup_returns_empty_dict_when_serial_not_found() -> None:
         coordinator, dev_id, plug_index=1, plug_sn=plug_sn, plug_key=plug_key
     )
 
-    assert sensor._plug == {}  # noqa: SLF001
+    assert sensor._plug == {}
 
 
 # ---------------------------------------------------------------------------

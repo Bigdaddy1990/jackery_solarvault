@@ -25,7 +25,7 @@ import pytest
 class TestBlockedLocalMqttTopicFilters:
     """Tests for the _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS constant."""
 
-    def test_contains_hash(self) -> None:  # noqa: PLR6301
+    def test_contains_hash(self) -> None:
         """The blocked set must contain '#'."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
@@ -33,7 +33,7 @@ class TestBlockedLocalMqttTopicFilters:
 
         assert "#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
-    def test_contains_plus_hash(self) -> None:  # noqa: PLR6301
+    def test_contains_plus_hash(self) -> None:
         """The blocked set must contain '+/#'."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
@@ -41,7 +41,7 @@ class TestBlockedLocalMqttTopicFilters:
 
         assert "+/#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
-    def test_is_frozenset(self) -> None:  # noqa: PLR6301
+    def test_is_frozenset(self) -> None:
         """_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS must be a frozenset."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
@@ -49,7 +49,7 @@ class TestBlockedLocalMqttTopicFilters:
 
         assert isinstance(_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS, frozenset)
 
-    def test_scoped_filter_is_not_blocked(self) -> None:  # noqa: PLR6301
+    def test_scoped_filter_is_not_blocked(self) -> None:
         """A scoped topic filter like 'jackery/#' must NOT be in the blocked set."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
@@ -58,7 +58,7 @@ class TestBlockedLocalMqttTopicFilters:
         assert "jackery/#" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
         assert "home/devices/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
-    def test_empty_string_is_not_in_blocked_set(self) -> None:  # noqa: PLR6301
+    def test_empty_string_is_not_in_blocked_set(self) -> None:
         """Empty string must not be blocked (it is handled separately by emptiness check)."""
         from custom_components.jackery_solarvault import (
             _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,  # noqa: PLC2701
@@ -75,7 +75,7 @@ class TestBlockedLocalMqttTopicFilters:
 class TestLocalMqttClient:
     """Tests for _local_mqtt_client() helper."""
 
-    def test_returns_none_when_domain_not_in_hass_data(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_domain_not_in_hass_data(self) -> None:
         """When the DOMAIN key is absent from hass.data, must return None."""
         from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
@@ -89,7 +89,7 @@ class TestLocalMqttClient:
         result = _local_mqtt_client(hass, entry)
         assert result is None
 
-    def test_returns_none_when_entry_id_not_in_hass_data(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_entry_id_not_in_hass_data(self) -> None:
         """When the entry_id key is absent from hass.data[DOMAIN], must return None."""
         from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
@@ -104,7 +104,7 @@ class TestLocalMqttClient:
         result = _local_mqtt_client(hass, entry)
         assert result is None
 
-    def test_returns_none_when_bucket_is_not_dict(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_bucket_is_not_dict(self) -> None:
         """When the bucket is not a dict (e.g. a string), must return None."""
         from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
@@ -119,7 +119,7 @@ class TestLocalMqttClient:
         result = _local_mqtt_client(hass, entry)
         assert result is None
 
-    def test_returns_none_when_local_mqtt_key_absent(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_local_mqtt_key_absent(self) -> None:
         """When the bucket dict has no 'local_mqtt_client' key, must return None."""
         from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
@@ -134,7 +134,7 @@ class TestLocalMqttClient:
         result = _local_mqtt_client(hass, entry)
         assert result is None
 
-    def test_returns_none_when_stored_value_is_wrong_type(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_stored_value_is_wrong_type(self) -> None:
         """When the stored value is not a JackeryLocalMqttClient, must return None."""
         from custom_components.jackery_solarvault import (
             _local_mqtt_client,  # noqa: PLC2701
@@ -151,7 +151,7 @@ class TestLocalMqttClient:
         result = _local_mqtt_client(hass, entry)
         assert result is None
 
-    def test_returns_client_when_stored_correctly(self) -> None:  # noqa: PLR6301
+    def test_returns_client_when_stored_correctly(self) -> None:
         """When a JackeryLocalMqttClient is stored, must return it."""
         try:
             from custom_components.jackery_solarvault.client.local_mqtt import (
@@ -214,7 +214,7 @@ def _make_mock_entry(  # noqa: PLR0913
 class TestAsyncStartLocalMqttGuards:
     """Tests for _async_start_local_mqtt guard conditions."""
 
-    async def test_skips_when_third_party_mqtt_disabled(self) -> None:  # noqa: PLR6301
+    async def test_skips_when_third_party_mqtt_disabled(self) -> None:
         """When CONF_THIRD_PARTY_MQTT_ENABLE is False, no client is created."""
         try:
             from custom_components.jackery_solarvault import (
@@ -238,7 +238,7 @@ class TestAsyncStartLocalMqttGuards:
             await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
 
-    async def test_skips_when_host_is_empty(self) -> None:  # noqa: PLR6301
+    async def test_skips_when_host_is_empty(self) -> None:
         """When the host is empty, no client is created."""
         try:
             from custom_components.jackery_solarvault import (
@@ -259,7 +259,7 @@ class TestAsyncStartLocalMqttGuards:
             await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
 
-    async def test_skips_when_host_is_whitespace_only(self) -> None:  # noqa: PLR6301
+    async def test_skips_when_host_is_whitespace_only(self) -> None:
         """When the host is only whitespace, no client is created (strip check)."""
         try:
             from custom_components.jackery_solarvault import (
@@ -280,7 +280,7 @@ class TestAsyncStartLocalMqttGuards:
             await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
 
-    async def test_skips_when_topic_filter_is_empty(self) -> None:  # noqa: PLR6301
+    async def test_skips_when_topic_filter_is_empty(self) -> None:
         """When the topic filter is empty, no client is created."""
         try:
             from custom_components.jackery_solarvault import (
@@ -301,7 +301,7 @@ class TestAsyncStartLocalMqttGuards:
             await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
 
-    async def test_skips_when_topic_filter_is_whitespace_only(self) -> None:  # noqa: PLR6301
+    async def test_skips_when_topic_filter_is_whitespace_only(self) -> None:
         """When the topic filter is whitespace-only after strip, no client is created."""
         try:
             from custom_components.jackery_solarvault import (
@@ -326,7 +326,7 @@ class TestAsyncStartLocalMqttGuards:
             await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
 
-    async def test_skips_and_warns_when_topic_filter_is_hash(  # noqa: PLR6301
+    async def test_skips_and_warns_when_topic_filter_is_hash(
         self,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
@@ -359,7 +359,7 @@ class TestAsyncStartLocalMqttGuards:
             mock_cls.assert_not_called()
         assert "blocked" in caplog.text.lower() or "CPU safety" in caplog.text
 
-    async def test_skips_and_warns_when_topic_filter_is_plus_hash(  # noqa: PLR6301
+    async def test_skips_and_warns_when_topic_filter_is_plus_hash(
         self,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
@@ -392,7 +392,7 @@ class TestAsyncStartLocalMqttGuards:
             mock_cls.assert_not_called()
         assert "blocked" in caplog.text.lower() or "+/#" in caplog.text
 
-    async def test_starts_client_when_all_conditions_met(self) -> None:  # noqa: PLR6301
+    async def test_starts_client_when_all_conditions_met(self) -> None:
         """When all conditions are met with a scoped topic filter, the client is started."""
         try:
             from custom_components.jackery_solarvault import (
@@ -424,7 +424,7 @@ class TestAsyncStartLocalMqttGuards:
             mock_cls.assert_called_once()
             mock_client.async_start.assert_called_once()
 
-    async def test_client_registered_in_hass_data(self) -> None:  # noqa: PLR6301
+    async def test_client_registered_in_hass_data(self) -> None:
         """After a successful start, the client is stored in hass.data."""
         try:
             from custom_components.jackery_solarvault import (
@@ -470,7 +470,7 @@ class TestAsyncStartLocalMqttGuards:
         entry_data = domain_data.get("entry-12345", {})
         assert entry_data.get(_LOCAL_MQTT_RUNTIME_KEY) is mock_client
 
-    async def test_unload_callback_registered(self) -> None:  # noqa: PLR6301
+    async def test_unload_callback_registered(self) -> None:
         """entry.async_on_unload must be called to register the stop callback."""
         try:
             from custom_components.jackery_solarvault import (
@@ -511,7 +511,7 @@ class TestAsyncStartLocalMqttGuards:
 class TestLocalMqttSink:
     """Tests for the _sink function created inside _async_start_local_mqtt."""
 
-    async def test_sink_routes_data_to_coordinator(self) -> None:  # noqa: PLR6301
+    async def test_sink_routes_data_to_coordinator(self) -> None:
         """The _sink must forward non-None data to coordinator.async_handle_local_mqtt_message."""
         try:
             from custom_components.jackery_solarvault import (
@@ -565,7 +565,7 @@ class TestLocalMqttSink:
         await captured_sink("jackery/data/device1", test_data, b"raw")
         handle_mock.assert_called_once_with("jackery/data/device1", test_data)
 
-    async def test_sink_skips_none_data(self) -> None:  # noqa: PLR6301
+    async def test_sink_skips_none_data(self) -> None:
         """The _sink must skip forwarding when data is None."""
         try:
             from custom_components.jackery_solarvault import (
@@ -625,7 +625,7 @@ class TestLocalMqttSink:
 class TestRsaPkcs1V15Encrypt:
     """Tests for _rsa_pkcs1v15_encrypt in client/api.py."""
 
-    def test_raises_type_error_for_non_rsa_key(self) -> None:  # noqa: PLR6301
+    def test_raises_type_error_for_non_rsa_key(self) -> None:
         """When the DER-encoded key is not an RSA key, must raise TypeError."""
         import base64
 
@@ -647,7 +647,7 @@ class TestRsaPkcs1V15Encrypt:
         with pytest.raises(TypeError, match="RSA public key"):
             _rsa_pkcs1v15_encrypt(b"test data", b64_key)
 
-    def test_accepts_valid_rsa_key(self) -> None:  # noqa: PLR6301
+    def test_accepts_valid_rsa_key(self) -> None:
         """A valid RSA public key must produce encrypted output without raising."""
         import base64
 
@@ -677,7 +677,7 @@ class TestRsaPkcs1V15Encrypt:
         assert len(result) == 256  # noqa: PLR2004
         assert isinstance(result, bytes)
 
-    def test_error_message_includes_actual_key_type(self) -> None:  # noqa: PLR6301
+    def test_error_message_includes_actual_key_type(self) -> None:
         """TypeError message must mention the actual key type found."""
         import base64
 
@@ -713,7 +713,7 @@ class TestRsaPkcs1V15Encrypt:
 class TestGenerateUdid:
     """Tests for _generate_udid in client/api.py."""
 
-    def test_output_starts_with_mqtt_mac_id_prefix(self) -> None:  # noqa: PLR6301
+    def test_output_starts_with_mqtt_mac_id_prefix(self) -> None:
         """The generated UDID must start with MQTT_MAC_ID_PREFIX."""
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -726,7 +726,7 @@ class TestGenerateUdid:
         result = _generate_udid("test@example.com")
         assert result.startswith(MQTT_MAC_ID_PREFIX)
 
-    def test_output_is_deterministic(self) -> None:  # noqa: PLR6301
+    def test_output_is_deterministic(self) -> None:
         """Same seed must produce the same UDID."""
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -739,7 +739,7 @@ class TestGenerateUdid:
         result2 = _generate_udid("user@example.com")
         assert result1 == result2
 
-    def test_different_seeds_produce_different_udids(self) -> None:  # noqa: PLR6301
+    def test_different_seeds_produce_different_udids(self) -> None:
         """Different seeds must produce different UDIDs."""
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -752,7 +752,7 @@ class TestGenerateUdid:
         result2 = _generate_udid("user2@example.com")
         assert result1 != result2
 
-    def test_output_has_expected_length(self) -> None:  # noqa: PLR6301
+    def test_output_has_expected_length(self) -> None:
         """MQTT_MAC_ID_PREFIX (1 char) + 32 hex chars UUID = 33 chars total."""
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -767,7 +767,7 @@ class TestGenerateUdid:
         # Total length = prefix + 32 UUID chars (UUID with dashes removed)
         assert len(result) == prefix_len + 32
 
-    def test_output_contains_no_dashes(self) -> None:  # noqa: PLR6301
+    def test_output_contains_no_dashes(self) -> None:
         """The UUID portion must have no dashes."""
         try:
             from custom_components.jackery_solarvault.client.api import (
@@ -781,7 +781,7 @@ class TestGenerateUdid:
         uuid_part = result[len(MQTT_MAC_ID_PREFIX) :]
         assert "-" not in uuid_part
 
-    def test_output_is_lowercase_hex_after_prefix(self) -> None:  # noqa: PLR6301
+    def test_output_is_lowercase_hex_after_prefix(self) -> None:
         """The UUID portion (after prefix) must be lowercase hexadecimal."""
         import re
 

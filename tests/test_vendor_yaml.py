@@ -29,28 +29,28 @@ from yaml.nodes import ScalarNode
 class TestWarnings:
     """Tests for the deprecated warnings() stub function."""
 
-    def test_warnings_no_args_returns_empty_dict(self) -> None:  # noqa: PLR6301
+    def test_warnings_no_args_returns_empty_dict(self) -> None:
         """warnings() with no arguments should return an empty dict."""
         result = yaml.warnings()
         assert result == {}
         assert isinstance(result, dict)
 
-    def test_warnings_none_arg_returns_empty_dict(self) -> None:  # noqa: PLR6301
+    def test_warnings_none_arg_returns_empty_dict(self) -> None:
         """warnings(None) is equivalent to no-arg call and returns an empty dict."""
         result = yaml.warnings(None)
         assert result == {}
 
-    def test_warnings_with_dict_arg_returns_none(self) -> None:  # noqa: PLR6301
+    def test_warnings_with_dict_arg_returns_none(self) -> None:
         """warnings({...}) should return None (no-op for non-None settings)."""
         result = yaml.warnings({"CheckUTF8": True})
         assert result is None
 
-    def test_warnings_with_empty_dict_arg_returns_none(self) -> None:  # noqa: PLR6301
+    def test_warnings_with_empty_dict_arg_returns_none(self) -> None:
         """warnings({}) — empty dict is not None, so should return None."""
         result = yaml.warnings({})
         assert result is None
 
-    def test_warnings_with_falsy_nonempty_arg_returns_none(self) -> None:  # noqa: PLR6301
+    def test_warnings_with_falsy_nonempty_arg_returns_none(self) -> None:
         """Any non-None value for settings, including 0 or False, returns None."""
         assert yaml.warnings(0) is None
         assert yaml.warnings(False) is None
@@ -65,7 +65,7 @@ class TestWarnings:
 class TestAddConstructor:
     """Tests for add_constructor() registering on default and specific loaders."""
 
-    def test_add_constructor_loader_none_registers_on_all_default_loaders(self) -> None:  # noqa: PLR6301
+    def test_add_constructor_loader_none_registers_on_all_default_loaders(self) -> None:
         """add_constructor(tag, fn) with Loader=None must register on Loader, FullLoader, and UnsafeLoader."""
         tag = "!test_add_constructor_all_loaders_unique_9f3a"
         sentinel = object()
@@ -81,7 +81,7 @@ class TestAddConstructor:
         result = yaml.load(f"{tag} value", Loader=_loader.Loader)
         assert result is sentinel
 
-    def test_add_constructor_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
+    def test_add_constructor_specific_loader_registers_only_on_that_loader(
         self,
     ) -> None:
         """add_constructor(tag, fn, Loader=X) must register only on X, not on the other defaults."""
@@ -103,7 +103,7 @@ class TestAddConstructor:
         assert tag not in _loader.FullLoader.yaml_constructors
         assert tag not in _loader.UnsafeLoader.yaml_constructors
 
-    def test_add_constructor_loader_none_functional_round_trip(self) -> None:  # noqa: PLR6301
+    def test_add_constructor_loader_none_functional_round_trip(self) -> None:
         """Constructor registered with Loader=None is invoked when loading via safe_load-equivalent."""
         tag = "!test_constructor_round_trip_unique_7d1e"
         expected = {"decoded": True}
@@ -116,7 +116,7 @@ class TestAddConstructor:
         result = yaml.load(f"{tag} anything", Loader=_loader.Loader)
         assert result is expected
 
-    def test_add_constructor_specific_loader_end_to_end(self) -> None:  # noqa: PLR6301
+    def test_add_constructor_specific_loader_end_to_end(self) -> None:
         """Constructor registered on a specific loader subclass is invoked correctly."""
         tag = "!test_constructor_specific_e2e_unique_4a7f"
         return_value = [1, 2, 3]
@@ -139,7 +139,7 @@ class TestAddConstructor:
 class TestAddMultiConstructor:
     """Tests for add_multi_constructor() registering on default and specific loaders."""
 
-    def test_add_multi_constructor_loader_none_registers_on_all_defaults(self) -> None:  # noqa: PLR6301
+    def test_add_multi_constructor_loader_none_registers_on_all_defaults(self) -> None:
         """add_multi_constructor with Loader=None must register on Loader, FullLoader, and UnsafeLoader."""
         prefix = "!testmulti_all_unique_6c2d/"
         multi_fn = lambda loader, suffix, node: f"matched:{suffix}"  # noqa: E731
@@ -150,7 +150,7 @@ class TestAddMultiConstructor:
         assert prefix in _loader.FullLoader.yaml_multi_constructors
         assert prefix in _loader.UnsafeLoader.yaml_multi_constructors
 
-    def test_add_multi_constructor_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
+    def test_add_multi_constructor_specific_loader_only_registers_on_that_loader(
         self,
     ) -> None:
         """add_multi_constructor with Loader=X only registers on X."""
@@ -167,7 +167,7 @@ class TestAddMultiConstructor:
         assert prefix not in _loader.FullLoader.yaml_multi_constructors
         assert prefix not in _loader.UnsafeLoader.yaml_multi_constructors
 
-    def test_add_multi_constructor_functional_with_default_loaders(self) -> None:  # noqa: PLR6301
+    def test_add_multi_constructor_functional_with_default_loaders(self) -> None:
         """Multi-constructor registered via add_multi_constructor(Loader=None) is invoked during load."""
         prefix = "!testmulti_func_unique_1b8e/"
         results: list[str] = []
@@ -190,7 +190,7 @@ class TestAddMultiConstructor:
 class TestAddImplicitResolver:
     """Tests for add_implicit_resolver() registering on loaders and dumper."""
 
-    def test_add_implicit_resolver_loader_none_registers_on_all_loaders(self) -> None:  # noqa: PLR6301
+    def test_add_implicit_resolver_loader_none_registers_on_all_loaders(self) -> None:
         """add_implicit_resolver with Loader=None registers on Loader, FullLoader, UnsafeLoader, and Dumper."""
         tag = "tag:example.com,2024:test_implicit_resolver_unique_5f2a"
         regexp = re.compile(r"^__UNIQUE_5F2A__")
@@ -210,7 +210,7 @@ class TestAddImplicitResolver:
         dumper_resolvers = yaml.Dumper.yaml_implicit_resolvers.get("_", [])
         assert tag in [t for t, _ in dumper_resolvers]
 
-    def test_add_implicit_resolver_with_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
+    def test_add_implicit_resolver_with_specific_loader_only_registers_on_that_loader(
         self,
     ) -> None:
         """add_implicit_resolver with a specific Loader registers only on that loader (plus Dumper)."""
@@ -235,7 +235,7 @@ class TestAddImplicitResolver:
         assert tag not in [t for t, _ in full_loader_wildcard]
         assert tag not in [t for t, _ in unsafe_loader_wildcard]
 
-    def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(  # noqa: PLR6301
+    def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(
         self,
     ) -> None:
         """When first=None, the resolver is registered under the None key in yaml_implicit_resolvers."""
@@ -260,7 +260,7 @@ class TestAddImplicitResolver:
 class TestAddRepresenter:
     """Tests for add_representer() and add_multi_representer()."""
 
-    def test_add_representer_registers_on_specified_dumper(self) -> None:  # noqa: PLR6301
+    def test_add_representer_registers_on_specified_dumper(self) -> None:
         """add_representer registers the callable on the given Dumper class."""
 
         class MyCustomType:
@@ -273,7 +273,7 @@ class TestAddRepresenter:
             MyCustomType, representer_fn
         )
 
-    def test_add_representer_default_dumper_round_trip(self) -> None:  # noqa: PLR6301
+    def test_add_representer_default_dumper_round_trip(self) -> None:
         """add_representer functional test: custom type is serialized with the registered representer."""
 
         class MyTaggedType:  # noqa: B903
@@ -293,7 +293,7 @@ class TestAddRepresenter:
         assert "!mytaggedtype" in result
         assert "hello" in result
 
-    def test_add_multi_representer_registers_on_specified_dumper(self) -> None:  # noqa: PLR6301
+    def test_add_multi_representer_registers_on_specified_dumper(self) -> None:
         """add_multi_representer registers the callable on the given Dumper class."""
 
         class BaseType:
@@ -310,7 +310,7 @@ class TestAddRepresenter:
         # Verify registration
         assert BaseType in IsolatedDumper.yaml_multi_representers
 
-    def test_add_representer_called_via_module_level_api(self) -> None:  # noqa: PLR6301
+    def test_add_representer_called_via_module_level_api(self) -> None:
         """add_representer correctly forwards the call to Dumper.add_representer."""
 
         class AnotherType:
@@ -336,10 +336,10 @@ class TestAddRepresenter:
 class TestConstructYamlBinary:
     """Tests for SafeConstructor.construct_yaml_binary() which now uses base64.decodebytes directly."""
 
-    def _make_scalar_node(self, value: str) -> ScalarNode:  # noqa: PLR6301
+    def _make_scalar_node(self, value: str) -> ScalarNode:
         return ScalarNode(tag="tag:yaml.org,2002:binary", value=value)
 
-    def _make_safe_constructor(self) -> SafeConstructor:  # noqa: PLR6301
+    def _make_safe_constructor(self) -> SafeConstructor:
         sc = SafeConstructor.__new__(SafeConstructor)
         SafeConstructor.__init__(sc)  # noqa: PLC2801
         return sc
@@ -391,7 +391,7 @@ class TestConstructYamlBinary:
         with pytest.raises(ConstructorError, match="failed to decode base64 data"):
             sc.construct_yaml_binary(node)
 
-    def test_via_safe_load_round_trip(self) -> None:  # noqa: PLR6301
+    def test_via_safe_load_round_trip(self) -> None:
         """safe_load round-trips binary data through YAML's !!binary tag correctly."""
         raw = b"\x00\x01\x02\x03\xff\xfe"
         b64 = base64.encodebytes(raw).decode("ascii").strip()
@@ -400,7 +400,7 @@ class TestConstructYamlBinary:
         result = yaml.safe_load(yaml_src)
         assert result == raw
 
-    def test_construct_yaml_binary_uses_decodebytes_directly(self) -> None:  # noqa: PLR6301
+    def test_construct_yaml_binary_uses_decodebytes_directly(self) -> None:
         """Regression: construct_yaml_binary calls base64.decodebytes without hasattr guard."""
         import inspect
 
@@ -416,10 +416,10 @@ class TestConstructYamlBinary:
 class TestConstructPythonBytes:
     """Tests for FullConstructor.construct_python_bytes() with direct base64.decodebytes call."""
 
-    def _make_scalar_node(self, value: str) -> ScalarNode:  # noqa: PLR6301
+    def _make_scalar_node(self, value: str) -> ScalarNode:
         return ScalarNode(tag="tag:yaml.org,2002:python/bytes", value=value)
 
-    def _make_full_constructor(self) -> FullConstructor:  # noqa: PLR6301
+    def _make_full_constructor(self) -> FullConstructor:
         fc = FullConstructor.__new__(FullConstructor)
         FullConstructor.__init__(fc)  # noqa: PLC2801
         return fc
@@ -471,7 +471,7 @@ class TestConstructPythonBytes:
         result = fc.construct_python_bytes(node)
         assert result == raw
 
-    def test_construct_python_bytes_uses_decodebytes_directly(self) -> None:  # noqa: PLR6301
+    def test_construct_python_bytes_uses_decodebytes_directly(self) -> None:
         """Regression: construct_python_bytes calls base64.decodebytes without hasattr guard."""
         import inspect
 
@@ -487,7 +487,7 @@ class TestConstructPythonBytes:
 class TestYAMLObjectMetaclass:
     """Tests for YAMLObjectMetaclass.__init__ — auto-registration of constructors/representers."""
 
-    def test_class_with_yaml_tag_registers_constructor_and_representer(self) -> None:  # noqa: PLR6301
+    def test_class_with_yaml_tag_registers_constructor_and_representer(self) -> None:
         """A YAMLObject subclass with yaml_tag auto-registers from_yaml and to_yaml."""
 
         class IsolatedLoader(yaml.Loader):  # type: ignore[misc]
@@ -513,7 +513,7 @@ class TestYAMLObjectMetaclass:
         # Representer should be registered on IsolatedDumper
         assert MyYAMLObj in IsolatedDumper.yaml_representers
 
-    def test_class_without_yaml_tag_does_not_register(self) -> None:  # noqa: PLR6301
+    def test_class_without_yaml_tag_does_not_register(self) -> None:
         """A YAMLObject subclass with yaml_tag=None does not register anything."""
 
         class IsolatedLoader(yaml.Loader):  # type: ignore[misc]
@@ -533,7 +533,7 @@ class TestYAMLObjectMetaclass:
             IsolatedLoader.yaml_constructors.get(None) != MyUntaggedObj.from_yaml
         )
 
-    def test_yaml_object_round_trip_with_metaclass(self) -> None:  # noqa: PLR6301
+    def test_yaml_object_round_trip_with_metaclass(self) -> None:
         """YAMLObject subclass with yaml_tag can be serialized and deserialized via YAML."""
 
         class Point(yaml.YAMLObject):
@@ -554,7 +554,7 @@ class TestYAMLObjectMetaclass:
         assert loaded.x == pytest.approx(1.5)
         assert loaded.y == pytest.approx(2.5)
 
-    def test_yaml_object_with_list_of_loaders_registers_on_each(self) -> None:  # noqa: PLR6301
+    def test_yaml_object_with_list_of_loaders_registers_on_each(self) -> None:
         """When yaml_loader is a list, metaclass registers from_yaml on every loader in the list."""
 
         class LoaderA(yaml.Loader):  # type: ignore[misc]
@@ -582,7 +582,7 @@ class TestYAMLObjectMetaclass:
 class TestAddPathResolver:
     """Tests for add_path_resolver() registering on loaders and dumper."""
 
-    def test_add_path_resolver_loader_none_registers_on_all_default_loaders(  # noqa: PLR6301
+    def test_add_path_resolver_loader_none_registers_on_all_default_loaders(
         self,
     ) -> None:
         """add_path_resolver with Loader=None registers on Loader, FullLoader, UnsafeLoader, and Dumper.
@@ -604,7 +604,7 @@ class TestAddPathResolver:
         # Also check Dumper
         assert tag in yaml.Dumper.yaml_path_resolvers.values()
 
-    def test_add_path_resolver_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
+    def test_add_path_resolver_specific_loader_registers_only_on_that_loader(
         self,
     ) -> None:
         """add_path_resolver with a specific Loader registers only on that class."""

@@ -100,6 +100,6 @@ def test_price_provider_current_ignores_blank_company_id() -> None:
     assert _price_provider_current(entity) is None
     assert not _price_mode_dynamic_available(entity)
 
-    entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"  # noqa: SLF001
+    entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"
     assert _price_provider_current(entity) is None
     assert not _price_mode_dynamic_available(entity)

@@ -46,7 +46,7 @@ def _make_mock_coordinator(
 class TestDeleteStormAlertButtonAvailable:
     """Tests for the JackeryDeleteStormAlertButton.available property."""
 
-    def test_available_is_false_when_alert_absent_from_payload(  # noqa: PLR6301
+    def test_available_is_false_when_alert_absent_from_payload(
         self,
     ) -> None:
         """Available must be False when the alert_id is not in the coordinator data."""
@@ -59,7 +59,7 @@ class TestDeleteStormAlertButtonAvailable:
         # _alert returns {} because no weather_plan exists → bool({}) is False
         assert btn.available is False
 
-    def test_available_is_false_when_weather_plan_is_empty(  # noqa: PLR6301
+    def test_available_is_false_when_weather_plan_is_empty(
         self,
     ) -> None:
         """Available must be False when weather_plan has no matching storm alert."""
@@ -74,7 +74,7 @@ class TestDeleteStormAlertButtonAvailable:
         )
         assert btn.available is False
 
-    def test_available_is_false_when_alert_id_not_in_storm_list(  # noqa: PLR6301
+    def test_available_is_false_when_alert_id_not_in_storm_list(
         self,
     ) -> None:
         """Available must be False when storm list contains a different alert_id."""
@@ -93,7 +93,7 @@ class TestDeleteStormAlertButtonAvailable:
         )
         assert btn.available is False
 
-    def test_available_is_true_when_alert_exists_and_coordinator_healthy(  # noqa: PLR6301
+    def test_available_is_true_when_alert_exists_and_coordinator_healthy(
         self,
     ) -> None:
         """Available must be True when the alert is present and coordinator is healthy."""
@@ -113,9 +113,9 @@ class TestDeleteStormAlertButtonAvailable:
         # (set to True in _make_mock_coordinator) then available must be True.
         # We cannot easily call super().available in isolation but can assert the
         # _alert property is non-empty and that available is not unconditionally False.
-        assert btn._alert != {}  # noqa: SLF001 — confirms alert was found
+        assert btn._alert != {}
 
-    def test_available_alert_is_removed_when_storm_cleared(  # noqa: PLR6301
+    def test_available_alert_is_removed_when_storm_cleared(
         self,
     ) -> None:
         """When the alert disappears from the payload, available must become False."""
@@ -131,11 +131,11 @@ class TestDeleteStormAlertButtonAvailable:
         coordinator = _make_mock_coordinator("dev1", payload)
         btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="temp-alert")
         # Alert is present → _alert is non-empty
-        assert btn._alert != {}  # noqa: SLF001
+        assert btn._alert != {}
 
         # Now clear the storm list (simulates coordinator refresh removing the alert)
         coordinator.data["dev1"]["weather_plan"]["storm"] = []
-        assert btn._alert == {}  # noqa: SLF001
+        assert btn._alert == {}
         assert btn.available is False
 
 
@@ -147,7 +147,7 @@ class TestDeleteStormAlertButtonAvailable:
 class TestTranslatedHomeAssistantErrorReRaise:
     """Tests that async_press re-raises HomeAssistantError carrying a translation_key."""
 
-    async def test_reboot_button_reraises_translated_ha_error(  # noqa: PLR6301
+    async def test_reboot_button_reraises_translated_ha_error(
         self,
     ) -> None:
         """JackeryRebootButton must re-raise a translated HomeAssistantError unchanged."""
@@ -170,7 +170,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         assert exc_info.value is translated_err
         assert exc_info.value.translation_key == "reboot_not_supported"
 
-    async def test_refresh_weather_plan_button_reraises_translated_ha_error(  # noqa: PLR6301
+    async def test_refresh_weather_plan_button_reraises_translated_ha_error(
         self,
     ) -> None:
         """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""
@@ -193,7 +193,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         assert exc_info.value is translated_err
         assert exc_info.value.translation_key == "weather_plan_unavailable"
 
-    async def test_read_schedule_button_reraises_translated_ha_error(  # noqa: PLR6301
+    async def test_read_schedule_button_reraises_translated_ha_error(
         self,
     ) -> None:
         """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""
@@ -223,7 +223,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         assert exc_info.value is translated_err
         assert exc_info.value.translation_key == "schedule_read_failed"
 
-    async def test_delete_storm_alert_button_reraises_translated_ha_error(  # noqa: PLR6301
+    async def test_delete_storm_alert_button_reraises_translated_ha_error(
         self,
     ) -> None:
         """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""
@@ -246,7 +246,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         assert exc_info.value is translated_err
         assert exc_info.value.translation_key == "alert_already_deleted"
 
-    async def test_query_button_reraises_translated_ha_error(  # noqa: PLR6301
+    async def test_query_button_reraises_translated_ha_error(
         self,
     ) -> None:
         """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""
@@ -280,7 +280,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
         assert exc_info.value is translated_err
         assert exc_info.value.translation_key == "mqtt_send_failed"
 
-    async def test_untranslated_ha_error_is_wrapped_by_reboot_button(  # noqa: PLR6301
+    async def test_untranslated_ha_error_is_wrapped_by_reboot_button(
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped, not re-raised."""
@@ -308,7 +308,7 @@ class TestTranslatedHomeAssistantErrorReRaise:
 class TestAsyncSetup:
     """Tests for async_setup in __init__.py."""
 
-    async def test_async_setup_returns_true(self) -> None:  # noqa: PLR6301
+    async def test_async_setup_returns_true(self) -> None:
         """async_setup must return True after registering services."""
         from unittest.mock import patch
 
@@ -322,7 +322,7 @@ class TestAsyncSetup:
         assert result is True
         mock_services.assert_called_once_with(hass)
 
-    async def test_async_setup_calls_services_setup(self) -> None:  # noqa: PLR6301
+    async def test_async_setup_calls_services_setup(self) -> None:
         """async_setup must call async_setup_services exactly once."""
         from unittest.mock import patch
 
@@ -399,7 +399,7 @@ def test_query_button_has_config_entity_category() -> None:
     )
     coordinator = _make_mock_coordinator("dev1")
     btn = JackeryQueryButton(coordinator, "dev1", description=desc)
-    assert btn._attr_entity_category is EntityCategory.CONFIG  # noqa: SLF001
+    assert btn._attr_entity_category is EntityCategory.CONFIG
 
 
 # ---------------------------------------------------------------------------
@@ -557,7 +557,7 @@ def test_delete_storm_alert_button_available_with_integer_zero_alert_id() -> Non
     # The button must be constructed with alert_id="0" (str(0))
     btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="0")
     # _alert must find the alert (since _storm_alert_id({alertId: 0}) == "0")
-    assert btn._alert != {}  # noqa: SLF001
+    assert btn._alert != {}
 
 
 # ---------------------------------------------------------------------------

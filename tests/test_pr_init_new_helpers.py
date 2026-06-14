@@ -56,7 +56,7 @@ class _FakeHass:
     def __init__(self) -> None:
         self.data: dict[str, Any] = {}
 
-    def async_create_background_task(  # noqa: PLR6301
+    def async_create_background_task(
         self,
         coro: Any,  # noqa: ANN401
         name: str = "",
@@ -115,25 +115,25 @@ def _make_local_mqtt_entry(  # noqa: PLR0913
 class TestEntryBootstrapMqttSession:
     """Tests for _entry_bootstrap_mqtt_session()."""
 
-    def test_returns_none_when_no_bootstrap_key_in_data(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_no_bootstrap_key_in_data(self) -> None:
         """Returns None when ENTRY_BOOTSTRAP_MQTT_SESSION is absent from entry.data."""
         entry = _FakeEntry(data={})
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_none_when_bootstrap_value_is_not_dict(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_bootstrap_value_is_not_dict(self) -> None:
         """Returns None when the bootstrap value is a non-dict type."""
         entry = _FakeEntry(data={ENTRY_BOOTSTRAP_MQTT_SESSION: "not-a-dict"})
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_none_when_bootstrap_value_is_none(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_bootstrap_value_is_none(self) -> None:
         """Returns None when the bootstrap value is None."""
         entry = _FakeEntry(data={ENTRY_BOOTSTRAP_MQTT_SESSION: None})
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_none_when_required_keys_missing(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_required_keys_missing(self) -> None:
         """Returns None when the dict lacks required user_id, seed_b64, or mac_id."""
         entry = _FakeEntry(
             data={
@@ -146,7 +146,7 @@ class TestEntryBootstrapMqttSession:
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_none_when_any_required_value_is_empty_string(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_any_required_value_is_empty_string(self) -> None:
         """Returns None when a required value is an empty string."""
         entry = _FakeEntry(
             data={
@@ -160,7 +160,7 @@ class TestEntryBootstrapMqttSession:
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_none_when_any_required_value_is_non_string(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_any_required_value_is_non_string(self) -> None:
         """Returns None when a required value is not a string (e.g. int)."""
         entry = _FakeEntry(
             data={
@@ -174,7 +174,7 @@ class TestEntryBootstrapMqttSession:
         result = _entry_bootstrap_mqtt_session(entry)
         assert result is None
 
-    def test_returns_snapshot_with_all_required_fields(self) -> None:  # noqa: PLR6301
+    def test_returns_snapshot_with_all_required_fields(self) -> None:
         """Returns dict with user_id, seed_b64, mac_id when all fields are valid."""
         entry = _FakeEntry(
             data={
@@ -191,7 +191,7 @@ class TestEntryBootstrapMqttSession:
         assert result[MQTT_SESSION_SEED_B64] == "c2VlZF9iYXNlNjQ="
         assert result[MQTT_SESSION_MAC_ID] == "2abc123456789abc"
 
-    def test_includes_optional_mac_id_source_when_present(self) -> None:  # noqa: PLR6301
+    def test_includes_optional_mac_id_source_when_present(self) -> None:
         """Includes MQTT_SESSION_MAC_ID_SOURCE when it is a non-empty string."""
         entry = _FakeEntry(
             data={
@@ -207,7 +207,7 @@ class TestEntryBootstrapMqttSession:
         assert result is not None
         assert result[MQTT_SESSION_MAC_ID_SOURCE] == "configured"
 
-    def test_omits_mac_id_source_when_empty_string(self) -> None:  # noqa: PLR6301
+    def test_omits_mac_id_source_when_empty_string(self) -> None:
         """Omits MQTT_SESSION_MAC_ID_SOURCE from the snapshot when it is an empty string."""
         entry = _FakeEntry(
             data={
@@ -223,7 +223,7 @@ class TestEntryBootstrapMqttSession:
         assert result is not None
         assert MQTT_SESSION_MAC_ID_SOURCE not in result
 
-    def test_omits_mac_id_source_when_not_string(self) -> None:  # noqa: PLR6301
+    def test_omits_mac_id_source_when_not_string(self) -> None:
         """Omits MQTT_SESSION_MAC_ID_SOURCE when its value is not a string."""
         entry = _FakeEntry(
             data={
@@ -239,7 +239,7 @@ class TestEntryBootstrapMqttSession:
         assert result is not None
         assert MQTT_SESSION_MAC_ID_SOURCE not in result
 
-    def test_snapshot_does_not_include_extra_keys(self) -> None:  # noqa: PLR6301
+    def test_snapshot_does_not_include_extra_keys(self) -> None:
         """The snapshot only includes the documented MQTT session keys."""
         entry = _FakeEntry(
             data={
@@ -264,14 +264,14 @@ class TestEntryBootstrapMqttSession:
 class TestEntryRuntimeBucket:
     """Tests for _entry_runtime_bucket()."""
 
-    def test_creates_domain_key_if_absent(self) -> None:  # noqa: PLR6301
+    def test_creates_domain_key_if_absent(self) -> None:
         """Creates hass.data[DOMAIN] if it does not exist."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
         _entry_runtime_bucket(hass, entry)
         assert DOMAIN in hass.data
 
-    def test_creates_entry_bucket_if_absent(self) -> None:  # noqa: PLR6301
+    def test_creates_entry_bucket_if_absent(self) -> None:
         """Creates hass.data[DOMAIN][entry_id] if it does not exist."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e2")
@@ -279,7 +279,7 @@ class TestEntryRuntimeBucket:
         assert isinstance(bucket, dict)
         assert hass.data[DOMAIN]["e2"] is bucket
 
-    def test_returns_same_bucket_on_repeated_calls(self) -> None:  # noqa: PLR6301
+    def test_returns_same_bucket_on_repeated_calls(self) -> None:
         """Repeated calls for the same entry return the identical dict object."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e3")
@@ -287,7 +287,7 @@ class TestEntryRuntimeBucket:
         bucket2 = _entry_runtime_bucket(hass, entry)
         assert bucket1 is bucket2
 
-    def test_preserves_existing_bucket_contents(self) -> None:  # noqa: PLR6301
+    def test_preserves_existing_bucket_contents(self) -> None:
         """Does not overwrite an existing bucket when one is already present."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e4")
@@ -295,7 +295,7 @@ class TestEntryRuntimeBucket:
         bucket = _entry_runtime_bucket(hass, entry)
         assert bucket["existing"] == "value"
 
-    def test_separate_entries_get_separate_buckets(self) -> None:  # noqa: PLR6301
+    def test_separate_entries_get_separate_buckets(self) -> None:
         """Different entry_ids must produce separate bucket objects."""
         hass = _FakeHass()
         entry_a = _FakeEntry(entry_id="ea")
@@ -313,14 +313,14 @@ class TestEntryRuntimeBucket:
 class TestEntryStartupTask:
     """Tests for _entry_startup_task()."""
 
-    def test_returns_none_when_domain_absent(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_domain_absent(self) -> None:
         """Returns None when DOMAIN is not in hass.data."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
         result = _entry_startup_task(hass, entry)
         assert result is None
 
-    def test_returns_none_when_entry_absent(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_entry_absent(self) -> None:
         """Returns None when entry_id is not in hass.data[DOMAIN]."""
         hass = _FakeHass()
         hass.data[DOMAIN] = {}
@@ -328,7 +328,7 @@ class TestEntryStartupTask:
         result = _entry_startup_task(hass, entry)
         assert result is None
 
-    def test_returns_none_when_bucket_is_not_dict(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_bucket_is_not_dict(self) -> None:
         """Returns None when hass.data[DOMAIN][entry_id] is not a dict."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -336,7 +336,7 @@ class TestEntryStartupTask:
         result = _entry_startup_task(hass, entry)
         assert result is None
 
-    def test_returns_none_when_startup_key_absent(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_startup_key_absent(self) -> None:
         """Returns None when _STARTUP_TASK_RUNTIME_KEY is not in the bucket."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -344,7 +344,7 @@ class TestEntryStartupTask:
         result = _entry_startup_task(hass, entry)
         assert result is None
 
-    def test_returns_none_when_task_is_not_asyncio_task(self) -> None:  # noqa: PLR6301
+    def test_returns_none_when_task_is_not_asyncio_task(self) -> None:
         """Returns None when the stored value is not an asyncio.Task."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -352,7 +352,7 @@ class TestEntryStartupTask:
         result = _entry_startup_task(hass, entry)
         assert result is None
 
-    async def test_returns_task_when_present(self) -> None:  # noqa: PLR6301
+    async def test_returns_task_when_present(self) -> None:
         """Returns the stored asyncio.Task when one is registered in hass.data."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -376,14 +376,14 @@ class TestEntryStartupTask:
 class TestAsyncCancelStartupTask:
     """Tests for _async_cancel_startup_task()."""
 
-    async def test_does_nothing_when_no_task_registered(self) -> None:  # noqa: PLR6301
+    async def test_does_nothing_when_no_task_registered(self) -> None:
         """No error when called with no task in hass.data."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
         # Should not raise
         await _async_cancel_startup_task(hass, entry)
 
-    async def test_cancels_running_task(self) -> None:  # noqa: PLR6301
+    async def test_cancels_running_task(self) -> None:
         """Cancels an in-flight background startup task."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -408,7 +408,7 @@ class TestAsyncCancelStartupTask:
         assert task.cancelled()
         assert cancelled
 
-    async def test_removes_task_from_bucket_after_cancel(self) -> None:  # noqa: PLR6301
+    async def test_removes_task_from_bucket_after_cancel(self) -> None:
         """Removes the startup task key from hass.data after cancellation."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -425,7 +425,7 @@ class TestAsyncCancelStartupTask:
 
         assert _STARTUP_TASK_RUNTIME_KEY not in bucket
 
-    async def test_does_not_raise_when_task_already_done(self) -> None:  # noqa: PLR6301
+    async def test_does_not_raise_when_task_already_done(self) -> None:
         """No error when the task has already completed before cancel is called."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="e1")
@@ -449,7 +449,7 @@ class TestAsyncCancelStartupTask:
 class TestAsyncRemoveConfigEntryDevice:
     """Tests for async_remove_config_entry_device()."""
 
-    async def test_always_returns_true(self) -> None:  # noqa: PLR6301
+    async def test_always_returns_true(self) -> None:
         """Cloud integrations always allow device removal from the UI."""
         hass = MagicMock()
         entry = MagicMock()
@@ -457,7 +457,7 @@ class TestAsyncRemoveConfigEntryDevice:
         result = await async_remove_config_entry_device(hass, entry, device_entry)
         assert result is True
 
-    async def test_returns_true_for_any_device(self) -> None:  # noqa: PLR6301
+    async def test_returns_true_for_any_device(self) -> None:
         """Return value is True regardless of the device entry provided."""
         hass = MagicMock()
         entry = MagicMock()
@@ -476,7 +476,7 @@ class TestAsyncRemoveConfigEntryDevice:
 class TestAsyncStartLocalMqttNewKeys:
     """Tests for _async_start_local_mqtt using the new CONF_LOCAL_MQTT_* config keys."""
 
-    async def test_disabled_local_mqtt_enable_prevents_start(self) -> None:  # noqa: PLR6301
+    async def test_disabled_local_mqtt_enable_prevents_start(self) -> None:
         """CONF_LOCAL_MQTT_ENABLE=False must prevent client creation."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=False, host="192.168.1.200")
@@ -487,7 +487,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_enabled_with_valid_host_and_filter_creates_client(self) -> None:  # noqa: PLR6301
+    async def test_enabled_with_valid_host_and_filter_creates_client(self) -> None:
         """CONF_LOCAL_MQTT_ENABLE=True with a valid host and topic filter must create the client."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -508,7 +508,7 @@ class TestAsyncStartLocalMqttNewKeys:
         )
         assert isinstance(client, JackeryLocalMqttClient)
 
-    async def test_empty_host_prevents_client_creation(self) -> None:  # noqa: PLR6301
+    async def test_empty_host_prevents_client_creation(self) -> None:
         """An empty CONF_LOCAL_MQTT_HOST must prevent client creation."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=True, host="")
@@ -519,7 +519,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_whitespace_only_host_prevents_client_creation(self) -> None:  # noqa: PLR6301
+    async def test_whitespace_only_host_prevents_client_creation(self) -> None:
         """A whitespace-only CONF_LOCAL_MQTT_HOST must be stripped and treated as empty."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=True, host="   ")
@@ -530,7 +530,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_empty_topic_filter_prevents_client_creation(self) -> None:  # noqa: PLR6301
+    async def test_empty_topic_filter_prevents_client_creation(self) -> None:
         """An empty topic filter must keep the listener disabled."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -543,7 +543,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_broad_wildcard_hash_is_blocked(self) -> None:  # noqa: PLR6301
+    async def test_broad_wildcard_hash_is_blocked(self) -> None:
         """The '#' topic filter must be blocked for CPU safety."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -556,7 +556,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_broad_wildcard_plus_hash_is_blocked(self) -> None:  # noqa: PLR6301
+    async def test_broad_wildcard_plus_hash_is_blocked(self) -> None:
         """The '+/#' topic filter must be blocked for CPU safety."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -569,7 +569,7 @@ class TestAsyncStartLocalMqttNewKeys:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert "local_mqtt_client" not in bucket
 
-    async def test_scoped_filter_is_not_blocked(self) -> None:  # noqa: PLR6301
+    async def test_scoped_filter_is_not_blocked(self) -> None:
         """A scoped filter like 'hb/app/+/device' must NOT be blocked."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -588,7 +588,7 @@ class TestAsyncStartLocalMqttNewKeys:
         )
         assert isinstance(client, JackeryLocalMqttClient)
 
-    async def test_client_id_uses_first_8_chars_of_entry_id(self) -> None:  # noqa: PLR6301
+    async def test_client_id_uses_first_8_chars_of_entry_id(self) -> None:
         """The MQTT client_id must be 'ha-jackery-' + first 8 chars of entry_id."""
         hass = _FakeHass()
         entry_id = "XYZWABCD1234"
@@ -604,9 +604,9 @@ class TestAsyncStartLocalMqttNewKeys:
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry_id]["local_mqtt_client"]
-        assert client._client_id == f"ha-jackery-{entry_id[:8]}"  # noqa: SLF001
+        assert client._client_id == f"ha-jackery-{entry_id[:8]}"
 
-    async def test_topic_filter_is_passed_to_client(self) -> None:  # noqa: PLR6301
+    async def test_topic_filter_is_passed_to_client(self) -> None:
         """The configured topic filter must appear on the created client."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -621,9 +621,9 @@ class TestAsyncStartLocalMqttNewKeys:
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"]
-        assert client._topic_filter == "sv3pro/+/status"  # noqa: SLF001
+        assert client._topic_filter == "sv3pro/+/status"
 
-    async def test_sink_forwards_non_none_data_to_coordinator(self) -> None:  # noqa: PLR6301
+    async def test_sink_forwards_non_none_data_to_coordinator(self) -> None:
         """The sink function must call coordinator.async_handle_local_mqtt_message for non-None data."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -644,12 +644,12 @@ class TestAsyncStartLocalMqttNewKeys:
 
         # Retrieve the sink and call it directly
         client = hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"]
-        sink = client._sink  # noqa: SLF001
+        sink = client._sink
         await sink("jackery/device1/data", {"soc": 80}, b'{"soc":80}')
 
         assert handle_calls == [("jackery/device1/data", {"soc": 80})]
 
-    async def test_sink_ignores_none_data(self) -> None:  # noqa: PLR6301
+    async def test_sink_ignores_none_data(self) -> None:
         """The sink must not forward a message when data is None."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(
@@ -667,12 +667,12 @@ class TestAsyncStartLocalMqttNewKeys:
             await _async_start_local_mqtt(hass, entry, coordinator)
 
         client = hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"]
-        sink = client._sink  # noqa: SLF001
+        sink = client._sink
         await sink("some/topic", None, b"raw")
 
         assert not handle_calls
 
-    async def test_unload_callback_registered(self) -> None:  # noqa: PLR6301
+    async def test_unload_callback_registered(self) -> None:
         """_async_start_local_mqtt must register exactly one unload callback."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=True, host="192.168.1.200")
@@ -684,9 +684,9 @@ class TestAsyncStartLocalMqttNewKeys:
         ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
-        assert len(entry._unload_callbacks) == 1  # noqa: SLF001
+        assert len(entry._unload_callbacks) == 1
 
-    async def test_unload_callback_stops_and_removes_client(self) -> None:  # noqa: PLR6301
+    async def test_unload_callback_stops_and_removes_client(self) -> None:
         """The unload callback stops the client and removes it from hass.data."""
         hass = _FakeHass()
         entry = _make_local_mqtt_entry(enable=True, host="192.168.1.200")
@@ -707,7 +707,7 @@ class TestAsyncStartLocalMqttNewKeys:
             stop_calls.append(True)
 
         with patch.object(client, "async_stop", new=_fake_stop):
-            await entry._unload_callbacks[0]()  # noqa: SLF001
+            await entry._unload_callbacks[0]()
 
         assert stop_calls
         assert "local_mqtt_client" not in bucket
@@ -721,7 +721,7 @@ class TestAsyncStartLocalMqttNewKeys:
 class TestAsyncAuthenticateApiLayer:
     """Tests for _async_authenticate_api_layer()."""
 
-    async def test_raises_config_entry_auth_failed_on_jackery_auth_error(  # noqa: PLR6301
+    async def test_raises_config_entry_auth_failed_on_jackery_auth_error(
         self,
     ) -> None:
         """JackeryAuthError from async_login must be re-raised as ConfigEntryAuthFailed."""
@@ -752,7 +752,7 @@ class TestAsyncAuthenticateApiLayer:
         ):
             await _async_authenticate_api_layer(hass, entry, api)
 
-    async def test_swallows_jackery_error_transient(self) -> None:  # noqa: PLR6301
+    async def test_swallows_jackery_error_transient(self) -> None:
         """A transient JackeryError (network down) must be logged but not raised."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
@@ -780,7 +780,7 @@ class TestAsyncAuthenticateApiLayer:
             # Must NOT raise
             await _async_authenticate_api_layer(hass, entry, api)
 
-    async def test_saves_new_mqtt_session_after_successful_login(self) -> None:  # noqa: PLR6301
+    async def test_saves_new_mqtt_session_after_successful_login(self) -> None:
         """After a successful login, a changed MQTT session snapshot must be persisted."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
@@ -823,7 +823,7 @@ class TestAsyncAuthenticateApiLayer:
         assert len(saved) == 1
         assert saved[0][MQTT_SESSION_USER_ID] == "uid_new"
 
-    async def test_does_not_save_session_when_snapshot_unchanged(self) -> None:  # noqa: PLR6301
+    async def test_does_not_save_session_when_snapshot_unchanged(self) -> None:
         """When the MQTT session snapshot matches cached data, no save is performed."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
@@ -865,7 +865,7 @@ class TestAsyncAuthenticateApiLayer:
 
         assert not save_called
 
-    async def test_does_not_save_session_when_snapshot_is_none(self) -> None:  # noqa: PLR6301
+    async def test_does_not_save_session_when_snapshot_is_none(self) -> None:
         """No save is performed when mqtt_session_snapshot returns None."""
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701

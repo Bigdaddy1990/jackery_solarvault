@@ -356,7 +356,7 @@ def test_plug_property_returns_empty_when_coordinator_data_none() -> None:
     sensor = JackerySmartPlugStateBinarySensor(
         coordinator, "dev1", plug_index=1, plug_sn="SN001", plug_key=plug_key
     )
-    assert sensor._plug == {}  # noqa: SLF001
+    assert sensor._plug == {}
 
 
 def test_plug_property_returns_empty_when_device_missing_from_data() -> None:
@@ -366,7 +366,7 @@ def test_plug_property_returns_empty_when_device_missing_from_data() -> None:
     sensor = JackerySmartPlugStateBinarySensor(
         coordinator, "dev1", plug_index=1, plug_sn="SN001", plug_key=plug_key
     )
-    assert sensor._plug == {}  # noqa: SLF001
+    assert sensor._plug == {}
 
 
 def test_plug_property_returns_empty_when_smart_plugs_key_absent() -> None:
@@ -376,7 +376,7 @@ def test_plug_property_returns_empty_when_smart_plugs_key_absent() -> None:
     sensor = JackerySmartPlugStateBinarySensor(
         coordinator, "dev1", plug_index=1, plug_sn="SN001", plug_key=plug_key
     )
-    assert sensor._plug == {}  # noqa: SLF001
+    assert sensor._plug == {}
 
 
 def test_plug_property_matches_by_serial_number() -> None:
@@ -394,7 +394,7 @@ def test_plug_property_matches_by_serial_number() -> None:
     sensor = JackerySmartPlugStateBinarySensor(
         coordinator, "dev1", plug_index=2, plug_sn=plug_sn, plug_key=plug_key
     )
-    assert sensor._plug == {"sn": plug_sn, FIELD_SWITCH_STATE: 1}  # noqa: SLF001
+    assert sensor._plug == {"sn": plug_sn, FIELD_SWITCH_STATE: 1}
 
 
 # ---------------------------------------------------------------------------
@@ -510,13 +510,13 @@ def test_smart_plug_index_stored_correctly() -> None:
     """The plug_index passed at construction must be stored and accessible."""
     expected_plug_index = 7
     sensor = _make_plug_sensor(plug_index=expected_plug_index)
-    assert sensor._plug_index == expected_plug_index  # noqa: SLF001
+    assert sensor._plug_index == expected_plug_index
 
 
 def test_smart_plug_sn_stored_correctly() -> None:
     """The plug_sn passed at construction must be stored and accessible."""
     sensor = _make_plug_sensor(plug_sn="MY-SERIAL")
-    assert sensor._plug_sn == "MY-SERIAL"  # noqa: SLF001
+    assert sensor._plug_sn == "MY-SERIAL"
 
 
 # ---------------------------------------------------------------------------
@@ -555,6 +555,6 @@ async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
     assert async_add_entities.call_count == 2  # noqa: PLR2004
     second_batch = async_add_entities.call_args_list[1][0][0]
     # The second batch must only contain entities for "new_dev", not for "dev_dup"
-    second_device_ids = {e._device_id for e in second_batch}  # noqa: SLF001
+    second_device_ids = {e._device_id for e in second_batch}
     assert "new_dev" in second_device_ids
     assert "dev_dup" not in second_device_ids

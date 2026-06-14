@@ -819,8 +819,8 @@ def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) ->
         "nested": {"mqttPassWord": "mqtt-seed"},
         "items": ({"bluetoothKey": "ble-key"},),
     }
-    redacted = util._payload_debug_redacted(event, False)  # noqa: SLF001
-    raw = util._payload_debug_redacted(event, True)  # noqa: SLF001
+    redacted = util._payload_debug_redacted(event, False)
+    raw = util._payload_debug_redacted(event, True)
     entity_attrs = util.redacted_json_safe_payload(event)
 
     assert redacted["password"] == "**REDACTED**"
@@ -2343,7 +2343,7 @@ def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload(
     assert "http_props," in refresh_block
 
 
-def test_component_modules_import_all_referenced_const_names() -> None:  # noqa: PLR0912
+def test_component_modules_import_all_referenced_const_names() -> None:
     """Catch runtime NameError regressions from missing .const imports in any module."""
     const_tree = ast.parse((CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8"))
     const_names: set[str] = set()

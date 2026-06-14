@@ -48,7 +48,7 @@ class _FakeHass:
     def __init__(self) -> None:
         self.data: dict[str, Any] = {}
 
-    def async_create_background_task(  # noqa: PLR6301
+    def async_create_background_task(
         self,
         coro: Any,  # noqa: ANN401
         name: str = "",
@@ -89,8 +89,8 @@ def _make_coordinator_stub() -> MagicMock:
     coordinator.async_apply_local_mqtt_config_to_devices = AsyncMock()
     coordinator.cached_discovery_snapshot = MagicMock(return_value=None)
     coordinator.async_set_updated_data = MagicMock()
-    coordinator._defer_background_auth_failure = MagicMock()  # noqa: SLF001
-    coordinator._mqtt_auth_failure_message = None  # noqa: SLF001
+    coordinator._defer_background_auth_failure = MagicMock()
+    coordinator._mqtt_auth_failure_message = None
     return coordinator
 
 
@@ -102,7 +102,7 @@ def _make_coordinator_stub() -> MagicMock:
 class TestAsyncFinishEntryStartupAuthFailure:
     """Tests for _async_finish_entry_startup when auth layer rejects credentials."""
 
-    async def test_auth_failure_stored_on_coordinator(self) -> None:  # noqa: PLR6301
+    async def test_auth_failure_stored_on_coordinator(self) -> None:
         """ConfigEntryAuthFailed from _async_authenticate_api_layer must be stored on the coordinator."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -126,9 +126,9 @@ class TestAsyncFinishEntryStartupAuthFailure:
             await _async_finish_entry_startup(hass, entry, coordinator)
 
         # ConfigEntryAuthFailed during auth → stored on coordinator
-        assert coordinator._mqtt_auth_failure_message is not None  # noqa: SLF001
+        assert coordinator._mqtt_auth_failure_message is not None
 
-    async def test_auth_failure_returns_early(self) -> None:  # noqa: PLR6301
+    async def test_auth_failure_returns_early(self) -> None:
         """When auth fails, _async_finish_entry_startup must return early without calling async_discover."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -155,7 +155,7 @@ class TestAsyncFinishEntryStartupAuthFailure:
 class TestAsyncFinishEntryStartupDiscovery:
     """Tests for _async_finish_entry_startup when discovery fails."""
 
-    async def test_discovery_update_failed_with_cached_snapshot_sets_data(  # noqa: PLR6301
+    async def test_discovery_update_failed_with_cached_snapshot_sets_data(
         self,
     ) -> None:
         """When discovery raises UpdateFailed and a cached snapshot exists, coordinator data is set."""
@@ -168,7 +168,7 @@ class TestAsyncFinishEntryStartupDiscovery:
 
         cached = {"dev-123": {"some": "payload"}}
         coordinator.cached_discovery_snapshot = MagicMock(return_value=cached)
-        coordinator._async_load_cached_discovery = AsyncMock(return_value=True)  # noqa: SLF001
+        coordinator._async_load_cached_discovery = AsyncMock(return_value=True)
 
         with (
             patch(
@@ -185,7 +185,7 @@ class TestAsyncFinishEntryStartupDiscovery:
 
         coordinator.async_set_updated_data.assert_called_once_with(cached)
 
-    async def test_discovery_auth_failed_stored_on_coordinator(self) -> None:  # noqa: PLR6301
+    async def test_discovery_auth_failed_stored_on_coordinator(self) -> None:
         """When discovery raises ConfigEntryAuthFailed, it is stored on the coordinator."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -207,7 +207,7 @@ class TestAsyncFinishEntryStartupDiscovery:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert coordinator._mqtt_auth_failure_message is not None  # noqa: SLF001
+        assert coordinator._mqtt_auth_failure_message is not None
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ class TestAsyncFinishEntryStartupDiscovery:
 class TestAsyncFinishEntryStartupGatherResults:
     """Tests for _async_finish_entry_startup gather result handling."""
 
-    async def test_mqtt_auth_failed_defers_background_auth_failure(  # noqa: PLR6301
+    async def test_mqtt_auth_failed_defers_background_auth_failure(
         self,
     ) -> None:
         """When mqtt_result is ConfigEntryAuthFailed, _defer_background_auth_failure is called."""
@@ -237,11 +237,11 @@ class TestAsyncFinishEntryStartupGatherResults:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        coordinator._defer_background_auth_failure.assert_called_once_with(  # noqa: SLF001
+        coordinator._defer_background_auth_failure.assert_called_once_with(
             mqtt_auth_err
         )
 
-    async def test_mqtt_generic_error_logs_warning(  # noqa: PLR6301
+    async def test_mqtt_generic_error_logs_warning(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """When mqtt_result is a non-auth BaseException, a warning is logged."""
@@ -266,7 +266,7 @@ class TestAsyncFinishEntryStartupGatherResults:
 
         assert "MQTT push could not start" in caplog.text
 
-    async def test_ble_error_logs_warning(  # noqa: PLR6301
+    async def test_ble_error_logs_warning(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """When ble_result is a BaseException, a warning is logged."""
@@ -291,7 +291,7 @@ class TestAsyncFinishEntryStartupGatherResults:
 
         assert "BLE transport could not start" in caplog.text
 
-    async def test_local_listener_error_logs_warning(  # noqa: PLR6301
+    async def test_local_listener_error_logs_warning(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """When local_listener_result is a BaseException, a warning is logged."""
@@ -316,7 +316,7 @@ class TestAsyncFinishEntryStartupGatherResults:
 
         assert "HA-MQTT listener could not start" in caplog.text
 
-    async def test_refresh_failed_with_cached_snapshot_sets_data(self) -> None:  # noqa: PLR6301
+    async def test_refresh_failed_with_cached_snapshot_sets_data(self) -> None:
         """When first refresh fails with UpdateFailed and cached snapshot exists, coordinator data is set."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -339,7 +339,7 @@ class TestAsyncFinishEntryStartupGatherResults:
 
         coordinator.async_set_updated_data.assert_called_once_with(cached)
 
-    async def test_refresh_failed_without_cached_snapshot_logs_warning(  # noqa: PLR6301
+    async def test_refresh_failed_without_cached_snapshot_logs_warning(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """When first refresh fails with UpdateFailed and no cached snapshot, a warning is logged."""
@@ -377,7 +377,7 @@ class TestAsyncFinishEntryStartupGatherResults:
 class TestAsyncFinishEntryStartupFinally:
     """Tests that the finally block cleans up the startup task key."""
 
-    async def test_finally_removes_startup_task_key_on_success(self) -> None:  # noqa: PLR6301
+    async def test_finally_removes_startup_task_key_on_success(self) -> None:
         """The startup_task key must be removed from hass.data after successful startup."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="entry-finally-ok")
@@ -395,7 +395,7 @@ class TestAsyncFinishEntryStartupFinally:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert _STARTUP_TASK_RUNTIME_KEY not in bucket
 
-    async def test_finally_removes_startup_task_key_on_auth_failure(self) -> None:  # noqa: PLR6301
+    async def test_finally_removes_startup_task_key_on_auth_failure(self) -> None:
         """The startup_task key must be removed even when auth fails during startup."""
         from homeassistant.exceptions import ConfigEntryAuthFailed
 
@@ -416,7 +416,7 @@ class TestAsyncFinishEntryStartupFinally:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
         assert _STARTUP_TASK_RUNTIME_KEY not in bucket
 
-    async def test_finally_handles_missing_hass_data_gracefully(self) -> None:  # noqa: PLR6301
+    async def test_finally_handles_missing_hass_data_gracefully(self) -> None:
         """The finally block must not raise when hass.data has no entry bucket."""
         hass = _FakeHass()
         entry = _FakeEntry(entry_id="entry-finally-missing")
@@ -439,7 +439,7 @@ class TestAsyncFinishEntryStartupFinally:
 class TestJackeryQueryButtonHomeAssistantErrorHandling:
     """Tests for HomeAssistantError handling in JackeryQueryButton.async_press."""
 
-    def _make_query_button(  # noqa: PLR6301
+    def _make_query_button(
         self,
         action: Any,  # noqa: ANN401
     ) -> Any:  # noqa: ANN401
@@ -529,7 +529,7 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
 class TestJackeryRebootButtonHomeAssistantErrorHandling:
     """Tests for HomeAssistantError handling in JackeryRebootButton.async_press."""
 
-    async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
+    async def test_homeassistant_error_with_translation_key_is_reraised(
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
@@ -553,7 +553,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
         assert exc_info.value is original_error
         assert exc_info.value.translation_key == "device_unreachable"
 
-    async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
+    async def test_homeassistant_error_without_translation_key_is_wrapped(
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""
@@ -582,7 +582,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
 class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
     """Tests for HomeAssistantError handling in JackeryDeleteStormAlertButton.async_press."""
 
-    async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
+    async def test_homeassistant_error_with_translation_key_is_reraised(
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
@@ -616,7 +616,7 @@ class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
 class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
     """Tests for HomeAssistantError handling in JackeryRefreshWeatherPlanButton.async_press."""
 
-    async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
+    async def test_homeassistant_error_with_translation_key_is_reraised(
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
@@ -650,7 +650,7 @@ class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
 class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
     """Tests for HomeAssistantError handling in JackeryReadScheduleButton.async_press."""
 
-    async def test_homeassistant_error_with_translation_key_is_reraised(  # noqa: PLR6301
+    async def test_homeassistant_error_with_translation_key_is_reraised(
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
@@ -682,7 +682,7 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
 
         assert exc_info.value is original_error
 
-    async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
+    async def test_homeassistant_error_without_translation_key_is_wrapped(
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""

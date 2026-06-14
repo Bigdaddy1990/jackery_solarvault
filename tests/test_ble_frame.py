@@ -543,10 +543,10 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
         Constructs a minimal JackeryBleListener instance with an empty client registry and a fixed 16-byte key resolver, calls async_send_command for a sample device and command, and asserts the call indicates the command was not sent.
         """
         listener = JackeryBleListener.__new__(JackeryBleListener)
-        listener._stop_event = asyncio.Event()  # noqa: SLF001
-        listener._clients = {}  # no active client  # noqa: SLF001
-        listener._mtu = {}  # noqa: SLF001
-        listener._key_resolver = lambda _device_id: b"x" * 16  # noqa: SLF001
+        listener._stop_event = asyncio.Event()
+        listener._clients = {}  # no active client
+        listener._mtu = {}
+        listener._key_resolver = lambda _device_id: b"x" * 16
         sent = await listener.async_send_command(
             "573702884982521856",
             cmd=107,
@@ -579,7 +579,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
     captured: dict[str, object] = {}
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             uuid: str,
             blob: bytes,
@@ -610,10 +610,10 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = JackeryBleListener.__new__(JackeryBleListener)
-        listener._stop_event = asyncio.Event()  # noqa: SLF001
-        listener._clients = {"573702884982521856": _FakeClient()}  # noqa: SLF001
-        listener._mtu = {}  # noqa: SLF001
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._stop_event = asyncio.Event()
+        listener._clients = {"573702884982521856": _FakeClient()}
+        listener._mtu = {}
+        listener._key_resolver = lambda _device_id: key
         ok = await listener.async_send_command(
             "573702884982521856",
             cmd=107,
@@ -783,10 +783,10 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
     async def _runner() -> None:
         listener = JackeryBleListener.__new__(JackeryBleListener)
-        listener._stop_event = asyncio.Event()  # noqa: SLF001
-        listener._unregister_callbacks = []  # noqa: SLF001
-        listener._connections = {}  # noqa: SLF001
-        listener._stats = {}  # noqa: SLF001
+        listener._stop_event = asyncio.Event()
+        listener._unregister_callbacks = []
+        listener._connections = {}
+        listener._stats = {}
 
         async def _stuck() -> None:
             # Mimic the real runner's backoff wait. Without
@@ -795,10 +795,10 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
             """  # noqa: D205
-            await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)  # noqa: SLF001
+            await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)
 
         task = asyncio.create_task(_stuck())
-        listener._connections["dev"] = task  # noqa: SLF001
+        listener._connections["dev"] = task
         # Give the loop a tick so the task actually parks at the wait.
         await asyncio.sleep(0)
         loop = asyncio.get_running_loop()
@@ -833,7 +833,7 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
         }
 
     class _Listener:
-        async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:  # noqa: PLR6301
+        async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:
             """Stub method that fails immediately to indicate the BLE listener must not be invoked.
 
             Raises:
@@ -878,7 +878,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
         }
 
     class _Listener:
-        def all_stats(self) -> dict[str, object]:  # noqa: PLR6301
+        def all_stats(self) -> dict[str, object]:
             """Return a snapshot of listener statistics as a mapping of statistic names to values.
 
             The returned dictionary contains current monitoring fields (counters, timestamps, and optional diagnostic strings) keyed by their descriptive names; callers may read but should not assume mutability of internal state.
@@ -888,7 +888,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
             """
             return {}
 
-        def mtu_for_device(self, device_id: str) -> int:  # noqa: PLR6301
+        def mtu_for_device(self, device_id: str) -> int:
             """Get the negotiated MTU size for the specified device.
 
             Returns:
@@ -899,8 +899,8 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.entry = _Entry()
-    coordinator._device_index = {"dev1": {}}  # noqa: SLF001
-    coordinator._ble_listener = None  # noqa: SLF001
+    coordinator._device_index = {"dev1": {}}
+    coordinator._ble_listener = None
 
     idle = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
     assert idle["enabled"] is True
@@ -909,7 +909,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     assert idle["frames_decoded"] == 0
     assert idle["mtu"] is None
 
-    coordinator._ble_listener = _Listener()  # noqa: SLF001
+    coordinator._ble_listener = _Listener()
     running = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
     assert running["enabled"] is True
     assert running["running"] is True
@@ -939,7 +939,7 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # noqa: PLR0913, PLR6301
+        async def async_send_command(  # noqa: PLR0913
             self,
             device_id: str,
             *,
@@ -1071,7 +1071,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
             "dev1",
             message_type="DevicePropertyChange",
@@ -1144,7 +1144,7 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
             "dev1",
             message_type="DevicePropertyChange",
@@ -1224,7 +1224,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
             "dev1",
             message_type="DevicePropertyChange",
@@ -1300,7 +1300,7 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
             "dev1",
             message_type="DevicePropertyChange",
@@ -1372,7 +1372,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # noqa: SLF001
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
             self,
             "dev1",
             message_type="SendWeatherAlert",
@@ -1399,18 +1399,18 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
         JackerySolarVaultCoordinator,
     )
 
-    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._command_body_for_transport(
         {"swEps": 1},
         cmd="107.0",  # type: ignore[arg-type]
     ) == {"swEps": 1, FIELD_CMD: 107}
-    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._command_body_for_transport(
         {"wpc": 30},
         cmd=0,
     ) == {"wpc": 30}
 
     for bad_cmd in (True, float("nan"), "107.5"):
         with pytest.raises(ValueError, match="cmd must be an integer"):
-            JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: SLF001
+            JackerySolarVaultCoordinator._command_body_for_transport(
                 {},
                 cmd=bad_cmd,  # type: ignore[arg-type]
             )
@@ -1421,15 +1421,15 @@ def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     from custom_components.jackery_solarvault import services
     from homeassistant.exceptions import ServiceValidationError
 
-    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # noqa: SLF001
-    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # noqa: SLF001
+    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}
+    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {
         "cmd": 107,
         "swEps": 1,
     }
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service("[1,2,3]", "dev1")  # noqa: SLF001
+        services._ble_body_from_service("[1,2,3]", "dev1")
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service("{bad json", "dev1")  # noqa: SLF001
+        services._ble_body_from_service("{bad json", "dev1")
 
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
@@ -1563,17 +1563,17 @@ def _build_bare_listener() -> object:
     )
 
     listener = JackeryBleListener.__new__(JackeryBleListener)
-    listener._stop_event = asyncio.Event()  # noqa: SLF001
-    listener._clients = {}  # noqa: SLF001
-    listener._pending_acks = {}  # noqa: SLF001
-    listener._stats = {}  # noqa: SLF001
-    listener._unregister_callbacks = []  # noqa: SLF001
-    listener._connections = {}  # noqa: SLF001
-    listener._device_addresses = {}  # noqa: SLF001
-    listener._mtu = {}  # noqa: SLF001
-    listener._key_resolver = lambda _device_id: None  # noqa: SLF001
-    listener._serial_resolver = None  # noqa: SLF001
-    listener._ble_address_resolver = lambda _device_id: None  # noqa: SLF001
+    listener._stop_event = asyncio.Event()
+    listener._clients = {}
+    listener._pending_acks = {}
+    listener._stats = {}
+    listener._unregister_callbacks = []
+    listener._connections = {}
+    listener._device_addresses = {}
+    listener._mtu = {}
+    listener._key_resolver = lambda _device_id: None
+    listener._serial_resolver = None
+    listener._ble_address_resolver = lambda _device_id: None
     return listener
 
 
@@ -1591,7 +1591,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
     captured: dict[str, object] = {}
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             blob: bytes,
@@ -1616,9 +1616,9 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_ack() -> None:
             # Give async_send_command a tick to register its pending ack
@@ -1631,7 +1631,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
             await asyncio.sleep(0)
             echo_plain = build_binary_frame(cmd=107, body=b'{"cmd":107,"swEps":1}')
             echo_blob = encrypt_binary_notify(echo_plain, key)
-            await listener._handle_notification("dev", echo_blob)  # noqa: SLF001
+            await listener._handle_notification("dev", echo_blob)
 
         sender = listener.async_send_command(
             "dev",
@@ -1646,7 +1646,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         assert stats.last_ack_at is not None
-        assert listener._pending_acks == {}  # noqa: SLF001
+        assert listener._pending_acks == {}
         # The frame round-trips through the real decoder.
         parsed = BleBinaryFrame.__name__  # smoke import
         del parsed
@@ -1665,7 +1665,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
     import base64
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             _blob: bytes,
@@ -1682,9 +1682,9 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(RuntimeError, match="ack timeout"):
             await listener.async_send_command(
@@ -1699,7 +1699,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
         assert stats.acks_timed_out == 1
         # Pending bucket is cleaned up so a later notify doesn't fire
         # into a dropped future.
-        assert listener._pending_acks == {}  # noqa: SLF001
+        assert listener._pending_acks == {}
 
     asyncio.run(_run())
 
@@ -1715,7 +1715,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
     )
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             _blob: bytes,
@@ -1732,9 +1732,9 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_wrong_cmd_then_right_cmd() -> None:
             await asyncio.sleep(0)
@@ -1744,8 +1744,8 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
                 build_binary_frame(cmd=42, body=b"unrelated"),
                 key,
             )
-            await listener._handle_notification("dev", mismatched)  # noqa: SLF001
-            assert listener._pending_acks.get("dev"), (  # noqa: SLF001
+            await listener._handle_notification("dev", mismatched)
+            assert listener._pending_acks.get("dev"), (
                 "mismatched cmd must leave the pending ack registered"
             )
             # Then the expected echo — this fulfils the future.
@@ -1753,7 +1753,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
                 build_binary_frame(cmd=111, body=b'{"ok":1}'),
                 key,
             )
-            await listener._handle_notification("dev", matching)  # noqa: SLF001
+            await listener._handle_notification("dev", matching)
 
         sender = listener.async_send_command(
             "dev",
@@ -1781,9 +1781,9 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
 
         with pytest.raises(ValueError, match="ack_cmds must be an integer"):
             # type: ignore[attr-defined]
-            listener._register_pending_ack("dev", (True,))  # noqa: SLF001
+            listener._register_pending_ack("dev", (True,))
 
-        assert listener._pending_acks == {}  # type: ignore[attr-defined]  # noqa: SLF001
+        assert listener._pending_acks == {}  # type: ignore[attr-defined]
 
     asyncio.run(_run())
 
@@ -1799,14 +1799,14 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
-        ack_a = listener._register_pending_ack("dev1", None)  # type: ignore[attr-defined]  # noqa: SLF001
-        ack_b = listener._register_pending_ack("dev2", (107,))  # type: ignore[attr-defined]  # noqa: SLF001
+        ack_a = listener._register_pending_ack("dev1", None)  # type: ignore[attr-defined]
+        ack_b = listener._register_pending_ack("dev2", (107,))  # type: ignore[attr-defined]
 
         await listener.async_stop()
 
         assert ack_a.future.cancelled()
         assert ack_b.future.cancelled()
-        assert listener._pending_acks == {}  # noqa: SLF001
+        assert listener._pending_acks == {}
 
     asyncio.run(_run())
 
@@ -1817,7 +1817,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
     import base64
 
     class _ExplodingClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             _blob: bytes,
@@ -1843,9 +1843,9 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _ExplodingClient()}  # noqa: SLF001
+        listener._clients = {"dev": _ExplodingClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(RuntimeError, match="simulated GATT failure"):
             await listener.async_send_command(
@@ -1857,7 +1857,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             )
         # Pending bucket cleared so a stray late notify cannot fulfil a
         # future the caller already gave up on.
-        assert listener._pending_acks == {}  # noqa: SLF001
+        assert listener._pending_acks == {}
 
     asyncio.run(_run())
 
@@ -1884,7 +1884,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # noqa: PLR0913, PLR6301
+        async def async_send_command(  # noqa: PLR0913
             self,
             device_id: str,
             *,
@@ -2001,7 +2001,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     writes: list[bytes] = []
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             uuid: str,
             blob: bytes,
@@ -2023,9 +2023,9 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         body = b'{"big":"' + (b"A" * 200) + b'"}'  # > 187 bytes
         sent = await listener.async_send_command(
@@ -2061,7 +2061,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
     writes: list[bytes] = []
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             blob: bytes,
@@ -2077,10 +2077,10 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
-        listener._mtu = {"dev": 247}  # type: ignore[attr-defined]  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
+        listener._mtu = {"dev": 247}  # type: ignore[attr-defined]
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         body = b"x" * 25
         # MTU 70 → 10 bytes / chunk → three frames.
@@ -2106,7 +2106,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
     import base64
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             _blob: bytes,
@@ -2132,9 +2132,9 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         with pytest.raises(ValueError, match="mtu_override must be an integer"):
             await listener.async_send_command(
@@ -2154,7 +2154,7 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     listener = _build_bare_listener()
     # type: ignore[attr-defined]
     assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU
-    listener._mtu["known"] = 120  # type: ignore[attr-defined]  # noqa: SLF001
+    listener._mtu["known"] = 120  # type: ignore[attr-defined]
     # type: ignore[attr-defined]
     assert listener.mtu_for_device("known") == 120  # noqa: PLR2004
 
@@ -2166,7 +2166,7 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
     class _Client:
         mtu_size = 185
 
-    listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]  # noqa: SLF001
+    listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]
     assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]  # noqa: PLR2004
 
 
@@ -2182,8 +2182,8 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     class _Bad:
         mtu_size = 12  # below the 60-byte overhead
 
-    listener._record_negotiated_mtu("dev", _NoMtu())  # type: ignore[attr-defined]  # noqa: SLF001
-    listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]  # noqa: SLF001
+    listener._record_negotiated_mtu("dev", _NoMtu())  # type: ignore[attr-defined]
+    listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]
     # Both fall back to the default — the cache stays untouched.
     # type: ignore[attr-defined]
     assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU
@@ -2210,12 +2210,12 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
         stats = listener.stats_for("dev")
         stats.last_error = "notify: Bluetooth GATT Error error=133"
 
         blob = encrypt_binary_notify(build_binary_frame(cmd=120, body=b"{}"), key)
-        await listener._handle_notification("dev", blob)  # noqa: SLF001
+        await listener._handle_notification("dev", blob)
 
         assert stats.frames_decoded == 1
         assert stats.last_error is None
@@ -2236,7 +2236,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
     writes: list[bytes] = []
 
     class _FakeClient:
-        async def write_gatt_char(  # noqa: PLR6301
+        async def write_gatt_char(
             self,
             _uuid: str,
             blob: bytes,
@@ -2252,9 +2252,9 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener()
         # type: ignore[attr-defined]
-        listener._clients = {"dev": _FakeClient()}  # noqa: SLF001
+        listener._clients = {"dev": _FakeClient()}
         # type: ignore[attr-defined]
-        listener._key_resolver = lambda _device_id: key  # noqa: SLF001
+        listener._key_resolver = lambda _device_id: key
 
         async def _drive_ack_after_writes() -> None:
             # Wait until both chunked writes have hit the wire, then push
@@ -2270,7 +2270,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
                 build_binary_frame(cmd=107, body=b'{"ok":1}'),
                 key,
             )
-            await listener._handle_notification("dev", echo)  # noqa: SLF001
+            await listener._handle_notification("dev", echo)
 
         sender = listener.async_send_command(
             "dev",
@@ -2286,7 +2286,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         # No leftover pending ack — one notify cleared the registry.
-        assert listener._pending_acks == {}  # noqa: SLF001
+        assert listener._pending_acks == {}
 
     asyncio.run(_run())
 
@@ -2323,7 +2323,7 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
         "outEgy": 5095,
         "inEgy": 5648,
     }
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(  # noqa: SLF001
+    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated,
         body,
     )
@@ -2365,7 +2365,7 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
         "outEgy": 99,
         "inEgy": 88,
     }
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(  # noqa: SLF001
+    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated,
         body,
     )
@@ -2390,7 +2390,7 @@ def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None
         "battery_packs": [{"deviceSn": "HQ2C01400955HP3", "devType": 1}],
     }
     body = {"deviceSn": "HQ2C01400955HP3", "devType": 1, "subType": 0}
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(  # noqa: SLF001
+    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
         updated,
         body,
     )

@@ -33,7 +33,7 @@ async def test_emit_payload_debug_noop_when_no_callback() -> None:
 
     # Neither a dict nor a callable being passed should raise.
     event: dict[str, Any] = {"kind": "http", "method": "GET", "path": "/test"}
-    await api._emit_payload_debug(event)  # must not raise  # noqa: SLF001
+    await api._emit_payload_debug(event)  # must not raise
 
 
 async def test_emit_payload_debug_passes_dict_to_callback() -> None:
@@ -47,7 +47,7 @@ async def test_emit_payload_debug_passes_dict_to_callback() -> None:
     api.payload_debug_callback = sync_callback
 
     event: dict[str, Any] = {"kind": "http", "path": "/v1/auth/login"}
-    await api._emit_payload_debug(event)  # noqa: SLF001
+    await api._emit_payload_debug(event)
 
     assert len(received) == 1
     assert received[0] is event
@@ -69,7 +69,7 @@ async def test_emit_payload_debug_passes_callable_to_callback() -> None:
         factory_called.append(True)
         return {"kind": "http", "path": "/v1/test"}
 
-    await api._emit_payload_debug(factory)  # noqa: SLF001
+    await api._emit_payload_debug(factory)
 
     assert len(received) == 1
     assert received[0] is factory
@@ -87,7 +87,7 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
     api.payload_debug_callback = exploding_callback
 
     # Must NOT raise.
-    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})
 
 
 async def test_emit_payload_debug_awaits_async_callback() -> None:
@@ -100,7 +100,7 @@ async def test_emit_payload_debug_awaits_async_callback() -> None:
 
     api.payload_debug_callback = async_callback
 
-    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})
 
     assert awaited == [True]
 
@@ -115,7 +115,7 @@ async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
     api.payload_debug_callback = async_exploding
 
     # Must NOT raise.
-    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})  # noqa: SLF001
+    await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
 
 async def test_http_payload_debug_returns_dict_with_required_keys() -> None:  # noqa: RUF029
     """_http_payload_debug must return a dict with expected shape."""
-    result = JackeryApi._http_payload_debug(  # noqa: SLF001
+    result = JackeryApi._http_payload_debug(
         method="GET",
         path="/v1/device/property",
         params={"deviceId": "123"},
@@ -161,14 +161,14 @@ async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
     api.payload_debug_callback = callback
 
     # Simulate the post-PR calling pattern: build the dict first, pass it in.
-    event = api._http_payload_debug(  # noqa: SLF001
+    event = api._http_payload_debug(
         method="POST",
         path="/v1/auth/login",
         body={"account": "user"},
         status=200,
         response={"code": 0, "data": {"token": "tok"}},
     )
-    await api._emit_payload_debug(event)  # noqa: SLF001
+    await api._emit_payload_debug(event)
 
     assert len(received) == 1
     assert isinstance(received[0], dict)
@@ -266,7 +266,7 @@ def test_client_init_getattr_raises_for_private_unknown_name() -> None:
     import custom_components.jackery_solarvault.client as client_pkg
 
     with pytest.raises(AttributeError):
-        _ = client_pkg._SomethingPrivate  # type: ignore[attr-defined]  # noqa: SLF001
+        _ = client_pkg._SomethingPrivate  # type: ignore[attr-defined]
 
 
 def test_client_init_getattr_attribute_error_message_contains_name() -> None:
