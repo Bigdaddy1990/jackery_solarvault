@@ -10,7 +10,7 @@ MQTT_PUSH_PATH = (
 )
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
 API_PATH = ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
-SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
+SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensors" / "base.py"
 
 
 def _read(path: Path) -> str:

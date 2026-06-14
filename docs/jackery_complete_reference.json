@@ -1,0 +1,524 @@
+{
+  "commands": {
+    "home": [
+      {
+        "action_id": 3001,
+        "name": "ACTION_ID_READ_WIFI_LIST"
+      },
+      {
+        "action_id": 3002,
+        "name": "ACTION_ID_WRITE_WIFI_INFO"
+      },
+      {
+        "action_id": 3003,
+        "name": "ACTION_ID_SEND_TIME_ZONE"
+      },
+      {
+        "action_id": 3004,
+        "name": "ACTION_ID_GET_TIME_ZONE"
+      },
+      {
+        "action_id": 3005,
+        "name": "ACTION_ID_SYNC_MQTT_CONNECT_INFO"
+      },
+      {
+        "action_id": 3006,
+        "name": "ACTION_ID_GET_DEVICE_OTA_VERSION"
+      },
+      {
+        "action_id": 3007,
+        "name": "ACTION_ID_NOTIFY_DEVICE_CAN_OTA"
+      },
+      {
+        "action_id": 3008,
+        "name": "ACTION_ID_NOTIFY_DEVICE_OTA_TOTAL_PAGE"
+      },
+      {
+        "action_id": 3009,
+        "name": "ACTION_ID_DEVICE_GET_OTA_PAGE_DATA"
+      },
+      {
+        "action_id": 3010,
+        "name": "ACTION_ID_SYNC_GRID_STANDARD"
+      },
+      {
+        "action_id": 3011,
+        "name": "ACTION_ID_QUERY_DEVICE_PROPERTY"
+      },
+      {
+        "action_id": 3012,
+        "name": "ACTION_ID_BIND_SMART_PART"
+      },
+      {
+        "action_id": 3013,
+        "name": "ACTION_ID_UNBIND_SMART_PART"
+      },
+      {
+        "action_id": 3014,
+        "name": "ACTION_ID_SUBDEVICE_3014"
+      },
+      {
+        "action_id": 3015,
+        "name": "ACTION_ID_TIMER_TASK_ADD"
+      },
+      {
+        "action_id": 3016,
+        "name": "ACTION_ID_TIMER_TASK_DELETE"
+      },
+      {
+        "action_id": 3017,
+        "name": "ACTION_ID_TIMER_TASK_UPDATE"
+      },
+      {
+        "action_id": 3018,
+        "name": "ACTION_ID_TIMER_TASK_READ"
+      },
+      {
+        "action_id": 3019,
+        "name": "ACTION_ID_QUERY_COMBINE_DATA"
+      },
+      {
+        "action_id": 3020,
+        "name": "ACTION_ID_QUERY_WEATHER_PLAN"
+      },
+      {
+        "action_id": 3021,
+        "name": "ACTION_ID_AUTO_STANDBY"
+      },
+      {
+        "action_id": 3022,
+        "name": "ACTION_ID_EPS_ENABLED"
+      },
+      {
+        "action_id": 3023,
+        "name": "ACTION_ID_STANDBY"
+      },
+      {
+        "action_id": 3024,
+        "name": "ACTION_ID_CONTROL_SOCKET_SWITCH"
+      },
+      {
+        "action_id": 3025,
+        "name": "ACTION_ID_CONTROL_SOCKET_PRIORITY"
+      },
+      {
+        "action_id": 3026,
+        "name": "ACTION_ID_CT_PHASE"
+      },
+      {
+        "action_id": 3027,
+        "name": "ACTION_ID_WORK_MODEL"
+      },
+      {
+        "action_id": 3028,
+        "name": "ACTION_ID_SOC_LIMITS"
+      },
+      {
+        "action_id": 3029,
+        "name": "ACTION_ID_MAX_FEED_GRID"
+      },
+      {
+        "action_id": 3030,
+        "name": "ACTION_ID_REBOOT_DEVICE"
+      },
+      {
+        "action_id": 3031,
+        "name": "ACTION_ID_SUBDEVICE_3031"
+      },
+      {
+        "action_id": 3032,
+        "name": "ACTION_ID_SUBDEVICE_3032"
+      },
+      {
+        "action_id": 3033,
+        "name": "ACTION_ID_SUBDEVICE_3033"
+      },
+      {
+        "action_id": 3034,
+        "name": "ACTION_ID_STORM_MINUTES"
+      },
+      {
+        "action_id": 3035,
+        "name": "ACTION_ID_DELETE_STORM_ALERT"
+      },
+      {
+        "action_id": 3036,
+        "name": "ACTION_ID_STORM_WARNING"
+      },
+      {
+        "action_id": 3037,
+        "name": "ACTION_ID_SUBDEVICE_3037"
+      },
+      {
+        "action_id": 3038,
+        "name": "ACTION_ID_MAX_OUT_PW"
+      },
+      {
+        "action_id": 3039,
+        "name": "ACTION_ID_OFF_GRID_DOWN"
+      },
+      {
+        "action_id": 3040,
+        "name": "ACTION_ID_OFF_GRID_TIME"
+      },
+      {
+        "action_id": 3041,
+        "name": "ACTION_ID_TEMP_UNIT"
+      },
+      {
+        "action_id": 3042,
+        "name": "ACTION_ID_FAULT_ALARM_REPORT"
+      },
+      {
+        "action_id": 3043,
+        "name": "ACTION_ID_DEFAULT_PW"
+      },
+      {
+        "action_id": 3044,
+        "name": "ACTION_ID_FOLLOW_METER_PW"
+      },
+      {
+        "action_id": 3045,
+        "name": "ACTION_ID_QUERY_WIFI_CONFIG"
+      },
+      {
+        "action_id": 3046,
+        "name": "ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG"
+      },
+      {
+        "action_id": 3047,
+        "name": "ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG"
+      }
+    ],
+    "portable": [
+      {
+        "action_id": 1,
+        "name": "ACTION_ID_PORTABLE_OTA_PAGE_DATA"
+      },
+      {
+        "action_id": 2,
+        "name": "ACTION_ID_PORTABLE_OTA_VERSION"
+      },
+      {
+        "action_id": 3,
+        "name": "ACTION_ID_PORTABLE_NOTIFY_CAN_OTA"
+      },
+      {
+        "action_id": 4,
+        "name": "ACTION_ID_PORTABLE_NOTIFY_OTA_TOTAL_PAGE"
+      },
+      {
+        "action_id": 5,
+        "name": "ACTION_ID_PORTABLE_READ_WIFI_LIST"
+      },
+      {
+        "action_id": 6,
+        "name": "ACTION_ID_PORTABLE_READ_DEVICE_INFO"
+      },
+      {
+        "action_id": 7,
+        "name": "ACTION_ID_PORTABLE_WRITE_WIFI_INFO"
+      },
+      {
+        "action_id": 8,
+        "name": "ACTION_ID_PORTABLE_GET_POWER_PACK_LIST"
+      },
+      {
+        "action_id": 9,
+        "name": "ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT"
+      },
+      {
+        "action_id": 10,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_DC"
+      },
+      {
+        "action_id": 11,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_DC_USB"
+      },
+      {
+        "action_id": 12,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_DC_CAR"
+      },
+      {
+        "action_id": 13,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_AC"
+      },
+      {
+        "action_id": 14,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_AC240"
+      },
+      {
+        "action_id": 17,
+        "name": "ACTION_ID_PORTABLE_LIGHT"
+      },
+      {
+        "action_id": 18,
+        "name": "ACTION_ID_PORTABLE_SCREEN"
+      },
+      {
+        "action_id": 19,
+        "name": "ACTION_ID_PORTABLE_AUTO_SHUTDOWN_TIME"
+      },
+      {
+        "action_id": 20,
+        "name": "ACTION_ID_PORTABLE_ENERGY_SAVING"
+      },
+      {
+        "action_id": 21,
+        "name": "ACTION_ID_PORTABLE_SETTING_CHARGE"
+      },
+      {
+        "action_id": 22,
+        "name": "ACTION_ID_PORTABLE_SETTING_BATTERY"
+      },
+      {
+        "action_id": 23,
+        "name": "ACTION_ID_PORTABLE_SUPER_CHARGE"
+      },
+      {
+        "action_id": 24,
+        "name": "ACTION_ID_PORTABLE_UPS_MODEL"
+      },
+      {
+        "action_id": 25,
+        "name": "ACTION_ID_PORTABLE_SEND_TIME_ZONE"
+      },
+      {
+        "action_id": 26,
+        "name": "ACTION_ID_PORTABLE_GET_CHARGE_PLAN"
+      },
+      {
+        "action_id": 27,
+        "name": "ACTION_ID_PORTABLE_ADD_CHARGE_PLAN"
+      },
+      {
+        "action_id": 28,
+        "name": "ACTION_ID_PORTABLE_UPDATE_CHARGE_PLAN"
+      },
+      {
+        "action_id": 29,
+        "name": "ACTION_ID_PORTABLE_DELETE_CHARGE_PLAN"
+      },
+      {
+        "action_id": 30,
+        "name": "ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN"
+      },
+      {
+        "action_id": 31,
+        "name": "ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT"
+      },
+      {
+        "action_id": 32,
+        "name": "ACTION_ID_PORTABLE_USE_POWER_MODE"
+      },
+      {
+        "action_id": 33,
+        "name": "ACTION_ID_PORTABLE_CUSTOM_USE_BATTERY"
+      },
+      {
+        "action_id": 34,
+        "name": "ACTION_ID_PORTABLE_AC_COUNTDOWN"
+      },
+      {
+        "action_id": 35,
+        "name": "ACTION_ID_PORTABLE_DC_COUNTDOWN"
+      },
+      {
+        "action_id": 36,
+        "name": "ACTION_ID_PORTABLE_DC_USB_COUNTDOWN"
+      },
+      {
+        "action_id": 37,
+        "name": "ACTION_ID_PORTABLE_DC_CAR_COUNTDOWN"
+      },
+      {
+        "action_id": 38,
+        "name": "ACTION_ID_PORTABLE_SET_CHARGE_POWER"
+      },
+      {
+        "action_id": 39,
+        "name": "ACTION_ID_PORTABLE_POWER_PACK_BLINK"
+      },
+      {
+        "action_id": 40,
+        "name": "ACTION_ID_PORTABLE_AC_OUTPUT_MODE"
+      },
+      {
+        "action_id": 41,
+        "name": "ACTION_ID_PORTABLE_AC_OUTPUT_DELAY"
+      },
+      {
+        "action_id": 42,
+        "name": "ACTION_ID_PORTABLE_SET_PEAKS_TROUGHS"
+      },
+      {
+        "action_id": 43,
+        "name": "ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS"
+      },
+      {
+        "action_id": 44,
+        "name": "ACTION_ID_PORTABLE_BLUETOOTH_SLEEP"
+      },
+      {
+        "action_id": 45,
+        "name": "ACTION_ID_PORTABLE_RESTART"
+      },
+      {
+        "action_id": 46,
+        "name": "ACTION_ID_PORTABLE_POWER_OFF"
+      },
+      {
+        "action_id": 47,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SWITCH"
+      },
+      {
+        "action_id": 48,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_PRIORITY"
+      },
+      {
+        "action_id": 49,
+        "name": "ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC"
+      },
+      {
+        "action_id": 50,
+        "name": "ACTION_ID_PORTABLE_SYNC_MQTT_INFO"
+      },
+      {
+        "action_id": 51,
+        "name": "ACTION_ID_PORTABLE_READ_SUB_CT"
+      },
+      {
+        "action_id": 52,
+        "name": "ACTION_ID_PORTABLE_GET_WIFI_CONFIG"
+      }
+    ]
+  },
+  "home_assistant_services": [
+    "delete_storm_alert",
+    "query_third_party_mqtt_config",
+    "refresh_weather_plan",
+    "rename_system",
+    "send_ble_command",
+    "send_device_schedule",
+    "set_third_party_mqtt_config"
+  ],
+  "http_endpoints": {
+    "implemented": [
+      "api/agreeUpgrade",
+      "api/alarm",
+      "api/alarm/detail",
+      "api/diy/gcsList",
+      "api/diy/zoneList",
+      "api/faq/answer",
+      "api/faqList",
+      "api/file/feedback",
+      "api/instruction",
+      "api/isUpgradeRequired",
+      "api/push/configGet",
+      "api/push/configSet",
+      "api/push/notifyList",
+      "api/push/unreadCount",
+      "app/banner/list",
+      "app/version/getNewVersion",
+      "auth/cancel",
+      "auth/check_verification",
+      "auth/headimg",
+      "auth/login",
+      "auth/loginOut",
+      "auth/modifyInfo",
+      "auth/modifyPassword",
+      "auth/register",
+      "auth/updateRegisterId",
+      "auth/verificationCode",
+      "device/accept_bind",
+      "device/accessories",
+      "device/accessories/exist",
+      "device/accessories/exists",
+      "device/accessories/list",
+      "device/accessories/name",
+      "device/accessories/synchronizeSmartAccessoriesData",
+      "device/alert",
+      "device/battery/pack/list",
+      "device/bind",
+      "device/bind/list",
+      "device/bind/nickname",
+      "device/bind/remove",
+      "device/bind/removeAll",
+      "device/bind/share/list",
+      "device/bind/shared",
+      "device/chargeReport",
+      "device/currencies/bindCurrency",
+      "device/currencies/currencyList",
+      "device/currencies/deviceCurrency",
+      "device/dynamic/cancelContractAuth",
+      "device/dynamic/contractList",
+      "device/dynamic/dynamicPrice",
+      "device/dynamic/historyConfig",
+      "device/dynamic/loginUrl",
+      "device/dynamic/powerPriceConfig",
+      "device/dynamic/priceCompany",
+      "device/dynamic/saveContractAuth",
+      "device/dynamic/saveDynamicMode",
+      "device/dynamic/saveLocationId",
+      "device/dynamic/saveSingleMode",
+      "device/location",
+      "device/offline/stat",
+      "device/ota/bluetooth",
+      "device/ota/list",
+      "device/ota/update",
+      "device/ota/version/list",
+      "device/property",
+      "device/property/power3",
+      "device/property/pv",
+      "device/property/subShadow",
+      "device/property/systemShadow",
+      "device/shelly/binding/failures",
+      "device/shelly/devices",
+      "device/smartMode/checkIfSet",
+      "device/smartMode/getSmartMode",
+      "device/smartMode/startSmartMode",
+      "device/stat",
+      "device/stat/battery",
+      "device/stat/carbon",
+      "device/stat/ct",
+      "device/stat/ct/statics",
+      "device/stat/cutoff",
+      "device/stat/deviceStatistic",
+      "device/stat/eps",
+      "device/stat/getSmartSchedulePrediction",
+      "device/stat/meter",
+      "device/stat/onGrid",
+      "device/stat/profit",
+      "device/stat/pv",
+      "device/stat/smartSocketStatistic",
+      "device/stat/soc",
+      "device/stat/socket",
+      "device/stat/symmetry",
+      "device/stat/sys/battery/trends",
+      "device/stat/sys/home/trends",
+      "device/stat/sys/pv/trends",
+      "device/stat/systemStatistic",
+      "device/stat/today",
+      "device/system",
+      "device/system/deviceName",
+      "device/system/exist",
+      "device/system/list",
+      "device/system/name",
+      "device/tou/queryTouPlan",
+      "device/tou/saveTouPlan",
+      "device/unbind",
+      "user/info",
+      "wss-cloud/device/shelly/auth-url",
+      "wss-cloud/device/shelly/device/control",
+      "wss-cloud/device/shelly/device/realtime-power",
+      "wss-cloud/device/shelly/unbind/account",
+      "wss-cloud/device/shelly/unbind/device"
+    ],
+    "intentionally_skipped": [
+      "auth/generatedJwt",
+      "device/bind/qrcode",
+      "device/bluetoothKey"
+    ]
+  },
+  "schema_version": 1
+}
