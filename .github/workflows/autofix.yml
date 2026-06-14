@@ -49,11 +49,9 @@ jobs:
         run: |
           uv pip install --system -r requirements.txt
           uv pip install --system -r requirements-test.txt --prerelease=allow
-          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
+          uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
-        with:
-         version: ">=0.4.0"
       - run: ruff check --fix
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
@@ -65,17 +63,8 @@ jobs:
           ruff check . --target-version py314 || true
           ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
-          ruff check . --add-noqa || true
           ruff check . --output-format=github || true
-          ruff format . || true
+          ruff check . --exit-non-zero-on-fix || true
+          ruff format
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual pyupgrade --all-files || true
-          pre-commit run --hook-stage manual mypy --all-files || true
-
-
-      - name: Run test requirements and localization sync
-        run: |
-          python -m scripts.enforce_test_requirements || true
-          python -m scripts.sync_localization_flags \
-            --allowlist scripts/sync_localization_flags.allowlist \
-            --check || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true

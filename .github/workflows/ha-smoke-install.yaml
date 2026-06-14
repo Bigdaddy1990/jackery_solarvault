@@ -22,7 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
-            requirements-test.txt
+            requirements_test.txt
             pyproject.toml
 
       - name: Show Python environment
@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Home Assistant and jackery_solarvault
         env:
-          HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+          HA_SPEC: ${{ format('=={0}', vars.HA_VERSION != '' && vars.HA_VERSION || '2026.1.1') }}
         run: |
           python -m pip install --no-cache-dir "homeassistant${HA_SPEC}"
           # `hass --script check_config` imports colorlog directly on Python 3.14.
