@@ -8,7 +8,6 @@ from typing import Any
 import aiohttp
 
 from ...const import (
-    AES_KEY,
     BASE_URL,
     CANCEL_ACCOUNT_PATH,
     CHECK_VERIFY_CODE_PATH,
@@ -42,13 +41,12 @@ from ...const import (
     REGISTER_APP_ID,
     REGISTER_PATH,
     RESET_PASSWORD_PATH,
-    RSA_PUBLIC_KEY_B64,
     UPDATE_REGISTER_ID_PATH,
     UPLOAD_HEADIMG_PATH,
     USER_INFO_PATH,
     VERIFY_CODE_PATH,
 )
-from .._crypto import _aes_cbc_encrypt, _aes_ecb_encrypt, _rsa_pkcs1v15_encrypt
+from .._crypto import _aes_cbc_encrypt, build_login_crypto_fields
 from .._http import BaseHTTPMixin, JackeryApiError, JackeryAuthError
 
 
@@ -76,13 +74,7 @@ class AuthEndpointMixin(BaseHTTPMixin):
         if self._region_code:
             login_bean[FIELD_REGION_CODE] = self._region_code
 
-        plaintext = json.dumps(login_bean, ensure_ascii=False).encode("utf-8")
-        aes_blob = base64.b64encode(_aes_ecb_encrypt(plaintext, AES_KEY)).decode(
-            "ascii"
-        )
-        rsa_blob = base64.b64encode(
-            _rsa_pkcs1v15_encrypt(AES_KEY, RSA_PUBLIC_KEY_B64)
-        ).decode("ascii")
+        form_body = build_login_crypto_fields(login_bean)
 
         url = f"{BASE_URL}{LOGIN_PATH}"
 
@@ -90,7 +82,6 @@ class AuthEndpointMixin(BaseHTTPMixin):
         # query string. This matches the captured traffic byte-for-byte.
         headers = self._headers()
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
-        form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
         try:
             async with self._session.post(
