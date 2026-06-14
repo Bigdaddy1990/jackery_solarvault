@@ -103,7 +103,27 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             source,
         )
 
-    devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)
+    data_quality = _redacted_payload_map(
+        {
+            device_id: payload.get("data_quality", [])
+            for device_id, payload in (coordinator.data or {}).items()
+            if isinstance(payload, dict) and payload.get("data_quality")
+        },
+        "device",
+        redact_keys,
+    )
+    devices = _redacted_payload_map(
+        {
+            device_id: {
+                key: value for key, value in payload.items() if key != "data_quality"
+            }
+            if isinstance(payload, dict)
+            else payload
+            for device_id, payload in (coordinator.data or {}).items()
+        },
+        "device",
+        redact_keys,
+    )
 
     raw = {
         "coordinator": {
@@ -179,6 +199,7 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             coordinator.app_chart_import_diagnostics(),
             redact_keys,
         ),
+        "data_quality": async_redact_data(data_quality, redact_keys),
     }
 
     return {
