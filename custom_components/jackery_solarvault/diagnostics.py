@@ -178,6 +178,10 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             coordinator.app_chart_import_diagnostics(),
             redact_keys,
         ),
+        "rejection_metrics": async_redact_data(
+            coordinator.rejection_metrics.as_dict(),
+            redact_keys,
+        ),
     }
 
     return {

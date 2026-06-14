@@ -32,6 +32,7 @@ from ...const import (
     FIELD_IN_PW,
     FIELD_IP,
     FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_MAX_POWER,
     FIELD_OP,
     FIELD_OUT_PW,
     FIELD_RB,
@@ -43,6 +44,7 @@ from ...const import (
     FIELD_UPGRADE_TYPE,
     FIELD_VERSION,
     LOCATION_PATH,
+    MAX_POWER_SAVE_PATH,
     OTA_LIST_PATH,
     OTA_UPDATE_PATH,
     PV_NAME_PATH,
@@ -94,6 +96,31 @@ class DeviceEndpointMixin(BaseHTTPMixin):
         )
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
+
+    async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
+        """Set the device's maximum allowed power (experimental max-power endpoint).
+
+        Parameters:
+            device_id (str | int): Device identifier used by the backend.
+            max_power (int): Desired maximum power in watts; must be an int >= 0.
+
+        Returns:
+            bool: ``True`` if the backend acknowledged success (truthy ``FIELD_DATA``).
+
+        Raises:
+            JackeryApiError: If ``max_power`` is invalid or the API call fails.
+        """
+        if (
+            not isinstance(max_power, int)
+            or isinstance(max_power, bool)
+            or max_power < 0
+        ):
+            raise JackeryApiError("max_power must be a non-negative integer")  # noqa: TRY003
+        data = await self._post_form(
+            MAX_POWER_SAVE_PATH,
+            {FIELD_MAX_POWER: max_power, FIELD_DEVICE_ID: str(device_id)},
+        )
+        return bool(data.get(FIELD_DATA))
 
     async def async_set_system_name(
         self, system_id: str | int, system_name: str

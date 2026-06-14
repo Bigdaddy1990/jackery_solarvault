@@ -6,6 +6,7 @@ diagnostic counters.  Domain-specific endpoint methods live in the
 ``_endpoints/`` sub-package mixins.
 """
 
+import asyncio
 import inspect
 import json
 import logging
@@ -43,12 +44,13 @@ from ..const import (
     REQUEST_TIMEOUT_SEC,
     SYS_VERSION,
     USER_AGENT,
+    _HTTP_RETRY_ATTEMPTS,
+    _HTTP_RETRY_BACKOFF_SEC,
 )
 from ..util import chart_series_debug
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
-    import asyncio
     from collections.abc import Awaitable, Callable
 
 _LOGGER = logging.getLogger(__name__)
@@ -142,6 +144,9 @@ class BaseHTTPMixin:
     last_ota_responses: dict[str, dict[str, Any]]
     last_location_responses: dict[str, dict[str, Any]]
     payload_debug_callback: Callable[[dict[str, Any]], Awaitable[None] | None] | None
+    # Optional sink invoked when an HTTP response is classified as an auth
+    # failure; the coordinator wires this to its rejection-metrics recorder.
+    auth_rejection_callback: Callable[[int, object], None] | None
 
     # Transport counters
     _requests_total: int
@@ -367,16 +372,22 @@ class BaseHTTPMixin:
         Returns:
             bool: `True` if the response indicates an authentication or authorization failure, `False` otherwise.
         """
-        if status in {401, 403}:
-            return True
-        if self._is_token_expired_response(status, data):
-            return True
-        if status != 200:  # noqa: PLR2004
-            return self._response_has_auth_failure_text(data)
-        code = self._extract_code(data)
-        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
-            data
-        )
+        if status in {401, 403} or self._is_token_expired_response(status, data):
+            is_failure = True
+        elif status != 200:  # noqa: PLR2004
+            is_failure = self._response_has_auth_failure_text(data)
+        else:
+            code = self._extract_code(data)
+            is_failure = code not in {
+                CODE_OK,
+                None,
+            } and self._response_has_auth_failure_text(data)
+        if is_failure and self.auth_rejection_callback is not None:
+            try:
+                self.auth_rejection_callback(status, data)
+            except Exception:
+                _LOGGER.debug("auth_rejection_callback raised", exc_info=True)
+        return is_failure
 
     @staticmethod
     def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
@@ -547,6 +558,62 @@ class BaseHTTPMixin:
             response[FIELD_DATA] = payload
         return response
 
+    # --- transient retry/backoff -------------------------------------------
+    @staticmethod
+    def _is_transient_http_status(status: int) -> bool:
+        """Return True for server-side statuses that are safe to retry."""
+        return 500 <= status < 600  # noqa: PLR2004
+
+    async def _request_json_with_retry(
+        self,
+        method: str,
+        path: str,
+        request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+    ) -> tuple[int, dict[str, Any]]:
+        """Run one JSON HTTP request with bounded transient retry/backoff.
+
+        Wraps a request callable (typically the per-method ``_do`` closure) so
+        that transient server errors (HTTP 5xx) and connection-level failures
+        (``TimeoutError`` / ``aiohttp.ClientConnectionError``) are retried with
+        the backoff schedule in :data:`_HTTP_RETRY_BACKOFF_SEC`. Token-expiry
+        re-login is handled separately by the caller, so this layer only adds
+        resilience against flaky transport without changing auth semantics.
+        """
+        for attempt in range(1, _HTTP_RETRY_ATTEMPTS + 1):
+            try:
+                status, data = await request()
+            except (TimeoutError, aiohttp.ClientConnectionError) as err:
+                if attempt >= _HTTP_RETRY_ATTEMPTS:
+                    raise
+                delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+                _LOGGER.debug(
+                    "Jackery %s %s transient %s on attempt %d/%d; retrying in %.1fs",
+                    method,
+                    path,
+                    type(err).__name__,
+                    attempt,
+                    _HTTP_RETRY_ATTEMPTS,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+            if not self._is_transient_http_status(status):
+                return status, data
+            if attempt >= _HTTP_RETRY_ATTEMPTS:
+                return status, data
+            delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+            _LOGGER.debug(
+                "Jackery %s %s HTTP %d on attempt %d/%d; retrying in %.1fs",
+                method,
+                path,
+                status,
+                attempt,
+                _HTTP_RETRY_ATTEMPTS,
+                delay,
+            )
+            await asyncio.sleep(delay)
+        raise JackeryApiError(f"{method} {path} retry loop exhausted")  # noqa: TRY003
+
     # --- generic GET with auto re-login ------------------------------------
     async def _get_json(
         self,
@@ -601,7 +668,9 @@ class BaseHTTPMixin:
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_GET, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -618,7 +687,9 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_GET, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
@@ -705,7 +776,9 @@ class BaseHTTPMixin:
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_PUT, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -723,7 +796,9 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_PUT, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
@@ -813,7 +888,9 @@ class BaseHTTPMixin:
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_POST, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -831,7 +908,9 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_POST, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
@@ -915,7 +994,9 @@ class BaseHTTPMixin:
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_POST, path, _do
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -931,7 +1012,9 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_POST, path, _do
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):

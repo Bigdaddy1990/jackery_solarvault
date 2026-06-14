@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd input
+def coerce_transport_cmd(cmd: Any) -> int:  # arbitrary cmd input  # noqa: ANN401
     """Coerce an arbitrary command value into an integer suitable for transport.
 
     Parameters:
@@ -102,7 +102,7 @@ def command_body_for_transport(
 async def publish_mqtt_command(  # noqa: PLR0913
     *,
     mqtt: JackeryMqttPushClient,
-    api: Any,  # noqa: ANN401  # JackeryApi — avoids circular import
+    api: Any,  # JackeryApi — avoids circular import  # noqa: ANN401
     device_id: str,
     device_sn: str,
     bt_key: bytes | None,

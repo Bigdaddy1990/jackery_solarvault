@@ -36,7 +36,7 @@ bleak / HA-bluetooth imports are deferred to the methods that need them so
 the module can be imported on systems without BlueZ during tests.
 """
 
-import asyncio
+import asyncio  # noqa: I001
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
@@ -47,10 +47,10 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..const import (
-     DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
-     _RECONNECT_BACKOFF_SEC,
-     _STOP_TIMEOUT_SEC,
-     _KEEPALIVE_INTERVAL_SEC,
+    DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
+    _RECONNECT_BACKOFF_SEC,
+    _STOP_TIMEOUT_SEC,
+    _KEEPALIVE_INTERVAL_SEC,
 )
 
 from ..util import first_nonblank_int
@@ -62,7 +62,6 @@ if TYPE_CHECKING:
         BluetoothServiceInfoBleak,
     )
     from homeassistant.core import HomeAssistant
-    
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -134,11 +133,12 @@ class _PendingAck:
 
     expected_cmds: frozenset[int] | None
     future: asyncio.Future[ble.BleBinaryFrame]
-    
+
 
 # ---------------------------------------------------------------------------
 # Listener
 # ---------------------------------------------------------------------------
+
 
 FrameSink = Callable[[str, BleFrameObservation], Awaitable[None]]
 """Async sink called for every observed frame.
@@ -268,6 +268,7 @@ class JackeryBleListener:
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
         from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+
         try:
             while not self._stop_event.is_set():
                 try:

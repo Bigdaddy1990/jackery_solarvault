@@ -72,7 +72,7 @@ def normalize_local_mqtt_payload(
             FIELD_DATA,
             FIELD_MESSAGE_TYPE,
             FIELD_ACTION_ID,
-    FIELD_BATTERY_PACKS,
+            FIELD_BATTERY_PACKS,
         )
     ):
         return payload
@@ -150,7 +150,7 @@ def normalize_ble_main_lifetime_counters(
 
 
 def merge_battery_pack_lists(
-    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while preserving learned and static fields.
@@ -215,7 +215,7 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by device serial number when available.
@@ -267,7 +267,7 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Merge Shelly Cloud accessory data by stable identity values and return an updated list.
@@ -296,7 +296,7 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental smart-plug telemetry entries using device serial numbers to align updates with existing entries.
@@ -507,7 +507,7 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge OTA metadata into an existing battery-pack list by matching serial numbers and return an updated list capped to five entries.

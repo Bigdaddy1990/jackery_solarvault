@@ -201,7 +201,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -233,7 +233,9 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401  # arbitrary payload timestamp, coerced at runtime
+def parse_utc_datetime(
+    value: Any,  # noqa: ANN401
+) -> datetime:  # arbitrary payload timestamp, coerced at runtime  # noqa: ANN401, RUF100
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
 
     Parameters:
@@ -502,11 +504,11 @@ def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
             return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
-def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401
     """Convert a value to an integer when possible.
 
     Returns None for a None input or when the value cannot be converted to an integer.
@@ -518,10 +520,10 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload val
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
 
@@ -560,7 +562,10 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
     )
 
 
-def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def _payload_debug_redacted(
+    value: Any,
+    redactions_disabled: bool | None = None,
+) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401
     """Create a JSON-serializable copy of `value` with sensitive fields redacted.
 
     When `redactions_disabled` is True (or when omitted and diagnostics redactions are disabled), returns a normalized passthrough of `value`. Otherwise, recursively replaces values for keys listed in `REDACT_KEYS` with `REDACTED_VALUE`, preserves overall structure, and converts tuples to lists so the result is JSON-serializable.
@@ -598,7 +603,9 @@ def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None)
     return value
 
 
-def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def _payload_debug_passthrough(
+    value: Any,  # noqa: ANN401
+) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401
     """Normalize a nested structure into JSON-serializable types.
 
     Converts mapping keys to strings and converts tuples to lists while recursively
@@ -624,7 +631,9 @@ def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive 
     return value
 
 
-def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
+def redacted_json_safe_payload(
+    value: Any,  # noqa: ANN401
+) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
     The redaction is applied recursively to nested dicts/lists/tuples while preserving the overall structure and types that are JSON-serializable.
@@ -753,7 +762,7 @@ def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
             return False
     try:
         return int(value) != 0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -3031,7 +3040,9 @@ def trend_series_has_value(  # noqa: PLR0911
     )
 
 
-def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # payload value of unknown type by design
+def task_plan_value(
+    task_plan: dict[str, Any], *keys: str
+) -> Any:  # payload value of unknown type by design  # noqa: ANN401
     """Retrieve the first non-None value for any of the given keys from a task-plan payload.
 
     Searches in this order: the top-level of `task_plan`, the `TASK_PLAN_BODY` dictionary (if present), then each dictionary item in the `TASK_PLAN_TASKS` list (if present). Keys are checked in the order provided and the first non-`None` match is returned.

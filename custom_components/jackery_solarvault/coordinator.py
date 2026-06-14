@@ -14,6 +14,7 @@ import asyncio  # noqa: I001
 import binascii
 import base64
 import contextlib
+from dataclasses import dataclass, field as dataclass_field
 from datetime import date, datetime, timedelta
 import importlib
 import json
@@ -113,6 +114,7 @@ from .subdevices.detector import (
     subdevice_stat_id,
 )
 from .const import (
+    DIAGNOSTICS_SCHEMA_VERSION,
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_CONTROL_SOCKET_PRIORITY,
     ACTION_ID_CONTROL_SOCKET_SWITCH,
@@ -428,6 +430,12 @@ from .const import (
     PAYLOAD_SYSTEM,
     PAYLOAD_SYSTEM_META,
     PAYLOAD_TASK_PLAN,
+    ACTION_ID_BIND_SMART_PART,
+    ACTION_ID_UNBIND_SMART_PART,
+    MQTT_CMD_BIND_SMART_PART,
+    MQTT_CMD_UNBIND_SMART_PART,
+    MQTT_MESSAGE_BIND_SMART_ACCESSORY,
+    MQTT_MESSAGE_REMOVE_SMART_ACCESSORY,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     PAYLOAD_TIMEZONE_CONFIG,
     PAYLOAD_TOU_SCHEDULE,
@@ -544,7 +552,7 @@ try:
     from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
     from homeassistant.helpers import entity_registry as er
     from homeassistant.helpers.recorder import session_scope
-except (ImportError, RuntimeError):
+except ImportError, RuntimeError:
     get_instance = None  # type: ignore[assignment]
     Statistics = None  # type: ignore[assignment,misc]
     StatisticsMeta = None  # type: ignore[assignment,misc]
@@ -636,6 +644,48 @@ _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS = 7
 _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_BACKFILL_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_IMPORT_STATE_TOLERANCE = 1e-4
+
+
+@dataclass
+class RejectionMetrics:
+    """Runtime rejection counters exported through diagnostics."""
+
+    http_auth_rejections: int = 0
+    mqtt_broker_rejections: int = 0
+    payload_validation_rejections: int = 0
+    schema_rejections: int = 0
+    timestamp_skew_rejections: int = 0
+    auth_token_expiry_rejections: int = 0
+    last_rejection: dict[str, str] | None = None
+    _seen: set[tuple[str, str]] = dataclass_field(default_factory=set, repr=False)
+
+    def increment(self, counter: str, reason: str) -> None:
+        """Increment one counter and remember the latest rejection."""
+        key = (counter, reason)
+        if key in self._seen:
+            return
+        self._seen.add(key)
+        setattr(self, counter, getattr(self, counter) + 1)
+        self.last_rejection = {
+            "counter": counter,
+            "reason": reason,
+            "at": dt_util.utcnow().isoformat(),
+        }
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return diagnostics payload for rejection counters."""
+        return {
+            "schema_version": DIAGNOSTICS_SCHEMA_VERSION,
+            "counters": {
+                "http_auth_rejections": self.http_auth_rejections,
+                "mqtt_broker_rejections": self.mqtt_broker_rejections,
+                "payload_validation_rejections": self.payload_validation_rejections,
+                "schema_rejections": self.schema_rejections,
+                "timestamp_skew_rejections": self.timestamp_skew_rejections,
+                "auth_token_expiry_rejections": self.auth_token_expiry_rejections,
+            },
+            "last_rejection": self.last_rejection,
+        }
 
 
 class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # noqa: PLR0904
@@ -771,11 +821,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=f"{DOMAIN} ({entry.title})",
             update_interval=update_interval,
         )
         self.api = api
         self.api.payload_debug_callback = self._async_payload_debug_event
+        self.api.auth_rejection_callback = self.record_http_auth_rejection
+        self.rejection_metrics = RejectionMetrics()
         self.entry = entry
         self._configured_update_interval = update_interval
         interval_sec = max(15, int(update_interval.total_seconds()))
@@ -1155,7 +1208,28 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         streak: int | None = None,
     ) -> None:
         """Pause MQTT after a broker auth rejection while HTTP keeps polling."""
+        self.rejection_metrics.increment("mqtt_broker_rejections", str(message))
         self._mqtt_mgr.pause_after_auth_failure(message, streak=streak)
+
+    def record_http_auth_rejection(self, status: int, data: object) -> None:
+        """Record HTTP/API authentication rejection metrics."""
+        reason = f"http_{status}"
+        if self.api._is_token_expired_response(status, data):  # noqa: SLF001
+            self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
+            return
+        self.rejection_metrics.increment("http_auth_rejections", reason)
+
+    def record_payload_validation_rejection(self, reason: str) -> None:
+        """Record a payload validation rejection."""
+        self.rejection_metrics.increment("payload_validation_rejections", reason)
+
+    def record_schema_rejection(self, reason: str) -> None:
+        """Record a schema/data-quality rejection."""
+        self.rejection_metrics.increment("schema_rejections", reason)
+
+    def record_timestamp_skew_rejection(self, reason: str) -> None:
+        """Record a timestamp validation rejection."""
+        self.rejection_metrics.increment("timestamp_skew_rejections", reason)
 
     def _defer_background_auth_failure(self, err: ConfigEntryAuthFailed) -> None:
         """Route background auth failures through the next coordinator refresh."""
@@ -2342,7 +2416,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             key = base64.b64decode(str(raw))
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -2366,6 +2440,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if sys_id is not None:
             return str(sys_id)
         return None
+
+    def device_supports_third_party_mqtt(self, device_id: str) -> bool:
+        """Return True if the device supports third-party MQTT configuration.
+
+        True when the device has already sent a ThirdPartMQTTConfig payload
+        (``PAYLOAD_THIRD_PARTY_MQTT_CONFIG`` present) or when
+        ``device_supports_advanced`` is True, since Pro Max / modelCode 3002
+        hardware always exposes this feature regardless of whether the config
+        payload has arrived yet.
+        """
+        payload = (self.data or {}).get(device_id, {})
+        return (
+            PAYLOAD_THIRD_PARTY_MQTT_CONFIG in payload
+            or self.device_supports_advanced(device_id)
+        )
 
     def device_supports_advanced(self, device_id: str) -> bool:
         """Return True if the device exposes advanced controls.
@@ -2688,7 +2777,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields."""
@@ -2697,7 +2786,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -2706,7 +2795,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_list_by_identity(
         cls,
-        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
         update: dict[str, Any],
     ) -> list[dict[str, Any]]:
         """Merge Shelly Cloud accessory data by stable ids, never by index."""
@@ -2715,7 +2804,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``."""
@@ -2951,7 +3040,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -3212,7 +3301,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 code = None
         if code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -3540,6 +3629,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             ensure_mqtt_cb=_ensure,
             relogin_cb=_relogin,
             stop_mqtt_cb=_stop_mqtt,
+        )
+
+    async def async_bind_smart_part(self, device_id: str, accessory_sn: str) -> None:
+        """Bind a smart accessory to the device (actionId 3012, cmd 108)."""
+        await self._async_publish_command(
+            device_id,
+            message_type=MQTT_MESSAGE_BIND_SMART_ACCESSORY,
+            action_id=ACTION_ID_BIND_SMART_PART,
+            cmd=MQTT_CMD_BIND_SMART_PART,
+            body_fields={"sn": accessory_sn},
+        )
+
+    async def async_unbind_smart_part(self, device_id: str, accessory_sn: str) -> None:
+        """Unbind a smart accessory from the device (actionId 3013, cmd 109)."""
+        await self._async_publish_command(
+            device_id,
+            message_type=MQTT_MESSAGE_REMOVE_SMART_ACCESSORY,
+            action_id=ACTION_ID_UNBIND_SMART_PART,
+            cmd=MQTT_CMD_UNBIND_SMART_PART,
+            body_fields={"sn": accessory_sn},
         )
 
     async def async_set_eps(self, device_id: str, enabled: bool) -> None:
@@ -5240,7 +5349,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _entity_statistic_ids_by_key(self, device_id: str) -> dict[str, str]:
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
-            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # noqa: I001
+            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
             from homeassistant.helpers import entity_registry as er
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Entity registry unavailable for entity repair: %s", err)
@@ -5552,7 +5661,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             from homeassistant.helpers import issue_registry as ir
-        except (ImportError, RuntimeError):
+        except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -6529,11 +6638,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,  # noqa: ANN401  # generic TTL cache over arbitrary payloads
+            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # noqa: ANN401  # generic TTL cache over arbitrary payloads
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401
             """Generic TTL cache helper operating on any dict.
 
             When *stale_ok* is ``True`` and the TTL has expired, the
@@ -6580,10 +6689,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,  # noqa: ANN401  # generic TTL cache over arbitrary payloads
+            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401
             *,
             stale_ok: bool = False,
-        ) -> Any:  # noqa: ANN401  # generic TTL cache over arbitrary payloads
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -6905,7 +7014,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:  # noqa: ANN401  # forwards arbitrary cached payload
+                    ) -> Any:  # forwards arbitrary cached payload  # noqa: ANN401
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         return await _get_with_ttl(
                             sys_id,
@@ -7602,6 +7711,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             quality_warnings = app_data_quality_warnings(entry, today=today)
             if quality_warnings:
+                for warning in quality_warnings:
+                    self.record_schema_rejection(warning.reason)
                 entry[PAYLOAD_DATA_QUALITY] = [
                     warning.as_dict() for warning in quality_warnings
                 ]
@@ -8349,7 +8460,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return round(float(value) / 1000.0, 5)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:

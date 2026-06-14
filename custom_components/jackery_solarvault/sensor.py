@@ -467,7 +467,9 @@ LOCAL_DAILY_METRIC_BY_SENSOR_KEY: dict[str, str] = {
 }
 
 
-def _path(props: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # returns arbitrary nested payload value
+def _path(
+    props: dict[str, Any], *keys: str
+) -> Any:  # returns arbitrary nested payload value  # noqa: ANN401
     """Walk a nested path; return None on missing intermediate keys."""
     node: Any = props
     for k in keys:
@@ -487,10 +489,10 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
         Callable[[Any], float | None]: A function that accepts any value, returns the quotient rounded to 2 decimals when the value can be converted to float, or `None` when conversion fails.
     """
 
-    def _f(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
+    def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401
         try:
             return round(float(value) / divisor, 2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     return _f
@@ -3744,7 +3746,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         return savings if isinstance(savings, dict) else {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Return the selected calculated value."""
         raw: Any = self._calculation
         for key in self.entity_description.path:
@@ -4164,7 +4166,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Return the entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
@@ -4394,7 +4396,10 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
-    def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401  # passes through dynamic state value
+    def _non_negative_period_raw(
+        self,
+        raw: Any,  # noqa: ANN401
+    ) -> Any:  # passes through dynamic state value  # noqa: ANN401
         """Clamp negative energy period totals to zero when applicable.
 
         If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
@@ -4688,7 +4693,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -4782,7 +4787,9 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             return {}
         return pack if isinstance(pack, dict) else {}
 
-    def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def _value_from_pack(
+        self, pack: dict[str, Any]
+    ) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Extracts the described battery-pack field from a battery-pack payload and applies the entity transform.
 
         Looks up the field named by the entity description in the provided pack dict. If the primary key is missing, checks a small set of known alias and alternate keys (including current firmware version, device serial candidates, and firmware-upgrade flag) before giving up.
@@ -4872,7 +4879,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Get the entity's last cached native value.
 
         Returns:
@@ -4998,7 +5005,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Get the smart plug entity's current sensor value from its plug payload.
 
         Reads the configured field from the plug data, falls back to known alias fields when the primary key is missing, and applies the entity description's transform.
@@ -5116,7 +5123,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Provide the current value for this meter-head sensor.
 
         Returns:
@@ -5253,7 +5260,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         """Calculate derived smart-meter powers from signed phase values."""
         return calculated_smart_meter_power(ct, calculation)
 
-    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Calculate the current value from a CT payload."""
         raw = None
 
@@ -5398,7 +5405,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Return the entity's current value."""
         return self._cached_native_value
 
@@ -6129,7 +6136,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except (TypeError, ValueError, OSError):
+        except TypeError, ValueError, OSError:
             return None
 
 
@@ -6157,7 +6164,7 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
         self._source_key = source_key
 
     @property
-    def native_value(self) -> Any:  # noqa: ANN401  # dynamic sensor state value
+    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401
         """Return the entity's current value."""
         return self._system.get(self._source_key)
 

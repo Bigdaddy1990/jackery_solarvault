@@ -162,7 +162,9 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
                 raise JackeryApiError(  # noqa: TRY003
                     "platform_company_id must be an integer"
                 )
-            signless_company_id = raw_company_id[1:] if raw_company_id[0] in "+-" else raw_company_id
+            signless_company_id = (
+                raw_company_id[1:] if raw_company_id[0] in "+-" else raw_company_id
+            )
             if not signless_company_id.isdigit():
                 raise JackeryApiError(  # noqa: TRY003
                     "platform_company_id must be an integer"

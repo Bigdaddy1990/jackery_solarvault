@@ -32,49 +32,9 @@ LOGIN_TIMEOUT_SEC: Final = 60
 _HTTP_RETRY_ATTEMPTS = 3
 _HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
 
+# Diagnostics export schema version (bump on breaking diagnostics-shape changes).
+DIAGNOSTICS_SCHEMA_VERSION: Final = 1
 
-# Strict by default: no implicit wildcard subscription.
-LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
-# Track topic names with a sensible upper bound so a misconfigured broker
-# (foreign neighbours publishing on the same LAN) cannot explode memory.
-LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
-# Guardrail for unexpectedly large broker payloads.
-LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
-_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
-_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
-    "actionId",
-    "batSoc",
-    "body",
-    "cmd",
-    "data",
-    "devId",
-    "devSn",
-    "deviceId",
-    "deviceSn",
-    "gridInPw",
-    "gridOutPw",
-    "messageType",
-    "payload",
-    "pvPw",
-    "sn",
-    "soc",
-}
-_MqttErrorTuple: tuple[type[Exception], ...] = (MqttError,)
-_MAX_PENDING_MESSAGE_TASKS = 32
-_MQTT_AVAILABILITY_ONLINE = b"online"
-_MQTT_AVAILABILITY_OFFLINE = b"offline"
-_MQTT_AVAILABILITY_TOPIC_SUFFIX = "status"
-# Topics carrying propertyChange / devicePropertyChange and alert data need
-# at-least-once delivery. The notice topic carries high-rate diagnostic
-# frames that are not entity-backed, so QoS 0 avoids unnecessary ACK traffic.
-_QOS0_TOPIC_SUFFIXES: frozenset[str] = frozenset({MQTT_TOPIC_NOTICE})
-
-# Sink signature kept loose so the wiring layer can pass any async callable
-# that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
-# for the dict means the payload was not valid JSON; the raw bytes are still
-# forwarded so a future binary protocol decoder can plug in without touching
-# this module.
-LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
 
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
@@ -482,46 +442,6 @@ CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 # topics and bluetoothKey are off by default for security. User must opt
 # in explicitly for local troubleshooting.
 DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
-
-#: Magic prefix that every plaintext frame starts with.
-BLE_FRAME_MAGIC: str = "DFED"
-#: Protocol version following the magic. Constant in the app's
-#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
-BLE_FRAME_VERSION: str = "0001"
-#: Payload-type marker between the header block and the chunk length.
-BLE_FRAME_PAYLOAD_MARKER: str = "0001"
-#: Length in hex characters of every fixed-width 16-bit field.
-_HEX16_WIDTH: int = 4
-#: Key lengths (in bytes) accepted by the BLE crypto helpers.
-#:
-#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
-#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
-#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
-#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
-#: AES-128 or AES-256 from the key length implicitly. Both are listed here
-#: so callers can pick the right one without hard-coding either.
-BLE_AES_KEY_LEN_AES128: int = 16
-BLE_AES_KEY_LEN_AES256: int = 32
-#: Tuple of accepted key lengths, used for input validation.
-BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
-    BLE_AES_KEY_LEN_AES128,
-    BLE_AES_KEY_LEN_AES256,
-)
-# Backwards-compatible alias kept until call sites migrate; new code should
-# branch on the actual key length the device returns.
-BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
-#: AES-CBC IV length in bytes.
-BLE_AES_IV_LEN: int = 16
-#: GATT service UUID advertised by the SolarVault BLE radio.
-BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
-#: Write-without-response characteristic (app -> device).
-BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
-#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
-BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
-#: Bluetooth SIG company identifier under which the SolarVault advertises
-#: its serial number in the manufacturer-data field.
-BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
 
 # Optional fallback for home-energy when sys/home/trends is empty.
 # Default stays False: device_home_stat is not the same metric family as

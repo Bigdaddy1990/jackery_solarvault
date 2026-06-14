@@ -64,7 +64,7 @@ from cryptography.hazmat.primitives.padding import PKCS7
 _LOGGER = logging.getLogger(__name__)
 
 
-from ..const import (
+from ..const import (  # noqa: E402, I001
     BLE_FRAME_MAGIC,
     BLE_FRAME_VERSION,
     BLE_FRAME_PAYLOAD_MARKER,
@@ -92,6 +92,7 @@ from ..const import (
 # ---------------------------------------------------------------------------
 # Low-level hex helpers (mirror ``sb.d.d`` in the app)
 # ---------------------------------------------------------------------------
+
 
 def hex16(value: int) -> str:
     """Encode a 16-bit unsigned integer as a 4-character uppercase hexadecimal string.
@@ -555,6 +556,7 @@ def parse_plaintext_frame(text: str) -> BleFrame:
 # ---------------------------------------------------------------------------
 # Full encrypt/decrypt pipeline
 # ---------------------------------------------------------------------------
+
 
 def _append_random_and_crc(plaintext_frame: str, random16: int | None) -> str:
     """Append a 16-bit hex tag and a 4-hex-digit Modbus CRC-16 suffix to a plaintext hex-frame string.

@@ -45,7 +45,9 @@ from .._http import BaseHTTPMixin
 class StatisticsEndpointMixin(BaseHTTPMixin):
     """Statistics, trends, and energy endpoint methods."""
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
+    async def async_get_alarm(
+        self, system_id: str | int
+    ) -> Any:  # parsed JSON response, indexed by callers  # noqa: ANN401
         """Fetches the alarm list for the specified system.
 
         Stores the raw parsed response in `self.last_alarm_response`.

@@ -524,7 +524,7 @@ async def _async_finish_entry_startup(
             direct_local_mqtt_result,
             ble_result,
         ) = await asyncio.gather(
-            coordinator.async_config_entry_first_refresh(),
+            coordinator.async_refresh(),
             coordinator.async_start_mqtt(),
             coordinator.async_start_local_mqtt_listener(),
             _async_start_local_mqtt(hass, entry, coordinator),
