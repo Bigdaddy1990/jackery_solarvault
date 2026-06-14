@@ -3162,7 +3162,7 @@ SMART_PLUG_SENSOR_DESCRIPTIONS: tuple[JackerySmartPlugSensorDescription, ...] = 
         icon="mdi:lan",
     ),
     # AccSocketBody short-keys ``sc`` / ``ts`` from the Smali doc table
-    # (docs/html/jackery_smali_home_assistant_report.html). Not observed
+    # (source-of-truth/jackery_smali_home_assistant_report.html). Not observed
     # in this installer's payload stream, but the Smali contract names
     # them so we expose them as default-disabled diagnostic sensors —
     # firmware versions that do emit them surface here without any
@@ -3459,7 +3459,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
     ),
     # ------------------------------------------------------------------
     # AccCTBody electrical measurements (PROTOCOL.md §3 +
-    # docs/html/jackery_entity_field_candidates_v2.html). Per-phase
+    # source-of-truth/jackery_entity_field_candidates_v2.html). Per-phase
     # voltage / current / power-factor / apparent / reactive plus their
     # totals. Active power is already covered above.
     #
@@ -3707,7 +3707,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         entity_registry_enabled_default=False,
         icon="mdi:lan",
     ),
-    # CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html —
+    # CtSub.funForm per source-of-truth/jackery_entity_field_candidates_v2.html —
     # function-form / wiring-mode identifier. Diagnostic, default-disabled.
     JackerySmartMeterSensorDescription(
         key="fun_form",
@@ -5158,7 +5158,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         # Branding lookup against the documented accessory catalog so the
         # UI shows "EcoTracker P1/R1" / "P1 Meter" / "Homey Energy Dongle"
         # / "Jackery HTO892A (Meter Head)" instead of the raw scanName
-        # (PROTOCOL §3 + docs/html scanName table, devType=4).
+        # (PROTOCOL §3 + source-of-truth scanName table, devType=4).
         manufacturer_brand, model_label = subdevice_branding(
             meter_head.get(FIELD_SCAN_NAME)
         )
@@ -5426,7 +5426,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             or "SolarVault"
         )
         # Branding lookup against the documented accessory catalog
-        # (PROTOCOL §3 + docs/html scanName table, devType=3 = CT). The
+        # (PROTOCOL §3 + source-of-truth scanName table, devType=3 = CT). The
         # old "shelly in name.lower()" substring heuristic missed branded
         # units like ``ecotracker`` / ``p1meter`` / ``homey_energy_dongle``
         # and Jackery's own ``HTO906A``/``HTO907A`` CT-type accessories;
