@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import time
+import warnings
 from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 from homeassistant.core import CoreState
@@ -43,9 +44,9 @@ from .client.third_party_mqtt_codec import (
     third_party_mqtt_config_from_options,
     third_party_mqtt_config_plaintext,
 )
+from .ingest import merge_live_properties
 from .models.property_merge import (
     find_dict_with_any_key,
-    merge_dict_values,
     strip_lifetime_counters,
     sync_property_aliases,
 )
@@ -2396,8 +2397,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         base: dict[str, Any],
         updates: dict[str, Any],
     ) -> dict[str, Any]:
-        """Recursively merge nested dictionaries while preserving old keys."""
-        return merge_dict_values(base, updates)
+        """Legacy live-property merge wrapper kept for compatibility."""
+        warnings.warn(
+            "JackerySolarVaultCoordinator._merge_dict_values is deprecated; "
+            "use ingest.merge_live_properties for live payloads",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return merge_live_properties(base, updates)
 
     @classmethod
     def _merge_main_properties(
@@ -2406,7 +2413,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         updates: dict[str, Any],
     ) -> dict[str, Any]:
         """Sanitize, merge, and normalize main-device property payloads."""
-        merged = merge_dict_values(
+        merged = merge_live_properties(
             cls._sanitize_main_properties(base),
             cls._sanitize_main_properties(updates),
         )
@@ -2606,7 +2613,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 ct = {**ct, **acc_ct}
             current_ct = updated.get(PAYLOAD_CT_METER)
             if isinstance(current_ct, dict):
-                updated[PAYLOAD_CT_METER] = self._merge_dict_values(current_ct, ct)
+                updated[PAYLOAD_CT_METER] = merge_live_properties(current_ct, ct)
             else:
                 updated[PAYLOAD_CT_METER] = dict(ct)
             touched = True
@@ -3086,7 +3093,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         new_data = dict(self.data)
         entry = dict(new_data[device_id])
         props = self._sanitize_main_properties(entry.get(PAYLOAD_PROPERTIES) or {})
-        props = self._merge_dict_values(props, clean_updates)
+        props = merge_live_properties(props, clean_updates)
         entry[PAYLOAD_PROPERTIES] = props
         new_data[device_id] = entry
         self._push_partial_update(new_data)
@@ -7584,7 +7591,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if override:
                 override_ts, price_updates = override
                 if time.monotonic() - override_ts < self._PRICE_OVERRIDE_TTL_SEC:
-                    entry[PAYLOAD_PRICE] = self._merge_dict_values(
+                    entry[PAYLOAD_PRICE] = merge_live_properties(
                         entry.get(PAYLOAD_PRICE) or {},
                         price_updates,
                     )
