@@ -2484,7 +2484,7 @@ def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
         assert name in const_source
         assert name in init_source
     assert "_async_remove_stale_energy_helpers(hass)" in init_source
-    assert "unit not in {None, \"\"}" in init_source
+    assert 'unit not in {None, ""}' in init_source
     assert "explicitly reference this integration" in init_source
     assert "please recreate with Jackery battery_net_power" in init_source
 
