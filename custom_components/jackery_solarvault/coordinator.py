@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import time
+import warnings
 from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 from homeassistant.core import CoreState
@@ -43,9 +44,9 @@ from .client.third_party_mqtt_codec import (
     third_party_mqtt_config_from_options,
     third_party_mqtt_config_plaintext,
 )
+from .ingest import merge_live_properties
 from .models.property_merge import (
     find_dict_with_any_key,
-    merge_dict_values,
     strip_lifetime_counters,
     sync_property_aliases,
 )
@@ -78,7 +79,11 @@ from .stats import (
     parse_statistics_backfill_date,
     stat_row_start,
     statistics_current_year_recovery_needed,
-    statistics_http_backfill_dates,
+)
+from .handlers.ble_handlers import (
+    async_send_ble_command as _ble_async_send_ble_command,
+    async_start_ble_transport as _ble_async_start_ble_transport,
+    ble_observations as _ble_observations,
 )
 from .handlers.mqtt_handlers import (
     app_period_section as _app_period_section_fn,
@@ -100,6 +105,11 @@ from .models.shelly_cloud import (
     shelly_cloud_device_ids as _shelly_cloud_device_ids_fn,
     shelly_cloud_device_matches_entry as _shelly_cloud_device_matches_entry_fn,
 )
+from .stats.backfill import (
+    apply_year_month_backfill,
+    statistics_http_backfill_dates,
+)
+from .stats.validators import verify_and_backfill
 from .subdevices.detector import (
     battery_packs_from_source,
     battery_packs_need_query,
@@ -520,7 +530,6 @@ from .util import (
     app_period_request_kwargs,
     app_year_request_kwargs,
     append_payload_debug_line,
-    apply_year_month_backfill,
     chart_series_debug,
     day_power_energy_points,
     day_power_series_key,
@@ -531,7 +540,6 @@ from .util import (
     safe_float,
     trend_series_points,
     utc_now,
-    verify_and_backfill,
     year_payload_appears_current_month_only,
 )
 
@@ -1328,6 +1336,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
+        """Send a command through the extracted BLE handler."""
+        return await _ble_async_send_ble_command(
+            self,
+            device_id,
+            cmd=cmd,
+            body=body,
+            flags=flags,
+            wait_for_ack=wait_for_ack,
+            ack_timeout_sec=ack_timeout_sec,
+            ack_cmds=ack_cmds,
+            mtu_override=mtu_override,
+        )
+
+    async def _async_send_ble_command_impl(  # noqa: PLR0913
+        self,
+        device_id: str,
+        *,
+        cmd: int,
+        body: dict[str, Any] | bytes,
+        flags: int = 0,
+        wait_for_ack: bool = False,
+        ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
+        ack_cmds: tuple[int, ...] | None = None,
+        mtu_override: int | None = None,
+    ) -> bool:
         """Send a single command frame to the device over BLE (experimental).
 
         Accepts the same ``cmd``/body shape as the MQTT setter pipeline:
@@ -1365,6 +1398,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return bool(sent)
 
     def ble_observations(self) -> dict[str, Any]:
+        """Return BLE diagnostics through the extracted BLE handler."""
+        return _ble_observations(self)
+
+    def _ble_observations_impl(self) -> dict[str, Any]:
         """Return a JSON-friendly snapshot of the BLE listener stats.
 
         Used by diagnostics + the optional BLE-status sensor. Returns an
@@ -1541,7 +1578,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "library": snap.get("library"),
         }
 
-    async def async_start_ble_transport(self) -> None:  # noqa: PLR0915
+    async def async_start_ble_transport(self) -> None:
+        """Start BLE transport through the extracted BLE handler."""
+        await _ble_async_start_ble_transport(self)
+
+    async def _async_start_ble_transport_impl(self) -> None:  # noqa: PLR0915
         """Start the optional BLE listener if the config-entry option is set.
 
         Safe to call repeatedly; only the first call attaches a listener.
@@ -2398,8 +2439,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         base: dict[str, Any],
         updates: dict[str, Any],
     ) -> dict[str, Any]:
-        """Recursively merge nested dictionaries while preserving old keys."""
-        return merge_dict_values(base, updates)
+        """Legacy live-property merge wrapper kept for compatibility."""
+        warnings.warn(
+            "JackerySolarVaultCoordinator._merge_dict_values is deprecated; "
+            "use ingest.merge_live_properties for live payloads",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return merge_live_properties(base, updates)
 
     @classmethod
     def _merge_main_properties(
@@ -2408,7 +2455,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         updates: dict[str, Any],
     ) -> dict[str, Any]:
         """Sanitize, merge, and normalize main-device property payloads."""
-        merged = merge_dict_values(
+        merged = merge_live_properties(
             cls._sanitize_main_properties(base),
             cls._sanitize_main_properties(updates),
         )
@@ -2608,7 +2655,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 ct = {**ct, **acc_ct}
             current_ct = updated.get(PAYLOAD_CT_METER)
             if isinstance(current_ct, dict):
-                updated[PAYLOAD_CT_METER] = self._merge_dict_values(current_ct, ct)
+                updated[PAYLOAD_CT_METER] = merge_live_properties(current_ct, ct)
             else:
                 updated[PAYLOAD_CT_METER] = dict(ct)
             touched = True
@@ -3088,7 +3135,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         new_data = dict(self.data)
         entry = dict(new_data[device_id])
         props = self._sanitize_main_properties(entry.get(PAYLOAD_PROPERTIES) or {})
-        props = self._merge_dict_values(props, clean_updates)
+        props = merge_live_properties(props, clean_updates)
         entry[PAYLOAD_PROPERTIES] = props
         new_data[device_id] = entry
         self._push_partial_update(new_data)
@@ -7586,7 +7633,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if override:
                 override_ts, price_updates = override
                 if time.monotonic() - override_ts < self._PRICE_OVERRIDE_TTL_SEC:
-                    entry[PAYLOAD_PRICE] = self._merge_dict_values(
+                    entry[PAYLOAD_PRICE] = merge_live_properties(
                         entry.get(PAYLOAD_PRICE) or {},
                         price_updates,
                     )
