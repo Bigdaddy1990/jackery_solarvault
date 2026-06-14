@@ -15,7 +15,10 @@ Rules:
   - Never merge HTTP and MQTT command body formats.
 """
 
-from typing import Final
+from collections.abc import Awaitable, Callable
+from typing import Any, Final
+
+from aiomqtt import MqttError
 
 DOMAIN: Final = "jackery_solarvault"
 MANUFACTURER: Final = "Jackery"
@@ -29,6 +32,48 @@ LOGIN_PATH: Final = "/v1/auth/login"
 # hybrid AES+RSA-login plus chained credential fetches takes noticeably longer
 # than GET /v1/device/* reads (which are served from a cache on Jackery's side).
 LOGIN_TIMEOUT_SEC: Final = 60
+_HTTP_RETRY_ATTEMPTS = 3
+_HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
+
+
+# Strict by default: no implicit wildcard subscription.
+LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
+# Track topic names with a sensible upper bound so a misconfigured broker
+# (foreign neighbours publishing on the same LAN) cannot explode memory.
+LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
+# Guardrail for unexpectedly large broker payloads.
+LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
+_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
+_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
+    "actionId",
+    "batSoc",
+    "body",
+    "cmd",
+    "data",
+    "devId",
+    "devSn",
+    "deviceId",
+    "deviceSn",
+    "gridInPw",
+    "gridOutPw",
+    "messageType",
+    "payload",
+    "pvPw",
+    "sn",
+    "soc",
+}
+_MqttErrorTuple: tuple[type[Exception], ...] = (MqttError,)
+_MAX_PENDING_MESSAGE_TASKS = 32
+_MQTT_AVAILABILITY_ONLINE = b"online"
+_MQTT_AVAILABILITY_OFFLINE = b"offline"
+_MQTT_AVAILABILITY_TOPIC_SUFFIX = "status"
+
+# Sink signature kept loose so the wiring layer can pass any async callable
+# that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
+# for the dict means the payload was not valid JSON; the raw bytes are still
+# forwarded so a future binary protocol decoder can plug in without touching
+# this module.
+LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
 
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
@@ -118,7 +163,121 @@ CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Safe narrow default from app traces / user reports. Still configurable.
 # Broad wildcards (for example ``#``) remain blocked separately.
 DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = ""
-
+#: Default timeout for the GATT connect + notify-subscribe handshake.
+DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
+#: Minimum time between (re)connect attempts when the device drops the link.
+_RECONNECT_BACKOFF_SEC: float = 30.0
+#: Hard timeout for ``async_stop()`` to wait for in-flight connection
+#: runners to honour cancellation. HA's shutdown sequence reports tasks
+#: that exceed its own per-integration timeout (typically 30 s for
+#: ``async_unload_entry``) — keep this well below that so the listener
+#: never becomes the reason a shutdown logs "tasks still pending".
+_STOP_TIMEOUT_SEC: float = 5.0
+#: How often to write a no-op query frame to keep the GATT session
+#: warm. The SolarVault peripheral closes idle GATT sessions after
+#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
+#: every 6-20 s without traffic). 15 s sits comfortably below that and
+#: doubles as a property-refresh — the device answers each ``cmd=106``
+#: with a ``DevicePropertyChange`` notify that the sink merges into
+#: ``coordinator.data`` via the existing cmd=107 path.
+_KEEPALIVE_INTERVAL_SEC: float = 15.0
+# ---------------------------------------------------------------------------
+# Wire-format constants
+# ---------------------------------------------------------------------------
+#: Magic prefix that every plaintext frame starts with.
+BLE_FRAME_MAGIC: str = "DFED"
+#: Protocol version following the magic. Constant in the app's
+#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
+BLE_FRAME_VERSION: str = "0001"
+#: Payload-type marker between the header block and the chunk length.
+BLE_FRAME_PAYLOAD_MARKER: str = "0001"
+#: Length in hex characters of every fixed-width 16-bit field.
+_HEX16_WIDTH: int = 4
+#: Key lengths (in bytes) accepted by the BLE crypto helpers.
+#:
+#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
+#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
+#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
+#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
+#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
+#: AES-128 or AES-256 from the key length implicitly. Both are listed here
+#: so callers can pick the right one without hard-coding either.
+BLE_AES_KEY_LEN_AES128: int = 16
+BLE_AES_KEY_LEN_AES256: int = 32
+#: Tuple of accepted key lengths, used for input validation.
+BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
+    BLE_AES_KEY_LEN_AES128,
+    BLE_AES_KEY_LEN_AES256,
+)
+# Backwards-compatible alias kept until call sites migrate; new code should
+# branch on the actual key length the device returns.
+BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
+#: AES-CBC IV length in bytes.
+BLE_AES_IV_LEN: int = 16
+#: GATT service UUID advertised by the SolarVault BLE radio.
+BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
+#: Write-without-response characteristic (app -> device).
+BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
+#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
+BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
+#: Bluetooth SIG company identifier under which the SolarVault advertises
+#: its serial number in the manufacturer-data field.
+BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
+# ---------------------------------------------------------------------------
+# Observed binary frame layout (device → app notify on char 0xEE02)
+# ---------------------------------------------------------------------------
+#
+# Live capture 2026-05-16 against a SolarVault 3 Pro Max (via an ESPHome BLE
+# proxy) gave the *real* wire format. The smali-reconstructed layout in
+# ``build_plaintext_frame`` / ``parse_plaintext_frame`` above stores all
+# header fields as ASCII hex; what actually goes over the air is the same
+# logical fields but **packed as big-endian binary** inside the encrypted
+# payload. The 16-byte IV is plaintext-prefixed to every frame.
+#
+# Wire structure (after :func:`aes_decrypt`):
+#
+#   bytes 0..1   magic  = 0xDFED
+#   bytes 2..3   0x0064 (constant in every observed frame — possibly
+#                       a protocol-version / framing-version marker)
+#   bytes 4..5   frame_index  (big-endian uint16, 1-based)
+#   bytes 6..7   chunk_count  (big-endian uint16)
+#   bytes 8..9   flags / actionId hint (purpose not yet pinned; the
+#                       decoded JSON also carries ``cmd``, so this is
+#                       redundant for routing)
+#   bytes 10..11 ble_cmd      (big-endian uint16; matches MQTT cmd:
+#                       107 = DevicePropertyChange, 121 = ControlCombine,
+#                       110 = QuerySubDeviceGroupProperty, etc.)
+#   bytes 12..13 payload-type marker = 0x0001
+#   bytes 14..15 body_length  (big-endian uint16, bytes in ``body``)
+#   bytes 16..16+body_length   body — JSON for SolarVault telemetry
+#   final 4 bytes              trailer (probable CRC-32; not yet
+#                              re-derived from any documented helper —
+#                              treated as opaque on decode for now)
+_BINARY_FRAME_HEADER_LEN: int = 16
+_BINARY_FRAME_TRAILER_LEN: int = 4
+_BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
+_BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
+_BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
+# Length of the fixed header before the variable-width ``CHUNK_HEX`` field:
+# magic(4) + version(4) + frame_idx(4) + chunk_cnt(4) + action_id(4)
+# + ble_cmd(4) + payload_marker(4) + chunk_len(4) = 32 hex chars.
+_HEADER_HEX_LEN: int = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4
+# ---------------------------------------------------------------------------
+# Chunking helper (encode side, for Phase 3b setters)
+# ---------------------------------------------------------------------------
+# The app sizes each chunk at ``(MTU - 60) * 2`` *hex characters*, i.e. the
+# raw payload-byte budget per frame is ``MTU - 60``. The default BLE 5.0
+# MTU is 23 (= 3 bytes/chunk after the 60-byte overhead), but the app
+# typically negotiates 247-byte MTU on Android → ~187 bytes/chunk. The
+# device may negotiate something else; this helper takes the negotiated
+# value as a parameter and refuses to chunk below the minimum.
+_BLE_FRAME_OVERHEAD: int = 60
+#: MTU the official Jackery Android app negotiates with the SolarVault.
+#: Used as a fallback when the bleak transport doesn't expose
+#: ``client.mtu_size`` (some backends only learn the value after the
+#: first long write). Matches the value pinned by
+#: :func:`chunk_size_for_mtu` to ``247 - 60 = 187`` payload bytes/frame.
+DEFAULT_BLE_MTU: int = 247
 # HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
@@ -322,46 +481,6 @@ CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 # topics and bluetoothKey are off by default for security. User must opt
 # in explicitly for local troubleshooting.
 DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
-
-#: Magic prefix that every plaintext frame starts with.
-BLE_FRAME_MAGIC: str = "DFED"
-#: Protocol version following the magic. Constant in the app's
-#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
-BLE_FRAME_VERSION: str = "0001"
-#: Payload-type marker between the header block and the chunk length.
-BLE_FRAME_PAYLOAD_MARKER: str = "0001"
-#: Length in hex characters of every fixed-width 16-bit field.
-_HEX16_WIDTH: int = 4
-#: Key lengths (in bytes) accepted by the BLE crypto helpers.
-#:
-#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
-#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
-#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
-#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
-#: AES-128 or AES-256 from the key length implicitly. Both are listed here
-#: so callers can pick the right one without hard-coding either.
-BLE_AES_KEY_LEN_AES128: int = 16
-BLE_AES_KEY_LEN_AES256: int = 32
-#: Tuple of accepted key lengths, used for input validation.
-BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
-    BLE_AES_KEY_LEN_AES128,
-    BLE_AES_KEY_LEN_AES256,
-)
-# Backwards-compatible alias kept until call sites migrate; new code should
-# branch on the actual key length the device returns.
-BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
-#: AES-CBC IV length in bytes.
-BLE_AES_IV_LEN: int = 16
-#: GATT service UUID advertised by the SolarVault BLE radio.
-BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
-#: Write-without-response characteristic (app -> device).
-BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
-#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
-BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
-#: Bluetooth SIG company identifier under which the SolarVault advertises
-#: its serial number in the manufacturer-data field.
-BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
 
 # Optional fallback for home-energy when sys/home/trends is empty.
 # Default stays False: device_home_stat is not the same metric family as
@@ -1453,6 +1572,10 @@ MQTT_TOPIC_DEVICE: Final = "device"
 MQTT_TOPIC_ALERT: Final = "alert"
 MQTT_TOPIC_CONFIG: Final = "config"
 MQTT_TOPIC_NOTICE: Final = "notice"
+# Topics carrying propertyChange / devicePropertyChange and alert data need
+# at-least-once delivery. The notice topic carries high-rate diagnostic
+# frames that are not entity-backed, so QoS 0 avoids unnecessary ACK traffic.
+_QOS0_TOPIC_SUFFIXES: frozenset[str] = frozenset({MQTT_TOPIC_NOTICE})
 MQTT_TOPIC_COMMAND: Final = "command"
 # Documented app topic; integration does not publish here.
 MQTT_TOPIC_ACTION: Final = "action"

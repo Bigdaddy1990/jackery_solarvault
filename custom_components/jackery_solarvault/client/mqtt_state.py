@@ -4,19 +4,16 @@ Encapsulates backoff, pause, auth-failure detection, and reconnect
 throttling so the coordinator never touches MQTT protocol state directly.
 """
 
-from __future__ import annotations
-
 import logging
 import time
 from typing import TYPE_CHECKING
+
+from ..const import MQTT_APP_CONFLICT_PAUSE_SEC, MQTT_RECONNECT_THROTTLE_SEC
 
 if TYPE_CHECKING:
     from .mqtt_push import JackeryMqttPushClient
 
 _LOGGER = logging.getLogger(__name__)
-
-MQTT_RECONNECT_THROTTLE_SEC = 5
-MQTT_APP_CONFLICT_PAUSE_SEC = 300
 
 # Permanent failures (auth / protocol) — long backoff
 MQTT_CONNECT_BACKOFF_STEPS_SEC: tuple[int, ...] = (

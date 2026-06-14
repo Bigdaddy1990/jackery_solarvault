@@ -150,15 +150,31 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         Raises:
             JackeryApiError: If `platform_company_id` is not an integer-valued number or if `system_region` is empty.
         """
-        try:
-            company_id_float = float(platform_company_id)
-        except (TypeError, ValueError) as err:
+        if isinstance(platform_company_id, bool):
             raise JackeryApiError(  # noqa: TRY003
                 "platform_company_id must be an integer"
-            ) from err
-        if not company_id_float.is_integer():
+            )
+        if isinstance(platform_company_id, int):
+            company_id = platform_company_id
+        elif isinstance(platform_company_id, str):
+            raw_company_id = platform_company_id.strip()
+            if not raw_company_id:
+                raise JackeryApiError(  # noqa: TRY003
+                    "platform_company_id must be an integer"
+                )
+            try:
+                float_val = float(raw_company_id)
+            except ValueError:
+                raise JackeryApiError(  # noqa: TRY003
+                    "platform_company_id must be an integer"
+                )
+            if float_val != int(float_val):
+                raise JackeryApiError(  # noqa: TRY003
+                    "platform_company_id must be an integer"
+                )
+            company_id = int(float_val)
+        else:
             raise JackeryApiError("platform_company_id must be an integer")  # noqa: TRY003
-        company_id = int(company_id_float)
         region = str(system_region or "").strip()
         if not region:
             raise JackeryApiError("system_region must be a non-empty string")  # noqa: TRY003

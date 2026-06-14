@@ -875,6 +875,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="soc_charge_limit",
         getter=_prop_any(FIELD_SOC_CHG_LIMIT, FIELD_SOC_CHARGE_LIMIT),
         native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:battery-charging-high",
     ),
@@ -883,6 +884,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="soc_discharge_limit",
         getter=_prop_any(FIELD_SOC_DISCHG_LIMIT, FIELD_SOC_DISCHARGE_LIMIT),
         native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:battery-low",
     ),
@@ -892,6 +894,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_MAX_OUT_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -900,6 +903,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_MAX_INV_STD_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -1006,6 +1010,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_MAX_SYS_OUT_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -1014,6 +1019,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_MAX_SYS_IN_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -1021,6 +1027,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="off_grid_time",
         getter=_prop(FIELD_OFF_GRID_TIME),
         native_unit_of_measurement="min",
+        state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         fallbacks=(
@@ -1038,6 +1045,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_DEFAULT_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
     JackerySensorDescription(
         key="standby_power",
@@ -1045,6 +1053,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_STANDBY_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -1053,6 +1062,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_OTHER_LOAD_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
     JackerySensorDescription(
         key="energy_plan_power",
@@ -1060,6 +1070,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_ENERGY_PLAN_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
@@ -1068,6 +1079,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_CHARGE_PLAN_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # Removed duplicate grid_side_in_power and grid_side_out_power sensors;
@@ -1133,6 +1145,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="storm_warning_minutes",
         getter=_prop_any(FIELD_WPC, FIELD_MINS_INTERVAL),
         native_unit_of_measurement="min",
+        state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:timer-alert-outline",
         fallbacks=(
@@ -4123,6 +4136,7 @@ async def async_setup_entry(  # noqa: C901, PLR0915, RUF029
     # (verified in the 2026-05-16 production audit).
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Detects changes in the coordinator data signature and adds any newly discovered entities to Home Assistant.
 

@@ -17,6 +17,7 @@ from homeassistant.components.number import (
     NumberMode,
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .client.api import JackeryAuthError
@@ -915,6 +916,7 @@ async def async_setup_entry(  # noqa: RUF029
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

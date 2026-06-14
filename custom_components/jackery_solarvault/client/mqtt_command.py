@@ -5,12 +5,10 @@ and credential refresh.  The coordinator calls these helpers instead of
 building MQTT payloads directly.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from ..const import (
     FIELD_ACTION_ID,
@@ -219,7 +217,7 @@ async def publish_mqtt_command(  # noqa: PLR0913
     ) from last_err
 
 
-def _raise_config_entry_auth_failed(message: str, err: Exception) -> None:
+def _raise_config_entry_auth_failed(message: str, err: Exception) -> NoReturn:
     """Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are invalid.
 
     Parameters:

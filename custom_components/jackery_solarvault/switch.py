@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .const import (
@@ -951,6 +952,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Add newly discovered switch entities when the coordinator's entity signature changes.
 

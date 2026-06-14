@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .const import (
@@ -897,6 +898,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Register new button entities when the coordinator's entity signature changes.
 
@@ -995,6 +997,8 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
 
         Calls the configured action callable for this entity's device. Propagates ConfigEntryAuthFailed; if a HomeAssistantError with a `translation_key` is raised it is propagated unchanged; any other exception is converted and raised via this entity's `_raise_action_error` helper.
         """
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self._query_description.action(self.coordinator, self._device_id)
         except ConfigEntryAuthFailed:
@@ -1048,6 +1052,8 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
         If authentication fails, the original ConfigEntryAuthFailed is propagated. A HomeAssistantError that already has a `translation_key` is re-raised unchanged; all other exceptions are converted and surfaced via `_raise_action_error`.
         """
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_reboot_device(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -1103,6 +1109,8 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
             ConfigEntryAuthFailed: If authentication with the config entry has failed.
             HomeAssistantError: If the action fails; if the caught error already has a `translation_key` it is re-raised unchanged, otherwise a `HomeAssistantError` is raised with a translation key indicating the entity action failed.
         """
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
             await self.coordinator.async_request_refresh()
@@ -1187,6 +1195,8 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             ConfigEntryAuthFailed: Re-raised when authentication has failed.
             HomeAssistantError: Re-raised unchanged if it already has a `translation_key`; other exceptions are converted into a translated `HomeAssistantError` indicating the entity action failed.
         """
+        if not self.available:
+            self._raise_action_error("device is offline")
         try:
             await self.coordinator.async_read_device_schedule(
                 self._device_id,
@@ -1297,6 +1307,8 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             ConfigEntryAuthFailed: If authentication with the config entry failed (re-raised).
             HomeAssistantError: If an error occurs; errors that already have a `translation_key` are re-raised, other exceptions are converted and raised via the entity's `_raise_action_error`.
         """
+        if not self.available:
+            self._raise_action_error("storm alert is no longer active")
         try:
             await self.coordinator.async_delete_storm_alert(
                 self._device_id,

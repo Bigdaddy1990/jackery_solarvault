@@ -185,7 +185,7 @@ def decode_third_party_mqtt_config_body(
     """Decode encrypted credential fields in a ThirdPartMQTTConfig body and return a new dict containing plaintext values and decode metadata.
 
     When `bluetooth_key` is None the returned dict will have `_ha_plaintext = False` and `_decode_error = "missing_bluetooth_key"`.
-    If `bluetooth_key` is provided, the function attempts to decode the username, password, and token fields (when present as non-empty strings). Successfully decoded fields replace the original values; fields that fail to decode are listed in `_decode_failed_fields`. The `_ha_plaintext` flag is `True` if any field was decoded, `False` otherwise.
+    If `bluetooth_key` is provided, the function attempts to decode the username, password, and token fields (when present as non-empty strings). Successfully decoded fields replace the original values; fields that fail to decode are listed in `_decode_failed_fields`. The `_ha_plaintext` flag is `True` only when at least one field was decoded and no field failed decoding.
 
     Parameters:
         body (dict[str, Any]): The input config/body to decode; not mutated.

@@ -6,6 +6,7 @@ diagnostic counters.  Domain-specific endpoint methods live in the
 ``_endpoints/`` sub-package mixins.
 """
 
+import asyncio
 import inspect
 import json
 import logging
@@ -43,12 +44,13 @@ from ..const import (
     REQUEST_TIMEOUT_SEC,
     SYS_VERSION,
     USER_AGENT,
+    _HTTP_RETRY_ATTEMPTS,
+    _HTTP_RETRY_BACKOFF_SEC,
 )
 from ..util import chart_series_debug
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
-    import asyncio
     from collections.abc import Awaitable, Callable
 
 _LOGGER = logging.getLogger(__name__)
@@ -142,6 +144,7 @@ class BaseHTTPMixin:
     last_ota_responses: dict[str, dict[str, Any]]
     last_location_responses: dict[str, dict[str, Any]]
     payload_debug_callback: Callable[[dict[str, Any]], Awaitable[None] | None] | None
+    auth_rejection_callback: Callable[[int, object], None] | None
 
     # Transport counters
     _requests_total: int
@@ -368,29 +371,96 @@ class BaseHTTPMixin:
             bool: `True` if the response indicates an authentication or authorization failure, `False` otherwise.
         """
         if status in {401, 403}:
+            if self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
             return True
         if self._is_token_expired_response(status, data):
+            if self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
             return True
         if status != 200:  # noqa: PLR2004
-            return self._response_has_auth_failure_text(data)
+            is_auth_failure = self._response_has_auth_failure_text(data)
+            if is_auth_failure and self.auth_rejection_callback is not None:
+                self.auth_rejection_callback(status, data)
+            return is_auth_failure
         code = self._extract_code(data)
-        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
-            data
-        )
+        is_auth_failure = code not in {
+            CODE_OK,
+            None,
+        } and self._response_has_auth_failure_text(data)
+        if is_auth_failure and self.auth_rejection_callback is not None:
+            self.auth_rejection_callback(status, data)
+        return is_auth_failure
 
     @staticmethod
-    def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
-        """Builds a concise authorization-failure message for an HTTP request.
-
-        Returns:
-            str: Formatted message containing the HTTP method, request path, status code,
-            backend `code` value, and the backend message/error text.
-        """
-        code = data.get(FIELD_CODE)
-        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
+    def _auth_failure_message(method: str, path: str, status: int, data: object) -> str:
+        """Build a compact auth-failure message without exposing secrets."""
+        if isinstance(data, dict):
+            code = data.get(FIELD_CODE)
+            msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
+        else:
+            code = None
+            msg = data
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
+
+    @staticmethod
+    def _decode_response_json(body_bytes: bytes) -> Any:  # noqa: ANN401
+        """Decode JSON from a response body that was read exactly once."""
+        return json.loads(body_bytes)
+
+    @staticmethod
+    def _truncated_response_text(body_bytes: bytes) -> str:
+        """Return bounded raw response text for diagnostics."""
+        return body_bytes[:HTTP_RAW_TEXT_LIMIT].decode("utf-8", errors="replace")
+
+    @staticmethod
+    def _is_transient_http_status(status: int) -> bool:
+        """Return True for server-side statuses that are safe to retry."""
+        return 500 <= status < 600  # noqa: PLR2004
+
+    async def _request_json_with_retry(
+        self,
+        method: str,
+        path: str,
+        request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+    ) -> tuple[int, dict[str, Any]]:
+        """Run one JSON HTTP request with bounded transient retry/backoff."""
+        for attempt in range(1, _HTTP_RETRY_ATTEMPTS + 1):
+            try:
+                status, data = await request()
+            except (TimeoutError, aiohttp.ClientConnectionError) as err:
+                if attempt >= _HTTP_RETRY_ATTEMPTS:
+                    raise
+                delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+                _LOGGER.debug(
+                    "Jackery %s %s transient %s on attempt %d/%d; retrying in %.1fs",
+                    method,
+                    path,
+                    type(err).__name__,
+                    attempt,
+                    _HTTP_RETRY_ATTEMPTS,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+            if not self._is_transient_http_status(status):
+                return status, data
+            if attempt >= _HTTP_RETRY_ATTEMPTS:
+                return status, data
+            delay = _HTTP_RETRY_BACKOFF_SEC[attempt - 1]
+            _LOGGER.debug(
+                "Jackery %s %s HTTP %d on attempt %d/%d; retrying in %.1fs",
+                method,
+                path,
+                status,
+                attempt,
+                _HTTP_RETRY_ATTEMPTS,
+                delay,
+            )
+            await asyncio.sleep(delay)
+        raise JackeryApiError(f"{method} {path} retry loop exhausted")  # noqa: TRY003
 
     # --- debug --------------------------------------------------------------
     async def _emit_payload_debug(
@@ -574,13 +644,7 @@ class BaseHTTPMixin:
         effective_timeout = request_timeout or REQUEST_TIMEOUT_SEC
 
         async def _do() -> tuple[int, dict]:
-            """Perform an HTTP GET request and parse the response into a status code and response body.
-
-            Attempts to decode the response as JSON; if decoding fails, captures the response text truncated to HTTP_RAW_TEXT_LIMIT under FIELD_RAW_TEXT.
-
-            Returns:
-                tuple[int, dict]: A pair of the HTTP status code and the parsed response body (JSON object or a dict containing `FIELD_RAW_TEXT` on decode failure).
-            """
+            """Perform an HTTP GET request and parse the response into a status code and response body."""
             async with self._session.get(
                 url,
                 params=params,
@@ -588,33 +652,38 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=effective_timeout),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    body = await resp.json(content_type=None)
+                    body = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    body = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, body
 
-        if self._is_token_expired_response(status, data):  # noqa: F821
-            _LOGGER.info("Jackery token expired — re-login for GET %s", path)
-            self._auth_retries += 1
-            self._token = None
-            async with self._lock:
-                if self._token is None:
-                    await self.async_login()
+        self._requests_total += 1
+        try:
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_GET,
+                path,
+                _do,
+            )
+        except (TimeoutError, aiohttp.ClientError) as err:
+            self._requests_failed += 1
+            if isinstance(err, TimeoutError):
+                self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_GET} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"  # noqa: F821
-            ) from err  # noqa: F821
-        if self._is_token_expired_response(status, data):  # noqa: F821
+                f"{type(err).__name__}: {err or '(no message)'}"
+            ) from err
+
+        if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for GET %s", path)
             self._auth_retries += 1
             async with self._lock:
-                # Another coroutine may have refreshed the token already.
                 self._token = None
                 await self.async_login()
             try:
@@ -680,11 +749,7 @@ class BaseHTTPMixin:
             return headers
 
         async def _do() -> tuple[int, dict]:
-            """Perform an HTTP PUT to the prepared URL and return the response status and parsed body.
-
-            Returns:
-                A tuple (status, body) where `status` is the HTTP status code and `body` is the parsed JSON response when available; if the response cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to HTTP_RAW_TEXT_LIMIT.
-            """
+            """Perform an HTTP PUT to the prepared URL and return the response status and parsed body."""
             async with self._session.put(
                 url,
                 json=payload,
@@ -692,20 +757,25 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    body = await resp.json(content_type=None)
+                    body = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    body = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, body
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_PUT,
+                path,
+                _do,
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -719,7 +789,6 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_PUT, path
             )
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -787,13 +856,7 @@ class BaseHTTPMixin:
         body = {k: str(v) for k, v in fields.items()}
 
         async def _do() -> tuple[int, dict]:
-            """Send a POST request to the prepared URL and return the HTTP status and parsed response payload.
-
-            Attempts to parse the response body as JSON. If JSON parsing or content-type decoding fails, returns a dictionary containing the response text truncated to HTTP_RAW_TEXT_LIMIT under the key `FIELD_RAW_TEXT`.
-
-            Returns:
-                tuple[int, dict]: A pair of (HTTP status code, parsed response). The response dict is either the decoded JSON object or `{FIELD_RAW_TEXT: <truncated text>}` on parse failure.
-            """
+            """Send a POST request to the prepared URL and return the HTTP status and parsed response payload."""
             async with self._session.post(
                 url,
                 data=body,
@@ -801,20 +864,25 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    data = await resp.json(content_type=None)
+                    data = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    data = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, data
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                HTTP_METHOD_POST,
+                path,
+                _do,
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -828,7 +896,6 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
             )
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -892,11 +959,7 @@ class BaseHTTPMixin:
             return headers
 
         async def _do() -> tuple[int, dict]:
-            """Send the POST request to the given URL with the prepared JSON payload and return the HTTP status and parsed response.
-
-            Returns:
-                tuple[int, dict]: A pair of (status, data) where `status` is the HTTP status code and `data` is the parsed JSON response when parsing succeeds. If the response cannot be parsed as JSON, `data` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to `HTTP_RAW_TEXT_LIMIT`.
-            """
+            """Send the POST request to the given URL with the prepared JSON payload and return the HTTP status and parsed response."""
             async with self._session.post(
                 url,
                 json=payload,
@@ -904,20 +967,25 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
+                body_bytes = await resp.read()
                 try:
-                    data = await resp.json(content_type=None)
+                    data = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
+                    data = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
                 return status, data
 
         self._requests_total += 1
         try:
-            status, data = await _do()
+            status, data = await self._request_json_with_retry(
+                "POST",
+                path,
+                _do,
+            )
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
@@ -929,7 +997,6 @@ class BaseHTTPMixin:
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()

@@ -1,6 +1,305 @@
 {
   "entity": {
+    "sensor": {
+      "battery_soc": {
+        "default": "mdi:battery"
+      },
+      "battery_soc_internal": {
+        "default": "mdi:battery"
+      },
+      "cell_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "battery_charge_power": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_discharge_power": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "pv_power_total": {
+        "default": "mdi:solar-power"
+      },
+      "pv1_power": {
+        "default": "mdi:solar-power"
+      },
+      "pv2_power": {
+        "default": "mdi:solar-power"
+      },
+      "pv3_power": {
+        "default": "mdi:solar-power"
+      },
+      "pv4_power": {
+        "default": "mdi:solar-power"
+      },
+      "grid_in_power": {
+        "default": "mdi:transmission-tower"
+      },
+      "grid_out_power": {
+        "default": "mdi:transmission-tower"
+      },
+      "eps_in_power": {
+        "default": "mdi:power-plug-battery"
+      },
+      "eps_out_power": {
+        "default": "mdi:power-plug-battery"
+      },
+      "stack_in_power": {
+        "default": "mdi:server-network"
+      },
+      "stack_out_power": {
+        "default": "mdi:server-network"
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi"
+      },
+      "wifi_name": {
+        "default": "mdi:wifi"
+      },
+      "wifi_ip": {
+        "default": "mdi:ip-network"
+      },
+      "mac_address": {
+        "default": "mdi:network"
+      },
+      "eth_port": {
+        "default": "mdi:ethernet"
+      },
+      "soc_charge_limit": {
+        "default": "mdi:battery-charging-high"
+      },
+      "soc_discharge_limit": {
+        "default": "mdi:battery-low"
+      },
+      "max_output_power": {
+        "default": "mdi:flash"
+      },
+      "max_inverter_power": {
+        "default": "mdi:flash"
+      },
+      "ethernet_ip": {
+        "default": "mdi:ip-network"
+      },
+      "ethernet_port": {
+        "default": "mdi:ethernet"
+      },
+      "ethernet_mac": {
+        "default": "mdi:network"
+      },
+      "battery_count": {
+        "default": "mdi:battery"
+      },
+      "battery_state": {
+        "default": "mdi:battery-check"
+      },
+      "auto_standby": {
+        "default": "mdi:power-sleep"
+      },
+      "system_state": {
+        "default": "mdi:information-outline"
+      },
+      "ongrid_state": {
+        "default": "mdi:transmission-tower"
+      },
+      "ct_state": {
+        "default": "mdi:current-ac"
+      },
+      "grid_state": {
+        "default": "mdi:transmission-tower"
+      },
+      "work_mode": {
+        "default": "mdi:cog"
+      },
+      "max_system_output_power": {
+        "default": "mdi:flash"
+      },
+      "max_system_input_power": {
+        "default": "mdi:flash"
+      },
+      "off_grid_time": {
+        "default": "mdi:timer-outline"
+      },
+      "default_power": {
+        "default": "mdi:flash"
+      },
+      "standby_power": {
+        "default": "mdi:power-sleep"
+      },
+      "other_load_power": {
+        "default": "mdi:flash"
+      },
+      "energy_plan_power": {
+        "default": "mdi:flash"
+      },
+      "charge_plan_power": {
+        "default": "mdi:flash"
+      },
+      "follow_meter_state": {
+        "default": "mdi:gauge"
+      },
+      "off_grid_shutdown_state": {
+        "default": "mdi:power-off"
+      },
+      "function_enable_flags": {
+        "default": "mdi:flag"
+      },
+      "temp_unit": {
+        "default": "mdi:thermometer"
+      },
+      "storm_warning_enabled": {
+        "default": "mdi:weather-lightning"
+      },
+      "storm_warning_minutes": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "today_load": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "total_generation": {
+        "default": "mdi:solar-power"
+      },
+      "total_revenue": {
+        "default": "mdi:cash"
+      },
+      "total_carbon_saved": {
+        "default": "mdi:leaf"
+      },
+      "pv_week_energy": {
+        "default": "mdi:solar-power"
+      },
+      "pv_month_energy": {
+        "default": "mdi:solar-power"
+      },
+      "pv_year_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv1_day_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv1_week_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv1_month_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv1_year_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv2_day_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv2_week_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv2_month_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv2_year_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv3_day_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv3_week_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv3_month_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv3_year_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv4_day_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv4_week_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv4_month_energy": {
+        "default": "mdi:solar-power"
+      },
+      "device_pv4_year_energy": {
+        "default": "mdi:solar-power"
+      },
+      "home_week_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_month_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_year_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "device_ongrid_input_week_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "device_ongrid_input_month_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "device_ongrid_input_year_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "device_ongrid_output_week_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "device_ongrid_output_month_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "device_ongrid_output_year_energy": {
+        "default": "mdi:transmission-tower"
+      },
+      "ct_input_day_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_input_week_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_input_month_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_input_year_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_output_day_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_output_week_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_output_month_energy": {
+        "default": "mdi:current-ac"
+      },
+      "ct_output_year_energy": {
+        "default": "mdi:current-ac"
+      },
+      "battery_charge_week_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_charge_month_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_charge_year_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_discharge_week_energy": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_discharge_month_energy": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_discharge_year_energy": {
+        "default": "mdi:battery-arrow-down"
+      }
+    },
     "button": {
+      "refresh_system_info": {
+        "default": "mdi:information-outline"
+      },
+      "refresh_weather_plan": {
+        "default": "mdi:weather-cloudy-clock"
+      },
+      "delete_storm_alert": {
+        "default": "mdi:weather-lightning-rainy"
+      },
       "portable_current_charge_plan": {
         "default": "mdi:calendar-check"
       },
@@ -91,6 +390,15 @@
       }
     },
     "switch": {
+      "eps_switch": {
+        "default": "mdi:power-plug-battery"
+      },
+      "auto_standby": {
+        "default": "mdi:power-sleep"
+      },
+      "follow_meter": {
+        "default": "mdi:gauge"
+      },
       "portable_ac240_output": {
         "default": "mdi:current-ac"
       },

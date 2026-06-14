@@ -70,6 +70,7 @@ from .coordinator import JackerySolarVaultCoordinator
 from .util import safe_bool
 
 if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant, ServiceCall
 
 _LOGGER = logging.getLogger(__name__)
@@ -1058,3 +1059,55 @@ async def _async_handle_send_device_schedule(
             device_id=device_id,
             error=err,
         ) from err
+
+
+def _entry_for_coordinator(
+    hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
+) -> ConfigEntry | None:
+    """Locate the loaded config entry that owns a coordinator."""
+    for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        if getattr(loaded_entry, "runtime_data", None) is coordinator:
+            return loaded_entry
+    return None
+
+
+def _text_field(  # noqa: PLR0913
+    call: ServiceCall,
+    field: str,
+    *,
+    translation_key: str,
+    placeholder_key: str,
+    max_length: int | None = None,
+    numeric: bool = False,
+) -> str:
+    raw = call.data.get(field)
+    if not isinstance(raw, str):
+        value = ""
+        error = f"{field} must be text"
+    else:
+        value = raw.strip()
+        if not value:
+            error = f"{field} must not be empty"
+        elif max_length is not None and len(value) > max_length:
+            error = f"{field} must be at most {max_length} characters"
+        elif numeric and not value.isdigit():
+            error = f"{field} must be numeric"
+        else:
+            return value
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key=translation_key,
+        translation_placeholders={
+            placeholder_key: value,
+            "error": error,
+        },
+    )
+
+
+def _optional_text(call: ServiceCall, field: str, label: str) -> str:
+    raw = call.data.get(field, "")
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError(f"{label} must be text")  # noqa: TRY003, TRY004
+    return raw

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .const import (
@@ -990,6 +991,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
 

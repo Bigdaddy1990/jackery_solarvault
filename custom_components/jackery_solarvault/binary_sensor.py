@@ -10,6 +10,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 
 from .const import (
     FIELD_COMM_MODE,
@@ -146,6 +147,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Register new binary sensor entities when the coordinator's entity signature changes.
 
@@ -271,6 +273,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains `plug_index`.
         """
+        plug = self._plug
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -281,6 +284,6 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
             FIELD_SYS_SWITCH,
             FIELD_VERSION,
         ):
-            if key in self._plug:
-                attrs[key] = self._plug.get(key)
+            if key in plug:
+                attrs[key] = plug[key]
         return attrs

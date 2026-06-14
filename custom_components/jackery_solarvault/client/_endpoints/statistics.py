@@ -493,6 +493,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         path: str,
         *,
         device_id: str | int | None = None,
+        device_sn: str | None = None,
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
@@ -503,6 +504,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         Parameters:
             path (str): API endpoint path to query.
             device_id (str | int | None): Optional device identifier to include as `deviceId` in the request.
+            device_sn (str | None): Optional device serial number to include as `deviceSn` in the request.
             date_type (str): Period granularity (e.g., "day"); used to compute begin/end dates when not provided.
             begin_date (str | None): Optional start date for the period; computed if None.
             end_date (str | None): Optional end date for the period; computed if None.
@@ -521,6 +523,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         }
         if device_id is not None:
             params[FIELD_DEVICE_ID] = str(device_id)
+        if device_sn is not None:
+            params[FIELD_DEVICE_SN] = str(device_sn)
         if system_id is not None:
             params[FIELD_SYSTEM_ID] = str(system_id)
         data = await self._get_json(path, params=params)
@@ -547,7 +551,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """
         return await self._async_get_period_stat(
             SYMMETRY_STAT_PATH,
-            device_id=device_sn,
+            device_sn=device_sn,
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
@@ -572,7 +576,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """
         return await self._async_get_period_stat(
             CUTOFF_STAT_PATH,
-            device_id=device_sn,
+            device_sn=device_sn,
             date_type="day",
             begin_date=begin_date,
             end_date=end_date,
@@ -610,7 +614,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict[str, Any]: Normalized carbon statistics payload.
         """
         data = await self._get_json(
-            CARBON_STAT_PATH, params={FIELD_DEVICE_ID: str(device_sn)}
+            CARBON_STAT_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
         )
         return self._payload_dict(data, CARBON_STAT_PATH)
 

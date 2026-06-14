@@ -35,6 +35,8 @@ from ._http import (  # noqa: F401  — public re-export for error hierarchy
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,6 +104,7 @@ class JackeryApi(
         self.last_ota_responses: dict[str, dict[str, Any]] = {}
         self.last_location_responses: dict[str, dict[str, Any]] = {}
         self.payload_debug_callback = None
+        self.auth_rejection_callback: Callable[[int, object], None] | None = None
 
         # Transport counters for diagnostic sensors (reset on HA restart).
         self._requests_total = 0

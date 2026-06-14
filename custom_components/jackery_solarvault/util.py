@@ -9,7 +9,7 @@ import operator
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -128,11 +128,16 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     import logging
 
+import logging as _logging
+
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
 _SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
 _DEV_MODE_CACHED: bool | None = None
+
+_LOGGER = _logging.getLogger(__name__)
+ZERO_CONFIRM_MIN_LOCAL_HOUR: Final = 20
 
 
 _WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
@@ -473,36 +478,6 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
         APP_REQUEST_BEGIN_DATE_ALT: begin,
         APP_REQUEST_END_DATE_ALT: end,
     }
-
-
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401
-    """Return the first provided value that can be parsed as an integer.
-
-    Boolean values, blank strings, and non-finite numeric strings are rejected
-    so callers can safely use this for protocol fields that require a real
-    integer value.
-    """
-    for value in values:
-        if value is None or isinstance(value, bool):
-            continue
-        if isinstance(value, str):
-            candidate = value.strip()
-            if not candidate:
-                continue
-        else:
-            candidate = value
-        try:
-            parsed = int(candidate)
-        except (TypeError, ValueError):
-            try:
-                parsed_float = float(candidate)
-            except (TypeError, ValueError):
-                continue
-            if not parsed_float.is_integer():
-                continue
-            parsed = int(parsed_float)
-        return parsed
-    return None
 
 
 def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
@@ -1480,7 +1455,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
         return None if parsed is None else (0.0, parsed)
 
     whole = sign * float(int(whole_text))
-    fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
+    fraction = sign * float(int(fraction_text)) / (10 ** len(fraction_text)) if int(fraction_text) else 0.0
 
     if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
         parsed = safe_float(value)
@@ -1516,11 +1491,6 @@ def expanded_year_series_values(
     raw_values = [round(safe_float(item) or 0.0, 5) for item in series]
     raw_sum = round(sum(raw_values), 2)
     direct_total = safe_float(source.get(stat_key))
-
-    if direct_total is not None:
-        tolerance = max(0.05, abs(direct_total) * 0.005)
-        if abs(raw_sum - direct_total) <= tolerance:
-            return raw_values
 
     expanded = [0.0 for _ in series]
     for index, raw_value in enumerate(series):

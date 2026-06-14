@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
+_SECTION_SIZE_CAP = 4096
 
 # Kept as an import alias so tests / external callers can still reference the
 # static redact-key set when needed. Runtime redaction in this module always
@@ -262,3 +263,21 @@ def _local_mqtt_diagnostics(
             },
         }
     return client.diagnostics_snapshot(redact=not redactions_disabled)
+
+
+def _cap_section(value: Any) -> Any:  # noqa: ANN401
+    """Cap a diagnostics section at _SECTION_SIZE_CAP bytes of JSON.
+
+    Sections that exceed the cap are replaced with a sentinel so the overall
+    export stays well under Home Assistant's implicit ~32 KB truncation limit.
+    """
+    try:
+        import json as _json
+
+        encoded = _json.dumps(value, default=str)
+    except Exception:  # noqa: BLE001
+        return {"truncated": True, "size_bytes": -1}
+    size = len(encoded.encode())
+    if size > _SECTION_SIZE_CAP:
+        return {"truncated": True, "size_bytes": size}
+    return value

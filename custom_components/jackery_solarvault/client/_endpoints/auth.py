@@ -28,7 +28,6 @@ from ...const import (
     HTTP_CONTENT_TYPE_FORM,
     HTTP_HEADER_CONTENT_TYPE,
     HTTP_METHOD_POST,
-    HTTP_RAW_TEXT_LIMIT,
     LOGIN_PATH,
     LOGIN_TIMEOUT_SEC,
     LOGOUT_PATH,
@@ -55,7 +54,7 @@ from .._http import BaseHTTPMixin, JackeryApiError, JackeryAuthError
 class AuthEndpointMixin(BaseHTTPMixin):
     """Auth, login, and MQTT credential methods."""
 
-    async def async_login(self) -> str:
+    async def async_login(self) -> str:  # noqa: PLR0914
         """Perform the encrypted login flow and persist the returned session and MQTT credentials.
 
         Returns:
@@ -101,32 +100,28 @@ class AuthEndpointMixin(BaseHTTPMixin):
             ) as resp:
                 if resp.status != 200:  # noqa: PLR2004
                     raise JackeryApiError(f"Login HTTP {resp.status}")  # noqa: TRY003
+                body_bytes = await resp.read()
                 try:
-                    data = await resp.json(content_type=None)
-                    if not isinstance(data, dict):
-                        raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                        raise JackeryApiError(  # noqa: TRY003
-                            f"Login returned JSON {type(data).__name__}, expected object: {raw!r}"
-                        )
+                    data = self._decode_response_json(body_bytes)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ) as err:
-                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                    raw = self._truncated_response_text(body_bytes)
                     raise JackeryApiError(  # noqa: TRY003
                         f"Login returned invalid JSON: {raw!r}"
                     ) from err
-                if not isinstance(data, dict):
-                    raw = str(data)[:HTTP_RAW_TEXT_LIMIT]
-                    raise JackeryApiError(  # noqa: TRY003
-                        f"Login returned non-object JSON: {raw!r}"
-                    )
         except (TimeoutError, aiohttp.ClientError) as err:
             raise JackeryApiError(  # noqa: TRY003
                 f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
             ) from err
+
+        if not isinstance(data, dict):
+            raise JackeryApiError(  # noqa: TRY003
+                f"Login returned JSON {type(data).__name__}, expected object"
+            )
 
         safe_response = dict(data)
         safe_response.pop(FIELD_TOKEN, None)
@@ -151,7 +146,6 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
             )
 
-        self.last_login_response = dict(data)
         token = data.get(FIELD_TOKEN) or ""
         if not token:
             raise JackeryAuthError("Login succeeded but no token returned")  # noqa: TRY003
@@ -160,8 +154,9 @@ class AuthEndpointMixin(BaseHTTPMixin):
         payload = data.get(FIELD_DATA) or {}
         if not isinstance(payload, dict):
             raise JackeryApiError(  # noqa: TRY003
-                f"Login returned data {type(payload).__name__}, expected object"
+                f"Login returned {FIELD_DATA} {type(payload).__name__}, expected object"
             )
+        self.last_login_response = dict(data)
         self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id
