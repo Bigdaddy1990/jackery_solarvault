@@ -15,18 +15,7 @@ def merge_dict_values(
     base: dict[str, Any],
     updates: dict[str, Any],
 ) -> dict[str, Any]:
-    """Merge two dictionaries recursively, combining nested mappings and applying updates.
-
-    Parameters:
-        base (dict): Original dictionary whose keys act as defaults.
-        updates (dict): Dictionary with values to apply over `base`. If a value and the
-            corresponding value in `base` are both dictionaries, they are merged
-            recursively; otherwise the value from `updates` replaces the one in `base`.
-
-    Returns:
-        dict: A new dictionary containing keys from `base` updated by `updates`. Nested
-        dictionaries are merged rather than replaced.
-    """
+    """Merge dictionaries recursively with update values taking precedence."""
     merged: dict[str, Any] = dict(base)
     for key, value in updates.items():
         cur = merged.get(key)
@@ -37,19 +26,19 @@ def merge_dict_values(
     return merged
 
 
+def merge_static_config_payload(
+    base: dict[str, Any],
+    updates: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge static config payloads where explicit blanks are meaningful."""
+    return merge_dict_values(base, updates)
+
+
 def sync_property_aliases(
     props: dict[str, Any],
     alias_pairs: tuple[tuple[str, str], ...],
 ) -> dict[str, Any]:
-    """Mirror equivalent property names in a properties mapping according to provided alias pairs.
-
-    Parameters:
-        props (dict[str, Any]): Source properties; not modified.
-        alias_pairs (tuple[tuple[str, str], ...]): Iterable of (left, right) alias name pairs. For each pair, if one name exists with a non-`None` value and the other is missing or `None`, the missing name is set to the existing value.
-
-    Returns:
-        dict[str, Any]: A new dictionary containing the original properties with aliases synchronized.
-    """
+    """Mirror equivalent property names according to alias pairs."""
     normalized = dict(props)
     for left, right in alias_pairs:
         if normalized.get(left) is not None and normalized.get(right) is None:
@@ -63,17 +52,7 @@ def find_dict_with_any_key(
     obj: object,
     keys: set[str] | frozenset[str],
 ) -> dict[str, Any] | None:
-    """Locate the first nested dictionary that contains any of the specified keys.
-
-    Searches recursively through dictionaries and lists in `obj` and returns the first dictionary encountered that has at least one key from `keys`.
-
-    Parameters:
-        obj (object): The nested structure (dicts/lists/values) to search.
-        keys (set[str] | frozenset[str]): Key names to look for.
-
-    Returns:
-        dict[str, Any] | None: The first dictionary that contains any of the specified keys, or `None` if no such dictionary exists.
-    """
+    """Locate the first nested dictionary containing any requested key."""
     if isinstance(obj, dict):
         if any(key in obj for key in keys):
             return obj
@@ -90,15 +69,7 @@ def find_dict_with_any_key(
 
 
 def find_list_for_key(obj: object, key: str) -> list[dict[str, Any]] | None:
-    """Locate the first nested list of dictionaries found under the specified dictionary key.
-
-    Parameters:
-        obj (object): Nested structure to search (dicts and lists).
-        key (str): Dictionary key name whose associated list to find.
-
-    Returns:
-        list[dict[str, Any]] | None: The first list containing only dictionary elements found at `key`, or `None` if no such list exists.
-    """
+    """Locate the first nested list of dictionaries under ``key``."""
     if isinstance(obj, dict):
         value = obj.get(key)
         if isinstance(value, list):
@@ -119,15 +90,7 @@ def strip_lifetime_counters(
     source: dict[str, Any],
     lifetime_counter_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Produce a copy of the source dictionary excluding specified lifetime counter keys.
-
-    Parameters:
-        source (dict[str, Any]): Original property mapping to filter.
-        lifetime_counter_keys (frozenset[str]): Keys that represent cumulative lifetime counters to remove.
-
-    Returns:
-        dict[str, Any]: New dictionary containing entries from `source` whose keys are not in `lifetime_counter_keys`.
-    """
+    """Return a copy excluding specified lifetime counter keys."""
     return {
         key: value for key, value in source.items() if key not in lifetime_counter_keys
     }
