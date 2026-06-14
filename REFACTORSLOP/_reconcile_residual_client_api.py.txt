@@ -157,7 +157,7 @@
    doc  <pre_transfer>: The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is
    doc  <pre_transfer>: action: str | int | None,
    CODE <pre_transfer>: raise JackeryApiError(f"Jackery {path} returned null data")  # noqa: TRY003
-   doc  <pre_transfer>: An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch 
+   doc  <pre_transfer>: An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch
    doc  <pre_transfer>: f"{HTTP_METHOD_GET} {path} returned invalid JSON: {raw!r}"
    CODE <pre_transfer>: raise JackeryApiError("Shelly control requires action and function")  # noqa: TRY003
    CODE <pre_transfer>: except TypeError as err:

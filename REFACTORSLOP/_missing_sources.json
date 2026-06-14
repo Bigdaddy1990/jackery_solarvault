@@ -1,569 +1,569 @@
 [
   {
-    "key": "__init__.py::_async_authenticate",
-    "rel": "__init__.py",
-    "qualname": "_async_authenticate",
     "backup": "pre_transfer",
-    "lineno": 165,
     "end_lineno": 195,
-    "lines": 31
+    "key": "__init__.py::_async_authenticate",
+    "lineno": 165,
+    "lines": 31,
+    "qualname": "_async_authenticate",
+    "rel": "__init__.py"
   },
   {
-    "key": "client/api.py::JackeryApi._decode_response_json",
-    "rel": "client/api.py",
-    "qualname": "JackeryApi._decode_response_json",
     "backup": "pre_transfer",
-    "lineno": 257,
     "end_lineno": 259,
-    "lines": 4
+    "key": "client/api.py::JackeryApi._decode_response_json",
+    "lineno": 257,
+    "lines": 4,
+    "qualname": "JackeryApi._decode_response_json",
+    "rel": "client/api.py"
   },
   {
-    "key": "client/api.py::JackeryApi._is_transient_http_status",
-    "rel": "client/api.py",
-    "qualname": "JackeryApi._is_transient_http_status",
     "backup": "pre_transfer",
-    "lineno": 267,
     "end_lineno": 269,
-    "lines": 4
+    "key": "client/api.py::JackeryApi._is_transient_http_status",
+    "lineno": 267,
+    "lines": 4,
+    "qualname": "JackeryApi._is_transient_http_status",
+    "rel": "client/api.py"
   },
   {
-    "key": "client/api.py::JackeryApi._request_json_with_retry",
-    "rel": "client/api.py",
-    "qualname": "JackeryApi._request_json_with_retry",
     "backup": "pre_transfer",
-    "lineno": 271,
     "end_lineno": 311,
-    "lines": 41
+    "key": "client/api.py::JackeryApi._request_json_with_retry",
+    "lineno": 271,
+    "lines": 41,
+    "qualname": "JackeryApi._request_json_with_retry",
+    "rel": "client/api.py"
   },
   {
-    "key": "client/api.py::JackeryApi._truncated_response_text",
-    "rel": "client/api.py",
-    "qualname": "JackeryApi._truncated_response_text",
     "backup": "pre_transfer",
-    "lineno": 262,
     "end_lineno": 264,
-    "lines": 4
+    "key": "client/api.py::JackeryApi._truncated_response_text",
+    "lineno": 262,
+    "lines": 4,
+    "qualname": "JackeryApi._truncated_response_text",
+    "rel": "client/api.py"
   },
   {
-    "key": "client/api.py::JackeryApi.async_set_max_power",
-    "rel": "client/api.py",
-    "qualname": "JackeryApi.async_set_max_power",
     "backup": "pre_transfer",
-    "lineno": 1735,
     "end_lineno": 1760,
-    "lines": 26
+    "key": "client/api.py::JackeryApi.async_set_max_power",
+    "lineno": 1735,
+    "lines": 26,
+    "qualname": "JackeryApi.async_set_max_power",
+    "rel": "client/api.py"
   },
   {
-    "key": "client/ble_transport.py::JackeryBleListener._mark_property_query_started",
-    "rel": "client/ble_transport.py",
-    "qualname": "JackeryBleListener._mark_property_query_started",
     "backup": "pre_transfer",
-    "lineno": 287,
     "end_lineno": 300,
-    "lines": 14
+    "key": "client/ble_transport.py::JackeryBleListener._mark_property_query_started",
+    "lineno": 287,
+    "lines": 14,
+    "qualname": "JackeryBleListener._mark_property_query_started",
+    "rel": "client/ble_transport.py"
   },
   {
-    "key": "client/ble_transport.py::JackeryBleListener.async_ensure_connected",
-    "rel": "client/ble_transport.py",
-    "qualname": "JackeryBleListener.async_ensure_connected",
     "backup": "pre_reconcile",
-    "lineno": 253,
     "end_lineno": 290,
-    "lines": 38
+    "key": "client/ble_transport.py::JackeryBleListener.async_ensure_connected",
+    "lineno": 253,
+    "lines": 38,
+    "qualname": "JackeryBleListener.async_ensure_connected",
+    "rel": "client/ble_transport.py"
   },
   {
-    "key": "client/local_mqtt.py::JackeryLocalMqttClient._async_consume_session",
-    "rel": "client/local_mqtt.py",
-    "qualname": "JackeryLocalMqttClient._async_consume_session",
     "backup": "pre_transfer",
-    "lineno": 206,
     "end_lineno": 244,
-    "lines": 39
+    "key": "client/local_mqtt.py::JackeryLocalMqttClient._async_consume_session",
+    "lineno": 206,
+    "lines": 39,
+    "qualname": "JackeryLocalMqttClient._async_consume_session",
+    "rel": "client/local_mqtt.py"
   },
   {
-    "key": "client/third_party_mqtt_codec.py::_split_iv_envelope",
-    "rel": "client/third_party_mqtt_codec.py",
-    "qualname": "_split_iv_envelope",
     "backup": "pre_transfer",
-    "lineno": 10,
     "end_lineno": 14,
-    "lines": 5
+    "key": "client/third_party_mqtt_codec.py::_split_iv_envelope",
+    "lineno": 10,
+    "lines": 5,
+    "qualname": "_split_iv_envelope",
+    "rel": "client/third_party_mqtt_codec.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices",
     "backup": "pre_transfer",
-    "lineno": 6134,
     "end_lineno": 6167,
-    "lines": 34
+    "key": "coordinator.py::JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices",
+    "lineno": 6134,
+    "lines": 34,
+    "qualname": "JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets",
     "backup": "pre_transfer",
-    "lineno": 4143,
     "end_lineno": 4178,
-    "lines": 36
+    "key": "coordinator.py::JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets",
+    "lineno": 4143,
+    "lines": 36,
+    "qualname": "JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._entity_source_priority",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._entity_source_priority",
     "backup": "pre_reconcile",
-    "lineno": 9147,
     "end_lineno": 9149,
-    "lines": 4
+    "key": "coordinator.py::JackerySolarVaultCoordinator._entity_source_priority",
+    "lineno": 9147,
+    "lines": 4,
+    "qualname": "JackerySolarVaultCoordinator._entity_source_priority",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._find_list_for_key",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._find_list_for_key",
     "backup": "pre_transfer",
-    "lineno": 2214,
     "end_lineno": 2232,
-    "lines": 20
+    "key": "coordinator.py::JackerySolarVaultCoordinator._find_list_for_key",
+    "lineno": 2214,
+    "lines": 20,
+    "qualname": "JackerySolarVaultCoordinator._find_list_for_key",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket",
     "backup": "pre_transfer",
-    "lineno": 3058,
     "end_lineno": 3079,
-    "lines": 23
+    "key": "coordinator.py::JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket",
+    "lineno": 3058,
+    "lines": 23,
+    "qualname": "JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload",
     "backup": "pre_reconcile",
-    "lineno": 9063,
     "end_lineno": 9070,
-    "lines": 9
+    "key": "coordinator.py::JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload",
+    "lineno": 9063,
+    "lines": 9,
+    "qualname": "JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._is_derived_home_energy_candidate",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._is_derived_home_energy_candidate",
     "backup": "pre_reconcile",
-    "lineno": 9461,
     "end_lineno": 9476,
-    "lines": 17
+    "key": "coordinator.py::JackerySolarVaultCoordinator._is_derived_home_energy_candidate",
+    "lineno": 9461,
+    "lines": 17,
+    "qualname": "JackerySolarVaultCoordinator._is_derived_home_energy_candidate",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._is_smart_meter_accessory",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._is_smart_meter_accessory",
     "backup": "pre_transfer",
-    "lineno": 2996,
     "end_lineno": 3014,
-    "lines": 20
+    "key": "coordinator.py::JackerySolarVaultCoordinator._is_smart_meter_accessory",
+    "lineno": 2996,
+    "lines": 20,
+    "qualname": "JackerySolarVaultCoordinator._is_smart_meter_accessory",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._jackery_error_code",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._jackery_error_code",
     "backup": "pre_reconcile",
-    "lineno": 4094,
     "end_lineno": 4102,
-    "lines": 10
+    "key": "coordinator.py::JackerySolarVaultCoordinator._jackery_error_code",
+    "lineno": 4094,
+    "lines": 10,
+    "qualname": "JackerySolarVaultCoordinator._jackery_error_code",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._looks_like_battery_pack",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._looks_like_battery_pack",
     "backup": "pre_transfer",
-    "lineno": 2305,
     "end_lineno": 2321,
-    "lines": 18
+    "key": "coordinator.py::JackerySolarVaultCoordinator._looks_like_battery_pack",
+    "lineno": 2305,
+    "lines": 18,
+    "qualname": "JackerySolarVaultCoordinator._looks_like_battery_pack",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._monotonic_age_seconds",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._monotonic_age_seconds",
     "backup": "pre_reconcile",
-    "lineno": 1413,
     "end_lineno": 1417,
-    "lines": 6
+    "key": "coordinator.py::JackerySolarVaultCoordinator._monotonic_age_seconds",
+    "lineno": 1413,
+    "lines": 6,
+    "qualname": "JackerySolarVaultCoordinator._monotonic_age_seconds",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._mqtt_connect_failure_signature",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._mqtt_connect_failure_signature",
     "backup": "pre_reconcile",
-    "lineno": 1204,
     "end_lineno": 1213,
-    "lines": 11
+    "key": "coordinator.py::JackerySolarVaultCoordinator._mqtt_connect_failure_signature",
+    "lineno": 1204,
+    "lines": 11,
+    "qualname": "JackerySolarVaultCoordinator._mqtt_connect_failure_signature",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._normalize_battery_pack_payload",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._normalize_battery_pack_payload",
     "backup": "pre_transfer",
-    "lineno": 2273,
     "end_lineno": 2302,
-    "lines": 31
+    "key": "coordinator.py::JackerySolarVaultCoordinator._normalize_battery_pack_payload",
+    "lineno": 2273,
+    "lines": 31,
+    "qualname": "JackerySolarVaultCoordinator._normalize_battery_pack_payload",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._normalize_shelly_cloud_payload",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._normalize_shelly_cloud_payload",
     "backup": "pre_reconcile",
-    "lineno": 3737,
     "end_lineno": 3762,
-    "lines": 27
+    "key": "coordinator.py::JackerySolarVaultCoordinator._normalize_shelly_cloud_payload",
+    "lineno": 3737,
+    "lines": 27,
+    "qualname": "JackerySolarVaultCoordinator._normalize_shelly_cloud_payload",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._shelly_cloud_api_device_id",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._shelly_cloud_api_device_id",
     "backup": "pre_reconcile",
-    "lineno": 3681,
     "end_lineno": 3705,
-    "lines": 26
+    "key": "coordinator.py::JackerySolarVaultCoordinator._shelly_cloud_api_device_id",
+    "lineno": 3681,
+    "lines": 26,
+    "qualname": "JackerySolarVaultCoordinator._shelly_cloud_api_device_id",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._should_skip_fast_property_fetch",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._should_skip_fast_property_fetch",
     "backup": "pre_transfer",
-    "lineno": 1119,
     "end_lineno": 1146,
-    "lines": 28
+    "key": "coordinator.py::JackerySolarVaultCoordinator._should_skip_fast_property_fetch",
+    "lineno": 1119,
+    "lines": 28,
+    "qualname": "JackerySolarVaultCoordinator._should_skip_fast_property_fetch",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._smart_meter_accessories",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._smart_meter_accessories",
     "backup": "pre_transfer",
-    "lineno": 3017,
     "end_lineno": 3031,
-    "lines": 16
+    "key": "coordinator.py::JackerySolarVaultCoordinator._smart_meter_accessories",
+    "lineno": 3017,
+    "lines": 16,
+    "qualname": "JackerySolarVaultCoordinator._smart_meter_accessories",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_accessories",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._subdevice_accessories",
     "backup": "pre_transfer",
-    "lineno": 3125,
     "end_lineno": 3145,
-    "lines": 22
+    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_accessories",
+    "lineno": 3125,
+    "lines": 22,
+    "qualname": "JackerySolarVaultCoordinator._subdevice_accessories",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_dev_type",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._subdevice_dev_type",
     "backup": "pre_reconcile",
-    "lineno": 3708,
     "end_lineno": 3715,
-    "lines": 9
+    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_dev_type",
+    "lineno": 3708,
+    "lines": 9,
+    "qualname": "JackerySolarVaultCoordinator._subdevice_dev_type",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_id",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._subdevice_id",
     "backup": "pre_transfer",
-    "lineno": 3117,
     "end_lineno": 3122,
-    "lines": 7
+    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_id",
+    "lineno": 3117,
+    "lines": 7,
+    "qualname": "JackerySolarVaultCoordinator._subdevice_id",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_serial",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._subdevice_serial",
     "backup": "pre_transfer",
-    "lineno": 3109,
     "end_lineno": 3114,
-    "lines": 7
+    "key": "coordinator.py::JackerySolarVaultCoordinator._subdevice_serial",
+    "lineno": 3109,
+    "lines": 7,
+    "qualname": "JackerySolarVaultCoordinator._subdevice_serial",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator._sync_property_aliases",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator._sync_property_aliases",
     "backup": "pre_transfer",
-    "lineno": 2140,
     "end_lineno": 2148,
-    "lines": 10
+    "key": "coordinator.py::JackerySolarVaultCoordinator._sync_property_aliases",
+    "lineno": 2140,
+    "lines": 10,
+    "qualname": "JackerySolarVaultCoordinator._sync_property_aliases",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.async_bind_smart_part",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.async_bind_smart_part",
     "backup": "pre_transfer",
-    "lineno": 4312,
     "end_lineno": 4320,
-    "lines": 9
+    "key": "coordinator.py::JackerySolarVaultCoordinator.async_bind_smart_part",
+    "lineno": 4312,
+    "lines": 9,
+    "qualname": "JackerySolarVaultCoordinator.async_bind_smart_part",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.async_unbind_smart_part",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.async_unbind_smart_part",
     "backup": "pre_transfer",
-    "lineno": 4322,
     "end_lineno": 4330,
-    "lines": 9
+    "key": "coordinator.py::JackerySolarVaultCoordinator.async_unbind_smart_part",
+    "lineno": 4322,
+    "lines": 9,
+    "qualname": "JackerySolarVaultCoordinator.async_unbind_smart_part",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.device_supports_third_party_mqtt",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.device_supports_third_party_mqtt",
     "backup": "pre_transfer",
-    "lineno": 2120,
     "end_lineno": 2133,
-    "lines": 14
+    "key": "coordinator.py::JackerySolarVaultCoordinator.device_supports_third_party_mqtt",
+    "lineno": 2120,
+    "lines": 14,
+    "qualname": "JackerySolarVaultCoordinator.device_supports_third_party_mqtt",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.record_http_auth_rejection",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.record_http_auth_rejection",
     "backup": "pre_transfer",
-    "lineno": 981,
     "end_lineno": 987,
-    "lines": 7
+    "key": "coordinator.py::JackerySolarVaultCoordinator.record_http_auth_rejection",
+    "lineno": 981,
+    "lines": 7,
+    "qualname": "JackerySolarVaultCoordinator.record_http_auth_rejection",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.record_payload_validation_rejection",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.record_payload_validation_rejection",
     "backup": "pre_transfer",
-    "lineno": 989,
     "end_lineno": 991,
-    "lines": 3
+    "key": "coordinator.py::JackerySolarVaultCoordinator.record_payload_validation_rejection",
+    "lineno": 989,
+    "lines": 3,
+    "qualname": "JackerySolarVaultCoordinator.record_payload_validation_rejection",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.record_schema_rejection",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.record_schema_rejection",
     "backup": "pre_transfer",
-    "lineno": 993,
     "end_lineno": 995,
-    "lines": 3
+    "key": "coordinator.py::JackerySolarVaultCoordinator.record_schema_rejection",
+    "lineno": 993,
+    "lines": 3,
+    "qualname": "JackerySolarVaultCoordinator.record_schema_rejection",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::JackerySolarVaultCoordinator.record_timestamp_skew_rejection",
-    "rel": "coordinator.py",
-    "qualname": "JackerySolarVaultCoordinator.record_timestamp_skew_rejection",
     "backup": "pre_transfer",
-    "lineno": 997,
     "end_lineno": 999,
-    "lines": 3
+    "key": "coordinator.py::JackerySolarVaultCoordinator.record_timestamp_skew_rejection",
+    "lineno": 997,
+    "lines": 3,
+    "qualname": "JackerySolarVaultCoordinator.record_timestamp_skew_rejection",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::RejectionMetrics",
-    "rel": "coordinator.py",
-    "qualname": "RejectionMetrics",
     "backup": "pre_transfer",
-    "lineno": 361,
     "end_lineno": 399,
-    "lines": 40
+    "key": "coordinator.py::RejectionMetrics",
+    "lineno": 361,
+    "lines": 40,
+    "qualname": "RejectionMetrics",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::RejectionMetrics.increment",
-    "rel": "coordinator.py",
-    "qualname": "RejectionMetrics.increment",
     "backup": "pre_transfer",
-    "lineno": 373,
     "end_lineno": 384,
-    "lines": 12
+    "key": "coordinator.py::RejectionMetrics.increment",
+    "lineno": 373,
+    "lines": 12,
+    "qualname": "RejectionMetrics.increment",
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::_generate_third_party_mqtt_token",
-    "rel": "coordinator.py",
-    "qualname": "_generate_third_party_mqtt_token",
     "backup": "pre_reconcile",
-    "lineno": 644,
     "end_lineno": 646,
-    "lines": 3
+    "key": "coordinator.py::_generate_third_party_mqtt_token",
+    "lineno": 644,
+    "lines": 3,
+    "qualname": "_generate_third_party_mqtt_token",
+    "rel": "coordinator.py"
   },
   {
-    "key": "diagnostics.py::_cap_section",
-    "rel": "diagnostics.py",
-    "qualname": "_cap_section",
     "backup": "pre_transfer",
-    "lineno": 39,
     "end_lineno": 52,
-    "lines": 14
+    "key": "diagnostics.py::_cap_section",
+    "lineno": 39,
+    "lines": 14,
+    "qualname": "_cap_section",
+    "rel": "diagnostics.py"
   },
   {
-    "key": "discovery_cache.py::_entry_lock",
-    "rel": "discovery_cache.py",
-    "qualname": "_entry_lock",
     "backup": "pre_transfer",
-    "lineno": 20,
     "end_lineno": 22,
-    "lines": 3
-  },
-  {
-    "key": "local_daily_cache.py::_entry_lock",
-    "rel": "local_daily_cache.py",
+    "key": "discovery_cache.py::_entry_lock",
+    "lineno": 20,
+    "lines": 3,
     "qualname": "_entry_lock",
+    "rel": "discovery_cache.py"
+  },
+  {
     "backup": "pre_transfer",
-    "lineno": 44,
     "end_lineno": 46,
-    "lines": 3
+    "key": "local_daily_cache.py::_entry_lock",
+    "lineno": 44,
+    "lines": 3,
+    "qualname": "_entry_lock",
+    "rel": "local_daily_cache.py"
   },
   {
-    "key": "services.py::_device_id_field",
-    "rel": "services.py",
-    "qualname": "_device_id_field",
     "backup": "pre_transfer",
-    "lineno": 333,
     "end_lineno": 348,
-    "lines": 16
+    "key": "services.py::_device_id_field",
+    "lineno": 333,
+    "lines": 16,
+    "qualname": "_device_id_field",
+    "rel": "services.py"
   },
   {
-    "key": "services.py::_entry_for_coordinator",
-    "rel": "services.py",
-    "qualname": "_entry_for_coordinator",
     "backup": "pre_transfer",
-    "lineno": 245,
     "end_lineno": 252,
-    "lines": 8
+    "key": "services.py::_entry_for_coordinator",
+    "lineno": 245,
+    "lines": 8,
+    "qualname": "_entry_for_coordinator",
+    "rel": "services.py"
   },
   {
-    "key": "services.py::_optional_text",
-    "rel": "services.py",
-    "qualname": "_optional_text",
     "backup": "pre_transfer",
-    "lineno": 351,
     "end_lineno": 357,
-    "lines": 7
+    "key": "services.py::_optional_text",
+    "lineno": 351,
+    "lines": 7,
+    "qualname": "_optional_text",
+    "rel": "services.py"
   },
   {
-    "key": "services.py::_text_field",
-    "rel": "services.py",
-    "qualname": "_text_field",
     "backup": "pre_transfer",
-    "lineno": 300,
     "end_lineno": 330,
-    "lines": 31
+    "key": "services.py::_text_field",
+    "lineno": 300,
+    "lines": 31,
+    "qualname": "_text_field",
+    "rel": "services.py"
   },
   {
-    "key": "client/ble.py::_unrecognised_version_count",
-    "rel": "client/ble.py",
+    "backup": "pre_transfer",
     "const": "_unrecognised_version_count",
-    "backup": "pre_transfer",
-    "lineno": 296
+    "key": "client/ble.py::_unrecognised_version_count",
+    "lineno": 296,
+    "rel": "client/ble.py"
   },
   {
-    "key": "client/ble_transport.py::_LOST_LINK_BACKOFF_SEC",
-    "rel": "client/ble_transport.py",
+    "backup": "pre_transfer",
     "const": "_LOST_LINK_BACKOFF_SEC",
-    "backup": "pre_transfer",
-    "lineno": 82
+    "key": "client/ble_transport.py::_LOST_LINK_BACKOFF_SEC",
+    "lineno": 82,
+    "rel": "client/ble_transport.py"
   },
   {
-    "key": "client/ble_transport.py::_MAX_BACKOFF_SEC",
-    "rel": "client/ble_transport.py",
+    "backup": "pre_transfer",
     "const": "_MAX_BACKOFF_SEC",
-    "backup": "pre_transfer",
-    "lineno": 105
+    "key": "client/ble_transport.py::_MAX_BACKOFF_SEC",
+    "lineno": 105,
+    "rel": "client/ble_transport.py"
   },
   {
-    "key": "client/ble_transport.py::_MAX_CONNECTION_RETRIES",
-    "rel": "client/ble_transport.py",
+    "backup": "pre_transfer",
     "const": "_MAX_CONNECTION_RETRIES",
-    "backup": "pre_transfer",
-    "lineno": 102
+    "key": "client/ble_transport.py::_MAX_CONNECTION_RETRIES",
+    "lineno": 102,
+    "rel": "client/ble_transport.py"
   },
   {
-    "key": "config_flow.py::DhcpServiceInfo",
-    "rel": "config_flow.py",
+    "backup": "pre_reconcile",
     "const": "DhcpServiceInfo",
-    "backup": "pre_reconcile",
-    "lineno": 84
+    "key": "config_flow.py::DhcpServiceInfo",
+    "lineno": 84,
+    "rel": "config_flow.py"
   },
   {
-    "key": "config_flow.py::MqttServiceInfo",
-    "rel": "config_flow.py",
+    "backup": "pre_reconcile",
     "const": "MqttServiceInfo",
-    "backup": "pre_reconcile",
-    "lineno": 82
+    "key": "config_flow.py::MqttServiceInfo",
+    "lineno": 82,
+    "rel": "config_flow.py"
   },
   {
-    "key": "config_flow.py::ZeroconfServiceInfo",
-    "rel": "config_flow.py",
+    "backup": "pre_reconcile",
     "const": "ZeroconfServiceInfo",
-    "backup": "pre_reconcile",
-    "lineno": 83
+    "key": "config_flow.py::ZeroconfServiceInfo",
+    "lineno": 83,
+    "rel": "config_flow.py"
   },
   {
-    "key": "const.py::ACTION_ID_SOC_CHARGE_LIMIT",
-    "rel": "const.py",
+    "backup": "pre_reconcile",
     "const": "ACTION_ID_SOC_CHARGE_LIMIT",
-    "backup": "pre_reconcile",
-    "lineno": 1781
+    "key": "const.py::ACTION_ID_SOC_CHARGE_LIMIT",
+    "lineno": 1781,
+    "rel": "const.py"
   },
   {
-    "key": "const.py::ACTION_ID_SOC_DISCHARGE_LIMIT",
-    "rel": "const.py",
+    "backup": "pre_reconcile",
     "const": "ACTION_ID_SOC_DISCHARGE_LIMIT",
-    "backup": "pre_reconcile",
-    "lineno": 1782
+    "key": "const.py::ACTION_ID_SOC_DISCHARGE_LIMIT",
+    "lineno": 1782,
+    "rel": "const.py"
   },
   {
-    "key": "const.py::DIAGNOSTICS_SCHEMA_VERSION",
-    "rel": "const.py",
+    "backup": "pre_transfer",
     "const": "DIAGNOSTICS_SCHEMA_VERSION",
-    "backup": "pre_transfer",
-    "lineno": 13
+    "key": "const.py::DIAGNOSTICS_SCHEMA_VERSION",
+    "lineno": 13,
+    "rel": "const.py"
   },
   {
-    "key": "coordinator.py::_DAY_TREND_SOURCE_BY_METRIC_KEY",
-    "rel": "coordinator.py",
+    "backup": "pre_transfer",
     "const": "_DAY_TREND_SOURCE_BY_METRIC_KEY",
-    "backup": "pre_transfer",
-    "lineno": 487
+    "key": "coordinator.py::_DAY_TREND_SOURCE_BY_METRIC_KEY",
+    "lineno": 487,
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD",
-    "rel": "coordinator.py",
+    "backup": "pre_transfer",
     "const": "_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD",
-    "backup": "pre_transfer",
-    "lineno": 424
+    "key": "coordinator.py::_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD",
+    "lineno": 424,
+    "rel": "coordinator.py"
   },
   {
-    "key": "coordinator.py::_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
-    "rel": "coordinator.py",
-    "const": "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
     "backup": "pre_reconcile",
-    "lineno": 659
+    "const": "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
+    "key": "coordinator.py::_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS",
+    "lineno": 659,
+    "rel": "coordinator.py"
   },
   {
-    "key": "diagnostics.py::_SECTION_SIZE_CAP",
-    "rel": "diagnostics.py",
+    "backup": "pre_transfer",
     "const": "_SECTION_SIZE_CAP",
-    "backup": "pre_transfer",
-    "lineno": 36
+    "key": "diagnostics.py::_SECTION_SIZE_CAP",
+    "lineno": 36,
+    "rel": "diagnostics.py"
   },
   {
+    "backup": "pre_transfer",
+    "const": "_ENTRY_LOCKS",
     "key": "discovery_cache.py::_ENTRY_LOCKS",
-    "rel": "discovery_cache.py",
-    "const": "_ENTRY_LOCKS",
-    "backup": "pre_transfer",
-    "lineno": 17
+    "lineno": 17,
+    "rel": "discovery_cache.py"
   },
   {
+    "backup": "pre_transfer",
+    "const": "_ENTRY_LOCKS",
     "key": "local_daily_cache.py::_ENTRY_LOCKS",
-    "rel": "local_daily_cache.py",
-    "const": "_ENTRY_LOCKS",
-    "backup": "pre_transfer",
-    "lineno": 41
+    "lineno": 41,
+    "rel": "local_daily_cache.py"
   },
   {
-    "key": "mqtt_session_cache.py::_CACHE_LOCK",
-    "rel": "mqtt_session_cache.py",
+    "backup": "pre_transfer",
     "const": "_CACHE_LOCK",
-    "backup": "pre_transfer",
-    "lineno": 40
+    "key": "mqtt_session_cache.py::_CACHE_LOCK",
+    "lineno": 40,
+    "rel": "mqtt_session_cache.py"
   },
   {
-    "key": "util.py::ZERO_CONFIRM_MIN_LOCAL_HOUR",
-    "rel": "util.py",
-    "const": "ZERO_CONFIRM_MIN_LOCAL_HOUR",
     "backup": "pre_transfer",
-    "lineno": 1201
+    "const": "ZERO_CONFIRM_MIN_LOCAL_HOUR",
+    "key": "util.py::ZERO_CONFIRM_MIN_LOCAL_HOUR",
+    "lineno": 1201,
+    "rel": "util.py"
   }
 ]

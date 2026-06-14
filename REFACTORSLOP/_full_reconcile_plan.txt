@@ -170,7 +170,7 @@ custom_components/jackery_solarvault/button.py
       (A) doc/comment-only:
         + """Collect reboot button entities for devices managed by the coordinator.
       (B) CODE-line mismatch [review]:
-        ! Create a JackeryRebootButton for each device that either supports advanced features or exposes the reboot 
+        ! Create a JackeryRebootButton for each device that either supports advanced features or exposes the reboot
    [_raise_action_error] (richest: 1\button.py)  DOC=1 CODE=0
       (A) doc/comment-only:
         + "entity": "reboot_device",
@@ -482,7 +482,7 @@ custom_components/jackery_solarvault/client/api.py
    [async_get_device_statistic] (richest: pre_transfer)  DOC=5 CODE=1
       (A) doc/comment-only:
         + The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowat
-        + Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, 
+        + Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`,
         + `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`.
         + Keys present may vary by device and backend response.
         + """  # noqa: E501, RUF100
@@ -1021,7 +1021,7 @@ custom_components/jackery_solarvault/client/mqtt_push.py
    [_async_wait_connected] (richest: jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py)  DOC=2 CODE=2
       (A) doc/comment-only:
         + """Wait until the MQTT client becomes connected or raise a RuntimeError on timeout or connection failure.
-        + "publish timeout waiting for MQTT connect" when there is no prior error and raises RuntimeError("MQTT not 
+        + "publish timeout waiting for MQTT connect" when there is no prior error and raises RuntimeError("MQTT not
       (B) CODE-line mismatch [review]:
         ! If the internal connected event is not set within timeout_sec, sets self._last_error to
         ! If the event is set but the client is not marked connected, raises RuntimeError including the current self
@@ -1279,7 +1279,7 @@ custom_components/jackery_solarvault/config_flow.py
         ! user_input (dict[str, Any] | None): Form input submitted by the user. Expected keys include `CONF_USERNAME
         ! ConfigFlowResult: A flow result that either shows the user form with errors or creates the new configurati
         ! account = _normalize_account(user_input[CONF_USERNAME])
-        ! Validates that the submitted username matches the entry being reconfigured, verifies credentials with the 
+        ! Validates that the submitted username matches the entry being reconfigured, verifies credentials with the
         ! A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or upda
         ! account = _normalize_account(user_input[CONF_USERNAME])
         ! CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
@@ -1384,7 +1384,7 @@ custom_components/jackery_solarvault/config_flow.py
         + CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
         + CONF_THIRD_PARTY_MQTT_ENABLE,
       (B) CODE-line mismatch [review]:
-        ! Validates that the submitted username matches the entry being reconfigured, verifies credentials with the 
+        ! Validates that the submitted username matches the entry being reconfigured, verifies credentials with the
         ! A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or upda
         ! account = _normalize_account(user_input[CONF_USERNAME])
         ! CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
@@ -1712,7 +1712,7 @@ custom_components/jackery_solarvault/coordinator.py
         + _LOGGER.exception("Jackery runtime discovery refresh failed")
         + _LOGGER.exception("Jackery runtime discovery refresh failed")
       (B) CODE-line mismatch [review]:
-        ! self._last_discovery_refresh_monotonic = now  # stamp AFTER success so a failed discover doesn't burn the 
+        ! self._last_discovery_refresh_monotonic = now  # stamp AFTER success so a failed discover doesn't burn the
         ! except JackeryError:
         ! except UpdateFailed:
    [_async_repair_missing_app_chart_statistics] (richest: 1\jackery_solarvault-main\custom_components\jackery_solarvault\coordinator.py)  DOC=1 CODE=0
@@ -2923,7 +2923,7 @@ custom_components/jackery_solarvault/number.py
         + """Rebuilds and adds number entities when the coordinator's entity signature changes.
         + """  # noqa: E501, RUF100
       (B) CODE-line mismatch [review]:
-        ! Computes the coordinator's entity signature and, if it differs from the last-seen signature, collects new 
+        ! Computes the coordinator's entity signature and, if it differs from the last-seen signature, collects new
    [_allowed_values] (richest: pre_transfer)  DOC=3 CODE=2
       (A) doc/comment-only:
         + """Get the discrete native values allowed for this number entity.
@@ -2939,7 +2939,7 @@ custom_components/jackery_solarvault/number.py
         + """  # noqa: E501, RUF100
         + @callback
       (B) CODE-line mismatch [review]:
-        ! Iterates coordinator data and instantiates a JackeryNumber for each entry in NUMBER_DESCRIPTIONS when the 
+        ! Iterates coordinator data and instantiates a JackeryNumber for each entry in NUMBER_DESCRIPTIONS when the
         ! list[NumberEntity]: Instantiated number entities ready to be added to Home Assistant.
    [_has_price_or_system] (richest: 01.06\custom_components\jackery_solarvault\number.py)  DOC=3 CODE=0
       (A) doc/comment-only:
@@ -3587,7 +3587,7 @@ custom_components/jackery_solarvault/services.py
         + Raises:
       (B) CODE-line mismatch [review]:
         ! def _ble_body_from_service(raw_body: object, device_id: str) -> dict[str, Any]:
-        ! Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string 
+        ! Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string
         ! dict[str, Any]: Parsed body mapping to send with the BLE command.
         ! ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object string, or if JSON parsing fa
         ! return dict(raw_body)
@@ -3664,7 +3664,7 @@ custom_components/jackery_solarvault/services.py
         + """Dispatches the Home Assistant service call to the integration handler that applies a device's third-par
         + The `call` data must conform to `SET_THIRD_PARTY_MQTT_SCHEMA`.
         + """  # noqa: E501, RUF100
-        + """Forward a "query third-party MQTT config" service call to the integration's async handler."""  # noqa: 
+        + """Forward a "query third-party MQTT config" service call to the integration's async handler."""  # noqa:
       (B) CODE-line mismatch [review]:
         ! Registers the following services (if not already present) and wires each to the integration's internal asy
         ! - `flags` (optional): flags for the command (int)

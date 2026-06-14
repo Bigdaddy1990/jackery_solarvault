@@ -8,8 +8,6 @@ compact reference file (_missing_sources.md) plus a machine-readable index
 Stdlib only. Python 3.14+.
 """  # noqa: INP001
 
-from __future__ import annotations  # noqa: TID251
-
 import ast
 import json
 from pathlib import Path

@@ -79,7 +79,7 @@
    doc  <1\1101\custom_components\jackery_solarvault\__init__.py>: _async_start_local_mqtt(hass, entry),
 
 [async_unload_entry] adopted=LIVE
-   CODE <01.06\custom_components\jackery_solarvault\__init__.py>: If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime 
+   CODE <01.06\custom_components\jackery_solarvault\__init__.py>: If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime
    CODE <01.06\custom_components\jackery_solarvault\__init__.py>: True if platforms were unloaded and runtime teardown completed, False otherwise.
    CODE <01.06\custom_components\jackery_solarvault\__init__.py>: entry.runtime_data = None  # type: ignore[assignment]
    CODE <pre_transfer>: async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF06

@@ -5,22 +5,22 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 +++ api.py(root)
 @@ -1,6 +1,6 @@
  """Async API client for the Jackery SolarVault cloud (iot.jackeryapp.com).
- 
+
 -Endpoint paths and polling rules are mirrored from PROTOCOL.md §2.
 -MQTT command details are documented separately in PROTOCOL.md §3.
 +Endpoint paths and polling rules are mirrored from APP_POLLING_MQTT.md.
 +MQTT command details are documented separately in MQTT_PROTOCOL.md.
- 
+
  Auth:     /v1/auth/login              (AES-128-ECB + RSA-1024 hybrid)
 @@ -26,10 +26,10 @@
- 
+
  import aiohttp
 -from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 +from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
  from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
  from cryptography.hazmat.primitives.padding import PKCS7
  from cryptography.hazmat.primitives.serialization import load_der_public_key
- 
+
 -from ..const import (
 +from .const import (
      AES_KEY,
@@ -96,18 +96,18 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
  )
 -from ..util import safe_bool, app_period_date_bounds, chart_series_debug
 +from .util import app_period_date_bounds, chart_series_debug
- 
+
  _LOGGER = logging.getLogger(__name__)
- 
+
 -
 -
 -# --- restored from Clause/live lineage (backup) ---
 -_HTTP_RETRY_ATTEMPTS = 3
 -_HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
- 
+
  class JackeryError(Exception):
 @@ -190,22 +165,6 @@
- 
+
  def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 -    """Encrypt `data` using RSA PKCS#1 v1.5 with a base64-encoded DER RSA public key.
 -
@@ -128,7 +128,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 -            f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
 -        )
      return public_key.encrypt(data, asym_padding.PKCS1v15())
- 
+
 @@ -279,12 +238,5 @@
      # --- headers ------------------------------------------------------------
      def _headers(self, *, with_token: bool = False) -> dict[str, str]:
@@ -161,7 +161,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          mac_id = value.strip().lower()
          # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
 @@ -328,16 +270,5 @@
- 
+
      def _resolve_login_mac_id(self) -> str:
 -        """Resolve and return the MAC identifier used for login and MQTT username derivation.
 -
@@ -179,7 +179,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          configured = self._mqtt_mac_id_configured
          if configured:
 @@ -359,11 +290,5 @@
- 
+
      async def async_login(self) -> str:
 -        """Perform the encrypted login flow and store session and MQTT credentials.
 -
@@ -228,7 +228,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
              )
          )
 @@ -447,16 +379,13 @@
- 
+
      async def async_get_mqtt_credentials(self) -> dict[str, str]:
 -        """Build MQTT client credentials using the current authenticated session.
 -
@@ -254,7 +254,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          """
          await self._ensure_token()
 @@ -519,13 +448,6 @@
- 
+
      @staticmethod
 -    def _extract_code(data: object) -> int | None:
 -        """Extracts the backend numeric `code` value from a parsed API response.
@@ -271,7 +271,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
              return None
 @@ -545,12 +467,8 @@
          return None
- 
+
 -    def _is_token_expired_response(self, status: int, data: object) -> bool:
 -        """Determine whether the parsed API response signals that the authentication token has expired.
 -
@@ -287,7 +287,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          if not isinstance(data, dict):
              return False
 @@ -562,5 +480,5 @@
- 
+
      @staticmethod
 -    def _response_has_auth_failure_text(data: object) -> bool:
 +    def _response_has_auth_failure_text(data: dict[str, Any] | Any) -> bool:
@@ -295,7 +295,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          if not isinstance(data, dict):
 @@ -598,5 +516,7 @@
          )
- 
+
 -    def _is_auth_failure_response(self, status: int, data: object) -> bool:
 +    def _is_auth_failure_response(
 +        self, status: int, data: dict[str, Any] | Any
@@ -332,7 +332,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          if isinstance(payload, list):
 @@ -718,28 +624,4 @@
          return []
- 
+
 -    @staticmethod
 -    def _select_ota_item(
 -        items: list[dict[str, Any]],
@@ -381,10 +381,10 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 -                    f"{type(err).__name__}: {err or '(no message)'}"
 +                    f"{HTTP_METHOD_GET} {path} request failed after re-login: {err}"
                  ) from err
- 
+
 @@ -837,5 +717,5 @@
          return self._payload_dict(data, DEVICE_PROPERTY_PATH)
- 
+
 -    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
 +    async def async_get_alarm(self, system_id: str | int) -> Any:
          """GET /v1/api/alarm — alarm list for a system."""
@@ -404,7 +404,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
              PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
 @@ -925,12 +799,12 @@
          return self._payload_dict(data, PRICE_HISTORY_CONFIG_PATH)
- 
+
 -    # --- Additional app-statistic endpoints from PROTOCOL.md §2 ----------
 +    # --- Additional app-statistic endpoints from APP_POLLING_MQTT.md ----------
      async def async_get_device_statistic(self, device_id: str | int) -> dict:
@@ -497,7 +497,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
              DEVICE_CT_STAT_PATH,
 @@ -1086,50 +926,12 @@
          )
- 
+
 -    async def async_get_device_eps_stat(
 -        self,
 -        device_id: str | int,
@@ -552,7 +552,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          data = await self._get_json(
 @@ -1141,107 +943,10 @@
          return self._payload_dict(data, DEVICE_METER_STAT_PATH)
- 
+
 -    async def async_get_device_socket_statistic(
 -        self,
 -        smart_socket_id: str | int,
@@ -686,7 +686,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          begin_date, end_date = app_period_date_bounds(
              date_type, begin_date=begin_date, end_date=end_date
 @@ -1352,59 +1047,14 @@
- 
+
      async def async_get_ota_info(self, device_sn: str) -> dict:
 -        """Retrieve OTA information for the device identified by `device_sn`.
 -
@@ -738,7 +738,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 -            return self._select_ota_item(items, device_sn)
 -        return {}
 +        return items[0] if items else {}
- 
+
      async def async_get_location(self, device_id: str | int) -> dict:
 -        """Retrieve the GPS coordinates previously set for the specified device.
 -
@@ -750,7 +750,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
              LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
 @@ -1413,17 +1063,7 @@
          return self._payload_dict(data, LOCATION_PATH)
- 
+
 -    # --- HTTP write endpoints documented in PROTOCOL.md §2 --------------
 +    # --- HTTP write endpoints documented in APP_POLLING_MQTT.md --------------
      async def _put_json(self, path: str, payload: dict) -> dict:
@@ -790,7 +790,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 -                    f"{type(err).__name__}: {err or '(no message)'}"
 +                    f"{HTTP_METHOD_PUT} {path} request failed after re-login: {err}"
                  ) from err
- 
+
 @@ -1499,15 +1137,8 @@
          self, system_id: str | int, system_name: str
      ) -> bool:
@@ -812,7 +812,7 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
          """
          if not system_name or not system_name.strip():
 @@ -1528,17 +1159,5 @@
- 
+
      async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
 -        """Send a form-urlencoded POST to the Jackery API, retrying once after automatic re-login if the token is expired.
 -
@@ -852,9 +852,9 @@ FULL UNIFIED DIFF: client/api.py (current) -> root api.py
 -                    f"{type(err).__name__}: {err or '(no message)'}"
 +                    f"{HTTP_METHOD_POST} {path} request failed after re-login: {err}"
                  ) from err
- 
+
 @@ -1616,17 +1233,12 @@
- 
+
      async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
 -        """Set the device's maximum allowed power using the experimental max-power endpoint.
 -
