@@ -468,6 +468,11 @@ from .const import (
     TIMER_TASK_TYPE_SMART_PLUG,
     TIMER_TASK_TYPE_TIME_ELEC,
 )
+from .stats.data_quality import (
+    app_data_quality_warnings,
+    format_data_quality_warning,
+    normalized_data_quality_warnings,
+)
 from .discovery_cache import async_load_discovery_cache, async_save_discovery_cache
 from .local_daily_cache import (
     async_load_daily_cache,
@@ -521,7 +526,6 @@ except ImportError:
 import operator
 
 from .util import (
-    app_data_quality_warnings,
     app_month_request_kwargs,
     app_period_request_kwargs,
     app_year_request_kwargs,
@@ -532,9 +536,7 @@ from .util import (
     diagnostic_redactions_disabled,
     effective_period_total_value,
     external_trend_statistic_id,
-    format_data_quality_warning,
     guard_statistic_totals_from_year,
-    normalized_data_quality_warnings,
     safe_float,
     trend_series_points,
     utc_now,
