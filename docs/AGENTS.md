@@ -285,6 +285,16 @@ Authoritative sources (non-exhaustive, must be consulted when relevant):
 
 ## Documentation and release hygiene
 
+## Documentation source boundary
+
+- Contributor and agent workflow rules live in `docs/`.
+- Jackery protocol captures, reverse-engineered DTOs, command catalogs, endpoint
+  matrices, and protocol helper scripts live in `source-of-truth/`.
+- `docs/` protocol pages are derived summaries only; if they conflict with
+  `source-of-truth/`, update or remove the derived page.
+- The classification for migrated protocol files is maintained in
+  `docs/DERIVED_PROTOCOL_DOCS.md`.
+
 - Update README, `info.md`, and `docs/` when workflows change. Each file must
   link to the relevant evidence (tests, modules, or scripts) so reviewers can
   verify Platinum claims.
@@ -342,7 +352,7 @@ For every pull request, reviewers and bots must enforce this minimum quality bar
 
 ### **1.0 Always strict follow Home Assistant Best Practices**  
 ## /docs/ha_custom_config_and_best_practices.json
-## /docs/jackery_complete_reference.json
+## /source-of-truth/jackery_complete_reference.json
 
 ### **1.1 Data Integrity First**
 - **Only verified data** may enter the Home Assistant Recorder.
@@ -570,7 +580,7 @@ fehlenden msg_id liegen in `docs/REFERENCE_COVERAGE.md`. Hoch-Level-Übersicht:
 | PortableBody entities    | ~77      | 38            | 49 %  | partial (AC/DC/USB/temp/power/config) |
 | Accessories              | 14       | 14            | 100 %  | ok |
 | Shelly Cloud2Cloud       | 7        | 7             | 100 %  | ok |
-| Crypto Layer A (auth)    | 1        | 1             | 100 %  | **deviation** (hardcoded `b"1234567890123456"`) |
+| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (random AES-128 key per login, RSA-wrapped) |
 | Crypto Layer B (signing) | 1        | 1             | 100 %  | ok |
 | Crypto Layer C (MQTT)    | 1        | 1             | 100 %  | ok (AES-128-CBC/PKCS7, key=bluetoothKey) |
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
@@ -578,9 +588,9 @@ fehlenden msg_id liegen in `docs/REFERENCE_COVERAGE.md`. Hoch-Level-Übersicht:
 
 **Bekannte Abweichungen vom Reference-Protokoll:**
 
-- **Crypto Layer A:** Der upstream-Key `b"1234567890123456"` wird direkt verwendet
-  (`custom_components/jackery_solarvault/const.py:163`). Dies ist eine
-  dokumentierte Limitation, kein Hardening-Claim.
+- **Crypto Layer A:** Login erzeugt pro Anfrage einen frischen zufälligen
+  AES-128-Key und überträgt ihn RSA-wrapped. Golden-vector Tests injizieren
+  den AES-Key deterministisch, ohne echten Login.
 - **Crypto Layer C:** MQTT-Bodies werden seit 2026-06-08 AES-128-CBC/PKCS7
   verschlüsselt (key=bluetoothKey, iv=key, Base64). Siehe `client/api.py:encrypt_mqtt_body`.
 

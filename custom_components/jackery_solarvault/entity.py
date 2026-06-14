@@ -196,7 +196,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         stable_key = plug_key or stable_subdevice_key("smart_plug", sn, plug_index)
         # Branding lookup against the documented accessory catalog so the
         # UI shows "Shelly Plus Plug S" instead of the raw "shellyplusplugs"
-        # wire identifier (PROTOCOL §3 + docs/html scanName table).
+        # wire identifier (PROTOCOL §3 + source-of-truth scanName table).
         manufacturer_brand, model_label = subdevice_branding(plug.get(FIELD_SCAN_NAME))
         display_name = (
             plug.get(FIELD_DEVICE_NAME)
