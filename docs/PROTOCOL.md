@@ -1,4 +1,4 @@
-Hier ist ein zusammenhängendes `PROTOCOL.md`, inhaltlich vollständig aus allen von dir genannten Quellen zusammengeführt und neu formuliert. 
+Hier ist ein zusammenhängendes `PROTOCOL.md`, inhaltlich vollständig aus allen von dir genannten Quellen zusammengeführt und neu formuliert.
 Dieses Protokoll ist ausdrücklich **bindend** und **darf nicht verändert** werden; jede Arbeit an der Integration hat sich daran zu orientieren.[^1][^2][^3][^4][^5][^6][^7][^8][^9][^10][^11][^12][^13][^14][^15][^16][^17][^18][^19]
 
 ***
@@ -620,7 +620,7 @@ Aus `HomeSubBody$BatteryPackBody`, `BatteryPackSub` und `SubBaseBean`:
     - Metriken: Phasen‑Spannungen/-Ströme, Wirk/Blind/Scheinleistung, Gesamtnettoleistung.
     - HA‑Geräte pro Pack, mit SOC, In/Out‑Power, Zelltemperatur, OTA‑Status.
     - "devType": 3, "deviceSn": "5c013b048e3c" = deviceSN = ShellysMAC ->> sollte sich damit lokal an die shelly devices koppeln lassen.
-    
+
 - Battery‑Packs:
 {"entry_id": "01KSG0YEJM5Y7ZQWC8XD19GQBE", "kind": "http", "method": "GET", "params": {"deviceSn": "HR2C04000280HH3"}, "path": "/v1/device/battery/pack/list", "request_body": {}, "response": {"code": 0, "data": null, "encryption": false, "msg": "SUCCESS", "rsaForAesKey": null, "token": ""}, "response_data_type": "NoneType", "status": 200, "timestamp": "2026-05-26T21:37:54.759782+02:00"}
 {"entry_id": "01KSG0YEJM5Y7ZQWC8XD19GQBE", "kind": "http", "method": "GET", "params": {"deviceSnList": "HR2C04000280HH3"}, "path": "/v1/device/ota/list", "request_body": {}, "response": {"code": 0, "data": [{"beginUpgradeTimestamp": null, "currentTimestamp": null, "currentVersion": "1.2", "deviceSn": "HR2C04000280HH3", "expireTimestamp": null, "targetModuleVersion": null, "targetVersion": null, "targetVersionId": null, "updateContent": null, "updateStatus": 6, "upgradeType": null}], "encryption": false, "msg": "SUCCESS", "rsaForAesKey": null, "token": ""}, "response_data_type": "list", "status": 200, "timestamp": "2026-05-26T21:37:54.804879+02:00"}
@@ -988,11 +988,10 @@ Die gesamte Formel‑ und Guard‑Logik aus PROTOCOL §7 spiegelt sich in diesen
 - Plattformdateien `sensor.py`, `switch.py`, `number.py`, `select.py`, `text.py`, `binary_sensor.py`, `button.py`
 
 ```
-- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).  
+- Erben von der Basis‑Entität und definieren die jeweiligen Suffixe konsistent (z.B. `_battery_pack_<index>_<suffix>` für Packs).
 ```
 
 - Tests:
     - `tests/test_entity.py`, `tests/test_battery_pack_stability.py` prüfen, dass `unique_id` stabil bleibt bei Namens‑/Label‑Änderungen und dass Battery‑Packs nicht ihre ID wechseln.
 
 ***
-
