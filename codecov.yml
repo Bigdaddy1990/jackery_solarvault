@@ -6,4 +6,4 @@ coverage:
     patch:
       default:
         target: 80%
-comment: false
+comment: true
