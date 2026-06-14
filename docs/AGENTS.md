@@ -580,7 +580,7 @@ fehlenden msg_id liegen in `docs/REFERENCE_COVERAGE.md`. Hoch-Level-Übersicht:
 | PortableBody entities    | ~77      | 38            | 49 %  | partial (AC/DC/USB/temp/power/config) |
 | Accessories              | 14       | 14            | 100 %  | ok |
 | Shelly Cloud2Cloud       | 7        | 7             | 100 %  | ok |
-| Crypto Layer A (auth)    | 1        | 1             | 100 %  | **deviation** (hardcoded `b"1234567890123456"`) |
+| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (random AES-128 key per login, RSA-wrapped) |
 | Crypto Layer B (signing) | 1        | 1             | 100 %  | ok |
 | Crypto Layer C (MQTT)    | 1        | 1             | 100 %  | ok (AES-128-CBC/PKCS7, key=bluetoothKey) |
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
@@ -588,9 +588,9 @@ fehlenden msg_id liegen in `docs/REFERENCE_COVERAGE.md`. Hoch-Level-Übersicht:
 
 **Bekannte Abweichungen vom Reference-Protokoll:**
 
-- **Crypto Layer A:** Der upstream-Key `b"1234567890123456"` wird direkt verwendet
-  (`custom_components/jackery_solarvault/const.py:163`). Dies ist eine
-  dokumentierte Limitation, kein Hardening-Claim.
+- **Crypto Layer A:** Login erzeugt pro Anfrage einen frischen zufälligen
+  AES-128-Key und überträgt ihn RSA-wrapped. Golden-vector Tests injizieren
+  den AES-Key deterministisch, ohne echten Login.
 - **Crypto Layer C:** MQTT-Bodies werden seit 2026-06-08 AES-128-CBC/PKCS7
   verschlüsselt (key=bluetoothKey, iv=key, Base64). Siehe `client/api.py:encrypt_mqtt_body`.
 

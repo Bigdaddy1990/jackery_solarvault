@@ -18,7 +18,7 @@ Home Assistant integration. Source of truth: `source-of-truth/jackery_complete_r
 | Device-Modelle           | runtime  | runtime       | n/a    | ok (`/v1/device/system/list`) |
 | Accessories              | 14       | 14            | 100 %  | ok |
 | Shelly Cloud2Cloud       | 7        | 7             | 100 %  | ok |
-| Crypto Layer A (auth)    | 1        | 1             | 100 %  | **deviation** (hardcoded `b"1234567890123456"`) |
+| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (random AES-128 key per login, RSA-wrapped) |
 | Crypto Layer B (signing) | 1        | 1             | 100 %  | ok |
 | Crypto Layer C (MQTT)    | 1        | 1             | 100 %  | ok (AES-128-CBC/PKCS7, key=bluetoothKey) |
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
@@ -429,6 +429,6 @@ handled in the coordinator's `_async_process_mqtt_message` method.
 
 | Layer | Status | Details |
 |-------|--------|---------|
-| A (auth) | deviation | Hardcoded AES_KEY at const.py:278 (not per-login random) |
+| A (auth) | ok | Random AES-128 key per login, RSA-wrapped; AES_KEY const is compatibility-only. |
 | B (signing) | ok | RSA-1024 PKCS#1 v1.5 for login AES key wrap |
 | C (MQTT) | ok | AES-128-CBC/PKCS7, key=bluetoothKey, iv=key, Base64 |

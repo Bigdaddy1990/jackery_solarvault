@@ -393,11 +393,9 @@ SUB_SHADOW_DIY_PATH: Final = "/v1/device/property/subShadow"
 SYSTEM_SHADOW_DIY_PATH: Final = "/v1/device/property/systemShadow"
 
 # Crypto material extracted from the Jackery app (iOS+Android both use these).
-# LIMITATION: The upstream protocol (crypto.layer_a_login) generates a fresh
-# random AES-128 key per login via KeyGenerator('AES').init(128).generateKey()
-# and wraps it with RSA. This integration uses a static key instead — the same
-# value observed in all captured traffic. This is a documented deviation, not
-# a hardening claim. See docs/REFERENCE_COVERAGE.md Crypto Layer A.
+# Layer A login generates a fresh random AES-128 key per login and wraps it
+# with this RSA public key. ``AES_KEY`` is retained only for compatibility with
+# older imports; runtime login code must not use it.
 AES_KEY: Final = b"1234567890123456"
 RSA_PUBLIC_KEY_B64: Final = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
