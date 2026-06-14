@@ -526,10 +526,8 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
     """Diagnostics must not expose device IDs or serials as raw map keys."""
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
-    assert (
-        'devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)'
-        in source
-    )
+    assert 'devices = _redacted_payload_map(' in source
+    assert 'for device_id, payload in (coordinator.data or {}).items()' in source
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
@@ -711,7 +709,10 @@ def test_sensor_division_transform_uses_safe_float_parser() -> None:
     source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     block = source.split("def _div(", 1)[1].split("\n\ndef _signed_diff", 1)[0]
 
-    assert "except (TypeError, ValueError):" in block
+    assert (
+        "except (TypeError, ValueError):" in block
+        or "except TypeError, ValueError:" in block
+    )
     assert "return None" in block
     assert "return round(float(value) / divisor, 2)" in block
     assert "parsed = safe_float(value)" not in block
@@ -1219,6 +1220,9 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
     """Implement test data quality diagnostics include request context keys."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    data_quality_source = (CUSTOM_COMPONENT / "stats" / "data_quality.py").read_text(
+        encoding="utf-8"
+    )
 
     for key in (
         "DATA_QUALITY_KEY_SOURCE_REQUEST",
@@ -1227,11 +1231,14 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
         "DATA_QUALITY_KEY_TOTAL_METHOD",
     ):
         assert key in const_source
-        assert key in util_source
+        assert key in util_source or key in data_quality_source
     assert "DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY" in const_source
-    assert "def _format_request_range" in util_source
-    assert "source_request=_request_for_section(source_section)" in util_source
-    assert "reference_request=_request_for_section(reference_section)" in util_source
+    assert "def _format_request_range" in data_quality_source
+    assert "source_request=_request_for_section(source_section)" in data_quality_source
+    assert (
+        "reference_request=_request_for_section(reference_section)"
+        in data_quality_source
+    )
 
 
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
@@ -3425,3 +3432,140 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
     )
+
+
+def _pv_quality_payload(
+    *,
+    day: float = 1.0,
+    week: float = 2.0,
+    month: float = 3.0,
+    year: float = 4.0,
+    lifetime: float = 5.0,
+) -> dict[str, object]:
+    return {
+        "device_pv_stat_day": {"totalSolarEnergy": day},
+        "device_pv_stat_week": {"unit": "kwh", "y": [week]},
+        "device_pv_stat_month": {"unit": "kwh", "y": [month]},
+        "device_pv_stat_year": {"unit": "kwh", "y": [year]},
+        "statistic": {"totalGeneration": lifetime},
+    }
+
+
+def test_data_quality_warns_when_year_is_less_than_month() -> None:
+    """Current-year totals cannot be lower than the current month total."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(month=12.0, year=9.0, lifetime=99.0),
+            today=util.date(2026, 6, 14),
+        )
+    ]
+
+    assert any(warning["reason"] == "year_less_than_month" for warning in warnings)
+
+
+def test_data_quality_allows_valid_month_boundary_week_exception() -> None:
+    """A week spanning two months may be greater than the new month bucket."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(week=12.0, month=2.0, year=99.0, lifetime=100.0),
+            today=util.date(2026, 5, 1),
+        )
+    ]
+
+    assert not any(warning["reason"] == "month_less_than_week" for warning in warnings)
+
+
+def test_data_quality_allows_valid_year_boundary_week_exception() -> None:
+    """A week spanning two years may be greater than the new year bucket."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(week=12.0, month=20.0, year=2.0, lifetime=100.0),
+            today=util.date(2027, 1, 1),
+        )
+    ]
+
+    assert not any(warning["reason"] == "year_less_than_week" for warning in warnings)
+
+
+def test_data_quality_warns_when_lifetime_is_less_than_current_year_pv() -> None:
+    """Lifetime PV generation must not be lower than current-year PV generation."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(year=42.0, lifetime=12.0),
+            today=util.date(2026, 6, 14),
+        )
+    ]
+
+    assert any(warning["reason"] == "lifetime_less_than_year" for warning in warnings)
+
+
+def test_data_quality_repair_warnings_are_sorted_and_deduplicated() -> None:
+    """Repair placeholders must be stable across dict/list ordering noise."""
+    warning_b = util.AppDataQualityWarning(
+        "warning", "year_less_than_month", "b", "B", "s", 1.0, "r", 2.0
+    ).as_dict()
+    warning_a = util.AppDataQualityWarning(
+        "warning", "lifetime_less_than_year", "a", "A", "s", 1.0, "r", 2.0
+    ).as_dict()
+
+    assert util.normalized_data_quality_warnings([warning_b, warning_a, warning_b]) == [
+        warning_a,
+        warning_b,
+    ]
+
+
+def test_data_quality_repair_text_redacts_sensitive_context() -> None:
+    """Repair text must not copy serials, device IDs, tokens, GPS, or MQTT secrets."""
+    warning = util.AppDataQualityWarning(
+        level="warning",
+        reason="year_less_than_month",
+        metric_key="pv_energy",
+        label="PV energy",
+        source_section="device_pv_stat_year",
+        source_value=1.0,
+        reference_section="device_pv_stat_month",
+        reference_value=2.0,
+        source_request={
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+            "sn": "SN-SECRET-123",
+            "deviceId": "DEV-SECRET-456",
+            "token": "TOKEN-SECRET-789",
+            "latitude": 52.52,
+            "longitude": 13.405,
+            "mqtt_username": "mqtt-user-secret",
+            "mqtt_password": "mqtt-pass-secret",
+        },
+    ).as_dict()
+
+    text = util.format_data_quality_warning(warning)
+
+    for secret in (
+        "SN-SECRET-123",
+        "DEV-SECRET-456",
+        "TOKEN-SECRET-789",
+        "52.52",
+        "13.405",
+        "mqtt-user-secret",
+        "mqtt-pass-secret",
+    ):
+        assert secret not in text
+
+
+def test_data_quality_details_are_exported_only_in_redacted_diagnostics_block() -> None:
+    """Full device data_quality details belong under raw_api.data_quality only."""
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        '"data_quality": async_redact_data(data_quality, redact_keys)'
+        in diagnostics_source
+    )
+    assert 'if key != "data_quality"' in diagnostics_source
+    assert 'payload.get("data_quality", [])' in diagnostics_source
