@@ -1,0 +1,13 @@
+"""Live device sensor descriptions."""
+
+from .base import (
+    SENSOR_DESCRIPTIONS,
+    SMART_MODE_SENSOR_DESCRIPTIONS,
+    TOU_PLAN_SENSOR_DESCRIPTIONS,
+)
+
+__all__ = [
+    "SENSOR_DESCRIPTIONS",
+    "SMART_MODE_SENSOR_DESCRIPTIONS",
+    "TOU_PLAN_SENSOR_DESCRIPTIONS",
+]
