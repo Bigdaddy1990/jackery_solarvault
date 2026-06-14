@@ -113,6 +113,11 @@ from .subdevices.detector import (
     subdevice_identity_values,
     subdevice_stat_id,
 )
+from .exceptions import (
+    BACKGROUND_TASK_ERRORS,
+    PAYLOAD_PARSE_ERRORS,
+    STORAGE_ERRORS,
+)
 from .const import (
     DIAGNOSTICS_SCHEMA_VERSION,
     ACTION_ID_AUTO_STANDBY,
@@ -1324,7 +1329,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._defer_background_auth_failure(err)
             except JackeryAuthError:
                 raise
-            except Exception as err:  # noqa: BLE001
+            except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug(
                     "Jackery MQTT auto-reconnect after disconnect failed: %s",
                     err,
@@ -1674,7 +1679,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return
             try:
                 payload = json.loads(body.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as err:
+            except PAYLOAD_PARSE_ERRORS as err:
                 _LOGGER.debug(
                     "Jackery BLE %s: body is not JSON (cmd=%d, %d bytes): %s",
                     device_id,
@@ -1808,7 +1813,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         try:
             await listener.async_start(list(self._device_index.keys()))
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.warning("Jackery BLE listener failed to start: %s", err)
             return
         self._ble_listener = listener
@@ -3018,7 +3023,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._push_partial_update(new_data)
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Jackery pack OTA background refresh failed: %s", err)
         finally:
             current = self._battery_pack_ota_tasks.get(device_id)
@@ -3301,7 +3306,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 code = None
         if code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -3564,7 +3569,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 body_fields=body_fields,
                 ensure_mqtt=ensure_mqtt,
             )
-        except Exception as mqtt_err:
+        except BACKGROUND_TASK_ERRORS as mqtt_err:
             if ble_error is not None:
                 _LOGGER.warning(
                     "Jackery MQTT fallback also failed for %s actionId=%s cmd=%s: "
@@ -5121,7 +5126,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             raise
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Jackery recorder-statistics import failed: %s", err)
         finally:
             if asyncio.current_task() is self._statistics_import_task:
@@ -5137,7 +5142,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await self._async_query_weather_plan_for_missing(snapshot=snapshot)
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Jackery MQTT backfill query failed: %s", err)
 
     # ------------------------------------------------------------------
@@ -5190,7 +5195,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             recorder = get_instance(self.hass)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Recorder instance unavailable: %s", err)
             return 0.0
 
@@ -5209,7 +5214,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 None,
                 {"start", "sum"},
             )
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Could not read previous statistics for %s: %s",
                 statistic_id,
@@ -5252,7 +5257,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             recorder = get_instance(self.hass)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Recorder instance unavailable for entity offset: %s", err)
             return 0.0, 0.0
 
@@ -5294,7 +5299,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             return await recorder.async_add_executor_job(_load_offsets)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Could not read previous entity statistics for %s: %s",
                 statistic_id,
@@ -5319,7 +5324,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             recorder = get_instance(self.hass)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Recorder instance unavailable for run markers: %s", err)
             return set()
 
@@ -5342,7 +5347,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         try:
             return await recorder.async_add_executor_job(_load_compiled_hours)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Could not read Recorder run markers: %s", err)
             return set()
 
@@ -5947,8 +5952,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 row_state = safe_float(row.get("state"))
                 if row_start is not None and row_state is not None:
                     existing_states[row_start] = row_state
-        except Exception:  # noqa: BLE001
-            pass
+        except BACKGROUND_TASK_ERRORS as err:
+            _LOGGER.debug("Jackery recorder existing-statistics lookup failed: %s", err)
 
         offset = await self._async_statistic_sum_offset(
             statistic_id,
@@ -5991,7 +5996,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 metadata,
                 statistics,
             )
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Could not import %d app chart statistics for %s: %s",
                 len(statistics),
@@ -7779,7 +7784,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._pending_device_removals:
             try:
                 await self.async_cleanup_pending_device_removals()
-            except Exception as err:  # noqa: BLE001
+            except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug("Jackery: device-registry cleanup deferred: %s", err)
         # Launch a non-blocking background refresh for systems whose
         # slow-metric caches were stale this cycle.  This avoids blocking
@@ -8026,10 +8031,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     )
             except asyncio.CancelledError:
                 _LOGGER.debug("Jackery: background slow-metric refresh cancelled")
-            except Exception:
-                _LOGGER.debug(
-                    "Jackery: background slow-metric refresh failed", exc_info=True
-                )
+            except BACKGROUND_TASK_ERRORS as err:
+                _LOGGER.debug("Jackery: background slow-metric refresh failed: %s", err)
             else:
                 # Notify HA that fresh data is available so entity states
                 # are updated immediately rather than waiting for the next
@@ -8222,7 +8225,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Use cached discovery metadata when Jackery cloud is unavailable."""
         try:
             cached = await async_load_discovery_cache(self.hass, self.entry.entry_id)
-        except Exception as err:  # noqa: BLE001
+        except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery discovery cache load failed: %s", err)
             return False
         if not cached:
@@ -8243,7 +8246,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await async_save_discovery_cache(
                 self.hass, self.entry.entry_id, self._device_index
             )
-        except Exception as err:  # noqa: BLE001
+        except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery discovery cache save failed: %s", err)
 
     async def async_start_local_mqtt_listener(self) -> None:
@@ -8271,7 +8274,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if isinstance(raw_payload, str):
                 try:
                     payload = json.loads(raw_payload)
-                except json.JSONDecodeError as err:
+                except PAYLOAD_PARSE_ERRORS as err:
                     _LOGGER.debug(
                         "Jackery local MQTT payload on %s is not JSON: %s",
                         message.topic,
@@ -8355,7 +8358,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return
         try:
             await async_save_mqtt_session(self.hass, self.entry.entry_id, **snapshot)  # type: ignore[arg-type]
-        except Exception as err:  # noqa: BLE001
+        except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery MQTT session cache save failed: %s", err)
             return
         self._persisted_mqtt_session = snapshot
@@ -8364,7 +8367,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Drop the cached MQTT session after a confirmed broker rejection."""
         try:
             await async_clear_mqtt_session(self.hass, self.entry.entry_id)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Jackery MQTT session cache clear failed (%s): %s", reason, err
             )
@@ -8381,7 +8384,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         try:
             cached = await async_load_daily_cache(self.hass, self.entry.entry_id)
-        except Exception as err:  # noqa: BLE001
+        except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery local daily cache load failed: %s", err)
             return
         self._local_daily_snapshots = {
@@ -8460,7 +8463,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return round(float(value) / 1000.0, 5)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:
@@ -8488,7 +8491,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self.entry.entry_id,
                 snapshots=self._local_daily_snapshots,
             )
-        except Exception as err:  # noqa: BLE001
+        except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery local daily cache save failed: %s", err)
             return
         self._persisted_local_daily_signature = signature
@@ -8576,7 +8579,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     username=username,
                     password=password,
                 )
-            except Exception as err:  # noqa: BLE001
+            except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.warning(
                     "Jackery local MQTT bridge: failed to push config to "
                     "device %s (%s); will retry on next reload",
@@ -8605,7 +8608,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await self._async_query_weather_plan_for_missing(snapshot=snapshot)
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Jackery MQTT polling query failed: %s",
                 _exception_debug_message(err),

@@ -2951,9 +2951,13 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
 
     assert "import contextlib" in init_source
     assert "try:" in init_source
-    assert "# Discovery must run first" in init_source
-    assert "except Exception:" in init_source
-    assert "with contextlib.suppress(Exception):" in init_source
+    assert (
+        "except (" in init_source
+        and "ConfigEntryAuthFailed," in init_source
+        and "HomeAssistantError," in init_source
+        and "JackeryError," in init_source
+    )
+    assert "with contextlib.suppress(HomeAssistantError, JackeryError, RuntimeError):" in init_source
     assert "await coordinator.async_shutdown()" in init_source
     assert "if entry.runtime_data is coordinator:" in init_source
     assert "entry.runtime_data = cast(Any, None)" in init_source
@@ -2962,9 +2966,7 @@ def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
         in init_source
     )
     assert "coordinator.async_start_statistics_imports()" in init_source
-    assert init_source.index(
-        "await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)",
-    ) < init_source.index("coordinator.async_start_statistics_imports()")
+    assert "startup_task = hass.async_create_background_task" in init_source
 
 
 def test_brand_assets_are_packaged_without_runtime_sync() -> None:
@@ -3432,3 +3434,43 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
     )
+
+
+def test_jackery_exception_handlers_are_domain_specific() -> None:
+    """Runtime code should not hide user-visible failures behind broad handlers."""
+    offenders = []
+    for path in CUSTOM_COMPONENT.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "except Exception" in source or "noqa: BLE001" in source:
+            offenders.append(str(path))
+    assert offenders == []
+
+
+def test_silent_coordinator_and_ble_paths_surface_diagnostics() -> None:
+    """Previously silent paths now log and expose diagnostics counters."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+    ble_source = (CLIENT_PACKAGE / "ble_transport.py").read_text(encoding="utf-8")
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Jackery recorder existing-statistics lookup failed" in coordinator_source
+    assert "keep-alive interval elapsed" in ble_source
+    assert "frames_decode_failed" in coordinator_source
+    assert "rejection_metrics" in diagnostics_source
+
+
+def test_user_visible_error_outcomes_remain_explicit() -> None:
+    """Auth failures, repair issues and unavailable states stay observable."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8"
+    )
+    repairs_source = (CUSTOM_COMPONENT / "repairs.py").read_text(encoding="utf-8")
+    entity_source = (CUSTOM_COMPONENT / "entity.py").read_text(encoding="utf-8")
+
+    assert "ConfigEntryAuthFailed" in coordinator_source
+    assert "_defer_background_auth_failure" in coordinator_source
+    assert "REPAIR_ISSUE_DEVICE_NOT_ACTIVATED" in repairs_source
+    assert "available" in entity_source

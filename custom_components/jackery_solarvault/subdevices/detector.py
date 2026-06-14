@@ -396,7 +396,7 @@ def battery_packs_need_query(payload: dict[str, Any]) -> bool:
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     try:
         expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         expected = 0
     packs = payload.get(PAYLOAD_BATTERY_PACKS)
     if not isinstance(packs, list):

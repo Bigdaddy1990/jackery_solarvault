@@ -22,6 +22,7 @@ from .const import (
     PAYLOAD_SYSTEM,
 )
 from .entity import JackeryEntity
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import append_unique_entity, coordinator_entity_signature
 
 if TYPE_CHECKING:
@@ -311,7 +312,7 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
                     "error": str(err),
                 },
             ) from err
-        except Exception as err:
+        except ACTION_WRITE_ERRORS as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="entity_action_failed",
@@ -386,5 +387,5 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)

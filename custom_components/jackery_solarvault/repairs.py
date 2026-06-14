@@ -15,6 +15,7 @@ from .const import (
     REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .exceptions import BACKGROUND_TASK_ERRORS
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -65,7 +66,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
@@ -122,7 +123,7 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:  # noqa: BLE001
+        except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:

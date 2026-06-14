@@ -85,6 +85,7 @@ from .const import (
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import append_unique_entity, coordinator_entity_signature, sorted_smart_plugs
 
 if TYPE_CHECKING:
@@ -1003,7 +1004,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 
@@ -1057,7 +1058,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 
@@ -1112,7 +1113,7 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 
@@ -1200,7 +1201,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 
@@ -1309,5 +1310,5 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
