@@ -1,7 +1,7 @@
 # Reference Coverage Matrix
 
 Tracks how much of the upstream Jackery protocol is implemented in the
-Home Assistant integration. Source of truth: `docs/jackery_complete_reference.json`.
+Home Assistant integration. Source of truth: `source-of-truth/jackery_complete_reference.json`.
 
 **Last updated:** 2026-06-14
 

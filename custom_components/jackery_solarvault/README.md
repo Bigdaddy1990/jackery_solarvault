@@ -26,7 +26,7 @@ This integration is not an official Jackery product and is not affiliated with J
 ### About hardware coverage and ``unknown`` entities
 
 The integration mirrors the documented Jackery wire-protocol (Smali analysis in
-``docs/html/`` and PROTOCOL.md) rather than only what one specific installation
+``source-of-truth/`` and PROTOCOL.md) rather than only what one specific installation
 emits at runtime. That means entities and sub-device branding are wired for the
 full documented catalog — Shelly Pro EM-50 / 3EM / 3EM63, EcoTracker, P1
 Meter, Homey Energy Dongle, Shelly Plug S / S-Gen3, Jackery HTO892A–HTO910A,
