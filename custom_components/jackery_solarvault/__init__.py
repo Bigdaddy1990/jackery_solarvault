@@ -366,15 +366,22 @@ async def _async_authenticate_api_layer(
     Raises:
         ConfigEntryAuthFailed: If the Jackery credentials are rejected (triggers re-auth flow).
     """
-    bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
+    # Prefer the persisted session: it is refreshed after every successful login
+    # and therefore holds the freshest credentials. Only fall back to the
+    # one-time config-entry bootstrap snapshot when no persisted session exists.
+    # Priming the bootstrap also *saves* it, so doing that unconditionally would
+    # clobber the fresher persisted session before it is loaded back.
     cached = await async_load_mqtt_session(hass, entry.entry_id)
     if cached:
+        bootstrap = None
         api.hydrate_mqtt_session(
             user_id=cached[MQTT_SESSION_USER_ID],
             seed_b64=cached[MQTT_SESSION_SEED_B64],
             mac_id=cached[MQTT_SESSION_MAC_ID],
             mac_id_source=cached.get(MQTT_SESSION_MAC_ID_SOURCE),
         )
+    else:
+        bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
     try:
         await api.async_login()
     except JackeryAuthError as err:

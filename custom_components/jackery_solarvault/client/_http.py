@@ -827,7 +827,6 @@ class BaseHTTPMixin:
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
             )
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -928,7 +927,6 @@ class BaseHTTPMixin:
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
             self._auth_retries += 1
-            self._token = None
             async with self._lock:
                 self._token = None
                 await self.async_login()

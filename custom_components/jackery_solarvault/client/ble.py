@@ -64,66 +64,34 @@ from cryptography.hazmat.primitives.padding import PKCS7
 _LOGGER = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Wire-format constants
-# ---------------------------------------------------------------------------
-
-#: Magic prefix that every plaintext frame starts with.
-BLE_FRAME_MAGIC: str = "DFED"
-
-#: Protocol version following the magic. Constant in the app's
-#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
-BLE_FRAME_VERSION: str = "0001"
-
-#: Payload-type marker between the header block and the chunk length.
-BLE_FRAME_PAYLOAD_MARKER: str = "0001"
-
-#: Length in hex characters of every fixed-width 16-bit field.
-_HEX16_WIDTH: int = 4
-
-#: Key lengths (in bytes) accepted by the BLE crypto helpers.
-#:
-#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
-#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
-#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
-#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
-#: AES-128 or AES-256 from the key length implicitly. Both are listed here
-#: so callers can pick the right one without hard-coding either.
-BLE_AES_KEY_LEN_AES128: int = 16
-BLE_AES_KEY_LEN_AES256: int = 32
-
-#: Tuple of accepted key lengths, used for input validation.
-BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
+from ..const import (
+    BLE_FRAME_MAGIC,
+    BLE_FRAME_VERSION,
+    BLE_FRAME_PAYLOAD_MARKER,
     BLE_AES_KEY_LEN_AES128,
     BLE_AES_KEY_LEN_AES256,
+    BLE_AES_KEY_LENGTHS,
+    BLE_AES_KEY_LEN,
+    BLE_AES_IV_LEN,
+    BLE_SERVICE_UUID,
+    BLE_WRITE_CHAR_UUID,
+    BLE_NOTIFY_CHAR_UUID,
+    BLE_MANUFACTURER_ID,
+    _BINARY_FRAME_HEADER_LEN,
+    _BINARY_FRAME_TRAILER_LEN,
+    _BINARY_FRAME_MAGIC_BE,
+    _BINARY_FRAME_VERSION_BE,
+    _BINARY_FRAME_PAYLOAD_MARKER_BE,
+    _HEX16_WIDTH,
+    _HEADER_HEX_LEN,
+    _BLE_FRAME_OVERHEAD,
+    DEFAULT_BLE_MTU,
 )
-
-# Backwards-compatible alias kept until call sites migrate; new code should
-# branch on the actual key length the device returns.
-BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
-
-#: AES-CBC IV length in bytes.
-BLE_AES_IV_LEN: int = 16
-
-#: GATT service UUID advertised by the SolarVault BLE radio.
-BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
-
-#: Write-without-response characteristic (app -> device).
-BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
-
-#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
-BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
-
-#: Bluetooth SIG company identifier under which the SolarVault advertises
-#: its serial number in the manufacturer-data field.
-BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
 
 
 # ---------------------------------------------------------------------------
 # Low-level hex helpers (mirror ``sb.d.d`` in the app)
 # ---------------------------------------------------------------------------
-
 
 def hex16(value: int) -> str:
     """Encode a 16-bit unsigned integer as a 4-character uppercase hexadecimal string.
@@ -282,44 +250,6 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
 def random_iv() -> bytes:
     """Generate a fresh 16-byte CBC IV using a cryptographic RNG."""
     return secrets.token_bytes(BLE_AES_IV_LEN)
-
-
-# ---------------------------------------------------------------------------
-# Observed binary frame layout (device → app notify on char 0xEE02)
-# ---------------------------------------------------------------------------
-#
-# Live capture 2026-05-16 against a SolarVault 3 Pro Max (via an ESPHome BLE
-# proxy) gave the *real* wire format. The smali-reconstructed layout in
-# ``build_plaintext_frame`` / ``parse_plaintext_frame`` above stores all
-# header fields as ASCII hex; what actually goes over the air is the same
-# logical fields but **packed as big-endian binary** inside the encrypted
-# payload. The 16-byte IV is plaintext-prefixed to every frame.
-#
-# Wire structure (after :func:`aes_decrypt`):
-#
-#   bytes 0..1   magic  = 0xDFED
-#   bytes 2..3   0x0064 (constant in every observed frame — possibly
-#                       a protocol-version / framing-version marker)
-#   bytes 4..5   frame_index  (big-endian uint16, 1-based)
-#   bytes 6..7   chunk_count  (big-endian uint16)
-#   bytes 8..9   flags / actionId hint (purpose not yet pinned; the
-#                       decoded JSON also carries ``cmd``, so this is
-#                       redundant for routing)
-#   bytes 10..11 ble_cmd      (big-endian uint16; matches MQTT cmd:
-#                       107 = DevicePropertyChange, 121 = ControlCombine,
-#                       110 = QuerySubDeviceGroupProperty, etc.)
-#   bytes 12..13 payload-type marker = 0x0001
-#   bytes 14..15 body_length  (big-endian uint16, bytes in ``body``)
-#   bytes 16..16+body_length   body — JSON for SolarVault telemetry
-#   final 4 bytes              trailer (probable CRC-32; not yet
-#                              re-derived from any documented helper —
-#                              treated as opaque on decode for now)
-
-_BINARY_FRAME_HEADER_LEN: int = 16
-_BINARY_FRAME_TRAILER_LEN: int = 4
-_BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
-_BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
-_BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 
 
 @dataclass(frozen=True, slots=True)
@@ -564,12 +494,6 @@ def build_plaintext_frame(frame: BleFrame) -> str:
     )
 
 
-# Length of the fixed header before the variable-width ``CHUNK_HEX`` field:
-# magic(4) + version(4) + frame_idx(4) + chunk_cnt(4) + action_id(4)
-# + ble_cmd(4) + payload_marker(4) + chunk_len(4) = 32 hex chars.
-_HEADER_HEX_LEN: int = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4
-
-
 def parse_plaintext_frame(text: str) -> BleFrame:
     """Parse a hex-encoded plaintext BLE frame into a BleFrame dataclass.
 
@@ -631,7 +555,6 @@ def parse_plaintext_frame(text: str) -> BleFrame:
 # ---------------------------------------------------------------------------
 # Full encrypt/decrypt pipeline
 # ---------------------------------------------------------------------------
-
 
 def _append_random_and_crc(plaintext_frame: str, random16: int | None) -> str:
     """Append a 16-bit hex tag and a 4-hex-digit Modbus CRC-16 suffix to a plaintext hex-frame string.
@@ -706,28 +629,6 @@ def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
     # Strip the trailing 16-bit random tag the app appends before the CRC.
     frame_text = body[:-_HEX16_WIDTH]
     return parse_plaintext_frame(frame_text)
-
-
-# ---------------------------------------------------------------------------
-# Chunking helper (encode side, for Phase 3b setters)
-# ---------------------------------------------------------------------------
-#
-# The app sizes each chunk at ``(MTU - 60) * 2`` *hex characters*, i.e. the
-# raw payload-byte budget per frame is ``MTU - 60``. The default BLE 5.0
-# MTU is 23 (= 3 bytes/chunk after the 60-byte overhead), but the app
-# typically negotiates 247-byte MTU on Android → ~187 bytes/chunk. The
-# device may negotiate something else; this helper takes the negotiated
-# value as a parameter and refuses to chunk below the minimum.
-
-
-_BLE_FRAME_OVERHEAD: int = 60
-
-#: MTU the official Jackery Android app negotiates with the SolarVault.
-#: Used as a fallback when the bleak transport doesn't expose
-#: ``client.mtu_size`` (some backends only learn the value after the
-#: first long write). Matches the value pinned by
-#: :func:`chunk_size_for_mtu` to ``247 - 60 = 187`` payload bytes/frame.
-DEFAULT_BLE_MTU: int = 247
 
 
 def chunk_size_for_mtu(mtu: int) -> int:

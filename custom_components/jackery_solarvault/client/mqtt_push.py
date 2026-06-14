@@ -1,7 +1,5 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
-from __future__ import annotations
-
 import asyncio
 import contextlib
 from datetime import UTC, datetime

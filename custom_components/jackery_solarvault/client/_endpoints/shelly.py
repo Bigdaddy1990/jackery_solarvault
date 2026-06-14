@@ -18,6 +18,21 @@ from ...const import (
 from .._http import BaseHTTPMixin, JackeryApiError
 
 
+def _data_field_accepted(data: dict[str, Any]) -> bool:
+    """Return whether a Shelly write response's ``data`` field signals acceptance.
+
+    The backend signals acceptance in the top-level ``data`` field as boolean
+    ``True`` or a truthy token (``"true"``/``"1"``/``"ok"``, case-insensitive).
+    Anything else — including a missing field — is treated as not accepted.
+    """
+    val = data.get(FIELD_DATA)
+    if val is True:
+        return True
+    if isinstance(val, (str, int)):
+        return str(val).lower() in {"true", "1", "ok"}
+    return False
+
+
 class ShellyEndpointMixin(BaseHTTPMixin):
     """Mixin providing Shelly-related cloud API endpoints."""
 
@@ -94,12 +109,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_FUNCTION: str(function),
             },
         )
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
         """Retrieve the Shelly OAuth authorization URL and accompanying state for the redirect flow.
@@ -131,12 +141,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_DEVICE_ID: str(device_id),
             },
         )
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_unbind_shelly_account(self) -> bool:
         """Unbinds the Shelly account associated with the current user.
@@ -145,12 +150,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             True if the account unbind succeeded, False otherwise.
         """
         data = await self._post_form(SHELLY_UNBIND_ACCOUNT_PATH, {})
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_get_shelly_binding_failures(
         self,

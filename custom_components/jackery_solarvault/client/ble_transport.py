@@ -31,6 +31,9 @@ plumbed into :meth:`async_write_frames`.
 Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 — that is why diagnostics retain the last raw frame behind redaction.
+
+bleak / HA-bluetooth imports are deferred to the methods that need them so
+the module can be imported on systems without BlueZ during tests.
 """
 
 import asyncio
@@ -43,6 +46,13 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
+from ..const import (
+     DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
+     _RECONNECT_BACKOFF_SEC,
+     _STOP_TIMEOUT_SEC,
+     _KEEPALIVE_INTERVAL_SEC,
+)
+
 from ..util import first_nonblank_int
 from . import ble
 
@@ -52,33 +62,9 @@ if TYPE_CHECKING:
         BluetoothServiceInfoBleak,
     )
     from homeassistant.core import HomeAssistant
+    
 
 _LOGGER = logging.getLogger(__name__)
-
-# bleak / HA-bluetooth imports are deferred to the methods that need them so
-# the module can be imported on systems without BlueZ during tests.
-
-#: Default timeout for the GATT connect + notify-subscribe handshake.
-DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
-
-#: Minimum time between (re)connect attempts when the device drops the link.
-_RECONNECT_BACKOFF_SEC: float = 30.0
-
-#: Hard timeout for ``async_stop()`` to wait for in-flight connection
-#: runners to honour cancellation. HA's shutdown sequence reports tasks
-#: that exceed its own per-integration timeout (typically 30 s for
-#: ``async_unload_entry``) — keep this well below that so the listener
-#: never becomes the reason a shutdown logs "tasks still pending".
-_STOP_TIMEOUT_SEC: float = 5.0
-
-#: How often to write a no-op query frame to keep the GATT session
-#: warm. The SolarVault peripheral closes idle GATT sessions after
-#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
-#: every 6-20 s without traffic). 15 s sits comfortably below that and
-#: doubles as a property-refresh — the device answers each ``cmd=106``
-#: with a ``DevicePropertyChange`` notify that the sink merges into
-#: ``coordinator.data`` via the existing cmd=107 path.
-_KEEPALIVE_INTERVAL_SEC: float = 15.0
 
 
 # ---------------------------------------------------------------------------
@@ -148,12 +134,11 @@ class _PendingAck:
 
     expected_cmds: frozenset[int] | None
     future: asyncio.Future[ble.BleBinaryFrame]
-
+    
 
 # ---------------------------------------------------------------------------
 # Listener
 # ---------------------------------------------------------------------------
-
 
 FrameSink = Callable[[str, BleFrameObservation], Awaitable[None]]
 """Async sink called for every observed frame.
@@ -457,7 +442,7 @@ class JackeryBleListener:
         pending = _PendingAck(
             expected_cmds=(
                 frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
-                if ack_cmds is not None and ack_cmds
+                if ack_cmds is not None
                 else None
             ),
             future=loop.create_future(),
