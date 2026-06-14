@@ -1,6 +1,22 @@
+# pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
 requires = ["setuptools<=80.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.dynamic.optional-dependencies]
+tests = { file = ["requirements-test.txt"] }
+
+[tool.setuptools]
+include-package-data = true
 
 [project]
 name = "jackery_solarvault"
@@ -9,7 +25,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Bigdaddy1990" }]
-keywords = ["home assistant", "jackery_solarvault", "solar", "automation", "telemetry"]
+keywords = ["homeassistant", "jackery_solarvault", "solar", "automation", "telemetry"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
@@ -17,16 +33,16 @@ classifiers = [
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
 requires-python = ">=3.14"
-
-[tool.ty.environment]
-python-version = "3.14"
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
 Documentation = "https://github.com/Bigdaddy1990/jackery_solarvault/blob/main/README.md"
 Issues = "https://github.com/Bigdaddy1990/jackery_solarvault/issues"
+
+[tool.ty.environment]
+python-version = "3.14"
 
 [tool.pytest.ini_options]
 addopts = "-p no:pytest_cov -p pytest_cov.plugin -p pytest_homeassistant_custom_component --cov=custom_components/jackery_solarvault --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov -q -ra --strict-markers --strict-config --tb=short --maxfail=20"
@@ -230,7 +246,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.15"
+required-version = ">=0.15.17"
 line-length = 88
 src = ["custom_components"]
 indent-width = 4
@@ -367,7 +383,7 @@ select = [
   "Q"
 ]
 
-ignore = ["PLC0415", "TID252", "E501", "PLW0717"]
+ignore = []
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true
@@ -480,7 +496,7 @@ disable_error_code = [
 [tool.coverage.run]
 branch = true
 source = ["custom_components/jackery_solarvault"]
-omit = ["tests/*", "*/__pycache__/*"]
+omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -506,21 +522,6 @@ directory = "htmlcov"
 
 [tool.coverage.xml]
 output = "coverage.xml"
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-dir]
-"" = "."
-
-[tool.setuptools.packages.find]
-include = ["custom_components*"]
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
-
-[tool.setuptools.dynamic.optional-dependencies]
-tests = { file = ["requirements-test.txt"] }
 
 [tool.pylint.BASIC]
 class-const-naming-style = "any"
