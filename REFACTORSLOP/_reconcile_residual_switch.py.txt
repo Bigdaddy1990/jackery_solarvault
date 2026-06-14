@@ -1,0 +1,96 @@
+
+[JackeryDescriptionSwitch] adopted=pre_transfer
+   doc  <1\switch.py>: """Turn the entity off."""
+   doc  <1\switch.py>: """Return True when the entity is on."""
+   doc  <1\switch.py>: """Turn the entity on."""
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: except Exception as err:
+
+[JackerySmartPlugPrioritySwitch] adopted=pre_transfer
+   doc  <1\switch.py>: """Set smart-plug priority through ControlSubDevice."""
+   doc  <1\switch.py>: f"smart_plug_{plug_index}_priority_enabled",
+   doc  <1\switch.py>: """Return True when smart-plug priority is enabled."""
+   CODE <1\switch.py>: plug_sn = _smart_plug_serial(self._plug)
+   doc  <1\switch.py>: """Raise a translatable HA action error for this switch."""
+   doc  <1\switch.py>: """Initialise the smart-plug priority switch from its sorted index/serial."""
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: except Exception as err:
+
+[JackerySmartPlugSwitch] adopted=pre_transfer
+   CODE <1\switch.py>: plug_sn = _smart_plug_serial(self._plug)
+   doc  <1\switch.py>: """Raise a translatable HA action error for this switch."""
+   CODE <1\switch.py>: plug_index, self._plug
+   doc  <1\switch.py>: """Initialise the smart-plug switch from its sorted index and serial."""
+   doc  <1\switch.py>: """Set the smart-plug state through ControlSubDevice."""
+   CODE <1\switch.py>: if plug_sn is None:
+   doc  <1\switch.py>: super().__init__(coordinator, device_id, f"smart_plug_{plug_index}_switch")
+   doc  <1\switch.py>: """Turn the smart plug on."""
+   doc  <1\switch.py>: """Return True when the smart plug reports an active output."""
+   doc  <1\switch.py>: """Return diagnostic attributes for the smart-plug switch."""
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: if raw in (None, ""):
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: except Exception as err:
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+
+[__init__] adopted=pre_transfer
+   doc  <1\switch.py>: f"smart_plug_{plug_index}_priority_enabled",
+   doc  <1\switch.py>: """Initialise the smart-plug priority switch from its sorted index/serial."""
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: super().__init__(coordinator, device_id, description.key)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: description: JackerySwitchDescription,
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: self.entity_description = description
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: """Initialise the entity from the coordinator and description."""
+
+[_append_unique] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: # APP_POLLING_MQTT.md documents SolarVault advanced controls as app
+   doc  <21.05\21.05\custom_components\jackery_solarvault\switch.py [ancient]>: # implementation notes §2/§4 documents SolarVault advanced controls as app
+
+[_async_set_state] adopted=pre_transfer
+   doc  <1\switch.py>: """Set smart-plug priority through ControlSubDevice."""
+   CODE <1\switch.py>: plug_sn = _smart_plug_serial(self._plug)
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: except Exception as err:
+
+[_cloud_device_id] adopted=LIVE
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: if raw in (None, ""):
+
+[_jackery_device_sn] adopted=LIVE
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: if raw in (None, ""):
+
+[_raise_action_error] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: @property
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py [ancient]>: "entity": self.entity_description.key,
+   doc  <1\switch.py>: """Raise a translatable HA action error for this switch."""
+
+[_standby_is_on] adopted=3.06\switch.py
+   doc  <pre_transfer>: raw: Any,  # noqa: ANN401, RUF100
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: except TypeError, ValueError:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\switch.py>: if parsed is not None:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\switch.py>: parsed = first_nonblank_int(raw)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\switch.py>: return parsed == 1
+   doc  <24.05\24.05\custom_components\jackery_solarvault\switch.py>: """Treat the raw autoStandby mode as on=1 / off=2."""
+   CODE <1\switch.py>: def _standby_is_on(raw: Any) -> bool | None:
+   doc  <1\switch.py>: """Treat the raw autoStandby integer flag as on=1 / off=0."""
+   CODE <1\switch.py>: except (TypeError, ValueError):
+   doc  <custom_components\jackery_solarvault\switch.py>: raw: Any,
+   CODE <custom_components\jackery_solarvault\switch.py>: def _standby_is_on(
+
+[async_setup_entry] adopted=LIVE
+   CODE <1\switch.py>: async def async_setup_entry(
+
+[async_turn_off] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: await self._async_set_state(False)
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: @property
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: """Turn the smart plug off."""
+
+[async_turn_on] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: await self._async_set_state(True)
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: Set the smart plug's switch to the on state and request a coordinator refresh.
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: """Turn the bound smart plug on.
+   doc  <1\switch.py>: """Turn the smart plug on."""
+
+[extra_state_attributes] adopted=pre_transfer
+   doc  <1\switch.py>: """Return diagnostic attributes for the smart-plug switch."""
+
+[is_on] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\switch.py
+   doc  <1\switch.py>: """Return True when smart-plug priority is enabled."""
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: """Indicates whether the smart plug's priority is enabled.
+   doc  <01.06\custom_components\jackery_solarvault\switch.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: `true` if the plug's `socketPriority` indicates enabled, `false` if it indicates disabled, `None` if
+   CODE <01.06\custom_components\jackery_solarvault\switch.py>: return safe_bool(self._plug.get(FIELD_SOCKET_PRIORITY))

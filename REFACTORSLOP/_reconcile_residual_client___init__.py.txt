@@ -1,0 +1,6 @@
+
+[__getattr__] adopted=pre_transfer
+   CODE <1\1101\custom_components\jackery_solarvault\client\__init__.py>: def __getattr__(name: str) -> Any:
+   CODE <01.06\custom_components\jackery_solarvault\client\__init__.py>: def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
+   CODE <01.06\custom_components\jackery_solarvault\client\__init__.py>: from .mqtt_push import JackeryMqttPushClient as _JackeryMqttPushClient
+   CODE <custom_components\jackery_solarvault\client\__init__.py>: def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export

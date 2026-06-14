@@ -1,0 +1,180 @@
+
+[JackeryConfigFlow] adopted=pre_transfer
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: stored_username = _entry_text(entry, CONF_USERNAME)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: if not stored_username:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: """Start account setup from a local BLE discovery signal."""
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: account = _normalize_account(user_input.get(CONF_USERNAME))
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: vol.Required(CONF_USERNAME, default=stored_username): vol.All(
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: account=stored_username,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: async def async_step_bluetooth(self, discovery_info: Any) -> ConfigFlowResult:
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: """Start account setup from a DHCP discovery signal."""
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: "username": stored_username,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: str, vol.Length(min=1)
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: """Handle the initial user-driven configuration step and authenticate the provided Jackery account.
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: ConfigFlowResult: A flow result that either shows the user form with errors or creates the new confi
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_IP],
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_PASSWORD,
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_ENABLE],
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_USERNAME,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: """Prompt for the account's current password and validate it against Jackery to complete reauthentic
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_PORT,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_IP,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: ConfigFlowResult: The next flow result (shows the password form on error or missing input, aborts an
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: Parameters:
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: ): str,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: """Reconfigure an existing config entry by validating provided account credentials and updating stor
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: user_input (dict[str, Any] | None): Form input submitted by the user. Expected keys include `CONF_US
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_PORT],
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, o
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_ENABLE,
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: Validates that the submitted username matches the entry being reconfigured, verifies credentials wit
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when submitted.
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_USERNAME],
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_PASSWORD],
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: CONF_THIRD_PARTY_MQTT_TOKEN,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: "username": entry.data[CONF_USERNAME],
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: Validates and normalizes the submitted username, prevents creating a duplicate entry for the same ac
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error("Cannot connect to Jackery: %s", err)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: """Handle the Jackery SolarVault jackery config flow."""
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error(
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error("Cannot connect to Jackery during reauth: %s", err)
+   CODE <25.05.v2\config_flow.py [ancient]>: except (KeyError, RuntimeError):
+   doc  <pre_reconcile>: # --- restored from Clause/live lineage (backup) ---
+
+[JackeryOptionsFlow] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   CODE <1\config_flow.py>: default=current_enable_derived_home_fallback,
+   doc  <1\config_flow.py>: """Step init."""
+   CODE <1\config_flow.py>: current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
+   doc  <1\config_flow.py>: CONF_ENABLE_WEEK_STATISTICS,
+   CODE <1\config_flow.py>: default=current_enable_week_statistics,
+   CODE <1\config_flow.py>: current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
+   CODE <1\config_flow.py>: default=current_enable_year_statistics,
+   doc  <1\config_flow.py>: CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
+   doc  <1\config_flow.py>: CONF_ENABLE_YEAR_STATISTICS,
+   CODE <1\config_flow.py>: current_enable_derived_home_fallback = current_options[
+   CODE <1\config_flow.py>: default=current_enable_month_statistics,
+   doc  <1\config_flow.py>: CONF_ENABLE_MONTH_STATISTICS,
+   doc  <1\config_flow.py>: CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+   CODE <1\config_flow.py>: current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_ENABLE],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_ENABLE,
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_HOST,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_HOST],
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: return self.async_create_entry(title="", data=merged)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: current_local_mqtt = _current_local_mqtt_options(self.config_entry)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_PORT],
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_USERNAME],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_USERNAME,
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_PASSWORD,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: merged = _flow_options(user_input, current_options)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: ): vol.All(int, vol.Range(min=1, max=65535)),
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_PORT,
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: """Handle the Jackery SolarVault jackery options flow."""
+
+[_current_option_values] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   doc  <1\config_flow.py>: key: config_entry_bool_option(entry, key, default)
+   CODE <1\config_flow.py>: return {
+   CODE <1\config_flow.py>: def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
+   CODE <1\config_flow.py>: for key, default in _OPTION_DEFAULTS.items()
+   doc  <1\config_flow.py>: """Return current option values with legacy setup-data fallback."""
+
+[_flow_options] adopted=LIVE
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: current_options: dict[str, Any] | None = None,
+
+[_normalize_account] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: def _normalize_account(value: Any) -> str:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: return value.strip() if isinstance(value, str) else ""
+   doc  <1\config_flow.py>: """Normalize user-facing account identifiers before auth and unique IDs."""
+
+[async_step_bluetooth] adopted=pre_transfer
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: """Start account setup from a local BLE discovery signal."""
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: async def async_step_bluetooth(self, discovery_info: Any) -> ConfigFlowResult:
+
+[async_step_dhcp] adopted=pre_transfer
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: """Start account setup from a DHCP discovery signal."""
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:
+
+[async_step_init] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   CODE <1\config_flow.py>: default=current_enable_derived_home_fallback,
+   doc  <1\config_flow.py>: """Step init."""
+   CODE <1\config_flow.py>: current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
+   doc  <1\config_flow.py>: CONF_ENABLE_WEEK_STATISTICS,
+   CODE <1\config_flow.py>: default=current_enable_week_statistics,
+   CODE <1\config_flow.py>: current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
+   CODE <1\config_flow.py>: default=current_enable_year_statistics,
+   doc  <1\config_flow.py>: CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
+   doc  <1\config_flow.py>: CONF_ENABLE_YEAR_STATISTICS,
+   CODE <1\config_flow.py>: current_enable_derived_home_fallback = current_options[
+   CODE <1\config_flow.py>: default=current_enable_month_statistics,
+   doc  <1\config_flow.py>: CONF_ENABLE_MONTH_STATISTICS,
+   doc  <1\config_flow.py>: CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+   CODE <1\config_flow.py>: current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_ENABLE],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_ENABLE,
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_HOST,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_HOST],
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: return self.async_create_entry(title="", data=merged)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: current_local_mqtt = _current_local_mqtt_options(self.config_entry)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_PORT],
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_USERNAME],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_USERNAME,
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_PASSWORD,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: merged = _flow_options(user_input, current_options)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: ): vol.All(int, vol.Range(min=1, max=65535)),
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: CONF_LOCAL_MQTT_PORT,
+
+[async_step_reauth_confirm] adopted=pre_transfer
+   CODE <25.05.v2\config_flow.py [ancient]>: except (KeyError, RuntimeError):
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: stored_username = _entry_text(entry, CONF_USERNAME)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: account=stored_username,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: if not stored_username:
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: "username": stored_username,
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: """Prompt for the account's current password and validate it against Jackery to complete reauthentic
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: ConfigFlowResult: The next flow result (shows the password form on error or missing input, aborts an
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: Parameters:
+   doc  <01.06\custom_components\jackery_solarvault\config_flow.py>: "username": entry.data[CONF_USERNAME],
+   CODE <01.06\custom_components\jackery_solarvault\config_flow.py>: user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when submitted.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error("Cannot connect to Jackery during reauth: %s", err)
+
+[async_step_reconfigure] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: stored_username = _entry_text(entry, CONF_USERNAME)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: account = _normalize_account(user_input.get(CONF_USERNAME))
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: vol.Required(CONF_USERNAME, default=stored_username): vol.All(
+   doc  <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: "username": stored_username,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: str, vol.Length(min=1)
+   doc  <1\config_flow.py>: the calculated-sensor options without removing the entry. The
+   doc  <1\config_flow.py>: """Handle a user-initiated reconfigure of an existing entry.
+   doc  <1\config_flow.py>: HA's reconfigure flow lets the user change credentials and toggle
+   doc  <1\config_flow.py>: stable across the reconfigure round-trip.
+   CODE <1\config_flow.py>: default=current_options[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK],
+   doc  <1\config_flow.py>: CONF_ENABLE_WEEK_STATISTICS,
+   doc  <1\config_flow.py>: triggered the flow; otherwise we abort to keep unique-id semantics
+   CODE <1\config_flow.py>: default=current_options[CONF_ENABLE_YEAR_STATISTICS],
+   CODE <1\config_flow.py>: default=current_options[CONF_ENABLE_WEEK_STATISTICS],
+   doc  <1\config_flow.py>: normalized account from user input must match the entry that
+   doc  <1\config_flow.py>: CONF_ENABLE_YEAR_STATISTICS,
+   CODE <1\config_flow.py>: default=current_options[CONF_ENABLE_MONTH_STATISTICS],
+   doc  <1\config_flow.py>: CONF_ENABLE_MONTH_STATISTICS,
+   doc  <1\config_flow.py>: CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error(
+   CODE <25.05.v2\config_flow.py [ancient]>: except (KeyError, RuntimeError):
+
+[async_step_user] adopted=01.06\custom_components\jackery_solarvault\config_flow.py
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\config_flow.py [ancient]>: _LOGGER.error("Cannot connect to Jackery: %s", err)
+   doc  <1\config_flow.py>: """Handle the initial user-driven config flow step."""
+   CODE <24.05\24.05\custom_components\jackery_solarvault\config_flow.py>: account = _normalize_account(user_input.get(CONF_USERNAME))

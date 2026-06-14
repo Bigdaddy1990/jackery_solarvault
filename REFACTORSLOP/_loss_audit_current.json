@@ -1,0 +1,2137 @@
+{
+  "totals": {
+    "missing_symbols": 120,
+    "truly_missing_symbols": 49,
+    "shrunk_symbols": 74,
+    "missing_consts": 51,
+    "truly_missing_consts": 18,
+    "missing_files": 1
+  },
+  "TRULY_MISSING_SYMBOLS": {
+    "__init__.py::_async_authenticate": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "client/api.py::JackeryApi._decode_response_json": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/api.py::JackeryApi._is_transient_http_status": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/api.py::JackeryApi._request_json_with_retry": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/api.py::JackeryApi._truncated_response_text": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/api.py::JackeryApi.async_set_max_power": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::JackeryBleListener._mark_property_query_started": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::JackeryBleListener.async_ensure_connected": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "client/local_mqtt.py::JackeryLocalMqttClient._async_consume_session": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/third_party_mqtt_codec.py::_split_iv_envelope": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._entity_source_priority": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._find_list_for_key": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._is_derived_home_energy_candidate": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._is_smart_meter_accessory": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._jackery_error_code": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._looks_like_battery_pack": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._monotonic_age_seconds": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._mqtt_connect_failure_signature": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._normalize_battery_pack_payload": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._normalize_shelly_cloud_payload": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._shelly_cloud_api_device_id": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._should_skip_fast_property_fetch": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._smart_meter_accessories": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._subdevice_accessories": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._subdevice_dev_type": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._subdevice_id": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._subdevice_serial": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator._sync_property_aliases": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.async_bind_smart_part": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.async_unbind_smart_part": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.device_supports_third_party_mqtt": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.record_http_auth_rejection": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.record_payload_validation_rejection": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.record_schema_rejection": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::JackerySolarVaultCoordinator.record_timestamp_skew_rejection": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::RejectionMetrics": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::RejectionMetrics.increment": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_generate_third_party_mqtt_token": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "diagnostics.py::_cap_section": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "discovery_cache.py::_entry_lock": [
+      "pre_transfer"
+    ],
+    "local_daily_cache.py::_entry_lock": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "services.py::_device_id_field": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "services.py::_entry_for_coordinator": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "services.py::_optional_text": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "services.py::_text_field": [
+      "pre_transfer",
+      "pre_reconcile"
+    ]
+  },
+  "TRULY_MISSING_CONSTS": {
+    "client/ble.py::_unrecognised_version_count": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_LOST_LINK_BACKOFF_SEC": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_MAX_BACKOFF_SEC": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_MAX_CONNECTION_RETRIES": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "config_flow.py::DhcpServiceInfo": [
+      "pre_reconcile"
+    ],
+    "config_flow.py::MqttServiceInfo": [
+      "pre_reconcile"
+    ],
+    "config_flow.py::ZeroconfServiceInfo": [
+      "pre_reconcile"
+    ],
+    "const.py::ACTION_ID_SOC_CHARGE_LIMIT": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "const.py::ACTION_ID_SOC_DISCHARGE_LIMIT": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "const.py::DIAGNOSTICS_SCHEMA_VERSION": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_DAY_TREND_SOURCE_BY_METRIC_KEY": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "diagnostics.py::_SECTION_SIZE_CAP": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "discovery_cache.py::_ENTRY_LOCKS": [
+      "pre_transfer"
+    ],
+    "local_daily_cache.py::_ENTRY_LOCKS": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "mqtt_session_cache.py::_CACHE_LOCK": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "util.py::ZERO_CONFIRM_MIN_LOCAL_HOUR": [
+      "pre_transfer",
+      "pre_reconcile"
+    ]
+  },
+  "files": {
+    "__init__.py": {
+      "MISSING_SYMBOLS": {
+        "_async_authenticate": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "async_setup_entry": {
+          "backup": "pre_recovery",
+          "backup_stmts": 39,
+          "current_stmts": 24,
+          "delta": 15
+        }
+      }
+    },
+    "api.py": {
+      "FILE_MISSING_IN_CURRENT": [
+        "pre_recovery",
+        "pre_reconcile"
+      ]
+    },
+    "client/api.py": {
+      "MISSING_SYMBOLS": {
+        "JackeryApi._async_get_device_period_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._auth_failure_message": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._decode_response_json": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryApi._emit_payload_debug": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._ensure_token": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._extract_code": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._get_json": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._get_json._do": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x4)"
+        },
+        "JackeryApi._headers": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._http_payload_debug": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._is_auth_failure_response": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._is_token_expired_response": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._is_transient_http_status": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryApi._maybe_learn_region_code": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._normalize_mqtt_mac_id": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._payload_dict": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._payload_list": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._post_form": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._post_form._do": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x4)"
+        },
+        "JackeryApi._post_form._request_headers": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x3)"
+        },
+        "JackeryApi._put_json": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._put_json._do": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x4)"
+        },
+        "JackeryApi._put_json._request_headers": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x3)"
+        },
+        "JackeryApi._request_json_with_retry": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryApi._resolve_login_mac_id": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._response_has_auth_failure_text": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._response_with_request_context": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._select_ota_item": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi._truncated_response_text": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryApi.async_control_shelly_device": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_alarm": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_battery_pack_list": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_battery_trends": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_battery_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_ct_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_eps_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_home_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_meter_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_property": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_pv_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_socket_stat": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_socket_statistic": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_device_statistic": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_home_trends": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_location": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_mqtt_credentials": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_ota_info": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_power_price": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_price_history_config": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_price_sources": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_pv_trends": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_shelly_devices": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_shelly_realtime_power": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_system_list": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_system_statistic": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_get_today_energy": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_list_devices_legacy": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_login": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x2)"
+        },
+        "JackeryApi.async_set_dynamic_mode": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_set_max_power": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryApi.async_set_single_mode": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.async_set_system_name": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.hydrate_mqtt_session": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.mqtt_fingerprint": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.mqtt_mac_id": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.mqtt_mac_id_source": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApi.mqtt_session_snapshot": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "JackeryApiError": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "JackeryAuthError": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "JackeryError": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "_aes_cbc_encrypt": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "_aes_ecb_encrypt": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "_generate_udid": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "_rsa_pkcs1v15_encrypt": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        },
+        "_write_accepted": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "same_qualname_elsewhere"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "JackeryApi": {
+          "backup": "pre_transfer",
+          "backup_stmts": 611,
+          "current_stmts": 33,
+          "delta": 578
+        }
+      },
+      "CONST_MISSING": {
+        "_HTTP_RETRY_ATTEMPTS": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_HTTP_RETRY_BACKOFF_SEC": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      }
+    },
+    "client/ble.py": {
+      "CONST_MISSING": {
+        "BLE_AES_IV_LEN": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_AES_KEY_LEN": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_AES_KEY_LENGTHS": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_AES_KEY_LEN_AES128": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_AES_KEY_LEN_AES256": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_FRAME_MAGIC": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_FRAME_PAYLOAD_MARKER": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_FRAME_VERSION": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_MANUFACTURER_ID": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_NOTIFY_CHAR_UUID": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_SERVICE_UUID": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "BLE_WRITE_CHAR_UUID": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "DEFAULT_BLE_MTU": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BINARY_FRAME_HEADER_LEN": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BINARY_FRAME_MAGIC_BE": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BINARY_FRAME_PAYLOAD_MARKER_BE": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BINARY_FRAME_TRAILER_LEN": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BINARY_FRAME_VERSION_BE": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_BLE_FRAME_OVERHEAD": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_HEADER_HEX_LEN": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_HEX16_WIDTH": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_unrecognised_version_count": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "client/ble_transport.py": {
+      "MISSING_SYMBOLS": {
+        "JackeryBleListener._mark_property_query_started": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryBleListener.async_ensure_connected": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "JackeryBleListener._async_run_connection": {
+          "backup": "pre_transfer",
+          "backup_stmts": 68,
+          "current_stmts": 53,
+          "delta": 15
+        },
+        "JackeryBleListener._handle_notification": {
+          "backup": "pre_transfer",
+          "backup_stmts": 34,
+          "current_stmts": 28,
+          "delta": 6
+        },
+        "JackeryBleListener._register_pending_ack": {
+          "backup": "pre_transfer",
+          "backup_stmts": 14,
+          "current_stmts": 6,
+          "delta": 8
+        },
+        "JackeryBleListener.async_send_command": {
+          "backup": "pre_transfer",
+          "backup_stmts": 53,
+          "current_stmts": 42,
+          "delta": 11
+        }
+      },
+      "CONST_MISSING": {
+        "DEFAULT_BLE_CONNECT_TIMEOUT_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_KEEPALIVE_INTERVAL_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_LOST_LINK_BACKOFF_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_MAX_BACKOFF_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_MAX_CONNECTION_RETRIES": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_RECONNECT_BACKOFF_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_STOP_TIMEOUT_SEC": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      }
+    },
+    "client/local_mqtt.py": {
+      "MISSING_SYMBOLS": {
+        "JackeryLocalMqttClient._async_consume_session": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "client/mqtt_push.py": {
+      "SHRUNK_SYMBOLS": {
+        "JackeryMqttPushClient._async_run_session": {
+          "backup": "pre_transfer",
+          "backup_stmts": 58,
+          "current_stmts": 47,
+          "delta": 11
+        },
+        "JackeryMqttPushClient._async_stop_locked": {
+          "backup": "pre_transfer",
+          "backup_stmts": 20,
+          "current_stmts": 15,
+          "delta": 5
+        },
+        "JackeryMqttPushClient._handle_message": {
+          "backup": "pre_transfer",
+          "backup_stmts": 31,
+          "current_stmts": 22,
+          "delta": 9
+        },
+        "JackeryMqttPushClient._schedule_coroutine": {
+          "backup": "pre_transfer",
+          "backup_stmts": 17,
+          "current_stmts": 13,
+          "delta": 4
+        },
+        "JackeryMqttPushClient.async_publish_json": {
+          "backup": "pre_transfer",
+          "backup_stmts": 21,
+          "current_stmts": 16,
+          "delta": 5
+        },
+        "JackeryMqttPushClient.async_start": {
+          "backup": "pre_transfer",
+          "backup_stmts": 26,
+          "current_stmts": 22,
+          "delta": 4
+        }
+      },
+      "CONST_MISSING": {
+        "_MAX_PENDING_MESSAGE_TASKS": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_MqttErrorTuple": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_QOS0_TOPIC_SUFFIXES": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      }
+    },
+    "client/third_party_mqtt_codec.py": {
+      "MISSING_SYMBOLS": {
+        "_split_iv_envelope": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "config_flow.py": {
+      "CONST_MISSING": {
+        "DhcpServiceInfo": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "MqttServiceInfo": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "ZeroconfServiceInfo": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "const.py": {
+      "CONST_MISSING": {
+        "ACTION_ID_SOC_CHARGE_LIMIT": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "ACTION_ID_SOC_DISCHARGE_LIMIT": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "DIAGNOSTICS_SCHEMA_VERSION": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "coordinator.py": {
+      "MISSING_SYMBOLS": {
+        "JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._encode_third_party_mqtt_secrets": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._entity_source_priority": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._find_list_for_key": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._has_subdevice_accessory_or_bucket": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._is_battery_pack_lifetime_ble_payload": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._is_derived_home_energy_candidate": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._is_smart_meter_accessory": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._jackery_error_code": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._looks_like_battery_pack": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._monotonic_age_seconds": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._mqtt_connect_failure_signature": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._normalize_battery_pack_payload": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._normalize_shelly_cloud_payload": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._shelly_cloud_api_device_id": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._should_skip_fast_property_fetch": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._smart_meter_accessories": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._subdevice_accessories": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._subdevice_dev_type": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._subdevice_id": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._subdevice_serial": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator._sync_property_aliases": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.async_bind_smart_part": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.async_unbind_smart_part": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.device_supports_third_party_mqtt": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.record_http_auth_rejection": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.record_payload_validation_rejection": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.record_schema_rejection": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackerySolarVaultCoordinator.record_timestamp_skew_rejection": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "RejectionMetrics": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "RejectionMetrics.as_dict": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "relocated?(leaf x1)"
+        },
+        "RejectionMetrics.increment": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_generate_third_party_mqtt_token": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "JackerySolarVaultCoordinator": {
+          "backup": "pre_reconcile",
+          "backup_stmts": 3864,
+          "current_stmts": 3168,
+          "delta": 696
+        },
+        "JackerySolarVaultCoordinator._async_ensure_mqtt": {
+          "backup": "pre_recovery",
+          "backup_stmts": 61,
+          "current_stmts": 40,
+          "delta": 21
+        },
+        "JackerySolarVaultCoordinator._async_publish_command": {
+          "backup": "pre_recovery",
+          "backup_stmts": 43,
+          "current_stmts": 18,
+          "delta": 25
+        },
+        "JackerySolarVaultCoordinator._battery_packs_from_source": {
+          "backup": "pre_transfer",
+          "backup_stmts": 16,
+          "current_stmts": 3,
+          "delta": 13
+        },
+        "JackerySolarVaultCoordinator._battery_packs_need_query": {
+          "backup": "pre_transfer",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "JackerySolarVaultCoordinator._coerce_transport_cmd": {
+          "backup": "pre_recovery",
+          "backup_stmts": 24,
+          "current_stmts": 4,
+          "delta": 20
+        },
+        "JackerySolarVaultCoordinator._completed_entity_app_points": {
+          "backup": "pre_transfer",
+          "backup_stmts": 17,
+          "current_stmts": 3,
+          "delta": 14
+        },
+        "JackerySolarVaultCoordinator._current_app_chart_entity_source_batches": {
+          "backup": "pre_transfer",
+          "backup_stmts": 13,
+          "current_stmts": 3,
+          "delta": 10
+        },
+        "JackerySolarVaultCoordinator._day_chart_source_candidates": {
+          "backup": "pre_transfer",
+          "backup_stmts": 15,
+          "current_stmts": 3,
+          "delta": 12
+        },
+        "JackerySolarVaultCoordinator._decode_third_party_mqtt_config_body": {
+          "backup": "pre_recovery",
+          "backup_stmts": 23,
+          "current_stmts": 3,
+          "delta": 20
+        },
+        "JackerySolarVaultCoordinator._defer_background_auth_failure": {
+          "backup": "pre_transfer",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._drop_stale_battery_packs": {
+          "backup": "pre_transfer",
+          "backup_stmts": 27,
+          "current_stmts": 3,
+          "delta": 24
+        },
+        "JackerySolarVaultCoordinator._entity_targets_for_app_points": {
+          "backup": "pre_transfer",
+          "backup_stmts": 21,
+          "current_stmts": 3,
+          "delta": 18
+        },
+        "JackerySolarVaultCoordinator._entry_subdevice_candidates": {
+          "backup": "pre_recovery",
+          "backup_stmts": 15,
+          "current_stmts": 3,
+          "delta": 12
+        },
+        "JackerySolarVaultCoordinator._find_dict_with_any_key": {
+          "backup": "pre_transfer",
+          "backup_stmts": 15,
+          "current_stmts": 3,
+          "delta": 12
+        },
+        "JackerySolarVaultCoordinator._historical_day_payload_from_sources": {
+          "backup": "pre_recovery",
+          "backup_stmts": 8,
+          "current_stmts": 3,
+          "delta": 5
+        },
+        "JackerySolarVaultCoordinator._is_subdevice_payload": {
+          "backup": "pre_recovery",
+          "backup_stmts": 16,
+          "current_stmts": 3,
+          "delta": 13
+        },
+        "JackerySolarVaultCoordinator._iter_calendar_months": {
+          "backup": "pre_transfer",
+          "backup_stmts": 11,
+          "current_stmts": 3,
+          "delta": 8
+        },
+        "JackerySolarVaultCoordinator._iter_calendar_weeks": {
+          "backup": "pre_transfer",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble": {
+          "backup": "pre_recovery",
+          "backup_stmts": 45,
+          "current_stmts": 3,
+          "delta": 42
+        },
+        "JackerySolarVaultCoordinator._merge_battery_pack_lists": {
+          "backup": "pre_recovery",
+          "backup_stmts": 35,
+          "current_stmts": 3,
+          "delta": 32
+        },
+        "JackerySolarVaultCoordinator._merge_battery_pack_ota_lists": {
+          "backup": "pre_transfer",
+          "backup_stmts": 22,
+          "current_stmts": 3,
+          "delta": 19
+        },
+        "JackerySolarVaultCoordinator._merge_device_statistic_data": {
+          "backup": "pre_recovery",
+          "backup_stmts": 14,
+          "current_stmts": 3,
+          "delta": 11
+        },
+        "JackerySolarVaultCoordinator._merge_dict_values": {
+          "backup": "pre_recovery",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._merge_lifetime_counter_data": {
+          "backup": "pre_recovery",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "JackerySolarVaultCoordinator._merge_pack_ota": {
+          "backup": "pre_transfer",
+          "backup_stmts": 8,
+          "current_stmts": 3,
+          "delta": 5
+        },
+        "JackerySolarVaultCoordinator._merge_shelly_cloud_item": {
+          "backup": "pre_recovery",
+          "backup_stmts": 43,
+          "current_stmts": 3,
+          "delta": 40
+        },
+        "JackerySolarVaultCoordinator._merge_subdevice_list_by_identity": {
+          "backup": "pre_recovery",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "JackerySolarVaultCoordinator._merge_subdevice_lists_by_sn": {
+          "backup": "pre_transfer",
+          "backup_stmts": 24,
+          "current_stmts": 3,
+          "delta": 21
+        },
+        "JackerySolarVaultCoordinator._mqtt_clear_connect_backoff": {
+          "backup": "pre_recovery",
+          "backup_stmts": 7,
+          "current_stmts": 3,
+          "delta": 4
+        },
+        "JackerySolarVaultCoordinator._mqtt_note_connect_failure": {
+          "backup": "pre_recovery",
+          "backup_stmts": 10,
+          "current_stmts": 3,
+          "delta": 7
+        },
+        "JackerySolarVaultCoordinator._normalize_ble_main_lifetime_counters": {
+          "backup": "pre_recovery",
+          "backup_stmts": 8,
+          "current_stmts": 3,
+          "delta": 5
+        },
+        "JackerySolarVaultCoordinator._normalize_local_mqtt_payload": {
+          "backup": "pre_recovery",
+          "backup_stmts": 10,
+          "current_stmts": 3,
+          "delta": 7
+        },
+        "JackerySolarVaultCoordinator._parse_statistics_backfill_date": {
+          "backup": "pre_transfer",
+          "backup_stmts": 7,
+          "current_stmts": 3,
+          "delta": 4
+        },
+        "JackerySolarVaultCoordinator._pause_mqtt_after_auth_failure": {
+          "backup": "pre_transfer",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._resolve_device_id_from_payload": {
+          "backup": "pre_transfer",
+          "backup_stmts": 13,
+          "current_stmts": 3,
+          "delta": 10
+        },
+        "JackerySolarVaultCoordinator._sanitize_main_properties": {
+          "backup": "pre_recovery",
+          "backup_stmts": 10,
+          "current_stmts": 3,
+          "delta": 7
+        },
+        "JackerySolarVaultCoordinator._shelly_cloud_device_ids": {
+          "backup": "pre_recovery",
+          "backup_stmts": 8,
+          "current_stmts": 3,
+          "delta": 5
+        },
+        "JackerySolarVaultCoordinator._smart_meter_accessory_device_id": {
+          "backup": "pre_transfer",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "JackerySolarVaultCoordinator._stable_third_party_mqtt_token": {
+          "backup": "pre_recovery",
+          "backup_stmts": 17,
+          "current_stmts": 11,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._statistics_current_year_recovery_needed": {
+          "backup": "pre_transfer",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "JackerySolarVaultCoordinator._statistics_http_backfill_dates": {
+          "backup": "pre_recovery",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "JackerySolarVaultCoordinator._subdevice_identity_values": {
+          "backup": "pre_recovery",
+          "backup_stmts": 8,
+          "current_stmts": 3,
+          "delta": 5
+        },
+        "JackerySolarVaultCoordinator._subdevice_stat_id": {
+          "backup": "pre_transfer",
+          "backup_stmts": 14,
+          "current_stmts": 3,
+          "delta": 11
+        },
+        "JackerySolarVaultCoordinator._third_party_mqtt_config_from_options": {
+          "backup": "pre_recovery",
+          "backup_stmts": 7,
+          "current_stmts": 3,
+          "delta": 4
+        },
+        "JackerySolarVaultCoordinator._valid_price_sources": {
+          "backup": "pre_transfer",
+          "backup_stmts": 13,
+          "current_stmts": 2,
+          "delta": 11
+        },
+        "JackerySolarVaultCoordinator.third_party_mqtt_config_plaintext": {
+          "backup": "pre_recovery",
+          "backup_stmts": 13,
+          "current_stmts": 3,
+          "delta": 10
+        }
+      },
+      "CONST_MISSING": {
+        "_DAY_TREND_SOURCE_BY_METRIC_KEY": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "diagnostics.py": {
+      "MISSING_SYMBOLS": {
+        "_cap_section": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "async_get_config_entry_diagnostics": {
+          "backup": "pre_transfer",
+          "backup_stmts": 15,
+          "current_stmts": 11,
+          "delta": 4
+        }
+      },
+      "CONST_MISSING": {
+        "_LOCAL_MQTT_RUNTIME_KEY": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_SECTION_SIZE_CAP": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "discovery_cache.py": {
+      "MISSING_SYMBOLS": {
+        "_entry_lock": {
+          "backups": [
+            "pre_transfer"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "CONST_MISSING": {
+        "_ENTRY_LOCKS": {
+          "backups": [
+            "pre_transfer"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "entity.py": {
+      "CONST_MISSING": {
+        "_LOGGER": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      }
+    },
+    "local_daily_cache.py": {
+      "MISSING_SYMBOLS": {
+        "_entry_lock": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "CONST_MISSING": {
+        "_ENTRY_LOCKS": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "mqtt_session_cache.py": {
+      "CONST_MISSING": {
+        "_CACHE_LOCK": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      }
+    },
+    "sensor.py": {
+      "SHRUNK_SYMBOLS": {
+        "JackeryStatSensor._refresh_cache": {
+          "backup": "pre_transfer",
+          "backup_stmts": 126,
+          "current_stmts": 104,
+          "delta": 22
+        }
+      }
+    },
+    "services.py": {
+      "MISSING_SYMBOLS": {
+        "_device_id_field": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_entry_for_coordinator": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_optional_text": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_text_field": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "_async_handle_delete_storm_alert": {
+          "backup": "pre_transfer",
+          "backup_stmts": 19,
+          "current_stmts": 11,
+          "delta": 8
+        },
+        "_async_handle_rename": {
+          "backup": "pre_transfer",
+          "backup_stmts": 25,
+          "current_stmts": 14,
+          "delta": 11
+        },
+        "_async_handle_set_third_party_mqtt_config": {
+          "backup": "pre_transfer",
+          "backup_stmts": 19,
+          "current_stmts": 11,
+          "delta": 8
+        },
+        "_resolve_jackery_device_id": {
+          "backup": "pre_transfer",
+          "backup_stmts": 21,
+          "current_stmts": 16,
+          "delta": 5
+        },
+        "_service_bool": {
+          "backup": "pre_transfer",
+          "backup_stmts": 11,
+          "current_stmts": 6,
+          "delta": 5
+        }
+      }
+    },
+    "util.py": {
+      "SHRUNK_SYMBOLS": {
+        "_savings_publish_decision": {
+          "backup": "pre_transfer",
+          "backup_stmts": 19,
+          "current_stmts": 12,
+          "delta": 7
+        },
+        "_scalar_day_energy_points": {
+          "backup": "pre_transfer",
+          "backup_stmts": 13,
+          "current_stmts": 9,
+          "delta": 4
+        },
+        "meter_head_serial": {
+          "backup": "pre_transfer",
+          "backup_stmts": 9,
+          "current_stmts": 3,
+          "delta": 6
+        },
+        "safe_int": {
+          "backup": "pre_transfer",
+          "backup_stmts": 21,
+          "current_stmts": 9,
+          "delta": 12
+        },
+        "smart_meter_net_power": {
+          "backup": "pre_transfer",
+          "backup_stmts": 13,
+          "current_stmts": 7,
+          "delta": 6
+        },
+        "sorted_meter_heads": {
+          "backup": "pre_transfer",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "sorted_smart_plugs": {
+          "backup": "pre_transfer",
+          "backup_stmts": 12,
+          "current_stmts": 3,
+          "delta": 9
+        },
+        "verify_and_backfill": {
+          "backup": "pre_transfer",
+          "backup_stmts": 56,
+          "current_stmts": 46,
+          "delta": 10
+        }
+      },
+      "CONST_MISSING": {
+        "ZERO_CONFIRM_MIN_LOCAL_HOUR": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_LOGGER": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      }
+    }
+  }
+}

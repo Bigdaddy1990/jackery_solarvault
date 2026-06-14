@@ -1,0 +1,468 @@
+
+[JackeryMqttPushClient] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(f"MQTT not connected yet ({self._last_error})")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: and ctx.verify_flags & strict_flag
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: return rc in (4, 5, 134, 135)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: clean_session=True,
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except MqttError as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: if was_connected and self._disconnect_callback is not None:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: async def _async_run_session(
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: isinstance(strict_flag, int)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: int: Extracted integer return code, or 0 if no integer code is present.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: err (MqttCodeError): Error that may expose a numeric return code via `err.rc` or `err.rc.value`.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: len(self._topics),
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(f"MQTT publish failed: {err}") from err
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: "topic_count": len(self._topics),
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: source_parts.append("x509_strict_disabled")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: self._schedule_coroutine(self._message_callback(topic, data), "message")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError("MQTT client is not running")
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Extract the integer MQTT return code from a `MqttCodeError`.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: qos: MQTT Quality of Service level (default 0).
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except MqttCodeError as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError("MQTT not connected yet") from err
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: self._handle_connect_failure(self._extract_mqtt_code(err))
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: await client.subscribe(topic, qos=0)
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: and hasattr(ctx, "verify_flags")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: qos: int = 0,
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: await client.publish(topic, text, qos=qos, retain=retain)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: def _extract_mqtt_code(err: MqttCodeError) -> int:
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - If the parsed object lacks a dict at `FIELD_BODY` but contains a dict at `FIELD_DATA`, copies `FIE
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.add(task)
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `True` if the elapsed time since the selected timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` o
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc> 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `true` if the client is connected to the MQTT broker, `false` otherwise.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: int: Count of consecutive authentication failure occurrences.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Redacts the user identifier segment from an MQTT topic when the topic uses the configured prefix.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return the integer MQTT return code contained in a MqttCodeError.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Start or restart the MQTT push client session with the given credentials and user scope.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `"connect failed: <error>"` when `was_connected` is False, and emits a debug log entry.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return a topic with its user-specific segment redacted when topic redaction is enabled.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: client_id (str): MQTT client identifier used for the session.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Report whether the MQTT push client's background runner task has been started.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # cleanly. Without this set the message-callback tasks spawned by
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.discard(done)
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: True if a background runner task exists, False otherwise.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: if not active.done():
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Record a disconnect or connection-failure error and update the client's last-error state.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Parses the ISO-8601 timestamp stored in `self._last_message_at` and returns the difference between n
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Extracts an integer code from `err.rc` or `err.rc.value`. If neither yields an integer, returns `0`.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # accumulation path documented in BUGFIXTODO.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # _schedule_coroutine. Leaving them attached to the loop is the
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful 
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Manage a single MQTT session: connect to the broker, subscribe to configured topics, process inco
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Wait until the MQTT client becomes connected or raise a RuntimeError on timeout or connection fai
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: int: The extracted MQTT return code, or `0` if no integer code is present.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the provided credentials match the currently running session and the client is already connected,
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: None if `topic` is `None`; otherwise the topic with the third slash-separated segment replaced by `R
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: err (MqttCodeError): Exception instance that may expose a numeric return code.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Process an incoming MQTT message: validate and normalize its JSON payload, update diagnostics, an
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: On successful connection this sets internal connection flags and timestamps, subscribes to topics in
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the internal connected event is not set within timeout_sec, sets self._last_error to
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return whether the MQTT client currently has an active connection.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled, 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - On successful validation increments `_messages_seen`, records `_last_message_at` as a UTC ISO time
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: active.cancel()
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the current `_last_error` already represents a connect failure, this method is a no-op.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # Track fire-and-forget tasks so _async_stop_locked can cancel them
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: "publish timeout waiting for MQTT connect" when there is no prior error and raises RuntimeError("MQT
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # Cancel any fire-and-forget tasks the runner spawned via
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Compute the non-negative number of seconds elapsed since the last received message.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the event is set but the client is not marked connected, raises RuntimeError including the curren
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: def _on_done(done: asyncio.Task[None]) -> None:
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Record an MQTT CONNACK failure and update connection and authentication-failure state.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: task.add_done_callback(_on_done)
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Report how many consecutive MQTT connect attempts failed due to authentication.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.clear()
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # _schedule_coroutine accumulated on the event loop under sustained
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets `_last_error` to either `"disconnect: <error>"` when `was_connected` is True, or
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or p
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # MQTT load — documented in BUGFIXTODO as a memory leak.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Determine whether an MQTT CONNACK return code indicates an authentication failure.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks: set[asyncio.Task[None]] = set()
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Determine whether the MQTT connection has been silent longer than the configured threshold.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Stop the MQTT runner and disconnect the client."""
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: for active in list(self._active_tasks):
+   doc  <1\client\mqtt_push.py>: # without holding the start-lock open. Reconnect-throttling stays the
+   doc  <1\client\mqtt_push.py>: # Non-auth rejection (e.g. server unavailable) does not count toward
+   doc  <1\client\mqtt_push.py>: """Return a snapshot of the MQTT client state for diagnostics."""
+   doc  <1\client\mqtt_push.py>: Real Jackery devices emit at least one heartbeat per ~30 s. A
+   doc  <1\client\mqtt_push.py>: # Resets to 0 the moment the broker accepts a session. The coordinator
+   doc  <1\client\mqtt_push.py>: """Return True when the MQTT client has an active broker session."""
+   doc  <1\client\mqtt_push.py>: # after a rejected CONNACK and we already mapped the rc above.
+   doc  <1\client\mqtt_push.py>: app) or surfaced as ``ConfigEntryAuthFailed`` so HA opens the reauth
+   doc  <1\client\mqtt_push.py>: # versions. Disabling only this strict flag preserves full chain
+   doc  <1\client\mqtt_push.py>: """Handle a passive disconnect or aiomqtt I/O failure mid-session."""
+   doc  <1\client\mqtt_push.py>: # Already mapped by ``_handle_connect_failure`` — keep the
+   doc  <1\client\mqtt_push.py>: # already-closed socket finalize.
+   doc  <1\client\mqtt_push.py>: """Return a compact UTC timestamp for diagnostics."""
+   doc  <1\client\mqtt_push.py>: # verification, hostname checking, and signature validation.
+   doc  <1\client\mqtt_push.py>: # flag if it has been silent longer than the threshold AND
+   doc  <1\client\mqtt_push.py>: # the auth-tolerance streak — the streak is for credential issues.
+   doc  <1\client\mqtt_push.py>: # actionable reason instead of overwriting it with the generic
+   doc  <1\client\mqtt_push.py>: """Redact the userId segment from Jackery MQTT topics."""
+   doc  <1\client\mqtt_push.py>: "Jackery MQTT TLS: VERIFY_X509_STRICT cleared "
+   doc  <1\client\mqtt_push.py>: # streak — the next rejection starts the tolerance count over.
+   doc  <1\client\mqtt_push.py>: topic subscriptions may not have been honoured. The
+   doc  <1\client\mqtt_push.py>: # Authority Key Identifier (AKID) extension in every certificate in
+   CODE <1\client\mqtt_push.py>: rejection should be tolerated (token-rotation race with the official
+   doc  <1\client\mqtt_push.py>: Reconnection is deliberately NOT done in this loop — the
+   doc  <1\client\mqtt_push.py>: # Best-effort wait so the caller (coordinator) sees connect-success or
+   doc  <1\client\mqtt_push.py>: # the first CONNACK rejection in diagnostics within a bounded window
+   CODE <1\client\mqtt_push.py>: ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+   doc  <1\client\mqtt_push.py>: """Return seconds elapsed since the last inbound MQTT frame, or None.
+   doc  <1\client\mqtt_push.py>: # Still waiting for the first frame after connect — only
+   doc  <1\client\mqtt_push.py>: # Broker rejected the CONNACK (rc != 0) or returned a non-zero
+   doc  <1\client\mqtt_push.py>: "[TLS source=%s]",
+   doc  <1\client\mqtt_push.py>: # the chain. Jackery's broker certificate does not include this
+   doc  <1\client\mqtt_push.py>: # Notify the upper layer so it can throttle a fresh reconnect.
+   doc  <1\client\mqtt_push.py>: """Stop MQTT connection."""
+   doc  <1\client\mqtt_push.py>: successful broker handshake.
+   doc  <1\client\mqtt_push.py>: """Return True when disconnect should not hide a failed connect."""
+   doc  <1\client\mqtt_push.py>: """Async-native MQTT client for Jackery cloud topics in implementation notes §3."""
+   doc  <1\client\mqtt_push.py>: # coordinator's job; we only surface the initial outcome here.
+   doc  <1\client\mqtt_push.py>: diagnostics so the user can investigate without enabling DEBUG.
+   doc  <1\client\mqtt_push.py>: # Successful broker handshake clears any transient auth-failure
+   CODE <1\client\mqtt_push.py>: flow. Increments on CONNACK rc=4/5/134/135, resets on the first
+   doc  <1\client\mqtt_push.py>: # The aiomqtt context manager handles socket teardown on cancel:
+   doc  <1\client\mqtt_push.py>: """Return the numeric reason code from an aiomqtt MqttCodeError."""
+   doc  <1\client\mqtt_push.py>: """Hold the broker session for one client lifetime.
+   doc  <1\client\mqtt_push.py>: # Jackery cloud rotates credentials when the official app logs in at
+   doc  <1\client\mqtt_push.py>: # Counter for consecutive CONNACK auth rejections (rc=4/5/134/135).
+   doc  <1\client\mqtt_push.py>: sustained silence of ``MQTT_SILENT_THRESHOLD_SEC`` (default 300 s)
+   doc  <1\client\mqtt_push.py>: client lifetime — the broker connect may have succeeded but the
+   doc  <1\client\mqtt_push.py>: source_parts.append("no_x509_strict")
+   doc  <1\client\mqtt_push.py>: """Publish JSON payload to an MQTT topic."""
+   doc  <1\client\mqtt_push.py>: flapping link cannot trigger reconnect storms.
+   doc  <1\client\mqtt_push.py>: # Preserve the actionable connect failure for callers waiting
+   doc  <1\client\mqtt_push.py>: """Public read-only view of the auth-failure streak counter.
+   doc  <1\client\mqtt_push.py>: """Public wait helper used by command paths that require a live link."""
+   doc  <1\client\mqtt_push.py>: """Initialise the entity from the coordinator and description."""
+   doc  <1\client\mqtt_push.py>: # implementation notes §3 documents body-based routing; some broker variants
+   doc  <1\client\mqtt_push.py>: coordinator owns it via ``MQTT_RECONNECT_THROTTLE_SEC`` so a
+   doc  <1\client\mqtt_push.py>: # MQTT-5 reason code. Preserve the actionable reason for callers
+   doc  <1\client\mqtt_push.py>: # on the initial broker check. Some brokers close immediately
+   doc  <1\client\mqtt_push.py>: "(broker cert missing AKID; chain/hostname/signature still verified)"
+   doc  <1\client\mqtt_push.py>: """Return True once the connect/start lifecycle has run at least once."""
+   doc  <1\client\mqtt_push.py>: subscription is broken even though TCP is alive — surface it in
+   CODE <1\client\mqtt_push.py>: if hasattr(ssl, "VERIFY_X509_STRICT"):
+   doc  <1\client\mqtt_push.py>: # uses this to differentiate a transient token-rotation race (the
+   doc  <1\client\mqtt_push.py>: # Only fires when we actually had a live session — a CONNACK
+   CODE <1\client\mqtt_push.py>: ``mqtt_silent_for_too_long`` flag combines this with a threshold.
+   doc  <1\client\mqtt_push.py>: """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
+   doc  <1\client\mqtt_push.py>: # not pretend the broker dropped a working connection.
+   doc  <1\client\mqtt_push.py>: # send the same structure as data. Normalize before coordinator routing.
+   doc  <1\client\mqtt_push.py>: # the same time) from a persistent credential failure that warrants
+   doc  <1\client\mqtt_push.py>: # extension, causing CERTIFICATE_VERIFY_FAILED on affected Python
+   doc  <1\client\mqtt_push.py>: "Jackery MQTT connected; subscribing to %d topic(s) "
+   doc  <1\client\mqtt_push.py>: # the connect itself was that long ago.
+   doc  <1\client\mqtt_push.py>: # disconnect message that some brokers emit immediately after a
+   doc  <1\client\mqtt_push.py>: # opening Home Assistant's reauth UI.
+   doc  <1\client\mqtt_push.py>: """Return True when the broker is "connected" but no message arrives.
+   doc  <1\client\mqtt_push.py>: # rejected CONNACK.
+   doc  <1\client\mqtt_push.py>: """Return a stable non-secret signature for MQTT credential changes."""
+   doc  <1\client\mqtt_push.py>: """Handle CONNACK rejection by mapping rc to actionable reason."""
+   doc  <1\client\mqtt_push.py>: # OpenSSL 3.x / Python 3.10+ ssl.create_default_context() enables
+   doc  <1\client\mqtt_push.py>: """Public read-only view of the last-message age helper.
+   doc  <1\client\mqtt_push.py>: Coordinator-side adaptive polling reads this property to gate
+   doc  <1\client\mqtt_push.py>: """Decode an inbound MQTT frame and route it to the coordinator."""
+   doc  <1\client\mqtt_push.py>: # ReasonCodes from paho-mqtt expose ``.value`` for MQTT-5 codes.
+   doc  <1\client\mqtt_push.py>: "tls_x509_strict_disabled": hasattr(ssl, "VERIFY_X509_STRICT"),
+   doc  <1\client\mqtt_push.py>: """Return a redacted snapshot of the MQTT client state for diagnostics."""
+   doc  <1\client\mqtt_push.py>: """Start MQTT connection or reconfigure it when credentials changed."""
+   doc  <1\client\mqtt_push.py>: """Return True for CONNACK codes that mean credentials are rejected."""
+   doc  <1\client\mqtt_push.py>: # a live session sends DISCONNECT; a rejected connect just lets the
+   CODE <1\client\mqtt_push.py>: while the connection is still open is a strong signal the
+   doc  <1\client\mqtt_push.py>: # waiting on the initial broker check.
+   doc  <1\client\mqtt_push.py>: # VERIFY_X509_STRICT by default. This enforces the presence of the
+   doc  <1\client\mqtt_push.py>: The coordinator reads this to decide whether a transient credential
+   CODE <1\client\mqtt_push.py>: fast HTTP refreshes while MQTT push is delivering fresh frames.
+   doc  <1\client\mqtt_push.py>: ``None`` means we have not received a single message yet on this
+   doc  <1\client\mqtt_push.py>: # rejection routes through ``_handle_connect_failure`` and must
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: "topics": [self._redact_topic(topic) for topic in self._topics],
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: """Async-native MQTT client for Jackery cloud topics in MQTT_PROTOCOL.md."""
+   CODE <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: self._loop = hass.loop
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: # MQTT_PROTOCOL.md documents body-based routing; some broker variants
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: "last_published_topic": self._redact_topic(self._last_published_topic),
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
+   doc  <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: hass: Any,
+   CODE <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: task = self._hass.async_create_task(coro, name=f"jackery_mqtt_{label}")
+   doc  <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: "tls_x509_strict_disabled": False,
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: if package_ca_path.is_file():
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: ca_path = package_ca_path
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: if not ca_path.is_file():
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: package_ca_path = Path(__file__).resolve().parents[1] / "jackery_ca.crt"
+   doc  <25.05.v2\client\mqtt_push.py [ancient]>: # PROTOCOL.md §3 documents body-based routing; some broker variants
+
+[_AioMqttPassiveDisconnectFilter] adopted=jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: bool: `True` if the record should be logged, `False` if suppressed.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Filter out common aiomqtt passive socket-reset log messages.
+   CODE <pre_transfer>: def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
+   doc  <1\client\mqtt_push.py>: """Return False for the known passive disconnect message."""
+
+[__init__] adopted=pre_transfer
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # Track fire-and-forget tasks so _async_stop_locked can cancel them
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # _schedule_coroutine accumulated on the event loop under sustained
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # cleanly. Without this set the message-callback tasks spawned by
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks: set[asyncio.Task[None]] = set()
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # MQTT load — documented in BUGFIXTODO as a memory leak.
+   CODE <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: self._loop = hass.loop
+   doc  <1\client\mqtt_push.py>: """Initialise the entity from the coordinator and description."""
+   doc  <1\client\mqtt_push.py>: # Jackery cloud rotates credentials when the official app logs in at
+   doc  <1\client\mqtt_push.py>: # the same time) from a persistent credential failure that warrants
+   doc  <1\client\mqtt_push.py>: # Counter for consecutive CONNACK auth rejections (rc=4/5/134/135).
+   doc  <1\client\mqtt_push.py>: # uses this to differentiate a transient token-rotation race (the
+   doc  <1\client\mqtt_push.py>: # Resets to 0 the moment the broker accepts a session. The coordinator
+   doc  <1\client\mqtt_push.py>: # opening Home Assistant's reauth UI.
+   doc  <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: hass: Any,
+
+[_async_run_session] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: # Broker rejected the CONNACK (rc != 0) or returned a non-zero
+   doc  <1\client\mqtt_push.py>: coordinator owns it via ``MQTT_RECONNECT_THROTTLE_SEC`` so a
+   doc  <1\client\mqtt_push.py>: "[TLS source=%s]",
+   doc  <1\client\mqtt_push.py>: # Notify the upper layer so it can throttle a fresh reconnect.
+   doc  <1\client\mqtt_push.py>: # MQTT-5 reason code. Preserve the actionable reason for callers
+   doc  <1\client\mqtt_push.py>: # on the initial broker check. Some brokers close immediately
+   doc  <1\client\mqtt_push.py>: # Successful broker handshake clears any transient auth-failure
+   doc  <1\client\mqtt_push.py>: # after a rejected CONNACK and we already mapped the rc above.
+   doc  <1\client\mqtt_push.py>: """Hold the broker session for one client lifetime.
+   doc  <1\client\mqtt_push.py>: # Only fires when we actually had a live session — a CONNACK
+   doc  <1\client\mqtt_push.py>: # waiting on the initial broker check.
+   doc  <1\client\mqtt_push.py>: # not pretend the broker dropped a working connection.
+   doc  <1\client\mqtt_push.py>: # streak — the next rejection starts the tolerance count over.
+   doc  <1\client\mqtt_push.py>: flapping link cannot trigger reconnect storms.
+   doc  <1\client\mqtt_push.py>: "Jackery MQTT connected; subscribing to %d topic(s) "
+   doc  <1\client\mqtt_push.py>: # Preserve the actionable connect failure for callers waiting
+   doc  <1\client\mqtt_push.py>: Reconnection is deliberately NOT done in this loop — the
+   doc  <1\client\mqtt_push.py>: # rejection routes through ``_handle_connect_failure`` and must
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: On successful connection this sets internal connection flags and timestamps, subscribes to topics in
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Manage a single MQTT session: connect to the broker, subscribe to configured topics, process inco
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except MqttCodeError as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except Exception as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except MqttError as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: clean_session=True,
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: self._handle_connect_failure(self._extract_mqtt_code(err))
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: if was_connected and self._disconnect_callback is not None:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: await client.subscribe(topic, qos=0)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: len(self._topics),
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: async def _async_run_session(
+
+[_async_stop_locked] adopted=jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py
+   CODE <pre_transfer>: self._connection_state = "disconnected"
+   CODE <pre_transfer>: self._subscribed_count = 0
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   CODE <pre_transfer>: self._availability_topic = None
+   CODE <pre_transfer>: with contextlib.suppress(asyncio.CancelledError, *_MqttErrorTuple, Exception):
+   CODE <pre_transfer>: self._stopping = True
+   CODE <pre_transfer>: self._topic_count = 0
+   doc  <1\client\mqtt_push.py>: # a live session sends DISCONNECT; a rejected connect just lets the
+   doc  <1\client\mqtt_push.py>: # already-closed socket finalize.
+   doc  <1\client\mqtt_push.py>: # The aiomqtt context manager handles socket teardown on cancel:
+
+[_async_wait_connected] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(f"MQTT not connected yet ({self._last_error})")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError("MQTT not connected yet") from err
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the event is set but the client is not marked connected, raises RuntimeError including the curren
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the internal connected event is not set within timeout_sec, sets self._last_error to
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Wait until the MQTT client becomes connected or raise a RuntimeError on timeout or connection fai
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: "publish timeout waiting for MQTT connect" when there is no prior error and raises RuntimeError("MQT
+
+[_build_ssl_context_blocking] adopted=pre_transfer
+   CODE <1\client\mqtt_push.py>: ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+   doc  <1\client\mqtt_push.py>: _LOGGER.debug(
+   doc  <1\client\mqtt_push.py>: # OpenSSL 3.x / Python 3.10+ ssl.create_default_context() enables
+   doc  <1\client\mqtt_push.py>: # the chain. Jackery's broker certificate does not include this
+   doc  <1\client\mqtt_push.py>: "(broker cert missing AKID; chain/hostname/signature still verified)"
+   doc  <1\client\mqtt_push.py>: # versions. Disabling only this strict flag preserves full chain
+   CODE <1\client\mqtt_push.py>: if hasattr(ssl, "VERIFY_X509_STRICT"):
+   doc  <1\client\mqtt_push.py>: # verification, hostname checking, and signature validation.
+   doc  <1\client\mqtt_push.py>: """Build a verified TLS context with the Jackery MQTT CA trust anchor."""
+   doc  <1\client\mqtt_push.py>: "Jackery MQTT TLS: VERIFY_X509_STRICT cleared "
+   doc  <1\client\mqtt_push.py>: source_parts.append("no_x509_strict")
+   doc  <1\client\mqtt_push.py>: # VERIFY_X509_STRICT by default. This enforces the presence of the
+   doc  <1\client\mqtt_push.py>: # extension, causing CERTIFICATE_VERIFY_FAILED on affected Python
+   doc  <1\client\mqtt_push.py>: # Authority Key Identifier (AKID) extension in every certificate in
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: isinstance(strict_flag, int)
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: ):
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: source_parts.append("x509_strict_disabled")
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: and ctx.verify_flags & strict_flag
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: if (
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: and hasattr(ctx, "verify_flags")
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: ca_path = package_ca_path
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: if not ca_path.is_file():
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: if package_ca_path.is_file():
+   CODE <24.05\24.05\custom_components\jackery_solarvault\client\mqtt_push.py>: package_ca_path = Path(__file__).resolve().parents[1] / "jackery_ca.crt"
+
+[_credential_fingerprint] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: """Return a stable non-secret signature for MQTT credential changes."""
+
+[_extract_mqtt_code] adopted=jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: int: Extracted integer return code, or 0 if no integer code is present.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Extract the integer MQTT return code from a `MqttCodeError`.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: err (MqttCodeError): Error that may expose a numeric return code via `err.rc` or `err.rc.value`.
+   doc  <pre_transfer>: """Extract the integer MQTT return code from an aiomqtt error."""
+   CODE <pre_transfer>: def _extract_mqtt_code(err: Exception) -> int:
+   doc  <1\client\mqtt_push.py>: """Return the numeric reason code from an aiomqtt MqttCodeError."""
+   doc  <1\client\mqtt_push.py>: # ReasonCodes from paho-mqtt expose ``.value`` for MQTT-5 codes.
+
+[_handle_connect_failure] adopted=pre_transfer
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc> 
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Record an MQTT CONNACK failure and update connection and authentication-failure state.
+   doc  <1\client\mqtt_push.py>: """Handle CONNACK rejection by mapping rc to actionable reason."""
+   doc  <1\client\mqtt_push.py>: # Non-auth rejection (e.g. server unavailable) does not count toward
+   doc  <1\client\mqtt_push.py>: # the auth-tolerance streak — the streak is for credential issues.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: self._consecutive_auth_failures = 0
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: _LOGGER.debug("Jackery MQTT repeated connect failure: %s", message)
+
+[_handle_disconnect_error] adopted=jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: If the current `_last_error` already indicates a connect failure, this method does nothing.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Record a disconnect or connection-failure error and emit a corresponding debug log.
+   CODE <pre_transfer>: self._connection_state = "disconnected"
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   doc  <1\client\mqtt_push.py>: """Handle a passive disconnect or aiomqtt I/O failure mid-session."""
+   doc  <1\client\mqtt_push.py>: # rejected CONNACK.
+   doc  <1\client\mqtt_push.py>: # Already mapped by ``_handle_connect_failure`` — keep the
+   doc  <1\client\mqtt_push.py>: # disconnect message that some brokers emit immediately after a
+   doc  <1\client\mqtt_push.py>: # actionable reason instead of overwriting it with the generic
+
+[_handle_message] adopted=pre_transfer
+   doc  <25.05.v2\client\mqtt_push.py [ancient]>: # PROTOCOL.md §3 documents body-based routing; some broker variants
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: self._schedule_coroutine(self._message_callback(topic, data), "message")
+   doc  <1\client\mqtt_push.py>: # send the same structure as data. Normalize before coordinator routing.
+   doc  <1\client\mqtt_push.py>: # implementation notes §3 documents body-based routing; some broker variants
+   doc  <1\client\mqtt_push.py>: """Decode an inbound MQTT frame and route it to the coordinator."""
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - If the parsed object lacks a dict at `FIELD_BODY` but contains a dict at `FIELD_DATA`, copies `FIE
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or p
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - On successful validation increments `_messages_seen`, records `_last_message_at` as a UTC ISO time
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Process an incoming MQTT message: validate and normalize its JSON payload, update diagnostics, an
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: # MQTT_PROTOCOL.md documents body-based routing; some broker variants
+
+[_is_connect_auth_failure_rc] adopted=pre_transfer
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Determine whether an MQTT CONNACK return code indicates an authentication failure.
+   doc  <1\client\mqtt_push.py>: """Return True for CONNACK codes that mean credentials are rejected."""
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: return rc in (4, 5, 134, 135)
+
+[_is_connect_failure_error] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: """Return True when disconnect should not hide a failed connect."""
+
+[_mqtt_silent_for_too_long] adopted=1\client\mqtt_push.py
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Determine whether the MQTT connection has been silent longer than the configured threshold.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `True` if the elapsed time since the selected timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` o
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful 
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` oth
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Return whether the MQTT connection has been silent longer than MQTT_SILENT_THRESHOLD_SEC.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Uses the time of the most recent received message when available; otherwise falls back to the last c
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[_redact_topic] adopted=pre_transfer
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: None if `topic` is `None`; otherwise the topic with the third slash-separated segment replaced by `R
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Redacts the user identifier segment from an MQTT topic when the topic uses the configured prefix.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:
+   doc  <1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: @property
+   doc  <1\client\mqtt_push.py>: """Redact the userId segment from Jackery MQTT topics."""
+
+[_schedule_coroutine] adopted=pre_transfer
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except Exception as err:
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: def _on_done(done: asyncio.Task[None]) -> None:
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: task.add_done_callback(_on_done)
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.add(task)
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.discard(done)
+   CODE <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: task = self._hass.async_create_task(coro, name=f"jackery_mqtt_{label}")
+
+[_seconds_since_last_message] adopted=1\client\mqtt_push.py
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Compute the non-negative number of seconds elapsed since the last received message.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Parses the ISO-8601 timestamp stored in `self._last_message_at` and returns the difference between n
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Return the non-negative number of seconds elapsed since the last received message.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Parses the ISO-8601 timestamp stored in `self._last_message_at` and computes the difference between 
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[_utc_now_iso] adopted=LIVE
+   doc  <1\client\mqtt_push.py>: """Return a compact UTC timestamp for diagnostics."""
+
+[async_publish_json] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: """Publish JSON payload to an MQTT topic."""
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: except MqttError as err:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError("MQTT client is not running")
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: qos: int = 0,
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: await client.publish(topic, text, qos=qos, retain=retain)
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError(f"MQTT publish failed: {err}") from err
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: qos: MQTT Quality of Service level (default 0).
+
+[async_start] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: # the first CONNACK rejection in diagnostics within a bounded window
+   doc  <1\client\mqtt_push.py>: # coordinator's job; we only surface the initial outcome here.
+   doc  <1\client\mqtt_push.py>: """Start MQTT connection or reconfigure it when credentials changed."""
+   doc  <1\client\mqtt_push.py>: # without holding the start-lock open. Reconnect-throttling stays the
+   doc  <1\client\mqtt_push.py>: # Best-effort wait so the caller (coordinator) sees connect-success or
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: client_id (str): MQTT client identifier used for the session.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Start or restart the MQTT push client session with the given credentials and user scope.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the provided credentials match the currently running session and the client is already connected,
+
+[async_stop] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: """Stop MQTT connection."""
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Stop the MQTT runner and disconnect the client."""
+
+[async_wait_until_connected] adopted=pre_transfer
+   doc  <1\client\mqtt_push.py>: """Public wait helper used by command paths that require a live link."""
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: raise RuntimeError("MQTT client is not running")
+
+[consecutive_auth_failures] adopted=1\client\mqtt_push.py
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Report how many consecutive MQTT connect attempts failed due to authentication.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: int: Count of consecutive authentication failure occurrences.
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: int: Count of consecutive authentication failures observed for connect attempts.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Number of consecutive MQTT authentication failures.
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[diagnostics] adopted=1\jackery_solarvault-main\custom_components\jackery_solarvault\client\mqtt_push.py
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Provide a diagnostics snapshot for the MQTT client.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: return self.diagnostics_snapshot()
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: dict[str, Any]: Diagnostics snapshot containing connection state and flags, timestamps for last conn
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[diagnostics_snapshot] adopted=pre_transfer
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: "topic_count": len(self._topics),
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return a topic with its user-specific segment redacted when topic redaction is enabled.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled, 
+   doc  <27.05\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: "tls_x509_strict_disabled": False,  # wir fassen verify_flags nicht an
+   doc  <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: "tls_x509_strict_disabled": False,
+   doc  <1\client\mqtt_push.py>: "tls_x509_strict_disabled": hasattr(ssl, "VERIFY_X509_STRICT"),
+   doc  <1\client\mqtt_push.py>: """Return a snapshot of the MQTT client state for diagnostics."""
+
+[filter] adopted=jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: bool: `True` if the record should be logged, `False` if suppressed.
+   doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Filter out common aiomqtt passive socket-reset log messages.
+   CODE <pre_transfer>: def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
+   doc  <1\client\mqtt_push.py>: """Return False for the known passive disconnect message."""
+
+[is_connected] adopted=LIVE
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `true` if the client is connected to the MQTT broker, `false` otherwise.
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return whether the MQTT client currently has an active connection.
+   doc  <1\client\mqtt_push.py>: """Return True when the MQTT client has an active broker session."""
+
+[is_started] adopted=LIVE
+   doc  <1\client\mqtt_push.py>: """Return True once the connect/start lifecycle has run at least once."""
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Report whether the MQTT push client's background runner task has been started.
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: True if a background runner task exists, False otherwise.
+
+[seconds_since_last_message] adopted=pre_transfer
+   CODE <1\client\mqtt_push.py>: fast HTTP refreshes while MQTT push is delivering fresh frames.
+   doc  <1\client\mqtt_push.py>: """Public read-only view of the last-message age helper.
+   doc  <1\client\mqtt_push.py>: Coordinator-side adaptive polling reads this property to gate

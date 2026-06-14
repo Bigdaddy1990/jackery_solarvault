@@ -1,0 +1,55 @@
+
+[JackeryGridStandardText] adopted=LIVE
+   CODE <custom_components\jackery_solarvault\text.py>: if raw in {None, ""}:
+
+[JackerySystemNameText] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\text.py [ancient]>: _LOGGER.error("Failed to rename system %s: %s", system_id, err)
+   doc  <1\text.py>: """Forward a text write to the device."""
+   doc  <1\text.py>: """Return the entity's current value."""
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: raise ConfigEntryAuthFailed(
+
+[JackeryThirdPartyMqttText] adopted=LIVE
+   CODE <pre_transfer>: def __init__(  # noqa: PLR0913
+   CODE <pre_transfer>: except Exception as err:  # noqa: BLE001
+
+[__init__] adopted=LIVE
+   doc  <1\text.py>: """Initialise the entity from the coordinator and description."""
+   doc  <1\text.py>: self, coordinator: JackerySolarVaultCoordinator, device_id: str
+   doc  <1\text.py>: super().__init__(coordinator, device_id, "system_name")
+   CODE <pre_transfer>: def __init__(  # noqa: PLR0913
+
+[_collect_entities] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
+   doc  <01.06\custom_components\jackery_solarvault\text.py>: dev_id
+   doc  <01.06\custom_components\jackery_solarvault\text.py>: ) or coordinator.device_bluetooth_key(dev_id):
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: if coordinator.device_supports_advanced(
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\text.py [ancient]>: # The rename endpoint in APP_POLLING_MQTT.md needs the system id.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\text.py [ancient]>: # The rename endpoint in implementation notes §2 needs the system id.
+
+[async_set_value] adopted=1\1101\custom_components\jackery_solarvault\text.py
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\text.py [ancient]>: _LOGGER.error("Failed to rename system %s: %s", system_id, err)
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: self._raise_action_error(err)
+   doc  <01.06\custom_components\jackery_solarvault\text.py>: """Write this ThirdPartMQTTConfig string field."""
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: new_value = str(value or "").strip()
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: self._device_id,
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: except HomeAssistantError as err:
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: raise
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: await self.coordinator.async_update_third_party_mqtt_config(
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: except Exception as err:
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: if getattr(err, "translation_key", None):
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: {self._field: new_value},
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: except ConfigEntryAuthFailed:
+   doc  <1\text.py>: """Forward a text write to the device."""
+   CODE <pre_transfer>: except Exception as err:  # noqa: BLE001
+
+[async_setup_entry] adopted=LIVE
+   CODE <1\text.py>: async def async_setup_entry(
+
+[native_value] adopted=1\1101\custom_components\jackery_solarvault\text.py
+   doc  <1\text.py>: """Return the entity's current value."""
+   doc  <01.06\custom_components\jackery_solarvault\text.py>: """Return the current plaintext value used for writes."""
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: return None
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: return str(value)
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: if value is None:
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: self._field
+   CODE <01.06\custom_components\jackery_solarvault\text.py>: value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(

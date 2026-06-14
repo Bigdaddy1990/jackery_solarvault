@@ -1,0 +1,127 @@
+
+[JackerySelect] adopted=LIVE
+   CODE <1\select.py>: def _warn_unknown_once(self, value: Any) -> None:
+   CODE <pre_transfer>: except Exception as err:  # noqa: BLE001
+
+[_ct_phase_current] adopted=LIVE
+   CODE <pre_transfer>: ct = entity._payload.get(PAYLOAD_CT_METER) or {}  # noqa: SLF001
+
+[_ct_phase_select] adopted=LIVE
+   CODE <pre_transfer>: ct = entity._payload.get(PAYLOAD_CT_METER) or {}  # noqa: SLF001
+   CODE <pre_transfer>: await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)  # noqa: SLF001
+   CODE <pre_transfer>: ct_sn = str(ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or "").strip()
+
+[_gate] adopted=pre_transfer
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: return bool(
+   doc  <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: ) or current_company not in (
+   doc  <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: _price_sources_from_payload(payload)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in (
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
+
+[_island_auto_off_current] adopted=LIVE
+   doc  <pre_transfer>: entity._task_plan,  # noqa: SLF001
+   CODE <pre_transfer>: raw = entity._properties.get(FIELD_OFF_GRID_TIME)  # noqa: SLF001
+
+[_island_auto_off_select] adopted=LIVE
+   CODE <pre_transfer>: await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)  # noqa: SLF001
+
+[_price_mode_current] adopted=LIVE
+   doc  <pre_transfer>: entity._warn_unknown_once(mode)  # noqa: SLF001
+
+[_price_mode_current_int] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if work_mode == 7:
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: entity._task_plan, FIELD_DYNAMIC_OR_SINGLE, FIELD_PRICE_MODE
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if entity._price.get(FIELD_SINGLE_PRICE) is not None:
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)
+
+[_price_mode_dynamic_available] adopted=LIVE
+   CODE <pre_transfer>: company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+   CODE <pre_transfer>: region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
+   CODE <pre_transfer>: return bool(_price_sources_from_payload(entity._payload))  # noqa: SLF001
+   CODE <custom_components\jackery_solarvault\select.py>: if company_id not in {None, ""} and bool(region):
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: if company_id is not None and region is not None:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: region = first_nonblank(entity._price.get(FIELD_SYSTEM_REGION))
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: company_id = first_nonblank_int(entity._price.get(FIELD_PLATFORM_COMPANY_ID))
+
+[_price_mode_select] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: await entity.coordinator.async_set_price_mode_single(entity._device_id)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: elif mode == 2:
+
+[_price_provider_current] adopted=21.05\21.05\custom_components\jackery_solarvault\select.py
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if company_id in (None, ""):
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: FIELD_COUNTRY: region,
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if _price_source_matches_current(source, company_id, region):
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: FIELD_PLATFORM_COMPANY_ID: company_id,
+   CODE <pre_transfer>: company_id = entity._price.get(FIELD_PLATFORM_COMPANY_ID)  # noqa: SLF001
+   CODE <pre_transfer>: region = entity._price.get(FIELD_SYSTEM_REGION)  # noqa: SLF001
+   doc  <pre_transfer>: FIELD_COMPANY_NAME: entity._price.get(FIELD_COMPANY_NAME),  # noqa: SLF001
+   CODE <pre_transfer>: for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
+   CODE <custom_components\jackery_solarvault\select.py>: if company_id in {None, ""}:
+
+[_price_provider_options] adopted=LIVE
+   CODE <pre_transfer>: for source in _price_sources_from_payload(entity._payload)  # noqa: SLF001
+
+[_price_provider_select] adopted=LIVE
+   CODE <pre_transfer>: for source in _price_sources_from_payload(entity._payload):  # noqa: SLF001
+   CODE <pre_transfer>: await entity.coordinator.async_set_price_source(entity._device_id, source)  # noqa: SLF001
+
+[_price_source_label] adopted=21.05\21.05\custom_components\jackery_solarvault\select.py
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: or source.get(FIELD_NAME)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: country = str(
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or ""
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: label = f"{name} ({country})" if country else name
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: name = str(
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if company_id not in (None, ""):
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: ).strip()
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: or source.get(FIELD_PLATFORM_COMPANY_ID)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: source.get(FIELD_COMPANY_NAME)
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: or source.get(FIELD_CID)
+   CODE <custom_components\jackery_solarvault\select.py>: if company_id not in {None, ""}:
+
+[_price_source_regions] adopted=LIVE
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: raw = first_nonblank(source.get(FIELD_COUNTRY), source.get(FIELD_SYSTEM_REGION))
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: if raw is None:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\select.py [ancient]>: return [part.strip() for part in raw.split(",") if part.strip()]
+   CODE <custom_components\jackery_solarvault\select.py>: if raw in {None, ""}:
+
+[_price_sources_from_payload] adopted=21.05\21.05\custom_components\jackery_solarvault\select.py
+   CODE <custom_components\jackery_solarvault\select.py>: if company_id not in {None, ""} and country:
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: country = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: if company_id not in (None, "") and country:
+
+[_storm_minutes_current_value] adopted=pre_transfer
+   doc  <01.06\custom_components\jackery_solarvault\select.py>: entity._properties, entity._weather_plan, entity._task_plan
+
+[_storm_minutes_select] adopted=LIVE
+   CODE <pre_transfer>: await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)  # noqa: SLF001
+
+[_storm_minutes_value] adopted=LIVE
+   CODE <pre_transfer>: def _storm_minutes_value(  # noqa: PLR0912
+
+[_temp_unit_current] adopted=LIVE
+   CODE <pre_transfer>: val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))  # noqa: SLF001
+
+[_temp_unit_select] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\select.py>: entity._device_id, _OPTION_TO_TEMP_UNIT[option]
+
+[_warn_unknown_once] adopted=LIVE
+   CODE <1\select.py>: def _warn_unknown_once(self, value: Any) -> None:
+
+[_work_mode_current] adopted=LIVE
+   CODE <pre_transfer>: mode_hint = safe_int(entity._price.get(FIELD_DYNAMIC_OR_SINGLE))  # noqa: SLF001
+   doc  <pre_transfer>: entity._warn_unknown_once(value)  # noqa: SLF001
+   CODE <pre_transfer>: raw = task_plan_value(entity._task_plan, FIELD_WORK_MODEL)  # noqa: SLF001
+   CODE <pre_transfer>: raw = entity._properties.get(FIELD_WORK_MODEL)  # noqa: SLF001
+
+[_work_mode_select] adopted=LIVE
+   CODE <pre_transfer>: await entity.coordinator.async_set_work_model(entity._device_id, mode)  # noqa: SLF001
+
+[async_select_option] adopted=LIVE
+   CODE <pre_transfer>: except Exception as err:  # noqa: BLE001
+
+[async_setup_entry] adopted=LIVE
+   CODE <1\select.py>: async def async_setup_entry(

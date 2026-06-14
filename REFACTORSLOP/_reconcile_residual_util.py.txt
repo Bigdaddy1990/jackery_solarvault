@@ -1,0 +1,475 @@
+
+[AppDataQualityWarning] adopted=LIVE
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: if self.reference_chart_series_key is not None:
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a diagnostics-safe mapping for coordinator payloads."""
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: self.reference_chart_series_key
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[TrendStatisticPoint] adopted=LIVE
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: start_date: date
+
+[_add_warning] adopted=pre_transfer
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: Keyword-only by design: with eight strings/floats it is otherwise
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: too easy to swap source and reference values silently. The
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Append a single contradiction warning to the loop-scoped list.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: DATE_TYPE_YEAR,
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: APP_SECTION_PV_STAT,
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: existing call sites all pass explicit kwargs.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: APP_STAT_TOTAL_SOLAR_ENERGY,
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def _add_warning(
+   doc  <1\util.py>: _period_total(prefix, DATE_TYPE_DAY, stat_key)
+
+[_app_period_bound_to_date] adopted=LIVE
+   CODE <pre_transfer>: raise ValueError(f"Jackery app period {field_name} must not be empty")  # noqa: TRY003
+   CODE <pre_transfer>: raise ValueError(  # noqa: TRY003
+   CODE <pre_transfer>: def _app_period_bound_to_date(value: str | date | datetime, *, field_name: str) -> date:
+
+[_calculated_savings_from_year] adopted=LIVE
+   CODE <pre_transfer>: def _calculated_savings_from_year(  # noqa: PLR0914
+
+[_chart_series_key_for_section] adopted=pre_transfer
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return None
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return trend_series_key(section, stat_key)
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: if isinstance(source, dict):
+
+[_chart_series_key_for_stat] adopted=pre_transfer
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: return APP_CHART_SERIES_Y4
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return the app chart-series key for one section/stat pair."""
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if stat_key == APP_STAT_PV1_ENERGY:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if stat_key == APP_STAT_PV2_ENERGY:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if stat_key == APP_STAT_PV4_ENERGY:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if stat_key == APP_STAT_PV3_ENERGY:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: return APP_CHART_SERIES_Y3
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
+
+[_compact_year_parts] adopted=24.05\24.05\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: whole = sign * float(int(whole_text))
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: tuple[float, float] | None: `(previous_part, current_part)` when the value can be
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: component (current-month share), and returns a tuple of two floats: (previous_part, current_part).
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: interpreted, or `None` when the input is missing or invalid.
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Parse a compact year bucket value into previous- and current-month parts.
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: Returns None for None, boolean, empty, or otherwise unparsable/unsupported values.
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: text = str(value).strip().replace(",", ".")
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if value is None or isinstance(value, bool):
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def _compact_year_parts(value: object) -> tuple[float, float] | None:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Accepts numeric or string inputs that encode a whole (previous months) and a fractional
+   CODE <pre_transfer>: return whole, 0.0
+   CODE <pre_transfer>: return None if parsed is None else (parsed, 0.0)
+   CODE <pre_transfer>: fraction_int = int(fraction_text)
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   CODE <pre_transfer>: fraction = sign * (fraction_int / (10 ** len(fraction_text)))
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: See ``DATA_SOURCE_PRIORITY.md`` ("Device year compact bucket expansion") and
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: keep normal decimal semantics per ``DATA_SOURCE_PRIORITY.md``.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: ``REPAIR_ROADMAP.md`` ("Device year compact bucket expansion"): for device
+   CODE <25.05.v2\util.py [ancient]>: ``PROTOCOL.md §1 "Repair roadmap"`` ("Device year compact bucket expansion"): for device
+   doc  <25.05.v2\util.py [ancient]>: keep normal decimal semantics per ``PROTOCOL.md §8``.
+   doc  <25.05.v2\util.py [ancient]>: See ``PROTOCOL.md §8`` ("Device year compact bucket expansion") and
+   CODE <custom_components\jackery_solarvault\util.py>: unsigned = text.removeprefix("-")
+
+[_format_request_range] adopted=LIVE
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def _format_request_range(request: Any) -> str | None:
+
+[_is_day_period_payload] adopted=pre_transfer
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Day responses carry power curves in W plus documented scalar totals.
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if a malformed payload reports the wrong dateType.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: explicit week/month/year section names keep their section contract even
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Only unsuffixed base trend sections may rely on request metadata here;
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return True for app ``dateType=day`` payloads.
+
+[_nonzero_months] adopted=LIVE
+   CODE <pre_transfer>: if abs(safe_float(value) or 0.0) > 0.00001  # noqa: PLR2004
+
+[_parse_day_chart_minute] adopted=pre_transfer
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: hour = int(match.group(1))
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", value)
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Parse an app day-chart label into minutes after local midnight."""
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: minute = int(match.group(2))
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: int: Minutes after local midnight for a valid label (0–1439).
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def _parse_day_chart_minute(value: Any) -> int | None:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if hour == 24 and minute == 0:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if 0 <= hour <= 23 and 0 <= minute <= 59:
+
+[_parse_iso_date] adopted=LIVE
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def _parse_iso_date(value: Any) -> date | None:
+
+[_payload_debug_passthrough] adopted=LIVE
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Mirrors the shape transforms in :func:`_payload_debug_redacted` (lists,
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Recursively normalise ``value`` to JSON-serializable types only.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: tuple-to-list) but skips redaction. Used in dev mode.
+   doc  <pre_transfer>: value: Any,  # noqa: ANN401, RUF100
+   CODE <custom_components\jackery_solarvault\util.py>: def _payload_debug_passthrough(
+   doc  <custom_components\jackery_solarvault\util.py>: value: Any,
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def _payload_debug_passthrough(value: Any) -> Any:
+
+[_payload_debug_redacted] adopted=LIVE
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Bypasses the redaction list entirely when diagnostics redaction is disabled
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return a recursively redacted, JSON-serializable debug payload.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: so the developer can see the raw bytes flowing through the integration.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return [_payload_debug_redacted(item) for item in value]
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: def _payload_debug_redacted(value: Any) -> Any:
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: else _payload_debug_redacted(item)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a recursively redacted, JSON-serializable debug payload."""
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:
+   CODE <custom_components\jackery_solarvault\util.py>: value: Any, redactions_disabled: bool | None = None
+   CODE <custom_components\jackery_solarvault\util.py>: def _payload_debug_redacted(
+   doc  <pre_transfer>: value: Any,  # noqa: ANN401, RUF100
+   CODE <pre_transfer>: redactions_disabled: bool | None = None,
+
+[_pv_revenue_value] adopted=LIVE
+   CODE <pre_transfer>: revenue = safe_float(source.get(APP_STAT_TOTAL_SOLAR_REVENUE))
+   CODE <pre_transfer>: profit = safe_float(source.get(APP_STAT_PV_PROFIT))
+
+[_savings_publish_decision] adopted=pre_transfer
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def _savings_publish_decision(
+
+[_stat_source_shape] adopted=24.05\24.05\custom_components\jackery_solarvault\util.py
+   doc  <pre_recovery>: # --- restored from 24.05\24.05\custom_components\jackery_solarvault\util.py ---
+
+[_trend_date_type] adopted=pre_transfer
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: for suffix in (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR):
+
+[active_redact_keys] adopted=pre_transfer
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: ``frozenset[str]`` for type consistency with the module-level
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return ``REDACT_KEYS`` or an empty set depending on dev-mode switches.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: ``REDACT_KEYS``.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: and HA diagnostics download) honour the same toggle. Cast to
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Imported by ``diagnostics.py`` so both redaction surfaces (JSONL log
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def active_redact_keys(entry: Any | None = None) -> frozenset[str]:
+
+[app_month_request_kwargs] adopted=LIVE
+   CODE <pre_transfer>: if month < 1 or month > 12:  # noqa: PLR2004
+   CODE <pre_transfer>: raise ValueError(f"Unsupported Jackery app month: {month!r}")  # noqa: TRY003
+
+[app_period_range] adopted=pre_transfer
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: implementation notes §2 requires explicit full ranges for period endpoints:
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: APP_POLLING_MQTT.md requires explicit full ranges for period endpoints:
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: day=today..today, week=Monday..Sunday, month=first..last day,
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return the documented Jackery app begin/end range for a period.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: year=Jan 1..Dec 31. Keeping this in one helper prevents the REST client
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: and coordinator diagnostics from drifting apart.
+   CODE <25.05.v2\util.py [ancient]>: PROTOCOL.md §2 requires explicit full ranges for period endpoints:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: today = date.today()
+
+[append_payload_debug_line] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: event: dict[str, Any],
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: redactions_disabled: bool | None = None,
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def append_payload_debug_line(
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: path: str | Path,
+
+[append_unique_entity] adopted=LIVE
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: logger: Any,
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: entity: Any,
+
+[as_dict] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a diagnostics-safe mapping for coordinator payloads."""
+   doc  <pre_recovery>: # --- restored from 24.05\24.05\custom_components\jackery_solarvault\util.py ---
+
+[backfill_year_payload_from_months] adopted=LIVE
+   CODE <pre_transfer>: def backfill_year_payload_from_months(  # noqa: PLR0912
+
+[calculated_smart_meter_power] adopted=LIVE
+   CODE <pre_transfer>: def calculated_smart_meter_power(  # noqa: PLR0911
+
+[chart_series_debug] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return raw/parsed chart-series diagnostics for app payload arrays.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: visible without guessing.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: list separator and decimal separator, e.g. ``0, 0, 14,84, 0``. Each item is
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: logged with raw value, Python type and parsed float so parser bugs are
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: This exists to avoid the ambiguous HA UI representation where comma is both
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def chart_series_debug(source: Any) -> dict[str, Any]:
+
+[compact_json] adopted=pre_transfer
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def compact_json(value: Any) -> str:
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return compact JSON for diagnostic attributes."""
+
+[config_entry_bool_option] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: custom integration briefly stored these toggles in ``entry.data`` during
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: setup, so every caller must use the same lookup order to avoid platform
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a bool option with legacy setup-data fallback.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: Home Assistant options live in ``entry.options``. Older releases of this
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: drift after upgrades.
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
+
+[config_entry_int_option] adopted=pre_transfer
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: options dict cannot break entry setup.
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return an int option with legacy setup-data fallback.
+   CODE <27.05\custom_components\jackery_solarvault\util.py [ancient]>: except (TypeError, ValueError):
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: Mirrors :func:`config_entry_bool_option`. Strings are coerced via
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: ``int(...)``; invalid values fall back to ``default`` so a corrupted
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def config_entry_int_option(entry: Any, key: str, default: int) -> int:
+
+[config_entry_str_option] adopted=pre_transfer
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return a str option with legacy setup-data fallback.
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: that reads mixed-type options (e.g. the Third-Party MQTT bridge
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: settings from PROTOCOL.md §5) without re-implementing the
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: options-then-data fallback per call site.
+   doc  <27.05\custom_components\jackery_solarvault\util.py [ancient]>: Mirrors :func:`config_entry_bool_option`. Used by config-flow code
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def config_entry_str_option(entry: Any, key: str, default: str) -> str:
+
+[day_power_energy_points] adopted=LIVE
+   CODE <pre_transfer>: def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
+
+[dev_mode_redactions_disabled] adopted=21.05\21.05\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: The result is cached on first call to avoid repeated environment lookups.
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Indicates whether developer-mode redactions are disabled based on the JACKERY_DEV_MODE environmen
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: global _DEV_MODE_CACHED
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: return _DEV_MODE_CACHED
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if _DEV_MODE_CACHED is None:
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   doc  <pre_transfer>: @functools.cache
+   doc  <25.05.v2\util.py [ancient]>: stay safe to share. PROTOCOL.md §13 ("Privacy / diagnostics") still
+
+[diagnostic_redactions_disabled] adopted=pre_transfer
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: Gated **only** by the ``JACKERY_DEV_MODE=1`` environment variable so the
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: process (``JACKERY_DEV_MODE=1`` in ``addon_config`` / ``compose`` /
+   doc  <24.05\24.05\custom_components\jackery_solarvault\util.py>: The developer who needs unredacted output sets the env var on the HA
+   doc  <24.05\24.05\custom_components\jackery_solarvault\util.py>: raw ``bluetoothKey`` / ``mqttPassWord`` / serial-number values cannot be
+   doc  <24.05\24.05\custom_components\jackery_solarvault\util.py>: previous signature and is intentionally ignored.
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: def diagnostic_redactions_disabled(_entry: Any | None = None) -> bool:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: The ``_entry`` parameter is kept for backward compatibility with the
+   doc  <24.05\24.05\custom_components\jackery_solarvault\util.py>: leaked by a user toggling a UI checkbox and sharing a diagnostics ZIP.
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: ``run.sh``) for the brief debugging window and turns it off again.
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: return dev_mode_redactions_disabled()
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return True when diagnostics should bypass sensitive-field redaction.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: ``JACKERY_DEV_MODE`` is kept as a developer fallback, but HAOS users cannot
+   CODE <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: option is therefore the normal runtime switch for short local debugging.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: reliably set arbitrary Home Assistant Core environment variables. The entry
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def diagnostic_redactions_disabled(entry: Any | None = None) -> bool:
+
+[expanded_year_series_values] adopted=LIVE
+   CODE <pre_transfer>: def expanded_year_series_values(  # noqa: PLR0911
+
+[first_nonblank_int] adopted=LIVE
+   doc  <pre_transfer>: first token that parses as an integer, or None when the value is
+   CODE <pre_transfer>: def first_nonblank_int(value: object) -> int | None:
+   doc  <pre_transfer>: """Return the first integer-parseable, non-blank token of ``value``.
+   CODE <pre_transfer>: return parsed
+   doc  <pre_transfer>: Accepts a scalar or a whitespace/comma-separated string and returns the
+   CODE <pre_transfer>: for token in text.replace(",", " ").split():
+   CODE <pre_transfer>: if parsed is not None:
+   doc  <pre_transfer>: None/blank/unparseable. Used by the cloud client to coerce loosely typed
+   doc  <pre_transfer>: id/code fields that may arrive as zero-padded or whitespace-wrapped strings.
+   CODE <pre_transfer>: return int(value)
+   CODE <pre_transfer>: parsed = safe_int(token)
+
+[first_power_value] adopted=pre_transfer
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: if key not in source or source.get(key) is None:
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return the first available numeric power value for the given keys."""
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: continue
+
+[format_data_quality_warning] adopted=LIVE
+   CODE <pre_transfer>: text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request
+   CODE <pre_transfer>: text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: f"{reference_section}: {reference_request or 'unknown'}]"
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a compact, deterministic repair/diagnostic warning example."""
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: text += (
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: f"{metric}: {source_section}={source_text} "
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: f"< {reference_section}={reference_text}"
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: text = (
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: f" [{source_section}: {source_request or 'unknown'}; "
+
+[guard_statistic_totals_from_year] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: *,
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: previous_statistic: dict[str, Any] | None = None,
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: payload: dict[str, Any],
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def guard_statistic_totals_from_year(
+   CODE <pre_transfer>: def guard_statistic_totals_from_year(  # noqa: PLR0914
+
+[is_device_year_period_section] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return True for device app dateType=year statistic payloads."""
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: date_type = _trend_date_type(section, source)
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return date_type == DATE_TYPE_YEAR and section.startswith((
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: `true` if the section's request dateType is year and the section name starts with a device statistic
+
+[jackery_grid_side_input_power] adopted=LIVE
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """AC power drawn by Jackery from the grid/home side.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: ``inGridSidePw`` name is kept as a compatibility fallback.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: Prefer the on-grid fields observed in live diagnostics. The older
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: return first_power_value(
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: props, FIELD_IN_ONGRID_PW, FIELD_GRID_IN_PW, FIELD_IN_GRID_SIDE_PW
+
+[jackery_grid_side_output_power] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: ``outGridSidePw`` name is kept as a compatibility fallback.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """AC power supplied by Jackery to the grid/home side.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: Prefer the on-grid fields observed in live diagnostics. The older
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: return first_power_value(
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: props, FIELD_OUT_ONGRID_PW, FIELD_GRID_OUT_PW, FIELD_OUT_GRID_SIDE_PW
+
+[jackery_online_state] adopted=pre_transfer
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def jackery_online_state(value: Any) -> bool | None:
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return a parsed Jackery online/offline marker, or None when unknown."""
+
+[jackery_reported_home_load_power] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: home-load value. Prefer this direct app field over reconstructing the load
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return Jackery's reported live home/other-load power if available.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: from grid-side fields, because grid-side field availability differs by
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: SolarVault 3 Pro Max diagnostics show ``otherLoadPw`` as the app's live
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: firmware and message source.
+
+[normalized_data_quality_warnings] adopted=LIVE
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: warnings: list[dict[str, Any]],
+
+[parse_utc_datetime] adopted=LIVE
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: if not isfinite(timestamp):
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: raise ValueError
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: raise ValueError(f"invalid UTC timestamp: {value!r}")
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: except OverflowError as err:
+   CODE <custom_components\jackery_solarvault\util.py>: def parse_utc_datetime(
+   doc  <custom_components\jackery_solarvault\util.py>: value: Any,
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Parse a Jackery timestamp and normalize it to timezone-aware UTC."""
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: elif isinstance(value, int | float) and not isinstance(value, bool):
+   doc  <pre_transfer>: value: Any,  # noqa: ANN401, RUF100
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def parse_utc_datetime(value: Any) -> datetime:
+
+[redacted_json_safe_payload] adopted=LIVE
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: can be written to the state machine and recorder, so they stay redacted
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: This is stricter than diagnostics export redaction: HA entity attributes
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return a JSON-safe payload with sensitive Jackery fields redacted.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: even when the developer-only unredacted diagnostics option is enabled.
+   doc  <pre_transfer>: value: Any,  # noqa: ANN401, RUF100
+   CODE <custom_components\jackery_solarvault\util.py>: def redacted_json_safe_payload(
+   doc  <custom_components\jackery_solarvault\util.py>: value: Any,
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def redacted_json_safe_payload(value: Any) -> Any:
+
+[safe_bool] adopted=24.05\24.05\custom_components\jackery_solarvault\util.py
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: `True` if the value represents a true state, `False` if it represents a false state, `None` if the v
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: except TypeError, ValueError:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Interpret a payload value as a boolean.
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def safe_bool(value: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at run
+   CODE <25.05.v2\util.py [ancient]>: except (TypeError, ValueError):
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+   CODE <pre_transfer>: def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime  # noqa: AN
+   CODE <custom_components\jackery_solarvault\util.py>: def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime
+
+[safe_float] adopted=24.05\24.05\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: return float(candidate)
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: return float(value)
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: except TypeError, ValueError:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Parse a payload value into a Python float or return None when it cannot be interpreted.
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: value (Any): Input value from a Jackery payload. Accepts numbers, None, or strings (including numeri
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Parameters:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: except ValueError:
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: float_value (float | None): The parsed float on success, or `None` if `value` is `None` or cannot be
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: and unsupported types produce `None`.
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def safe_float(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at r
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: optionally using a single comma as the decimal separator when no dot is present). Empty or malformed
+   doc  <pre_transfer>: value: Any,  # noqa: ANN401, RUF100
+   CODE <pre_transfer>: def safe_float(  # noqa: PLR0911
+   CODE <25.05.v2\util.py [ancient]>: except (TypeError, ValueError):
+   doc  <custom_components\jackery_solarvault\util.py>: value: Any,
+   CODE <custom_components\jackery_solarvault\util.py>: def safe_float(
+
+[safe_int] adopted=pre_transfer
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def safe_int(value: Any) -> int | None:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: return int(parsed)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: if isinstance(value, bool):
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: parsed = float(value)
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: except TypeError, ValueError, OverflowError:
+   CODE <24.05\24.05\custom_components\jackery_solarvault\util.py>: if not isfinite(parsed):
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Convert a Jackery payload value to int, returning None on error.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: ("8.0" -> 8) so that downstream enum lookups still succeed.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: Handles numeric strings that were written with a decimal point
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runti
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: return int(float(value))
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: if value is None:
+   CODE <25.05.v2\util.py [ancient]>: except (TypeError, ValueError):
+   CODE <custom_components\jackery_solarvault\util.py>: def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime
+
+[signed_phase_power_values] adopted=pre_transfer
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return signed CT phase powers; positive=grid import, negative=export."""
+
+[smart_meter_net_power] adopted=pre_transfer
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: phase fields remain available for gross import/export/flow diagnostics.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return app-reported CT grid power; positive=import, negative=export.
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return None
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: return sum(phases)
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: SolarVault CT payloads contain both phase-level fields and aggregate total
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: fields. The Jackery app uses the aggregate pair for its net CT value; the
+
+[smart_plug_serial] adopted=pre_transfer
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: placing a serial in the unique ID itself (implementation notes §0 rule 7).
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: cross-payload identifier; sorting plugs by this value gives every plug a
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return the deviceSn for a smart-plug subdevice payload, or None.
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: positional ``smart_plug_<N>_*`` unique-ID suffix stays stable without
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: deterministic position that survives cloud-side re-ordering, so the
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: Smart plugs arrive in an unordered list. The serial is the only stable
+   doc  <25.05.v2\util.py [ancient]>: placing a serial in the unique ID itself (PROTOCOL.md §0 rule 7).
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def smart_plug_serial(plug: Any) -> str | None:
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: raw = plug.get(FIELD_DEVICE_SN) or plug.get(FIELD_DEV_SN) or plug.get(FIELD_SN)
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: """Extract the serial number from a smart-plug subdevice payload.
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: serial (str | None): The trimmed serial string from `FIELD_DEVICE_SN`, `FIELD_DEV_SN`, or `FIELD_SN`
+
+[sorted_meter_heads] adopted=LIVE
+   CODE <custom_components\jackery_solarvault\util.py>: entries.sort(key=operator.itemgetter(0))
+
+[sorted_smart_plugs] adopted=pre_transfer
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def sorted_smart_plugs(plugs: Any) -> list[dict[str, Any]]:
+   doc  <1\1101\custom_components\jackery_solarvault\util.py>: """Return plug entries sorted by their serial numbers.
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: list[dict[str, Any]]: The input entries that contain a serial (as determined by `smart_plug_serial`)
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: entries.sort(key=lambda item: item[0])
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Return plug entries sorted by serial, dropping entries without one."""
+
+[statistic_id_part] adopted=LIVE
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def statistic_id_part(value: Any) -> str:
+
+[subdevice_branding] adopted=27.05\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: tuple[str | None, str | None]: `(manufacturer, model_label)` or
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: is not found in the catalog, returns `(None, None)` so callers may fall
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: `(None, None)` when unknown or invalid.
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Return manufacturer and model label for a documented subdevice `scan_name`.
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: def subdevice_branding(scan_name: object) -> tuple[str | None, str | None]:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: back to other payload fields.
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Looks up `scan_name` in the internal accessory catalog and returns a tuple
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: (manufacturer, model_label). If `scan_name` is not a non-empty string or
+
+[task_plan_value] adopted=LIVE
+   CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: if not isinstance(item, dict):
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: App/MQTT task-plan responses can expose values directly, inside ``body``
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: or as items in ``tasks``. Platforms should use this helper instead of
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Read a value from the task-plan shapes documented in MQTT_PROTOCOL.md.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: duplicating shape-specific fallbacks.
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: continue
+   CODE <custom_components\jackery_solarvault\util.py>: def task_plan_value(
+   CODE <custom_components\jackery_solarvault\util.py>: task_plan: dict[str, Any], *keys: str
+   CODE <1\1101\custom_components\jackery_solarvault\util.py>: def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:
+   doc  <21.05\21.05\custom_components\jackery_solarvault\util.py [ancient]>: """Read a value from the task-plan shapes documented in implementation notes §3-§5.
+   doc  <25.05.v2\util.py [ancient]>: """Read a value from the task-plan shapes documented in PROTOCOL.md §3-§5.
+
+[trend_series_has_value] adopted=LIVE
+   CODE <pre_transfer>: def trend_series_has_value(  # noqa: PLR0911
+
+[trend_series_key] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is n
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Returns:
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: Only returns a chart-series key when `section` denotes a week, month, or year payload; otherwise ret
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Map a section and statistic key to the corresponding chart-series key for week/month/year payload
+   CODE <01.06\custom_components\jackery_solarvault\util.py>: return _chart_series_key_for_stat(section, stat_key)
+   doc  <1\util.py>: f"_{DATE_TYPE_DAY}",
+   doc  <1\util.py>: Only returns a chart-series key when `section` denotes a day, week, month, or year payload; otherwis
+   doc  <1\util.py>: """Map a section and statistic key to the corresponding chart-series key for day/week/month/year pay
+   doc  <pre_transfer>: """  # noqa: E501, RUF100
+
+[trend_series_points] adopted=LIVE
+   CODE <pre_transfer>: def trend_series_points(  # noqa: PLR0912
+
+[trend_series_total] adopted=LIVE
+   CODE <pre_transfer>: def trend_series_total(  # noqa: PLR0911
+
+[utc_now] adopted=LIVE
+   doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py [ancient]>: """Return the current UTC time as a timezone-aware datetime."""
+
+[validate_app_period_date_type] adopted=1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\util.py
+   doc  <01.06\custom_components\jackery_solarvault\util.py>: """Return a supported Jackery app period type or raise ValueError."""
+   CODE <pre_transfer>: raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")  # noqa: TRY003

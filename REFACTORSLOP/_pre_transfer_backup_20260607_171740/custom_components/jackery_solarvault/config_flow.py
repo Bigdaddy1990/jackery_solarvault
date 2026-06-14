@@ -1,0 +1,473 @@
+"""Config flow for Jackery SolarVault."""
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigFlow, OptionsFlow
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+
+    DhcpServiceInfo = Any
+    MqttServiceInfo = Any
+    ZeroconfServiceInfo = Any
+
+from .client import JackeryApi, JackeryAuthError, JackeryError
+from .const import (
+    CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_BLE_WRITES,
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    CONF_ENABLE_MONTH_STATISTICS,
+    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CONF_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS,
+    CONF_MQTT_MAC_ID,
+    CONF_REGION_CODE,
+    DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    DEFAULT_ENABLE_BLE_TRANSPORT,
+    DEFAULT_ENABLE_BLE_WRITES,
+    DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    DEFAULT_ENABLE_MONTH_STATISTICS,
+    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    DEFAULT_ENABLE_WEEK_STATISTICS,
+    DEFAULT_ENABLE_YEAR_STATISTICS,
+    DOMAIN,
+    FLOW_ABORT_REAUTH_ENTRY_MISSING,
+    FLOW_ABORT_REAUTH_SUCCESSFUL,
+    FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
+    FLOW_ABORT_RECONFIGURE_ENTRY_MISSING,
+    FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
+    FLOW_ERROR_ACCOUNT_REQUIRED,
+    FLOW_ERROR_BASE,
+    FLOW_ERROR_CANNOT_CONNECT,
+    FLOW_ERROR_INVALID_AUTH,
+    FLOW_STEP_INIT,
+    FLOW_STEP_REAUTH_CONFIRM,
+    FLOW_STEP_RECONFIGURE,
+    FLOW_STEP_USER,
+)
+from .mqtt_session_cache import async_clear_mqtt_session
+from .util import config_entry_bool_option
+
+_LOGGER = logging.getLogger(__name__)
+
+_OPTION_DEFAULTS: dict[str, bool] = {
+    CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES,
+    CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
+    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,  # noqa: E501, RUF100
+}
+
+
+def _normalize_account(value: str) -> str:
+    """Normalize user-facing account identifiers before auth and unique IDs."""
+    return value.strip()
+
+
+def _current_option_values(entry: ConfigEntry) -> dict[str, bool]:
+    """Return current option values with legacy setup-data fallback."""
+    return {
+        key: config_entry_bool_option(entry, key, default)
+        for key, default in _OPTION_DEFAULTS.items()
+    }
+
+
+def _flow_options(
+    user_input: dict[str, Any],
+    current_options: dict[str, bool] | None = None,
+) -> dict[str, bool]:
+    """Build complete options, preserving current values when fields are omitted."""
+    current = current_options or {}
+    return {
+        key: user_input.get(key, current.get(key, default))
+        for key, default in _OPTION_DEFAULTS.items()
+    }
+
+
+USER_SCHEMA = vol.Schema({
+    vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1)),
+    vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+    vol.Optional(
+        CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+        default=DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
+    ): bool,
+    vol.Optional(
+        CONF_CREATE_CALCULATED_POWER_SENSORS,
+        default=DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
+    ): bool,
+    vol.Optional(
+        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+        default=DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
+    ): bool,
+    vol.Optional(
+        CONF_ENABLE_BLE_TRANSPORT,
+        default=DEFAULT_ENABLE_BLE_TRANSPORT,
+    ): bool,
+})
+
+
+class JackeryOptionsFlow(OptionsFlow):
+    """Handle the Jackery SolarVault options flow."""
+
+    # No __init__: HA injects self.config_entry automatically since 2024.11.
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step init."""
+        current_options = _current_option_values(self.config_entry)
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data=_flow_options(user_input, current_options),
+            )
+
+        current_create_derived = current_options[
+            CONF_CREATE_SMART_METER_DERIVED_SENSORS
+        ]
+        current_create_calculated_power = current_options[
+            CONF_CREATE_CALCULATED_POWER_SENSORS
+        ]
+        current_create_savings_details = current_options[
+            CONF_CREATE_SAVINGS_DETAIL_SENSORS
+        ]
+        current_enable_ble_transport = current_options[CONF_ENABLE_BLE_TRANSPORT]
+        current_enable_ble_writes = current_options[CONF_ENABLE_BLE_WRITES]
+        current_enable_unredacted_diagnostics = current_options[
+            CONF_ENABLE_UNREDACTED_DIAGNOSTICS
+        ]
+        current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
+        current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
+        current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
+        current_enable_derived_home_fallback = current_options[
+            CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
+        ]
+        schema = vol.Schema({
+            vol.Optional(
+                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                default=current_create_derived,
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                default=current_create_calculated_power,
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                default=current_create_savings_details,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_BLE_TRANSPORT,
+                default=current_enable_ble_transport,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_BLE_WRITES,
+                default=current_enable_ble_writes,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+                default=current_enable_unredacted_diagnostics,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_WEEK_STATISTICS,
+                default=current_enable_week_statistics,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_MONTH_STATISTICS,
+                default=current_enable_month_statistics,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_YEAR_STATISTICS,
+                default=current_enable_year_statistics,
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+                default=current_enable_derived_home_fallback,
+            ): bool,
+        })
+        return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
+
+
+class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle the Jackery SolarVault config flow."""
+
+    VERSION = 1
+
+    async def async_step_bluetooth(
+        self, discovery_info: BluetoothServiceInfoBleak
+    ) -> ConfigFlowResult:
+        """Handle Bluetooth discovery."""
+        await self.async_set_unique_id(discovery_info.address)
+        self._abort_if_unique_id_configured()
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle DHCP discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_mqtt(
+        self, discovery_info: MqttServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle MQTT discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle Zeroconf discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+        return await self.async_step_user()
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the initial user-driven config flow step."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            account = _normalize_account(user_input[CONF_USERNAME])
+            if not account:
+                errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
+                return self.async_show_form(
+                    step_id=FLOW_STEP_USER,
+                    data_schema=USER_SCHEMA,
+                    errors=errors,
+                )
+            await self.async_set_unique_id(account.lower())
+            self._abort_if_unique_id_configured()
+
+            session = async_get_clientsession(self.hass)
+            api = JackeryApi(
+                session=session,
+                account=account,
+                password=user_input[CONF_PASSWORD],
+            )
+            try:
+                await api.async_login()
+            except JackeryAuthError:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+            except JackeryError as err:
+                _LOGGER.debug("Cannot connect to Jackery during setup: %s", err)
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+            else:
+                return self.async_create_entry(
+                    title=account,
+                    data={
+                        CONF_USERNAME: account,
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                    options=_flow_options(user_input),
+                )
+
+        return self.async_show_form(
+            step_id=FLOW_STEP_USER,
+            data_schema=USER_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle a user-initiated reconfigure of an existing entry.
+
+        HA's reconfigure flow lets the user change credentials and toggle
+        the calculated-sensor options without removing the entry. The
+        normalized account from user input must match the entry that
+        triggered the flow; otherwise we abort to keep unique-id semantics
+        stable across the reconfigure round-trip.
+        """
+        try:
+            entry = self._get_reconfigure_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            account = _normalize_account(user_input[CONF_USERNAME])
+            if not account:
+                errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
+            elif account.lower() != str(entry.unique_id or "").lower():
+                return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
+            else:
+                await self.async_set_unique_id(account.lower())
+                self._abort_if_unique_id_mismatch()
+                session = async_get_clientsession(self.hass)
+                api = JackeryApi(
+                    session=session,
+                    account=account,
+                    password=user_input[CONF_PASSWORD],
+                    mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                    region_code=entry.data.get(CONF_REGION_CODE),
+                )
+                try:
+                    await api.async_login()
+                except JackeryAuthError:
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+                except JackeryError as err:
+                    _LOGGER.debug(
+                        "Cannot connect to Jackery during reconfigure: %s", err
+                    )
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates={
+                            CONF_USERNAME: account,
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        },
+                        options=_flow_options(
+                            user_input, _current_option_values(entry)
+                        ),
+                        reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
+                    )
+
+        current_options = _current_option_values(entry)
+        schema = vol.Schema({
+            vol.Required(
+                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
+            ): vol.All(str, vol.Length(min=1)),
+            vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+            vol.Optional(
+                CONF_CREATE_SMART_METER_DERIVED_SENSORS,
+                default=current_options[CONF_CREATE_SMART_METER_DERIVED_SENSORS],
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_CALCULATED_POWER_SENSORS,
+                default=current_options[CONF_CREATE_CALCULATED_POWER_SENSORS],
+            ): bool,
+            vol.Optional(
+                CONF_CREATE_SAVINGS_DETAIL_SENSORS,
+                default=current_options[CONF_CREATE_SAVINGS_DETAIL_SENSORS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_BLE_TRANSPORT,
+                default=current_options[CONF_ENABLE_BLE_TRANSPORT],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_BLE_WRITES,
+                default=current_options[CONF_ENABLE_BLE_WRITES],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_WEEK_STATISTICS,
+                default=current_options[CONF_ENABLE_WEEK_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_MONTH_STATISTICS,
+                default=current_options[CONF_ENABLE_MONTH_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_YEAR_STATISTICS,
+                default=current_options[CONF_ENABLE_YEAR_STATISTICS],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+                default=current_options[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+                default=current_options[CONF_ENABLE_UNREDACTED_DIAGNOSTICS],
+            ): bool,
+        })
+        return self.async_show_form(
+            step_id=FLOW_STEP_RECONFIGURE,
+            data_schema=schema,
+            description_placeholders={
+                "username": str(entry.data.get(CONF_USERNAME, "")),
+            },
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle reauth started by ConfigEntryAuthFailed."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Prompt the user for a fresh password and re-test against Jackery."""
+        try:
+            entry = self._get_reauth_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            session = async_get_clientsession(self.hass)
+            api = JackeryApi(
+                session=session,
+                account=entry.data[CONF_USERNAME],
+                password=user_input[CONF_PASSWORD],
+                mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                region_code=entry.data.get(CONF_REGION_CODE),
+            )
+            try:
+                await api.async_login()
+            except JackeryAuthError:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+            except JackeryError as err:
+                _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+            else:
+                # The cloud may have rotated the MQTT seed on password change.
+                # Clear the cached session so the next setup derives fresh
+                # MQTT credentials from the new login instead of replaying
+                # a potentially stale AES-256 seed.
+                try:
+                    await async_clear_mqtt_session(self.hass, entry.entry_id)
+                except Exception:  # noqa: BLE001
+                    _LOGGER.debug(
+                        "Jackery reauth: failed to clear MQTT session; "
+                        "proceeding with reload"
+                    )
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
+                )
+
+        return self.async_show_form(
+            step_id=FLOW_STEP_REAUTH_CONFIRM,
+            data_schema=vol.Schema({
+                vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
+            }),
+            description_placeholders={
+                "username": entry.data.get(CONF_USERNAME, ""),
+            },
+            errors=errors,
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(entry: ConfigEntry) -> JackeryOptionsFlow:
+        """Return the options flow handler for this entry."""
+        return JackeryOptionsFlow()
