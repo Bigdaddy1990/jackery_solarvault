@@ -274,6 +274,7 @@ exclude = [
     "logs",
     "APP",
     ".scripts",
+    "clause backups",
 ]
 
 [tool.ruff.analyze]
@@ -384,6 +385,7 @@ max-complexity = 25
 "**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
 "**/client/api.py" = ["F821", "E402"]  # debug pkcs7 pad test + mid-file imports
 "**/client/_endpoints/*.py" = ["PLR0904"]  # domain mixins have many public methods
+"tests/*.py" = ["SLF001", "PLR6301", "PLR0912", "PERF401", "B007"]  # tests access private members freely
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
