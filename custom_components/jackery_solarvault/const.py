@@ -561,7 +561,7 @@ FIELD_SWITCH: Final = "switch"
 SHELLY_CONTROL_FUNCTION_SWITCH: Final = "switch"
 SHELLY_CONTROL_ACTION_ON: Final = "on"
 SHELLY_CONTROL_ACTION_OFF: Final = "off"
-# AccSocketBody short-keys per docs/html/jackery_smali_home_assistant_report.html
+# AccSocketBody short-keys per source-of-truth/jackery_smali_home_assistant_report.html
 # §"AccSocketBody". ``op`` is already an alias for ``outPw`` (coordinator
 # merge), ``switch`` is exposed through switch/binary_sensor entities, and
 # the remaining two are documented but not observed in this installer's
@@ -868,7 +868,7 @@ FIELD_CT_POWER_FACTOR: Final = "fact"
 FIELD_CT_POWER_FACTOR1: Final = "fact1"
 FIELD_CT_POWER_FACTOR2: Final = "fact2"
 FIELD_CT_POWER_FACTOR3: Final = "fact3"
-# AccCTBody apparent / reactive power per docs/html jackery_entity_field_candidates_v2:
+# AccCTBody apparent / reactive power per source-of-truth/jackery_entity_field_candidates_v2:
 # ``ap``/``ap1..3`` = apparent power (VA), ``rep``/``rep1..3`` = reactive
 # power (var). Total + per-phase variants mirror the active-power layout.
 FIELD_CT_APPARENT_POWER: Final = "ap"
@@ -879,7 +879,7 @@ FIELD_CT_REACTIVE_POWER: Final = "rep"
 FIELD_CT_REACTIVE_POWER1: Final = "rep1"
 FIELD_CT_REACTIVE_POWER2: Final = "rep2"
 FIELD_CT_REACTIVE_POWER3: Final = "rep3"
-# CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html:
+# CtSub.funForm per source-of-truth/jackery_entity_field_candidates_v2.html:
 # CT function-form / wiring-mode identifier (1-phase vs 3-phase config).
 # Exposed as diagnostic — useful for troubleshooting an unexpected CT layout.
 FIELD_CT_FUN_FORM: Final = "funForm"
@@ -1275,7 +1275,7 @@ APP_STAT_TOTAL_CHARGE: Final = "totalCharge"
 APP_STAT_TOTAL_DISCHARGE: Final = "totalDischarge"
 APP_STAT_TOTAL_CT_INPUT_ENERGY: Final = "totalInCtEnergy"
 APP_STAT_TOTAL_CT_OUTPUT_ENERGY: Final = "totalOutCtEnergy"
-# EpsStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — EPS /
+# EpsStatApi$Bean per source-of-truth/jackery_http_model_fields_v2.html — EPS /
 # off-grid in/out totals for a single dateType payload.
 APP_STAT_TOTAL_IN_EPS_ENERGY: Final = "totalInEpsEnergy"
 APP_STAT_TOTAL_OUT_EPS_ENERGY: Final = "totalOutEpsEnergy"
@@ -1293,7 +1293,7 @@ APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
 APP_STAT_TODAY_LOAD: Final = "todayLoad"
 APP_STAT_TOTAL_GENERATION: Final = "totalGeneration"
 APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
-# PvStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — separate
+# PvStatApi$Bean per source-of-truth/jackery_http_model_fields_v2.html — separate
 # from systemStatistic.totalRevenue (latter is the lifetime KPI).
 # totalSolarRevenue is the periodic Jackery cloud "PV revenue" value tied
 # to that period's PV energy and the configured tariff (singlePrice or
@@ -1928,7 +1928,7 @@ ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
 
 # --- Portable / Explorer powerstation command IDs (msg_id 1-53) ---------------
 # Sourced from ``com.hbxn.control.device.cmd.portable.b`` (51 portable commands
-# per docs/Jackery_2.1.1_RE_Supplement.md §3.2). All transport as
+# per source-of-truth/Jackery_2.1.1_RE_Supplement.md §3.2). All transport as
 # ``messageType=DevicePropertyChange`` with ``bleMsgType`` per row, unless noted.
 ACTION_ID_PORTABLE_OTA_PAGE_DATA: Final = 1  # ble=103 DevicePropertyChange
 ACTION_ID_PORTABLE_OTA_VERSION: Final = 2  # ble=100 DevicePropertyChange
@@ -2087,7 +2087,7 @@ SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
 })
 
 # Subdevice ``scanName`` catalog from the Jackery app's accessory enum.
-# Source: ``docs/html/jackery_smali_home_assistant_report.html`` section
+# Source: ``source-of-truth/jackery_smali_home_assistant_report.html`` section
 # "Subdevice-/Zubehör-Erkennung" — the table the app's
 # ``DeviceJackeryAccessoriesExistApi`` populates from BLE/mDNS scans.
 # Keys are the wire ``scanName`` exactly as the firmware reports them
@@ -2095,7 +2095,7 @@ SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
 SUBDEVICE_SCAN_NAME_DEV_TYPES: Final[dict[str, int]] = {
     # UNKNOWN sentinel: intentionally omitted at runtime (no scanName match).
     # Reference accessories.types[0] = UNKNOWN/devType=0; kept as comment
-    # for audit completeness per jackery_complete_reference.json.
+    # for audit completeness per source-of-truth/jackery_complete_reference.json.
     "shellyproem50": SUBDEVICE_DEV_TYPE_CT,
     "shellypro3em": SUBDEVICE_DEV_TYPE_CT,
     "shellypro3em63": SUBDEVICE_DEV_TYPE_CT,

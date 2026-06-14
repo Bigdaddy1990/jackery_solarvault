@@ -285,6 +285,16 @@ Authoritative sources (non-exhaustive, must be consulted when relevant):
 
 ## Documentation and release hygiene
 
+## Documentation source boundary
+
+- Contributor and agent workflow rules live in `docs/`.
+- Jackery protocol captures, reverse-engineered DTOs, command catalogs, endpoint
+  matrices, and protocol helper scripts live in `source-of-truth/`.
+- `docs/` protocol pages are derived summaries only; if they conflict with
+  `source-of-truth/`, update or remove the derived page.
+- The classification for migrated protocol files is maintained in
+  `docs/DERIVED_PROTOCOL_DOCS.md`.
+
 - Update README, `info.md`, and `docs/` when workflows change. Each file must
   link to the relevant evidence (tests, modules, or scripts) so reviewers can
   verify Platinum claims.
@@ -342,7 +352,7 @@ For every pull request, reviewers and bots must enforce this minimum quality bar
 
 ### **1.0 Always strict follow Home Assistant Best Practices**  
 ## /docs/ha_custom_config_and_best_practices.json
-## /docs/jackery_complete_reference.json
+## /source-of-truth/jackery_complete_reference.json
 
 ### **1.1 Data Integrity First**
 - **Only verified data** may enter the Home Assistant Recorder.
