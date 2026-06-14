@@ -689,7 +689,7 @@ def test_const_exposes_ble_option_and_field() -> None:
     from custom_components.jackery_solarvault import const
 
     assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
-    assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
+    assert const.DEFAULT_ENABLE_BLE_TRANSPORT is True
     assert const.CONF_ENABLE_BLE_WRITES == "enable_ble_writes"
     assert const.DEFAULT_ENABLE_BLE_WRITES is False
     assert const.FIELD_BLUETOOTH_KEY == "bluetoothKey"
@@ -947,7 +947,7 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             body: bytes,
             flags: int,
             wait_for_ack: bool = False,
-            ack_timeout_sec: float = 5.0,
+            ack_timeout_sec: float = 20,
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:
@@ -998,7 +998,7 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             "body": b'{"cmd":107,"swEps":1}',
             "flags": 42,
             "wait_for_ack": False,
-            "ack_timeout_sec": 5.0,
+            "ack_timeout_sec": 20,
             "ack_cmds": None,
             "mtu_override": None,
         }
@@ -1009,7 +1009,7 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
 def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
     """Verify that when BLE send succeeds, the coordinator does not call the MQTT fallback and forwards the expected BLE send options.
 
-    Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
+    Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (20), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
     """
     import asyncio
 
@@ -1030,7 +1030,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             body: dict[str, object],
             flags: int = 0,
             wait_for_ack: bool = False,
-            ack_timeout_sec: float = 5.0,
+            ack_timeout_sec: float = 20,
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:
@@ -1087,7 +1087,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
             "body": {FIELD_SW_EPS: 1, "cmd": 107},
             "flags": 0,
             "wait_for_ack": True,
-            "ack_timeout_sec": 5.0,
+            "ack_timeout_sec": 20,
             "ack_cmds": None,
             "mtu_override": None,
         }
@@ -1892,7 +1892,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             body: bytes,
             flags: int,
             wait_for_ack: bool = False,
-            ack_timeout_sec: float = 5.0,
+            ack_timeout_sec: float = 20,
             ack_cmds: tuple[int, ...] | None = None,
             mtu_override: int | None = None,
         ) -> bool:

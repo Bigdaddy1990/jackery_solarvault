@@ -17,7 +17,7 @@ Covers code changed/added in this PR:
 """
 
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -44,14 +44,17 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _make_coordinator(
-    data: dict[str, Any] | None = None,
-) -> Any:
+    data: dict[str, object] | None = None,
+) -> SimpleNamespace:
     """Build a minimal coordinator stub."""
     return SimpleNamespace(
         data=data,
@@ -59,7 +62,7 @@ def _make_coordinator(
     )
 
 
-def _make_entry(coordinator: Any) -> Any:
+def _make_entry(coordinator: SimpleNamespace) -> SimpleNamespace:
     """Build a minimal config-entry stub."""
     return SimpleNamespace(
         runtime_data=coordinator,
@@ -261,9 +264,9 @@ async def test_async_setup_entry_same_signature_no_double_add() -> None:
     coordinator = _make_coordinator(data={dev_id: _make_device_payload()})
     entry = _make_entry(coordinator)
 
-    captured_listener: Any = None
+    captured_listener: Callable[[], None] | None = None
 
-    def capture_add_listener(fn: Any) -> Any:
+    def capture_add_listener(fn: Callable[[], None]) -> Callable[[], None]:
         nonlocal captured_listener
         captured_listener = fn
         return lambda: None
@@ -278,6 +281,7 @@ async def test_async_setup_entry_same_signature_no_double_add() -> None:
     assert first_call_count == 1
 
     # Invoke the listener with unchanged data — signature is the same
+    assert captured_listener is not None
     captured_listener()
 
     # async_add_entities must NOT be called again
@@ -292,9 +296,9 @@ async def test_async_setup_entry_new_device_triggers_add() -> None:
     coordinator = _make_coordinator(data={dev_id_a: _make_device_payload()})
     entry = _make_entry(coordinator)
 
-    captured_listener: Any = None
+    captured_listener: Callable[[], None] | None = None
 
-    def capture_add_listener(fn: Any) -> Any:
+    def capture_add_listener(fn: Callable[[], None]) -> Callable[[], None]:
         nonlocal captured_listener
         captured_listener = fn
         return lambda: None
@@ -310,6 +314,7 @@ async def test_async_setup_entry_new_device_triggers_add() -> None:
         dev_id_a: _make_device_payload(),
         dev_id_b: _make_device_payload(),
     }
+    assert captured_listener is not None
     captured_listener()
 
     # A second call must have been made with new entities for dev_b
@@ -323,17 +328,20 @@ async def test_async_setup_entry_new_device_triggers_add() -> None:
 
 def test_smart_plug_sensor_translation_key() -> None:
     """_attr_translation_key must be 'smart_plug_switch_state'."""
-    assert JackerySmartPlugStateBinarySensor._attr_translation_key == "smart_plug_switch_state"
+    sensor = _make_plug_sensor()
+    assert sensor.translation_key == "smart_plug_switch_state"
 
 
 def test_smart_plug_sensor_device_class() -> None:
     """_attr_device_class must be BinarySensorDeviceClass.POWER."""
-    assert JackerySmartPlugStateBinarySensor._attr_device_class == BinarySensorDeviceClass.POWER
+    sensor = _make_plug_sensor()
+    assert sensor.device_class == BinarySensorDeviceClass.POWER
 
 
 def test_smart_plug_sensor_icon() -> None:
     """_attr_icon must be 'mdi:power-socket-de'."""
-    assert JackerySmartPlugStateBinarySensor._attr_icon == "mdi:power-socket-de"
+    sensor = _make_plug_sensor()
+    assert sensor.icon == "mdi:power-socket-de"
 
 
 # ---------------------------------------------------------------------------
@@ -500,8 +508,9 @@ def test_smart_plug_unique_id_format() -> None:
 
 def test_smart_plug_index_stored_correctly() -> None:
     """The plug_index passed at construction must be stored and accessible."""
-    sensor = _make_plug_sensor(plug_index=7)
-    assert sensor._plug_index == 7  # noqa: SLF001
+    expected_plug_index = 7
+    sensor = _make_plug_sensor(plug_index=expected_plug_index)
+    assert sensor._plug_index == expected_plug_index  # noqa: SLF001
 
 
 def test_smart_plug_sn_stored_correctly() -> None:
@@ -522,9 +531,9 @@ async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
     coordinator = _make_coordinator(data={dev_id: _make_device_payload()})
     entry = _make_entry(coordinator)
 
-    captured_listener: Any = None
+    captured_listener: Callable[[], None] | None = None
 
-    def capture_add_listener(fn: Any) -> Any:
+    def capture_add_listener(fn: Callable[[], None]) -> Callable[[], None]:
         nonlocal captured_listener
         captured_listener = fn
         return lambda: None
