@@ -551,7 +551,7 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -816,7 +816,7 @@ class JackeryBleListener:
                 device_id,
             )
             raise
-        except Exception as err:  # pragma: no cover — defensive
+        except Exception as err:
             stats.last_error = f"runner: {err}"
             _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
         finally:
@@ -890,7 +890,7 @@ class JackeryBleListener:
             stats.frames_decode_failed += 1
         try:
             await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
 
 
