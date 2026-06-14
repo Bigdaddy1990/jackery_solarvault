@@ -57,6 +57,7 @@ class TestDumpAll:
     def test_dump_all_returns_none_when_stream_provided(self) -> None:
         """dump_all must return None when a stream is provided and write to the stream."""
         import io
+
         buf = io.StringIO()
         result = yaml.dump_all([{"x": 42}], stream=buf)
         assert result is None
@@ -100,6 +101,7 @@ class TestDump:
     def test_dump_returns_none_when_stream_provided(self) -> None:
         """Dump must return None when a stream is provided."""
         import io
+
         buf = io.StringIO()
         result = yaml.dump({"key": "val"}, stream=buf)
         assert result is None
@@ -168,6 +170,7 @@ class TestAddImplicitResolver:
     def test_add_implicit_resolver_registers_and_resolves(self) -> None:
         """After add_implicit_resolver, matching scalars must receive the tag."""
         import re
+
         tag = "tag:test.example,2024:mytype"
         pattern = re.compile(r"^MYVAL$")
         # Register on a local SafeLoader subclass to avoid polluting global state
@@ -175,15 +178,19 @@ class TestAddImplicitResolver:
 
         class _TestLoader(SafeLoader):
             pass
+
         _TestLoader.add_implicit_resolver(tag, pattern, ["M"])
         # Now load a scalar that matches
         node = yaml.compose("MYVAL", Loader=_TestLoader)
         assert node is not None
         assert node.tag == tag
 
-    def test_add_implicit_resolver_none_loader_registers_on_default_loaders(self) -> None:
+    def test_add_implicit_resolver_none_loader_registers_on_default_loaders(
+        self,
+    ) -> None:
         """add_implicit_resolver with Loader=None must not raise."""
         import re
+
         # Use a unique tag to avoid conflicts
         tag = "tag:test.example,2024:unused"
         pattern = re.compile(r"^UNUSED_MARKER_XYZ$")
@@ -200,6 +207,7 @@ class TestAddConstructor:
 
         class _TestLoader(SafeLoader):
             pass
+
         tag = "tag:test.example,2024:myobj"
         _TestLoader.add_constructor(tag, lambda loader, node: "constructed")
         result = yaml.load(f"!!{tag} value", Loader=_TestLoader)
@@ -323,6 +331,7 @@ class TestComposerInit:
 
     def test_composer_init_creates_anchors_dict(self) -> None:
         """Composer.__init__ must create self.anchors as an empty dict."""
+
         # Composer is a mixin so we stub the minimal required interface
         class _FakeComposer(Composer):
             def check_event(self, *args: Any, **kwargs: Any) -> bool:
@@ -349,52 +358,65 @@ class TestComposerInit:
 class TestSafeConstructorBool:
     """Tests for SafeConstructor.construct_yaml_bool (docstring reformatted)."""
 
-    @pytest.mark.parametrize(["yaml_text", "expected"], [
-        ["true", True],
-        ["false", False],
-        ["yes", True],
-        ["no", False],
-        ["on", True],
-        ["off", False],
-        ["True", True],
-        ["False", False],
-        ["YES", True],
-        ["NO", False],
-    ])
+    @pytest.mark.parametrize(
+        ["yaml_text", "expected"],
+        [
+            ["true", True],
+            ["false", False],
+            ["yes", True],
+            ["no", False],
+            ["on", True],
+            ["off", False],
+            ["True", True],
+            ["False", False],
+            ["YES", True],
+            ["NO", False],
+        ],
+    )
     def test_bool_values_via_safe_load(self, yaml_text: str, expected: bool) -> None:
         """Bool scalar variants must load to the correct Python bool."""
         result = yaml.safe_load(yaml_text)
-        assert result is expected, f"Expected {expected} for {yaml_text!r}, got {result!r}"
+        assert result is expected, (
+            f"Expected {expected} for {yaml_text!r}, got {result!r}"
+        )
 
 
 class TestSafeConstructorInt:
     """Tests for SafeConstructor.construct_yaml_int (docstring reformatted)."""
 
-    @pytest.mark.parametrize(["yaml_text", "expected"], [
-        ["42", 42],
-        ["-7", -7],
-        ["+100", 100],
-        ["0b1010", 10],   # binary
-        ["0xFF", 255],    # hexadecimal
-        ["010", 8],       # octal (leading zero)
-        ["1_000", 1000],  # underscores
-        ["3:25", 205],    # sexagesimal: 3*60 + 25
-    ])
+    @pytest.mark.parametrize(
+        ["yaml_text", "expected"],
+        [
+            ["42", 42],
+            ["-7", -7],
+            ["+100", 100],
+            ["0b1010", 10],  # binary
+            ["0xFF", 255],  # hexadecimal
+            ["010", 8],  # octal (leading zero)
+            ["1_000", 1000],  # underscores
+            ["3:25", 205],  # sexagesimal: 3*60 + 25
+        ],
+    )
     def test_int_formats_via_safe_load(self, yaml_text: str, expected: int) -> None:
         """Various integer formats must be parsed correctly."""
         result = yaml.safe_load(yaml_text)
-        assert result == expected, f"Expected {expected} for {yaml_text!r}, got {result!r}"
+        assert result == expected, (
+            f"Expected {expected} for {yaml_text!r}, got {result!r}"
+        )
 
 
 class TestSafeConstructorFloat:
     """Tests for SafeConstructor.construct_yaml_float (docstring reformatted)."""
 
-    @pytest.mark.parametrize(["yaml_text", "expected"], [
-        ["3.14", math.pi],
-        ["-0.5", -0.5],
-        ["+1.0", 1.0],
-        ["1_000.5", 1000.5],
-    ])
+    @pytest.mark.parametrize(
+        ["yaml_text", "expected"],
+        [
+            ["3.14", math.pi],
+            ["-0.5", -0.5],
+            ["+1.0", 1.0],
+            ["1_000.5", 1000.5],
+        ],
+    )
     def test_float_values_via_safe_load(self, yaml_text: str, expected: float) -> None:
         """Float scalar variants must load to the correct Python float."""
         result = yaml.safe_load(yaml_text)
@@ -403,6 +425,7 @@ class TestSafeConstructorFloat:
     def test_inf_via_safe_load(self) -> None:
         """'.inf' must load to positive infinity."""
         import math
+
         result = yaml.safe_load(".inf")
         assert math.isinf(result)
         assert result > 0
@@ -410,6 +433,7 @@ class TestSafeConstructorFloat:
     def test_neg_inf_via_safe_load(self) -> None:
         """'-.inf' must load to negative infinity."""
         import math
+
         result = yaml.safe_load("-.inf")
         assert math.isinf(result)
         assert result < 0
@@ -417,6 +441,7 @@ class TestSafeConstructorFloat:
     def test_nan_via_safe_load(self) -> None:
         """.nan must load to a NaN float."""
         import math
+
         result = yaml.safe_load(".nan")
         assert math.isnan(result)
 
@@ -555,17 +580,20 @@ class TestLoadBoundaryConditions:
     def test_get_single_node_raises_on_multiple_docs(self) -> None:
         """get_single_node (via load) must raise if the stream has multiple documents."""
         from annotatedyaml._vendor.yaml.composer import ComposerError
+
         with pytest.raises((ComposerError, Exception)):
             yaml.load("---\na: 1\n---\nb: 2\n", Loader=yaml.SafeLoader)
 
     def test_compose_returns_node_for_mapping(self) -> None:
         """Compose must return a MappingNode for a YAML mapping."""
         from annotatedyaml._vendor.yaml.nodes import MappingNode
+
         node = yaml.compose("{key: val}")
         assert isinstance(node, MappingNode)
 
     def test_compose_sequence_returns_sequence_node(self) -> None:
         """Compose must return a SequenceNode for a YAML sequence."""
         from annotatedyaml._vendor.yaml.nodes import SequenceNode
+
         node = yaml.compose("[1, 2, 3]")
         assert isinstance(node, SequenceNode)

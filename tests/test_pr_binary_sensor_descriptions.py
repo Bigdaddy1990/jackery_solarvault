@@ -346,7 +346,9 @@ class TestGetterIsolation:
         """'online' getter must ignore the first argument (properties)."""
         desc = next(d for d in BINARY_DESCRIPTIONS if d.key == "online")
         result = desc.getter({FIELD_ONLINE_STATUS: 99}, {})
-        assert result is None  # online reads from device_meta (second arg), not properties
+        assert (
+            result is None
+        )  # online reads from device_meta (second arg), not properties
 
     def test_eps_active_getter_reads_only_properties(self) -> None:
         """'eps_active' getter must use the first argument (properties), not device_meta."""

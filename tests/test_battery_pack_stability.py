@@ -200,7 +200,7 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
         re.DOTALL,
     )
     assert match is not None
-    body = src[match.start():]
+    body = src[match.start() :]
     # Must reject CT meter frames + Shelly smart meters
     assert "_CT_METER_KEYS" in body or "ct_meter" in body, body
     assert "shelly" in body, body
@@ -247,7 +247,7 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
         re.DOTALL,
     )
     assert match is not None
-    body = src[match.start():]
+    body = src[match.start() :]
     # Implementation must filter `None` updates (so a missing field doesn't
     # overwrite a real one) and merge per-key.
     assert "value is not None" in body, body

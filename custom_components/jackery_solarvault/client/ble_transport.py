@@ -267,6 +267,7 @@ class JackeryBleListener:
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
         from ..const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+
         try:
             while not self._stop_event.is_set():
                 try:

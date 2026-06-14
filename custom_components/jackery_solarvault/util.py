@@ -206,7 +206,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -507,7 +507,7 @@ def safe_float(value: Any) -> float | None:  # noqa: ANN401, PLR0911
             return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -523,10 +523,10 @@ def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload val
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
 
@@ -758,7 +758,7 @@ def safe_bool(value: Any) -> bool | None:  # noqa: ANN401, PLR0911
             return False
     try:
         return int(value) != 0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -1455,7 +1455,11 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
         return None if parsed is None else (0.0, parsed)
 
     whole = sign * float(int(whole_text))
-    fraction = sign * float(int(fraction_text)) / (10 ** len(fraction_text)) if int(fraction_text) else 0.0
+    fraction = (
+        sign * float(int(fraction_text)) / (10 ** len(fraction_text))
+        if int(fraction_text)
+        else 0.0
+    )
 
     if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
         parsed = safe_float(value)

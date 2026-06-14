@@ -133,6 +133,7 @@ async def test_login_rejects_non_object_data_payload() -> None:
 
         async def read(self) -> bytes:
             import json
+
             return json.dumps({
                 FIELD_CODE: CODE_OK,
                 FIELD_TOKEN: "token",
@@ -164,6 +165,7 @@ async def test_login_rejection_does_not_update_last_success_response() -> None:
 
         async def read(self) -> bytes:
             import json
+
             return json.dumps({FIELD_CODE: 401, FIELD_MSG: "invalid token"}).encode()
 
     class _Session:

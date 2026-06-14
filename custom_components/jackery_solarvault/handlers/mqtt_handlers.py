@@ -72,7 +72,7 @@ def normalize_local_mqtt_payload(
             FIELD_DATA,
             FIELD_MESSAGE_TYPE,
             FIELD_ACTION_ID,
-    FIELD_BATTERY_PACKS,
+            FIELD_BATTERY_PACKS,
         )
     ):
         return payload

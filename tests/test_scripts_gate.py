@@ -78,8 +78,7 @@ def test_vendor_pyyaml_is_not_in_default_profile() -> None:
     assert "vendor_pyyaml" not in default
     assert "vendor_pyyaml" not in full
     only = {
-        g.name
-        for g in gate._select_gates("default", only=frozenset({"vendor_pyyaml"}))
+        g.name for g in gate._select_gates("default", only=frozenset({"vendor_pyyaml"}))
     }
     assert only == {"vendor_pyyaml"}
 

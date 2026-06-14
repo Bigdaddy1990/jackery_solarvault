@@ -42,7 +42,12 @@ class TestLegacySuffixMatches:
 
     def test_plain_digits_head_and_suffix(self) -> None:
         """Numeric head followed by _suffix must return True."""
-        assert _legacy_suffix_matches("123456_today_battery_charge", "_today_battery_charge") is True
+        assert (
+            _legacy_suffix_matches(
+                "123456_today_battery_charge", "_today_battery_charge"
+            )
+            is True
+        )
 
     def test_single_digit_head_and_suffix(self) -> None:
         """Single digit head with suffix must return True."""
@@ -56,22 +61,35 @@ class TestLegacySuffixMatches:
 
     def test_battery_pack_head_and_suffix(self) -> None:
         """Battery-pack head (<digits>_battery_pack_<digits>) with suffix must return True."""
-        assert _legacy_suffix_matches("123_battery_pack_1_cell_voltage", "_cell_voltage") is True
+        assert (
+            _legacy_suffix_matches("123_battery_pack_1_cell_voltage", "_cell_voltage")
+            is True
+        )
 
     def test_battery_pack_double_digit_index(self) -> None:
         """Battery-pack head with two-digit index must match."""
-        assert _legacy_suffix_matches("123456_battery_pack_12_charge", "_charge") is True
+        assert (
+            _legacy_suffix_matches("123456_battery_pack_12_charge", "_charge") is True
+        )
 
     # --- Negative matches: current non-legacy ids ---
 
     def test_does_not_match_current_device_prefix(self) -> None:
         """A suffix embedded in a longer current key must not match."""
         # "_today_battery_charge" is a legacy suffix; current key adds "device_" in between
-        assert _legacy_suffix_matches("123456_device_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches(
+                "123456_device_today_battery_charge", "_today_battery_charge"
+            )
+            is False
+        )
 
     def test_does_not_match_when_head_has_non_digit_prefix(self) -> None:
         """A non-numeric head prefix must not match."""
-        assert _legacy_suffix_matches("abc_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches("abc_today_battery_charge", "_today_battery_charge")
+            is False
+        )
 
     def test_does_not_match_when_suffix_not_at_end(self) -> None:
         """Suffix that is not at the end must not match."""
@@ -79,7 +97,10 @@ class TestLegacySuffixMatches:
 
     def test_does_not_match_when_uid_is_only_suffix(self) -> None:
         """UID equal to the suffix only (no head) must not match."""
-        assert _legacy_suffix_matches("_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches("_today_battery_charge", "_today_battery_charge")
+            is False
+        )
 
     def test_does_not_match_when_head_has_trailing_non_digit(self) -> None:
         """Head with trailing letters must not match."""

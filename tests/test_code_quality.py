@@ -557,12 +557,23 @@ def test_polling_and_statistics_import_diagnostics_are_exported() -> None:
         encoding="utf-8",
     )
 
-    assert "def polling_diagnostics(self) -> dict[str, Any]:" in coordinator_source or "coordinator_polling" in diagnostics_source
-    assert "def statistics_import_diagnostics(self) -> dict[str, Any]:" in (
-        coordinator_source
-    ) or "statistics_backfill" in diagnostics_source
-    assert '"polling": async_redact_data(' in diagnostics_source or '"coordinator_polling"' in diagnostics_source
-    assert '"statistics_import": async_redact_data(' in diagnostics_source or '"statistics_backfill"' in diagnostics_source
+    assert (
+        "def polling_diagnostics(self) -> dict[str, Any]:" in coordinator_source
+        or "coordinator_polling" in diagnostics_source
+    )
+    assert (
+        "def statistics_import_diagnostics(self) -> dict[str, Any]:"
+        in (coordinator_source)
+        or "statistics_backfill" in diagnostics_source
+    )
+    assert (
+        '"polling": async_redact_data(' in diagnostics_source
+        or '"coordinator_polling"' in diagnostics_source
+    )
+    assert (
+        '"statistics_import": async_redact_data(' in diagnostics_source
+        or '"statistics_backfill"' in diagnostics_source
+    )
     assert '"statistics_backfill"' in diagnostics_source
     for key in (
         '"cache_hits"',
@@ -605,7 +616,10 @@ def test_diagnostic_second_values_use_safe_int_parser() -> None:
         encoding="utf-8",
     )
     # Check that safe_int is used (not raw int) for interval seconds
-    if "safe_int(coordinator.configured_update_interval.total_seconds())" in diagnostics_source:
+    if (
+        "safe_int(coordinator.configured_update_interval.total_seconds())"
+        in diagnostics_source
+    ):
         pass  # Good: using safe_int
     elif "safe_int(" in diagnostics_source:
         pass  # Good: using safe_int in some form
@@ -613,7 +627,9 @@ def test_diagnostic_second_values_use_safe_int_parser() -> None:
         pass  # May have been refactored
 
     if "def mqtt_diagnostics_snapshot" in coordinator_source:
-        mqtt_diag = coordinator_source.split("def mqtt_diagnostics_snapshot", 1)[1].split(
+        mqtt_diag = coordinator_source.split("def mqtt_diagnostics_snapshot", 1)[
+            1
+        ].split(
             "\n    @property",
             1,
         )[0]
@@ -629,9 +645,8 @@ def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
         1,
     )[0]
 
-    assert (
-        "interval_sec = max(15, int(update_interval.total_seconds()))"
-        in (init_block)
+    assert "interval_sec = max(15, int(update_interval.total_seconds()))" in (
+        init_block
     )
     assert "interval_sec = max(15, safe_int(" not in init_block
 
@@ -1002,8 +1017,9 @@ def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None
     assert "DATA_QUALITY_REPAIR_EXAMPLE_LIMIT" in coordinator_source
     assert "async_create_issue" in coordinator_source
     assert "async_delete_issue" in coordinator_source
-    assert 'issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"' in (
-        coordinator_source
+    assert (
+        'issue_id = f"{self.entry.entry_id}_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"'
+        in (coordinator_source)
     )
     assert "app_data_quality_warnings" in util_source
     assert "normalized_data_quality_warnings" in util_source
@@ -1221,15 +1237,16 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
     """Runtime guard paths should raise HA/domain errors, not AssertionError."""
     api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
-    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(encoding="utf-8")
+    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(
+        encoding="utf-8"
+    )
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
         encoding="utf-8",
     )
 
     assert "assert self._token is not None" not in auth_source
     assert (
-        'raise JackeryAuthError("Login succeeded but no token returned")'
-        in auth_source
+        'raise JackeryAuthError("Login succeeded but no token returned")' in auth_source
     )
     assert "assert self._reauth_entry is not None" not in config_flow_source
 
@@ -1492,7 +1509,9 @@ def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reu
 ):
     """Reject malformed MQTT seeds and redact login diagnostics at export time."""
     api_source = _all_api_sources()
-    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(encoding="utf-8")
+    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "base64.b64decode(self._mqtt_seed_b64, validate=True)" in auth_source
     assert "self.last_login_response = dict(data)" in auth_source
@@ -1607,7 +1626,9 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
 
 def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None:
     """Login should surface malformed cloud responses as JackeryApiError."""
-    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(encoding="utf-8")
+    auth_source = (CLIENT_PACKAGE / "_endpoints" / "auth.py").read_text(
+        encoding="utf-8"
+    )
     login_block = auth_source.split("async def async_login", 1)[1].split(
         "async def async_get_mqtt_credentials",
         1,
@@ -2323,7 +2344,10 @@ def test_single_price_setters_use_safe_float_parser() -> None:
     assert "single_price=float(price_value)" in set_block
     assert "FIELD_SINGLE_PRICE: round(float(price_value), 4)" in set_block
 
-    assert "await self.async_set_single_price(device_id, float(single_price))" in mode_block
+    assert (
+        "await self.async_set_single_price(device_id, float(single_price))"
+        in mode_block
+    )
 
 
 def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> (
@@ -2388,7 +2412,9 @@ def test_component_modules_import_all_referenced_const_names() -> None:
                 assigned.add(node.target.id)
             elif isinstance(node, ast.Name):
                 used.add(node.id)
-        missing = sorted((used & const_names) - imported_from_const - imported_from_any - assigned)
+        missing = sorted(
+            (used & const_names) - imported_from_const - imported_from_any - assigned
+        )
         if missing:
             failures[path.name] = missing
 
@@ -2811,16 +2837,16 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             continue
         api_tree = ast.parse(api_path.read_text(encoding="utf-8"))
         for cls in [
-            node
-            for node in ast.walk(api_tree)
-            if isinstance(node, ast.ClassDef)
+            node for node in ast.walk(api_tree) if isinstance(node, ast.ClassDef)
         ]:
             for item in cls.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     args = item.args
                     positional = len(args.posonlyargs) + len(args.args)
                     decorators = {
-                        dec.id for dec in item.decorator_list if isinstance(dec, ast.Name)
+                        dec.id
+                        for dec in item.decorator_list
+                        if isinstance(dec, ast.Name)
                     }
                     if "classmethod" in decorators:
                         positional = max(0, positional - 1)
@@ -2852,9 +2878,7 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
                 continue
             required, max_count = method_arity[name]
             positional = len(call.args)
-            keyword_names = {
-                kw.arg for kw in call.keywords if kw.arg is not None
-            }
+            keyword_names = {kw.arg for kw in call.keywords if kw.arg is not None}
             effective_required = max(0, required - len(keyword_names))
             assert positional >= effective_required, (
                 f"{path}:{call.lineno} calls {name}() with too few positional args"
@@ -3288,7 +3312,11 @@ def test_ble_service_waits_for_reconnect_before_failing() -> None:
     assert "self._async_run_connection(device_id, " in transport
 
     coordinator = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
-    assert "async_send_command(" in coordinator or "async_ensure_connected(" in coordinator or "_async_run_connection" in coordinator
+    assert (
+        "async_send_command(" in coordinator
+        or "async_ensure_connected(" in coordinator
+        or "_async_run_connection" in coordinator
+    )
 
 
 def test_ble_cmd_120_battery_pack_routing_is_narrow() -> None:

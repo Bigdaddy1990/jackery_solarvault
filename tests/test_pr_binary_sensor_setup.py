@@ -127,9 +127,7 @@ def test_parallel_updates_is_zero() -> None:
 async def test_async_setup_entry_creates_binary_sensors_for_each_device() -> None:
     """async_setup_entry must create BINARY_DESCRIPTIONS-count entities per device."""
     dev_id = "device_001"
-    coordinator = _make_coordinator(
-        data={dev_id: _make_device_payload()}
-    )
+    coordinator = _make_coordinator(data={dev_id: _make_device_payload()})
     entry = _make_entry(coordinator)
     added_entities: list[Any] = []
 
@@ -209,7 +207,9 @@ async def test_async_setup_entry_creates_smart_plug_entities() -> None:
     await async_setup_entry(None, entry, async_add_entities)
 
     entities = async_add_entities.call_args[0][0]
-    plug_entities = [e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)]
+    plug_entities = [
+        e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)
+    ]
     assert len(plug_entities) == 2  # noqa: PLR2004
 
 
@@ -218,8 +218,8 @@ async def test_async_setup_entry_skips_plugs_without_serial() -> None:
     """async_setup_entry must skip smart plugs that have no extractable serial number."""
     dev_id = "dev_001"
     plugs = [
-        {},             # no serial fields at all
-        {"sn": ""},     # empty serial
+        {},  # no serial fields at all
+        {"sn": ""},  # empty serial
         {"sn": "SN-X"},  # valid serial
     ]
     coordinator = _make_coordinator(
@@ -231,7 +231,9 @@ async def test_async_setup_entry_skips_plugs_without_serial() -> None:
     await async_setup_entry(None, entry, async_add_entities)
 
     entities = async_add_entities.call_args[0][0]
-    plug_entities = [e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)]
+    plug_entities = [
+        e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)
+    ]
     # Only the plug with "SN-X" should be included
     assert len(plug_entities) == 1
 
@@ -382,14 +384,16 @@ def test_plug_property_returns_empty_when_smart_plugs_key_absent() -> None:
 def test_plug_property_matches_by_serial_number() -> None:
     """_plug must return the dict matching the captured serial, not by position."""
     plug_sn = "TARGET-SN"
-    coordinator = _make_coordinator(data={
-        "dev1": {
-            PAYLOAD_SMART_PLUGS: [
-                {"sn": "FIRST-SN", FIELD_SWITCH_STATE: 0},
-                {"sn": plug_sn, FIELD_SWITCH_STATE: 1},
-            ]
+    coordinator = _make_coordinator(
+        data={
+            "dev1": {
+                PAYLOAD_SMART_PLUGS: [
+                    {"sn": "FIRST-SN", FIELD_SWITCH_STATE: 0},
+                    {"sn": plug_sn, FIELD_SWITCH_STATE: 1},
+                ]
+            }
         }
-    })
+    )
     plug_key = stable_subdevice_key("smart_plug", plug_sn, 2)
     sensor = JackerySmartPlugStateBinarySensor(
         coordinator, "dev1", plug_index=2, plug_sn=plug_sn, plug_key=plug_key
@@ -450,15 +454,21 @@ def test_extra_state_attributes_none_not_present_when_key_absent() -> None:
     """extra_state_attributes must not include keys absent from the plug payload."""
     sensor = _make_plug_sensor(smart_plugs=[{"sn": "SN001"}])
     attrs = sensor.extra_state_attributes
-    for key in (FIELD_DEVICE_NAME, FIELD_SCAN_NAME, FIELD_COMM_STATE, FIELD_COMM_MODE, FIELD_VERSION):
-        assert key not in attrs, f"Key {key!r} should not be in attrs when absent from plug"
+    for key in (
+        FIELD_DEVICE_NAME,
+        FIELD_SCAN_NAME,
+        FIELD_COMM_STATE,
+        FIELD_COMM_MODE,
+        FIELD_VERSION,
+    ):
+        assert key not in attrs, (
+            f"Key {key!r} should not be in attrs when absent from plug"
+        )
 
 
 def test_extra_state_attributes_switch_state_included_when_none() -> None:
     """extra_state_attributes includes FIELD_SWITCH_STATE even when its value is None."""
-    sensor = _make_plug_sensor(
-        smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: None}]
-    )
+    sensor = _make_plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: None}])
     attrs = sensor.extra_state_attributes
     # The key IS present in the plug dict (just with value None), so it must appear
     assert FIELD_SWITCH_STATE in attrs
@@ -467,9 +477,7 @@ def test_extra_state_attributes_switch_state_included_when_none() -> None:
 
 def test_extra_state_attributes_sys_switch_included() -> None:
     """extra_state_attributes includes FIELD_SYS_SWITCH when present in plug payload."""
-    sensor = _make_plug_sensor(
-        smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}]
-    )
+    sensor = _make_plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}])
     attrs = sensor.extra_state_attributes
     assert FIELD_SYS_SWITCH in attrs
     assert attrs[FIELD_SYS_SWITCH] == 1
@@ -479,7 +487,7 @@ def test_extra_state_attributes_no_plug_returns_only_plug_index() -> None:
     """extra_state_attributes must only contain plug_index when plug cannot be found."""
     sensor = _make_plug_sensor(
         plug_sn="NOT-FOUND",
-        smart_plugs=[{"sn": "OTHER-SN"}]  # different SN → _plug returns {}
+        smart_plugs=[{"sn": "OTHER-SN"}],  # different SN → _plug returns {}
     )
     attrs = sensor.extra_state_attributes
     assert attrs == {"plug_index": 1}
@@ -548,7 +556,10 @@ async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
     # Simulate a forced re-collection by clearing coordinator data and then restoring it
     # with a new device, so the signature changes and entities are collected again.
     # The entities with the same device_id should NOT be added again (deduplication).
-    coordinator.data = {dev_id: _make_device_payload(), "new_dev": _make_device_payload()}
+    coordinator.data = {
+        dev_id: _make_device_payload(),
+        "new_dev": _make_device_payload(),
+    }
     captured_listener()
 
     # Only new entities (for "new_dev") should be added

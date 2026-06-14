@@ -1,6 +1,5 @@
 """Check that active project documentation lives as root HTML files."""
 
-from __future__ import annotations
 
 from argparse import ArgumentParser
 from pathlib import Path

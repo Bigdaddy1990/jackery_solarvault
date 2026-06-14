@@ -555,6 +555,7 @@ def parse_plaintext_frame(text: str) -> BleFrame:
 # Full encrypt/decrypt pipeline
 # ---------------------------------------------------------------------------
 
+
 def _append_random_and_crc(plaintext_frame: str, random16: int | None) -> str:
     """Append a 16-bit hex tag and a 4-hex-digit Modbus CRC-16 suffix to a plaintext hex-frame string.
 

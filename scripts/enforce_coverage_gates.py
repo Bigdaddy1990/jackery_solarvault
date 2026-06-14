@@ -1,6 +1,5 @@
 """Enforce total and critical-module coverage gates from coverage.py XML."""
 
-from __future__ import annotations
 
 import argparse
 from decimal import Decimal, InvalidOperation
