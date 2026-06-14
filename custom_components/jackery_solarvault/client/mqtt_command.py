@@ -99,6 +99,31 @@ def command_body_for_transport(
     return body
 
 
+def build_smali_command_envelope(  # noqa: PLR0913
+    *,
+    device_sn: str,
+    message_type: str,
+    action_id: int,
+    body: Any,
+    timestamp_ms: int,
+    version: int = 0,
+) -> dict[str, Any]:
+    """Build the app-compatible command envelope in Smali field order.
+
+    Mirrors ``HomeControlFormat`` / ``PortableControlFormat``:
+    ``deviceSn,id,version,messageType,actionId,timestamp,body``.
+    """
+    return {
+        FIELD_DEVICE_SN: device_sn,
+        "id": timestamp_ms,
+        FIELD_VERSION: version,
+        FIELD_MESSAGE_TYPE: message_type,
+        FIELD_ACTION_ID: action_id,
+        FIELD_TIMESTAMP: timestamp_ms,
+        FIELD_BODY: body,
+    }
+
+
 async def publish_mqtt_command(  # noqa: PLR0913
     *,
     mqtt: JackeryMqttPushClient,
@@ -166,15 +191,13 @@ async def publish_mqtt_command(  # noqa: PLR0913
     else:
         payload_str = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
 
-    payload: dict[str, Any] = {
-        "id": ts,
-        FIELD_VERSION: 0,
-        FIELD_MESSAGE_TYPE: message_type,
-        FIELD_ACTION_ID: action_id,
-        FIELD_TIMESTAMP: ts,
-        FIELD_BODY: payload_str,
-        FIELD_DEVICE_SN: device_sn,
-    }
+    payload = build_smali_command_envelope(
+        device_sn=device_sn,
+        message_type=message_type,
+        action_id=action_id,
+        body=payload_str,
+        timestamp_ms=ts,
+    )
 
     last_err: Exception | None = None
     for attempt in range(2):
