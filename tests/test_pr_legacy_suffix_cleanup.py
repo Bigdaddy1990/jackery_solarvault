@@ -42,7 +42,12 @@ class TestLegacySuffixMatches:
 
     def test_plain_digits_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Numeric head followed by _suffix must return True."""
-        assert _legacy_suffix_matches("123456_today_battery_charge", "_today_battery_charge") is True
+        assert (
+            _legacy_suffix_matches(
+                "123456_today_battery_charge", "_today_battery_charge"
+            )
+            is True
+        )
 
     def test_single_digit_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Single digit head with suffix must return True."""
@@ -56,22 +61,35 @@ class TestLegacySuffixMatches:
 
     def test_battery_pack_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Battery-pack head (<digits>_battery_pack_<digits>) with suffix must return True."""
-        assert _legacy_suffix_matches("123_battery_pack_1_cell_voltage", "_cell_voltage") is True
+        assert (
+            _legacy_suffix_matches("123_battery_pack_1_cell_voltage", "_cell_voltage")
+            is True
+        )
 
     def test_battery_pack_double_digit_index(self) -> None:  # noqa: PLR6301
         """Battery-pack head with two-digit index must match."""
-        assert _legacy_suffix_matches("123456_battery_pack_12_charge", "_charge") is True
+        assert (
+            _legacy_suffix_matches("123456_battery_pack_12_charge", "_charge") is True
+        )
 
     # --- Negative matches: current non-legacy ids ---
 
     def test_does_not_match_current_device_prefix(self) -> None:  # noqa: PLR6301
         """A suffix embedded in a longer current key must not match."""
         # "_today_battery_charge" is a legacy suffix; current key adds "device_" in between
-        assert _legacy_suffix_matches("123456_device_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches(
+                "123456_device_today_battery_charge", "_today_battery_charge"
+            )
+            is False
+        )
 
     def test_does_not_match_when_head_has_non_digit_prefix(self) -> None:  # noqa: PLR6301
         """A non-numeric head prefix must not match."""
-        assert _legacy_suffix_matches("abc_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches("abc_today_battery_charge", "_today_battery_charge")
+            is False
+        )
 
     def test_does_not_match_when_suffix_not_at_end(self) -> None:  # noqa: PLR6301
         """Suffix that is not at the end must not match."""
@@ -79,7 +97,10 @@ class TestLegacySuffixMatches:
 
     def test_does_not_match_when_uid_is_only_suffix(self) -> None:  # noqa: PLR6301
         """UID equal to the suffix only (no head) must not match."""
-        assert _legacy_suffix_matches("_today_battery_charge", "_today_battery_charge") is False
+        assert (
+            _legacy_suffix_matches("_today_battery_charge", "_today_battery_charge")
+            is False
+        )
 
     def test_does_not_match_when_head_has_trailing_non_digit(self) -> None:  # noqa: PLR6301
         """Head with trailing letters must not match."""
@@ -139,7 +160,7 @@ class TestAsyncCallIfPresent:
         called: list[str] = []
 
         class _Obj:
-            async def my_method(self) -> None:
+            async def my_method(self) -> None:  # noqa: PLR6301
                 called.append("called")
 
         await _async_call_if_present(_Obj(), "my_method")
@@ -150,7 +171,7 @@ class TestAsyncCallIfPresent:
         called: list[str] = []
 
         class _Obj:
-            def my_sync(self) -> None:
+            def my_sync(self) -> None:  # noqa: PLR6301
                 called.append("sync")
 
         await _async_call_if_present(_Obj(), "my_sync")
@@ -183,7 +204,7 @@ class TestAsyncCallIfPresent:
         awaited: list[bool] = []
 
         class _Obj:
-            def my_method(self) -> Any:  # noqa: ANN401
+            def my_method(self) -> Any:  # noqa: ANN401, PLR6301
                 async def _inner() -> None:  # noqa: RUF029
                     awaited.append(True)
 
@@ -215,7 +236,7 @@ class TestDeferCoordinatorAuthFailure:
 
         _defer_coordinator_auth_failure(coordinator, err)
 
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     def test_sets_mqtt_auth_failure_message(self) -> None:  # noqa: PLR6301
         """Must set coordinator._mqtt_auth_failure_message to str(err)."""
@@ -225,7 +246,7 @@ class TestDeferCoordinatorAuthFailure:
         _defer_coordinator_auth_failure(coordinator, err)
 
         # The coordinator mock captures the attribute assignment
-        assert coordinator._mqtt_auth_failure_message == str(err)
+        assert coordinator._mqtt_auth_failure_message == str(err)  # noqa: SLF001
 
     def test_message_matches_str_of_error(self) -> None:  # noqa: PLR6301
         """The message stored on the coordinator must equal str(err)."""
@@ -235,7 +256,7 @@ class TestDeferCoordinatorAuthFailure:
 
         _defer_coordinator_auth_failure(coordinator, err)
 
-        assert coordinator._mqtt_auth_failure_message == message
+        assert coordinator._mqtt_auth_failure_message == message  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +284,7 @@ class TestAsyncDiscoverWithCacheFallback:
         result = await _async_discover_with_cache_fallback(coordinator)
 
         assert result is False
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     async def test_defers_auth_failure_on_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """Calls _defer_coordinator_auth_failure when ConfigEntryAuthFailed is raised."""
@@ -273,7 +294,7 @@ class TestAsyncDiscoverWithCacheFallback:
 
         await _async_discover_with_cache_fallback(coordinator)
 
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     async def test_returns_true_on_update_failed_with_no_cache(self) -> None:  # noqa: PLR6301
         """Returns True (but logs warning) when UpdateFailed and no cache available."""
@@ -320,21 +341,21 @@ class TestHandleRefreshStartupResult:
         """No action is taken when result is a normal value (not an exception)."""
         coordinator = MagicMock()
         _handle_refresh_startup_result(coordinator, {"data": "ok"})
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
         coordinator.async_set_updated_data.assert_not_called()
 
     def test_does_nothing_for_none_result(self) -> None:  # noqa: PLR6301
         """No action is taken when result is None."""
         coordinator = MagicMock()
         _handle_refresh_startup_result(coordinator, None)
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
 
     def test_defers_auth_failure_on_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """Calls _defer_coordinator_auth_failure when result is ConfigEntryAuthFailed."""
         coordinator = MagicMock()
         err = ConfigEntryAuthFailed("expired")
         _handle_refresh_startup_result(coordinator, err)
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     def test_uses_cache_on_update_failed_with_cache(self) -> None:  # noqa: PLR6301
         """Calls async_set_updated_data when result is UpdateFailed and cache is available."""
@@ -363,7 +384,7 @@ class TestHandleRefreshStartupResult:
         err = RuntimeError("unexpected error")
         # Should not raise; only log
         _handle_refresh_startup_result(coordinator, err)
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
         coordinator.async_set_updated_data.assert_not_called()
 
     def test_auth_failure_not_treated_as_generic_exception(self) -> None:  # noqa: PLR6301
@@ -372,7 +393,7 @@ class TestHandleRefreshStartupResult:
         err = ConfigEntryAuthFailed("bad creds")
         _handle_refresh_startup_result(coordinator, err)
         # Only auth path is taken; no generic warning path
-        coordinator._defer_background_auth_failure.assert_called_once()
+        coordinator._defer_background_auth_failure.assert_called_once()  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -387,14 +408,14 @@ class TestHandleOptionalStartupResult:
         """No action when result is a normal value."""
         coordinator = MagicMock()
         _handle_optional_startup_result(coordinator, {"status": "ok"}, label="MQTT")
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
 
     def test_defers_auth_failure_on_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """Defers auth failure when result is ConfigEntryAuthFailed."""
         coordinator = MagicMock()
         err = ConfigEntryAuthFailed("expired token")
         _handle_optional_startup_result(coordinator, err, label="BLE")
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     def test_logs_warning_on_generic_base_exception(self) -> None:  # noqa: PLR6301
         """Logs a warning (not raises) when result is a generic BaseException."""
@@ -402,26 +423,26 @@ class TestHandleOptionalStartupResult:
         err = RuntimeError("broker down")
         # Should NOT raise
         _handle_optional_startup_result(coordinator, err, label="local MQTT")
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
 
     def test_does_nothing_for_none_result(self) -> None:  # noqa: PLR6301
         """No action when result is None."""
         coordinator = MagicMock()
         _handle_optional_startup_result(coordinator, None, label="BLE")
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
 
     def test_does_nothing_for_false_result(self) -> None:  # noqa: PLR6301
         """No action when result is False (falsy non-exception)."""
         coordinator = MagicMock()
         _handle_optional_startup_result(coordinator, False, label="MQTT")
-        coordinator._defer_background_auth_failure.assert_not_called()
+        coordinator._defer_background_auth_failure.assert_not_called()  # noqa: SLF001
 
     def test_label_does_not_affect_auth_failure_path(self) -> None:  # noqa: PLR6301
         """The label parameter is for logging only and does not change logic."""
         coordinator = MagicMock()
         err = ConfigEntryAuthFailed("bad creds")
         _handle_optional_startup_result(coordinator, err, label="any label")
-        coordinator._defer_background_auth_failure.assert_called_once_with(err)
+        coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
