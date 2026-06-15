@@ -215,6 +215,7 @@ class TestAddConstructor:
 
     def test_add_constructor_registered_and_invoked(self) -> None:  # noqa: PLR6301
         """A registered constructor must be invoked when loading a tagged scalar."""
+
         class _TestLoader(SafeLoader):
             pass
 
@@ -234,6 +235,7 @@ class TestAddRepresenter:
 
     def test_add_representer_used_for_custom_type(self) -> None:  # noqa: PLR6301
         """A registered representer must be called when dumping an instance of that type."""
+
         class _TestDumper(SafeDumper):
             pass
 
@@ -250,6 +252,7 @@ class TestAddRepresenter:
 
     def test_add_multi_representer_used_for_subclasses(self) -> None:  # noqa: PLR6301
         """add_multi_representer must be applied to subclasses of the registered type."""
+
         class _TestDumper(SafeDumper):
             pass
 
