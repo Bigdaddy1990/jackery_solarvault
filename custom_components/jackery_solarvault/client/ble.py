@@ -750,4 +750,4 @@ __all__ = [
 # Re-exported for callers that need to seed deterministic tests; not part of
 # the public API. ``os.urandom`` is the underlying entropy source used by
 # ``secrets.token_bytes``.
-del os  # pragma: no cover — keep the import out of __all__ to avoid leakage.
+del os  # pragma: no cover — module namespace hygiene; import-time cleanup only.

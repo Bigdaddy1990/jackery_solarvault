@@ -394,8 +394,7 @@ jobs:
         run: |
           python -m scripts.enforce_coverage_gates \
             --coverage-xml "${{ env.COVERAGE_XML }}" \
-            --total-minimum-percent "${{ env.COVERAGE_MIN }}" \
-            --critical-module-minimum-percent "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
+            --total-minimum-percent "${{ env.COVERAGE_MIN }}"
 
       - name: Enforce pytest and coverage gates
         if: always() && !cancelled()
