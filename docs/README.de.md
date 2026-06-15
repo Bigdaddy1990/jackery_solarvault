@@ -13,7 +13,7 @@ Diese Integration ist kein offizielles Jackery-Produkt und steht in keiner Verbi
 
 ## Was die Integration bereitstellt
 
-- Automatische System- und Geräteerkennung über den Jackery-Cloud-Account.
+- Account-basierte System- und Geräteerkennung über die Jackery-Cloud-API sowie Setup-Auslöser über die lokalen Home-Assistant-Discovery-Flächen aus dem Manifest: Bluetooth (`0000bdee-0000-1000-8000-00805f9b34fb`, Hersteller-ID `18434`), DHCP (`solarvault*`/`jackery*` auf `80F1B2*`-MACs), MQTT-Discovery und Zeroconf (`_jackery-solarvault._tcp.local.`).
 - Hauptgerät, Smart-Meter und Zusatzbatterien als getrennte Home-Assistant-Geräte.
 - Live-Leistungssensoren für Batterie, PV gesamt, PV-Kanäle, Netzbezug/-einspeisung, EPS, Stack-Leistung und Smart-Meter-Phasen.
 - Energiesensoren für Jackery-App-Perioden: Tag, Woche, Monat und Jahr.

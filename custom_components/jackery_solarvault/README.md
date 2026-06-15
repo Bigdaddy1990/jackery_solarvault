@@ -15,7 +15,7 @@ This integration is not an official Jackery product and is not affiliated with J
 
 ## What it provides
 
-- Automatic system and device discovery through your Jackery cloud account.
+- Account-based system and device discovery through the Jackery cloud API, plus setup triggers from the local Home Assistant discovery surfaces declared in the manifest: Bluetooth (`0000bdee-0000-1000-8000-00805f9b34fb`), DHCP (`solarvault*`/`jackery*` on `80F1B2*` MACs), MQTT discovery, and Zeroconf (`_jackery-solarvault._tcp.local.`).
 - Main unit, smart meter and expansion batteries as separate Home Assistant devices.
 - Live power sensors for battery, PV total, PV channels, grid import/export, EPS, stack power and smart meter phases.
 - Energy sensors for Jackery app periods: day, week, month and year.
@@ -99,6 +99,10 @@ The setup flow asks for:
 Device ID, system ID, MQTT `macId` and region are derived from cloud and MQTT data. They are not entered manually.
 
 The same options can be changed later from the integration options. Credentials can be updated through Home Assistant's reconfigure or reauth flow without deleting the integration.
+
+## Discovery
+
+The integration has four local Home Assistant discovery entry points in `manifest.json`: Bluetooth advertisements with service UUID `0000bdee-0000-1000-8000-00805f9b34fb` and manufacturer ID `18434`, DHCP matches for `solarvault*` or `jackery*` hostnames on `80F1B2*` MAC addresses, MQTT discovery, and Zeroconf service `_jackery-solarvault._tcp.local.`. These signals only start or de-duplicate the setup flow. Authentication and the authoritative system list still come from the Jackery cloud account, and runtime live data can then be refreshed by cloud HTTP, Jackery MQTT push, BLE, or configured local third-party MQTT where available.
 
 ## Devices and Entities
 
