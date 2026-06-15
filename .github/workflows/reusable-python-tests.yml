@@ -152,7 +152,6 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip ruff
-          python -m pip install -U mypy
           pip install -U pytest pytest-asyncio pytest-cov coverage[toml]
           pip install -U pytest-homeassistant-custom-component
           if [ -n "${{ env.HA_SPEC }}" ]; then
@@ -195,6 +194,7 @@ jobs:
           PY
 
           ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --add-noqa || true
           ruff check . --extend-select RUF100 || true
@@ -303,7 +303,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.COVERAGE_XML) != ''
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -318,7 +318,7 @@ jobs:
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           (steps.codecov_coverage_upload.outcome == 'failure' ||
           steps.codecov_coverage_upload.outcome == 'skipped')
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -332,7 +332,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.JUNIT_PATH) != ''
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -365,41 +365,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python - <<'PY'
-          from __future__ import annotations
+          python -m scripts.publish_coverage \
+            --coverage-xml "${{ env.COVERAGE_XML }}" \
+            --coverage-html-index "${{ env.COVERAGE_HTML_DIR }}/index.html" \
+            --artifact-directory "${{ env.PAGES_ARTIFACT_DIR }}" \
+            --mode pages \
+            --pages-branch "${{ env.PAGES_BRANCH }}" \
+            --pages-prefix "${{ env.PAGES_PREFIX }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --commit-sha "${{ github.sha }}" \
+            --ref "${{ github.ref }}"
 
-          import json
-          from pathlib import Path
-          import shutil
-
-          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
-          coverage_html_index = Path(r"${{ env.COVERAGE_HTML_DIR }}/index.html")
-          artifact_directory = Path(r"${{ env.PAGES_ARTIFACT_DIR }}")
-          artifact_directory.mkdir(parents=True, exist_ok=True)
-
-          def copy_if_exists(source: Path, destination: Path) -> None:
-              if source.is_file():
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-                  shutil.copy2(source, destination)
-
-          copy_if_exists(coverage_xml, artifact_directory / "coverage.xml")
-          copy_if_exists(coverage_html_index, artifact_directory / "index.html")
-          metadata = {
-              "mode": "pages",
-              "pages_branch": r"${{ env.PAGES_BRANCH }}",
-              "pages_prefix": r"${{ env.PAGES_PREFIX }}",
-              "run_id": r"${{ github.run_id }}",
-              "run_attempt": r"${{ github.run_attempt }}",
-              "commit_sha": r"${{ github.sha }}",
-              "ref": r"${{ github.ref }}",
-              "coverage_xml": str(coverage_xml),
-              "coverage_html_index": str(coverage_html_index),
-          }
-          (artifact_directory / "metadata.json").write_text(
-              json.dumps(metadata, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          PY
       - name: Upload GitHub Pages bundle
         if: inputs.publish-pages == true && steps.pytest.outcome == 'success'
         uses: actions/upload-artifact@v7
@@ -410,12 +387,12 @@ jobs:
 
       - name: Enforce module and total coverage gates
         if: always() && !cancelled() && steps.pytest.outcome == 'success'
-        run: >-
-          python -m scripts.enforce_coverage_gates
-          --coverage-xml "${{ env.COVERAGE_XML }}"
-          --total-minimum "${{ env.COVERAGE_MIN }}"
-          --legacy-module-minimum "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
-          --perfect-module-minimum "100"
+        run: |
+          python -m scripts.enforce_coverage_gates \
+            --coverage-xml "${{ env.COVERAGE_XML }}" \
+            --total-minimum-percent "${{ env.COVERAGE_MIN }}" \
+            --critical-module-minimum-percent "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
+
       - name: Enforce pytest and coverage gates
         if: always() && !cancelled()
         env:

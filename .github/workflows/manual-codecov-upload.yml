@@ -9,17 +9,13 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   coverage:
     name: Collect and upload coverage
     uses: ./.github/workflows/reusable-python-tests.yml
-    permissions:
-      contents: read
-      # Required by the reusable coverage job for Codecov OIDC upload.
-      id-token: write
-    secrets:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    secrets: inherit
     with:
       python-version: "3.14"
       run-codecov: true

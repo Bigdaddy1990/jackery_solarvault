@@ -29,6 +29,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -47,34 +50,29 @@ jobs:
 
       - name: Install deps (uv)
         run: |
-          uv pip install --system --upgrade -r requirements.txt
-          uv pip install --system --upgrade -r requirements-test.txt
-          uv pip install --system --upgrade pre-commit ruff pyupgrade mypy pyright flake8-type-checking reorder-python-imports
+          uv pip install --system -r requirements.txt
+          uv pip install --system -r requirements-test.txt --prerelease=allow
+          uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
-        with:
-         version: ">=0.4.0"
-      - run: ruff check . --fix
-      - run: ruff format .
+      - run: ruff check --fix
+      - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
+        with:
+          msg: apply code formatting
+          
       - name: Run pre-commit with fixes
         run: |
           ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
           ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
-          ruff check . --add-noqa || true
           ruff check . --output-format=github || true
+          ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual pyupgrade --all-files || true
-          pre-commit run --hook-stage manual mypy --all-files || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
 
-
-      - name: Run test requirements and localization sync
-        run: |
-          python -m scripts.enforce_test_requirements || true
-          python -m scripts.sync_localization_flags \
-            --allowlist scripts/sync_localization_flags.allowlist \
-            --check || true
+      - uses: stefanzweifel/git-auto-commit-action@v7

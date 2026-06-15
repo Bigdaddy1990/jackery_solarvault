@@ -7,14 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       override_ci_window:
-        description: Set to true after coordinating with maintainers
+        description: Confirm the reserved CI slot was coordinated with maintainers
         required: true
-        default: "false"
         type: boolean
+        default: false
       run_reason:
         description: Reason for the manual full-suite run
-        required: false
-        default: manual dispatch
+        required: true
         type: string
 
 permissions:
@@ -33,11 +32,11 @@ jobs:
     steps:
       - name: Validate override flag
         run: |
-          if [ "${{ github.event.inputs.override_ci_window }}" != 'true' ]; then
+          if [ "${{ inputs.override_ci_window }}" != 'true' ]; then
             echo "::error ::Manual dispatch requires override_ci_window=true after coordinating with maintainers."
             exit 1
           fi
-          echo "ℹ️ Scheduled full-suite run reason: ${{ github.event.inputs.run_reason }}"
+          echo "ℹ️ Scheduled full-suite run reason: ${{ inputs.run_reason }}"
 
   scheduled-pytest:
     needs: guard-manual-dispatch
@@ -51,7 +50,7 @@ jobs:
     uses: ./.github/workflows/reusable-python-tests.yml
     with:
       python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      home-assistant-spec: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+      home-assistant-spec: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '==2026.6.1' }}
       coverage-min: ${{ vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '5' }}
       coverage-xml-path: ./coverage/coverage.xml
       coverage-html-dir: ./coverage/html
