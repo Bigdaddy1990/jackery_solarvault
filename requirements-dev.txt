@@ -1,4 +1,4 @@
 -r requirements-test.txt
-homeassistant>=2026.6.1
+homeassistant>=2026.6.3
 prek
 pytest-homeassistant
