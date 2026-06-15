@@ -1,24 +1,39 @@
 # Coordinator Refactoring Plan — Jackery SolarVault
 
 > **Status:** PLANNING
-> **Date:** 2026-06-12 (v2 - rewritten against RE docs)
+> **Date:** 2026-06-14 (v3 - corrected authority chain)
 > **Coordinator:** 9,467 lines (was 10,091) -> target ~3,000 lines
-> **Authoritative sources:** Jackery 2.1.1 RE documentation (`Jackery_2.1.1_RE_Documentation.md`,
-> `Jackery_2.1.1_RE_Supplement.md`, `Jackery_2.1.1_RE_Crypto_and_DTOs.md`,
-> `Jackery_2.1.1_DEX_Aufschluesselung.md`, `Jackery_2.1.1_Stats_und_Trends.md`,
-> Historical planning snapshot. Current endpoint/command truth lives in
-> `docs/REFERENCE_COVERAGE.md`, `docs/jackery_complete_reference.json`, and
-> `scripts/check_reference_coverage.py`. Older counts in this file are not
-> authoritative.
->
-> `jackery_complete_reference.json`, `jackery_entity_field_candidates_v2.json`,
-> `hbxn_commands.html`, `jackery_command_catalog_v2.html`,
-> `jackery_http_api_endpoints_v2.html`, `jackery_http_model_fields_v2.html`,
-> `hbxn_model_fields.html`, `jackery_ha_extraction_v2.json`)
+> **Authoritative source:** `source-of-truth/` — captured Jackery App Smali data.
+> `docs/` and `tests/` are derived/agent-edited evidence only and must be
+> reconciled against `source-of-truth/` before they are trusted.
 
 ---
 
-## 1. Protocol Reference (from RE docs)
+## 0. Corrected Authority Chain
+
+The previous v2 plan treated `docs/` and generated tests as authoritative. That
+was wrong: both areas were modified by agents and may preserve broken behavior.
+The refactor must therefore follow this order:
+
+1. **Primary truth:** `source-of-truth/` Smali data from the Jackery App.
+2. **Secondary evidence:** current runtime code and real captured payloads/logs.
+3. **Derived documentation:** `docs/` files, only after each claim is traced to
+   `source-of-truth/`.
+4. **Tests:** regression contracts for corrected behavior, never proof that the
+   current behavior is correct.
+
+### Immediate Plan Corrections
+
+- Do **not** normalize the protocol matrix from `docs/jackery_complete_reference.json`
+  alone. Rebuild it from `source-of-truth/` first, then regenerate docs.
+- Do **not** adapt tests to current output. If tests conflict with Smali-derived
+  behavior, fix parser/coordinator code and rewrite the test expectation.
+- Add drift checks that compare `source-of-truth/` -> implementation -> docs ->
+  tests in that direction only.
+- Keep work notes in dedicated work-log files; do not mix temporary agent
+  commentary into stable reference docs.
+
+## 1. Protocol Reference (must be re-derived from `source-of-truth/`)
 
 ### 1.1 Transport Layers
 
@@ -139,6 +154,24 @@ Home commands (cmd int → actionId):
 | **BatterySources** / **BatteryUsage** | 2 each | Battery energy flow |
 | **HomeSource** | 2 | Home energy flow |
 | **StatisticBody** | 30+ | Lifetime/today counters |
+
+### 1.7 Source-of-Truth Reconciliation Package (NEW FIRST STEP)
+
+Before extracting coordinator code or chasing coverage percentages:
+
+1. Inventory every file in `source-of-truth/` and classify it as HTTP endpoint,
+   MQTT message/action, BLE frame, DTO/model field, crypto primitive, app-only
+   UI flow, or unknown.
+2. Generate a machine-readable manifest, e.g.
+   `docs/generated/source_truth_manifest.json`, from the Smali data.
+3. Compare that manifest with implementation constants, endpoint modules, MQTT
+   routers, BLE helpers, services, and entities.
+4. Mark each mismatch as one of: implementation bug, stale doc, invalid test,
+   intentional app-only omission, or unknown requiring payload evidence.
+5. Only after this reconciliation, regenerate `docs/REFERENCE_COVERAGE.md` and
+   update branch target lists for coverage packages.
+6. Add CI/script coverage for this drift check so future agent edits cannot make
+   `docs/` or `tests/` the de-facto authority again.
 
 ---
 
