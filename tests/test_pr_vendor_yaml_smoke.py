@@ -27,13 +27,26 @@ All tests run without a real Home Assistant environment.
 """
 
 import base64
+from dataclasses import dataclass
 import datetime
+import importlib
+from importlib.util import find_spec
 import math
 from typing import Any
 
-from annotatedyaml._vendor import yaml
-from annotatedyaml._vendor.yaml.composer import Composer
 import pytest
+
+_YAML_PACKAGE = "annotatedyaml._vendor.yaml"
+if find_spec("annotatedyaml._vendor") is None or find_spec(_YAML_PACKAGE) is None:
+    _YAML_PACKAGE = "yaml"
+
+yaml = importlib.import_module(_YAML_PACKAGE)
+Composer = importlib.import_module(f"{_YAML_PACKAGE}.composer").Composer
+SafeDumper = importlib.import_module(f"{_YAML_PACKAGE}.dumper").SafeDumper
+SafeLoader = importlib.import_module(f"{_YAML_PACKAGE}.loader").SafeLoader
+ComposerError = importlib.import_module(f"{_YAML_PACKAGE}.composer").ComposerError
+MappingNode = importlib.import_module(f"{_YAML_PACKAGE}.nodes").MappingNode
+SequenceNode = importlib.import_module(f"{_YAML_PACKAGE}.nodes").SequenceNode
 
 # ---------------------------------------------------------------------------
 # dump_all / dump — return-type matrix
@@ -174,7 +187,6 @@ class TestAddImplicitResolver:
         tag = "tag:test.example,2024:mytype"
         pattern = re.compile(r"^MYVAL$")
         # Register on a local SafeLoader subclass to avoid polluting global state
-        from annotatedyaml._vendor.yaml.loader import SafeLoader
 
         class _TestLoader(SafeLoader):
             pass
@@ -203,14 +215,13 @@ class TestAddConstructor:
 
     def test_add_constructor_registered_and_invoked(self) -> None:  # noqa: PLR6301
         """A registered constructor must be invoked when loading a tagged scalar."""
-        from annotatedyaml._vendor.yaml.loader import SafeLoader
 
         class _TestLoader(SafeLoader):
             pass
 
         tag = "tag:test.example,2024:myobj"
         _TestLoader.add_constructor(tag, lambda loader, node: "constructed")
-        result = yaml.load(f"!!{tag} value", Loader=_TestLoader)
+        result = yaml.load(f"!<{tag}> value", Loader=_TestLoader)
         assert result == "constructed"
 
     def test_add_constructor_none_loader_does_not_raise(self) -> None:  # noqa: PLR6301
@@ -224,14 +235,13 @@ class TestAddRepresenter:
 
     def test_add_representer_used_for_custom_type(self) -> None:  # noqa: PLR6301
         """A registered representer must be called when dumping an instance of that type."""
-        from annotatedyaml._vendor.yaml.dumper import SafeDumper
 
         class _TestDumper(SafeDumper):
             pass
 
+        @dataclass(frozen=True)
         class _MyType:
-            def __init__(self, val: int) -> None:
-                self.val = val
+            val: int
 
         _TestDumper.add_representer(
             _MyType,
@@ -242,7 +252,6 @@ class TestAddRepresenter:
 
     def test_add_multi_representer_used_for_subclasses(self) -> None:  # noqa: PLR6301
         """add_multi_representer must be applied to subclasses of the registered type."""
-        from annotatedyaml._vendor.yaml.dumper import SafeDumper
 
         class _TestDumper(SafeDumper):
             pass
@@ -411,7 +420,7 @@ class TestSafeConstructorFloat:
     @pytest.mark.parametrize(
         ["yaml_text", "expected"],
         [
-            ["3.14", math.pi],
+            ["3.14", 3.14],
             ["-0.5", -0.5],
             ["+1.0", 1.0],
             ["1_000.5", 1000.5],
@@ -424,24 +433,18 @@ class TestSafeConstructorFloat:
 
     def test_inf_via_safe_load(self) -> None:  # noqa: PLR6301
         """'.inf' must load to positive infinity."""
-        import math
-
         result = yaml.safe_load(".inf")
         assert math.isinf(result)
         assert result > 0
 
     def test_neg_inf_via_safe_load(self) -> None:  # noqa: PLR6301
         """'-.inf' must load to negative infinity."""
-        import math
-
         result = yaml.safe_load("-.inf")
         assert math.isinf(result)
         assert result < 0
 
     def test_nan_via_safe_load(self) -> None:  # noqa: PLR6301
         """.nan must load to a NaN float."""
-        import math
-
         result = yaml.safe_load(".nan")
         assert math.isnan(result)
 
@@ -579,21 +582,15 @@ class TestLoadBoundaryConditions:
 
     def test_get_single_node_raises_on_multiple_docs(self) -> None:  # noqa: PLR6301
         """get_single_node (via load) must raise if the stream has multiple documents."""
-        from annotatedyaml._vendor.yaml.composer import ComposerError
-
         with pytest.raises((ComposerError, Exception)):
             yaml.load("---\na: 1\n---\nb: 2\n", Loader=yaml.SafeLoader)
 
     def test_compose_returns_node_for_mapping(self) -> None:  # noqa: PLR6301
         """Compose must return a MappingNode for a YAML mapping."""
-        from annotatedyaml._vendor.yaml.nodes import MappingNode
-
         node = yaml.compose("{key: val}")
         assert isinstance(node, MappingNode)
 
     def test_compose_sequence_returns_sequence_node(self) -> None:  # noqa: PLR6301
         """Compose must return a SequenceNode for a YAML sequence."""
-        from annotatedyaml._vendor.yaml.nodes import SequenceNode
-
         node = yaml.compose("[1, 2, 3]")
         assert isinstance(node, SequenceNode)

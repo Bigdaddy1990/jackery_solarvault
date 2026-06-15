@@ -1,7 +1,5 @@
 """Regression tests for coverage gate enforcement."""
 
-from __future__ import annotations
-
 import importlib
 from pathlib import Path
 from unittest.mock import patch

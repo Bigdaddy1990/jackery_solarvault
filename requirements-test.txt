@@ -1,7 +1,7 @@
+
+defusedxml>=0.7.1
 mypy
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component
 PyYAML
-
-defusedxml>=0.7.1
