@@ -1,7 +1,7 @@
 """Data-quality warning generation for Jackery app statistics."""
 
-import math
 from datetime import date
+import math
 from typing import Any, NamedTuple
 
 from custom_components.jackery_solarvault.const import (

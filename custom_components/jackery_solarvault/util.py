@@ -906,13 +906,6 @@ def verify_and_backfill(  # noqa: PLR0911, PLR0912
     return cloud_value
 
 
-from custom_components.jackery_solarvault.stats.data_quality import (
-    AppDataQualityWarning,
-    app_data_quality_warnings,
-    format_data_quality_warning,
-    normalized_data_quality_warnings,
-)
-
 def statistic_id_part(value: object) -> str:
     """Return a Home-Assistant-safe external statistic id component."""
     text = str(value or "").strip().lower()

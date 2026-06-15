@@ -528,8 +528,8 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
     """Diagnostics must not expose device IDs or serials as raw map keys."""
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
-    assert 'devices = _redacted_payload_map(' in source
-    assert 'for device_id, payload in (coordinator.data or {}).items()' in source
+    assert "devices = _redacted_payload_map(" in source
+    assert "for device_id, payload in (coordinator.data or {}).items()" in source
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
