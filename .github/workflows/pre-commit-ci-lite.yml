@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
   actions: write
   checks: write
-  id-token: write
-
+  id-token: write # for Trusted Publishing + attest-action
+  
 concurrency:
   group: pre-commit-lite-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,15 +39,19 @@ jobs:
             requirements-test.txt
             pyproject.toml
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-          ignore-nothing-to-cache: true
-      - uses: astral-sh/ruff-action@v3
+          #enable-cache: true
+          #ignore-nothing-to-cache: true
+      - uses: astral-sh/ruff-action@v4.0.0
+      - uses: actions/setup-python@v4
         with:
-         version: ">=0.4.0"
-      - run: ruff check --fix --preview --target-version py314 || true
-      - run: ruff format || true
+           python-version: 3.14
+      - run: ruff check . --fix
+      - run: ruff format .
+      - run: ruff check . --fix --preview --target-version py314 || true
+      - run: ruff format . || true
+      - uses: pre-commit/action@v3.0.1
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
