@@ -47,7 +47,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
          version: ">=0.4.0"
-      - run: ruff check --fix --preview --target-version py314 || true
-      - run: ruff format || true
+      - run: ruff check . --fix --preview --target-version py314 || true
+      - run: ruff format . || true
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()

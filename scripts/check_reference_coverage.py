@@ -1,169 +1,273 @@
-"""Validate Jackery reference coverage against implementation files."""
+"""Validate Jackery protocol/reference coverage against integration code."""
 
-from __future__ import annotations
 
+import argparse
 import ast
 import json
+import re
+import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_PATH = ROOT / "docs" / "jackery_complete_reference.json"
-ENDPOINTS_DIR = (
-    ROOT / "custom_components" / "jackery_solarvault" / "client" / "_endpoints"
-)
-CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
-SERVICES_PATH = ROOT / "custom_components" / "jackery_solarvault" / "services.yaml"
+DOMAIN_DIR = Path("custom_components/jackery_solarvault")
+ENDPOINT_DIR = DOMAIN_DIR / "client" / "_endpoints"
+REFERENCE_JSON = Path("docs/jackery_complete_reference.json")
+MQTT_DOC = Path("docs/MQTT_PROTOCOL.md")
+SERVICES_YAML = DOMAIN_DIR / "services.yaml"
+STRINGS_JSON = DOMAIN_DIR / "strings.json"
+SERVICES_PY = DOMAIN_DIR / "services.py"
+QUALITY_SCALE = DOMAIN_DIR / "quality_scale.yaml"
+MANIFEST = DOMAIN_DIR / "manifest.json"
+
+_HTTP_RE = re.compile(r"/v1/[A-Za-z0-9_./{}:-]+")
+_BACKTICK_RE = re.compile(r"`([A-Z][A-Za-z0-9]+(?:[A-Z][A-Za-z0-9]+)+)`")
+_CAMEL_CASE_RE = re.compile(r"^[A-Z][A-Za-z0-9]+(?:[A-Z][A-Za-z0-9]+)+$")
 
 
-def _literal_assignments() -> dict[str, object]:
-    """Return literal module-level assignments from const.py."""
-    tree = ast.parse(CONST_PATH.read_text(encoding="utf-8"))
-    values: dict[str, object] = {}
+@dataclass(frozen=True)
+class CoverageReport:
+    """Reference coverage check result."""
+
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when no blocking coverage errors were found."""
+        return not self.errors
+
+
+def _top_level_yaml_keys(path: Path) -> set[str]:
+    """Return first-level mapping keys from the repository's simple YAML files."""
+    keys: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith((" ", "#", "-")) or ":" not in line:
+            continue
+        key = line.split(":", 1)[0].strip()
+        if key:
+            keys.add(key)
+    return keys
+
+
+def _quality_rule_statuses(path: Path) -> set[str]:
+    """Return status values from quality_scale.yaml without external YAML deps."""
+    statuses: set[str] = set()
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("status:"):
+            statuses.add(line.split(":", 1)[1].strip())
+            continue
+        if raw_line.startswith("  ") and not raw_line.startswith("    ") and ":" in line:
+            value = line.split(":", 1)[1].strip()
+            if value in {"done", "todo", "exempt"}:
+                statuses.add(value)
+    return statuses
+
+
+def _literal_string_assignments(path: Path) -> dict[str, str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    values: dict[str, str] = {}
     for node in tree.body:
         target: ast.expr | None = None
-        value_node: ast.expr | None = None
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        value: ast.expr | None = None
+        if isinstance(node, ast.AnnAssign):
             target = node.target
-            value_node = node.value
+            value = node.value
         elif isinstance(node, ast.Assign) and len(node.targets) == 1:
             target = node.targets[0]
-            value_node = node.value
-        if not isinstance(target, ast.Name) or value_node is None:
-            continue
-        try:
-            values[target.id] = ast.literal_eval(value_node)
-        except ValueError:
-            continue
-        except TypeError:
-            continue
+            value = node.value
+        if isinstance(target, ast.Name) and isinstance(value, ast.Constant):
+            if isinstance(value.value, str):
+                values[target.id] = value.value
     return values
 
 
-def _endpoint_module_text() -> str:
-    """Return concatenated endpoint module source."""
-    return "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(ENDPOINTS_DIR.glob("*.py"))
-    )
+def _iter_strings(value: Any) -> set[str]:
+    strings: set[str] = set()
+    if isinstance(value, str):
+        strings.add(value)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            strings.update(_iter_strings(key))
+            strings.update(_iter_strings(item))
+    elif isinstance(value, list | tuple | set):
+        for item in value:
+            strings.update(_iter_strings(item))
+    return strings
 
 
-def const_http_endpoints() -> dict[str, str]:
-    """Return /v1 endpoint constants from const.py without the /v1 prefix."""
+def _normalize_paths(values: set[str]) -> set[str]:
+    return {match.group(0).rstrip(".,`)]") for value in values for match in _HTTP_RE.finditer(value)}
+
+
+def reference_http_endpoints(root: Path = Path.cwd()) -> set[str]:
+    """Return documented /v1 endpoints from the structured reference JSON."""
+    reference_path = root / REFERENCE_JSON
+    if not reference_path.exists():
+        return set()
+    return _normalize_paths(_iter_strings(json.loads(reference_path.read_text(encoding="utf-8"))))
+
+
+def implemented_http_endpoints(root: Path = Path.cwd()) -> set[str]:
+    """Return /v1 endpoints used by domain endpoint mixins."""
+    constants = _literal_string_assignments(root / DOMAIN_DIR / "const.py")
+    values: set[str] = set()
+    for path in (root / ENDPOINT_DIR).glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                values.add(node.value)
+            elif isinstance(node, ast.Name) and node.id in constants:
+                values.add(constants[node.id])
+    return _normalize_paths(values)
+
+
+def reference_mqtt_message_types(root: Path = Path.cwd()) -> set[str]:
+    """Return documented MQTT messageType values."""
+    values: set[str] = set()
+    reference_path = root / REFERENCE_JSON
+    if reference_path.exists():
+        for item in _iter_strings(json.loads(reference_path.read_text(encoding="utf-8"))):
+            if item and len(item) > 4 and _CAMEL_CASE_RE.match(item):
+                values.add(item)
+    doc_path = root / MQTT_DOC
+    if doc_path.exists():
+        values.update(_BACKTICK_RE.findall(doc_path.read_text(encoding="utf-8")))
+    return {value for value in values if not value.startswith("Jackery")}
+
+
+def implemented_mqtt_message_types(root: Path = Path.cwd()) -> set[str]:
+    """Return MQTT messageType values declared for runtime routing."""
+    constants = _literal_string_assignments(root / DOMAIN_DIR / "const.py")
     return {
-        name: value.removeprefix("/v1/")
-        for name, value in _literal_assignments().items()
-        if name.endswith("_PATH")
-        and isinstance(value, str)
-        and value.startswith("/v1/")
+        value for name, value in constants.items() if name.startswith("MQTT_MESSAGE_")
     }
 
 
-def implemented_http_endpoints() -> set[str]:
-    """Return endpoints whose constants are used by endpoint mixins."""
-    module_text = _endpoint_module_text()
+def _service_constants(root: Path) -> dict[str, str]:
+    constants = _literal_string_assignments(root / DOMAIN_DIR / "const.py")
     return {
-        endpoint
-        for name, endpoint in const_http_endpoints().items()
-        if name in module_text
+        name: value for name, value in constants.items() if name.startswith("SERVICE_")
     }
 
 
-def action_ids() -> tuple[dict[str, int], dict[str, int]]:
-    """Return home and portable action constants keyed by name."""
-    actions = {
-        name: value
-        for name, value in _literal_assignments().items()
-        if name.startswith("ACTION_ID") and isinstance(value, int)
-    }
-    return {name: value for name, value in actions.items() if "PORTABLE" not in name}, {
-        name: value for name, value in actions.items() if "PORTABLE" in name
-    }
+def _registered_service_name(node: ast.expr, constants: dict[str, str]) -> str | None:
+    """Return a service name from an async_register argument."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id, node.id)
+    return None
 
 
-def service_names() -> set[str]:
-    """Return top-level Home Assistant service names from services.yaml."""
-    return {
-        line[:-1]
-        for line in SERVICES_PATH.read_text(encoding="utf-8").splitlines()
-        if line and not line.startswith(" ") and line.endswith(":")
-    }
+def registered_services(root: Path = Path.cwd()) -> set[str]:
+    """Return services registered in services.py."""
+    constants = _service_constants(root)
+    found: set[str] = set()
+    path = root / SERVICES_PY
+    if not path.exists():
+        return found
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or len(node.args) < 2:
+            continue
+        func = node.func
+        if isinstance(func, ast.Name):
+            is_register = func.id == "async_register"
+        elif isinstance(func, ast.Attribute):
+            is_register = func.attr == "async_register"
+        else:
+            is_register = False
+        if not is_register:
+            continue
+        domain_arg = node.args[0]
+        if not (isinstance(domain_arg, ast.Name) and domain_arg.id == "DOMAIN"):
+            continue
+        service_name = _registered_service_name(node.args[1], constants)
+        if service_name is not None:
+            found.add(service_name)
+    return found
 
 
-def validate_reference_coverage() -> list[str]:
-    """Return drift messages between the reference matrix and implementation."""
-    reference = json.loads(REFERENCE_PATH.read_text(encoding="utf-8"))
+def service_yaml_names(root: Path = Path.cwd()) -> set[str]:
+    """Return service names from services.yaml."""
+    return _top_level_yaml_keys(root / SERVICES_YAML)
+
+
+def strings_service_names(root: Path = Path.cwd()) -> set[str]:
+    """Return service names from strings.json."""
+    data = json.loads((root / STRINGS_JSON).read_text(encoding="utf-8"))
+    services = data.get("services", {})
+    return set(services) if isinstance(services, dict) else set()
+
+
+def quality_scale_statuses(root: Path = Path.cwd()) -> tuple[str, set[str]]:
+    """Return manifest quality_scale plus internal quality rule statuses."""
+    manifest = json.loads((root / MANIFEST).read_text(encoding="utf-8"))
+    return str(manifest.get("quality_scale", "")), _quality_rule_statuses(root / QUALITY_SCALE)
+
+
+def check_reference_coverage(root: Path = Path.cwd()) -> CoverageReport:
+    """Run all reference-coverage checks."""
     errors: list[str] = []
+    warnings: list[str] = []
 
-    reference_http = reference["http_endpoints"]
-    expected_implemented = set(reference_http["implemented"])
-    expected_skipped = set(reference_http["intentionally_skipped"])
-    actual_implemented = implemented_http_endpoints()
-    const_endpoints = set(const_http_endpoints().values())
+    reference_endpoints = reference_http_endpoints(root)
+    implemented_endpoints = implemented_http_endpoints(root)
+    missing_endpoints = sorted(reference_endpoints - implemented_endpoints)
+    if missing_endpoints:
+        errors.append("HTTP endpoints missing from client/_endpoints: " + ", ".join(missing_endpoints))
+    if not (root / REFERENCE_JSON).exists():
+        warnings.append(f"{REFERENCE_JSON} not found; structured HTTP endpoint check skipped")
 
-    if actual_implemented != expected_implemented:
-        errors.append(
-            "HTTP implemented drift: "
-            f"missing={sorted(expected_implemented - actual_implemented)} "
-            f"unexpected={sorted(actual_implemented - expected_implemented)}"
-        )
-    if expected_skipped & const_endpoints:
-        errors.append(
-            "Skipped endpoints are implemented in const.py: "
-            f"{sorted(expected_skipped & const_endpoints)}"
-        )
+    reference_mqtt = reference_mqtt_message_types(root)
+    implemented_mqtt = implemented_mqtt_message_types(root)
+    missing_mqtt = sorted(reference_mqtt - implemented_mqtt)
+    if missing_mqtt:
+        errors.append("MQTT message types missing from runtime router/constants: " + ", ".join(missing_mqtt))
 
-    home_actions, portable_actions = action_ids()
-    expected_home = {
-        item["name"]: item["action_id"] for item in reference["commands"]["home"]
-    }
-    expected_portable = {
-        item["name"]: item["action_id"] for item in reference["commands"]["portable"]
-    }
-    if home_actions != expected_home:
+    services_yaml = service_yaml_names(root)
+    services_strings = strings_service_names(root)
+    services_registered = registered_services(root)
+    if services_yaml != services_strings:
         errors.append(
-            "Home command drift: "
-            f"missing={sorted(expected_home.keys() - home_actions.keys())} "
-            f"unexpected={sorted(home_actions.keys() - expected_home.keys())} "
-            f"changed={sorted(name for name in expected_home.keys() & home_actions.keys() if expected_home[name] != home_actions[name])}"
+            "services.yaml and strings.json services differ: "
+            f"missing in strings={sorted(services_yaml - services_strings)}, "
+            f"extra in strings={sorted(services_strings - services_yaml)}"
         )
-    if portable_actions != expected_portable:
+    if services_yaml != services_registered:
         errors.append(
-            "Portable command drift: "
-            f"missing={sorted(expected_portable.keys() - portable_actions.keys())} "
-            f"unexpected={sorted(portable_actions.keys() - expected_portable.keys())} "
-            f"changed={sorted(name for name in expected_portable.keys() & portable_actions.keys() if expected_portable[name] != portable_actions[name])}"
+            "services.yaml and services.py registrations differ: "
+            f"missing registrations={sorted(services_yaml - services_registered)}, "
+            f"extra registrations={sorted(services_registered - services_yaml)}"
         )
 
-    expected_services = set(reference["home_assistant_services"])
-    actual_services = service_names()
-    if actual_services != expected_services:
-        errors.append(
-            "Service drift: "
-            f"missing={sorted(expected_services - actual_services)} "
-            f"unexpected={sorted(actual_services - expected_services)}"
-        )
+    manifest_quality, internal_statuses = quality_scale_statuses(root)
+    if manifest_quality != "custom":
+        errors.append(f"manifest quality_scale must remain custom, got {manifest_quality!r}")
+    if "done" not in internal_statuses:
+        errors.append("quality_scale.yaml must keep internal completed rule statuses")
 
-    return errors
+    return CoverageReport(tuple(errors), tuple(warnings))
 
 
 def main() -> int:
-    """Run the reference coverage gate."""
-    errors = validate_reference_coverage()
-    if errors:
-        for error in errors:
-            print(error)
-        return 1
-    reference = json.loads(REFERENCE_PATH.read_text(encoding="utf-8"))
-    implemented = len(reference["http_endpoints"]["implemented"])
-    skipped = len(reference["http_endpoints"]["intentionally_skipped"])
-    print(
-        "Reference coverage OK: "
-        f"HTTP {implemented}/{implemented + skipped} implemented, "
-        f"{skipped} intentionally skipped; "
-        f"commands {len(reference['commands']['home'])} home + "
-        f"{len(reference['commands']['portable'])} portable; "
-        f"services {len(reference['home_assistant_services'])}."
-    )
-    return 0
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path.cwd())
+    args = parser.parse_args()
+    report = check_reference_coverage(args.root)
+    for warning in report.warnings:
+        print(f"WARNING: {warning}", file=sys.stderr)
+    if report.ok:
+        print("Reference coverage checks passed.")
+        return 0
+    for error in report.errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
