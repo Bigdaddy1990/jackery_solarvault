@@ -3272,7 +3272,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 code = None
         if code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -8429,7 +8429,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             return round(float(value) / 1000.0, 5)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:

@@ -19,4 +19,3 @@ Die Tabelle enthält für:
 - **§12 Unique‑ID‑Vertrag**: `entity.py` als Basis, Plattformdateien für Suffixe und die Unique‑ID‑/Battery‑Stabilitäts‑Tests.
 
 Du kannst die Datei direkt ins Repo legen; sie ist rein navigativ und ändert das PROTOCOL nicht.
-

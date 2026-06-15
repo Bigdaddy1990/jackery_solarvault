@@ -1,6 +1,4 @@
 {
-  "domain": "jackery_solarvault",
-  "name": "Jackery SolarVault",
   "after_dependencies": [
     "bluetooth",
     "dhcp",
@@ -10,9 +8,9 @@
   ],
   "bluetooth": [
     {
-      "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb",
+      "connectable": true,
       "manufacturer_id": 18434,
-      "connectable": true
+      "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb"
     }
   ],
   "codeowners": [
@@ -31,6 +29,7 @@
     }
   ],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
+  "domain": "jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
@@ -43,6 +42,7 @@
     "custom_components.jackery_solarvault.client.mqtt_push",
     "aiomqtt"
   ],
+  "name": "Jackery SolarVault",
   "quality_scale": "custom",
   "requirements": [
     "aiomqtt==2.5.1",

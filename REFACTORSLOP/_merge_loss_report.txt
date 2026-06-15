@@ -1,7 +1,7 @@
 
 ================================================================================
 __init__.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 61
 ================================================================================
 --- __init__.py (LIVE/merged)
@@ -14,7 +14,7 @@ __init__.py
  import re
 -from typing import Any, cast
 +from typing import TYPE_CHECKING, Any, cast
- 
+
 @@ -12,3 +11,2 @@
  from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 -from homeassistant.core import HomeAssistant
@@ -22,7 +22,7 @@ __init__.py
 @@ -16,3 +14,2 @@
  from homeassistant.helpers.aiohttp_client import async_get_clientsession
 -from homeassistant.helpers.update_coordinator import UpdateFailed
- 
+
 @@ -20,2 +17,3 @@
  from .client.local_mqtt import JackeryLocalMqttClient
 +from .client.mqtt_push import JackeryMqttPushClient
@@ -39,7 +39,7 @@ __init__.py
 -from .mqtt_session_cache import async_load_mqtt_session, async_save_mqtt_session
  from .services import async_setup_services
 @@ -66,2 +59,7 @@
- 
+
 +if TYPE_CHECKING:
 +    from collections.abc import Iterable
 +
@@ -56,7 +56,7 @@ __init__.py
 +
 +_LOGGER = logging.getLogger(__name__)  # noqa: RUF067, RUF100
 +_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})  # noqa: RUF067, RUF100
- 
+
 @@ -82,6 +80,6 @@
  # accident.
 -CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -69,7 +69,7 @@ __init__.py
 +async def async_setup(hass: HomeAssistant, config: dict) -> bool:  # noqa: RUF029, RUF067, RUF100
      """Set up global Jackery SolarVault services.
 @@ -97,3 +95,3 @@
- 
+
 -def _async_clean_legacy_entities(
 +async def _async_clean_legacy_entities(  # noqa: RUF067, RUF100
      hass: HomeAssistant, entry: JackeryConfigEntry
@@ -106,7 +106,7 @@ __init__.py
 +    await _async_remove_entities_with_suffixes(
          hass,
 @@ -166,25 +164,14 @@
- 
+
 -async def _async_authenticate(
 +async def _async_authenticate(  # noqa: RUF067, RUF100
      hass: HomeAssistant, entry: JackeryConfigEntry
@@ -125,11 +125,11 @@ __init__.py
 -    discovery and a cached MQTT session can start the local transports without
 -    a successful cloud round-trip.
 +    """Authenticate to the Jackery cloud using credentials from the config entry and return an authenticated API client.
- 
+
      Returns:
 -        JackeryApi: The API client (authenticated when the cloud was reachable).
 +        JackeryApi: An authenticated API client ready for use.
- 
+
      Raises:
 -        ConfigEntryAuthFailed: If the provided credentials are rejected.
 -    """
@@ -184,7 +184,7 @@ __init__.py
 +        ) from err
      return api
 @@ -232,27 +197,10 @@
- 
+
 -_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 -
 -
@@ -215,7 +215,7 @@ __init__.py
  ) -> None:
 -    """Start the optional per-entry local MQTT listener (PROTOCOL.md §5).
 +    """Start a per-entry local MQTT client when the entry is explicitly scoped.
- 
+
 @@ -261,9 +209,3 @@
      accidental broad wildcard subscription from ingesting unrelated broker
 -    traffic and causing high CPU load. When started, the client is stored at
@@ -238,18 +238,18 @@ __init__.py
 +        if current is None:
 +            return
 +        await current.async_handle_local_mqtt_message(topic, data)
- 
+
 @@ -327,3 +276,3 @@
          Exceptions raised while stopping the client are suppressed.
 -        """
 +        """  # noqa: E501, RUF100
          with contextlib.suppress(Exception):
 @@ -338,14 +287,6 @@
- 
+
 -async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
 +async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF100
      """Set up the Jackery SolarVault config entry, start its coordinator and optional transports, and forward platform setup.
- 
+
 -    Performs authentication, constructs the coordinator, runs discovery and the
 -    initial refresh, and starts cloud MQTT plus an optional local MQTT listener
 -    and BLE transport. Cloud/transport failures do not block setup (AGENTS.md
@@ -260,7 +260,7 @@ __init__.py
 -    created, the coordinator is shut down and the entry's runtime state is
 -    cleared before the error is re-raised.
 +    Performs authentication, constructs the coordinator, runs discovery and the initial refresh, and starts cloud MQTT plus an optional local MQTT listener and BLE transport. Transport startup failures that indicate invalid credentials will surface re-auth; other transport failures are logged and do not block setup. On successful setup the coordinator is stored on the entry's runtime state and platform setups and listeners are registered. If setup fails after the coordinator is created, the coordinator is shut down and the entry's runtime state is cleared before the error is re-raised.
- 
+
 @@ -353,5 +294,5 @@
          True if setup completed successfully.
 -    """
@@ -268,9 +268,9 @@ __init__.py
 +    """  # noqa: E501, RUF100
      api = await _async_authenticate(hass, entry)
 +    await _async_clean_legacy_entities(hass, entry)
- 
+
 @@ -363,3 +304,3 @@
- 
+
 -    try:
 +    try:  # noqa: PLW0717
          # Discovery must run first (MQTT subscriptions and the first refresh
@@ -353,7 +353,7 @@ __init__.py
 +            entry.runtime_data = None  # type: ignore[assignment]
          raise
 @@ -463,3 +375,3 @@
- 
+
 -def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
 +async def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF029, RUF067, RUF100
      """Remove stale Energy helper entities that were created without a unit of measurement.
@@ -368,7 +368,7 @@ __init__.py
 +        if unit not in {None, ""}:
              continue
 @@ -501,27 +413,13 @@
- 
+
 -_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 -
 -
@@ -396,7 +396,7 @@ __init__.py
 +    """Determine whether `uid` consists of a legacy device head immediately followed by `key_suffix`.
 +
 +    A legacy device head has the form `<digits>` or `<digits>_battery_pack_<digits>`. This function returns `True` only when `uid` ends with `key_suffix` and the substring before that suffix exactly matches the legacy head pattern.
- 
+
      Returns:
 -        ``True`` if ``uid`` is a legacy head concatenated with ``key_suffix``,
 -        ``False`` otherwise.
@@ -405,12 +405,12 @@ __init__.py
 +    """  # noqa: E501, RUF100
      if not uid.endswith(key_suffix):
 @@ -532,3 +430,3 @@
- 
+
 -def _async_remove_entities_with_suffixes(
 +async def _async_remove_entities_with_suffixes(  # noqa: RUF029, RUF067, RUF100
      hass: HomeAssistant,
 @@ -542,18 +440,9 @@
- 
+
 -    Matching only applies when the unique ID conforms to the legacy unique-id
 -    shape to avoid accidental removal of current entities. Unique IDs for this
 -    integration follow ``<device_id>_<key_suffix>`` per docs/PROTOCOL.md §11, so
@@ -420,7 +420,7 @@ __init__.py
 -    legacy suffix cannot accidentally delete a current entity whose key happens
 -    to contain the legacy tail. If ``suffixes`` is empty, no action is taken.
 +    Matching only applies when the unique ID conforms to the legacy unique-id shape to avoid accidental removal of current entities. If `suffixes` is empty, the function performs no action.
- 
+
      Parameters:
 -        domain (str): Entity domain to restrict removals (e.g., "sensor",
 -            "binary_sensor").
@@ -433,21 +433,21 @@ __init__.py
 +    """  # noqa: E501, RUF100
      suffix_tuple = tuple(suffixes)
 @@ -576,3 +465,3 @@
- 
+
 -async def _async_update_listener(
 +async def _async_update_listener(  # noqa: RUF067, RUF100
      hass: HomeAssistant, entry: JackeryConfigEntry
 @@ -588,13 +477,10 @@
- 
+
 -async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
 +async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF100
      """Unload the config entry and tear down its runtime resources.
- 
+
 -    If platform unload succeeds, shuts down the coordinator (if present) and
 -    clears the entry's runtime data to avoid retaining the coordinator. Teardown
 -    is performed only when platforms are successfully unloaded.
 +    If platform unload succeeds, shuts down the coordinator (if present) and clears the entry's runtime data to avoid retaining the coordinator. Teardown is performed only when platforms are successfully unloaded.
- 
+
      Returns:
 -        True if platforms were unloaded and runtime teardown completed, False
 -        otherwise.
@@ -463,19 +463,19 @@ __init__.py
 
 ================================================================================
 binary_sensor.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 15
 ================================================================================
 --- binary_sensor.py (LIVE/merged)
 +++ binary_sensor.py (BACKUP)
 @@ -2,6 +2,5 @@
- 
+
 -from collections.abc import Callable
  from dataclasses import dataclass
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
 @@ -13,6 +12,4 @@
  from homeassistant.const import EntityCategory
 -from homeassistant.core import HomeAssistant
@@ -496,7 +496,7 @@ binary_sensor.py
 -from .coordinator import JackerySolarVaultCoordinator
  from .entity import JackeryEntity
 @@ -41,2 +37,11 @@
- 
+
 +if TYPE_CHECKING:
 +    from collections.abc import Callable
 +
@@ -513,7 +513,7 @@ binary_sensor.py
 +# payload names documented in implementation notes §2.
  BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
 @@ -82,3 +87,3 @@
- 
+
 -async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 +async def async_setup_entry(  # noqa: RUF029 - HA platform hook must stay async.
      hass: HomeAssistant,
@@ -551,7 +551,7 @@ binary_sensor.py
 -                        plug_key=plug_key,
                      ),
 @@ -140,7 +129,4 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 -        """Register new binary sensor entities when the coordinator's entity signature changes.
@@ -630,7 +630,7 @@ binary_sensor.py
 
 ================================================================================
 button.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 27
 ================================================================================
 --- button.py (LIVE/merged)
@@ -639,7 +639,7 @@ button.py
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
 @@ -9,7 +9,5 @@
  from homeassistant.const import EntityCategory
 -from homeassistant.core import HomeAssistant
@@ -658,7 +658,7 @@ button.py
 -    FIELD_DEVICE_SN,
      FIELD_END_TS,
 @@ -75,2 +73,8 @@
- 
+
 +if TYPE_CHECKING:
 +    from homeassistant.core import HomeAssistant
 +    from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -692,7 +692,7 @@ button.py
 +        """  # noqa: E501, RUF100
          entities: list[ButtonEntity] = []
 @@ -458,2 +462,3 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 @@ -462,3 +467,3 @@
@@ -731,7 +731,7 @@ button.py
 +        except Exception as err:  # noqa: BLE001
              self._raise_action_error(err)
 @@ -618,3 +629,3 @@
- 
+
 -    def __init__(
 +    def __init__(  # noqa: PLR0913
          self,
@@ -764,13 +764,13 @@ button.py
 
 ================================================================================
 client\__init__.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 4
 ================================================================================
 --- client\__init__.py (LIVE/merged)
 +++ client\__init__.py (BACKUP)
 @@ -25,5 +25,7 @@
- 
+
 -def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 lazy re-export
 +def __getattr__(name: str) -> Any:  # noqa: ANN401, RUF100
      if name == "JackeryMqttPushClient":
@@ -778,7 +778,7 @@ client\__init__.py
 +        from .mqtt_push import (  # noqa: PLC0415
 +            JackeryMqttPushClient as _JackeryMqttPushClient,
 +        )
- 
+
 
 ================================================================================
 client\api.py
@@ -788,7 +788,7 @@ client\api.py
 --- client\api.py (LIVE/merged)
 +++ client\api.py (BACKUP)
 @@ -2,6 +2,6 @@
- 
+
 -Endpoint paths and polling rules are mirrored from PROTOCOL.md §2.
 -MQTT command details are documented separately in PROTOCOL.md §3.
 -
@@ -796,7 +796,7 @@ client\api.py
 +Endpoint paths and polling rules below.
 +MQTT API BLE commands and details are documented separately.
 +
-+Auth:     /v1/auth/login              (AES-128-ECB + RSA-1024 hybrid) 
++Auth:     /v1/auth/login              (AES-128-ECB + RSA-1024 hybrid)
  Systems:  /v1/device/system/list      (no params)
 @@ -17,3 +17,2 @@
  import binascii
@@ -812,7 +812,7 @@ client\api.py
 +import aiomqtt  # noqa: F401
  from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 @@ -32,3 +32,3 @@
- 
+
 -from ..const import (
 +from ..const import (  # noqa: TID252
      AES_KEY,
@@ -871,11 +871,11 @@ client\api.py
 +
 +if TYPE_CHECKING:
 +    from collections.abc import Awaitable, Callable
- 
+
  _LOGGER = logging.getLogger(__name__)
 +_HTTP_RETRY_ATTEMPTS = 3
 +_HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
- 
+
 @@ -172,3 +168,3 @@
      padded = padder.update(plaintext) + padder.finalize()
 -    cipher = Cipher(algorithms.AES(key), modes.ECB())
@@ -956,7 +956,7 @@ client\api.py
 +            )
 +            await asyncio.sleep(delay)
 +        raise JackeryApiError(f"{method} {path} retry loop exhausted")  # noqa: TRY003
- 
+
 @@ -282,3 +336,3 @@
                  headers (dict[str, str]): Mapping of HTTP header names to values. Includes the auth token header when `with_token` is True and a token is present.
 -        """
@@ -983,7 +983,7 @@ client\api.py
 +        """  # noqa: E501, RUF100
          mac_id = self._resolve_login_mac_id()
 @@ -389,3 +443,3 @@
- 
+
 -        try:
 +        try:  # noqa: PLW0717
              async with self._session.post(
@@ -1011,7 +1011,7 @@ client\api.py
 +            raise JackeryApiError(  # noqa: TRY003
                  f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
 @@ -415,3 +470,7 @@
- 
+
 -        self.last_login_response = dict(data)
 +        if not isinstance(data, dict):
 +            raise JackeryApiError(  # noqa: TRY003
@@ -1030,7 +1030,7 @@ client\api.py
          if not token:
 -            raise JackeryAuthError("Login succeeded but no token returned")
 +            raise JackeryAuthError("Login succeeded but no token returned")  # noqa: TRY003
- 
+
 @@ -437,2 +496,7 @@
          payload = data.get(FIELD_DATA) or {}
 +        if not isinstance(payload, dict):
@@ -1118,7 +1118,7 @@ client\api.py
 +        if is_auth_failure and self.auth_rejection_callback is not None:
 +            self.auth_rejection_callback(status, data)
 +        return is_auth_failure
- 
+
      @staticmethod
 -    def _auth_failure_message(method: str, path: str, status: int, data: dict) -> str:
 +    def _auth_failure_message(method: str, path: str, status: int, data: object) -> str:
@@ -1173,7 +1173,7 @@ client\api.py
                  return item
 -        return items[0] if items else {}
 +        return {}
- 
+
      # --- generic GET with auto re-login ------------------------------------
 -    async def _get_json(self, path: str, params: dict | None = None) -> dict:
 +    async def _get_json(
@@ -1181,7 +1181,7 @@ client\api.py
 +    ) -> dict[str, Any]:
          await self._ensure_token()
 @@ -743,3 +824,3 @@
- 
+
 -        async def _do() -> tuple[int, dict]:
 +        async def _do() -> tuple[int, dict[str, Any]]:
              async with self._session.get(
@@ -1233,7 +1233,7 @@ client\api.py
 +                raise JackeryApiError(  # noqa: TRY003
 +                    f"{HTTP_METHOD_GET} {path} token still expired after re-login"
 +                )
- 
+
 @@ -785,8 +883,11 @@
              )
 -        if status != 200:
@@ -1252,19 +1252,19 @@ client\api.py
 +                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # noqa: E501, RUF100
              )
 @@ -825,3 +926,3 @@
- 
+
 -    async def async_get_device_property(self, device_id: str | int) -> dict:
 +    async def async_get_device_property(self, device_id: str | int) -> dict[str, Any]:
          """GET /v1/device/property — device + properties dict."""
 @@ -833,3 +934,5 @@
- 
+
 -    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
 +    async def async_get_alarm(
 +        self, system_id: str | int
 +    ) -> Any:  # parsed JSON response, indexed by callers  # noqa: ANN401, RUF100
          """GET /v1/api/alarm — alarm list for a system."""
 @@ -841,3 +944,3 @@
- 
+
 -    async def async_get_system_statistic(self, system_id: str | int) -> dict:
 +    async def async_get_system_statistic(self, system_id: str | int) -> dict[str, Any]:
          """GET /v1/device/stat/systemStatistic — today/total KPIs.
@@ -1274,7 +1274,7 @@ client\api.py
 +    ) -> dict[str, Any]:
          """GET /v1/device/stat/sys/pv/trends — historical curves."""
 @@ -881,3 +984,3 @@
- 
+
 -    async def async_get_power_price(self, system_id: str | int) -> dict:
 +    async def async_get_power_price(self, system_id: str | int) -> dict[str, Any]:
          """GET /v1/device/dynamic/powerPriceConfig — tariff config."""
@@ -1288,30 +1288,30 @@ client\api.py
 -    async def async_get_device_statistic(self, device_id: str | int) -> dict:
 +    async def async_get_device_statistic(self, device_id: str | int) -> dict[str, Any]:
          """Retrieve current-day energy flow statistics for the specified device.
- 
+
 -        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. Keys present may vary by device and backend response.
-+        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh). 
-+        Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, 
-+        `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`. 
++        The returned dictionary maps metric keys (strings) to their values as numeric strings representing kilowatt-hours (kWh).
++        Typical keys include: `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`,
++        `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`.
 +        Keys present may vary by device and backend response.
- 
+
 @@ -929,3 +1035,3 @@
              dict: Mapping of statistic keys to their values as strings in kWh.
 -        """
 +        """  # noqa: E501, RUF100
          data = await self._get_json(
 @@ -936,3 +1042,3 @@
- 
+
 -    async def _async_get_device_period_stat(
 +    async def _async_get_device_period_stat(  # noqa: PLR0913
          self,
 @@ -948,3 +1054,5 @@
- 
+
 -        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
-+        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. 
-+        An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, 
++        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned.
++        An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data,
 +        excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
- 
+
 @@ -960,3 +1068,3 @@
              dict[str, Any]: Normalized payload dict from the endpoint's `data` field, augmented with `APP_REQUEST_META`.
 -        """
@@ -1347,7 +1347,7 @@ client\api.py
 @@ -1116,2 +1224,3 @@
          )
 +        return self._payload_dict(data, DEVICE_TODAY_ENERGY_PATH)
- 
+
 @@ -1128,3 +1237,3 @@
              A dictionary containing the parsed payload with the meter panel totals from the device meter statistics endpoint.
 -        """
@@ -1421,7 +1421,7 @@ client\api.py
 +        """  # noqa: E501, RUF100
          begin_date, end_date = app_period_date_bounds(
 @@ -1347,3 +1446,3 @@
- 
+
 -    async def async_get_ota_info(self, device_sn: str) -> dict:
 +    async def async_get_ota_info(self, device_sn: str) -> dict[str, Any]:
          """Retrieve OTA information for the device identified by `device_sn`.
@@ -1431,7 +1431,7 @@ client\api.py
 +        """  # noqa: E501, RUF100
          data = await self._get_json(
 @@ -1397,3 +1496,3 @@
- 
+
 -    async def async_get_location(self, device_id: str | int) -> dict:
 +    async def async_get_location(self, device_id: str | int) -> dict[str, Any]:
          """Retrieve the GPS coordinates previously set for the specified device.
@@ -1451,7 +1451,7 @@ client\api.py
 +        """  # noqa: E501, RUF100
          await self._ensure_token()
 @@ -1430,3 +1529,3 @@
- 
+
 -        async def _do() -> tuple[int, dict]:
 +        async def _do() -> tuple[int, dict[str, Any]]:
              async with self._session.put(
@@ -1493,7 +1493,7 @@ client\api.py
 +                raise JackeryApiError(  # noqa: TRY003
 +                    f"{HTTP_METHOD_PUT} {path} token still expired after re-login"
 +                )
- 
+
 @@ -1474,8 +1582,11 @@
              )
 -        if status != 200:
@@ -1525,7 +1525,7 @@ client\api.py
 +    # app-captured writers
      # ------------------------------------------------------------------
 @@ -1523,3 +1634,3 @@
- 
+
 -    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
 +    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict[str, Any]:
          """Send a form-urlencoded POST to the Jackery API, retrying once after automatic re-login if the token is expired.
@@ -1535,7 +1535,7 @@ client\api.py
 +        """  # noqa: E501, RUF100
          await self._ensure_token()
 @@ -1547,3 +1658,3 @@
- 
+
 -        async def _do() -> tuple[int, dict]:
 +        async def _do() -> tuple[int, dict[str, Any]]:
              async with self._session.post(
@@ -1577,7 +1577,7 @@ client\api.py
 +                raise JackeryApiError(  # noqa: TRY003
 +                    f"{HTTP_METHOD_POST} {path} token still expired after re-login"
 +                )
- 
+
 @@ -1591,9 +1711,12 @@
              )
 -        if status != 200:
@@ -1717,7 +1717,7 @@ client\ble.py
  with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 -"""
 +"""  # noqa: E501, RUF100
- 
+
 @@ -134,4 +134,4 @@
      """
 -    if not 0 <= value <= 0xFFFF:
@@ -1737,7 +1737,7 @@ client\ble.py
      except ValueError as err:
 -        raise ValueError("parse_hex16: expected hex chars") from err
 +        raise ValueError("parse_hex16: expected hex chars") from err  # noqa: TRY003
- 
+
 @@ -166,3 +166,3 @@
          str: Uppercase hexadecimal representation of `data`.
 -    """
@@ -1763,7 +1763,7 @@ client\ble.py
 +_unrecognised_version_count: list[int] = [0]
  _BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 @@ -343,3 +344,3 @@
- 
+
 -def build_binary_frame(
 +def build_binary_frame(  # noqa: PLR0913
      *,
@@ -1904,12 +1904,12 @@ client\ble_transport.py
 --- client\ble_transport.py (LIVE/merged)
 +++ client\ble_transport.py (BACKUP)
 @@ -30,3 +30,3 @@
- 
+
 -Crypto assumptions follow implementation notes §14 and the reverse-engineered
 +Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
  ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 @@ -35,7 +35,6 @@
- 
+
 -from __future__ import annotations
 -
 -import asyncio
@@ -1919,7 +1919,7 @@ client\ble_transport.py
 +from collections import deque
  from collections.abc import Awaitable, Callable
 @@ -47,3 +46,7 @@
- 
+
 -from ..util import first_nonblank_int
 +from ..const import (  # noqa: TID252
 +    DEFAULT_BLE_ACK_TIMEOUT_SEC,
@@ -1936,7 +1936,7 @@ client\ble_transport.py
 +        BluetoothChange,
          BluetoothServiceInfoBleak,
 @@ -65,4 +71,13 @@
- 
+
 -#: Minimum time between (re)connect attempts when the device drops the link.
 +#: Backoff after a failed connect *attempt* (device unreachable / GATT
 +#: connect raised). Long, so we don't hammer a device that is off or out of
@@ -1949,9 +1949,9 @@ client\ble_transport.py
 +#: BLE dark for 30 s. Using the long backoff here was capping BLE uptime at
 +#: ~36 % (≈17 s up per ≈47 s cycle); a short retry roughly doubles it.
 +_LOST_LINK_BACKOFF_SEC: float = 8.0
- 
+
 @@ -84,9 +99,8 @@
- 
+
 -
 -def _coerce_ble_int(value: Any, field_name: str) -> int:
 -    """Parse an integer BLE transport option without bool/non-finite leakage."""
@@ -1965,11 +1965,11 @@ client\ble_transport.py
 +
 +#: Exponential-backoff ceiling — retries never wait longer than this.
 +_MAX_BACKOFF_SEC: float = 300.0
- 
+
 @@ -113,2 +127,3 @@
      decode_error: str | None = None
 +    source_started_at: datetime | None = None
- 
+
 @@ -127,2 +142,3 @@
      acks_timed_out: int = 0
 +    writes_with_response_failed: int = 0
@@ -1980,7 +1980,7 @@ client\ble_transport.py
 -    # unchanged-but-routed frames (for example battery-pack lifetime
 -    # snapshots) separate from genuinely unsupported BLE payloads.
 -    routed_frames_by_cmd: dict[int, int] = field(default_factory=dict)
- 
+
 @@ -192,17 +204,11 @@
      ) -> None:
 -        """Build the listener.
@@ -2021,7 +2021,7 @@ client\ble_transport.py
 -        self._unmapped_serials_logged: set[str] = set()
 -        self._missing_key_logged: set[str] = set()
 +        self._pending_property_query_starts: dict[str, deque[datetime]] = {}
- 
+
      def address_for_device_id(self, device_id: str) -> str | None:
 -        """Return the cached BLE MAC for a device id, or None."""
 +        """Get the cached BLE MAC address for the given device id.
@@ -2030,7 +2030,7 @@ client\ble_transport.py
 +            The MAC address string for the device, or `None` if no cached address exists.
 +        """  # noqa: E501, RUF100
          return self._device_addresses.get(device_id)
- 
+
 -    async def async_ensure_connected(
 -        self,
 -        device_id: str,
@@ -2072,7 +2072,7 @@ client\ble_transport.py
 -
      # ------------------------------------------------------------------
 @@ -288,3 +255,3 @@
- 
+
 -    def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:
 +    def _record_negotiated_mtu(self, device_id: str, client: BleakClient) -> None:
          """Cache the negotiated GATT MTU after ``start_notify`` returns.
@@ -2082,7 +2082,7 @@ client\ble_transport.py
 +            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
                  self._mtu[device_id] = value
 @@ -319,2 +286,17 @@
- 
+
 +    def _mark_property_query_started(
 +        self,
 +        device_id: str,
@@ -2117,7 +2117,7 @@ client\ble_transport.py
 -        except asyncio.CancelledError:
 +        except asyncio.CancelledError:  # noqa: TRY203
              raise
- 
+
 -    async def async_send_command(
 +    async def async_send_command(  # noqa: PLR0912, PLR0913, PLR0915
          self,
@@ -2291,7 +2291,7 @@ client\ble_transport.py
          # environments without BlueZ / bleak.
 -        from homeassistant.components import bluetooth
 +        from homeassistant.components import bluetooth  # noqa: PLC0415
- 
+
 @@ -611,11 +615,21 @@
          )
 +        # Surface the exact matcher tuple so the user can cross-check it
@@ -2306,7 +2306,7 @@ client\ble_transport.py
 +            ble.BLE_MANUFACTURER_ID,
 +            len(device_ids),
 +        )
- 
+
      async def async_stop(self) -> None:
 -        """Shut the listener down. Safe to call from coordinator unload.
 -
@@ -2390,7 +2390,7 @@ client\ble_transport.py
 -        # Clear the one-shot diagnostic flag now that this serial resolves.
 -        self._unmapped_serials_logged.discard(serial)
          return device_id
- 
+
 -    async def _async_run_connection(self, device_id: str, address: str) -> None:
 -        """Maintain a GATT session for one device, reconnecting on drop."""
 -        from bleak.exc import BleakError
@@ -2411,7 +2411,7 @@ client\ble_transport.py
 +        )
 +
 +        from homeassistant.components import bluetooth  # noqa: PLC0415
- 
+
          stats = self.stats_for(device_id)
 -        try:
 -            while not self._stop_event.is_set():
@@ -2496,7 +2496,7 @@ client\ble_transport.py
 +                        return  # stop_event fired during the wait  # noqa: TRY300
 +                    except TimeoutError:
 +                        continue
- 
+
 @@ -816,3 +867,3 @@
                  async def _notify_callback(
 -                    _characteristic: Any, data: bytearray
@@ -2562,7 +2562,7 @@ client\ble_transport.py
 +                device_id,
 +                self._stop_event.is_set(),
 +            )
- 
+
      def _on_disconnect(self, device_id: str) -> None:
 +        """Handle a peripheral disconnect for the given device.
 +
@@ -2579,7 +2579,7 @@ client\ble_transport.py
 +        # HA logs so the user can correlate them with the keep-alive /
 +        # reconnect-backoff timing in PROTOCOL.md §4.
 +        _LOGGER.info("Jackery BLE %s: peripheral disconnected", device_id)
- 
+
 @@ -910,10 +995,6 @@
      async def _handle_notification(self, device_id: str, raw: bytes) -> None:
 -        """Decrypt + parse a 0xEE02 notify frame and forward it to the sink.
@@ -2614,7 +2614,7 @@ client\ble_transport.py
 -                # Successful decode — clear the one-shot diagnostic flag so
 -                # a future key-loss can surface again at INFO.
 -                self._missing_key_logged.discard(device_id)
- 
+
 @@ -963,2 +1030,5 @@
          )
 +        if parsed is not None and parsed.cmd == 107:  # noqa: PLR2004
@@ -2639,7 +2639,7 @@ client\local_mqtt.py
 --- client\local_mqtt.py (LIVE/merged)
 +++ client\local_mqtt.py (BACKUP)
 @@ -22,7 +22,3 @@
- 
+
 -import aiomqtt
 -from aiomqtt import Client as MQTTClient, MqttError
 -from aiomqtt.exceptions import MqttCodeError
@@ -2656,9 +2656,9 @@ client\local_mqtt.py
  # Strict by default: no implicit wildcard subscription.
 -LOCAL_MQTT_DEFAULT_TOPIC: str = ""
 +LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
- 
+
 @@ -87,3 +85,3 @@
- 
+
 -    def __init__(
 +    def __init__(  # noqa: PLR0913
          self,
@@ -2788,7 +2788,7 @@ client\local_mqtt.py
 +            return
 +        async for message in client.messages:
 +            self._handle_message(str(message.topic), message.payload)
- 
+
 @@ -260,3 +283,3 @@
              rc (int): MQTT CONNACK return code provided by the broker indicating the reason for refusal.
 -        """
@@ -2814,7 +2814,7 @@ client\local_mqtt.py
 +        """Extract the integer MQTT return code from an aiomqtt error."""
          rc = getattr(err, "rc", None)
 @@ -308,3 +324,3 @@
- 
+
 -    def _handle_message(
 +    def _handle_message(  # noqa: PLR0912, PLR0915
          self,
@@ -2836,7 +2836,7 @@ client\local_mqtt.py
              label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
 -        """
 +        """  # noqa: E501, RUF100
- 
+
 @@ -484,3 +504,3 @@
                  done (asyncio.Task[None]): Completed task whose exception, if raised, will be logged.
 -            """
@@ -2848,7 +2848,7 @@ client\local_mqtt.py
 -                _LOGGER.error("Jackery local MQTT %s handler failed: %s", label, err)
 +            except Exception:
 +                _LOGGER.exception("Jackery local MQTT %s handler failed", label)
- 
+
 @@ -506,3 +526,3 @@
              dict[str, Any]: A snapshot containing connection/configuration flags, topic diagnostics, message counters, last-seen timestamps/errors, connect attempts, and the MQTT client library identifier.
 -        """
@@ -2900,7 +2900,7 @@ client\mqtt_push.py
 +    MQTT_TOPIC_NOTICE,
      MQTT_TOPIC_PREFIX,
 @@ -32,3 +32,14 @@
- 
+
 +_MqttErrorTuple: tuple[type[Exception], ...] = (MqttError,)
 +
 +# Topics carrying propertyChange / devicePropertyChange and alert data need
@@ -2922,9 +2922,9 @@ client\mqtt_push.py
 +_MQTT_AVAILABILITY_ONLINE = b"online"
 +_MQTT_AVAILABILITY_OFFLINE = b"offline"
 +_MQTT_AVAILABILITY_TOPIC_SUFFIX = "status"
- 
+
 @@ -43,3 +58,3 @@
- 
+
 -    def filter(self, record: logging.LogRecord) -> bool:
 +    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
          """Filter out common aiomqtt passive socket-reset log messages.
@@ -2953,7 +2953,7 @@ client\mqtt_push.py
 +        self._message_tasks: deque[asyncio.Task[None]] = deque(
 +            maxlen=_MAX_PENDING_MESSAGE_TASKS
 +        )
- 
+
 @@ -130,3 +154,3 @@
              user_id (str): User identifier used to construct the subscription topic namespace.
 -        """
@@ -2972,7 +2972,7 @@ client\mqtt_push.py
              self._last_error = None
              self._last_connect_failure_signature = None
 +            self._stopping = False
- 
+
 @@ -169,2 +200,3 @@
                      ssl_context=ssl_context,
 +                    availability_topic=self._availability_topic,
@@ -3050,7 +3050,7 @@ client\mqtt_push.py
          if not self._connected:
 -            raise RuntimeError(f"MQTT not connected yet ({self._last_error})")
 +            raise RuntimeError(f"MQTT not connected yet ({self._last_error})")  # noqa: TRY003
- 
+
 @@ -281,4 +321,5 @@
          If a background runner task exists, cancel it and wait for its completion while suppressing cancellation, MQTT, and generic exceptions. Clears the stored client, fingerprint, subscribed topics, connected flag, and connected event so the instance is left in a stopped state.
 -        """
@@ -3071,7 +3071,7 @@ client\mqtt_push.py
 -        with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
 +        with contextlib.suppress(asyncio.CancelledError, *_MqttErrorTuple, Exception):
              await task
- 
+
 -    async def _async_run_session(
 +    async def _async_run_session(  # noqa: PLR0912, PLR0915
          self,
@@ -3245,7 +3245,7 @@ client\mqtt_push.py
 -        return rc in (4, 5, 134, 135)
 +        """  # noqa: E501, RUF100
 +        return rc in {4, 5, 134, 135}
- 
+
 @@ -472,3 +566,3 @@
              bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
 -        """
@@ -3260,9 +3260,9 @@ client\mqtt_push.py
          source_parts = ["system_default"]
          self._tls_custom_ca_loaded = False
 -        self._tls_x509_strict_disabled = False
- 
+
 @@ -512,14 +605,22 @@
- 
+
 +        # Jackery's broker certificate is missing the Authority Key Identifier
 +        # extension that strict X.509 validation (default in OpenSSL 3.x /
 +        # Python >=3.10) enforces, so the handshake fails with
@@ -3293,7 +3293,7 @@ client\mqtt_push.py
 -            ctx.verify_flags &= ~strict_flag
 -            self._tls_x509_strict_disabled = True
 -            source_parts.append("x509_strict_disabled")
- 
+
 @@ -541,3 +642,3 @@
                  Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or parse failure, or when the JSON value is not an object, increments `_messages_dropped` and sets `_last_message_error`. If the parsed object does not contain a dict at `FIELD_BODY` but does contain a dict at `FIELD_DATA`, copies `FIELD_DATA` into `FIELD_BODY`. On successful validation increments `_messages_seen`, records `_last_message_at` (UTC ISO), clears `_last_message_error`, and schedules the configured message callback with `(topic, data)`.
 -        """
@@ -3344,7 +3344,7 @@ client\mqtt_push.py
 +                tracked_tasks.append(task)
 +            else:
 +                tracked_tasks.add(task)
- 
+
          def _log_task_result(done: asyncio.Task[None]) -> None:
 +            if tracked_tasks is not None:
 +                with contextlib.suppress(ValueError, KeyError):
@@ -3356,7 +3356,7 @@ client\mqtt_push.py
 -                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
 +            except Exception:
 +                _LOGGER.exception("Jackery MQTT %s handler failed", label)
- 
+
 @@ -602,3 +735,3 @@
                  None if `topic` is `None`; otherwise the possibly-redacted topic string.
 -        """
@@ -3371,7 +3371,7 @@ client\mqtt_push.py
                - "library": identifier of the MQTT client library
 -        """
 +        """  # noqa: E501, RUF100
- 
+
 @@ -645,3 +778,3 @@
                  str | None: The redacted topic when redaction is enabled, the original topic when redaction is disabled, or `None` if `topic` is `None`.
 -            """
@@ -3428,7 +3428,7 @@ client\third_party_mqtt_codec.py
  import base64
 +import binascii
 +import secrets
- 
+
  from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 +
 +
@@ -3437,9 +3437,9 @@ client\third_party_mqtt_codec.py
 +    if len(envelope) <= BLE_AES_IV_LEN:
 +        raise ValueError("missing third-party MQTT IV envelope")  # noqa: TRY003
 +    return envelope[:BLE_AES_IV_LEN], envelope[BLE_AES_IV_LEN:]
- 
+
 @@ -10,10 +19,7 @@
- 
+
 -    Smali source:
 -    ``HomeDeviceController.g1`` runs ``userName``, ``password`` and ``token``
 -    through ``Lbb/c;->d(String)``. For SolarVault home devices ``bb/e.d``
@@ -3459,7 +3459,7 @@ client\third_party_mqtt_codec.py
 +    iv = secrets.token_bytes(BLE_AES_IV_LEN)
 +    ciphertext = aes_encrypt(value.encode("utf-8"), bluetooth_key, iv)
 +    return base64.b64encode(iv + ciphertext).decode("ascii")
- 
+
 @@ -28,3 +35,3 @@
      if len(bluetooth_key) != BLE_AES_IV_LEN:
 -        raise ValueError(
@@ -3486,7 +3486,7 @@ config_flow.py
 --- config_flow.py (LIVE/merged)
 +++ config_flow.py (BACKUP)
 @@ -2,12 +2,8 @@
- 
+
 -from collections.abc import Mapping
  import logging
 -from typing import Any
@@ -3551,7 +3551,7 @@ config_flow.py
 +from .mqtt_session_cache import async_clear_mqtt_session
  from .util import config_entry_bool_option
 @@ -63,8 +66,2 @@
- 
+
 -# Options surface in the UI flow. Debug-only toggles
 -# (``CONF_ENABLE_UNREDACTED_DIAGNOSTICS`` and ``CONF_ENABLE_PAYLOAD_DEBUG_LOG``)
 -# are deliberately NOT listed here — sensitive logging is gated by the
@@ -3570,7 +3570,7 @@ config_flow.py
 +    CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,  # noqa: E501, RUF100
  }
 @@ -81,11 +80,5 @@
- 
+
 -def _normalize_account(value: Any) -> str:
 +def _normalize_account(value: str) -> str:
      """Normalize user-facing account identifiers before auth and unique IDs."""
@@ -3582,7 +3582,7 @@ config_flow.py
 -    value = entry.data.get(key)
 -    return value if isinstance(value, str) else ""
 +    return value.strip()
- 
+
 @@ -109,43 +102,2 @@
          for key, default in _OPTION_DEFAULTS.items()
 -    }
@@ -3638,7 +3638,7 @@ config_flow.py
 +                title="",
 +                data=_flow_options(user_input, current_options),
 +            )
- 
+
 @@ -201,2 +153,6 @@
          current_enable_ble_transport = current_options[CONF_ENABLE_BLE_TRANSPORT]
 +        current_enable_ble_writes = current_options[CONF_ENABLE_BLE_WRITES]
@@ -3681,7 +3681,7 @@ config_flow.py
 -            ): str,
          })
 @@ -269,10 +213,34 @@
- 
+
 -    async def async_step_bluetooth(self, discovery_info: Any) -> ConfigFlowResult:
 -        """Start account setup from a local BLE discovery signal."""
 -        self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
@@ -3694,7 +3694,7 @@ config_flow.py
 +        if self._async_current_entries():
 +            return self.async_abort(reason="already_configured")
          return await self.async_step_user()
- 
+
 -    async def async_step_dhcp(self, discovery_info: Any) -> ConfigFlowResult:
 -        """Start account setup from a DHCP discovery signal."""
 -        self.context["title_placeholders"] = {"name": "Jackery SolarVault"}
@@ -3766,7 +3766,7 @@ config_flow.py
 -        stored_username = _entry_text(entry, CONF_USERNAME)
 -        if not stored_username:
 -            return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
- 
+
 @@ -455,3 +427,3 @@
                  session=session,
 -                account=stored_username,
@@ -3803,7 +3803,7 @@ const.py
  from typing import Final
 +
 +from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
- 
+
 @@ -6,2 +8,7 @@
  MANUFACTURER: Final = "Jackery"
 +
@@ -3811,12 +3811,12 @@ const.py
 +# to the diagnostics payload so downstream dashboards / docs ingest tools
 +# can detect and adapt to the new shape.
 +DIAGNOSTICS_SCHEMA_VERSION: Final = 1
- 
+
 @@ -27,3 +34,3 @@
  # is still open.
 -MQTT_SILENT_THRESHOLD_SEC: Final = 300
 +MQTT_SILENT_THRESHOLD_SEC: Final = 180
- 
+
 @@ -51,3 +58,3 @@
  # poll can create reconnect churn. Throttle reconnect attempts a little.
 -MQTT_RECONNECT_THROTTLE_SEC: Final = 90
@@ -3838,7 +3838,7 @@ const.py
 +CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"  # noqa: RUF100, S105
  DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 @@ -106,3 +113,3 @@
- 
+
 -# HTTP endpoint constants. Keep this list aligned with PROTOCOL.md §2.
 +# HTTP endpoint constants.
  DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
@@ -3886,7 +3886,7 @@ const.py
 +DEFAULT_ENABLE_BLE_WRITES: Final = True
  CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 @@ -248,2 +254,11 @@
- 
+
 +# Per-period statistics import toggles surfaced in the options flow. Day buckets
 +# always import; week/month/year are opt-out. Defaults preserve the baseline
 +# behaviour of importing every documented period.
@@ -3908,7 +3908,7 @@ const.py
  HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
 -HTTP_RAW_TEXT_LIMIT: Final = 1000
 +HTTP_RAW_TEXT_LIMIT: Final = 10000
- 
+
 @@ -286,3 +301,2 @@
  # the same normalized payload shape; keep the keys in one place so section names
 -# stay aligned with PROTOCOL.md §2.
@@ -3994,7 +3994,7 @@ const.py
 +    "credential_mac_id_source",
  }
 @@ -1250,3 +1278,3 @@
- 
+
 -# Subdevice type markers observed in PROTOCOL.md §3. devType=1 is a
 +# Subdevice type markers. devType=1 is a
  # BatteryPackSub query target. All other concrete devType values are excluded
@@ -4056,7 +4056,7 @@ const.py
  # These IDs are sent in MQTT command payloads' `actionId` field. Keep them
 -# aligned with the MQTT command tables in PROTOCOL.md §3 and PROTOCOL.md §2.
 +# aligned with the MQTT command tables
- 
+
 @@ -1506,11 +1530,6 @@
  # one DevicePropertyChange frame (body has ``socChgLimit`` and
 -# ``socDischgLimit`` together). An earlier doc capture
@@ -4108,7 +4108,7 @@ const.py
  ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
 +ACTION_ID_BIND_SMART_PART: Final = 3012  # cmd=108 BindSmartAccessory
 +ACTION_ID_UNBIND_SMART_PART: Final = 3013  # cmd=109 RemoveSmartAccessory
- 
+
 @@ -1601,9 +1613,4 @@
  FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
 -FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
@@ -4120,7 +4120,7 @@ const.py
 -FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 +FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"  # noqa: RUF100, S105
 +FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"  # noqa: RUF100, S105
- 
+
 @@ -1612,4 +1619,3 @@
  # numeric value as the ``devType`` body field for QuerySubDeviceGroupProperty
 -# bodies and to route inbound UploadSubDeviceGroupProperty payloads. Keep this
@@ -4202,12 +4202,12 @@ coordinator.py
 -import secrets
  import time
 @@ -16,4 +13,2 @@
- 
+
 -from homeassistant.config_entries import ConfigEntry
 -from homeassistant.core import CoreState, HomeAssistant
  from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 @@ -23,18 +18,6 @@
- 
+
 -from .client import JackeryApi, JackeryAuthError, JackeryError
 -from .client.third_party_mqtt_codec import (
 -    decode_third_party_mqtt_field,
@@ -4509,7 +4509,7 @@ coordinator.py
 -    PAYLOAD_LOCAL_DAILY_ENERGY,
  )
 +from .ingest import merge_live_properties
- 
+
  if TYPE_CHECKING:
 -    from .client.mqtt_push import JackeryMqttPushClient
 +    from collections.abc import Awaitable, Callable
@@ -4522,7 +4522,7 @@ coordinator.py
 +    from .client.ble_transport import BleFrameObservation
 +
 +import operator
- 
+
 @@ -444,6 +340,6 @@
      chart_series_debug,
 +    config_entry_bool_option,
@@ -4533,7 +4533,7 @@ coordinator.py
 -    effective_period_total_value,
      external_trend_statistic_id,
 @@ -462,2 +358,45 @@
- 
+
 +
 +@dataclass
 +class RejectionMetrics:
@@ -4579,20 +4579,20 @@ coordinator.py
 +
  _STATISTICS_BACKFILL_STORE_VERSION = 1
 @@ -466,6 +405,6 @@
- 
+
 -def _load_mqtt_push_client() -> type[Any]:
 +def _load_mqtt_push_client() -> Any:  # noqa: ANN401, RUF100
      """Import the optional MQTT client module outside the event loop."""
      module = importlib.import_module(".client.mqtt_push", __package__)
 -    return cast(type[Any], module.JackeryMqttPushClient)
 +    return module.JackeryMqttPushClient
- 
+
 @@ -482,5 +421,2 @@
  _ENTITY_STATISTICS_REPAIR_VERSION = 3
 -_BLE_PARTIAL_UPDATE_COALESCE_SEC = 0.25
 -_ENDPOINT_BACKOFF_CODES = frozenset({10422, 10432})
 -_ENDPOINT_BACKOFF_DELAYS_SEC: tuple[int, ...] = (300, 900, 3600, 21600)
- 
+
 @@ -542,26 +478,2 @@
      },
 -    "ct_input_energy": {
@@ -4675,7 +4675,7 @@ coordinator.py
          }
 -    """
 +    """  # noqa: E501, RUF100
- 
+
 @@ -705,5 +597,2 @@
      _SUBDEVICE_MAIN_MIRROR_KEYS = SUBDEVICE_MAIN_MIRROR_KEYS
 -    _SUBDEVICE_DEV_TYPE_STRINGS = NON_BATTERY_SUBDEVICE_TYPES | {
@@ -4763,7 +4763,7 @@ coordinator.py
 @@ -827,2 +652,3 @@
          self._device_index: dict[str, dict[str, Any]] = {}
 +        self._device_update_received_at: dict[str, datetime] = {}
- 
+
 @@ -866,2 +692,8 @@
          self._property_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
 +        # Local plaintext mirror of the third-party MQTT bridge config per
@@ -4819,7 +4819,7 @@ coordinator.py
 -        self._polling_diagnostics: dict[str, Any] = {}
 -        self._statistics_import_diagnostics: dict[str, Any] = {}
 -        self._last_statistics_http_backfill_monotonic: float = float("-inf")
- 
+
 @@ -1018,3 +817,3 @@
          if isinstance(payload_obj, dict):
 -            message_type = str(payload_obj.get("messageType") or "")
@@ -4840,7 +4840,7 @@ coordinator.py
 +        event.setdefault(FIELD_TIMESTAMP, dt_util.now().isoformat())
          event.setdefault("entry_id", self.entry.entry_id)
 @@ -1049,3 +841,3 @@
- 
+
 -    async def async_discover(self) -> None:
 +    async def async_discover(self) -> None:  # noqa: PLR0912
          """Populate _device_index from config or /v1/device/system/list."""
@@ -4853,7 +4853,7 @@ coordinator.py
          except JackeryError as err:
 -            raise UpdateFailed(f"system/list failed: {err}") from err
 +            raise UpdateFailed(f"system/list failed: {err}") from err  # noqa: TRY003
- 
+
 @@ -1102,3 +894,3 @@
          except JackeryAuthError as err:
 -            raise ConfigEntryAuthFailed(
@@ -4887,7 +4887,7 @@ coordinator.py
 +        if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):  # noqa: PLR2004
              return False
 @@ -1188,50 +980,21 @@
- 
+
 -    @staticmethod
 -    def _mqtt_connect_failure_signature(message: object) -> str:
 -        """Normalize MQTT setup errors for deduplicated backoff logging."""
@@ -4955,7 +4955,7 @@ coordinator.py
 +    def record_timestamp_skew_rejection(self, reason: str) -> None:
 +        """Record a timestamp validation rejection."""
 +        self.rejection_metrics.increment("timestamp_skew_rejections", reason)
- 
+
 @@ -1247,2 +1010,3 @@
              return
 +        self.rejection_metrics.increment("mqtt_broker_rejections", str(message))
@@ -4987,7 +4987,7 @@ coordinator.py
 +        trends, day-cache rollover and the Recorder statistic imports stay
 +        on their own slow cadence regardless of MQTT liveness — they are
 +        gated by ``SLOW_METRICS_INTERVAL_SEC`` in their own TTL caches.
- 
+
          Within the ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC`` window the property
 -        fetch is skipped only while the slow HTTP endpoints are not in active
 -        backoff. A skipped property endpoint is not evidence that HTTP
@@ -5030,7 +5030,7 @@ coordinator.py
 -        if timestamp == float("-inf"):
 -            return None
 -        return max(0.0, now_monotonic - timestamp)
- 
+
 @@ -1414,3 +1157,2 @@
              *self._battery_pack_ota_tasks.values(),
 -            *self._ble_coalesce_tasks.values(),
@@ -5051,7 +5051,7 @@ coordinator.py
 -
          return config_entry_bool_option(
 @@ -1447,3 +1185,3 @@
- 
+
 -    async def async_send_ble_command(
 +    async def async_send_ble_command(  # noqa: PLR0913
          self,
@@ -5085,7 +5085,7 @@ coordinator.py
 +                mtu_override=mtu_override,
 +            )
 +        )
- 
+
 @@ -1502,46 +1241,23 @@
          """
 -        from .util import config_entry_bool_option
@@ -5173,7 +5173,7 @@ coordinator.py
 +            last_frame = stats.last_frame
              if last_frame is not None:
 @@ -1591,3 +1300,3 @@
- 
+
 -    async def async_start_ble_transport(self) -> None:
 +    async def async_start_ble_transport(self) -> None:  # noqa: PLR0915
          """Start the optional BLE listener if the config-entry option is set.
@@ -5190,7 +5190,7 @@ coordinator.py
 +            from .client.ble_transport import JackeryBleListener  # noqa: PLC0415
          except ImportError as err:
 @@ -1617,3 +1322,5 @@
- 
+
 -        async def _sink(device_id: str, observation: BleFrameObservation) -> None:
 +        async def _sink(  # noqa: PLR0911, PLR0912, RUF029
 +            device_id: str, observation: BleFrameObservation
@@ -5252,7 +5252,7 @@ coordinator.py
 +                )
                  return
 @@ -1706,9 +1413,3 @@
- 
+
 -            if cmd in (MQTT_CMD_DEVICE_PROPERTY_CHANGE, MQTT_CMD_CONTROL_COMBINE):
 -                counter_payload = self._normalize_ble_main_lifetime_counters(payload)
 -                touched = (
@@ -5350,7 +5350,7 @@ coordinator.py
 +                stats.unrouted_frames_by_cmd[cmd] = (
 +                    stats.unrouted_frames_by_cmd.get(cmd, 0) + 1
 +                )
- 
+
 @@ -1773,6 +1468,7 @@
                  return
 -            if updated == current_device:
@@ -5375,13 +5375,13 @@ coordinator.py
          if dev_mode_redactions_disabled():
 -            import base64 as _base64
 +            import base64 as _base64  # noqa: PLC0415
- 
+
 @@ -1835,3 +1529,4 @@
              return None
 -        return cast(str | None, self._ble_listener.address_for_device_id(device_id))
 +        address = self._ble_listener.address_for_device_id(device_id)
 +        return str(address) if address is not None else None
- 
+
 @@ -1881,4 +1576,3 @@
          """Ensure MQTT is connected with credentials from current login session."""
 -        mqtt = self._mqtt
@@ -5402,7 +5402,7 @@ coordinator.py
 -                self._mqtt_clear_connect_backoff()
              return
 @@ -1923,11 +1616,2 @@
- 
+
 -        backoff_remaining = self._mqtt_connect_backoff_remaining()
 -        if backoff_remaining > 0:
 -            _LOGGER.debug(
@@ -5433,7 +5433,7 @@ coordinator.py
 +            _LOGGER.exception("Jackery MQTT credential build failed")
              return
 @@ -1977,10 +1661,4 @@
- 
+
 -        # A concurrent unload/reload may replace the MQTT runtime while we
 -        # awaited credentials. Bail out quietly instead of touching a stale
 -        # handle that might already be stopped.
@@ -5479,7 +5479,7 @@ coordinator.py
 -        if mqtt.is_connected:
 -            self._mqtt_clear_connect_backoff()
          self._mqtt_fingerprint = fingerprint
- 
+
 -    async def _async_handle_mqtt_message(
 +    async def async_handle_local_mqtt_message(
 +        self,
@@ -5621,7 +5621,7 @@ coordinator.py
 -                    self._note_property_equivalent_push(property_body)
 -                    touched = bool(property_body) or touched
 +                    touched = True
- 
+
 @@ -2191,3 +1791,8 @@
          elif topic.endswith("/alert"):
 -            updated[PAYLOAD_ALARM] = body if body else payload
@@ -5717,7 +5717,7 @@ coordinator.py
 -            self._note_property_equivalent_push(property_body)
 -            touched = bool(property_body) or touched
 +            touched = True
- 
+
 @@ -2283,3 +1896,3 @@
                  msg_type
 -                in (
@@ -5766,7 +5766,7 @@ coordinator.py
 -            self._note_property_equivalent_push(property_body)
 -            touched = bool(property_body) or touched
 +            touched = True
- 
+
 @@ -2333,3 +1923,3 @@
          ):
 -            source = body if body else payload
@@ -5818,9 +5818,9 @@ coordinator.py
 +                    reported
 +                )
 +                touched = True
- 
+
 @@ -2390,48 +2024,2 @@
- 
+
 -    async def async_handle_local_mqtt_message(
 -        self,
 -        topic: str,
@@ -5872,14 +5872,14 @@ coordinator.py
          """
 -        from .client.ble import BLE_AES_KEY_LENGTHS
 +        from .client.ble import BLE_AES_KEY_LENGTHS  # noqa: PLC0415
- 
+
 @@ -2483,3 +2071,3 @@
          try:
 -            import base64
 +            import base64  # noqa: PLC0415
- 
+
 @@ -2531,2 +2119,17 @@
- 
+
 +    def device_supports_third_party_mqtt(self, device_id: str) -> bool:
 +        """Return True if the device supports third-party MQTT configuration.
 +
@@ -5915,7 +5915,7 @@ coordinator.py
 -            else:
 -                merged[key] = value
 -        return merged
- 
+
 @@ -2569,4 +2155,8 @@
      ) -> dict[str, Any]:
 -        """Sanitize, merge, and normalize main-device property payloads."""
@@ -5996,7 +5996,7 @@ coordinator.py
 +    ) -> list[dict[str, Any]] | None:
          """Extract up to five add-on battery pack payloads from known shapes."""
 @@ -2785,3 +2374,3 @@
- 
+
 -    def _merge_subdevice_data(
 +    def _merge_subdevice_data(  # noqa: PLR0912, PLR0914
          self,
@@ -6032,7 +6032,7 @@ coordinator.py
 +                updated[PAYLOAD_CT_METER] = merge_live_properties(current_ct, ct)
              else:
 @@ -2886,73 +2475,2 @@
- 
+
 -    def _merge_device_statistic_data(
 -        self,
 -        updated: dict[str, Any],
@@ -6139,7 +6139,7 @@ coordinator.py
 +                merged[target_idx] = merge_live_properties(merged[target_idx], update)
                  if sn:
 @@ -3012,20 +2526,15 @@
- 
+
 -        # Only update the online timestamp on transitions to commState=1.
 -        # This avoids rewriting _last_seen_at on every incremental packet.
 +        # Tag each pack that is reporting as online with the current UTC
@@ -6164,10 +6164,10 @@ coordinator.py
 -            if comm_state == "1" and previous_comm_state != "1":
 +            if comm_state == "1" or PACK_FIELD_LAST_SEEN_AT not in pack:
                  pack[PACK_FIELD_LAST_SEEN_AT] = now_iso
- 
+
 -        return merged[:5]
 +        return merged
- 
+
 @@ -3034,4 +2543,4 @@
          cls,
 -        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
@@ -6213,7 +6213,7 @@ coordinator.py
 +        current: Any,  # noqa: ANN401, RUF100
          updates: list[dict[str, Any]],
 @@ -3112,5 +2603,4 @@
- 
+
 -    @classmethod
      def _drop_stale_battery_packs(
 -        cls,
@@ -6245,7 +6245,7 @@ coordinator.py
          # exercise the coordinator without HA helpers loaded.
 -        from homeassistant.helpers import device_registry as dr
 +        from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
- 
+
 @@ -3217,16 +2708,2 @@
              removed += 1
 -        # Registry removal alone would leave per-device cache entries behind.
@@ -6264,7 +6264,7 @@ coordinator.py
 -            self._last_subdevice_query.pop(dev_id, None)
          if removed:
 @@ -3239,6 +2716,6 @@
- 
+
 -    async def _async_enrich_battery_pack_ota(
 +    async def _async_enrich_battery_pack_ota(  # noqa: PLR0912
          self,
@@ -6336,7 +6336,7 @@ coordinator.py
 -        updated[PAYLOAD_BATTERY_PACKS] = merged_packs
 -        return True
 +        return touched
- 
+
 @@ -3493,4 +2949,4 @@
      def _merge_battery_pack_ota_lists(
 -        current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
@@ -6358,7 +6358,7 @@ coordinator.py
                      merged[target_idx][key] = raw_update.get(key)
 -        return merged[:5]
 +        return merged
- 
+
 @@ -3666,201 +3124,2 @@
      @classmethod
 -    def _shelly_cloud_api_device_id(cls, item: dict[str, Any]) -> str | None:
@@ -6562,7 +6562,7 @@ coordinator.py
 -    @classmethod
      def _subdevice_accessories(
 @@ -3915,3 +3174,3 @@
- 
+
 -    def _local_timezone(self) -> tzinfo:
 +    def _local_timezone(self) -> Any:  # noqa: ANN401, RUF100
          """Return the Home Assistant local timezone for app-period math."""
@@ -6603,7 +6603,7 @@ coordinator.py
 +        weather = merge_live_properties(weather, updates)
          entry[PAYLOAD_WEATHER_PLAN] = weather
 @@ -4043,141 +3282,26 @@
- 
+
 -    def _schedule_ble_partial_update(
 -        self,
 -        device_id: str,
@@ -6766,7 +6766,7 @@ coordinator.py
 +            else:
 +                merged[device_id] = incoming
 +        self.async_set_updated_data(merged)
- 
+
 @@ -4267,5 +3391,5 @@
                  continue
 -            self._last_weather_plan_query[device_id] = now
@@ -6822,7 +6822,7 @@ coordinator.py
 +        if int(cmd) > 0:
 +            body[FIELD_CMD] = int(cmd)
          return body
- 
+
 -    async def _async_publish_command_ble_first(
 -        self,
 -        device_id: str,
@@ -6966,7 +6966,7 @@ coordinator.py
          if self._mqtt is None:
 -            raise HomeAssistantError("MQTT client not initialized")
 +            raise HomeAssistantError("MQTT client not initialized")  # noqa: TRY003
- 
+
 @@ -4421,3 +3490,3 @@
          except JackeryError as err:
 -            raise HomeAssistantError(
@@ -7038,7 +7038,7 @@ coordinator.py
 -        self._push_partial_update(new_data)
 +            body_fields={"alertId": alert_id},
 +        )
- 
+
 @@ -4780,3 +3821,3 @@
          if not system_id:
 -            raise UpdateFailed(
@@ -7123,7 +7123,7 @@ coordinator.py
 @@ -4973,3 +4011,2 @@
              )
 -        company_id_int = int(company_id_num)
- 
+
 @@ -4978,3 +4015,3 @@
                  system_id=system_id,
 -                platform_company_id=company_id_int,
@@ -7164,7 +7164,7 @@ coordinator.py
 +                platform_company_id=int(company_id),
                  system_region=str(region),
 @@ -5067,103 +4098,2 @@
- 
+
 -    async def async_query_wifi_list(
 -        self, device_id: str, *, ensure_mqtt: bool = True
 -    ) -> None:
@@ -7273,7 +7273,7 @@ coordinator.py
 +        await self._async_publish_command(
              device_id,
 @@ -5181,17 +4111,4 @@
- 
+
 -    async def async_query_wifi_config(
 -        self, device_id: str, *, ensure_mqtt: bool = True
 -    ) -> None:
@@ -7797,7 +7797,7 @@ coordinator.py
      async def async_query_third_party_mqtt_config(self, device_id: str) -> None:
 -        """Read back the device's third-party MQTT bridge config.
 +        """Read back the device's third-party MQTT bridge config (experimental).
- 
+
 @@ -5472,8 +4419,9 @@
          """
 -        _LOGGER.info(
@@ -7813,7 +7813,7 @@ coordinator.py
 +        await self._async_publish_command(
              device_id,
 @@ -5485,88 +4433,2 @@
- 
+
 -    async def async_send_device_schedule(
 -        self,
 -        device_id: str,
@@ -7922,7 +7922,7 @@ coordinator.py
 +        await self._async_publish_command(
              device_id,
 @@ -5657,24 +4519,2 @@
- 
+
 -    async def async_set_shelly_cloud_switch(
 -        self,
 -        device_id: str,
@@ -7966,7 +7966,7 @@ coordinator.py
      async def async_set_ct_phase(self, device_id: str, ct_sn: str, phase: int) -> None:
 -        """Assign a CT sub-device to phase 1..3 or combined phases (4).
 +        """Assign a CT (current transformer) sub-device to a phase (1..4).
- 
+
 @@ -5780,3 +4624,2 @@
          ``{"devType":3,"deviceSn":"<ct-sn>","schePhase":<1..4>,"cmd":111}``.
 -        ``schePhase=4`` means combined phases.
@@ -7979,7 +7979,7 @@ coordinator.py
 +            raise HomeAssistantError(f"CT phase must be 1..4 (got {phase_int})")  # noqa: TRY003
          await self._async_publish_command_ble_first(
 @@ -5804,3 +4647,3 @@
- 
+
 -    async def _async_query_subdevices_for_missing(
 +    async def _async_query_subdevices_for_missing(  # noqa: PLR0912, PLR0915
          self,
@@ -8015,7 +8015,7 @@ coordinator.py
 -            _LOGGER.debug("Jackery MQTT backfill query failed: %s", err)
 +        except Exception:
 +            _LOGGER.exception("Jackery MQTT backfill query failed")
- 
+
 @@ -5979,5 +4826,7 @@
      @staticmethod
 -    def _stat_row_start(row: Mapping[str, Any]) -> float | None:
@@ -8130,7 +8130,7 @@ coordinator.py
 +            _LOGGER.exception("Entity registry unavailable for entity repair")
              return {}
 @@ -6232,3 +5083,3 @@
- 
+
 -    def _completed_entity_app_points(
 +    def _completed_entity_app_points(  # noqa: PLR6301
          self,
@@ -8148,7 +8148,7 @@ coordinator.py
 +            key=operator.itemgetter(0),
          ):
 @@ -6299,3 +5150,3 @@
- 
+
 -    async def _async_import_app_chart_entity_statistics_for_device(
 +    async def _async_import_app_chart_entity_statistics_for_device(  # noqa: PLR0912, PLR0914, PLR0915
          self,
@@ -8198,7 +8198,7 @@ coordinator.py
 +            except Exception as err:  # statistics import must not abort the whole cycle  # noqa: BLE001
                  failed_rows += len(statistics)
 @@ -6455,3 +5301,3 @@
- 
+
 -    def _current_app_chart_entity_source_batches(
 +    def _current_app_chart_entity_source_batches(  # noqa: PLR6301
          self,
@@ -8228,12 +8228,12 @@ coordinator.py
 +            if cursor.month == 12:  # noqa: PLR2004
                  cursor = cursor.replace(year=cursor.year + 1, month=1)
 @@ -6758,3 +5604,3 @@
- 
+
 -    def _day_chart_points_for_metric(
 +    def _day_chart_points_for_metric(  # noqa: PLR0913
          self,
 @@ -6789,3 +5635,3 @@
- 
+
 -    async def _async_add_app_chart_statistics(
 +    async def _async_add_app_chart_statistics(  # noqa: PLR0913
          self,
@@ -8268,7 +8268,7 @@ coordinator.py
 +                # PROTOCOL.md §2 Smart-Meter/CT rules.
                  for date_type, bucket, bucket_label in APP_CHART_STAT_PERIODS:
 @@ -6965,3 +5813,3 @@
- 
+
 -    async def _async_fetch_historical_app_chart_source(
 +    async def _async_fetch_historical_app_chart_source(  # noqa: PLR0911
          self,
@@ -8285,7 +8285,7 @@ coordinator.py
 -            )
          if section_prefix == APP_SECTION_EPS_STAT:
 @@ -7022,3 +5864,3 @@
- 
+
 -    async def _async_repair_missing_app_chart_statistics(
 +    async def _async_repair_missing_app_chart_statistics(  # noqa: PLR0912, PLR0914
          self,
@@ -8300,7 +8300,7 @@ coordinator.py
 -                                ct_device_id=ct_device_id,
                                  section_prefix=section_prefix,
 @@ -7153,3 +5991,3 @@
- 
+
 -    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:
 +    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:  # noqa: PLR0911
          """Return the recovery start date for one device, if needed.
@@ -8310,7 +8310,7 @@ coordinator.py
 +                    "Jackery statistics backfill for %s repaired %d bucket(s), %d step(s) failed",  # noqa: E501, RUF100
                      device_id,
 @@ -7295,2 +6133,37 @@
- 
+
 +    async def _async_retry_after_invalid_discovery_devices(
 +        self,
 +        invalid_device_ids: list[str],
@@ -8348,7 +8348,7 @@ coordinator.py
 +
      # ------------------------------------------------------------------
 @@ -7299,3 +6172,3 @@
- 
+
 -    async def _async_update_data(
 +    async def _async_update_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
          self, _retry_discovery_once: bool = True
@@ -8356,7 +8356,7 @@ coordinator.py
              if not self._device_index:
 -                raise UpdateFailed("No Jackery devices found.")
 +                raise UpdateFailed("No Jackery devices found.")  # noqa: TRY003
- 
+
 @@ -7331,18 +6204,7 @@
              self._skipped_refresh_ticks += 1
 -            now_monotonic = time.monotonic()
@@ -8381,7 +8381,7 @@ coordinator.py
 +                time.monotonic() - self._last_http_refresh_completed_monotonic,
              )
 @@ -7351,5 +6213,7 @@
- 
+
 -        # Once per slow-metrics window: log which HTTP statistics families are
 -        # evaluated. Individual calls are TTL/backoff-gated and may serve
 -        # cached/default data, so this must not claim fresh cloud data.
@@ -8485,7 +8485,7 @@ coordinator.py
 +        ) -> Any:  # noqa: ANN401, RUF100
              """System-scoped TTL cache wrapper."""
 @@ -7516,25 +6367,24 @@
- 
+
 -        async def _fetch_shelly_cloud_devices() -> list[dict[str, Any]]:
 -            """Return app-linked Shelly Cloud devices from the documented API."""
 -            per_shelly = self._slow_cache.setdefault("shelly_cloud", {})
@@ -8587,7 +8587,7 @@ coordinator.py
 +                    ) -> Any:  # noqa: ANN401, RUF100
                          request_kwargs = app_month_request_kwargs(today.year, month)
 @@ -7820,7 +6624,2 @@
- 
+
 -                    # A single 404 (e.g. the device was bought mid-year and
 -                    # earlier months legitimately do not exist) must not abort
 -                    # the whole year backfill. ``return_exceptions`` lets the
@@ -8606,7 +8606,7 @@ coordinator.py
 +                    })
                  if months:
 @@ -7841,3 +6642,3 @@
- 
+
 -        async def _fetch_device_extras(
 +        async def _fetch_device_extras(  # noqa: PLR0914, PLR0915
              dev_id: str,
@@ -8642,7 +8642,7 @@ coordinator.py
 -
 -            def _month_backoff_key(base_key: str, month: int) -> str:
 -                return f"{base_key}:{DATE_TYPE_MONTH}:{today.year}-{month:02d}"
- 
+
 @@ -7897,2 +6674,10 @@
              for date_type in APP_PERIOD_DATE_TYPES:
 +                # The device period-stat endpoints (/v1/device/stat/{pv,battery,
@@ -9008,7 +9008,7 @@ coordinator.py
 -                )
 -                if isinstance(realtime, dict):
 -                    self._merge_shelly_cloud_item(entry, realtime)
- 
+
 @@ -8377,6 +7014,2 @@
              sys_id = str(idx.get(FIELD_SYSTEM_ID)) if idx.get(FIELD_SYSTEM_ID) else None
 -            # Resolve the CT/Smart-Meter accessory's own deviceId from the
@@ -9073,7 +9073,7 @@ coordinator.py
 +            )
 +            if retry_result is not None:
 +                return retry_result
- 
+
 @@ -8529,4 +7156,4 @@
                  await self.async_cleanup_pending_device_removals()
 -            except Exception as err:
@@ -10099,13 +10099,13 @@ diagnostics.py
 --- diagnostics.py (LIVE/merged)
 +++ diagnostics.py (BACKUP)
 @@ -2,17 +2,11 @@
- 
+
 -from collections.abc import Mapping
 +import json
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
  from homeassistant.components.diagnostics import async_redact_data
 -from homeassistant.core import HomeAssistant
 -
@@ -10127,7 +10127,7 @@ diagnostics.py
 -    config_entry_str_option,
      dev_mode_redactions_disabled,
 @@ -28,4 +20,10 @@
- 
+
 +if TYPE_CHECKING:
 +    from collections.abc import Mapping
 +
@@ -10137,7 +10137,7 @@ diagnostics.py
 +
  _LOGGER = logging.getLogger(__name__)
 -_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
- 
+
 @@ -36,2 +34,20 @@
  REDACT_KEYS = _STATIC_REDACT_KEYS
 +_LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
@@ -10158,7 +10158,7 @@ diagnostics.py
 +    if size > _SECTION_SIZE_CAP:
 +        return {"truncated": True, "size_bytes": size}
 +    return value
- 
+
 @@ -43,18 +59,15 @@
  ) -> dict[str, Any]:
 -    """Return a deterministic, labeled mapping of redacted payloads where original mapping keys are replaced with stable generated labels.
@@ -10190,7 +10190,7 @@ diagnostics.py
 +    for index, key in enumerate(sorted(payloads, key=str), start=1):
          payload = payloads[key]
 @@ -68,17 +81,23 @@
- 
+
 -async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this entry point
 +def _local_mqtt_diagnostics(
 +    hass: HomeAssistant,
@@ -10227,7 +10227,7 @@ diagnostics.py
 +    """Get config entry diagnostics."""
      redact_keys = active_redact_keys(entry)
 @@ -98,2 +117,22 @@
- 
+
 +    entry_data = async_redact_data(dict(entry.data), redact_keys)
 +    options = async_redact_data(dict(entry.options), redact_keys)
 +    coordinator = getattr(entry, "runtime_data", None)
@@ -10466,11 +10466,11 @@ discovery_cache.py
 --- discovery_cache.py (LIVE/merged)
 +++ discovery_cache.py (BACKUP)
 @@ -2,7 +2,5 @@
- 
+
 -from __future__ import annotations
 +import asyncio
 +from typing import TYPE_CHECKING, Any, Final
- 
+
 -from typing import Any, Final
 -
 -from homeassistant.core import HomeAssistant
@@ -10480,7 +10480,7 @@ discovery_cache.py
 +
 +if TYPE_CHECKING:
 +    from homeassistant.core import HomeAssistant
- 
+
 @@ -15,2 +16,8 @@
  _KEY_DEVICE_INDEX: Final = "device_index"
 +_ENTRY_LOCKS: dict[str, asyncio.Lock] = {}
@@ -10489,7 +10489,7 @@ discovery_cache.py
 +def _entry_lock(entry_id: str) -> asyncio.Lock:
 +    """Return the in-process lock for one config-entry cache row."""
 +    return _ENTRY_LOCKS.setdefault(entry_id, asyncio.Lock())
- 
+
 @@ -18,9 +25,3 @@
  def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 -    """Create a Store configured for this integration's discovery cache.
@@ -10563,7 +10563,7 @@ entity.py
 --- entity.py (LIVE/merged)
 +++ entity.py (BACKUP)
 @@ -2,2 +2,3 @@
- 
+
 +import logging
  from typing import Any
 @@ -10,5 +11,5 @@
@@ -10574,10 +10574,10 @@ entity.py
 +    FIELD_DEV_MODEL,
      FIELD_MODEL,
 @@ -47,2 +48,4 @@
- 
+
 +_LOGGER = logging.getLogger(__name__)
 +
- 
+
 @@ -140,3 +143,3 @@
              DeviceInfo: DeviceInfo populated for the parent SolarVault device.
 -        """
@@ -10611,7 +10611,7 @@ local_daily_cache.py
 --- local_daily_cache.py (LIVE/merged)
 +++ local_daily_cache.py (BACKUP)
 @@ -23,8 +23,5 @@
- 
+
 -from __future__ import annotations
 -
 -from datetime import date
@@ -10629,7 +10629,7 @@ local_daily_cache.py
 +    from datetime import date
 +
 +    from homeassistant.core import HomeAssistant
- 
+
 @@ -38,2 +40,8 @@
  _KEY_VALUES: Final = "values"
 +_ENTRY_LOCKS: dict[str, asyncio.Lock] = {}
@@ -10638,7 +10638,7 @@ local_daily_cache.py
 +def _entry_lock(entry_id: str) -> asyncio.Lock:
 +    """Return the in-process lock for one config-entry cache row."""
 +    return _ENTRY_LOCKS.setdefault(entry_id, asyncio.Lock())
- 
+
 @@ -41,7 +49,3 @@
  def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 -    """Provide the Home Assistant Store configured for the module's local midnight snapshot cache.
@@ -10849,28 +10849,28 @@ mqtt_session_cache.py
 --- mqtt_session_cache.py (LIVE/merged)
 +++ mqtt_session_cache.py (BACKUP)
 @@ -16,7 +16,5 @@
- 
+
 -from __future__ import annotations
 +import asyncio
 +from typing import TYPE_CHECKING, Any, Final
- 
+
 -from typing import Any, Final
 -
 -from homeassistant.core import HomeAssistant
  from homeassistant.helpers.storage import Store
 @@ -31,2 +29,5 @@
- 
+
 +if TYPE_CHECKING:
 +    from homeassistant.core import HomeAssistant
 +
  _STORAGE_VERSION: Final = 1
 @@ -36,9 +37,9 @@
- 
+
 +# Serializes concurrent save/clear calls so a resurrected entry
 +# never silently overwrites a just-cleared one.
 +_CACHE_LOCK = asyncio.Lock()
 +
- 
+
  def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 -    """Get the Store configured for persisting the MQTT session cache.
 -
@@ -10880,14 +10880,14 @@ mqtt_session_cache.py
 +    """Return the HA Store backing the MQTT-session cache."""
      return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 @@ -46,10 +47,11 @@
- 
+
 -async def async_load_mqtt_session(
 +async def async_load_mqtt_session(  # noqa: PLR0911
      hass: HomeAssistant, entry_id: str
  ) -> dict[str, str] | None:
 -    """Load cached MQTT session credentials for the given config entry from persistent storage.
 +    """Return cached MQTT session fields for ``entry_id`` or ``None``.
- 
+
 -    Returns:
 -        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` if present.
 -        None: If storage is missing or malformed, or any required field is missing or empty.
@@ -10897,7 +10897,7 @@ mqtt_session_cache.py
 +    useful because the AES password derivation needs all three.
      """
 @@ -84,3 +86,3 @@
- 
+
 -async def async_save_mqtt_session(
 +async def async_save_mqtt_session(  # noqa: PLR0913
      hass: HomeAssistant,
@@ -10905,7 +10905,7 @@ mqtt_session_cache.py
  ) -> None:
 -    """Persist MQTT session fields for a config entry.
 +    """Persist the MQTT session fields for ``entry_id``.
- 
+
 -    Stores the `userId`, base64 `mqttPassWord` seed, and `macId` for `entry_id` in the integration's Home Assistant storage, overwriting any existing row.
 -
 -    Parameters:
@@ -10957,12 +10957,12 @@ mqtt_session_cache.py
 +        entries[entry_id] = row
 +        data[_KEY_ENTRIES] = entries
 +        await store.async_save(data)
- 
+
 @@ -128,17 +124,19 @@
  async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
 -    """Remove the cached MQTT session row for the given config entry.
 +    """Drop the cached MQTT session for ``entry_id``.
- 
+
 -    Performs no action if the storage layout or the entry's row does not exist.
 +    Called after the broker explicitly rejects cached credentials so the next
 +    setup pass forces a fresh login instead of replaying stale values.
@@ -10995,19 +10995,19 @@ mqtt_session_cache.py
 
 ================================================================================
 number.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 86
 ================================================================================
 --- number.py (LIVE/merged)
 +++ number.py (BACKUP)
 @@ -8,6 +8,5 @@
- 
+
 -from collections.abc import Awaitable, Callable
  from dataclasses import dataclass
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
 @@ -20,8 +19,6 @@
  from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower
 -from homeassistant.core import HomeAssistant
@@ -11046,7 +11046,7 @@ number.py
 +
 +    from . import JackeryConfigEntry
 +    from .coordinator import JackerySolarVaultCoordinator
- 
+
 @@ -74,10 +79,2 @@
  # ---------------------------------------------------------------------------
 -
@@ -11057,7 +11057,7 @@ number.py
 -    if parsed is None:
 -        raise HomeAssistantError("invalid number value")
 -    return int(round(parsed))
- 
+
 @@ -106,3 +103,4 @@
      ) = None
 -    value_transform: Callable[[float], Any] = _rounded_int
@@ -11065,7 +11065,7 @@ number.py
 +    validate_range: bool = False
      raise_on_setter_error: bool = True
 @@ -115,18 +113,2 @@
- 
+
 -def _wire_int(value: Any) -> int:
 -    """Return an integer value prepared for coordinator setter calls."""
 -    parsed = first_nonblank_int(value)
@@ -11087,28 +11087,28 @@ number.py
      """Set the SOC charge limit on a device."""
 -    await coord.async_set_soc_limits(dev_id, charge_limit=value)
 +    await coord.async_set_soc_limits(dev_id, charge_limit=int(value))
- 
+
 @@ -142,3 +124,3 @@
      """Set the SOC discharge limit on a device."""
 -    await coord.async_set_soc_limits(dev_id, discharge_limit=_wire_int(value))
 +    await coord.async_set_soc_limits(dev_id, discharge_limit=int(value))
- 
+
 @@ -149,4 +131,3 @@
      """Set the maximum grid feed-in power on a device."""
 -    parsed = _wire_int(value)
 -    await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)
 +    await coord.async_set_max_feed_grid(dev_id, int(value))
- 
+
 @@ -157,3 +138,3 @@
      """Set the maximum output power on a device."""
 -    await coord.async_set_max_output_power(dev_id, _wire_int(value))
 +    await coord.async_set_max_output_power(dev_id, int(value))
- 
+
 @@ -164,3 +145,3 @@
      """Set the default-load power preference on a device."""
 -    await coord.async_set_default_power(dev_id, _wire_int(value))
 +    await coord.async_set_default_power(dev_id, int(value))
- 
+
 @@ -170,4 +151,20 @@
  ) -> None:
 -    """Set the single-tariff electricity price on a device."""
@@ -11130,7 +11130,7 @@ number.py
 +        dev_id,
 +        {FIELD_THIRD_PARTY_MQTT_PORT: int(value)},
 +    )
- 
+
 @@ -184,3 +181,3 @@
          feed_limit = safe_int(props.get(key))
 -        if feed_limit is not None and feed_limit > 800:
@@ -11140,7 +11140,7 @@ number.py
          max_out_int = 2500
 -    return 800.0 if max_out_int <= 800 else 2500.0
 +    return 800.0 if max_out_int <= 800 else 2500.0  # noqa: PLR2004
- 
+
 @@ -198,3 +195,3 @@
      """Jackery's app exposes feed-in as a binary 800/2500W selection."""
 -    if _max_feed_grid_dynamic_max(payload) <= 800:
@@ -11179,7 +11179,7 @@ number.py
 +        else:
 +            section = self._payload.get(self.entity_description.source_section) or {}
 +        return section if isinstance(section, dict) else {}
- 
+
 @@ -354,3 +372,5 @@
              if val is not None:
 -                return safe_float(val)
@@ -11194,7 +11194,7 @@ number.py
 +        if max_value is None:
 +            return 0.0
 +        return float(max_value)
- 
+
 @@ -366,3 +389,7 @@
      def native_unit_of_measurement(self) -> str | None:
 -        """Return the entity's unit of measurement."""
@@ -11256,7 +11256,7 @@ number.py
 +        except Exception as err:  # noqa: BLE001
              if self.entity_description.raise_on_setter_error:
 @@ -443,3 +479,3 @@
- 
+
 -async def async_setup_entry(
 +async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
      hass: HomeAssistant,
@@ -11280,7 +11280,7 @@ number.py
 +        """  # noqa: E501, RUF100
          entities: list[NumberEntity] = []
 @@ -493,3 +539,8 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 +        """Rebuilds and adds number entities when the coordinator's entity signature changes.
@@ -11303,7 +11303,7 @@ number.py
 
 ================================================================================
 repairs.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 18
 ================================================================================
 --- repairs.py (LIVE/merged)
@@ -11312,20 +11312,20 @@ repairs.py
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any, cast
- 
+
 @@ -9,7 +9,10 @@
  from homeassistant.components.repairs import RepairsFlow
 -from homeassistant.core import HomeAssistant
 -from homeassistant.exceptions import ConfigEntryAuthFailed
 +from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
- 
+
 +from .client import JackeryError
  from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
  from .coordinator import JackerySolarVaultCoordinator
 +
 +if TYPE_CHECKING:
 +    from homeassistant.core import HomeAssistant
- 
+
 @@ -46,7 +49,10 @@
              await self._async_force_refresh()
 -            return self.async_create_entry(data={})
@@ -11356,7 +11356,7 @@ repairs.py
 +        except (HomeAssistantError, TimeoutError, OSError, JackeryError) as err:
              _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 @@ -76,3 +87,3 @@
- 
+
 -async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
 +async def async_create_fix_flow(  # noqa: RUF029 - HA repairs hook is async.
      hass: HomeAssistant,
@@ -11368,13 +11368,13 @@ repairs.py
 
 ================================================================================
 select.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 66
 ================================================================================
 --- select.py (LIVE/merged)
 +++ select.py (BACKUP)
 @@ -12,5 +12,2 @@
- 
+
 -from __future__ import annotations
 -
 -from collections.abc import Awaitable, Callable
@@ -11383,7 +11383,7 @@ select.py
  import re
 -from typing import Any, NoReturn
 +from typing import TYPE_CHECKING, Any, NoReturn
- 
+
 @@ -22,7 +19,5 @@
  from homeassistant.const import EntityCategory
 -from homeassistant.core import HomeAssistant
@@ -11415,14 +11415,14 @@ select.py
 +
 +    from . import JackeryConfigEntry
 +    from .coordinator import JackerySolarVaultCoordinator
- 
+
 @@ -110,3 +113,3 @@
              "entity": entity.entity_description.key,
 -            "device_id": entity._device_id,
 +            "device_id": entity._device_id,  # noqa: SLF001
              **{key: str(value) for key, value in placeholders.items()},
 @@ -121,3 +124,3 @@
- 
+
 -def _storm_minutes_value(
 +def _storm_minutes_value(  # noqa: PLR0912
      properties: dict[str, object],
@@ -11467,7 +11467,7 @@ select.py
          return True
 -    return bool(_price_sources_from_payload(entity._payload))
 +    return bool(_price_sources_from_payload(entity._payload))  # noqa: SLF001
- 
+
 @@ -273,12 +276,14 @@
  def _price_mode_current_int(entity: JackerySelect) -> int | None:
 -    raw = entity._price.get(FIELD_DYNAMIC_OR_SINGLE)
@@ -11515,7 +11515,7 @@ select.py
          _raise_select_action_error(entity, "invalid_select_option", option=option)
 -    await entity.coordinator.async_set_work_model(entity._device_id, mode)
 +    await entity.coordinator.async_set_work_model(entity._device_id, mode)  # noqa: SLF001
- 
+
 @@ -417,3 +422,3 @@
  def _temp_unit_current(entity: JackerySelect) -> str | None:
 -    val = safe_int(entity._properties.get(FIELD_TEMP_UNIT))
@@ -11540,7 +11540,7 @@ select.py
      hours = _AUTO_OFF_OPTION_TO_HOURS[option]
 -    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)
 +    await entity.coordinator.async_set_off_grid_time(entity._device_id, hours * 60)  # noqa: SLF001
- 
+
 @@ -461,3 +467,5 @@
      current = _storm_minutes_value(
 -        entity._properties, entity._weather_plan, entity._task_plan
@@ -11559,7 +11559,7 @@ select.py
      minutes = int(match.group(1))
 -    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)
 +    await entity.coordinator.async_set_storm_minutes(entity._device_id, minutes)  # noqa: SLF001
- 
+
 @@ -500,3 +510,3 @@
          return option
 -    entity._warn_unknown_once(mode)
@@ -11575,7 +11575,7 @@ select.py
 +        await entity.coordinator.async_set_price_mode_single(entity._device_id)  # noqa: SLF001
 +    else:
 +        _raise_select_action_error(entity, "invalid_select_option", option=option)
- 
+
 @@ -526,3 +538,3 @@
          _price_source_label(source)
 -        for source in _price_sources_from_payload(entity._payload)
@@ -11628,7 +11628,7 @@ select.py
          )
 -    await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)
 +    await entity.coordinator.async_set_ct_phase(entity._device_id, ct_sn, phase)  # noqa: SLF001
- 
+
 @@ -674,3 +684,3 @@
          async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
 -    """
@@ -11659,7 +11659,7 @@ select.py
 +        """  # noqa: E501, RUF100
          entities: list[SelectEntity] = []
 @@ -752,2 +762,3 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 @@ -756,3 +767,3 @@
@@ -11670,13 +11670,13 @@ select.py
 
 ================================================================================
 sensor.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 156
 ================================================================================
 --- sensor.py (LIVE/merged)
 +++ sensor.py (BACKUP)
 @@ -8,16 +8,7 @@
- 
+
 -The descriptions in ``SENSOR_DESCRIPTIONS`` and the period builders below
 -each carry inline references to the source-of-truth ``docs/PROTOCOL.md``
 -(§2 HTTP, §3-§5 MQTT, §8 data-source priority, §10 entity → source mapping,
@@ -11684,7 +11684,7 @@ sensor.py
 -be verified without re-reading the parser.
 -
  Conventions used in the per-sensor doc strings:
- 
+
 -* ``HTTP:`` lines name the documented endpoint from PROTOCOL.md §2 (HTTP
 -  endpoints table).
 -* ``MQTT:`` lines name the telemetry message and the field from PROTOCOL.md
@@ -11702,7 +11702,7 @@ sensor.py
 +prefer ``/v1/device/stat/systemStatistic``. Per generation/carbon are guarded against broken
  month-only cloud totals. ``total_revenue`` stays the raw Jackery app savings
 @@ -64,3 +54,3 @@
- 
+
 -Unique IDs follow ``PROTOCOL.md §11`` strictly:
 +Unique IDs follow strictly:
  ``<device_id>_<stable_key_suffix>`` for the main device and
@@ -11720,7 +11720,7 @@ sensor.py
 -from typing import Any, Literal
 +import math
 +from typing import TYPE_CHECKING, Any, Literal
- 
+
 @@ -99,8 +89,6 @@
  )
 -from homeassistant.core import HomeAssistant, callback
@@ -11728,7 +11728,7 @@ sensor.py
  from homeassistant.helpers.device_registry import DeviceInfo
 -from homeassistant.helpers.entity_platform import AddEntitiesCallback
  from homeassistant.util import dt as dt_util
- 
+
 -from . import JackeryConfigEntry
  from .const import (
 @@ -158,2 +146,3 @@
@@ -11816,7 +11816,7 @@ sensor.py
 +    from . import JackeryConfigEntry
 +    from .coordinator import JackerySolarVaultCoordinator
 +    from .util import HomeConsumptionPower
- 
+
 @@ -380,18 +378,5 @@
  # ---------------------------------------------------------------------------
 -LOCAL_DAILY_METRIC_BY_SENSOR_KEY: dict[str, str] = {
@@ -11861,7 +11861,7 @@ sensor.py
          timezone (Any | None): Timezone to use for computing the boundary; when
 -            None the Home Assistant local timezone is used.
 +            None the Home Assistant local timezone is used.   #TODO check if periods DATE_TYPE_DAY in all functions and statistic/backfill/trends
- 
+
 @@ -1083,3 +1067,3 @@
          the current period.
 -    """
@@ -11874,7 +11874,7 @@ sensor.py
 +    actionId=3032) with the ``plugs`` array.
      """
 @@ -1299,3 +1282,3 @@
- 
+
 -def _stat_description_has_value(
 +def _stat_description_has_value(  # noqa: PLR0911
      payload: dict[str, Any],
@@ -12029,7 +12029,7 @@ sensor.py
 -            return round(value, SAVINGS_PRICE_PRECISION)
 -        return value
 +        return self.entity_description.transform(raw)
- 
+
 @@ -3190,3 +3195,3 @@
  # ---------------------------------------------------------------------------
 -async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
@@ -12041,7 +12041,7 @@ sensor.py
 +    """  # noqa: E501, RUF100
      coordinator: JackerySolarVaultCoordinator = entry.runtime_data
 @@ -3231,3 +3236,3 @@
- 
+
 -    def _collect_entities() -> list[SensorEntity]:
 +    def _collect_entities() -> list[SensorEntity]:  # noqa: C901, PLR0912, PLR0915
          """Collect and instantiate all sensor entities for each device payload present in the coordinator.
@@ -12051,7 +12051,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          entities: list[SensorEntity] = []
 @@ -3291,6 +3296,8 @@
- 
+
 -            # Experimental BLE listener status (disabled by default; the
 -            # entity is only meaningful when the integration option
 -            # ``enable_ble_transport`` is on and shows zero otherwise).
@@ -12062,7 +12062,7 @@ sensor.py
 +                entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT
 +            ):
 +                _append_unique(entities, JackeryBleTransportSensor(coordinator, dev_id))
- 
+
 @@ -3310,3 +3317,3 @@
                      # the first pack into the main device.
 -                    pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
@@ -12074,7 +12074,7 @@ sensor.py
 +            if coordinator._has_smart_meter_accessory(payload) or payload.get(  # noqa: SLF001
                  PAYLOAD_CT_METER
 @@ -3424,2 +3431,3 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 @@ -3428,3 +3436,3 @@
@@ -12093,10 +12093,10 @@ sensor.py
 +        """  # noqa: E501, RUF100
          super().__init__(coordinator, device_id, description.key)
 @@ -3549,3 +3557,3 @@
- 
+
 -        When a reset period is set, use the source section's request metadata `begin_date` to compute the timezone-aware local midnight that marks the period start. If the source data is stale or from the future, or if no valid `begin_date` is available or parseable, fall back to the local period start computed from the current wall clock. This ensures the entity's `last_reset` only advances when the server-side period data is actually present.
 +        When a reset period is set, use the source section's request metadata `begin_date` to compute the timezone-aware local midnight that marks the period start. Future period data returns `None`; stale data keeps the stale source period so Recorder never sees a stale value at the current period boundary.
- 
+
 @@ -3553,9 +3561,9 @@
              datetime | None: Timezone-aware local midnight for the period start, or `None` when no reset period is configured.
 -        """
@@ -12137,7 +12137,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          if self._reset_period is None:
 @@ -3652,3 +3660,3 @@
- 
+
 -    def _source_for_section(self, section: str) -> dict[str, Any]:
 +    def _source_for_section(self, section: str) -> dict[str, Any]:  # noqa: PLR0911
          """Return the coordinator source dictionary corresponding to a payload section name.
@@ -12147,7 +12147,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          if section == PAYLOAD_PRICE:
 @@ -3676,12 +3684,17 @@
- 
+
 -    def _non_negative_period_raw(self, raw: Any) -> Any:  # noqa: ANN401  # passes through dynamic state value
 -        """Clamp negative energy period totals to zero when applicable.
 +    def _non_negative_period_raw(
@@ -12155,7 +12155,7 @@ sensor.py
 +        raw: Any,  # noqa: ANN401, RUF100
 +    ) -> Any:  # passes through dynamic state value  # noqa: ANN401, RUF100
 +        """Guard against negative energy period totals.
- 
+
          If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
 -        parses `raw` as a float and returns `0` when the parsed value is less than zero.
 -        Otherwise returns the original `raw` value unchanged.
@@ -12163,7 +12163,7 @@ sensor.py
 +        Returning `None` renders the sensor unavailable for that update, which avoids a
 +        false-zero spike in the HA Energy Dashboard (clamping to 0 causes a negative
 +        delta on the next positive reading).
- 
+
          Returns:
 -            The original `raw` value, or `0` when a negative energy total was detected.
 -        """
@@ -12181,12 +12181,12 @@ sensor.py
 +        """  # noqa: E501, RUF100
          if self._reset_period != DATE_TYPE_DAY:
 @@ -3727,3 +3740,3 @@
- 
+
 -    def _resolve_period_value(
 +    def _resolve_period_value(  # noqa: PLR6301
          self,
 @@ -3755,3 +3768,3 @@
- 
+
 -    def _refresh_cache(self) -> None:
 +    def _refresh_cache(self) -> None:  # noqa: C901, PLR0912, PLR0914, PLR0915
          """Recompute native_value and extra_state_attributes once per update."""
@@ -12322,7 +12322,7 @@ sensor.py
 +    def native_value(self) -> Any:  # dynamic sensor state value  # noqa: ANN401, RUF100
          """Return the entity's current value."""
 @@ -3979,30 +4053,2 @@
- 
+
 -
 -
 -    # --- restored from 24.05\24.05\custom_components\jackery_solarvault\sensor.py ---
@@ -12351,7 +12351,7 @@ sensor.py
 -            CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
 -            DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
 -        )
- 
+
 @@ -4030,3 +4076,3 @@
              enabled_default (bool): Whether the entity should be enabled by default in the entity registry.
 -        """
@@ -12363,7 +12363,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          packs = self._payload.get(PAYLOAD_BATTERY_PACKS) or []
 @@ -4065,3 +4111,5 @@
- 
+
 -    def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
 +    def _value_from_pack(
 +        self, pack: dict[str, Any]
@@ -12400,7 +12400,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          return self._cached_attrs
 @@ -4219,3 +4267,3 @@
- 
+
 -    def __init__(
 +    def __init__(  # noqa: PLR0913
          self,
@@ -12430,7 +12430,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          if self._reset_period is None:
 @@ -4349,3 +4397,3 @@
- 
+
 -    def __init__(
 +    def __init__(  # noqa: PLR0913
          self,
@@ -12460,7 +12460,7 @@ sensor.py
 +        """  # noqa: E501, RUF100
          attrs: dict[str, Any] = {
 @@ -4535,3 +4583,3 @@
- 
+
 -    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamic sensor state value
 +    def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value  # noqa: ANN401, RUF100
          """Calculate the current value from a CT payload."""
@@ -12533,7 +12533,7 @@ sensor.py
 +        meter_net = JackerySmartMeterSensor._net_power(ct)  # noqa: SLF001
          input_available = self._grid_side_input_power(props) is not None
 @@ -5148,3 +5197,3 @@
- 
+
 -        phases = JackerySmartMeterSensor._signed_phase_values(ct)
 +        phases = JackerySmartMeterSensor._signed_phase_values(ct)  # noqa: SLF001
          if phases is not None:
@@ -12605,7 +12605,7 @@ services.py
 +if TYPE_CHECKING:
 +    from homeassistant.config_entries import ConfigEntry
 +    from homeassistant.core import HomeAssistant, ServiceCall
- 
+
  _LOGGER = logging.getLogger(__name__)
 -
 -_BLE_SERVICE_CONNECT_TIMEOUT_SEC = 35.0
@@ -12648,7 +12648,7 @@ services.py
 -    if not math.isfinite(parsed):
 -        raise vol.Invalid("expected finite number")
 -    return parsed
- 
+
 @@ -130,10 +101,6 @@
  REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema({
 -    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
@@ -12717,7 +12717,7 @@ services.py
 +    """  # noqa: E501, RUF100
      coordinators: list[JackerySolarVaultCoordinator] = []
 @@ -206,26 +176,53 @@
- 
+
 +# Jackery numeric main-device ids are digits only (e.g.
 +# ``573702884982521856`` per PROTOCOL.md §12). Subdevice identifiers in the
 +# integration follow ``<parent_digits>_<suffix>`` where ``<suffix>`` is
@@ -12801,7 +12801,7 @@ services.py
 +    """  # noqa: E501, RUF100
      for coordinator in _loaded_coordinators(hass):
 @@ -243,2 +244,12 @@
- 
+
 +def _entry_for_coordinator(
 +    hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
 +) -> ConfigEntry | None:
@@ -12855,7 +12855,7 @@ services.py
 +        },
      )
 @@ -277,44 +299,30 @@
- 
+
 -def _device_id_from_service(
 -    hass: HomeAssistant,
 -    raw: Any,
@@ -12920,7 +12920,7 @@ services.py
 +            placeholder_key: value,
              "error": error,
 @@ -324,104 +332,62 @@
- 
+
 -def _rename_name_from_service(raw: Any, system_id: str) -> str:
 -    """Return a validated system name from a direct rename service call."""
 +def _device_id_field(call: ServiceCall, translation_key: str) -> str:
@@ -13085,7 +13085,7 @@ services.py
 +            return parsed
          raise _service_validation_error(
 @@ -446,132 +412,2 @@
- 
+
 -def _service_bool(
 -    raw: Any,
 -    *,
@@ -13679,7 +13679,7 @@ services.py
 +            error="BLE writes are disabled or no active BLE session exists",
 +        )
 +
- 
+
 @@ -1009,4 +758,4 @@
          ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
 -    """
@@ -13695,7 +13695,7 @@ services.py
 +        ) from err
      except (JackeryError, LookupError, RuntimeError, ValueError) as err:
 @@ -1033 +786,117 @@
- 
+
 +
 +# ---------------------------------------------------------------------------
 +# Setup
@@ -13815,19 +13815,19 @@ services.py
 
 ================================================================================
 switch.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 16
 ================================================================================
 --- switch.py (LIVE/merged)
 +++ switch.py (BACKUP)
 @@ -9,6 +9,5 @@
- 
+
 -from collections.abc import Awaitable, Callable
  from dataclasses import dataclass
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
 @@ -16,7 +15,5 @@
  from homeassistant.const import EntityCategory
 -from homeassistant.core import HomeAssistant
@@ -13843,7 +13843,7 @@ switch.py
 -from .coordinator import JackerySolarVaultCoordinator
  from .entity import JackeryEntity
 @@ -64,2 +60,11 @@
- 
+
 +if TYPE_CHECKING:
 +    from collections.abc import Awaitable, Callable
 +
@@ -13977,7 +13977,7 @@ switch.py
 +        """  # noqa: E501, RUF100
          entities: list[SwitchEntity] = []
 @@ -758,2 +761,3 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 @@ -762,3 +766,3 @@
@@ -13988,7 +13988,7 @@ switch.py
 
 ================================================================================
 text.py
-  lost top-level symbols (0): 
+  lost top-level symbols (0):
   backup-only code lines: 18
 ================================================================================
 --- text.py (LIVE/merged)
@@ -13997,7 +13997,7 @@ text.py
  import logging
 -from typing import Any
 +from typing import TYPE_CHECKING, Any
- 
+
 @@ -7,7 +7,5 @@
  from homeassistant.const import EntityCategory
 -from homeassistant.core import HomeAssistant
@@ -14020,7 +14020,7 @@ text.py
 +
 +    from . import JackeryConfigEntry
 +    from .coordinator import JackerySolarVaultCoordinator
- 
+
 @@ -80,3 +84,3 @@
      Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
 -    """
@@ -14051,7 +14051,7 @@ text.py
 +            if coordinator.device_supports_third_party_mqtt(dev_id):
                  for (
 @@ -139,2 +145,3 @@
- 
+
 +    @callback
      def _add_new_entities() -> None:
 @@ -143,3 +150,3 @@
@@ -14080,7 +14080,7 @@ text.py
 +        if raw in {None, ""}:
              return None
 @@ -329,3 +336,3 @@
- 
+
 -    def __init__(
 +    def __init__(  # noqa: PLR0913
          self,
@@ -14109,7 +14109,7 @@ util.py
  import re
 -from typing import Any, NamedTuple, cast
 +from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
- 
+
 @@ -44,2 +47,3 @@
      APP_STAT_PV4_ENERGY,
 +    APP_STAT_PV_PROFIT,
@@ -14145,7 +14145,7 @@ util.py
 -    REDACTED_VALUE,
      SUBDEVICE_SCAN_NAME_LABELS,
 @@ -123,2 +131,8 @@
- 
+
 +if TYPE_CHECKING:
 +    from collections.abc import Callable
 +    from datetime import tzinfo as TZInfo  # noqa: N812
@@ -14160,7 +14160,7 @@ util.py
 -
 -_WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
 +
- 
+
 @@ -142,3 +153,3 @@
          bool: The resolved boolean value (`true` or `false`), or `default` if the value is missing or not parseable.
 -    """
@@ -14177,7 +14177,7 @@ util.py
 +    """  # noqa: E501, RUF100
      options = getattr(entry, "options", {}) or {}
 @@ -227,3 +238,5 @@
- 
+
 -def parse_utc_datetime(value: Any) -> datetime:  # noqa: ANN401  # arbitrary payload timestamp, coerced at runtime
 +def parse_utc_datetime(
 +    value: Any,  # noqa: ANN401, RUF100
@@ -14214,7 +14214,7 @@ util.py
      else:
 -        raise ValueError(f"unsupported UTC timestamp: {value!r}")
 +        raise ValueError(f"unsupported UTC timestamp: {value!r}")  # noqa: TRY003, TRY004
- 
+
 @@ -284,3 +297,3 @@
          alarm payload, a boolean indicating presence of an OTA current version, and a boolean indicating presence of a CT meter.
 -    """
@@ -14240,7 +14240,7 @@ util.py
 +        today = datetime.now(tz=UTC).date()
      if date_type == DATE_TYPE_DAY:
 @@ -370,3 +383,3 @@
- 
+
 -def _app_period_bound_to_date(value: str | date, *, field_name: str) -> date:
 +def _app_period_bound_to_date(value: str | date | datetime, *, field_name: str) -> date:
      """Return a validated ISO date bound for a Jackery app period request."""
@@ -14272,7 +14272,7 @@ util.py
 +        raise ValueError(f"Unsupported Jackery app month: {month!r}")  # noqa: TRY003
      first = date(year, month, 1)
 @@ -472,3 +485,5 @@
- 
+
 -def safe_float(value: Any) -> float | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
 +def safe_float(  # noqa: PLR0911
 +    value: Any,  # noqa: ANN401, RUF100
@@ -14284,7 +14284,7 @@ util.py
 +    """  # noqa: E501, RUF100
      if value is None:
 @@ -503,3 +518,3 @@
- 
+
 -def safe_int(value: Any) -> int | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
 +def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
      """Convert a value to an integer when possible.
@@ -14358,14 +14358,14 @@ util.py
 +    """  # noqa: E501, RUF100
 +    raw = os.environ.get(_DEV_MODE_ENV, "")
 +    return raw.strip().lower() in {"1", "true", "yes", "on"}
- 
+
 @@ -545,3 +594,3 @@
          bool: `True` if redactions are disabled, `False` otherwise.
 -    """
 +    """  # noqa: E501, RUF100
      if dev_mode_redactions_disabled():
 @@ -557,3 +606,6 @@
- 
+
 -def _payload_debug_redacted(value: Any, redactions_disabled: bool | None = None) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
 +def _payload_debug_redacted(
 +    value: Any,  # noqa: ANN401, RUF100
@@ -14378,14 +14378,14 @@ util.py
 +    """  # noqa: E501, RUF100
      if redactions_disabled is None:
 @@ -595,3 +647,5 @@
- 
+
 -def _payload_debug_passthrough(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
 +def _payload_debug_passthrough(
 +    value: Any,  # noqa: ANN401, RUF100
 +) -> Any:  # recursive JSON walker over arbitrary payload  # noqa: ANN401, RUF100
      """Normalize a nested structure into JSON-serializable types.
 @@ -621,3 +675,5 @@
- 
+
 -def redacted_json_safe_payload(value: Any) -> Any:  # noqa: ANN401  # recursive JSON walker over arbitrary payload
 +def redacted_json_safe_payload(
 +    value: Any,  # noqa: ANN401, RUF100
@@ -14412,7 +14412,7 @@ util.py
 +    """  # noqa: E501, RUF100
      debug_path = Path(path)
 @@ -728,3 +784,3 @@
- 
+
 -def safe_bool(value: Any) -> bool | None:  # noqa: ANN401  # arbitrary payload value, coerced at runtime
 +def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, PLR0911, RUF100
      """Interpret a payload value as a boolean.
@@ -14459,7 +14459,7 @@ util.py
 +            )
          if self.total_method is not None:
 @@ -925,20 +985,2 @@
- 
+
 -
 -
 -    # --- restored from 24.05\24.05\custom_components\jackery_solarvault\util.py ---
@@ -14478,9 +14478,9 @@ util.py
 -                continue
 -            shape.append((key_text, "value"))
 -        return tuple(sorted(shape))
- 
+
 @@ -1013,3 +1055,3 @@
- 
+
 -    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"
 +    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E501, RUF100
      source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
@@ -14626,7 +14626,7 @@ util.py
 +# has charged since local midnight), so the §2.2 §5 zero-confirmation rule must
 +# not raise a repair issue — otherwise it fires a false positive every night.
 +ZERO_CONFIRM_MIN_LOCAL_HOUR: Final = 20
- 
+
 @@ -1028,3 +1207,5 @@
      today: date | None = None,
 +    now: datetime | None = None,
@@ -14653,7 +14653,7 @@ util.py
 +        """  # noqa: E501, RUF100
          source = payload.get(section)
 @@ -1094,3 +1278,3 @@
- 
+
 -    def _add_warning(
 +    def _add_warning(  # noqa: PLR0913
          *,
@@ -14663,14 +14663,14 @@ util.py
 +        """  # noqa: E501, RUF100
          warnings.append(
 @@ -1144,3 +1328,6 @@
- 
+
 +    day_in_current_week = True  # today is always within the current week
 +
      for prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
 +        day = _period_total(prefix, DATE_TYPE_DAY, stat_key)
          week = _period_total(prefix, DATE_TYPE_WEEK, stat_key)
 @@ -1193,2 +1380,58 @@
- 
+
 +        # §2.2: day ≤ week — today's value cannot exceed the current week total.
 +        if (
 +            day_in_current_week
@@ -14770,20 +14770,20 @@ util.py
          parsed = safe_float(value)
 -        return None if parsed is None else (0.0, parsed)
 +        return None if parsed is None else (parsed, 0.0)
- 
+
 @@ -1351,7 +1597,7 @@
      whole = sign * float(int(whole_text))
 -    fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
 +    fraction_int = int(fraction_text)
 +    fraction = sign * (fraction_int / (10 ** len(fraction_text)))
- 
+
      if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
 -        parsed = safe_float(value)
 -        return None if parsed is None else (0.0, parsed)
 +        return whole, 0.0
      return whole, fraction
 @@ -1359,3 +1605,3 @@
- 
+
 -def expanded_year_series_values(
 +def expanded_year_series_values(  # noqa: PLR0911
      source: dict[str, Any],
@@ -14793,7 +14793,7 @@ util.py
 +    """  # noqa: E501, RUF100
      series_key = trend_series_key(section, stat_key)
 @@ -1388,8 +1634,4 @@
- 
+
 -    if direct_total is not None:
 -        tolerance = max(0.05, abs(direct_total) * 0.005)
 -        if abs(raw_sum - direct_total) <= tolerance:
@@ -14810,7 +14810,7 @@ util.py
          if current_value:
              expanded[index] += current_value
 +            compact_encoded = compact_encoded or isinstance(raw_value, str)
- 
+
      expanded = [round(value, 5) for value in expanded]
 +    if compact_encoded and expanded != raw_values:
 +        return expanded
@@ -14819,7 +14819,7 @@ util.py
 +        tolerance = max(0.05, abs(direct_total) * 0.005)
 +        if abs(raw_sum - direct_total) <= tolerance:
 +            return raw_values
- 
+
 @@ -1433,3 +1686,3 @@
          list[float] | None: Normalized list of floats rounded to 5 decimals, or `None` if the chart series key is not applicable or the series value is not a list.
 -    """
@@ -14875,7 +14875,7 @@ util.py
 +            revenue_meta = corrected.get(APP_STAT_TOTAL_SOLAR_REVENUE)
              if isinstance(revenue_meta, dict):
 @@ -1624,3 +1879,3 @@
- 
+
 -def _calculated_savings_from_year(
 +def _calculated_savings_from_year(  # noqa: PLR0914
      payload: dict[str, Any],
@@ -14885,7 +14885,7 @@ util.py
 +    """  # noqa: E501, RUF100
      device_output = _period_total_from_payload(
 @@ -1767,3 +2022,3 @@
- 
+
 -def _savings_publish_decision(
 +def _savings_publish_decision(  # noqa: PLR0911, PLR0913
      *,
@@ -14935,7 +14935,7 @@ util.py
 +        if month < 1 or month > 12:  # noqa: PLR2004
              continue
 @@ -1838,8 +2114,10 @@
- 
+
 -    out["totalSolarRevenue"] = monthly_total
 -    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
 -    out[APP_CHART_SERIES_Y6] = [
@@ -14952,7 +14952,7 @@ util.py
 +    meta.setdefault("corrected", {})[APP_STAT_TOTAL_SOLAR_REVENUE] = {
          "raw_total": raw_total,
 @@ -1850,3 +2128,3 @@
- 
+
 -def backfill_year_payload_from_months(
 +def backfill_year_payload_from_months(  # noqa: PLR0912
      year_source: dict[str, Any],
@@ -14967,7 +14967,7 @@ util.py
 +            if month < 1 or month > 12:  # noqa: PLR2004
                  continue
 @@ -1924,12 +2202,19 @@
- 
+
 +        partial_year = len(found_months) < 12  # noqa: PLR2004
 +        corrected_total = (
 +            round(monthly_total * 12 / len(found_months), 2)
@@ -14990,7 +14990,7 @@ util.py
          elif stat_key == APP_STAT_TOTAL_DISCHARGE:
 -            out["batOtGridEgy"] = monthly_total
 +            out["batOtGridEgy"] = corrected_total
- 
+
 @@ -1937,5 +2222,7 @@
              "raw_total": raw_total,
 -            "corrected_total": monthly_total,
@@ -15006,7 +15006,7 @@ util.py
 +    """  # noqa: E501, RUF100
      section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
 @@ -2001,3 +2288,3 @@
- 
+
 -def guard_statistic_totals_from_year(
 +def guard_statistic_totals_from_year(  # noqa: PLR0914
      payload: dict[str, Any],
@@ -15045,7 +15045,7 @@ util.py
 +    """  # noqa: E501, RUF100
      return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 @@ -2153,3 +2446,3 @@
- 
+
 -def trend_series_points(
 +def trend_series_points(  # noqa: PLR0912
      source: dict[str, Any],
@@ -15058,12 +15058,12 @@ util.py
          return []
 -    series_values = cast(list[Any], series)
 +    series_values = cast("list[Any]", series)
- 
+
 @@ -2198,3 +2491,3 @@
      if today is None:
 -        today = date.today()
 +        today = datetime.now(tz=UTC).date()
- 
+
 @@ -2206,3 +2499,3 @@
              month = index + 1
 -            if month < 1 or month > 12:
@@ -15179,7 +15179,7 @@ util.py
 -    phases = signed_phase_power_values(ct)
      return sum(phases) if phases is not None else None
 @@ -2547,3 +2858,3 @@
- 
+
 -def calculated_smart_meter_power(
 +def calculated_smart_meter_power(  # noqa: PLR0911
      ct: dict[str, Any],
@@ -15226,7 +15226,7 @@ util.py
 +    """Map a section and statistic key to the corresponding chart-series key for day/week/month/year payloads.
 +
 +    Only returns a chart-series key when `section` denotes a day, week, month, or year payload; otherwise returns `None`.
- 
+
 @@ -2792,4 +3103,5 @@
          str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a week/month/year payload or no mapping exists.
 -    """
@@ -15240,7 +15240,7 @@ util.py
 +    """  # noqa: E501, RUF100
      if not _is_day_period_payload(source, section):
 @@ -2827,3 +3139,3 @@
- 
+
 -def trend_series_total(
 +def trend_series_total(  # noqa: PLR0911
      source: dict[str, Any],
@@ -15250,7 +15250,7 @@ util.py
 +    """  # noqa: E501, RUF100
      if _is_day_period_payload(source, section):
 @@ -2886,3 +3198,3 @@
- 
+
 -def trend_series_has_value(
 +def trend_series_has_value(  # noqa: PLR0911
      source: dict[str, Any],
@@ -15260,7 +15260,7 @@ util.py
 +    """  # noqa: E501, RUF100
      if _is_day_period_payload(source, section):
 @@ -2932,3 +3244,5 @@
- 
+
 -def task_plan_value(task_plan: dict[str, Any], *keys: str) -> Any:  # noqa: ANN401  # payload value of unknown type by design
 +def task_plan_value(
 +    task_plan: dict[str, Any], *keys: str

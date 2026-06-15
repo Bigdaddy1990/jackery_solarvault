@@ -426,7 +426,9 @@ class BaseHTTPMixin:
             if inspect.isawaitable(result):
                 await result
         except Exception as err:
-            _LOGGER.debug("Jackery payload debug logging failed: %s", err, exc_info=True)
+            _LOGGER.debug(
+                "Jackery payload debug logging failed: %s", err, exc_info=True
+            )
 
     @staticmethod
     def _http_payload_debug(  # noqa: PLR0913

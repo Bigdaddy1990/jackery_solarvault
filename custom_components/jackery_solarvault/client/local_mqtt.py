@@ -185,7 +185,9 @@ class JackeryLocalMqttClient:
                 return
             if not task.done():
                 task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, MqttError, OSError, RuntimeError):
+            with contextlib.suppress(
+                asyncio.CancelledError, MqttError, OSError, RuntimeError
+            ):
                 await task
 
     # ------------------------------------------------------------------

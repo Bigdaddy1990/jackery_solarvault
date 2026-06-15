@@ -49,7 +49,7 @@
    CODE <1\sensor.py>: consumed = c["battery_charge_power"] + c["grid_side_output_power"]
 
 [JackeryGridNetPowerSensor] adopted=LIVE
-   doc  <pre_transfer>: "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501, 
+   doc  <pre_transfer>: "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501,
 
 [JackeryHomeConsumptionPowerSensor] adopted=LIVE
    CODE <pre_transfer>: phases = JackerySmartMeterSensor._signed_phase_values(ct)  # noqa: SLF001
@@ -105,7 +105,7 @@
    CODE <01.06\custom_components\jackery_solarvault\sensor.py>: redacted = redacted_json_safe_payload(self._properties)
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: Returns:
    CODE <01.06\custom_components\jackery_solarvault\sensor.py>: return redacted if isinstance(redacted, dict) else {}
-   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: dict[str, Any]: A dictionary of redacted diagnostic attributes when the redaction yields a mapping, 
+   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: dict[str, Any]: A dictionary of redacted diagnostic attributes when the redaction yields a mapping,
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: """Diagnostic attributes derived from the redacted device properties payload.
    doc  <pre_transfer>: """  # noqa: E501, RUF100
 
@@ -172,13 +172,13 @@
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: """Get the API-request `begin_date` stamped on the sensor's source.
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: """Determine whether the source period begin date from request metadata is later than the current lo
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: Returns:
-   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: datetime | None: Timezone-aware local midnight for the period start, or `None` when no reset period 
+   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: datetime | None: Timezone-aware local midnight for the period start, or `None` when no reset period
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: # PROTOCOL.md §2 fallback — try documented alternate
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: If the sensor has no reset period or the request metadata begin date is missing or invalid, the data
    CODE <01.06\custom_components\jackery_solarvault\sensor.py>: dict[str, Any]: The dict storing data for the requested section, or an empty dict if no usable sourc
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: date: Local date in the configured Home Assistant timezone.
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: # PROTOCOL.md §8 keeps period sensors' attributes lean: source
-   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: True if the source period begin date is after the local period start for the sensor's reset period, 
+   CODE <01.06\custom_components\jackery_solarvault\sensor.py>: True if the source period begin date is after the local period start for the sensor's reset period,
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: parses `raw` as a float and returns `0` when the parsed value is less than zero.
    CODE <01.06\custom_components\jackery_solarvault\sensor.py>: str: The `begin_date` string from the source's request metadata when present and valid, or `None` if
    doc  <01.06\custom_components\jackery_solarvault\sensor.py>: `source_section` is the chart section used (e.g., `"<prefix>_week"`), and `source_dict` is the
@@ -419,7 +419,7 @@
    CODE <24.05\24.05\custom_components\jackery_solarvault\sensor.py>: if parsed is None:
    CODE <24.05\24.05\custom_components\jackery_solarvault\sensor.py>: parsed = safe_float(value)
    CODE <24.05\24.05\custom_components\jackery_solarvault\sensor.py>: return round(parsed / divisor, 2)
-   CODE <pre_transfer>: def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, 
+   CODE <pre_transfer>: def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401,
    CODE <custom_components\jackery_solarvault\sensor.py>: def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime
 
 [_getter] adopted=21.05\21.05\custom_components\jackery_solarvault\sensor.py
@@ -528,7 +528,7 @@
 [_value_from_ct] adopted=LIVE
    CODE <custom_components\jackery_solarvault\sensor.py>: def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value
    CODE <1\sensor.py>: def _value_from_ct(self, ct: dict[str, Any]) -> Any:
-   CODE <pre_transfer>: def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value  # noqa: ANN401, 
+   CODE <pre_transfer>: def _value_from_ct(self, ct: dict[str, Any]) -> Any:  # dynamic sensor state value  # noqa: ANN401,
 
 [_value_from_pack] adopted=pre_transfer
    CODE <custom_components\jackery_solarvault\sensor.py>: ) -> Any:  # dynamic sensor state value

@@ -37,7 +37,7 @@
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - If the parsed object lacks a dict at `FIELD_BODY` but contains a dict at `FIELD_DATA`, copies `FIE
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: self._active_tasks.add(task)
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `True` if the elapsed time since the selected timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` o
-   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc> 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc>
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `true` if the client is connected to the MQTT broker, `false` otherwise.
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: int: Count of consecutive authentication failure occurrences.
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Redacts the user identifier segment from an MQTT topic when the topic uses the configured prefix.
@@ -56,7 +56,7 @@
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Extracts an integer code from `err.rc` or `err.rc.value`. If neither yields an integer, returns `0`.
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # accumulation path documented in BUGFIXTODO.
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: # _schedule_coroutine. Leaving them attached to the loop is the
-   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful 
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Manage a single MQTT session: connect to the broker, subscribe to configured topics, process inco
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Wait until the MQTT client becomes connected or raise a RuntimeError on timeout or connection fai
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: int: The extracted MQTT return code, or `0` if no integer code is present.
@@ -67,7 +67,7 @@
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: On successful connection this sets internal connection flags and timestamps, subscribes to topics in
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the internal connected event is not set within timeout_sec, sets self._last_error to
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return whether the MQTT client currently has an active connection.
-   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled, 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled,
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: - On successful validation increments `_messages_seen`, records `_last_message_at` as a UTC ISO time
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: active.cancel()
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If the current `_last_error` already represents a connect failure, this method is a no-op.
@@ -316,7 +316,7 @@
    doc  <1\client\mqtt_push.py>: # ReasonCodes from paho-mqtt expose ``.value`` for MQTT-5 codes.
 
 [_handle_connect_failure] adopted=pre_transfer
-   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc> 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: Sets the client as disconnected, stores a human-readable `_last_error` of the form `connect rc=<rc>
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Record an MQTT CONNACK failure and update connection and authentication-failure state.
    doc  <1\client\mqtt_push.py>: """Handle CONNACK rejection by mapping rc to actionable reason."""
    doc  <1\client\mqtt_push.py>: # Non-auth rejection (e.g. server unavailable) does not count toward
@@ -359,7 +359,7 @@
 [_mqtt_silent_for_too_long] adopted=1\client\mqtt_push.py
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Determine whether the MQTT connection has been silent longer than the configured threshold.
    CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: `True` if the elapsed time since the selected timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` o
-   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful 
+   doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: If a most-recent message timestamp is available, use it; otherwise fall back to the last successful
    CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` oth
    doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Return whether the MQTT connection has been silent longer than MQTT_SILENT_THRESHOLD_SEC.
    doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
@@ -389,7 +389,7 @@
    CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
    doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Returns:
    doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: """Return the non-negative number of seconds elapsed since the last received message.
-   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Parses the ISO-8601 timestamp stored in `self._last_message_at` and computes the difference between 
+   CODE <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: Parses the ISO-8601 timestamp stored in `self._last_message_at` and computes the difference between
    doc  <pre_transfer>: """  # noqa: E501, RUF100
 
 [_utc_now_iso] adopted=LIVE
@@ -440,7 +440,7 @@
 [diagnostics_snapshot] adopted=pre_transfer
    doc  <01.06\custom_components\jackery_solarvault\client\mqtt_push.py>: "topic_count": len(self._topics),
    doc  <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: """Return a topic with its user-specific segment redacted when topic redaction is enabled.
-   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled, 
+   CODE <jackery_solarvault-Bigdaddy1990-patch-1\client\mqtt_push.py [ancient]>: str | None: Topic with the user segment replaced by the redaction marker when redaction is enabled,
    doc  <27.05\custom_components\jackery_solarvault\client\mqtt_push.py [ancient]>: "tls_x509_strict_disabled": False,  # wir fassen verify_flags nicht an
    doc  <1\1101\custom_components\jackery_solarvault\client\mqtt_push.py>: "tls_x509_strict_disabled": False,
    doc  <1\client\mqtt_push.py>: "tls_x509_strict_disabled": hasattr(ssl, "VERIFY_X509_STRICT"),

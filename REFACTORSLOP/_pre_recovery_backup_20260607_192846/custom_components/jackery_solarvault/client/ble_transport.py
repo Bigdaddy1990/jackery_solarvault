@@ -33,8 +33,6 @@ Crypto assumptions follow implementation notes §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-from __future__ import annotations  # noqa: TID251
-
 import asyncio
 import base64
 import binascii

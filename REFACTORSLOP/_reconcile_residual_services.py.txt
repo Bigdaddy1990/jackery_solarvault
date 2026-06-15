@@ -51,7 +51,7 @@
    CODE <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\services.py [ancient]>: id (legacy automations), the lookup misses and we return the raw value
    doc  <1\jackery_solarvault-0.1.0\custom_components\jackery_solarvault\services.py [ancient]>: unchanged so handlers stay backwards-compatible.
    CODE <01.06\custom_components\jackery_solarvault\services.py>: parent_id (str): The parent Jackery numeric device id with any documented subdevice suffix removed.
-   doc  <01.06\custom_components\jackery_solarvault\services.py>: """Resolve a Home Assistant device-registry id or Jackery compound id to the parent Jackery numeric 
+   doc  <01.06\custom_components\jackery_solarvault\services.py>: """Resolve a Home Assistant device-registry id or Jackery compound id to the parent Jackery numeric
    doc  <01.06\custom_components\jackery_solarvault\services.py>: Parameters:
    doc  <01.06\custom_components\jackery_solarvault\services.py>: Returns:
    doc  <01.06\custom_components\jackery_solarvault\services.py>: raw (str): A device-registry id or a Jackery device identifier that may include a documented subdevi

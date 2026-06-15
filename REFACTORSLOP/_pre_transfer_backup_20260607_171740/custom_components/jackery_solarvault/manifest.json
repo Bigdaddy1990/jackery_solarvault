@@ -1,6 +1,4 @@
 {
-  "domain": "jackery_solarvault",
-  "name": "Jackery SolarVault",
   "after_dependencies": [
     "aiousbwatcher",
     "bluetooth",
@@ -30,6 +28,7 @@
     }
   ],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
+  "domain": "jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
@@ -47,6 +46,7 @@
     "lwip/#",
     "hb/#"
   ],
+  "name": "Jackery SolarVault",
   "quality_scale": "custom",
   "requirements": [
     "aiomqtt>=2.5.0,<2.6.0"
@@ -54,22 +54,22 @@
   "version": "0.1.1",
   "zeroconf": [
     {
-      "type": "_api._tcp.local.",
       "properties": {
         "device": "lwip"
-      }
+      },
+      "type": "_api._tcp.local."
     },
     {
-      "type": "_api._udp.local.",
       "properties": {
         "device": "lwip"
-      }
+      },
+      "type": "_api._udp.local."
     },
     {
-      "type": "_http._tcp.local.",
       "properties": {
         "device": "lwip"
-      }
+      },
+      "type": "_http._tcp.local."
     }
   ]
 }

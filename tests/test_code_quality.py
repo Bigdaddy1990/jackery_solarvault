@@ -3432,16 +3432,14 @@ def test_jackery_exception_handlers_are_domain_specific() -> None:
         source = path.read_text(encoding="utf-8")
         rel = path.as_posix()
         has_intentional_broad_handler = (
-            rel in allowed_broad_handlers
-            and "except Exception as err:" in source
+            rel in allowed_broad_handlers and "except Exception as err:" in source
         )
         has_intentional_ble_noqa = (
             rel in allowed_broad_handlers and "# noqa: BLE001" in source
         )
-        if (
-            "except Exception" in source
-            and not has_intentional_broad_handler
-        ) or ("noqa: BLE001" in source and not has_intentional_ble_noqa):
+        if ("except Exception" in source and not has_intentional_broad_handler) or (
+            "noqa: BLE001" in source and not has_intentional_ble_noqa
+        ):
             offenders.append(str(path))
     assert offenders == []
 

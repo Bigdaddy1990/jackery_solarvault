@@ -13,7 +13,6 @@ allows the integration to start the MQTT push channel during a cloud outage
 or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
-from __future__ import annotations
 
 import asyncio
 

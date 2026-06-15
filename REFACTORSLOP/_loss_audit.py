@@ -12,13 +12,11 @@ and reports:
 Stdlib only. Python 3.14+.
 """  # noqa: INP001
 
-from __future__ import annotations  # noqa: I001, TID251
-
 import ast
-import json
-import sys
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
+import sys
 
 ROOT = Path(r"M:\v0.1.0")
 PKG_REL = Path("custom_components/jackery_solarvault")

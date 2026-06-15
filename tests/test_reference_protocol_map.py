@@ -1,7 +1,5 @@
 """Validate the Jackery protocol reference is covered by protocol_map."""
 
-from __future__ import annotations
-
 import ast
 import importlib.util
 import json
