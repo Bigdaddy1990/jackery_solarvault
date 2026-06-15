@@ -11,7 +11,7 @@ permissions:
   actions: write
   checks: write
   id-token: write # for Trusted Publishing + attest-action
-  
+
 concurrency:
   group: pre-commit-lite-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,7 +33,7 @@ jobs:
           ref: ${{ github.head_ref }}
           # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
           persist-credentials: true
-          
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -42,14 +42,14 @@ jobs:
             requirements.txt
             requirements-test.txt
             pyproject.toml
-            
+
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           #enable-cache: true
           #ignore-nothing-to-cache: true
-          
+
       - uses: astral-sh/ruff-action@v4.0.0
       - uses: actions/setup-python@v4
         with:
