@@ -9,11 +9,11 @@ Home Assistant integration. Primary source of truth: `source-of-truth/` Smali da
 
 | Oberfläche               | Referenz | Implementiert | %      | Status |
 |--------------------------|----------|---------------|--------|--------|
-| HTTP-Endpoints           | 112      | 105           | 94 %   | ok (3 mobile-app-only intentionally skipped) |
+| HTTP-Endpoints           | 112      | 109           | 97 %   | ok (3 mobile-app-only intentionally skipped) |
 | MQTT-Msg-Types (home)    | 16       | 16            | 100 %  | ok |
 | MQTT-Msg-Types (portable)| n/a      | n/a           | n/a    | nicht anwendbar (MQTT = home only) |
 | Commands (home)          | 47       | 47            | 100 %  | ok (all ACTION_ID constants defined) |
-| Commands (portable)      | 51       | 51            | 100 %  | ok (all ACTION_ID_PORTABLE_* constants defined) |
+| Commands (portable)      | 50       | 50            | 100 %  | ok (all ACTION_ID_PORTABLE_* constants defined) |
 | Portable entities        | ~119     | 119           | 100 %  | ok (76 sensors + 15 buttons + 11 switches + 10 numbers + 7 selects) |
 | Device-Modelle           | runtime  | runtime       | n/a    | ok (`/v1/device/system/list`) |
 | Accessories              | 14       | 14            | 100 %  | ok |
@@ -24,9 +24,22 @@ Home Assistant integration. Primary source of truth: `source-of-truth/` Smali da
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
 | Test-Files               | 45       | 45            | 100 %  | tracked in git |
 
-## HTTP-Endpoints (106/118)
 
-### Implemented (106)
+## Single Source of Truth
+
+`docs/jackery_complete_reference.json` is the machine-readable reference for this
+page and for CI drift checks. The current counted matrix is:
+
+| Bereich | Gesamt | Implementiert | Bewusst ausgelassen | Testabdeckung |
+|---------|--------|---------------|---------------------|---------------|
+| HTTP-Endpoints | 112 | 109 | 3 | `tests/test_reference_coverage.py` runs `scripts.check_reference_coverage` |
+| Home Commands | 47 | 47 | 0 | `ACTION_ID_*` constants in `const.py` are compared to the reference |
+| Portable Commands | 50 | 50 | 0 | `ACTION_ID_PORTABLE_*` constants in `const.py` are compared to the reference |
+| Home Assistant Services | 7 | 7 | 0 | `services.yaml` top-level service keys are compared to the reference |
+
+## HTTP-Endpoints (109/112)
+
+### Implemented (109)
 
 **Auth (11):**
 - `auth/login` — AES-128-ECB + RSA-1024 hybrid login
@@ -237,9 +250,9 @@ All 47 home commands have `ACTION_ID_*` constants defined in `const.py`.
 - `UNBIND_SMART_PART` (3013) — accessory unbinding flow
 - `FAULT_ALARM_REPORT` (3042) — device-to-cloud alert (read-only, device-initiated)
 
-## Portable Commands (51/51)
+## Portable Commands (50/50)
 
-All 51 portable commands have `ACTION_ID_PORTABLE_*` constants defined in `const.py`.
+All 50 portable commands have `ACTION_ID_PORTABLE_*` constants defined in `const.py`.
 Entity descriptions wired in `button.py`, `switch.py`, `number.py`, `select.py`.
 
 ### Buttons (15)

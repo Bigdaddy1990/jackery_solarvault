@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
+SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensors" / "base.py"
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 INIT_PATH = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
@@ -579,7 +579,8 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
         Path(__file__).resolve().parents[1]
         / "custom_components"
         / "jackery_solarvault"
-        / "sensor.py"
+        / "sensors"
+        / "base.py"
     ).read_text(encoding="utf-8")
     # The last_reset property must consult begin_date metadata
     assert "_period_begin_from_meta" in sensor_source
@@ -602,7 +603,8 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
         Path(__file__).resolve().parents[1]
         / "custom_components"
         / "jackery_solarvault"
-        / "sensor.py"
+        / "sensors"
+        / "base.py"
     ).read_text(encoding="utf-8")
     # The helper exists
     assert "def _is_period_data_stale(self) -> bool:" in sensor_source

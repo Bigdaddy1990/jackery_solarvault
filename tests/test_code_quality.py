@@ -480,7 +480,9 @@ def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
 def test_period_source_diagnostics_stay_minimal() -> None:
     """Period sensors should expose calculation facts, not redundant contracts."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     # Period sensors expose only compact diagnostic facts. JSON-stringified
     # duplicates and cloud-shape heuristics belong in diagnostics /
@@ -526,10 +528,8 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
     """Diagnostics must not expose device IDs or serials as raw map keys."""
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
-    assert (
-        'devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)'
-        in source
-    )
+    assert 'devices = _redacted_payload_map(' in source
+    assert 'for device_id, payload in (coordinator.data or {}).items()' in source
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
@@ -708,10 +708,13 @@ def test_ble_transport_numeric_options_use_shared_integer_parser() -> None:
 
 def test_sensor_division_transform_uses_safe_float_parser() -> None:
     """Scaled sensor transforms must not expose NaN/Infinity as native values."""
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     block = source.split("def _div(", 1)[1].split("\n\ndef _signed_diff", 1)[0]
 
-    assert "except (TypeError, ValueError):" in block
+    assert (
+        "except (TypeError, ValueError):" in block
+        or "except TypeError, ValueError:" in block
+    )
     assert "return None" in block
     assert "return round(float(value) / divisor, 2)" in block
     assert "parsed = safe_float(value)" not in block
@@ -719,7 +722,7 @@ def test_sensor_division_transform_uses_safe_float_parser() -> None:
 
 def test_ble_transport_sensor_attributes_do_not_expose_raw_payloads() -> None:
     """BLE status entity attributes must keep debug-only data out of recorder."""
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     cls = source.split("class JackeryBleTransportSensor", 1)[1].split(
         "class JackeryWeatherPlanSensor",
         1,
@@ -737,9 +740,13 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
     """Subdevice entity attributes should avoid serial numbers and IP-like IDs."""
     sensitive_fields = ("FIELD_DEVICE_SN", "FIELD_DEV_SN", "FIELD_SN", "FIELD_WIP")
 
-    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(
+        encoding="utf-8"
+    )
     switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
 
     blocks = [
@@ -850,7 +857,7 @@ def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) ->
 
 def test_raw_properties_sensor_redacts_state_attributes() -> None:
     """Raw-properties sensor attributes can enter Recorder and must be redacted."""
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     cls = source.split("class JackeryRawPropertiesSensor", 1)[1].split(
         "class JackeryBleTransportSensor",
         1,
@@ -906,7 +913,7 @@ def test_entity_platforms_use_shared_unique_id_append_helper() -> None:
         "button.py",
         "number.py",
         "select.py",
-        "sensor.py",
+        "sensors/base.py",
         "switch.py",
         "text.py",
     }
@@ -947,7 +954,9 @@ def test_unique_id_contract_is_documented_and_followed() -> None:
 
 def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
     """Battery-pack entities must not use serial/name fields for unique_id."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     assert 'f"battery_pack_{pack_index}_{description.key}"' in sensor_source
     pack_class = sensor_source.split(
         "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
@@ -964,8 +973,12 @@ def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
 
 def test_smart_plug_unique_ids_keep_stable_index_suffix() -> None:
     """Smart-plug entities keep names and serials out of unique IDs."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
-    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(
+        encoding="utf-8"
+    )
     switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
 
     assert 'f"{plug_key}_{description.key}"' in sensor_source
@@ -983,7 +996,9 @@ def test_smart_plug_unique_ids_keep_stable_index_suffix() -> None:
 
 def test_meter_head_unique_ids_keep_stable_index_suffix() -> None:
     """Meter-head entities keep names and serials out of unique IDs."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
 
     assert 'f"{meter_head_key}_{description.key}"' in sensor_source
     meter_head_class = sensor_source.split(
@@ -1219,6 +1234,9 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
     """Implement test data quality diagnostics include request context keys."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    data_quality_source = (CUSTOM_COMPONENT / "stats" / "data_quality.py").read_text(
+        encoding="utf-8"
+    )
 
     for key in (
         "DATA_QUALITY_KEY_SOURCE_REQUEST",
@@ -1227,11 +1245,14 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
         "DATA_QUALITY_KEY_TOTAL_METHOD",
     ):
         assert key in const_source
-        assert key in util_source
+        assert key in util_source or key in data_quality_source
     assert "DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY" in const_source
-    assert "def _format_request_range" in util_source
-    assert "source_request=_request_for_section(source_section)" in util_source
-    assert "reference_request=_request_for_section(reference_section)" in util_source
+    assert "def _format_request_range" in data_quality_source
+    assert "source_request=_request_for_section(source_section)" in data_quality_source
+    assert (
+        "reference_request=_request_for_section(reference_section)"
+        in data_quality_source
+    )
 
 
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
@@ -2465,7 +2486,9 @@ def test_component_modules_import_all_referenced_util_helpers() -> None:
 
 def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> None:
     """Calculated live-difference power sensors should not create LTS unit metadata."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     for class_name in (
         "JackeryBatteryNetPowerSensor",
         "JackeryBatteryStackNetPowerSensor",
@@ -2482,7 +2505,9 @@ def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> No
 
 def test_smart_meter_entities_cache_state_before_ha_state_write() -> None:
     """Smart-meter sensors must not recompute values during every HA state read."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     block = sensor_source.split(
         "class JackerySmartMeterSensor(JackeryEntity, SensorEntity):",
         1,
@@ -2517,7 +2542,9 @@ def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
 
 def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> None:
     """Battery-pack diagnostics should not expose the same raw key twice."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     block = sensor_source.split(
         "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
         1,
@@ -2528,7 +2555,9 @@ def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> Non
 
 def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     """Pack firmware/update diagnostics must read the OTA-enriched fields."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     block = sensor_source.split(
         "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
         1,
@@ -2551,7 +2580,9 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
 
 def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
     """Repairs diagnose contradictions; entity states keep their documented source."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     stat_block = sensor_source.split(
         "class JackeryStatSensor(JackeryEntity, SensorEntity):",
         1,
@@ -2725,7 +2756,9 @@ def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
 
 def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
-    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
+        encoding="utf-8"
+    )
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
         "# ---------------------------------------------------------------------------\n# Entities",
         1,
@@ -3146,7 +3179,7 @@ def test_stale_period_guard_publishes_none_for_all_periods() -> None:
     None`` carve-out reintroduced the midnight delta spike the
     three-part fix was designed to prevent.
     """
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     assert "raw = 0 if self._reset_period == DATE_TYPE_DAY" not in source
     assert "raw = 0 if self._reset_period" not in source
 
@@ -3159,13 +3192,13 @@ def test_total_revenue_uses_total_increasing_without_monetary_class() -> None:
     CHANGELOG fix that uses ``TOTAL_INCREASING`` so the Recorder treats the
     midnight cloud transient as a reset rather than a real loss.
     """
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     block = re.search(
         r'key="total_revenue",.*?\),',
         source,
         re.DOTALL,
     )
-    assert block is not None, "total_revenue description not found in sensor.py"
+    assert block is not None, "total_revenue description not found in sensors/base.py"
     body = block.group(0)
     assert "SensorStateClass.TOTAL_INCREASING" in body, (
         "total_revenue must use SensorStateClass.TOTAL_INCREASING per CHANGELOG "
@@ -3185,7 +3218,7 @@ def test_no_entity_layer_cross_period_repair() -> None:
     pattern that papered over the stale-period guard regression at the
     wrong layer.
     """
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     assert "_clamp_backwards_period_value" not in source
     assert "_last_published_value" not in source
     assert "_last_published_anchor" not in source
@@ -3262,7 +3295,7 @@ def test_listener_gate_is_present_in_all_entity_platforms() -> None:
     because each entity registers its own CoordinatorEntity listener.
     """
     platforms = (
-        "sensor.py",
+        "sensors/base.py",
         "binary_sensor.py",
         "button.py",
         "number.py",
@@ -3365,7 +3398,7 @@ def test_battery_pack_lifetime_entities_exist() -> None:
     kWh after the ``_div(1000)`` Wh-int transform) and
     ``entity_registry_enabled_default=False`` (BLE transport is opt-in).
     """
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     assert 'translation_key="battery_pack_lifetime_charge_energy"' in source
     assert 'translation_key="battery_pack_lifetime_discharge_energy"' in source
     assert "field=FIELD_IN_EGY" in source
@@ -3394,7 +3427,7 @@ def test_battery_pack_lifetime_entities_exist() -> None:
 
 def test_battery_pack_setup_honors_description_enabled_default() -> None:
     """Pack sensor creation must preserve per-description default enablement."""
-    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(encoding="utf-8")
     block = source.split("for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:", 1)[
         1
     ].split("# Smart plugs", 1)[0]
@@ -3425,3 +3458,140 @@ def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
     assert '"unrouted_frames_by_cmd"' in coord, (
         "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
     )
+
+
+def _pv_quality_payload(
+    *,
+    day: float = 1.0,
+    week: float = 2.0,
+    month: float = 3.0,
+    year: float = 4.0,
+    lifetime: float = 5.0,
+) -> dict[str, object]:
+    return {
+        "device_pv_stat_day": {"totalSolarEnergy": day},
+        "device_pv_stat_week": {"unit": "kwh", "y": [week]},
+        "device_pv_stat_month": {"unit": "kwh", "y": [month]},
+        "device_pv_stat_year": {"unit": "kwh", "y": [year]},
+        "statistic": {"totalGeneration": lifetime},
+    }
+
+
+def test_data_quality_warns_when_year_is_less_than_month() -> None:
+    """Current-year totals cannot be lower than the current month total."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(month=12.0, year=9.0, lifetime=99.0),
+            today=util.date(2026, 6, 14),
+        )
+    ]
+
+    assert any(warning["reason"] == "year_less_than_month" for warning in warnings)
+
+
+def test_data_quality_allows_valid_month_boundary_week_exception() -> None:
+    """A week spanning two months may be greater than the new month bucket."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(week=12.0, month=2.0, year=99.0, lifetime=100.0),
+            today=util.date(2026, 5, 1),
+        )
+    ]
+
+    assert not any(warning["reason"] == "month_less_than_week" for warning in warnings)
+
+
+def test_data_quality_allows_valid_year_boundary_week_exception() -> None:
+    """A week spanning two years may be greater than the new year bucket."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(week=12.0, month=20.0, year=2.0, lifetime=100.0),
+            today=util.date(2027, 1, 1),
+        )
+    ]
+
+    assert not any(warning["reason"] == "year_less_than_week" for warning in warnings)
+
+
+def test_data_quality_warns_when_lifetime_is_less_than_current_year_pv() -> None:
+    """Lifetime PV generation must not be lower than current-year PV generation."""
+    warnings = [
+        warning.as_dict()
+        for warning in util.app_data_quality_warnings(
+            _pv_quality_payload(year=42.0, lifetime=12.0),
+            today=util.date(2026, 6, 14),
+        )
+    ]
+
+    assert any(warning["reason"] == "lifetime_less_than_year" for warning in warnings)
+
+
+def test_data_quality_repair_warnings_are_sorted_and_deduplicated() -> None:
+    """Repair placeholders must be stable across dict/list ordering noise."""
+    warning_b = util.AppDataQualityWarning(
+        "warning", "year_less_than_month", "b", "B", "s", 1.0, "r", 2.0
+    ).as_dict()
+    warning_a = util.AppDataQualityWarning(
+        "warning", "lifetime_less_than_year", "a", "A", "s", 1.0, "r", 2.0
+    ).as_dict()
+
+    assert util.normalized_data_quality_warnings([warning_b, warning_a, warning_b]) == [
+        warning_a,
+        warning_b,
+    ]
+
+
+def test_data_quality_repair_text_redacts_sensitive_context() -> None:
+    """Repair text must not copy serials, device IDs, tokens, GPS, or MQTT secrets."""
+    warning = util.AppDataQualityWarning(
+        level="warning",
+        reason="year_less_than_month",
+        metric_key="pv_energy",
+        label="PV energy",
+        source_section="device_pv_stat_year",
+        source_value=1.0,
+        reference_section="device_pv_stat_month",
+        reference_value=2.0,
+        source_request={
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+            "sn": "SN-SECRET-123",
+            "deviceId": "DEV-SECRET-456",
+            "token": "TOKEN-SECRET-789",
+            "latitude": 52.52,
+            "longitude": 13.405,
+            "mqtt_username": "mqtt-user-secret",
+            "mqtt_password": "mqtt-pass-secret",
+        },
+    ).as_dict()
+
+    text = util.format_data_quality_warning(warning)
+
+    for secret in (
+        "SN-SECRET-123",
+        "DEV-SECRET-456",
+        "TOKEN-SECRET-789",
+        "52.52",
+        "13.405",
+        "mqtt-user-secret",
+        "mqtt-pass-secret",
+    ):
+        assert secret not in text
+
+
+def test_data_quality_details_are_exported_only_in_redacted_diagnostics_block() -> None:
+    """Full device data_quality details belong under raw_api.data_quality only."""
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        '"data_quality": async_redact_data(data_quality, redact_keys)'
+        in diagnostics_source
+    )
+    assert 'if key != "data_quality"' in diagnostics_source
+    assert 'payload.get("data_quality", [])' in diagnostics_source

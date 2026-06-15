@@ -43,7 +43,7 @@ The refactor must therefore follow this order:
 | **4** | BLE (GATT) | FALLBACK — commands + live data | ✅ | ✅ |
 | **5** | MQTT (Cloud + Local) | DATA SOURCE + CMD TRANSPORT | ✅ | ✅ |
 
-### 1.2 HTTP API — 112 Endpoints (57% implemented)
+### 1.2 HTTP API — historical snapshot (superseded)
 
 | Category | Endpoints | Implemented | Module |
 |----------|:---------:|:-----------:|--------|
@@ -544,7 +544,7 @@ Phase 1: models/property_merge.py                       │
 | MQTT handlers (1462–2606) | `jackery_complete_reference.json` msgTypes | 25 message types with actionId mapping |
 | Statistics (6004–7424) | `Jackery_2.1.1_Stats_und_Trends.md` | 17 device + 5 system stat endpoints, energy flow objects |
 | Third-party bridge (5331–6003) | `Jackery_2.1.1_RE_Supplement.md` §5 | ThirdPartyMqttBody, cmd=113/114, Layer C encrypted |
-| HTTP endpoints (7425–8832) | `jackery_http_api_endpoints_v2.html` | 112 endpoints, 64 implemented |
+| HTTP endpoints (7425–8832) | `jackery_http_api_endpoints_v2.html` | Historical row; see `docs/REFERENCE_COVERAGE.md` for current counts |
 | BLE transport (1462–2606) | `Jackery_2.1.1_RE_Documentation.md` §4 | BLE cmd routing, Layer C encryption |
 | Crypto layers | `Jackery_2.1.1_RE_Crypto_and_DTOs.md` | Layer A (login), B (MQTT auth), C (payload) |
 
@@ -572,7 +572,7 @@ Phase 1: models/property_merge.py                       │
 3. **Diagnostics section** — move to `diagnostics.py` or keep thin wrapper in coordinator
 4. **`_raise_config_entry_auth_failed`** — keep in coordinator or move to `util.py`
 5. **Translation keys** — validate `strings.json` consistency after refactoring
-6. **OTA endpoints** (3 endpoints) — not yet implemented; add to `client/_endpoints/ota.py` when needed
+6. **Reference coverage** — current endpoint and command counts are enforced by `python -m scripts.check_reference_coverage`
 7. **Portable commands** (41 cmds) — intentionally excluded (SolarVault home only); document in `const.py`
 
 ---
