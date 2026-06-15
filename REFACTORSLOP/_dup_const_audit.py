@@ -15,7 +15,7 @@ def literal_repr(node: ast.AST) -> str | None:
     """Best-effort stable repr of a literal/simple constant value, else None."""
     try:
         return repr(ast.literal_eval(node))
-    except ValueError, TypeError, SyntaxError:
+    except (ValueError, TypeError, SyntaxError):
         # Non-literal (expression / name reference) — represent by source-ish unparse.
         try:
             return f"<expr:{ast.unparse(node)}>"
@@ -28,7 +28,7 @@ def collect(path: Path) -> dict[str, str | None]:
     out: dict[str, str | None] = {}
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-    except SyntaxError, UnicodeDecodeError:
+    except (SyntaxError, UnicodeDecodeError):
         return out
 
     def is_const_name(name: str) -> bool:

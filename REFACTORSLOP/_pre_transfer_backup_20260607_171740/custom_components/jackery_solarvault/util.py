@@ -204,7 +204,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -512,7 +512,7 @@ def safe_float(  # noqa: PLR0911
             return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -543,7 +543,7 @@ def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at r
             return None
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -802,7 +802,7 @@ def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
