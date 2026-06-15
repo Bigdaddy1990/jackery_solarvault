@@ -183,9 +183,13 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
         )
 
 
-@pytest.mark.parametrize("company_id", ["7.0", 7.0])
+@pytest.mark.parametrize(
+    ["company_id", "expected_company_id"],
+    [["7.0", 7], [7.0, 7], [9007199254740993, 9007199254740993]],
+)
 async def test_dynamic_tariff_writer_accepts_integral_company_id_values(
-    company_id: str | float,
+    company_id: str | float | int,
+    expected_company_id: int,
 ) -> None:
     """API writer should accept app-style integral values without truncation."""
     api = JackeryApi.__new__(JackeryApi)
@@ -210,7 +214,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_values(
             SAVE_DYNAMIC_MODE_PATH,
             {
                 FIELD_SYSTEM_ID: "sys1",
-                FIELD_PLATFORM_COMPANY_ID: 7,
+                FIELD_PLATFORM_COMPANY_ID: expected_company_id,
                 FIELD_SYSTEM_REGION: "DE",
             },
         ),

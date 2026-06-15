@@ -1,5 +1,6 @@
 """Energy price, tariff, and dynamic-pricing endpoint mixins."""
 
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from ...const import (
@@ -134,7 +135,7 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
         self,
         *,
         system_id: str | int,
-        platform_company_id: float | str,
+        platform_company_id: int | float | str,
         system_region: str,
     ) -> bool:
         """Enable or update dynamic pricing mode for a system.
@@ -155,18 +156,19 @@ class EnergyPriceEndpointMixin(BaseHTTPMixin):
                 "platform_company_id must be an integer"
             )
         try:
-            company_id_float = float(platform_company_id)
-        except TypeError as err:
+            company_id_decimal = Decimal(str(platform_company_id).strip())
+        except InvalidOperation as err:
             raise JackeryApiError(  # noqa: TRY003
                 "platform_company_id must be an integer"
             ) from err
-        except ValueError as err:
+        if (
+            not company_id_decimal.is_finite()
+            or company_id_decimal != company_id_decimal.to_integral_value()
+        ):
             raise JackeryApiError(  # noqa: TRY003
                 "platform_company_id must be an integer"
-            ) from err
-        if not company_id_float.is_integer():
-            raise JackeryApiError("platform_company_id must be an integer")  # noqa: TRY003
-        company_id = int(company_id_float)
+            )
+        company_id = int(company_id_decimal)
         region = str(system_region or "").strip()
         if not region:
             raise JackeryApiError("system_region must be a non-empty string")  # noqa: TRY003
