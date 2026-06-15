@@ -740,9 +740,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
     """Subdevice entity attributes should avoid serial numbers and IP-like IDs."""
     sensitive_fields = ("FIELD_DEVICE_SN", "FIELD_DEV_SN", "FIELD_SN", "FIELD_WIP")
 
-    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(
-        encoding="utf-8"
-    )
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
     switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
     sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
         encoding="utf-8"
@@ -976,9 +974,7 @@ def test_smart_plug_unique_ids_keep_stable_index_suffix() -> None:
     sensor_source = (CUSTOM_COMPONENT / "sensors" / "base.py").read_text(
         encoding="utf-8"
     )
-    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(
-        encoding="utf-8"
-    )
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
     switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
 
     assert 'f"{plug_key}_{description.key}"' in sensor_source
