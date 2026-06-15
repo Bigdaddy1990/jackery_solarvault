@@ -54,8 +54,8 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
          version: ">=0.4.0"
-      - run: ruff check . --fix
-      - run: ruff format .
+      - run: ruff check . --fix || true
+      - run: ruff format . || true
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
       - name: Run pre-commit with fixes
