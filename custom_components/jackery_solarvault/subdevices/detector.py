@@ -13,22 +13,22 @@ from typing import TYPE_CHECKING, Any
 from ..const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
-    FIELD_BATTERIES,
-    FIELD_BATTERY_PACK,
-    FIELD_BATTERY_PACKS,
-    FIELD_BATTERY_PACK_LIST,
     FIELD_BAT_NUM,
     FIELD_BAT_SOC,
+    FIELD_BATTERIES,
+    FIELD_BATTERY_PACK,
+    FIELD_BATTERY_PACK_LIST,
+    FIELD_BATTERY_PACKS,
     FIELD_BIND_ID,
     FIELD_BODY,
+    FIELD_DEV_ID,
+    FIELD_DEV_SN,
+    FIELD_DEV_TYPE,
     FIELD_DEVICE_CODE,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_TYPE,
-    FIELD_DEV_ID,
-    FIELD_DEV_SN,
-    FIELD_DEV_TYPE,
     FIELD_ID,
     FIELD_IN_EGY,
     FIELD_IN_PW,
@@ -396,7 +396,7 @@ def battery_packs_need_query(payload: dict[str, Any]) -> bool:
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     try:
         expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         expected = 0
     packs = payload.get(PAYLOAD_BATTERY_PACKS)
     if not isinstance(packs, list):

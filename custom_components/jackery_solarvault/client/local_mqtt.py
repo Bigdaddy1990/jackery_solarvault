@@ -34,7 +34,6 @@ from ..const import (  # noqa: RUF100, TID252
 
 if TYPE_CHECKING:
     from aiomqtt import Client as MQTTClient
-
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -369,7 +368,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
