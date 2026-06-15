@@ -1,6 +1,6 @@
 """Tests for REFACTORSLOP/_loss_audit.py.
 
-These scripts were added in this PR as new files.  The functions under test
+These scripts were covered by this integration as new files.  The functions under test
 are:
   * SymbolInfo / ModuleInfo  – dataclasses
   * _count_stmts             – statement counter for an AST node

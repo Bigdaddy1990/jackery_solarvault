@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 MQTT_PUSH_PATH = (
     ROOT / "custom_components" / "jackery_solarvault" / "client" / "mqtt_push.py"

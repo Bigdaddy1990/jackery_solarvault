@@ -1,6 +1,6 @@
 """Unit tests for custom_components.jackery_solarvault.client.local_mqtt.
 
-This is a new module introduced in this PR. Tests exercise:
+This is a new module covered by this integration. Tests exercise:
 - JackeryLocalMqttClient construction (initial state)
 - _extract_mqtt_code: numeric return-code extraction from MqttCodeError
 - _handle_connect_failure: records rc + reason in last_error

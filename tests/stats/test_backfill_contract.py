@@ -9,7 +9,7 @@ import ast
 from pathlib import Path
 import re
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SENSOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "sensor.py"
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 INIT_PATH = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
@@ -576,7 +576,7 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
     only when fresh data has actually arrived.
     """
     sensor_source = (
-        Path(__file__).resolve().parents[1]
+        Path(__file__).resolve().parents[2]
         / "custom_components"
         / "jackery_solarvault"
         / "sensor.py"
@@ -599,7 +599,7 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
     of going unknown after midnight.
     """
     sensor_source = (
-        Path(__file__).resolve().parents[1]
+        Path(__file__).resolve().parents[2]
         / "custom_components"
         / "jackery_solarvault"
         / "sensor.py"

@@ -1,4 +1,4 @@
-"""Tests for annotatedyaml/_vendor/yaml changes introduced in this PR.
+"""Tests for annotatedyaml/_vendor/yaml changes covered by this integration.
 
 Covers:
 - warnings() stub function behavior
