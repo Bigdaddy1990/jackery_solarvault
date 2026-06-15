@@ -42,8 +42,8 @@ def _aes_cbc_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
     return decryptor.update(ciphertext) + decryptor.finalize()
 
 
-def test_layer_a_login_crypto_is_deterministic_with_injected_aes_key() -> None:
-    """Injected Layer A AES key gives a stable app-compatible golden vector."""
+def test_layer_a_login_crypto_matches_app_fixed_vector() -> None:
+    """Fixed Layer A seed gives a stable app-compatible golden vector."""
     login_bean = {
         FIELD_ACCOUNT: "user@example.invalid",
         FIELD_LOGIN_TYPE: 2,
@@ -51,15 +51,16 @@ def test_layer_a_login_crypto_is_deterministic_with_injected_aes_key() -> None:
         FIELD_PASSWORD: "secret",
         FIELD_REGISTER_APP_ID: REGISTER_APP_ID,
     }
-    aes_key = bytes.fromhex("00112233445566778899aabbccddeeff")
+    seed = b"1234567890123456"
+    aes_key = base64.b64encode(seed)
 
-    fields = build_login_crypto_fields(login_bean, aes_key=aes_key)
+    fields = build_login_crypto_fields(login_bean, random_source=lambda length: seed)
 
     expected = (
-        "gn7DAwauZySran/8kvCKZK4OI495mQai/3gEbU4vl665AG8U/WOLVu0o"
-        "YrzAHXrP5I6en1LM+ZeXn56ueg7kdrUO3JP85DQHtgdXQBNm9eoe0xsts"
-        "Zdzu09MD48ZiA4NNb1GGOvEcN6Ntv69ViVOkWiX/6dduMttpdky/xgM77"
-        "UVWYFEKx3Oz+Yt0XJ/sbUIEX7G9q1bfcd/j1KN+duTeg=="
+        "U6SuPAHg9+6MpQAmpIs6xdTV9p/TRKvSZkpjmLTebeoG3AtALBVAIqOxIzs+jV92"
+        "TR8k/T7IKyZ6UANnTf4Brb6/vnQ2/T/kSsz1lZhqpbXCN2KWbWEwF+P0jMzobkgW"
+        "/ZpRrelbQDPFvXwSvRSVuq0VDtRXdQe/fXnowEZjUyWCLX+ZSNXoCdzJNCsDtWYe"
+        "1+yG1kbsxi4p49b+bdq49g=="
     )
     assert fields["aesEncryptData"] == expected
     plaintext = _pkcs7_unpad(
@@ -67,6 +68,9 @@ def test_layer_a_login_crypto_is_deterministic_with_injected_aes_key() -> None:
     )
     assert json.loads(plaintext.decode("utf-8")) == login_bean
     assert base64.b64decode(fields["rsaForAesKey"])
+
+    injected_fields = build_login_crypto_fields(login_bean, aes_key=aes_key)
+    assert injected_fields["aesEncryptData"] == expected
 
 
 def test_layer_a_login_key_uses_injectable_random_source() -> None:
@@ -77,7 +81,7 @@ def test_layer_a_login_key_uses_injectable_random_source() -> None:
         calls.append(length)
         return bytes(range(length))
 
-    assert generate_login_aes_key(fake_random) == bytes(range(16))
+    assert generate_login_aes_key(fake_random) == base64.b64encode(bytes(range(16)))
     assert calls == [16]
 
 
@@ -88,6 +92,7 @@ def test_layer_a_login_runtime_code_does_not_use_static_const_aes_key() -> None:
     ).read_text(encoding="utf-8")
 
     assert "AES_KEY" not in auth_source
+    assert "1234567890123456" not in auth_source
     assert "build_login_crypto_fields(login_bean)" in auth_source
 
 
