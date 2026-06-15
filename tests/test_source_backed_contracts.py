@@ -1,6 +1,6 @@
 """Contracts pinned directly to files in source-of-truth/."""
 
-# ruff: noqa: E501, PLC2701, PLR2004, PLR6301, RUF012, RUF029, SIM102, SLF001
+# ruff: noqa: PLC2701, PLR2004, PLR6301, RUF012, RUF029, SIM102, SLF001
 
 import ast
 import asyncio
