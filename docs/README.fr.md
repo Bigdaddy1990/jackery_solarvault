@@ -13,7 +13,7 @@ Cette intégration n'est pas un produit officiel Jackery et n'est pas affiliée 
 
 ## Ce que fournit l'intégration
 
-- Détection automatique du système et des appareils via le compte cloud Jackery.
+- Détection des systèmes et appareils basée sur le compte via l'API cloud Jackery, plus déclencheurs locaux Home Assistant déclarés dans le manifeste : Bluetooth (`0000bdee-0000-1000-8000-00805f9b34fb`, fabricant `18434`), DHCP (`solarvault*`/`jackery*` sur MAC `80F1B2*`), découverte MQTT et Zeroconf (`_jackery-solarvault._tcp.local.`).
 - Unité principale, smart meter et batteries d'extension comme appareils Home Assistant séparés.
 - Capteurs de puissance en direct pour la batterie, le PV total, les canaux PV, l'import/export réseau, l'EPS, la puissance de pile et les phases du smart meter.
 - Capteurs d'énergie pour les périodes de l'application Jackery : jour, semaine, mois et année.
