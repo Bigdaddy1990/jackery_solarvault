@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 import shutil
 
-from scripts.check_reference_coverage import check_reference_coverage
+from scripts.check_reference_coverage import (
+    check_reference_coverage,
+    reference_mqtt_message_types,
+    registered_services,
+)
 
 
 def _copy_reference_fixture(tmp_path: Path) -> Path:
@@ -74,6 +78,45 @@ def test_reference_coverage_detects_missing_mqtt_message_type(tmp_path: Path) ->
     assert any("UnimplementedMessageType" in error for error in report.errors)
 
 
+def test_reference_mqtt_message_types_ignore_common_capitalized_words(
+    tmp_path: Path,
+) -> None:
+    """Structured reference JSON only treats strict CamelCase as MQTT types."""
+    root = _copy_reference_fixture(tmp_path)
+    reference_path = root / "docs" / "jackery_complete_reference.json"
+    (root / "docs" / "MQTT_PROTOCOL.md").write_text("", encoding="utf-8")
+    reference_path.write_text(
+        json.dumps({"status": ["Success", "Error", "OK", "BLE", "MQTT", "WiFi"]}),
+        encoding="utf-8",
+    )
+
+    assert reference_mqtt_message_types(root).isdisjoint({
+        "Success",
+        "Error",
+        "OK",
+        "BLE",
+        "MQTT",
+        "WiFi",
+    })
+
+
+def test_registered_services_support_qualified_service_registry_calls(
+    tmp_path: Path,
+) -> None:
+    """Registered services are parsed from hass.services.async_register calls."""
+    root = _copy_reference_fixture(tmp_path)
+
+    assert registered_services(root) == {
+        "delete_storm_alert",
+        "query_third_party_mqtt_config",
+        "refresh_weather_plan",
+        "rename_system",
+        "send_ble_command",
+        "send_device_schedule",
+        "set_third_party_mqtt_config",
+    }
+
+
 def test_reference_coverage_detects_missing_service_translation(tmp_path: Path) -> None:
     """A service in services.yaml must also exist in strings.json."""
     root = _copy_reference_fixture(tmp_path)
@@ -85,6 +128,7 @@ def test_reference_coverage_detects_missing_service_translation(tmp_path: Path) 
     report = check_reference_coverage(root)
 
     assert not report.ok
+    assert len(report.errors) == 1, f"Unexpected errors: {report.errors}"
     assert any("services.yaml and strings.json" in error for error in report.errors)
 
 

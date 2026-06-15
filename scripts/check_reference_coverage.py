@@ -21,10 +21,8 @@ QUALITY_SCALE = DOMAIN_DIR / "quality_scale.yaml"
 MANIFEST = DOMAIN_DIR / "manifest.json"
 
 _HTTP_RE = re.compile(r"/v1/[A-Za-z0-9_./{}:-]+")
-_MQTT_CONSTANT_RE = re.compile(r'^MQTT_MESSAGE_[A-Z0-9_]+:\s*Final\s*=\s*"([^"]+)"', re.M)
 _BACKTICK_RE = re.compile(r"`([A-Z][A-Za-z0-9]+(?:[A-Z][A-Za-z0-9]+)+)`")
-_SERVICE_CONST_RE = re.compile(r'^SERVICE_[A-Z0-9_]+:\s*Final\s*=\s*"([a-z0-9_]+)"', re.M)
-_REGISTER_RE = re.compile(r"async_register\(\s*\n\s*DOMAIN,\s*\n\s*([A-Z0-9_]+|['\"]([^'\"]+)['\"])", re.M)
+_CAMEL_CASE_RE = re.compile(r"^[A-Z][A-Za-z0-9]+(?:[A-Z][A-Za-z0-9]+)+$")
 
 
 @dataclass(frozen=True)
@@ -133,7 +131,7 @@ def reference_mqtt_message_types(root: Path = Path.cwd()) -> set[str]:
     reference_path = root / REFERENCE_JSON
     if reference_path.exists():
         for item in _iter_strings(json.loads(reference_path.read_text(encoding="utf-8"))):
-            if item and item[:1].isupper() and " " not in item:
+            if item and len(item) > 4 and _CAMEL_CASE_RE.match(item):
                 values.add(item)
     doc_path = root / MQTT_DOC
     if doc_path.exists():
@@ -143,23 +141,54 @@ def reference_mqtt_message_types(root: Path = Path.cwd()) -> set[str]:
 
 def implemented_mqtt_message_types(root: Path = Path.cwd()) -> set[str]:
     """Return MQTT messageType values declared for runtime routing."""
-    const_text = (root / DOMAIN_DIR / "const.py").read_text(encoding="utf-8")
-    return set(_MQTT_CONSTANT_RE.findall(const_text))
+    constants = _literal_string_assignments(root / DOMAIN_DIR / "const.py")
+    return {
+        value for name, value in constants.items() if name.startswith("MQTT_MESSAGE_")
+    }
 
 
 def _service_constants(root: Path) -> dict[str, str]:
-    return {f"SERVICE_{name.upper()}": name for name in _SERVICE_CONST_RE.findall((root / DOMAIN_DIR / "const.py").read_text(encoding="utf-8"))}
+    constants = _literal_string_assignments(root / DOMAIN_DIR / "const.py")
+    return {
+        name: value for name, value in constants.items() if name.startswith("SERVICE_")
+    }
+
+
+def _registered_service_name(node: ast.expr, constants: dict[str, str]) -> str | None:
+    """Return a service name from an async_register argument."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id, node.id)
+    return None
 
 
 def registered_services(root: Path = Path.cwd()) -> set[str]:
     """Return services registered in services.py."""
     constants = _service_constants(root)
     found: set[str] = set()
-    for const_name, literal in _REGISTER_RE.findall((root / SERVICES_PY).read_text(encoding="utf-8")):
-        if literal:
-            found.add(literal)
+    path = root / SERVICES_PY
+    if not path.exists():
+        return found
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or len(node.args) < 2:
+            continue
+        func = node.func
+        if isinstance(func, ast.Name):
+            is_register = func.id == "async_register"
+        elif isinstance(func, ast.Attribute):
+            is_register = func.attr == "async_register"
         else:
-            found.add(constants.get(const_name, const_name))
+            is_register = False
+        if not is_register:
+            continue
+        domain_arg = node.args[0]
+        if not (isinstance(domain_arg, ast.Name) and domain_arg.id == "DOMAIN"):
+            continue
+        service_name = _registered_service_name(node.args[1], constants)
+        if service_name is not None:
+            found.add(service_name)
     return found
 
 
