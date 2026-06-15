@@ -352,7 +352,7 @@ For every pull request, reviewers and bots must enforce this minimum quality bar
 
 ### **1.0 Always strict follow Home Assistant Best Practices**
 ## /docs/ha_custom_config_and_best_practices.json
-## /source-of-truth/jackery_complete_reference.json
+## /docs/jackery_complete_reference.json
 
 ### **1.1 Data Integrity First**
 - **Only verified data** may enter the Home Assistant Recorder.
@@ -571,11 +571,11 @@ fehlenden msg_id liegen in `docs/REFERENCE_COVERAGE.md`. Hoch-Level-Übersicht:
 
 | Oberfläche               | Referenz | Implementiert | %      | Status |
 |--------------------------|----------|---------------|--------|--------|
-| HTTP-Endpoints           | 112      | 64            | 57 %  | partial |
-| MQTT-Msg-Types (home)    | 25       | 28            | 100 %  | ok (all constants defined + routed) |
+| HTTP-Endpoints           | 112      | 108           | 96 %  | ok (3 mobile-app-only intentionally skipped; 111/112 covered incl. exemptions) |
+| MQTT-Msg-Types (home)    | 25       | 28            | 100 % | ok (reference types plus implementation aliases/constants) |
 | MQTT-Msg-Types (portable)| n/a      | n/a           | n/a    | nicht anwendbar (MQTT = home only) |
 | Commands (home)          | 47       | 47            | 100 %  | ok |
-| Commands (portable)      | 41       | 0             | 0 %    | intentional (SolarVault home only) |
+| Commands (portable)      | 41       | 50            | 100 % | ok (41 reference commands plus implementation-specific portable action mappings) |
 | Device-Modelle           | runtime  | runtime       | n/a    | ok (`/v1/device/system/list`) |
 | PortableBody entities    | ~77      | 38            | 49 %  | partial (AC/DC/USB/temp/power/config) |
 | Accessories              | 14       | 14            | 100 %  | ok |
