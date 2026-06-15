@@ -89,11 +89,11 @@ def test_module_info_parse_error_is_stored() -> None:
 
 
 def test_count_stmts_single_pass() -> None:
-    """A function with one pass statement has one statement."""
+    """A one-pass function counts the function node plus pass."""
     src = "def f():\n    pass\n"
     tree = ast.parse(src)
     func = tree.body[0]
-    assert _count_stmts(func) == 1
+    assert _count_stmts(func) == 2
 
 
 def test_count_stmts_multiple_statements() -> None:
@@ -107,8 +107,8 @@ def test_count_stmts_multiple_statements() -> None:
     tree = ast.parse(src)
     func = tree.body[0]
     count = _count_stmts(func)
-    # def body has 3 statements
-    assert count == 3
+    # function node + 3 body statements
+    assert count == 4
 
 
 def test_count_stmts_nested_function() -> None:
@@ -124,8 +124,8 @@ def test_count_stmts_nested_function() -> None:
     count = _count_stmts(outer)
     # outer has: def inner(...) stmt + return stmt = 2 top-level
     # inner has: return 1 = 1 stmt
-    # total recursive = 3
-    assert count == 3
+    # total recursive plus outer function node = 4
+    assert count == 4
 
 
 def test_count_stmts_if_block() -> None:
@@ -140,8 +140,8 @@ def test_count_stmts_if_block() -> None:
     tree = ast.parse(src)
     func = tree.body[0]
     count = _count_stmts(func)
-    # if stmt, y=1, return y, return 0 = 4
-    assert count == 4
+    # function node, if stmt, y=1, return y, return 0 = 5
+    assert count == 5
 
 
 def test_count_stmts_class_body() -> None:
@@ -155,17 +155,17 @@ def test_count_stmts_class_body() -> None:
     tree = ast.parse(src)
     cls = tree.body[0]
     count = _count_stmts(cls)
-    # annotated assignment + def method + pass = 3
-    assert count == 3
+    # class node + annotated assignment + def method + pass = 4
+    assert count == 4
 
 
 def test_count_stmts_empty_function() -> None:
-    """A function with only a docstring has one statement (the expression)."""
+    """A docstring-only function counts the function node plus Expr."""
     src = 'def f():\n    """Docstring."""\n'
     tree = ast.parse(src)
     func = tree.body[0]
-    # docstring is an Expr statement
-    assert _count_stmts(func) == 1
+    # function node + docstring Expr statement
+    assert _count_stmts(func) == 2
 
 
 def test_count_stmts_returns_int() -> None:
@@ -292,7 +292,7 @@ def test_extract_stmt_count_stored_in_symbol(tmp_path: Path) -> None:
 
     info = extract(py)
 
-    assert info.symbols["f"].stmt_count == 3
+    assert info.symbols["f"].stmt_count == 4
 
 
 def test_extract_lineno_is_function_start(tmp_path: Path) -> None:
