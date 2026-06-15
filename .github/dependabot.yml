@@ -27,6 +27,8 @@ updates:
           - "codecov"
           - "codefactor"
           - "mypy"
+          - "pre-commit"
+          - "ruff"
       security:
         patterns:
           - "bandit"
