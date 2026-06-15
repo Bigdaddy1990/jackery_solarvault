@@ -2567,7 +2567,7 @@ def test_payload_debug_sync_file_io_is_guarded_and_offloaded() -> None:
     assert "append_payload_debug_line" in debug_call
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_payload_debug_line_rejects_direct_event_loop_file_io(tmp_path) -> None:
     """Guard direct async runtime calls before any sync file operation."""
     from custom_components.jackery_solarvault.util import append_payload_debug_line

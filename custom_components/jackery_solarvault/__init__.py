@@ -711,7 +711,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:
         _LOGGER.debug("Jackery setup failed after coordinator creation: %s", err)
         with contextlib.suppress(Exception):
             await coordinator.async_shutdown()

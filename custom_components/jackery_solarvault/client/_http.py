@@ -385,7 +385,7 @@ class BaseHTTPMixin:
         if is_failure and self.auth_rejection_callback is not None:
             try:
                 self.auth_rejection_callback(status, data)
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:
                 _LOGGER.debug("auth_rejection_callback raised: %s", err, exc_info=True)
         return is_failure
 
@@ -425,7 +425,7 @@ class BaseHTTPMixin:
             result = callback(event)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             _LOGGER.debug("Jackery payload debug logging failed: %s", err, exc_info=True)
 
     @staticmethod
