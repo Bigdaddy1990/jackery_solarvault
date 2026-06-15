@@ -393,9 +393,10 @@ SUB_SHADOW_DIY_PATH: Final = "/v1/device/property/subShadow"
 SYSTEM_SHADOW_DIY_PATH: Final = "/v1/device/property/systemShadow"
 
 # Crypto material extracted from the Jackery app (iOS+Android both use these).
-# Layer A login generates a fresh random AES-128 key per login and wraps it
-# with this RSA public key. ``AES_KEY`` is retained only for compatibility with
-# older imports; runtime login code must not use it.
+# Layer A login follows source-of-truth/jackery_auth.py: generate 16 random
+# bytes, Base64-encode them, then AES-ECB the LoginBean with those 24 ASCII
+# bytes and RSA-wrap the same bytes. ``AES_KEY`` is compatibility-only; the
+# app does not require b"1234567890123456" for runtime login.
 AES_KEY: Final = b"1234567890123456"
 RSA_PUBLIC_KEY_B64: Final = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
