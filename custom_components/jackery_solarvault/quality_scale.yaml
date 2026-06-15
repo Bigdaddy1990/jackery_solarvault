@@ -71,12 +71,14 @@ rules:
       diagnostics. Both paths redact sensitive fields and anonymize outer payload
       map keys so device IDs, serials and locations are not exposed.
   discovery-update-info:
-    status: exempt
-    comment: Cloud-polling integration; no LAN discovery applicable.
+    status: done
+    comment: Local discovery surfaces are declared in manifest.json for Bluetooth, DHCP, MQTT and Zeroconf. Their config-flow steps only prefill/route users to authenticated account setup and abort duplicates, because the authoritative device list and live update metadata still come from the Jackery account plus runtime HTTP/MQTT/BLE refreshes.
   discovery:
-    status: exempt
-    comment: Cloud-only — no zeroconf/SSDP/Bluetooth surface.
-  docs-data-update: done
+    status: done
+    comment: manifest.json advertises Bluetooth service UUID 0000bdee-0000-1000-8000-00805f9b34fb with manufacturer 18434, DHCP hostnames solarvault*/jackery* on MAC prefix 80F1B2*, MQTT discovery, and Zeroconf service _jackery-solarvault._tcp.local.; config_flow.py implements async_step_bluetooth, async_step_dhcp, async_step_mqtt and async_step_zeroconf with duplicate-flow protection.
+  docs-data-update:
+    status: done
+    comment: README.md, custom_components/jackery_solarvault/README.md and localized docs/README.*.md document that local discovery triggers setup while account-backed HTTP, Jackery MQTT push, BLE and optional local third-party MQTT provide runtime data according to docs/DATA_SOURCE_PRIORITY.md and docs/APP_POLLING_MQTT.md.
   docs-examples: done
   docs-known-limitations: done
   docs-supported-devices: done
@@ -85,12 +87,7 @@ rules:
   docs-use-cases: done
   dynamic-devices:
     status: done
-    comment: Battery packs are auto-added on first appearance via MQTT/HTTP merge.
-      _drop_stale_battery_packs returns dropped_indices so the coordinator can queue
-      HA device-registry removals; _async_update_data drains the queue every refresh
-      via async_cleanup_pending_device_removals. The HA device registry therefore
-      converges with the coordinator's pack list within one refresh of a permanent
-      removal.
+    comment: Dynamic runtime devices are discovered from account/system metadata and refreshed by HTTP/MQTT/BLE payloads. Main units, smart meters and accessories are added from the cloud/MQTT merge, while battery packs are auto-added on first appearance and stale packs queue HA device-registry removals after BATTERY_PACK_STALE_THRESHOLD_SEC. Discovery manifest triggers do not claim device ownership until the account-backed coordinator confirms the runtime device list.
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default: done

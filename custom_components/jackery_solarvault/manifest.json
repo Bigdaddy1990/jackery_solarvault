@@ -30,6 +30,7 @@
       "macaddress": "80F1B2*"
     }
   ],
+  "mqtt": [],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
