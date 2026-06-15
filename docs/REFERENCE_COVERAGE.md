@@ -18,7 +18,7 @@ Home Assistant integration. Single technical source of truth: `docs/jackery_comp
 | Device-Modelle           | runtime  | runtime       | n/a    | ok (`/v1/device/system/list`) |
 | Accessories              | 15       | 14            | 93 %   | ok (runtime accessory discovery covers supported classes) |
 | Shelly Cloud2Cloud       | 7        | 7             | 100 %  | ok |
-| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (random AES-128 key per login, RSA-wrapped) |
+| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (app-compatible Base64 random key, RSA-wrapped) |
 | Crypto Layer B (signing) | 1        | 1             | 100 %  | ok |
 | Crypto Layer C (MQTT)    | 1        | 1             | 100 %  | ok (AES-128-CBC/PKCS7, key=bluetoothKey) |
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
@@ -429,6 +429,6 @@ handled in the coordinator's `_async_process_mqtt_message` method.
 
 | Layer | Status | Details |
 |-------|--------|---------|
-| A (auth) | ok | Random AES-128 key per login, RSA-wrapped; AES_KEY const is compatibility-only. |
+| A (auth) | ok | App-compatible 16 random bytes → Base64 ASCII AES key per login, RSA-wrapped; AES_KEY const is compatibility-only and `b"1234567890123456"` is not runtime-required/configurable. |
 | B (signing) | ok | RSA-1024 PKCS#1 v1.5 for login AES key wrap |
 | C (MQTT) | ok | AES-128-CBC/PKCS7, key=bluetoothKey, iv=key, Base64 |

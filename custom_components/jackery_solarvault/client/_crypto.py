@@ -1,6 +1,6 @@
 """Cryptographic primitives for the Jackery SolarVault protocol.
 
-AES-128-ECB/RSA-1024 hybrid login encryption (Layer A), AES-128-CBC/PKCS7
+AES-ECB/RSA-1024 hybrid login encryption (Layer A), AES-128-CBC/PKCS7
 MQTT body encryption (Layer C), and deterministic UDID generation.
 """
 
@@ -19,7 +19,8 @@ from cryptography.hazmat.primitives.serialization import load_der_public_key
 
 from ..const import MQTT_MAC_ID_PREFIX, RSA_PUBLIC_KEY_B64  # noqa: TID252
 
-LOGIN_AES_KEY_LEN: Final = 16
+LOGIN_AES_SEED_LEN: Final = 16
+LOGIN_AES_KEY_LEN: Final = 24
 RandomBytesSource = Callable[[int], bytes]
 
 
@@ -87,13 +88,13 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
 
 
 def generate_login_aes_key(random_source: RandomBytesSource = os.urandom) -> bytes:
-    """Return a fresh AES-128 key for one Layer A login request."""
-    key = random_source(LOGIN_AES_KEY_LEN)
-    if len(key) != LOGIN_AES_KEY_LEN:
+    """Return the app-compatible Layer A AES key bytes for one login request."""
+    seed = random_source(LOGIN_AES_SEED_LEN)
+    if len(seed) != LOGIN_AES_SEED_LEN:
         raise ValueError(  # noqa: TRY003
-            f"Layer A login AES key must be 16 bytes, got {len(key)}"
+            f"Layer A login AES seed must be 16 bytes, got {len(seed)}"
         )
-    return key
+    return base64.b64encode(seed)
 
 
 def build_login_crypto_fields(
@@ -104,17 +105,21 @@ def build_login_crypto_fields(
 ) -> dict[str, str]:
     """Build Jackery Layer A login form fields with an injectable AES key.
 
-    Production calls omit ``aes_key`` so each login uses a fresh random AES-128
-    key. Tests may inject ``aes_key`` or ``random_source`` for golden vectors.
+    Production calls omit ``aes_key`` so each login uses the app behavior from
+    ``source-of-truth/jackery_auth.py``: 16 random bytes are Base64-encoded,
+    then those ASCII bytes are used as the AES key and RSA-wrapped. Tests may
+    inject ``aes_key`` or ``random_source`` for golden vectors.
     """
     login_aes_key = (
         aes_key if aes_key is not None else generate_login_aes_key(random_source)
     )
     if len(login_aes_key) != LOGIN_AES_KEY_LEN:
         raise ValueError(  # noqa: TRY003
-            f"Layer A login AES key must be 16 bytes, got {len(login_aes_key)}"
+            f"Layer A login AES key must be 24 bytes, got {len(login_aes_key)}"
         )
-    plaintext = json.dumps(login_bean, ensure_ascii=False).encode("utf-8")
+    plaintext = json.dumps(
+        login_bean, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
     return {
         "aesEncryptData": base64.b64encode(
             _aes_ecb_encrypt(plaintext, login_aes_key)

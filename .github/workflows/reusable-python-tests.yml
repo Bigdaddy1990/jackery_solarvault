@@ -410,94 +410,12 @@ jobs:
 
       - name: Enforce module and total coverage gates
         if: always() && !cancelled() && steps.pytest.outcome == 'success'
-        run: |
-          python - <<'PY'
-          from __future__ import annotations
-
-          from decimal import Decimal, InvalidOperation
-          from pathlib import Path
-          import sys
-          import xml.etree.ElementTree as ET
-
-          critical_modules = frozenset({
-              "custom_components/jackery_solarvault/__init__.py",
-              "custom_components/jackery_solarvault/coordinator.py",
-              "custom_components/jackery_solarvault/sensor.py",
-              "custom_components/jackery_solarvault/util.py",
-              "custom_components/jackery_solarvault/client/api.py",
-              "custom_components/jackery_solarvault/client/mqtt_push.py",
-              "custom_components/jackery_solarvault/client/ble_transport.py",
-          })
-
-          def decimal_percent(raw: str, *, label: str) -> Decimal:
-              try:
-                  value = Decimal(raw)
-              except InvalidOperation as err:
-                  raise ValueError(f"invalid {label}: {raw!r}") from err
-              if value < 0 or value > 100:
-                  raise ValueError(f"{label} must be between 0 and 100: {raw!r}")
-              return value
-
-          def rate_to_percent(raw: str | None, *, label: str) -> Decimal:
-              if raw is None:
-                  raise ValueError(f"coverage XML missing {label} line-rate")
-              try:
-                  rate = Decimal(raw)
-              except InvalidOperation as err:
-                  raise ValueError(f"invalid {label} line-rate: {raw!r}") from err
-              return rate * Decimal(100)
-
-          def normalized_filename(raw: str | None) -> str | None:
-              if not raw:
-                  return None
-              return raw.replace("\\", "/").lstrip("./")
-
-          coverage_xml = Path(r"${{ env.COVERAGE_XML }}")
-          if not coverage_xml.is_file():
-              raise SystemExit(f"coverage xml not found: {coverage_xml}")
-          root = ET.parse(coverage_xml).getroot()
-          total = rate_to_percent(root.get("line-rate"), label="total")
-          total_minimum = decimal_percent(
-              r"${{ env.COVERAGE_MIN }}",
-              label="total minimum percent",
-          )
-          critical_minimum = decimal_percent(
-              r"${{ env.CRITICAL_MODULE_COVERAGE_MIN }}",
-              label="critical module minimum percent",
-          )
-          failures: list[str] = []
-          if total < total_minimum:
-              failures.append(f"total coverage {total:.2f}% < {total_minimum:.2f}%")
-
-          rates: dict[str, Decimal] = {}
-          for class_node in root.findall('.//class'):
-              filename = normalized_filename(class_node.get('filename'))
-              if filename is None:
-                  continue
-              rates[filename] = rate_to_percent(
-                  class_node.get('line-rate'),
-                  label=filename,
-              )
-
-          for module in sorted(critical_modules):
-              coverage = rates.get(module)
-              if coverage is None:
-                  failures.append(f"critical module missing from coverage XML: {module}")
-              elif coverage < critical_minimum:
-                  failures.append(
-                      f"{module} coverage {coverage:.2f}% < {critical_minimum:.2f}%"
-                  )
-
-          if failures:
-              print("\n".join(failures), file=sys.stderr)
-              raise SystemExit(1)
-
-          print(
-              "coverage gates passed: "
-              f"total={total:.2f}% >= {total_minimum:.2f}%, "
-              f"critical_modules>={critical_minimum:.2f}%"
-          )
-          PY
+        run: >-
+          python -m scripts.enforce_coverage_gates
+          --coverage-xml "${{ env.COVERAGE_XML }}"
+          --total-minimum "${{ env.COVERAGE_MIN }}"
+          --legacy-module-minimum "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
+          --perfect-module-minimum "100"
       - name: Enforce pytest and coverage gates
         if: always() && !cancelled()
         env:
