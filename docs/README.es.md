@@ -13,7 +13,7 @@ Esta integración no es un producto oficial de Jackery y no está afiliada a Jac
 
 ## Qué proporciona
 
-- Detección automática del sistema y de dispositivos mediante la cuenta de la nube de Jackery.
+- Detección de sistemas y dispositivos basada en la cuenta mediante la API cloud de Jackery, además de disparadores locales de Home Assistant declarados en el manifiesto: Bluetooth (`0000bdee-0000-1000-8000-00805f9b34fb`, fabricante `18434`), DHCP (`solarvault*`/`jackery*` en MAC `80F1B2*`), descubrimiento MQTT y Zeroconf (`_jackery-solarvault._tcp.local.`).
 - Unidad principal, smart meter y baterías de expansión como dispositivos separados de Home Assistant.
 - Sensores de potencia en directo para batería, PV total, canales PV, importación/exportación de red, EPS, potencia de pila y fases del smart meter.
 - Sensores de energía para periodos de la app de Jackery: día, semana, mes y año.
