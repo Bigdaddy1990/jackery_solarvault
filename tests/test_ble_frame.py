@@ -14,9 +14,9 @@ import pytest
 from custom_components.jackery_solarvault.client.ble import (
     BLE_AES_IV_LEN,
     BLE_AES_KEY_LEN,
-    BLE_AES_KEY_LENGTHS,
     BLE_AES_KEY_LEN_AES128,
     BLE_AES_KEY_LEN_AES256,
+    BLE_AES_KEY_LENGTHS,
     BLE_FRAME_MAGIC,
     BLE_FRAME_PAYLOAD_MARKER,
     BLE_FRAME_VERSION,
@@ -1418,8 +1418,9 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    from custom_components.jackery_solarvault import services
     from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.jackery_solarvault import services
 
     assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # noqa: SLF001
     assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # noqa: SLF001

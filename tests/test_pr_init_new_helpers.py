@@ -725,11 +725,12 @@ class TestAsyncAuthenticateApiLayer:
         self,
     ) -> None:
         """JackeryAuthError from async_login must be re-raised as ConfigEntryAuthFailed."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
         from custom_components.jackery_solarvault import (
             _async_authenticate_api_layer,  # noqa: PLC2701
         )
         from custom_components.jackery_solarvault.client.api import JackeryAuthError
-        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         hass = _FakeHass()
         entry = _FakeEntry()

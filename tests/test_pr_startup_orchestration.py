@@ -586,10 +586,11 @@ class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         original_error = HomeAssistantError(
             translation_domain=DOMAIN,
@@ -620,10 +621,11 @@ class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         original_error = HomeAssistantError(
             translation_domain=DOMAIN,
@@ -654,10 +656,11 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError with translation_key must pass through unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         original_error = HomeAssistantError(
             translation_domain=DOMAIN,
@@ -686,10 +689,11 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
         self,
     ) -> None:
         """HomeAssistantError without translation_key must be wrapped into entity_action_failed."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = MagicMock()
         coordinator.data = {"12345": {}}

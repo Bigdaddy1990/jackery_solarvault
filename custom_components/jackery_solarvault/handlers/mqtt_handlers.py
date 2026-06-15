@@ -20,11 +20,11 @@ from ..const import (
     FIELD_COMM_STATE,
     FIELD_CURRENT_VERSION,
     FIELD_DATA,
-    FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
     FIELD_DEV_ID,
     FIELD_DEV_SN,
     FIELD_DEV_TYPE,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_SN,
     FIELD_IN_EGY,
     FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_MESSAGE_TYPE,
@@ -72,7 +72,7 @@ def normalize_local_mqtt_payload(
             FIELD_DATA,
             FIELD_MESSAGE_TYPE,
             FIELD_ACTION_ID,
-    FIELD_BATTERY_PACKS,
+            FIELD_BATTERY_PACKS,
         )
     ):
         return payload

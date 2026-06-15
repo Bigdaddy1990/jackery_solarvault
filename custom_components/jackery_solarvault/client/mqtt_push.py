@@ -1,7 +1,5 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
-from __future__ import annotations
-
 import asyncio
 import contextlib
 from datetime import UTC, datetime
@@ -36,7 +34,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from aiomqtt import Client as MQTTClient
-
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)

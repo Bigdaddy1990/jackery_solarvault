@@ -655,10 +655,11 @@ class TestJackeryQueryButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate unchanged from async_press."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         async def _auth_fail(coord, dev_id):  # noqa: ANN001, ANN202, RUF029
             raise ConfigEntryAuthFailed("bad creds")  # noqa: TRY003
@@ -678,10 +679,11 @@ class TestJackeryQueryButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:  # noqa: PLR6301
         """Generic exceptions must be wrapped into HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButtonDescription,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         async def _fail(coord, dev_id):  # noqa: ANN001, ANN202, RUF029
             raise RuntimeError("unexpected")
@@ -859,11 +861,12 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate from async_press."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
         from custom_components.jackery_solarvault.const import PAYLOAD_WEATHER_PLAN
-        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         payload = {PAYLOAD_WEATHER_PLAN: {"storm": [{"alertId": "alert-x"}]}}
         coordinator = _make_mock_coordinator("12345", payload)
@@ -879,11 +882,12 @@ class TestJackeryDeleteStormAlertButton:
 
     async def test_async_press_wraps_runtime_error(self) -> None:  # noqa: PLR6301
         """Generic RuntimeError from async_press must be wrapped into HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
         from custom_components.jackery_solarvault.const import PAYLOAD_WEATHER_PLAN
-        from homeassistant.exceptions import HomeAssistantError
 
         payload = {PAYLOAD_WEATHER_PLAN: {"storm": [{"alertId": "alert-x"}]}}
         coordinator = _make_mock_coordinator("12345", payload)
@@ -1112,10 +1116,11 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_reraises_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
         """ConfigEntryAuthFailed must propagate from async_press."""
+        from homeassistant.exceptions import ConfigEntryAuthFailed
+
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import ConfigEntryAuthFailed
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1129,10 +1134,11 @@ class TestJackeryRefreshWeatherPlanButton:
 
     async def test_async_press_wraps_generic_exception(self) -> None:  # noqa: PLR6301
         """Generic exception from async_press must be wrapped into HomeAssistantError."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         coordinator.async_query_weather_plan = AsyncMock(
@@ -1147,10 +1153,11 @@ class TestJackeryRefreshWeatherPlanButton:
 
     def test_raise_action_error_has_entity_in_placeholders(self) -> None:  # noqa: PLR6301
         """The error placeholder must include the entity key 'refresh_weather_plan'."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         btn = JackeryRefreshWeatherPlanButton(coordinator, "12345")

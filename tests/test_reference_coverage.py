@@ -1,14 +1,13 @@
 """Regression tests for the Jackery reference coverage checker."""
 
 import ast
-import json
 from io import StringIO
+import json
 from pathlib import Path
 import shutil
 from unittest.mock import patch
 
 import pytest
-
 from scripts.check_reference_coverage import (
     CoverageReport,
     _iter_strings,
@@ -224,7 +223,9 @@ def test_top_level_yaml_keys_ignores_blank_lines(tmp_path: Path) -> None:
 def test_top_level_yaml_keys_ignores_comment_lines(tmp_path: Path) -> None:
     """Hash-prefixed comment lines are not included in the key set."""
     yaml_file = tmp_path / "svc.yaml"
-    yaml_file.write_text("# comment: looks like a key but is not\nreal_key:\n", encoding="utf-8")
+    yaml_file.write_text(
+        "# comment: looks like a key but is not\nreal_key:\n", encoding="utf-8"
+    )
 
     keys = _top_level_yaml_keys(yaml_file)
 
@@ -262,10 +263,7 @@ def test_quality_rule_statuses_parses_two_space_indented_values(tmp_path: Path) 
     """Two-space indented lines whose values are done/todo/exempt are captured."""
     qfile = tmp_path / "quality_scale.yaml"
     qfile.write_text(
-        "some_rule:\n"
-        "  status: done\n"
-        "another_rule:\n"
-        "  status: exempt\n",
+        "some_rule:\n  status: done\nanother_rule:\n  status: exempt\n",
         encoding="utf-8",
     )
 
@@ -295,7 +293,9 @@ def test_quality_rule_statuses_ignores_non_standard_values(tmp_path: Path) -> No
     assert "something_else" not in statuses
 
 
-def test_quality_rule_statuses_returns_all_three_standard_values(tmp_path: Path) -> None:
+def test_quality_rule_statuses_returns_all_three_standard_values(
+    tmp_path: Path,
+) -> None:
     """All three recognised status values can coexist."""
     qfile = tmp_path / "quality_scale.yaml"
     qfile.write_text("status: done\nstatus: todo\nstatus: exempt\n", encoding="utf-8")
@@ -323,14 +323,18 @@ def test_literal_string_assignments_finds_plain_assign(tmp_path: Path) -> None:
 def test_literal_string_assignments_finds_annotated_assign(tmp_path: Path) -> None:
     """Annotated NAME: type = 'value' assignments are also extracted."""
     py_file = tmp_path / "const.py"
-    py_file.write_text("from typing import Final\nFOO: Final = 'baz'\n", encoding="utf-8")
+    py_file.write_text(
+        "from typing import Final\nFOO: Final = 'baz'\n", encoding="utf-8"
+    )
 
     result = _literal_string_assignments(py_file)
 
     assert result["FOO"] == "baz"
 
 
-def test_literal_string_assignments_ignores_non_string_constants(tmp_path: Path) -> None:
+def test_literal_string_assignments_ignores_non_string_constants(
+    tmp_path: Path,
+) -> None:
     """Integer and None constants are not included."""
     py_file = tmp_path / "const.py"
     py_file.write_text("COUNT = 42\nFLAG = True\n", encoding="utf-8")
@@ -438,7 +442,9 @@ def test_normalize_paths_handles_multiple_paths_in_one_string() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_reference_http_endpoints_returns_empty_when_json_missing(tmp_path: Path) -> None:
+def test_reference_http_endpoints_returns_empty_when_json_missing(
+    tmp_path: Path,
+) -> None:
     """When docs/jackery_complete_reference.json does not exist, return empty set."""
     root = tmp_path / "repo"
     root.mkdir()
@@ -503,12 +509,16 @@ def test_reference_mqtt_message_types_excludes_short_camel_case(tmp_path: Path) 
     assert "DeviceStatus" in result
 
 
-def test_reference_mqtt_message_types_collects_backtick_types_from_doc(tmp_path: Path) -> None:
+def test_reference_mqtt_message_types_collects_backtick_types_from_doc(
+    tmp_path: Path,
+) -> None:
     """CamelCase identifiers in backticks from MQTT_PROTOCOL.md are included."""
     root = tmp_path / "repo"
     docs = root / "docs"
     docs.mkdir(parents=True)
-    (docs / "jackery_complete_reference.json").write_text(json.dumps({}), encoding="utf-8")
+    (docs / "jackery_complete_reference.json").write_text(
+        json.dumps({}), encoding="utf-8"
+    )
     (docs / "MQTT_PROTOCOL.md").write_text(
         "| messageType | description |\n| `DeviceHeartbeat` | periodic ping |\n",
         encoding="utf-8",
@@ -519,7 +529,9 @@ def test_reference_mqtt_message_types_collects_backtick_types_from_doc(tmp_path:
     assert "DeviceHeartbeat" in result
 
 
-def test_reference_mqtt_message_types_returns_empty_when_no_files(tmp_path: Path) -> None:
+def test_reference_mqtt_message_types_returns_empty_when_no_files(
+    tmp_path: Path,
+) -> None:
     """When neither reference JSON nor MQTT doc exists, return empty set."""
     root = tmp_path / "repo"
     root.mkdir()
@@ -560,7 +572,9 @@ def test_implemented_mqtt_message_types_returns_empty_without_mqtt_constants(
     root = tmp_path / "repo"
     domain_dir = root / "custom_components" / "jackery_solarvault"
     domain_dir.mkdir(parents=True)
-    (domain_dir / "const.py").write_text("DOMAIN = 'jackery_solarvault'\n", encoding="utf-8")
+    (domain_dir / "const.py").write_text(
+        "DOMAIN = 'jackery_solarvault'\n", encoding="utf-8"
+    )
 
     result = implemented_mqtt_message_types(root)
 
@@ -613,12 +627,16 @@ def test_registered_service_name_returns_none_for_other_node_types() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_registered_services_returns_empty_when_services_py_missing(tmp_path: Path) -> None:
+def test_registered_services_returns_empty_when_services_py_missing(
+    tmp_path: Path,
+) -> None:
     """When services.py does not exist an empty set is returned without error."""
     root = tmp_path / "repo"
     domain_dir = root / "custom_components" / "jackery_solarvault"
     domain_dir.mkdir(parents=True)
-    (domain_dir / "const.py").write_text("DOMAIN = 'jackery_solarvault'\n", encoding="utf-8")
+    (domain_dir / "const.py").write_text(
+        "DOMAIN = 'jackery_solarvault'\n", encoding="utf-8"
+    )
 
     result = registered_services(root)
 
@@ -630,7 +648,9 @@ def test_registered_services_parses_literal_string_service_name(tmp_path: Path) 
     root = tmp_path / "repo"
     domain_dir = root / "custom_components" / "jackery_solarvault"
     domain_dir.mkdir(parents=True)
-    (domain_dir / "const.py").write_text("DOMAIN = 'jackery_solarvault'\n", encoding="utf-8")
+    (domain_dir / "const.py").write_text(
+        "DOMAIN = 'jackery_solarvault'\n", encoding="utf-8"
+    )
     (domain_dir / "services.py").write_text(
         "DOMAIN = 'jackery_solarvault'\n"
         "async def setup(hass):\n"
@@ -701,12 +721,16 @@ def test_strings_service_names_extracts_service_keys(tmp_path: Path) -> None:
     assert result == {"svc_one", "svc_two"}
 
 
-def test_strings_service_names_returns_empty_when_no_services_key(tmp_path: Path) -> None:
+def test_strings_service_names_returns_empty_when_no_services_key(
+    tmp_path: Path,
+) -> None:
     """When 'services' key is absent from strings.json, return empty set."""
     root = tmp_path / "repo"
     domain_dir = root / "custom_components" / "jackery_solarvault"
     domain_dir.mkdir(parents=True)
-    (domain_dir / "strings.json").write_text(json.dumps({"title": "Jackery"}), encoding="utf-8")
+    (domain_dir / "strings.json").write_text(
+        json.dumps({"title": "Jackery"}), encoding="utf-8"
+    )
 
     result = strings_service_names(root)
 
@@ -735,7 +759,9 @@ def test_strings_service_names_returns_empty_when_services_is_not_dict(
 # ---------------------------------------------------------------------------
 
 
-def test_check_reference_coverage_warns_when_reference_json_absent(tmp_path: Path) -> None:
+def test_check_reference_coverage_warns_when_reference_json_absent(
+    tmp_path: Path,
+) -> None:
     """A warning is emitted when the structured reference JSON does not exist."""
     root = _copy_reference_fixture(tmp_path)
 
@@ -762,7 +788,9 @@ def test_check_reference_coverage_detects_quality_scale_missing_done(
 ) -> None:
     """An error is raised when quality_scale.yaml has no 'done' status."""
     root = _copy_reference_fixture(tmp_path)
-    quality_path = root / "custom_components" / "jackery_solarvault" / "quality_scale.yaml"
+    quality_path = (
+        root / "custom_components" / "jackery_solarvault" / "quality_scale.yaml"
+    )
     quality_path.write_text("some_rule:\n  status: todo\n", encoding="utf-8")
 
     report = check_reference_coverage(root)
@@ -771,7 +799,9 @@ def test_check_reference_coverage_detects_quality_scale_missing_done(
     assert any("must keep internal completed rule statuses" in e for e in report.errors)
 
 
-def test_check_reference_coverage_detects_extra_registered_service(tmp_path: Path) -> None:
+def test_check_reference_coverage_detects_extra_registered_service(
+    tmp_path: Path,
+) -> None:
     """A service registered in services.py but absent from services.yaml is an error."""
     root = _copy_reference_fixture(tmp_path)
     services_path = root / "custom_components" / "jackery_solarvault" / "services.py"
@@ -786,7 +816,9 @@ def test_check_reference_coverage_detects_extra_registered_service(tmp_path: Pat
     report = check_reference_coverage(root)
 
     assert not report.ok
-    assert any("services.yaml and services.py registrations differ" in e for e in report.errors)
+    assert any(
+        "services.yaml and services.py registrations differ" in e for e in report.errors
+    )
     assert any("phantom_service" in e for e in report.errors)
 
 
@@ -870,7 +902,9 @@ def test_main_prints_warnings_to_stderr(tmp_path: Path) -> None:
     assert "WARNING:" in stderr_capture.getvalue()
 
 
-def test_main_prints_success_to_stdout_when_passing(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_main_prints_success_to_stdout_when_passing(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
     """On a passing run main() prints a success message to stdout."""
     root = _copy_reference_fixture(tmp_path)
 

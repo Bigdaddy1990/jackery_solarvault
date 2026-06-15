@@ -174,10 +174,11 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryRefreshWeatherPlanButton must re-raise a translated HomeAssistantError unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryRefreshWeatherPlanButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -197,10 +198,11 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryReadScheduleButton must re-raise a translated HomeAssistantError unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryReadScheduleButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -227,10 +229,11 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryDeleteStormAlertButton must re-raise a translated HomeAssistantError unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryDeleteStormAlertButton,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         coordinator = _make_mock_coordinator("12345")
         translated_err = HomeAssistantError(
@@ -250,11 +253,12 @@ class TestTranslatedHomeAssistantErrorReRaise:
         self,
     ) -> None:
         """JackeryQueryButton must re-raise a translated HomeAssistantError unchanged."""
+        from homeassistant.exceptions import HomeAssistantError
+
         from custom_components.jackery_solarvault.button import (
             JackeryQueryButton,
             JackeryQueryButtonDescription,
         )
-        from homeassistant.exceptions import HomeAssistantError
 
         translated_err = HomeAssistantError(
             translation_domain="jackery_solarvault",
@@ -382,11 +386,12 @@ def test_query_button_descriptions_unique_cmds() -> None:
 
 def test_query_button_has_config_entity_category() -> None:
     """JackeryQueryButton must have EntityCategory.CONFIG."""
+    from homeassistant.const import EntityCategory
+
     from custom_components.jackery_solarvault.button import (
         JackeryQueryButton,
         JackeryQueryButtonDescription,
     )
-    from homeassistant.const import EntityCategory
 
     desc = JackeryQueryButtonDescription(
         key="some_cmd",
