@@ -61,7 +61,7 @@ jobs:
         if: always()
         with:
           msg: apply code formatting
-          
+
       - name: Run pre-commit with fixes
         run: |
           ruff check . --fix || true
