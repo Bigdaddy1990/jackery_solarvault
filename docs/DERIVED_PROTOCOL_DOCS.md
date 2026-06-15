@@ -20,7 +20,7 @@ summary as protocol truth.
 | `docs/Jackery_2.1.1_Stats_und_Trends.md` | Protocol source artifact | Removed from `docs/`; use `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`. |
 | `docs/jackery_auth.py` | Protocol helper source artifact | Removed from `docs/`; use `source-of-truth/jackery_auth.py`. |
 | `docs/jackery_command_catalog_v2.html` | Generated protocol source artifact | Removed from `docs/`; use `source-of-truth/jackery_command_catalog_v2.html`. |
-| `docs/jackery_complete_reference.json` | Generated protocol source artifact | Removed from `docs/`; use `source-of-truth/jackery_complete_reference.json`. |
+| `docs/jackery_complete_reference.json` | Single technical source of truth | Authoritative JSON for endpoint, MQTT, command, and protocol counters. |
 | `docs/jackery_entity_field_candidates_v2.html` | Generated protocol source artifact | Removed from `docs/`; use `source-of-truth/jackery_entity_field_candidates_v2.html`. |
 | `docs/jackery_entity_field_candidates_v2.json` | Generated protocol source artifact | Removed from `docs/`; use `source-of-truth/jackery_entity_field_candidates_v2.json`. |
 | `docs/jackery_ha_extraction_v2.html` | Generated protocol source artifact | Removed from `docs/`; use `source-of-truth/jackery_ha_extraction_v2.html`. |
