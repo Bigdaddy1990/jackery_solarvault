@@ -183,8 +183,11 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
         )
 
 
-async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
-    """API writer should accept app-style integral text without truncation."""
+@pytest.mark.parametrize("company_id", ["7.0", 7.0])
+async def test_dynamic_tariff_writer_accepts_integral_company_id_values(
+    company_id: str | float,
+) -> None:
+    """API writer should accept app-style integral values without truncation."""
     api = JackeryApi.__new__(JackeryApi)
     captured: list[tuple[str, dict[str, Any]]] = []
 
@@ -197,7 +200,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
     assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
-            platform_company_id="7.0",
+            platform_company_id=company_id,
             system_region=" DE ",
         )
         is True
@@ -212,6 +215,23 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
             },
         ),
     ]
+
+
+async def test_dynamic_tariff_writer_rejects_bool_company_id() -> None:
+    """API writer should not treat bool as an integer company id."""
+    api = JackeryApi.__new__(JackeryApi)
+
+    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
+        raise AssertionError("invalid tariff input must stop before HTTP post")  # noqa: TRY003
+
+    api._post_form = _post_form
+
+    with pytest.raises(JackeryApiError, match="platform_company_id"):
+        await api.async_set_dynamic_mode(
+            system_id="sys1",
+            platform_company_id=True,
+            system_region="DE",
+        )
 
 
 async def test_device_period_diagnostics_keep_request_context_for_null_payload() -> (

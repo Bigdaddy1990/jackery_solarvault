@@ -377,38 +377,38 @@ class JackeryBleListener:
         pending: _PendingAck | None = None
         if wait_for_ack:
             pending = self._register_pending_ack(device_id, ack_cmds)
+        write_succeeded = False
         try:
-            for idx, chunk in enumerate(chunks, start=1):
-                plain = ble.build_binary_frame(
-                    cmd=cmd,
-                    body=chunk,
-                    flags=flags,
-                    frame_index=idx,
-                    chunk_count=chunk_count,
-                )
-                blob = ble.encrypt_binary_notify(plain, key)
-                await asyncio.wait_for(
-                    client.write_gatt_char(
-                        ble.BLE_WRITE_CHAR_UUID,
-                        blob,
-                        response=False,
-                    ),
-                    timeout=timeout_sec,
-                )
-        except TimeoutError as err:
-            if pending is not None:
+            try:
+                for idx, chunk in enumerate(chunks, start=1):
+                    plain = ble.build_binary_frame(
+                        cmd=cmd,
+                        body=chunk,
+                        flags=flags,
+                        frame_index=idx,
+                        chunk_count=chunk_count,
+                    )
+                    blob = ble.encrypt_binary_notify(plain, key)
+                    await asyncio.wait_for(
+                        client.write_gatt_char(
+                            ble.BLE_WRITE_CHAR_UUID,
+                            blob,
+                            response=False,
+                        ),
+                        timeout=timeout_sec,
+                    )
+                write_succeeded = True
+            except TimeoutError as err:
+                raise RuntimeError(  # noqa: TRY003
+                    f"BLE write to {device_id} timed out after {timeout_sec}s",
+                ) from err
+            except Exception as err:  # bleak surfaces BleakError + variants
+                raise RuntimeError(  # noqa: TRY003
+                    f"BLE write to {device_id} failed: {err}"
+                ) from err
+        finally:
+            if not write_succeeded and pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(  # noqa: TRY003
-                f"BLE write to {device_id} timed out after {timeout_sec}s",
-            ) from err
-        except Exception as err:  # bleak surfaces BleakError + variants
-            if pending is not None:
-                self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
-        except BaseException:
-            if pending is not None:
-                self._discard_pending_ack(device_id, pending)
-            raise
         if pending is not None:
             stats = self.stats_for(device_id)
             try:
