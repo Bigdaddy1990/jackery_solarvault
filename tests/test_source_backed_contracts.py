@@ -1,6 +1,6 @@
 """Contracts pinned directly to files in source-of-truth/."""
 
-# ruff: noqa: E501, PLC2701, PLC0415, PLR2004, PLR6301, RUF012, RUF029, SIM102, SLF001
+# ruff: noqa: PLC2701, PLR2004, PLR6301, RUF012, RUF029, SIM102, SLF001
 
 import ast
 import asyncio
@@ -47,7 +47,9 @@ def _read(path: str) -> str:
 
 
 def _const_strings() -> set[str]:
-    tree = ast.parse((ROOT / "custom_components/jackery_solarvault/const.py").read_text())
+    tree = ast.parse(
+        (ROOT / "custom_components/jackery_solarvault/const.py").read_text()
+    )
     values: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.AnnAssign) and isinstance(node.value, ast.Constant):
@@ -66,7 +68,9 @@ def _decrypt_aes_cbc(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
 def test_all_source_truth_http_endpoints_exist_as_constants() -> None:
     """Every path in jackery_http_api_endpoints_v2.csv must be pinned in const.py."""
     const_values = _const_strings()
-    with (SOURCE_ROOT / "jackery_http_api_endpoints_v2.csv").open(encoding="utf-8") as f:
+    with (SOURCE_ROOT / "jackery_http_api_endpoints_v2.csv").open(
+        encoding="utf-8"
+    ) as f:
         rows = list(csv.DictReader(f))
 
     expected_paths = {f"/v1/{row['path']}" for row in rows}
@@ -75,20 +79,36 @@ def test_all_source_truth_http_endpoints_exist_as_constants() -> None:
 
 def test_http_endpoint_request_fields_are_not_doc_copies() -> None:
     """CSV request fields remain the endpoint-field authority, independent of docs/."""
-    with (SOURCE_ROOT / "jackery_http_api_endpoints_v2.csv").open(encoding="utf-8") as f:
-        by_path = {row["path"]: row["request_fields"].split(",") for row in csv.DictReader(f)}
+    with (SOURCE_ROOT / "jackery_http_api_endpoints_v2.csv").open(
+        encoding="utf-8"
+    ) as f:
+        by_path = {
+            row["path"]: row["request_fields"].split(",") for row in csv.DictReader(f)
+        }
 
     assert by_path["auth/login"] == ["aesEncryptData", "rsaForAesKey"]
     assert by_path["device/bind/list"] == [""]
     assert by_path["device/property"] == ["deviceId"]
-    assert by_path["device/dynamic/saveSingleMode"] == ["currency", "singlePrice", "systemId"]
+    assert by_path["device/dynamic/saveSingleMode"] == [
+        "currency",
+        "singlePrice",
+        "systemId",
+    ]
     assert by_path["device/accessories"] == ["devices", "id", "parentDeviceId"]
 
 
 async def test_mqtt_command_envelope_matches_re_supplement() -> None:
     """Command publish creates the exact source-of-truth MQTT envelope."""
     supplement = _read("Jackery_2.1.1_RE_Supplement.md")
-    for key in ("deviceSn", "id", "version", "messageType", "actionId", "timestamp", "body"):
+    for key in (
+        "deviceSn",
+        "id",
+        "version",
+        "messageType",
+        "actionId",
+        "timestamp",
+        "body",
+    ):
         assert f'"{key}"' in supplement
     assert "hb/app/<sn>/command" in supplement
 
@@ -98,8 +118,15 @@ async def test_mqtt_command_envelope_matches_re_supplement() -> None:
         is_connected = True
         diagnostics: dict[str, str] = {}
 
-        async def async_publish_json(self, topic: str, payload: dict[str, Any], *, qos: int, retain: bool) -> None:
-            published.update({"topic": topic, "payload": payload, "qos": qos, "retain": retain})
+        async def async_publish_json(
+            self, topic: str, payload: dict[str, Any], *, qos: int, retain: bool
+        ) -> None:
+            published.update({
+                "topic": topic,
+                "payload": payload,
+                "qos": qos,
+                "retain": retain,
+            })
 
     class Api:
         async def async_get_mqtt_credentials(self) -> dict[str, str]:
@@ -199,10 +226,27 @@ def test_crypto_layer_c_mqtt_body_contract() -> None:
 
 def test_entity_field_candidates_source_truth_shape() -> None:
     """DTO/entity field candidates are pinned to the extracted JSON catalog."""
-    catalog = json.loads((SOURCE_ROOT / "jackery_entity_field_candidates_v2.json").read_text())
+    catalog = json.loads(
+        (SOURCE_ROOT / "jackery_entity_field_candidates_v2.json").read_text()
+    )
     by_class = {entry["class"]: set(entry["fields"]) for entry in catalog}
 
-    assert by_class["home/SystemBody"] >= {"soc", "batInPw", "batOutPw", "gridInPw", "workModel"}
+    assert by_class["home/SystemBody"] >= {
+        "soc",
+        "batInPw",
+        "batOutPw",
+        "gridInPw",
+        "workModel",
+    }
     assert by_class["accessory/AccCTBody"] >= {"volt1", "curr1", "power1", "freq"}
-    assert by_class["home/UserSystemListApi$Bean"] >= {"bluetoothKey", "deviceSn", "systemSn", "region"}
-    assert by_class["DeviceDetailApi$DeviceInfo"] >= {"deviceSn", "modelName", "onlineStatus"}
+    assert by_class["home/UserSystemListApi$Bean"] >= {
+        "bluetoothKey",
+        "deviceSn",
+        "systemSn",
+        "region",
+    }
+    assert by_class["DeviceDetailApi$DeviceInfo"] >= {
+        "deviceSn",
+        "modelName",
+        "onlineStatus",
+    }

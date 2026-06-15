@@ -20,7 +20,6 @@ Persistence is mandatory: a HA restart in the middle of the day must not
 reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
-from __future__ import annotations
 
 import asyncio
 
@@ -293,4 +292,3 @@ __all__ = [
 def _entry_lock(entry_id: str) -> asyncio.Lock:
     """Return the in-process lock for one config-entry cache row."""
     return _ENTRY_LOCKS.setdefault(entry_id, asyncio.Lock())
-

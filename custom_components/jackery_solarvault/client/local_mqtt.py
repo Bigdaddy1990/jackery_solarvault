@@ -185,7 +185,9 @@ class JackeryLocalMqttClient:
                 return
             if not task.done():
                 task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
+            with contextlib.suppress(
+                asyncio.CancelledError, MqttError, OSError, RuntimeError
+            ):
                 await task
 
     # ------------------------------------------------------------------
@@ -239,7 +241,7 @@ class JackeryLocalMqttClient:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001
+        except (OSError, RuntimeError, ValueError, TypeError) as err:
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery local MQTT connect setup failed: %s", err)
@@ -514,7 +516,7 @@ class JackeryLocalMqttClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
+            except (MqttError, OSError, RuntimeError, ValueError, TypeError) as err:
                 _LOGGER.exception(
                     "Jackery local MQTT %s handler failed: %s",
                     label,

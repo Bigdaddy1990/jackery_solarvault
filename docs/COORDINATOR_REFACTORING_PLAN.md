@@ -1,8 +1,8 @@
 # Coordinator Refactoring Plan — Jackery SolarVault
 
-> **Status:** PLANNING  
-> **Date:** 2026-06-12 (v2 - rewritten against RE docs)  
-> **Coordinator:** 9,467 lines (was 10,091) -> target ~3,000 lines  
+> **Status:** PLANNING
+> **Date:** 2026-06-12 (v2 - rewritten against RE docs)
+> **Coordinator:** 9,467 lines (was 10,091) -> target ~3,000 lines
 > **Authoritative sources:** Jackery 2.1.1 RE documentation (`source-of-truth/Jackery_2.1.1_RE_Documentation.md`,
 > `source-of-truth/Jackery_2.1.1_RE_Supplement.md`, `source-of-truth/Jackery_2.1.1_RE_Crypto_and_DTOs.md`,
 > `source-of-truth/Jackery_2.1.1_DEX_Aufschluesselung.md`, `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`,
@@ -288,17 +288,17 @@ custom_components/jackery_solarvault/
 ## 4. Migration Phases
 
 ### Phase 0: Key Namespace Unification ✅ DONE
-**Goal:** Fix local MQTT not starting  
-**Status:** COMPLETE — `__init__.py` reads both `CONF_LOCAL_MQTT_*` and `CONF_THIRD_PARTY_MQTT_*`  
+**Goal:** Fix local MQTT not starting
+**Status:** COMPLETE — `__init__.py` reads both `CONF_LOCAL_MQTT_*` and `CONF_THIRD_PARTY_MQTT_*`
 **Validation:** Local MQTT starts when options are set
 
 ---
 
 ### Phase 1: Extract Property Merging & Payload Helpers ✅ DONE
-**Source:** `coordinator.py` lines 2607-2797  
-**Target:** `models/property_merge.py` (67 lines) + `models/__init__.py`  
-**Status:** COMPLETE - pure functions extracted, coordinator methods are thin wrappers  
-**Size:** 67 lines extracted, coordinator reduced by 624 lines  
+**Source:** `coordinator.py` lines 2607-2797
+**Target:** `models/property_merge.py` (67 lines) + `models/__init__.py`
+**Status:** COMPLETE - pure functions extracted, coordinator methods are thin wrappers
+**Size:** 67 lines extracted, coordinator reduced by 624 lines
 **RE mapping:** HomeBody (35 fields) merge logic, property alias sync
 
 **Methods to move:**
@@ -312,16 +312,16 @@ custom_components/jackery_solarvault/
 - `_clean_property_payload()` → `clean_property_payload()`
 - All `_*HINT_KEYS`, `_MAIN_PROPERTY_ALIAS_PAIRS` frozensets → `models/payload.py`
 
-**Dependencies:** `const.py` field constants only  
-**Risk:** LOW — pure functions, no side effects  
+**Dependencies:** `const.py` field constants only
+**Risk:** LOW — pure functions, no side effects
 **Validation:** `ruff check`, `mypy`, existing tests pass
 
 ---
 
 ### Phase 2: Extract Subdevice Management (IN PROGRESS)
-**Source:** `coordinator.py` lines 2762-4024  
-**Target:** `subdevices/` package  
-**Size:** ~1,260 lines (detection: 387 lines extracted, merge ops: pending)  
+**Source:** `coordinator.py` lines 2762-4024
+**Target:** `subdevices/` package
+**Size:** ~1,260 lines (detection: 387 lines extracted, merge ops: pending)
 **RE mapping:** BatteryPackSub (9 fields), AccCTBody (26 fields), devType/subType enums from `source-of-truth/jackery_entity_field_candidates_v2.json`
 
 **2a - Detection functions ✅ DONE:**
@@ -345,9 +345,9 @@ custom_components/jackery_solarvault/
 ---
 
 ### Phase 3: Extract Statistics Import & Backfill
-**Source:** `coordinator.py` lines 6004–7424, 8833–9060  
-**Target:** `stats/` package  
-**Size:** ~1,425 + 228 = ~1,653 lines  
+**Source:** `coordinator.py` lines 6004–7424, 8833–9060
+**Target:** `stats/` package
+**Size:** ~1,425 + 228 = ~1,653 lines
 **RE mapping:** 17 device stat endpoints + 5 system stat endpoints from `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`, StatisticBody (30+ fields)
 
 **Files:**
@@ -358,16 +358,16 @@ custom_components/jackery_solarvault/
 - `stats/entity_stats.py` (~200 lines): Entity-statistic offset/repair, `_async_entity_statistic_offsets`
 - `stats/__init__.py`: Re-exports
 
-**Dependencies:** `client/_endpoints/statistics.py`, `local_daily_cache.py`  
-**Risk:** HIGH — Recorder integration, needs stat metadata tests  
+**Dependencies:** `client/_endpoints/statistics.py`, `local_daily_cache.py`
+**Risk:** HIGH — Recorder integration, needs stat metadata tests
 **Validation:** `test_stat_metadata.py`, `test_power_math.py`, coverage gates
 
 ---
 
 ### Phase 4: Extract Command Dispatch (Setters)
-**Source:** `coordinator.py` lines 4344–5330  
-**Target:** `setters/` package  
-**Size:** ~986 lines  
+**Source:** `coordinator.py` lines 4344–5330
+**Target:** `setters/` package
+**Size:** ~986 lines
 **RE mapping:** 47 home commands (cmd 107–3044), body templates from `source-of-truth/hbxn_commands.html` + `source-of-truth/jackery_command_catalog_v2.html`
 
 **Files:**
@@ -381,16 +381,16 @@ custom_components/jackery_solarvault/
 - `setters/storm.py` (~86 lines): Storm alert set/delete (cmd=112)
 - `setters/__init__.py`: Re-exports
 
-**Dependencies:** `client/api.py`, `client/mqtt_command.py`, `client/ble_transport.py`  
-**Risk:** MEDIUM — command dispatch affects all entities  
+**Dependencies:** `client/api.py`, `client/mqtt_command.py`, `client/ble_transport.py`
+**Risk:** MEDIUM — command dispatch affects all entities
 **Validation:** Button entity tests, service tests
 
 ---
 
 ### Phase 5: Extract MQTT/BLE Message Handlers
-**Source:** `coordinator.py` lines 1462–2606 (BLE), `_async_handle_mqtt_message` body  
-**Target:** `handlers/` package  
-**Size:** ~1,144 (BLE) + ~800 (MQTT handlers) = ~1,944 lines  
+**Source:** `coordinator.py` lines 1462–2606 (BLE), `_async_handle_mqtt_message` body
+**Target:** `handlers/` package
+**Size:** ~1,144 (BLE) + ~800 (MQTT handlers) = ~1,944 lines
 **RE mapping:** 25 MQTT message types, BLE cmd routing (cmd=107,111,121,120)
 
 **Files:**
@@ -403,16 +403,16 @@ custom_components/jackery_solarvault/
 - `handlers/ota.py` (~100 lines): `UploadOTAStatus`, `UploadFirmwareVersion`
 - `handlers/__init__.py`: Re-exports
 
-**Dependencies:** `models/property_merge.py`, `subdevices/`  
-**Risk:** HIGH — MQTT merge is the hot path  
+**Dependencies:** `models/property_merge.py`, `subdevices/`
+**Risk:** HIGH — MQTT merge is the hot path
 **Validation:** `test_mqtt_protocol_contract.py`, `test_mqtt_stability.py`
 
 ---
 
 ### Phase 6: Extract Local Bridge
-**Source:** `coordinator.py` lines 5331–6003  
-**Target:** `local_bridge.py`  
-**Size:** ~672 lines  
+**Source:** `coordinator.py` lines 5331–6003
+**Target:** `local_bridge.py`
+**Size:** ~672 lines
 **RE mapping:** ThirdPartyMqttBody {enable, ip, port, userName, password, token}, cmd=113/114, Layer C encrypted, local MQTT subscribe
 
 **Responsibilities:**
@@ -422,8 +422,8 @@ custom_components/jackery_solarvault/
 - `decode_third_party_mqtt_config_body` (Layer C decryption)
 - `stable_third_party_mqtt_token` (token generation/validation)
 
-**Dependencies:** `client/local_mqtt.py`, `client/third_party_mqtt_codec.py`, `client/_crypto.py`  
-**Risk:** LOW — isolated feature  
+**Dependencies:** `client/local_mqtt.py`, `client/third_party_mqtt_codec.py`, `client/_crypto.py`
+**Risk:** LOW — isolated feature
 **Validation:** Third-party MQTT tests
 
 ---
@@ -436,7 +436,7 @@ custom_components/jackery_solarvault/
 4. `diagnostics` (~200 lines): Export
 5. Module constants (~100 lines)
 
-**Target:** ~3,000 lines  
+**Target:** ~3,000 lines
 **Remaining:** Thin orchestrator that wires everything together
 
 ---
@@ -491,7 +491,7 @@ Phase 1: models/property_merge.py                       │
             └── Phase 7: coordinator slim ──────────────┘
 ```
 
-**Parallelizable:** Phases 2, 3, 4, 6 can run in parallel after Phase 1  
+**Parallelizable:** Phases 2, 3, 4, 6 can run in parallel after Phase 1
 **Sequential:** Phase 5 depends on Phase 2; Phase 7 depends on all
 
 ---

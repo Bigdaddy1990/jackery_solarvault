@@ -267,4 +267,3 @@ Die Home‑Assistant‑Integration kann damit sehr gezielt:
 [^8]: jackery_command_catalog_v2-6.html
 
 [^9]: jackery_smali_home_assistant_report-3.html
-

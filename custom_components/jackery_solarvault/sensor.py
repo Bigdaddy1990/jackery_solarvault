@@ -398,10 +398,7 @@ from .const import (
     UNRECORDED_ATTRS_LOCAL_MQTT,
 )
 from .entity import JackeryEntity
-from .entity_contract import (
-    DEFAULT_LIVE_SOURCES,
-    DEFAULT_NULL_SEMANTICS,
-)
+from .entity_contract import DEFAULT_LIVE_SOURCES, DEFAULT_NULL_SEMANTICS
 from .util import (
     append_unique_entity,
     calculated_smart_meter_power,

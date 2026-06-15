@@ -1,11 +1,75 @@
 {
-  "totals": {
-    "missing_symbols": 120,
-    "truly_missing_symbols": 49,
-    "shrunk_symbols": 74,
-    "missing_consts": 51,
-    "truly_missing_consts": 18,
-    "missing_files": 1
+  "TRULY_MISSING_CONSTS": {
+    "client/ble.py::_unrecognised_version_count": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_LOST_LINK_BACKOFF_SEC": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_MAX_BACKOFF_SEC": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "client/ble_transport.py::_MAX_CONNECTION_RETRIES": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "config_flow.py::DhcpServiceInfo": [
+      "pre_reconcile"
+    ],
+    "config_flow.py::MqttServiceInfo": [
+      "pre_reconcile"
+    ],
+    "config_flow.py::ZeroconfServiceInfo": [
+      "pre_reconcile"
+    ],
+    "const.py::ACTION_ID_SOC_CHARGE_LIMIT": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "const.py::ACTION_ID_SOC_DISCHARGE_LIMIT": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "const.py::DIAGNOSTICS_SCHEMA_VERSION": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_DAY_TREND_SOURCE_BY_METRIC_KEY": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": [
+      "pre_transfer",
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "coordinator.py::_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": [
+      "pre_recovery",
+      "pre_reconcile"
+    ],
+    "diagnostics.py::_SECTION_SIZE_CAP": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "discovery_cache.py::_ENTRY_LOCKS": [
+      "pre_transfer"
+    ],
+    "local_daily_cache.py::_ENTRY_LOCKS": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "mqtt_session_cache.py::_CACHE_LOCK": [
+      "pre_transfer",
+      "pre_reconcile"
+    ],
+    "util.py::ZERO_CONFIRM_MIN_LOCAL_HOUR": [
+      "pre_transfer",
+      "pre_reconcile"
+    ]
   },
   "TRULY_MISSING_SYMBOLS": {
     "__init__.py::_async_authenticate": [
@@ -217,78 +281,6 @@
       "pre_reconcile"
     ]
   },
-  "TRULY_MISSING_CONSTS": {
-    "client/ble.py::_unrecognised_version_count": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "client/ble_transport.py::_LOST_LINK_BACKOFF_SEC": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "client/ble_transport.py::_MAX_BACKOFF_SEC": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "client/ble_transport.py::_MAX_CONNECTION_RETRIES": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "config_flow.py::DhcpServiceInfo": [
-      "pre_reconcile"
-    ],
-    "config_flow.py::MqttServiceInfo": [
-      "pre_reconcile"
-    ],
-    "config_flow.py::ZeroconfServiceInfo": [
-      "pre_reconcile"
-    ],
-    "const.py::ACTION_ID_SOC_CHARGE_LIMIT": [
-      "pre_recovery",
-      "pre_reconcile"
-    ],
-    "const.py::ACTION_ID_SOC_DISCHARGE_LIMIT": [
-      "pre_recovery",
-      "pre_reconcile"
-    ],
-    "const.py::DIAGNOSTICS_SCHEMA_VERSION": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "coordinator.py::_DAY_TREND_SOURCE_BY_METRIC_KEY": [
-      "pre_transfer",
-      "pre_recovery",
-      "pre_reconcile"
-    ],
-    "coordinator.py::_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": [
-      "pre_transfer",
-      "pre_recovery",
-      "pre_reconcile"
-    ],
-    "coordinator.py::_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": [
-      "pre_recovery",
-      "pre_reconcile"
-    ],
-    "diagnostics.py::_SECTION_SIZE_CAP": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "discovery_cache.py::_ENTRY_LOCKS": [
-      "pre_transfer"
-    ],
-    "local_daily_cache.py::_ENTRY_LOCKS": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "mqtt_session_cache.py::_CACHE_LOCK": [
-      "pre_transfer",
-      "pre_reconcile"
-    ],
-    "util.py::ZERO_CONFIRM_MIN_LOCAL_HOUR": [
-      "pre_transfer",
-      "pre_reconcile"
-    ]
-  },
   "files": {
     "__init__.py": {
       "MISSING_SYMBOLS": {
@@ -317,6 +309,20 @@
       ]
     },
     "client/api.py": {
+      "CONST_MISSING": {
+        "_HTTP_RETRY_ATTEMPTS": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_HTTP_RETRY_BACKOFF_SEC": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      },
       "MISSING_SYMBOLS": {
         "JackeryApi._async_get_device_period_stat": {
           "backups": [
@@ -918,20 +924,6 @@
           "current_stmts": 33,
           "delta": 578
         }
-      },
-      "CONST_MISSING": {
-        "_HTTP_RETRY_ATTEMPTS": {
-          "backups": [
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        },
-        "_HTTP_RETRY_BACKOFF_SEC": {
-          "backups": [
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        }
       }
     },
     "client/ble.py": {
@@ -1114,48 +1106,6 @@
       }
     },
     "client/ble_transport.py": {
-      "MISSING_SYMBOLS": {
-        "JackeryBleListener._mark_property_query_started": {
-          "backups": [
-            "pre_transfer",
-            "pre_reconcile"
-          ],
-          "status": "TRULY_MISSING"
-        },
-        "JackeryBleListener.async_ensure_connected": {
-          "backups": [
-            "pre_recovery",
-            "pre_reconcile"
-          ],
-          "status": "TRULY_MISSING"
-        }
-      },
-      "SHRUNK_SYMBOLS": {
-        "JackeryBleListener._async_run_connection": {
-          "backup": "pre_transfer",
-          "backup_stmts": 68,
-          "current_stmts": 53,
-          "delta": 15
-        },
-        "JackeryBleListener._handle_notification": {
-          "backup": "pre_transfer",
-          "backup_stmts": 34,
-          "current_stmts": 28,
-          "delta": 6
-        },
-        "JackeryBleListener._register_pending_ack": {
-          "backup": "pre_transfer",
-          "backup_stmts": 14,
-          "current_stmts": 6,
-          "delta": 8
-        },
-        "JackeryBleListener.async_send_command": {
-          "backup": "pre_transfer",
-          "backup_stmts": 53,
-          "current_stmts": 42,
-          "delta": 11
-        }
-      },
       "CONST_MISSING": {
         "DEFAULT_BLE_CONNECT_TIMEOUT_SEC": {
           "backups": [
@@ -1210,6 +1160,48 @@
           ],
           "status": "centralized/relocated"
         }
+      },
+      "MISSING_SYMBOLS": {
+        "JackeryBleListener._mark_property_query_started": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "JackeryBleListener.async_ensure_connected": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
+      "SHRUNK_SYMBOLS": {
+        "JackeryBleListener._async_run_connection": {
+          "backup": "pre_transfer",
+          "backup_stmts": 68,
+          "current_stmts": 53,
+          "delta": 15
+        },
+        "JackeryBleListener._handle_notification": {
+          "backup": "pre_transfer",
+          "backup_stmts": 34,
+          "current_stmts": 28,
+          "delta": 6
+        },
+        "JackeryBleListener._register_pending_ack": {
+          "backup": "pre_transfer",
+          "backup_stmts": 14,
+          "current_stmts": 6,
+          "delta": 8
+        },
+        "JackeryBleListener.async_send_command": {
+          "backup": "pre_transfer",
+          "backup_stmts": 53,
+          "current_stmts": 42,
+          "delta": 11
+        }
       }
     },
     "client/local_mqtt.py": {
@@ -1224,6 +1216,26 @@
       }
     },
     "client/mqtt_push.py": {
+      "CONST_MISSING": {
+        "_MAX_PENDING_MESSAGE_TASKS": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_MqttErrorTuple": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        },
+        "_QOS0_TOPIC_SUFFIXES": {
+          "backups": [
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      },
       "SHRUNK_SYMBOLS": {
         "JackeryMqttPushClient._async_run_session": {
           "backup": "pre_transfer",
@@ -1260,26 +1272,6 @@
           "backup_stmts": 26,
           "current_stmts": 22,
           "delta": 4
-        }
-      },
-      "CONST_MISSING": {
-        "_MAX_PENDING_MESSAGE_TASKS": {
-          "backups": [
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        },
-        "_MqttErrorTuple": {
-          "backups": [
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        },
-        "_QOS0_TOPIC_SUFFIXES": {
-          "backups": [
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
         }
       }
     },
@@ -1342,6 +1334,31 @@
       }
     },
     "coordinator.py": {
+      "CONST_MISSING": {
+        "_DAY_TREND_SOURCE_BY_METRIC_KEY": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": {
+          "backups": [
+            "pre_transfer",
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": {
+          "backups": [
+            "pre_recovery",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        }
+      },
       "MISSING_SYMBOLS": {
         "JackerySolarVaultCoordinator._async_retry_after_invalid_discovery_devices": {
           "backups": [
@@ -1869,34 +1886,25 @@
           "current_stmts": 3,
           "delta": 10
         }
-      },
+      }
+    },
+    "diagnostics.py": {
       "CONST_MISSING": {
-        "_DAY_TREND_SOURCE_BY_METRIC_KEY": {
+        "_LOCAL_MQTT_RUNTIME_KEY": {
           "backups": [
             "pre_transfer",
-            "pre_recovery",
             "pre_reconcile"
           ],
-          "status": "TRULY_MISSING"
+          "status": "centralized/relocated"
         },
-        "_ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD": {
+        "_SECTION_SIZE_CAP": {
           "backups": [
             "pre_transfer",
-            "pre_recovery",
-            "pre_reconcile"
-          ],
-          "status": "TRULY_MISSING"
-        },
-        "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS": {
-          "backups": [
-            "pre_recovery",
             "pre_reconcile"
           ],
           "status": "TRULY_MISSING"
         }
-      }
-    },
-    "diagnostics.py": {
+      },
       "MISSING_SYMBOLS": {
         "_cap_section": {
           "backups": [
@@ -1913,35 +1921,19 @@
           "current_stmts": 11,
           "delta": 4
         }
-      },
-      "CONST_MISSING": {
-        "_LOCAL_MQTT_RUNTIME_KEY": {
-          "backups": [
-            "pre_transfer",
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        },
-        "_SECTION_SIZE_CAP": {
-          "backups": [
-            "pre_transfer",
-            "pre_reconcile"
-          ],
-          "status": "TRULY_MISSING"
-        }
       }
     },
     "discovery_cache.py": {
-      "MISSING_SYMBOLS": {
-        "_entry_lock": {
+      "CONST_MISSING": {
+        "_ENTRY_LOCKS": {
           "backups": [
             "pre_transfer"
           ],
           "status": "TRULY_MISSING"
         }
       },
-      "CONST_MISSING": {
-        "_ENTRY_LOCKS": {
+      "MISSING_SYMBOLS": {
+        "_entry_lock": {
           "backups": [
             "pre_transfer"
           ],
@@ -1961,8 +1953,8 @@
       }
     },
     "local_daily_cache.py": {
-      "MISSING_SYMBOLS": {
-        "_entry_lock": {
+      "CONST_MISSING": {
+        "_ENTRY_LOCKS": {
           "backups": [
             "pre_transfer",
             "pre_reconcile"
@@ -1970,8 +1962,8 @@
           "status": "TRULY_MISSING"
         }
       },
-      "CONST_MISSING": {
-        "_ENTRY_LOCKS": {
+      "MISSING_SYMBOLS": {
+        "_entry_lock": {
           "backups": [
             "pre_transfer",
             "pre_reconcile"
@@ -2066,6 +2058,22 @@
       }
     },
     "util.py": {
+      "CONST_MISSING": {
+        "ZERO_CONFIRM_MIN_LOCAL_HOUR": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "TRULY_MISSING"
+        },
+        "_LOGGER": {
+          "backups": [
+            "pre_transfer",
+            "pre_reconcile"
+          ],
+          "status": "centralized/relocated"
+        }
+      },
       "SHRUNK_SYMBOLS": {
         "_savings_publish_decision": {
           "backup": "pre_transfer",
@@ -2115,23 +2123,15 @@
           "current_stmts": 46,
           "delta": 10
         }
-      },
-      "CONST_MISSING": {
-        "ZERO_CONFIRM_MIN_LOCAL_HOUR": {
-          "backups": [
-            "pre_transfer",
-            "pre_reconcile"
-          ],
-          "status": "TRULY_MISSING"
-        },
-        "_LOGGER": {
-          "backups": [
-            "pre_transfer",
-            "pre_reconcile"
-          ],
-          "status": "centralized/relocated"
-        }
       }
     }
+  },
+  "totals": {
+    "missing_consts": 51,
+    "missing_files": 1,
+    "missing_symbols": 120,
+    "shrunk_symbols": 74,
+    "truly_missing_consts": 18,
+    "truly_missing_symbols": 49
   }
 }

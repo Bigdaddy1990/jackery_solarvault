@@ -387,7 +387,7 @@ class JackeryMqttPushClient:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001
+        except (MqttError, OSError, RuntimeError, ValueError, TypeError) as err:
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
@@ -630,7 +630,7 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
+            except (MqttError, OSError, RuntimeError, ValueError, TypeError) as err:
                 _LOGGER.exception("Jackery MQTT %s handler failed: %s", label, err)  # noqa: TRY401
 
         task.add_done_callback(_log_task_result)

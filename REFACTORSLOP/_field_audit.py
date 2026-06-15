@@ -9,8 +9,6 @@ Sources of truth (docs/): jackery_http_model_fields_v2.csv, hbxn_model_fields.cs
 jackery_entity_field_candidates_v2.json. Stdlib only. Python 3.14+.
 """  # noqa: INP001
 
-from __future__ import annotations  # noqa: TID251
-
 import ast
 import csv
 import json

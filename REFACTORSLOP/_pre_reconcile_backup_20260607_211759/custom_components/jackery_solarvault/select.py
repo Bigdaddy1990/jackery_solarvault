@@ -10,8 +10,6 @@ value warnings) lives as module-level helper functions so the description
 registry stays declarative.
 """
 
-from __future__ import annotations  # noqa: I001, TID251
-
 from collections.abc import Awaitable, Callable  # noqa: TC003
 from dataclasses import dataclass, field
 import logging
@@ -32,8 +30,8 @@ from .const import (
     FIELD_CID,
     FIELD_COMPANY_NAME,
     FIELD_COUNTRY,
-    FIELD_DEV_SN,
     FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_MINS_INTERVAL,
     FIELD_NAME,

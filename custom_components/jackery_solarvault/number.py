@@ -48,10 +48,8 @@ from .const import (
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 from .entity import JackeryEntity
-from .entity_contract import (
-    DEFAULT_LIVE_SOURCES,
-    DEFAULT_NULL_SEMANTICS,
-)
+from .entity_contract import DEFAULT_LIVE_SOURCES, DEFAULT_NULL_SEMANTICS
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -823,7 +821,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 self.entity_description.key,
                 err,
             )
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             if self.entity_description.raise_on_setter_error:
                 self._raise_action_error("entity_action_failed", error=err)
             _LOGGER.debug(

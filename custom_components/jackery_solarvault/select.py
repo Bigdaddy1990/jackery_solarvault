@@ -60,10 +60,8 @@ from .const import (
     WORK_MODE_TO_OPTION,
 )
 from .entity import JackeryEntity
-from .entity_contract import (
-    DEFAULT_LIVE_SOURCES,
-    DEFAULT_NULL_SEMANTICS,
-)
+from .entity_contract import DEFAULT_LIVE_SOURCES, DEFAULT_NULL_SEMANTICS
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -381,7 +379,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
             if getattr(err, "translation_key", None):
                 raise
             _raise_select_action_error(self, "entity_action_failed", error=err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             _raise_select_action_error(self, "entity_action_failed", error=err)
 
     def _warn_unknown_once(self, value: object) -> None:

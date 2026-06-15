@@ -238,7 +238,7 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_wifi_list"
         )
-        assert desc.cmd == 1  # noqa: PLR2004
+        assert desc.cmd == 1
 
     def test_portable_refresh_battery_packs_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_battery_packs must use cmd=6 (msgId=8)."""

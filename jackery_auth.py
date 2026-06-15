@@ -10,7 +10,6 @@ Verifiziert aus dem Bytecode von com.hbxn.jackery 2.1.1:
 Benötigt: pip install pycryptodome paho-mqtt requests
 """
 
-
 import base64
 import hashlib
 import uuid

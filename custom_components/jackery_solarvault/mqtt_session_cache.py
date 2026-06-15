@@ -50,7 +50,7 @@ async def async_load_mqtt_session(  # noqa: PLR0911
 ) -> dict[str, str] | None:
     """
     Load cached MQTT session credentials for the given config entry.
-    
+
     Returns:
         dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present and non-empty.
         None: If storage is missing or malformed, or if any required field is missing or empty.
@@ -96,7 +96,7 @@ async def async_save_mqtt_session(  # noqa: PLR0913
 ) -> None:
     """
     Persist MQTT session fields for a config entry, overwriting any existing cached row.
-    
+
     Parameters:
         hass: Home Assistant instance (storage access).
         entry_id: Config entry identifier to associate with the cached session.

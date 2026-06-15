@@ -5,8 +5,6 @@ CONFLICTS (same name, different literal value across modules — a latent bug).
 Only counts assignments, not imports. Stdlib only. Python 3.14+.
 """  # noqa: INP001
 
-from __future__ import annotations  # noqa: TID251
-
 import ast
 from pathlib import Path
 

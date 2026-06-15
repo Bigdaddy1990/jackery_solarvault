@@ -46,6 +46,8 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
+from bleak.exc import BleakError
+
 from ..const import (
     DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
     _RECONNECT_BACKOFF_SEC,
@@ -278,7 +280,9 @@ class JackeryBleListener:
                     )
                     return  # stop_event fired  # noqa: TRY300
                 except TimeoutError:
-                    pass
+                    _LOGGER.debug(
+                        "Jackery BLE %s: keep-alive interval elapsed", device_id
+                    )
                 if device_id not in self._clients:
                     return  # connection went away while we slept
                 try:
@@ -402,7 +406,7 @@ class JackeryBleListener:
             raise RuntimeError(  # noqa: TRY003
                 f"BLE write to {device_id} timed out after {timeout_sec}s",
             ) from err
-        except Exception as err:  # bleak surfaces BleakError + variants
+        except (BleakError, OSError, RuntimeError) as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
             raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
@@ -548,7 +552,7 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -678,7 +682,6 @@ class JackeryBleListener:
 
         Subscribes to the device's notify characteristic and forwards incoming notifications to the listener, starts a keep‑alive heartbeat to keep the session active, caches the negotiated MTU and exposes the active client for outgoing writes, and updates per-device connection and frame statistics. The routine automatically attempts reconnects with backoff when the link is lost, cleans up client state and background tasks on disconnect or shutdown, and propagates cancellation so caller shutdown logic can observe task cancellation.
         """  # noqa: RUF002
-        from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
         from homeassistant.components import bluetooth
@@ -813,7 +816,7 @@ class JackeryBleListener:
                 device_id,
             )
             raise
-        except Exception as err:  # pragma: no cover — defensive
+        except (BleakError, OSError, RuntimeError, ValueError, TypeError) as err:
             stats.last_error = f"runner: {err}"
             _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
         finally:
@@ -886,7 +889,7 @@ class JackeryBleListener:
             stats.frames_decode_failed += 1
         try:
             await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
+        except (RuntimeError, ValueError, TypeError, KeyError) as err:
             _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
 
 

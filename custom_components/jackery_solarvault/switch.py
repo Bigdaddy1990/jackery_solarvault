@@ -47,10 +47,8 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .entity import JackeryEntity
-from .entity_contract import (
-    DEFAULT_LIVE_SOURCES,
-    DEFAULT_NULL_SEMANTICS,
-)
+from .entity_contract import DEFAULT_LIVE_SOURCES, DEFAULT_NULL_SEMANTICS
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -553,7 +551,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -578,7 +576,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 
@@ -724,7 +722,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -860,7 +858,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
             if getattr(err, "translation_key", None):
                 raise
             self._raise_action_error(err)
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
 

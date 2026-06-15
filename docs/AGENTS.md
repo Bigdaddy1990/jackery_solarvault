@@ -350,7 +350,7 @@ For every pull request, reviewers and bots must enforce this minimum quality bar
 
 ## **1. Core Principles**
 
-### **1.0 Always strict follow Home Assistant Best Practices**  
+### **1.0 Always strict follow Home Assistant Best Practices**
 ## /docs/ha_custom_config_and_best_practices.json
 ## /source-of-truth/jackery_complete_reference.json
 
@@ -528,7 +528,7 @@ async def update_today_energy(
 ### **7.2 Critical/Breaking* Bugs *directly after ruff/mypy, always need to be fixed*
 ### **7.3 High Impacts *non-breaking but high issues*
 ### **7.4 Medium *like Deprecated/wrong Values*
-### **7.5 Low Priorities *like Syntax/codesmells. should mostly fixed by ruff/lint/pyupgrade* 
+### **7.5 Low Priorities *like Syntax/codesmells. should mostly fixed by ruff/lint/pyupgrade*
 
 ---
 

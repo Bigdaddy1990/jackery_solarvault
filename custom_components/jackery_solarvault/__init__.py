@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,  # noqa: TC001
@@ -711,10 +711,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    except Exception:
+    except Exception as err:
+        _LOGGER.debug("Jackery setup failed after coordinator creation: %s", err)
         with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
-        entry.runtime_data = cast("Any", None)
+        if entry.runtime_data is coordinator:
+            entry.runtime_data = cast("Any", None)
         raise
 
     startup_task = hass.async_create_background_task(
