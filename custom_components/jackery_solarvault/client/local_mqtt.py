@@ -371,7 +371,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
@@ -617,19 +617,6 @@ class JackeryLocalMqttClient:
             ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """
         return datetime.now(UTC).isoformat()
-
-    # --- restored from 01.06\custom_components\jackery_solarvault\client\local_mqtt.py ---
-    @staticmethod
-    def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
-        """Detect whether a byte payload appears to be a Home Assistant event-style JSON wrapper.
-
-        Checks the first 1024 bytes for the presence of the JSON keys "event_type" and "event_data".
-
-        Returns:
-            True if both `"event_type"` and `"event_data"` appear in the payload head, False otherwise.
-        """
-        head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
-        return b'"event_type"' in head and b'"event_data"' in head
 
 
 _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"

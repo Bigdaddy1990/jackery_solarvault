@@ -401,7 +401,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     def _f(value: Any) -> float | None:  # arbitrary payload value, coerced at runtime  # noqa: ANN401, RUF100
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -5299,7 +5299,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 

@@ -2074,7 +2074,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             import base64  # noqa: PLC0415, RUF100
 
             key = base64.b64decode(str(raw))
-        except ValueError, binascii.Error:
+        except (ValueError, binascii.Error):
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -2261,7 +2261,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             if action_id is not None and int(action_id) in MQTT_ACTION_IDS_SUBDEVICE:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         updates = body.get(FIELD_UPDATES)
         if isinstance(updates, dict) and any(
@@ -2365,7 +2365,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         try:
             expected = max(0, int(props.get(FIELD_BAT_NUM) or 0))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             expected = 0
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
         if not isinstance(packs, list):
@@ -4856,7 +4856,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             from homeassistant.components.recorder.statistics import (  # noqa: PLC0415, RUF100
                 statistics_during_period,
             )
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Recorder statistics API unavailable")
             return 0.0
 
@@ -4924,7 +4924,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             from homeassistant.helpers.recorder import (
                 session_scope,  # noqa: PLC0415, RUF100
             )
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Recorder entity-statistic offset unavailable")
             return 0.0, 0.0
 
@@ -4991,7 +4991,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             from homeassistant.components.recorder import get_instance  # noqa: I001, PLC0415, RUF100
             from homeassistant.components.recorder.db_schema import StatisticsRuns  # noqa: PLC0415, RUF100
             from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415, RUF100
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Recorder run markers unavailable")
             return set()
 
@@ -5029,7 +5029,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         try:
             from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # noqa: I001, PLC0415, RUF100
             from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF100
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Entity registry unavailable for entity repair")
             return {}
 
@@ -5177,7 +5177,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             from homeassistant.const import UnitOfEnergy  # noqa: PLC0415, RUF100
             from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415, RUF100
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Recorder entity statistics import unavailable")
             return 0, 1
 
@@ -5374,7 +5374,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             from homeassistant.helpers import (
                 issue_registry as ir,  # noqa: PLC0415, RUF100
             )
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             if warnings:
                 examples = "; ".join(
                     format_data_quality_warning(warning)
@@ -5673,7 +5673,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             from homeassistant.const import UnitOfEnergy  # noqa: PLC0415, RUF100
             from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415, RUF100
-        except ImportError, RuntimeError:
+        except (ImportError, RuntimeError):
             _LOGGER.exception("Recorder statistics import unavailable")
             return False, 0
 

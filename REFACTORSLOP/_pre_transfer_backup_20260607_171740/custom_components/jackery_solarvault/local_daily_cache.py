@@ -88,7 +88,7 @@ async def async_load_daily_cache(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         result[str(device_id)] = {
             _KEY_DAY: day,
@@ -127,7 +127,7 @@ async def async_save_daily_cache(
                     continue
                 try:
                     clean_values[metric] = int(value)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     continue
             cleaned[str(device_id)] = {
                 _KEY_DAY: day,
@@ -157,7 +157,7 @@ def daily_delta(  # noqa: PLR0911
         return None
     try:
         current = int(current_lifetime_wh)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if not isinstance(snapshot, dict):
         return None
@@ -172,7 +172,7 @@ def daily_delta(  # noqa: PLR0911
         return None
     try:
         anchor_int = int(anchor)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if current < anchor_int:
         diff = anchor_int - current
@@ -209,7 +209,7 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         return {_KEY_DAY: today_iso, _KEY_VALUES: clean_values}
     existing_values = snapshot.get(_KEY_VALUES)
@@ -221,7 +221,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
     for metric, value in current_values.items():
         if metric in merged:
@@ -230,7 +230,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
     return {_KEY_DAY: today_iso, _KEY_VALUES: merged}
 

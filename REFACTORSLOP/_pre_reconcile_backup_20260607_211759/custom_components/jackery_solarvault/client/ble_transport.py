@@ -243,6 +243,7 @@ class JackeryBleListener:
         # the same device successfully resolves / decodes again.
         self._unmapped_serials_logged: set[str] = set()
         self._missing_key_logged: set[str] = set()
+        self._pending_property_query_starts: dict[str, deque[datetime]] = {}
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """Return the cached BLE MAC for a device id, or None."""

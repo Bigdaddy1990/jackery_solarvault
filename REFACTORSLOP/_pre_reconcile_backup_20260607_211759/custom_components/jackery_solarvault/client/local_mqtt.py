@@ -373,7 +373,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 parsed = None
             if isinstance(parsed, dict):
                 data = self._extract_local_jackery_payload(parsed)
@@ -582,51 +582,3 @@ class JackeryLocalMqttClient:
             iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
         """
         return datetime.now(UTC).isoformat()
-
-    # --- restored from 01.06\custom_components\jackery_solarvault\client\local_mqtt.py ---
-    @staticmethod
-    def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
-        """Return True for HA event-stream JSON published on a shared topic."""
-        head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
-        return b'"event_type"' in head and b'"event_data"' in head
-
-    # --- restored from Clause/live lineage (backup) ---  # noqa: E303, RUF100
-    async def _async_consume_session(
-        self,
-        client: MQTTClient,
-        mqtt_error_cls: type[Exception],
-    ) -> None:
-        """Mark the session connected, subscribe, then dispatch incoming messages.
-
-        Split out of :meth:`_async_run_session` so the surrounding ``try`` stays
-        small. A subscribe failure records the error and returns, which unwinds
-        the caller's ``async with`` (disconnecting) and runs its ``finally``.
-
-        Parameters:
-            client: The connected aiomqtt client.
-            mqtt_error_cls: The lazily imported ``aiomqtt.MqttError`` class to
-                catch subscribe failures (passed in to avoid re-importing).
-        """
-        self._client = client
-        self._connected = True
-        self._last_connect_at = self._utc_now_iso()
-        self._last_error = None
-        self._connected_event.set()
-        _LOGGER.info(
-            "Jackery local MQTT connected to %s:%s; subscribing %r",
-            self._host,
-            self._port,
-            self._topic_filter,
-        )
-        try:
-            await client.subscribe(self._topic_filter, qos=0)
-        except mqtt_error_cls as err:
-            self._last_error = f"subscribe failed: {err}"
-            _LOGGER.warning(
-                "Jackery local MQTT subscribe failed for %r: %s",
-                self._topic_filter,
-                err,
-            )
-            return
-        async for message in client.messages:
-            self._handle_message(str(message.topic), message.payload)
