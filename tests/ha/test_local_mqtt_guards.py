@@ -1,4 +1,4 @@
-"""Tests for the local MQTT guard logic added to __init__.py in this PR.
+"""Tests for the local MQTT guard logic added to __init__.py for this integration.
 
 Covers:
 - _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS: constant contains "#" and "+/#"

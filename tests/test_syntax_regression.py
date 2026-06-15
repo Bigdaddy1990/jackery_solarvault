@@ -1,4 +1,4 @@
-"""Syntax regression tests for modules changed in this PR.
+"""Syntax regression tests for modules changed for this integration.
 
 These tests always run (no skipif) and catch import-time errors
 in the changed modules. They are designed to fail fast and clearly
@@ -12,7 +12,7 @@ import sys
 def test_client_local_mqtt_can_be_imported() -> None:
     """client/local_mqtt.py must be importable without SyntaxError.
 
-    The PR adds ``except json.JSONDecodeError, ValueError:`` which is Python 2
+    The invalid syntax would add ``except json.JSONDecodeError, ValueError:`` which is Python 2
     syntax and must be written as ``except (json.JSONDecodeError, ValueError):``
     in Python 3. This test catches that class of regression.
     """

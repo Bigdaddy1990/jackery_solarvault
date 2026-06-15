@@ -1,11 +1,11 @@
-"""Smoke tests for the annotatedyaml vendored PyYAML module (PR docstring changes).
+"""Smoke tests for the annotatedyaml vendored PyYAML module (vendor YAML behavior).
 
-The PR changes in annotatedyaml/_vendor/yaml/ are purely docstring reformatting
+The behavior contracts in annotatedyaml/_vendor/yaml/ are purely docstring reformatting
 (removing trailing ``# noqa: E501`` comments and rewording).  These tests verify
 that the refactoring did not accidentally break any of the affected public API
 functions' behaviour.
 
-Covered modules/functions (as listed in the PR diff):
+Covered modules/functions (as listed in the vendor YAML surface):
 - annotatedyaml/_vendor/yaml/__init__.py:
   - dump_all (stream=None, encoding=None → str; encoding set → bytes)
   - dump (stream=None → str; with stream → None)
@@ -41,7 +41,7 @@ import pytest
 
 
 class TestDumpAll:
-    """Tests for the dump_all function whose docstring was reformatted in this PR."""
+    """Tests for the dump_all function whose docstring was reformatted for this integration."""
 
     def test_dump_all_returns_str_when_no_stream_no_encoding(self) -> None:  # noqa: PLR6301
         """dump_all must return a str when stream is None and encoding is None."""
@@ -90,7 +90,7 @@ class TestDumpAll:
 
 
 class TestDump:
-    """Tests for the dump function whose docstring was reformatted in this PR."""
+    """Tests for the dump function whose docstring was reformatted for this integration."""
 
     def test_dump_returns_str_when_no_stream(self) -> None:  # noqa: PLR6301
         """Dump must return a str when no stream is provided."""

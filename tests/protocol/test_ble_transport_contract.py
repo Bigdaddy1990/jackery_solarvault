@@ -1,6 +1,6 @@
-"""Tests for the PR changes to client/ble.py.
+"""Tests for the behavior contracts to client/ble.py.
 
-The PR changed:
+The contract requires:
 - String literals from single to double quotes (cosmetic, no behaviour change)
 - build_binary_frame: replaced ``if len(header) != _BINARY_FRAME_HEADER_LEN: raise RuntimeError``
   with ``assert len(header) == _BINARY_FRAME_HEADER_LEN``
@@ -127,7 +127,7 @@ def test_build_binary_frame_output_ends_with_default_zero_trailer() -> None:
 def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
     """build_binary_frame + encrypt_binary_notify + decrypt_binary_notify must round-trip.
 
-    Pins the symmetry that the PR did not break despite the assert change.
+    Pins the symmetry that the behavior did not break despite the assert change.
     """
     import base64
 
@@ -161,7 +161,7 @@ def test_build_binary_frame_round_trips_with_decrypt_binary_notify() -> None:
 def test_ble_frame_string_constants_unchanged() -> None:
     """Wire-format string constants must still match smali reference values.
 
-    The PR changed single-quoted literals to double-quoted literals.
+    The contract requires single-quoted literals to double-quoted literals.
     Values must be identical.
     """
     assert BLE_FRAME_MAGIC == "DFED"
@@ -170,7 +170,7 @@ def test_ble_frame_string_constants_unchanged() -> None:
 
 
 def test_gatt_uuid_string_constants_unchanged() -> None:
-    """GATT UUIDs must be exact lowercase strings, unchanged by the PR."""
+    """GATT UUIDs must be exact lowercase strings, unchanged by the behavior."""
     assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"
     assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"
     assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"

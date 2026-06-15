@@ -1,4 +1,4 @@
-"""Tests for the __init__.py helpers introduced or clarified in this PR.
+"""Tests for the __init__.py helpers introduced or clarified for this integration.
 
 Covers:
 - _legacy_suffix_matches: anchored suffix match against the legacy device-head pattern

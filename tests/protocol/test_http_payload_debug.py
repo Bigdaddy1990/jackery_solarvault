@@ -1,9 +1,9 @@
-"""Additional tests to strengthen PR coverage beyond existing test_*_pr_changes.py files.
+"""additional protocol, repair, and diagnostic contracts.
 
-Covers gaps not addressed by the existing PR test files:
+Covers behavior contracts for:
 
 1. local_mqtt._handle_message: bytearray payload handling (not in test_local_mqtt.py)
-2. api._emit_payload_debug: accepts a pre-built dict (the PR removed the lambda
+2. api._emit_payload_debug: accepts a pre-built dict (the behavior removed the lambda
    wrapper — direct dicts now arrive instead of zero-arg callables)
 3. api._http_payload_debug: verifies the returned dict shape so callers can rely on it
 4. async_get_device_eps_stat: with omitted begin/end dates (exercises default bounds)
@@ -265,7 +265,7 @@ def test_handle_message_bytearray_raw_bytes_forwarded_to_sink() -> None:
 
 
 # ===========================================================================
-# 2. api._emit_payload_debug — direct dict (PR removed lambda wrapper)
+# 2. api._emit_payload_debug — direct dict (behavior removed lambda wrapper)
 # ===========================================================================
 
 
@@ -285,7 +285,7 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
 
 
 async def test_emit_payload_debug_with_callable_calls_callback() -> None:
-    """When a callable is passed, it must be forwarded to the callback."""
+    """Callable factories must be evaluated before callback delivery."""
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
@@ -299,7 +299,7 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
 
     await api._emit_payload_debug(factory)  # noqa: SLF001
     assert len(received) == 1
-    assert received[0] is factory
+    assert received[0] == {"kind": "http", "path": "/lazy"}
 
 
 async def test_emit_payload_debug_noop_when_callback_is_none() -> None:
@@ -531,7 +531,7 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
-        await _async_start_local_mqtt(hass, entry)
+        await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # Empty string username must become None (the constructor does `username or None`).
@@ -550,7 +550,7 @@ async def test_async_start_local_mqtt_empty_password_stored_as_none_in_client() 
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
-        await _async_start_local_mqtt(hass, entry)
+        await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     assert client._password is None  # noqa: SLF001
@@ -568,7 +568,7 @@ async def test_async_start_local_mqtt_non_empty_credentials_preserved() -> None:
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
-        await _async_start_local_mqtt(hass, entry)
+        await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     assert client._username == "mqttuser"  # noqa: SLF001
@@ -582,7 +582,7 @@ async def test_async_start_local_mqtt_port_passed_to_client() -> None:
     entry = _make_local_mqtt_entry(enable=True, host="192.168.1.100", port=8883)
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
-        await _async_start_local_mqtt(hass, entry)
+        await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     assert client._port == 8883  # noqa: PLR2004, SLF001
@@ -595,7 +595,7 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
     entry = _make_local_mqtt_entry(enable=True, host="  mqtt.local  ")
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
-        await _async_start_local_mqtt(hass, entry)
+        await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # The _async_start_local_mqtt strips the host before passing it.

@@ -1,4 +1,4 @@
-"""Tests for PR changes not covered by existing test files.
+"""Tests for button and service outcome contracts.
 
 Covers:
 - JackeryDeleteStormAlertButton.available: False when alert is absent from payload,

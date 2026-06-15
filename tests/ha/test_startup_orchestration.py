@@ -1,4 +1,4 @@
-"""Tests for the new startup orchestration logic added to __init__.py in this PR.
+"""Tests for the new startup orchestration logic added to __init__.py for this integration.
 
 Covers:
 - _async_finish_entry_startup: auth failure path stores message on coordinator
@@ -761,7 +761,7 @@ def test_storm_alert_id_with_false_alertid_returns_string_false() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regression: _legacy_suffix_matches boundary cases not in test_pr_new_coverage
+# Regression: _legacy_suffix_matches boundary cases not in legacy ID coverage
 # ---------------------------------------------------------------------------
 
 
@@ -777,7 +777,7 @@ def test_legacy_suffix_matches_rejects_current_schema_entity_tail_overlap() -> N
         _legacy_suffix_matches,  # noqa: PLC2701
     )
 
-    # This is the exact regression case from the PR description
+    # This is the exact regression case for legacy cleanup
     assert (
         _legacy_suffix_matches(
             "12345_device_today_battery_charge", "_today_battery_charge"
@@ -835,9 +835,9 @@ def test_legacy_suffix_matches_empty_suffix_always_false() -> None:
 def test_api_module_uses_relative_const_import() -> None:
     """The api module must be importable, confirming the relative import fix works.
 
-    The PR changed 'from jackery_solarvault.const import' to 'from ..const import'.
+    The contract requires 'from jackery_solarvault.const import' to 'from ..const import'.
     This test confirms the module imports without error and that encrypt_mqtt_body
-    (a new function added in this PR) is available.
+    (a new function added for this integration) is available.
     """
     from custom_components.jackery_solarvault.client.api import encrypt_mqtt_body  # noqa: I001
 
@@ -863,7 +863,7 @@ def test_api_module_encrypt_mqtt_body_requires_16_byte_key() -> None:
 def test_client_init_getattr_uses_import_module() -> None:
     """The __getattr__ must use import_module (importlib) rather than a direct import.
 
-    The PR changed the implementation from a direct inline import to importlib.import_module.
+    The contract requires the implementation from a direct inline import to importlib.import_module.
     We verify the behavior is equivalent: the class is loaded lazily and is correct.
     """
     import custom_components.jackery_solarvault.client as client_pkg

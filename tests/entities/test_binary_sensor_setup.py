@@ -1,6 +1,6 @@
 """Tests for binary_sensor.py async_setup_entry and class-level attributes.
 
-Covers code changed/added in this PR:
+Covers code changed/added for this integration:
 - PARALLEL_UPDATES constant
 - async_setup_entry: entity discovery from coordinator data
 - async_setup_entry: deduplication (same unique_id not added twice)

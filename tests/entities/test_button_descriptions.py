@@ -1,4 +1,4 @@
-"""Tests for button.py new functions and entity classes added in this PR.
+"""Tests for button.py new functions and entity classes added for this integration.
 
 Covers:
 - _storm_alert_id: alertId extraction from alert dicts

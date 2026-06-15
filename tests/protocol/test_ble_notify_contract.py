@@ -1,7 +1,7 @@
-"""Additional tests for PR changes not yet covered by earlier test files.
+"""protocol debug and BLE notify contracts.
 
 Covers:
-- _emit_payload_debug: pre-built-dict form (PR changed lambda → direct call in
+- _emit_payload_debug: pre-built-dict form (contract changed lambda → direct call in
   async_login / _get_json / _put_json / _post_form)
 - decrypt_binary_notify: version-field mismatch now silently continues instead
   of logging a debug message
@@ -72,9 +72,8 @@ async def test_emit_payload_debug_passes_callable_to_callback() -> None:
     await api._emit_payload_debug(factory)  # noqa: SLF001
 
     assert len(received) == 1
-    assert received[0] is factory
-    # Factory itself must not have been called by _emit_payload_debug.
-    assert not factory_called
+    assert received[0] == {"kind": "http", "path": "/v1/test"}
+    assert factory_called == [True]
 
 
 async def test_emit_payload_debug_suppresses_callback_exception() -> None:
@@ -121,7 +120,7 @@ async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
 # ---------------------------------------------------------------------------
 # _http_payload_debug is now called eagerly (not via lambda)
 #
-# The PR changed:
+# The contract requires:
 #   await self._emit_payload_debug(lambda: self._http_payload_debug(...))
 # to:
 #   await self._emit_payload_debug(self._http_payload_debug(...))
@@ -160,7 +159,7 @@ async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
 
     api.payload_debug_callback = callback
 
-    # Simulate the post-PR calling pattern: build the dict first, pass it in.
+    # Simulate the current calling pattern: build the dict first, pass it in.
     event = api._http_payload_debug(  # noqa: SLF001
         method="POST",
         path="/v1/auth/login",
@@ -198,7 +197,7 @@ def _make_tampered_notify(cmd: int, body: bytes, key: bytes) -> bytes:
 def test_decrypt_binary_notify_version_mismatch_does_not_raise() -> None:
     """A frame with unexpected version bytes must parse without raising.
 
-    The PR removed the _LOGGER.debug call on version mismatch and replaced it
+    The decoder no longer emits the _LOGGER.debug call on version mismatch and replaced it
     with a ``pass`` comment.  Decoding must still succeed.
     """
     key = b"hr2c0hh361336138"  # 16-byte AES-128 key

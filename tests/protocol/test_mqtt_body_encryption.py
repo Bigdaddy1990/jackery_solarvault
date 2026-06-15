@@ -1,4 +1,4 @@
-"""Tests for the encrypt_mqtt_body function added to client/api.py in this PR.
+"""Tests for the encrypt_mqtt_body function added to client/api.py for this integration.
 
 Covers:
 - Valid 16-byte key: returns a base64 string

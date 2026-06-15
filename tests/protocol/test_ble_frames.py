@@ -664,7 +664,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
     import json
     from pathlib import Path
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     manifest = json.loads(
         (root / "custom_components" / "jackery_solarvault" / "manifest.json").read_text(
             encoding="utf-8",
@@ -714,7 +714,7 @@ def test_ble_write_option_is_options_only() -> None:
     """BLE writes default off and are not shown in the initial login form."""
     from pathlib import Path
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     source = (
         root / "custom_components" / "jackery_solarvault" / "config_flow.py"
     ).read_text(encoding="utf-8")
@@ -738,7 +738,7 @@ def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
     """BLE option lookup must use the entry attribute stored by the coordinator."""
     from pathlib import Path
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     coordinator_source = (
         root / "custom_components" / "jackery_solarvault" / "coordinator.py"
     ).read_text(encoding="utf-8")

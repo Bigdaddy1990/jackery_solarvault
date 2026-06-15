@@ -1,8 +1,8 @@
-"""Tests for PR changes not covered by earlier test files.
+"""Tests for client export and legacy ID contracts.
 
 Covers:
 - __init__.py new import path: JackeryLocalMqttClient is imported from
-  .client.local_mqtt (new import added in this PR).
+  .client.local_mqtt (new import added for this integration).
 - _legacy_suffix_matches: the regex pattern was changed from single-quote to
   double-quote string literals and the docstring was rewritten. Tests pin the
   actual match semantics (digits-only head and battery-pack head).
@@ -56,7 +56,7 @@ def test_api_error_is_subclass_of_error() -> None:
 def test_init_imports_jackery_local_mqtt_client() -> None:
     """JackeryLocalMqttClient must be importable from the package init module.
 
-    The PR added ``from .client.local_mqtt import JackeryLocalMqttClient`` to
+    The package exposes ``from .client.local_mqtt import JackeryLocalMqttClient`` to
     __init__.py. This test verifies the import works without error.
     """
     try:
@@ -72,7 +72,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
 def test_client_init_imports_jackery_api_from_client_package() -> None:
     """JackeryApi must be importable from the client sub-package (not from .api shim).
 
-    The PR changed __init__.py to import from .client instead of .api.
+    The contract requires __init__.py to import from .client instead of .api.
     """
     assert JackeryApi is not None
 
@@ -88,11 +88,11 @@ def test_client_init_imports_jackery_error() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _legacy_suffix_matches — docstring and string-literal style changed in PR
+# _legacy_suffix_matches — docstring and string-literal style changed in behavior
 # ---------------------------------------------------------------------------
 # The function's regex pattern was updated from single-quoted to double-quoted
 # string literals. These tests pin the matching contract so any accidental
-# regex change in a future PR is caught immediately.
+# regex change in a future change is caught immediately.
 
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:

@@ -1,4 +1,4 @@
-"""Tests for the binary_sensor.py platform updated in this PR.
+"""Tests for the binary_sensor.py platform updated for this integration.
 
 Covers:
 - BINARY_DESCRIPTIONS count, structure and required fields

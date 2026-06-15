@@ -21,7 +21,7 @@ from custom_components.jackery_solarvault.button import (
 # The expected total count: 14 SolarVault + 14 portable = 28 entries
 _EXPECTED_TOTAL_COUNT = 28
 
-# Portable button keys (added in current PR scope)
+# Portable button keys (added in portable device scope)
 _PORTABLE_KEYS = frozenset({
     "portable_restart",
     "portable_power_off",

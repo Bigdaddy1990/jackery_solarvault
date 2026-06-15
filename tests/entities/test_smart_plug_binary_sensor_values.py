@@ -1,6 +1,6 @@
-"""Tests for the JackerySmartPlugStateBinarySensor changes introduced in this PR.
+"""Tests for the JackerySmartPlugStateBinarySensor changes introduced for this integration.
 
-The PR changes the entity unique_id from
+The behavior contracts the entity unique_id from
     "<device_id>_smart_plug_<index>_switch_state"
 to
     "<device_id>_<plug_key>_switch_state"
@@ -134,7 +134,7 @@ def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
 
 
 # ---------------------------------------------------------------------------
-# is_on behaviour (unchanged from pre-PR, verify it still works)
+# is_on behaviour (unchanged from legacy, verify it still works)
 # ---------------------------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-"""Tests for the new helper functions added to __init__.py in this PR.
+"""Tests for the new helper functions added to __init__.py for this integration.
 
 Covers:
 - _entry_bootstrap_mqtt_session: validates bootstrap MQTT session from entry.data

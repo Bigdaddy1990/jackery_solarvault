@@ -1,4 +1,4 @@
-"""Tests for the PR changes to client/api.py.
+"""Tests for the behavior contracts to client/api.py.
 
 Covers:
 - _rsa_pkcs1v15_encrypt: new isinstance guard that raises TypeError for non-RSA keys

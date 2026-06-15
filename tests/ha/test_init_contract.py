@@ -1,6 +1,6 @@
-"""Tests for the PR changes to custom_components/jackery_solarvault/__init__.py.
+"""Tests for the behavior contracts to custom_components/jackery_solarvault/__init__.py.
 
-Covers the new helper functions introduced in this PR:
+Covers the new helper functions introduced for this integration:
 - _local_mqtt_client: retrieves a JackeryLocalMqttClient from hass.data
 - _LOCAL_MQTT_RUNTIME_KEY: the key used to store the client
 - _async_start_local_mqtt: creates, stores and starts the local MQTT client
