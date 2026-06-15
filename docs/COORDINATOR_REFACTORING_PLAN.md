@@ -3,13 +3,7 @@
 > **Status:** PLANNING
 > **Date:** 2026-06-12 (v2 - rewritten against RE docs)
 > **Coordinator:** 9,467 lines (was 10,091) -> target ~3,000 lines
-> **Authoritative sources:** Jackery 2.1.1 RE documentation (`source-of-truth/Jackery_2.1.1_RE_Documentation.md`,
-> `source-of-truth/Jackery_2.1.1_RE_Supplement.md`, `source-of-truth/Jackery_2.1.1_RE_Crypto_and_DTOs.md`,
-> `source-of-truth/Jackery_2.1.1_DEX_Aufschluesselung.md`, `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`,
-> `source-of-truth/jackery_complete_reference.json`, `source-of-truth/jackery_entity_field_candidates_v2.json`,
-> `source-of-truth/hbxn_commands.html`, `source-of-truth/jackery_command_catalog_v2.html`,
-> `source-of-truth/jackery_http_api_endpoints_v2.html`, `source-of-truth/jackery_http_model_fields_v2.html`,
-> `source-of-truth/hbxn_model_fields.html`, `source-of-truth/jackery_ha_extraction_v2.json`)
+> **Single technical source of truth:** `docs/jackery_complete_reference.json`; derived coverage: `docs/REFERENCE_COVERAGE.md`.
 
 ---
 
@@ -23,25 +17,15 @@
 | **4** | BLE (GATT) | FALLBACK — commands + live data | ✅ | ✅ |
 | **5** | MQTT (Cloud + Local) | DATA SOURCE + CMD TRANSPORT | ✅ | ✅ |
 
-### 1.2 HTTP API — 112 Endpoints (57% implemented)
+### 1.2 HTTP API — 112 Endpoints (96% implemented; 111/112 covered including exemptions)
 
-| Category | Endpoints | Implemented | Module |
-|----------|:---------:|:-----------:|--------|
-| Auth/login | 3 | 3 | `client/_endpoints/auth.py` |
-| Device/property | 8 | 8 | `client/_endpoints/device.py` |
-| System list | 1 | 1 | `client/_endpoints/device.py` |
-| PV statistics | 20 | 20 | `client/_endpoints/statistics.py` |
-| Home statistics | 10 | 10 | `client/_endpoints/statistics.py` |
-| Battery statistics | 20 | 20 | `client/_endpoints/statistics.py` |
-| CT/Meter statistics | 20 | 20 | `client/_endpoints/statistics.py` |
-| Smart mode | 3 | 3 | `client/_endpoints/smart_mode.py` |
-| Energy price | 6 | 3 | `client/_endpoints/energy_price.py` |
-| Accessories | 2 | 2 | `client/_endpoints/accessories.py` |
-| Alarms | 1 | 1 | `client/_endpoints/misc.py` |
-| Weather | 2 | 2 | `client/_endpoints/misc.py` |
-| Push register | 2 | 2 | `client/_endpoints/push.py` |
-| OTA | 3 | 0 | NOT YET IMPLEMENTED |
-| **Total** | **112** | **64** | |
+| Metric | Count | Source |
+|--------|------:|--------|
+| Reference endpoints | 112 | `docs/jackery_complete_reference.json` `counts.http_endpoints` |
+| Implemented client mappings | 108 | `client/endpoint_registry.py` `CLIENT_ENDPOINTS` |
+| Explicit mobile-app-only exemptions | 3 | `client/endpoint_registry.py` `EXEMPT_ENDPOINTS` |
+| Covered endpoints incl. exemptions | 111 | `docs/REFERENCE_COVERAGE.md` |
+| Coverage | 96% implemented / 99% covered | `docs/REFERENCE_COVERAGE.md` |
 
 ### 1.3 MQTT Message Types — 25 (home) + 28 defined
 
@@ -500,13 +484,13 @@ Phase 1: models/property_merge.py                       │
 
 | Coordinator Section | RE Doc Reference | Key Fields/DTOs |
 |--------------------|------------------|-----------------|
-| Property merging (2607–2797) | `source-of-truth/jackery_complete_reference.json` HomeBody | 35 fields: soc, batSoc, cellTemp, pvPw, batInPw, batOutPw, gridInPw, gridOutPw, ... |
-| Subdevice mgmt (2798–4343) | `source-of-truth/jackery_complete_reference.json` BatteryPackSub | 9 fields: deviceSn, devType, subType, soc, cellTemp, inPw, outPw, commState, ... |
+| Property merging (2607–2797) | `docs/jackery_complete_reference.json` HomeBody | 35 fields: soc, batSoc, cellTemp, pvPw, batInPw, batOutPw, gridInPw, gridOutPw, ... |
+| Subdevice mgmt (2798–4343) | `docs/jackery_complete_reference.json` BatteryPackSub | 9 fields: deviceSn, devType, subType, soc, cellTemp, inPw, outPw, commState, ... |
 | Command dispatch (4344–5330) | `source-of-truth/hbxn_commands.html` + `source-of-truth/jackery_command_catalog_v2.html` | 88 cmds (47 home + 41 portable), body templates from BoxControlFormat |
-| MQTT handlers (1462–2606) | `source-of-truth/jackery_complete_reference.json` msgTypes | 25 message types with actionId mapping |
+| MQTT handlers (1462–2606) | `docs/jackery_complete_reference.json` msgTypes | 25 message types with actionId mapping |
 | Statistics (6004–7424) | `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md` | 17 device + 5 system stat endpoints, energy flow objects |
 | Third-party bridge (5331–6003) | `source-of-truth/Jackery_2.1.1_RE_Supplement.md` §5 | ThirdPartyMqttBody, cmd=113/114, Layer C encrypted |
-| HTTP endpoints (7425–8832) | `source-of-truth/jackery_http_api_endpoints_v2.html` | 112 endpoints, 64 implemented |
+| HTTP endpoints (7425–8832) | `docs/jackery_complete_reference.json` + `docs/REFERENCE_COVERAGE.md` | 112 endpoints, 108 implemented, 111/112 covered incl. exemptions |
 | BLE transport (1462–2606) | `source-of-truth/Jackery_2.1.1_RE_Documentation.md` §4 | BLE cmd routing, Layer C encryption |
 | Crypto layers | `source-of-truth/Jackery_2.1.1_RE_Crypto_and_DTOs.md` | Layer A (login), B (MQTT auth), C (payload) |
 
