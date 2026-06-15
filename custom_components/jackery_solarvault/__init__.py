@@ -711,19 +711,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    except (
-        ConfigEntryAuthFailed,
-        HomeAssistantError,
-        JackeryError,
-        RuntimeError,
-        ValueError,
-        TypeError,
-    ) as err:
+    except Exception as err:  # noqa: BLE001
         _LOGGER.debug("Jackery setup failed after coordinator creation: %s", err)
-        with contextlib.suppress(HomeAssistantError, JackeryError, RuntimeError):
+        with contextlib.suppress(Exception):
             await coordinator.async_shutdown()
         if entry.runtime_data is coordinator:
-            entry.runtime_data = cast(Any, None)
+            entry.runtime_data = cast("Any", None)
         raise
 
     startup_task = hass.async_create_background_task(
@@ -899,7 +892,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     # HA convention on unload: drop the runtime_data reference so any
     # stragglers cannot keep the coordinator alive. Same narrowing caveat
     # as the setup-failure path above.
-    entry.runtime_data = cast(Any, None)
+    entry.runtime_data = cast("Any", None)
     return True
 
 

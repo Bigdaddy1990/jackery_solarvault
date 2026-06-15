@@ -270,7 +270,7 @@ async def _portable_restart(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_RESTART,
-        cmd=45,
+        cmd=96,
         body_fields={FIELD_REBOOT: 1},
     )
 
@@ -285,7 +285,7 @@ async def _portable_power_off(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_OFF,
-        cmd=46,
+        cmd=97,
         body_fields={FIELD_REBOOT: 2},
     )
 
@@ -300,7 +300,7 @@ async def _portable_power_pack_blink(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
-        cmd=39,
+        cmd=90,
         body_fields={},
     )
 
@@ -316,7 +316,7 @@ async def _portable_read_device_info(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
-        cmd=6,
+        cmd=57,
         body_fields={},
     )
 
@@ -326,12 +326,12 @@ async def _portable_read_wifi_list(
 ) -> None:
     """Request the portable device's available WiFi networks.
 
-    Sends a portable command to query the device WiFi list (msgId=5, bleMsgType=1).
+    Sends a portable command to query the device WiFi list (msgId=56, bleMsgType=1).
     """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_WIFI_LIST,
-        cmd=5,
+        cmd=56,
         body_fields={},
     )
 
@@ -348,7 +348,7 @@ async def _portable_get_power_pack_list(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
-        cmd=8,
+        cmd=59,
         body_fields={},
     )
 
@@ -358,12 +358,12 @@ async def _portable_get_electricity_data_count(
 ) -> None:
     """Request the portable device's stored electricity data count.
 
-    Sends a portable command via the coordinator to query how many electricity data records the portable device holds (uses action_id ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT, cmd=9).
+    Sends a portable command via the coordinator to query how many electricity data records the portable device holds (uses action_id ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT, cmd=60).
     """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
-        cmd=9,
+        cmd=60,
         body_fields={},
     )
 
@@ -375,7 +375,7 @@ async def _portable_send_time_zone(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_SEND_TIME_ZONE,
-        cmd=25,
+        cmd=76,
         body_fields={},
     )
 
@@ -390,7 +390,7 @@ async def _portable_sync_mqtt_info(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
-        cmd=50,
+        cmd=101,
         body_fields={},
     )
 
@@ -398,11 +398,11 @@ async def _portable_sync_mqtt_info(
 async def _portable_get_wifi_config(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable WiFi config (msgId=52, bleMsgType=124)."""
+    """Query portable WiFi config (msgId=103, bleMsgType=124)."""
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
-        cmd=52,
+        cmd=103,
         body_fields={},
     )
 
@@ -412,12 +412,12 @@ async def _portable_get_charge_plan(
 ) -> None:
     """Request the portable unit's charge/discharge plan.
 
-    Sends the portable query for the device's electricity strategy (message type MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY, command 26).
+    Sends the portable query for the device's electricity strategy (message type MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY, command 77).
     """
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
-        cmd=26,
+        cmd=77,
         body_fields={},
         message_type=MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
     )
@@ -426,11 +426,11 @@ async def _portable_get_charge_plan(
 async def _portable_current_charge_plan(
     coordinator: JackerySolarVaultCoordinator, device_id: str
 ) -> None:
-    """Query portable current charge/discharge plan (msgId=30)."""
+    """Query portable current charge/discharge plan (msgId=81)."""
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN,
-        cmd=30,
+        cmd=81,
         body_fields={},
         message_type=MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
     )
@@ -447,7 +447,7 @@ async def _portable_get_peaks_troughs(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
-        cmd=43,
+        cmd=94,
         body_fields={},
         message_type=MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
     )
@@ -463,7 +463,7 @@ async def _portable_read_sub_ct(
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_READ_SUB_CT,
-        cmd=51,
+        cmd=102,
         body_fields={},
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
     )
@@ -609,7 +609,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_restart,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_RESTART,
-        cmd=45,
+        cmd=96,
     ),
     JackeryQueryButtonDescription(
         key="portable_power_off",
@@ -618,7 +618,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_power_off,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_POWER_OFF,
-        cmd=46,
+        cmd=97,
     ),
     JackeryQueryButtonDescription(
         key="portable_power_pack_blink",
@@ -627,7 +627,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_power_pack_blink,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
-        cmd=39,
+        cmd=90,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_device_info",
@@ -636,7 +636,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_read_device_info,
         message_type=MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
         action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
-        cmd=6,
+        cmd=57,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_wifi_list",
@@ -645,7 +645,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_read_wifi_list,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_READ_WIFI_LIST,
-        cmd=5,
+        cmd=56,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_battery_packs",
@@ -654,7 +654,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_get_power_pack_list,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
-        cmd=8,
+        cmd=59,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_electricity_count",
@@ -663,7 +663,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_get_electricity_data_count,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT,
-        cmd=9,
+        cmd=60,
     ),
     JackeryQueryButtonDescription(
         key="portable_sync_time_zone",
@@ -672,7 +672,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_send_time_zone,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_SEND_TIME_ZONE,
-        cmd=25,
+        cmd=76,
     ),
     JackeryQueryButtonDescription(
         key="portable_sync_mqtt_info",
@@ -681,7 +681,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_sync_mqtt_info,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
-        cmd=50,
+        cmd=101,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_wifi_config",
@@ -690,7 +690,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_get_wifi_config,
         message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
         action_id=ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
-        cmd=52,
+        cmd=103,
     ),
     JackeryQueryButtonDescription(
         key="portable_get_charge_plan",
@@ -699,7 +699,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_get_charge_plan,
         message_type=MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
         action_id=ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
-        cmd=26,
+        cmd=77,
     ),
     JackeryQueryButtonDescription(
         key="portable_current_charge_plan",
@@ -708,7 +708,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_current_charge_plan,
         message_type=MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
         action_id=ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN,
-        cmd=30,
+        cmd=81,
     ),
     JackeryQueryButtonDescription(
         key="portable_get_peaks_troughs",
@@ -717,7 +717,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_get_peaks_troughs,
         message_type=MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
         action_id=ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS,
-        cmd=43,
+        cmd=94,
     ),
     JackeryQueryButtonDescription(
         key="portable_refresh_sub_ct",
@@ -726,7 +726,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action=_portable_read_sub_ct,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
         action_id=ACTION_ID_PORTABLE_READ_SUB_CT,
-        cmd=51,
+        cmd=102,
     ),
 )
 

@@ -552,7 +552,7 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except (RuntimeError, ValueError, TypeError) as err:
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.

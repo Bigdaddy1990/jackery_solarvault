@@ -485,8 +485,6 @@ from .util import (
     config_entry_int_option,
     config_entry_str_option,
     dev_mode_redactions_disabled,
-    first_nonblank_int,
-    safe_int,
 )
 
 if TYPE_CHECKING:
@@ -9052,19 +9050,3 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 def _exception_debug_message(err: BaseException) -> str:
     """Return a useful debug message for exceptions with empty ``str(err)``."""
     return f"{type(err).__name__}: {err or '(no message)'}"
-
-
-def _control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
-    """Return a finite integer control value or raise a coordinator error."""
-    parsed = None if isinstance(value, bool) else safe_int(value)
-    if parsed is None:
-        raise UpdateFailed(f"Invalid {field_name}")  # noqa: TRY003
-    return parsed
-
-
-def _transport_cmd(value: Any) -> int:  # noqa: ANN401
-    """Return a command integer for MQTT/BLE transport routing."""
-    parsed = first_nonblank_int(value)
-    if parsed is None:
-        raise ValueError("cmd must be an integer")  # noqa: TRY003
-    return parsed
