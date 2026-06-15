@@ -56,6 +56,8 @@ jobs:
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
+        with:
+          msg: apply code formatting
       - name: Run pre-commit with fixes
         run: |
           ruff check . --fix || true
@@ -65,6 +67,7 @@ jobs:
           ruff check . --preview || true
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
-          ruff format
+          ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+
