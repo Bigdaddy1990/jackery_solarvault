@@ -61,6 +61,10 @@ from .models.mqtt_classifiers import (
     is_wifi_list_message,
 )
 from .models.price import source_regions, valid_price_sources
+from .models.coordinator_domain import (
+    exception_debug_message as _exception_debug_message,
+    stable_payload_debug_signature as _stable_payload_debug_signature,
+)
 from .stats import (
     ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD,
     STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
@@ -591,42 +595,6 @@ _ENTITY_STATISTICS_REPAIR_VERSION = 3
 _BLE_PARTIAL_UPDATE_COALESCE_SEC = 0.25
 _ENDPOINT_BACKOFF_CODES = frozenset({10422, 10432})
 _ENDPOINT_BACKOFF_DELAYS_SEC: tuple[int, ...] = (300, 900, 3600, 21600)
-
-
-def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
-    """Return a content-only signature for payload-debug dedup.
-
-    Per-message identifiers (``id``, ``timestamp``, ``messageId``) and
-    the optional ``entry_id`` annotation change for every record but
-    do not represent new information about the device. They are
-    excluded from the signature so a stream of identical telemetry
-    payloads collapses into one log line per actually-changed value.
-    """
-    payload = event.get("payload") or {}
-    body = payload.get("body") if isinstance(payload, dict) else None
-    if isinstance(body, dict):
-        body_sig: Any = {k: v for k, v in body.items() if k != "messageId"}
-    else:
-        body_sig = body
-    response = (
-        event.get("response") if isinstance(event.get("response"), dict) else None
-    )
-    response_data = response.get("data") if response is not None else None
-    return json.dumps(
-        [
-            event.get("kind"),
-            event.get("topic") or event.get("path"),
-            payload.get("messageType") if isinstance(payload, dict) else None,
-            body_sig,
-            event.get("body_type"),
-            event.get("data_type"),
-            event.get("response_data_type"),
-            event.get("status"),
-            response_data,
-        ],
-        sort_keys=True,
-        default=str,
-    )
 
 
 def _raise_config_entry_auth_failed(message: str, err: JackeryAuthError) -> NoReturn:
@@ -4921,8 +4889,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Send an arbitrary portable command (msg_id 1-53) via BLE-first then MQTT.
 
-        Portable commands use ``cmd=<portable_msg_id>`` directly rather than
-        the home MQTT_CMD constants.  Most portable commands transport as
+        Portable commands use ``action_id=<msgId>`` and ``cmd=<bleMsgType>``
+        from ``cmd.portable.b``.  Most portable commands transport as
         ``DevicePropertyChange`` (the ``message_type`` parameter allows overriding
         for strategy/plan commands).
         """

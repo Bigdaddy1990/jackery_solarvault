@@ -3,13 +3,13 @@
 > **Status:** PLANNING  
 > **Date:** 2026-06-12 (v2 - rewritten against RE docs)  
 > **Coordinator:** 9,467 lines (was 10,091) -> target ~3,000 lines  
-> **Authoritative sources:** Jackery 2.1.1 RE documentation (`Jackery_2.1.1_RE_Documentation.md`,
-> `Jackery_2.1.1_RE_Supplement.md`, `Jackery_2.1.1_RE_Crypto_and_DTOs.md`,
-> `Jackery_2.1.1_DEX_Aufschluesselung.md`, `Jackery_2.1.1_Stats_und_Trends.md`,
-> `jackery_complete_reference.json`, `jackery_entity_field_candidates_v2.json`,
-> `hbxn_commands.html`, `jackery_command_catalog_v2.html`,
-> `jackery_http_api_endpoints_v2.html`, `jackery_http_model_fields_v2.html`,
-> `hbxn_model_fields.html`, `jackery_ha_extraction_v2.json`)
+> **Authoritative sources:** Jackery 2.1.1 RE documentation (`source-of-truth/Jackery_2.1.1_RE_Documentation.md`,
+> `source-of-truth/Jackery_2.1.1_RE_Supplement.md`, `source-of-truth/Jackery_2.1.1_RE_Crypto_and_DTOs.md`,
+> `source-of-truth/Jackery_2.1.1_DEX_Aufschluesselung.md`, `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`,
+> `source-of-truth/jackery_complete_reference.json`, `source-of-truth/jackery_entity_field_candidates_v2.json`,
+> `source-of-truth/hbxn_commands.html`, `source-of-truth/jackery_command_catalog_v2.html`,
+> `source-of-truth/jackery_http_api_endpoints_v2.html`, `source-of-truth/jackery_http_model_fields_v2.html`,
+> `source-of-truth/hbxn_model_fields.html`, `source-of-truth/jackery_ha_extraction_v2.json`)
 
 ---
 
@@ -322,7 +322,7 @@ custom_components/jackery_solarvault/
 **Source:** `coordinator.py` lines 2762-4024  
 **Target:** `subdevices/` package  
 **Size:** ~1,260 lines (detection: 387 lines extracted, merge ops: pending)  
-**RE mapping:** BatteryPackSub (9 fields), AccCTBody (26 fields), devType/subType enums from `jackery_entity_field_candidates_v2.json`
+**RE mapping:** BatteryPackSub (9 fields), AccCTBody (26 fields), devType/subType enums from `source-of-truth/jackery_entity_field_candidates_v2.json`
 
 **2a - Detection functions ✅ DONE:**
 - `subdevices/detector.py` (387 lines): 20 pure functions for subdevice identification
@@ -348,7 +348,7 @@ custom_components/jackery_solarvault/
 **Source:** `coordinator.py` lines 6004–7424, 8833–9060  
 **Target:** `stats/` package  
 **Size:** ~1,425 + 228 = ~1,653 lines  
-**RE mapping:** 17 device stat endpoints + 5 system stat endpoints from `Jackery_2.1.1_Stats_und_Trends.md`, StatisticBody (30+ fields)
+**RE mapping:** 17 device stat endpoints + 5 system stat endpoints from `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md`, StatisticBody (30+ fields)
 
 **Files:**
 - `stats/importer.py` (~600 lines): All `_async_import_*` stat methods (pv_trends, home_trends, battery_trends, device_stat, system_stat)
@@ -368,7 +368,7 @@ custom_components/jackery_solarvault/
 **Source:** `coordinator.py` lines 4344–5330  
 **Target:** `setters/` package  
 **Size:** ~986 lines  
-**RE mapping:** 47 home commands (cmd 107–3044), body templates from `hbxn_commands.html` + `jackery_command_catalog_v2.html`
+**RE mapping:** 47 home commands (cmd 107–3044), body templates from `source-of-truth/hbxn_commands.html` + `source-of-truth/jackery_command_catalog_v2.html`
 
 **Files:**
 - `setters/core.py` (~200 lines): `_async_publish_command`, `_async_publish_command_ble_first`, optimistic patching
@@ -500,15 +500,15 @@ Phase 1: models/property_merge.py                       │
 
 | Coordinator Section | RE Doc Reference | Key Fields/DTOs |
 |--------------------|------------------|-----------------|
-| Property merging (2607–2797) | `jackery_complete_reference.json` HomeBody | 35 fields: soc, batSoc, cellTemp, pvPw, batInPw, batOutPw, gridInPw, gridOutPw, ... |
-| Subdevice mgmt (2798–4343) | `jackery_complete_reference.json` BatteryPackSub | 9 fields: deviceSn, devType, subType, soc, cellTemp, inPw, outPw, commState, ... |
-| Command dispatch (4344–5330) | `hbxn_commands.html` + `jackery_command_catalog_v2.html` | 88 cmds (47 home + 41 portable), body templates from BoxControlFormat |
-| MQTT handlers (1462–2606) | `jackery_complete_reference.json` msgTypes | 25 message types with actionId mapping |
-| Statistics (6004–7424) | `Jackery_2.1.1_Stats_und_Trends.md` | 17 device + 5 system stat endpoints, energy flow objects |
-| Third-party bridge (5331–6003) | `Jackery_2.1.1_RE_Supplement.md` §5 | ThirdPartyMqttBody, cmd=113/114, Layer C encrypted |
-| HTTP endpoints (7425–8832) | `jackery_http_api_endpoints_v2.html` | 112 endpoints, 64 implemented |
-| BLE transport (1462–2606) | `Jackery_2.1.1_RE_Documentation.md` §4 | BLE cmd routing, Layer C encryption |
-| Crypto layers | `Jackery_2.1.1_RE_Crypto_and_DTOs.md` | Layer A (login), B (MQTT auth), C (payload) |
+| Property merging (2607–2797) | `source-of-truth/jackery_complete_reference.json` HomeBody | 35 fields: soc, batSoc, cellTemp, pvPw, batInPw, batOutPw, gridInPw, gridOutPw, ... |
+| Subdevice mgmt (2798–4343) | `source-of-truth/jackery_complete_reference.json` BatteryPackSub | 9 fields: deviceSn, devType, subType, soc, cellTemp, inPw, outPw, commState, ... |
+| Command dispatch (4344–5330) | `source-of-truth/hbxn_commands.html` + `source-of-truth/jackery_command_catalog_v2.html` | 88 cmds (47 home + 41 portable), body templates from BoxControlFormat |
+| MQTT handlers (1462–2606) | `source-of-truth/jackery_complete_reference.json` msgTypes | 25 message types with actionId mapping |
+| Statistics (6004–7424) | `source-of-truth/Jackery_2.1.1_Stats_und_Trends.md` | 17 device + 5 system stat endpoints, energy flow objects |
+| Third-party bridge (5331–6003) | `source-of-truth/Jackery_2.1.1_RE_Supplement.md` §5 | ThirdPartyMqttBody, cmd=113/114, Layer C encrypted |
+| HTTP endpoints (7425–8832) | `source-of-truth/jackery_http_api_endpoints_v2.html` | 112 endpoints, 64 implemented |
+| BLE transport (1462–2606) | `source-of-truth/Jackery_2.1.1_RE_Documentation.md` §4 | BLE cmd routing, Layer C encryption |
+| Crypto layers | `source-of-truth/Jackery_2.1.1_RE_Crypto_and_DTOs.md` | Layer A (login), B (MQTT auth), C (payload) |
 
 ---
 

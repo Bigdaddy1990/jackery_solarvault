@@ -398,6 +398,10 @@ from .const import (
     UNRECORDED_ATTRS_LOCAL_MQTT,
 )
 from .entity import JackeryEntity
+from .entity_contract import (
+    DEFAULT_LIVE_SOURCES,
+    DEFAULT_NULL_SEMANTICS,
+)
 from .util import (
     append_unique_entity,
     calculated_smart_meter_power,
@@ -581,6 +585,11 @@ class JackerySensorDescription(SensorEntityDescription):
     transform: Callable[[Any], Any] = _identity
     fallbacks: tuple[Callable[[dict[str, Any]], Any], ...] = ()
     value_map: dict[int, str] | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
@@ -1200,6 +1209,11 @@ class JackeryStatSensorDescription(SensorEntityDescription):
     section: str = PAYLOAD_STATISTIC  # statistic | price | system
     fallback_sources: tuple[tuple[str, str], ...] = ()
     reset_period: StatResetPeriod | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _period_from_stat_description(
@@ -1224,6 +1238,11 @@ class JackeryBatteryPackSensorDescription(SensorEntityDescription):
 
     field: str
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1238,6 +1257,11 @@ class JackerySmartPlugSensorDescription(SensorEntityDescription):
     field: str
     transform: Callable[[Any], Any] = _identity
     reset_period: StatResetPeriod | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1251,6 +1275,11 @@ class JackeryMeterHeadSensorDescription(SensorEntityDescription):
 
     field: str
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1264,6 +1293,11 @@ class JackerySmartMeterSensorDescription(SensorEntityDescription):
     sum_fields: tuple[str, ...] = ()
     negative_sum_fields: tuple[str, ...] = ()
     transform: Callable[[Any], Any] = _identity
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1272,6 +1306,11 @@ class JackerySavingsDetailSensorDescription(SensorEntityDescription):
 
     path: tuple[str, ...]
     transform: Callable[[Any], Any] = safe_float
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 def _external_chart_metric_key(section: str, stat_key: str) -> str | None:
@@ -3162,7 +3201,7 @@ SMART_PLUG_SENSOR_DESCRIPTIONS: tuple[JackerySmartPlugSensorDescription, ...] = 
         icon="mdi:lan",
     ),
     # AccSocketBody short-keys ``sc`` / ``ts`` from the Smali doc table
-    # (docs/html/jackery_smali_home_assistant_report.html). Not observed
+    # (source-of-truth/jackery_smali_home_assistant_report.html). Not observed
     # in this installer's payload stream, but the Smali contract names
     # them so we expose them as default-disabled diagnostic sensors —
     # firmware versions that do emit them surface here without any
@@ -3459,7 +3498,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
     ),
     # ------------------------------------------------------------------
     # AccCTBody electrical measurements (PROTOCOL.md §3 +
-    # docs/html/jackery_entity_field_candidates_v2.html). Per-phase
+    # source-of-truth/jackery_entity_field_candidates_v2.html). Per-phase
     # voltage / current / power-factor / apparent / reactive plus their
     # totals. Active power is already covered above.
     #
@@ -3707,7 +3746,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         entity_registry_enabled_default=False,
         icon="mdi:lan",
     ),
-    # CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html —
+    # CtSub.funForm per source-of-truth/jackery_entity_field_candidates_v2.html —
     # function-form / wiring-mode identifier. Diagnostic, default-disabled.
     JackerySmartMeterSensorDescription(
         key="fun_form",
@@ -5158,7 +5197,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         # Branding lookup against the documented accessory catalog so the
         # UI shows "EcoTracker P1/R1" / "P1 Meter" / "Homey Energy Dongle"
         # / "Jackery HTO892A (Meter Head)" instead of the raw scanName
-        # (PROTOCOL §3 + docs/html scanName table, devType=4).
+        # (PROTOCOL §3 + source-of-truth scanName table, devType=4).
         manufacturer_brand, model_label = subdevice_branding(
             meter_head.get(FIELD_SCAN_NAME)
         )
@@ -5426,7 +5465,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             or "SolarVault"
         )
         # Branding lookup against the documented accessory catalog
-        # (PROTOCOL §3 + docs/html scanName table, devType=3 = CT). The
+        # (PROTOCOL §3 + source-of-truth scanName table, devType=3 = CT). The
         # old "shelly in name.lower()" substring heuristic missed branded
         # units like ``ecotracker`` / ``p1meter`` / ``homey_energy_dongle``
         # and Jackery's own ``HTO906A``/``HTO907A`` CT-type accessories;

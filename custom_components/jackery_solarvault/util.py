@@ -1,7 +1,9 @@
 """Shared helpers for Jackery SolarVault entities."""
 
+import asyncio
 import calendar
 import contextlib
+import inspect
 from datetime import UTC, date, datetime, timedelta
 import json
 import math
@@ -714,18 +716,48 @@ def chart_series_debug(source: object) -> dict[str, Any]:
     return result
 
 
+def _payload_debug_caller_path() -> str:
+    """Return the external caller path for payload-debug sync I/O guards."""
+    current_file = Path(__file__).resolve()
+    for frame in inspect.stack(context=0)[2:]:
+        with contextlib.suppress(OSError):
+            if Path(frame.filename).resolve() != current_file:
+                return f"{frame.filename}:{frame.lineno}"
+    return "unknown"
+
+
+def _guard_payload_debug_sync_file_io() -> None:
+    """Reject direct payload-debug sync file I/O from an active event loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    caller_path = _payload_debug_caller_path()
+    raise RuntimeError(
+        "append_payload_debug_line performs synchronous diagnostic file I/O; "
+        "call it via hass.async_add_executor_job or asyncio.to_thread from "
+        f"async code (caller: {caller_path})."
+    )
+
+
 def append_payload_debug_line(
     path: str | Path,
     event: dict[str, Any],
     redactions_disabled: bool | None = None,
 ) -> None:
-    """Write a single JSON Lines (JSONL) diagnostic entry for `event`, applying redaction by default, and rotate the target file when it exceeds the configured maximum size.
+    """Write one payload-debug JSONL entry using sync I/O only off the event loop.
+
+    This helper is intentionally synchronous because it is also used by
+    dev/test tooling. Runtime HA callers must schedule it with
+    ``hass.async_add_executor_job`` or ``asyncio.to_thread``; direct calls from
+    an active event loop raise before touching the filesystem.
 
     Parameters:
         path (str | Path): Path to the JSONL file to append. Parent directories will be created if missing.
         event (dict[str, Any]): Event payload to serialize and write (will be redacted unless redactions are disabled).
         redactions_disabled (bool | None): When `True`, write the event without redaction; when `False`, enforce redaction; when `None`, use the module's default redaction behavior.
     """
+    _guard_payload_debug_sync_file_io()
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:

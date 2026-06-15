@@ -48,6 +48,10 @@ from .const import (
 )
 from .entity import JackeryEntity
 from .exceptions import ACTION_WRITE_ERRORS
+from .entity_contract import (
+    DEFAULT_LIVE_SOURCES,
+    DEFAULT_NULL_SEMANTICS,
+)
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -132,6 +136,11 @@ class JackerySwitchDescription(SwitchEntityDescription):
         Callable[[JackerySolarVaultCoordinator, str, bool], Awaitable[None]] | None
     ) = None
     is_on_transform: Callable[[Any], bool | None] = safe_bool
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 # ---------------------------------------------------------------------------

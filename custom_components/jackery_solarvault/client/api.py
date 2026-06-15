@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING, Any
 from ._crypto import (
     _generate_udid,  # noqa: F401
     _rsa_pkcs1v15_encrypt,  # noqa: F401
+    build_login_crypto_fields,  # noqa: F401
     encrypt_mqtt_body,  # noqa: F401
+    generate_login_aes_key,  # noqa: F401
 )
 from ._endpoints.accessories import AccessoriesEndpointMixin
 from ._endpoints.auth import AuthEndpointMixin

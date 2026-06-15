@@ -61,6 +61,10 @@ from .const import (
 )
 from .entity import JackeryEntity
 from .exceptions import ACTION_WRITE_ERRORS
+from .entity_contract import (
+    DEFAULT_LIVE_SOURCES,
+    DEFAULT_NULL_SEMANTICS,
+)
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -318,6 +322,11 @@ class JackerySelectDescription(SelectEntityDescription):
     current_fn: Callable[[JackerySelect], str | None]
     select_fn: Callable[[JackerySelect, str], Awaitable[None]]
     warn_unknown_kind: str | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 # ---------------------------------------------------------------------------
