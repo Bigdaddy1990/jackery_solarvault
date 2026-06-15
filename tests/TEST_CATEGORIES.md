@@ -31,21 +31,6 @@ Kategorie-Definitionen: `source-backed` (direkt aus `source-of-truth/`), `ha-con
 | `test_mqtt_protocol_contract.py` | `source-backed` | Erwartung an Reverse-Engineering-Quelle bzw. Source-of-truth gekoppelt. |
 | `test_mqtt_stability.py` | `legacy-regression` | Regressionsschutz ohne direkte Autorität aus source-of-truth. |
 | `test_power_math.py` | `legacy-regression` | Regressionsschutz ohne direkte Autorität aus source-of-truth. |
-| `test_pr_additional_coverage.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_binary_sensor_descriptions.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_binary_sensor_plug_key.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_binary_sensor_setup.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_client_init_and_api_counters.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_encrypt_mqtt_body.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_final_coverage.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_init_new_helpers.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_legacy_suffix_cleanup.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_new_coverage.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_portable_button_descriptions.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_remaining_coverage.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_startup_orchestration.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_syntax_regression.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
-| `test_pr_vendor_yaml_smoke.py` | `agent-slop` | PR-/Coverage-getrieben; besonders kritisch geprüft, nicht autoritativ. |
 | `test_price_setters.py` | `legacy-regression` | Regressionsschutz ohne direkte Autorität aus source-of-truth. |
 | `test_reauth_contract.py` | `ha-contract` | Home-Assistant Setup/Unload/Flow/Service-Vertrag. |
 | `test_scripts_gate.py` | `legacy-regression` | Regressionsschutz ohne direkte Autorität aus source-of-truth. |
