@@ -65,13 +65,24 @@ jobs:
   ha-fixture-tests:
     name: HA fixture tests
     runs-on: ubuntu-latest
-    if: ('tests/ha/**') != ''
     steps:
       - uses: actions/checkout@v6
+      - name: Check for HA fixture tests
+        id: fixtures
+        run: |
+          if find tests/ha -type f -name 'test_*.py' -print -quit 2>/dev/null | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No tests/ha fixtures found; skipping HA fixture test job."
+          fi
       - uses: actions/setup-python@v6
+        if: steps.fixtures.outputs.exists == 'true'
         with:
           python-version: "3.14"
       - name: Install Home Assistant test dependencies
+        if: steps.fixtures.outputs.exists == 'true'
         run: python -m pip install -r requirements-test.txt
       - name: Run HA fixture tests
-        run: pytest -q -p no:cacheprovider -c pytest-ha.ini tests/ha
+        if: steps.fixtures.outputs.exists == 'true'
+        run: pytest -q -p no:cacheprovider -c tests/fixtures

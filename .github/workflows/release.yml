@@ -1,102 +1,44 @@
-name: Release Automation
+name: Release
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  create-release:
-    name: Create Release
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-
-      - name: Extract version
-        id: version
+      - name: Verify manifest version matches tag
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Get commits since last tag
-          PREVIOUS_TAG_COMMIT=$(git rev-list --tags --skip=1 --max-count=1)
-          PREVIOUS_TAG=$(git describe --abbrev=0 --tags "$PREVIOUS_TAG_COMMIT" 2>/dev/null || echo "")
-
-          if [ -z "$PREVIOUS_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s (%h)" --reverse)
-          else
-            COMMITS=$(git log "$PREVIOUS_TAG"..HEAD --pretty=format:"- %s (%h)" --reverse)
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('custom_components/jackery_solarvault/manifest.json'))['version'])")
+          if [ "$TAG" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Tag '${TAG}' does not match manifest version '${MANIFEST_VERSION}'"
+            exit 1
           fi
+          echo "Tag and manifest both at ${TAG}"
 
-          # Write release body to a dedicated temp file – never overwrite CHANGELOG.md
-          # (the repo CHANGELOG.md is maintained by release-please and must not be
-          # clobbered here).
-          cat > RELEASE_BODY.md << EOF
-          # Release ${{ steps.version.outputs.version }}
-
-          ## Changes
-
-          $COMMITS
-
-          ## Installation
-
-          \`\`\`yaml
-          # Via HACS (recommended)
-          1. Open HACS → Integrations
-          2. Search for "jackery_solarvault"
-          3. Click Download
-
-          # Manual
-          1. Download jackery_solarvault.tar.gz
-          2. Extract to custom_components/
-          3. Restart Home Assistant
-          \`\`\`
-
-          ## Verification
-
-          SHA256: \$(sha256sum dist/jackery_solarvault.tar.gz | cut -d' ' -f1)
-          EOF
-
-          cat RELEASE_BODY.md
-
-      - name: Create package
+      - name: Build release zip
         run: |
-          mkdir -p dist
-          cp -r custom_components/jackery_solarvault dist/
-          cd dist
-          tar -czf jackery_solarvault.tar.gz jackery_solarvault/
-          sha256sum jackery_solarvault.tar.gz > jackery_solarvault.tar.gz.sha256
+          cd custom_components/jackery_solarvault
+          zip -r "$GITHUB_WORKSPACE/jackery_solarvault.zip" . \
+            -x "*.pyc" "*/__pycache__/*" "*.pytest_cache*" "*.ruff_cache*"
+          cd "$GITHUB_WORKSPACE"
+          ls -la jackery_solarvault.zip
 
-      - name: Create GitHub Release
+      - name: Publish release with auto-generated notes
         uses: softprops/action-gh-release@v3
         with:
-          name: Release ${{ steps.version.outputs.version }}
-          body_path: RELEASE_BODY.md
+          generate_release_notes: true
           files: |
-            dist/jackery_solarvault.tar.gz
-            dist/jackery_solarvault.tar.gz.sha256
-          draft: false
-          prerelease: ${{ contains(steps.version.outputs.version, 'rc') || contains(steps.version.outputs.version, 'beta') }}
+            jackery_solarvault.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update HACS repository
-        if: ${{ !contains(steps.version.outputs.version, 'rc') && !contains(steps.version.outputs.version, 'beta') }}
-        run: |
-          echo "Stable release ${{ steps.version.outputs.version }} created"
-          # HACS will automatically detect the new release
