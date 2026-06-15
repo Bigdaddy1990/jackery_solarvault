@@ -1,7 +1,9 @@
 # .github/workflows/ruff-baseline.yml
 name: Ruff baseline (web only)
 on: { workflow_dispatch: {} }
-permissions: { contents: write }
+permissions:
+  id-token: write # for Trusted Publishing + attest-action
+  contents: read # for actions/checkout, if you're in a private repo
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
 jobs:
