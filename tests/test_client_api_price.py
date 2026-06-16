@@ -41,7 +41,7 @@ async def test_set_single_mode_formats_numeric_price() -> None:
         calls.append((path, fields))
         return {"data": True}
 
-    api._post_form = fake_post_form  # type: ignore[method-assign]
+    api._post_form = fake_post_form  # type: ignore[method-assign]  # noqa: SLF001
 
     assert await api.async_set_single_mode(
         system_id=123,
@@ -57,7 +57,7 @@ async def test_set_single_mode_formats_numeric_price() -> None:
                 FIELD_SINGLE_PRICE: "0.28",
                 FIELD_CURRENCY: "EUR",
             },
-        )
+        ),
     ]
 
 
@@ -70,7 +70,7 @@ async def test_set_single_mode_rejects_negative_price() -> None:
         await asyncio.sleep(0)
         pytest.fail("negative prices must not be sent")
 
-    api._post_form = fake_post_form  # type: ignore[method-assign]
+    api._post_form = fake_post_form  # type: ignore[method-assign]  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="single_price must be >= 0"):
         await api.async_set_single_mode(
@@ -89,7 +89,7 @@ async def test_set_single_mode_rejects_non_numeric_price() -> None:
         await asyncio.sleep(0)
         pytest.fail("invalid prices must not be sent")
 
-    api._post_form = fake_post_form  # type: ignore[method-assign]
+    api._post_form = fake_post_form  # type: ignore[method-assign]  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="single_price must be a valid number"):
         await api.async_set_single_mode(
@@ -108,7 +108,7 @@ async def test_set_single_mode_rejects_empty_currency() -> None:
         await asyncio.sleep(0)
         pytest.fail("empty currency must not be sent")
 
-    api._post_form = fake_post_form  # type: ignore[method-assign]
+    api._post_form = fake_post_form  # type: ignore[method-assign]  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="currency must be a non-empty string"):
         await api.async_set_single_mode(
@@ -131,17 +131,15 @@ async def test_login_rejects_non_object_data_payload() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def read(self) -> bytes:
-            import json
-
-            return json.dumps({
+        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
+            return {
                 FIELD_CODE: CODE_OK,
                 FIELD_TOKEN: "token",
                 FIELD_DATA: ["not", "an", "object"],
-            }).encode()
+            }
 
     class _Session:
-        def post(self, *args: object, **kwargs: object) -> _Response:
+        def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
     api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
@@ -163,13 +161,11 @@ async def test_login_rejection_does_not_update_last_success_response() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def read(self) -> bytes:
-            import json
-
-            return json.dumps({FIELD_CODE: 401, FIELD_MSG: "invalid token"}).encode()
+        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
+            return {FIELD_CODE: 401, FIELD_MSG: "invalid token"}
 
     class _Session:
-        def post(self, *args: object, **kwargs: object) -> _Response:
+        def post(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
     api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
@@ -193,15 +189,19 @@ async def test_get_json_rejects_unparseable_success_body() -> None:
         async def __aexit__(self, *args: object) -> None:
             return None
 
-        async def read(self) -> bytes:
-            return b"<html>maintenance</html>"
+        async def json(self, *, content_type: object = None) -> dict[str, object]:  # noqa: PLR6301
+            msg = "not json"
+            raise ValueError(msg)
+
+        async def text(self) -> str:  # noqa: PLR6301
+            return "<html>maintenance</html>"
 
     class _Session:
-        def get(self, *args: object, **kwargs: object) -> _Response:
+        def get(self, *args: object, **kwargs: object) -> _Response:  # noqa: PLR6301
             return _Response()
 
     api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
-    api._token = "token"
+    api._token = "token"  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="returned invalid JSON"):
         await api.async_get_device_property("123")

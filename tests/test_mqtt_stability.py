@@ -20,6 +20,7 @@ session against accidental regressions:
 import datetime
 from pathlib import Path
 import re
+import re as _re
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
@@ -72,7 +73,8 @@ def test_every_connect_resubscribes_all_topics() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.DOTALL,
     )
@@ -92,7 +94,8 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.DOTALL,
     )
@@ -111,7 +114,8 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|"
+        r"\n    def |\nclass )",
         src,
         re.DOTALL,
     )
@@ -124,7 +128,8 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     # And the connect-failure mapper itself must produce the rc=… signature
     # so ``_is_connect_failure_error`` can detect it.
     fail_match = re.search(
-        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|"
+        r"\n    def |\nclass )",
         src,
         re.DOTALL,
     )
@@ -152,7 +157,8 @@ def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> Non
     """
     src = _read("mqtt_push.py")
     stop_match = re.search(
-        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
+        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|"
+        r"\n    async def |\n    def |\nclass )",
         src,
         re.DOTALL,
     )
@@ -360,7 +366,8 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     # The session runner routes through the callback only after a real
     # session — not after a CONNACK rejection.
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         mqtt_src,
         re.DOTALL,
     )
@@ -377,7 +384,8 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
 
     # Recovery handler resets the throttle and force-reconnects.
     handler_match = re.search(
-        r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
+        r"async def _async_handle_mqtt_disconnect\(self\).*?(?="
+        r"\n    async def |\n    @|\nclass |\n    def )",
         coord_src,
         re.DOTALL,
     )
@@ -410,7 +418,6 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
         "self._last_http_refresh_completed_monotonic =" in body
     )  # may use intermediate variable
     # Find first assignment of _last_http_refresh_completed_monotonic
-    import re as _re
 
     m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
     assert m is not None
@@ -424,7 +431,8 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
     assert assignment_offset > gate_offset, "assignment must be after gate"
 
     skip_match = re.search(
-        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
+        r"def _should_skip_fast_property_fetch\(self\).*?(?="
+        r"\n    def |\n    @|\nclass )",
         src,
         _re.DOTALL,
     )

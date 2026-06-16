@@ -27,8 +27,8 @@ def test_language_files_cover_all_string_keys() -> None:
     for lang in LANGUAGES:
         translated = json.loads(
             (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         assert _leaf_paths(translated) == base_paths, lang
 
@@ -37,7 +37,7 @@ def test_service_actions_use_translation_files() -> None:
     """Service action labels belong in translations, not services.yaml."""
     services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
     strings = json.loads(
-        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8")
+        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"),
     )
     icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
 
@@ -88,8 +88,8 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     for lang, (main_battery, battery_system) in expected.items():
         translation = json.loads(
             (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         assert (
             translation["entity"]["sensor"]["battery_discharge_power"]["name"]

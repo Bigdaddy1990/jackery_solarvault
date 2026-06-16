@@ -55,22 +55,20 @@ PERIODIC_SECTION_PREFIXES: frozenset[str] = frozenset({
 
 
 def is_periodic_section(section_key: str) -> bool:
-    """Return whether a section contains periodic long-term data."""
+    """Determine whether a payload section contains periodic (long-term) data.
+
+    Matches either a known periodic prefix exactly or keys that start with a recognized
+    prefix followed by an underscore (for example, `device_pv_stat_day`).
+
+    Parameters:
+        section_key (str): Payload section identifier to test.
+
+    Returns:
+        `true` if the section_key represents a periodic section, `false` otherwise.
+    """
     return any(
         section_key == prefix or section_key.startswith(f"{prefix}_")
         for prefix in PERIODIC_SECTION_PREFIXES
-    )
-
-
-def _is_unconfirmed_zero(current: object, value: object) -> bool:
-    """Return true when an incoming zero would erase a valid live value."""
-    return (
-        isinstance(value, int | float)
-        and not isinstance(value, bool)
-        and value == 0
-        and isinstance(current, int | float)
-        and not isinstance(current, bool)
-        and current > 0
     )
 
 
@@ -96,20 +94,31 @@ def merge_live_properties(
     base: dict[str, Any],
     update: dict[str, Any],
 ) -> dict[str, Any]:
-    """Merge live properties without blanking populated base values.
+    """Produce a merged mapping of live device properties where populated base values.
 
-    Incoming dictionaries merge recursively. Incoming ``None``, empty strings,
-    empty containers, and unconfirmed numeric ``0`` values do not replace
-    populated values already accepted from another transport.
+    are never overwritten by blank update values.
+
+    Performs an update-wins merge: dictionary values are merged recursively;
+    non-dictionary values from `update` replace those in `base` unless the `update`
+    value is considered blank (None, an empty or whitespace-only string, or an empty
+    list/dict) and the corresponding `base` value is populated. The inputs are not
+    mutated.
+
+    Parameters:
+        base (dict[str, Any]): Original live properties to merge into.
+        update (dict[str, Any]): Incoming update to apply; blank values in this mapping
+        will not replace populated values from `base`.
+
+    Returns:
+        dict[str, Any]: A new mapping containing the merged properties with the "never
+        blank populated keys" rule enforced.
     """
     merged: dict[str, Any] = dict(base)
     for key, value in update.items():
         current = merged.get(key)
         if isinstance(current, dict) and isinstance(value, dict):
             merged[key] = merge_live_properties(current, value)
-        elif (
-            _is_blankable(value) and not _is_blankable(current)
-        ) or _is_unconfirmed_zero(current, value):
+        elif _is_blankable(value) and not _is_blankable(current):
             continue
         else:
             merged[key] = value

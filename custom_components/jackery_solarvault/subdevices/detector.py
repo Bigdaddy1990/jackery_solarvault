@@ -10,7 +10,7 @@ Reference: jackery_entity_field_candidates_v2.json, hbxn_model_fields.html
 import contextlib
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from custom_components.jackery_solarvault.const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_BATTERIES,
@@ -61,8 +61,11 @@ from ..const import (
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
     SUBDEVICE_TYPE_SMART_METER,
 )
-from ..models.property_merge import find_list_for_key, merge_dict_values
-from ..util import safe_float, safe_int
+from custom_components.jackery_solarvault.models.property_merge import (
+    find_list_for_key,
+    merge_dict_values,
+)
+from custom_components.jackery_solarvault.util import safe_float, safe_int
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -177,7 +180,9 @@ def battery_packs_from_source(
         return packs[:5] if packs else None
     normalized_source = normalize_battery_pack_payload(source)
     if looks_like_battery_pack(
-        normalized_source, ct_meter_keys, battery_pack_hint_keys
+        normalized_source,
+        ct_meter_keys,
+        battery_pack_hint_keys,
     ):
         return [normalized_source]
     return None

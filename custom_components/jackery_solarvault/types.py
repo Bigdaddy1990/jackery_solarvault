@@ -985,3 +985,20 @@ class PowerReportRequestData(TypedDict):
 
     deviceSn: str
     properties: dict[str, str]
+
+
+# =============================================================================
+# MQTT Session Snapshot
+# =============================================================================
+
+
+class MqttSessionSnapshot(TypedDict):
+    """Serialisable MQTT session fields returned by BaseHTTPMixin.mqtt_session_snapshot.
+
+    Keys mirror the MQTT_SESSION_* constants in const.py.
+    """
+
+    user_id: str
+    seed_b64: str
+    mac_id: str
+    mac_id_source: str

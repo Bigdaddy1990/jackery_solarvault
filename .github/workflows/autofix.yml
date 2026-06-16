@@ -44,7 +44,7 @@ jobs:
             pyproject.toml
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -74,5 +74,3 @@ jobs:
           ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
-
-      - uses: stefanzweifel/git-auto-commit-action@v7

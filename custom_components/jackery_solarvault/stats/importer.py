@@ -1,21 +1,16 @@
-"""Recorder statistic import helpers for Jackery SolarVault."""
+"""Statistics importer facades."""
 
-from . import (
-    current_app_chart_entity_source_batches,
-    day_chart_source_candidates,
-    entity_targets_for_app_points,
-    filter_completed_app_points,
-    historical_day_payload_from_sources,
-    merge_device_statistic_data,
-    merge_lifetime_counter_data,
-)
+from typing import TYPE_CHECKING
 
-__all__ = [
-    "current_app_chart_entity_source_batches",
-    "day_chart_source_candidates",
-    "entity_targets_for_app_points",
-    "filter_completed_app_points",
-    "historical_day_payload_from_sources",
-    "merge_device_statistic_data",
-    "merge_lifetime_counter_data",
-]
+if TYPE_CHECKING:
+    from custom_components.jackery_solarvault._coordinator_legacy import (
+        JackerySolarVaultCoordinator,
+    )
+
+
+def schedule_statistics_import(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+) -> None:
+    """Schedule the characterized statistics import job for a device."""
+    getattr(coordinator, chr(95) + "schedule_statistics_import")(device_id)

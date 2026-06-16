@@ -6,8 +6,6 @@ Languages:
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CodeFactor](https://www.codefactor.io/repository/github/bigdaddy1990/jackery_solarvault/badge)](https://www.codefactor.io/repository/github/bigdaddy1990/jackery_solarvault)
-
 
 Community integration for Jackery SolarVault systems, especially SolarVault 3 Pro Max. It reads live values, energy statistics and configurable settings from the Jackery cloud, and uses MQTT push for fast live updates and control commands.
 
@@ -15,29 +13,13 @@ This integration is not an official Jackery product and is not affiliated with J
 
 ## What it provides
 
-- Automatic system and device discovery through your Jackery cloud account.
+- Account-based system and device discovery through the Jackery cloud API, plus setup triggers from the local Home Assistant discovery surfaces declared in the manifest: Bluetooth (`0000bdee-0000-1000-8000-00805f9b34fb`), DHCP (`solarvault*`/`jackery*` on `80F1B2*` MACs), MQTT discovery, and Zeroconf (`_jackery-solarvault._tcp.local.`).
 - Main unit, smart meter and expansion batteries as separate Home Assistant devices.
 - Live power sensors for battery, PV total, PV channels, grid import/export, EPS, stack power and smart meter phases.
 - Energy sensors for Jackery app periods: day, week, month and year.
 - Configurable entities for EPS, standby, limits, output power, smart meter follow mode, storm warning, temperature unit and electricity price.
 - Device restart button and cloud services for system name and storm-alert management.
 - Diagnostics for raw redacted data, MQTT status, firmware, system limits and data-quality warnings.
-
-### About hardware coverage and ``unknown`` entities
-
-The integration mirrors the documented Jackery wire-protocol (Smali analysis in
-``docs/html/`` and PROTOCOL.md) rather than only what one specific installation
-emits at runtime. That means entities and sub-device branding are wired for the
-full documented catalog — Shelly Pro EM-50 / 3EM / 3EM63, EcoTracker, P1
-Meter, Homey Energy Dongle, Shelly Plug S / S-Gen3, Jackery HTO892A–HTO910A,
-and per-phase voltage / current / frequency / power-factor / apparent /
-reactive readings from ``AccCTBody``, plus EPS-period totals and the today
-KPI bean. Entities for fields that the user's own SolarVault does not
-currently emit (no external CT accessory bound, no EPS event in the period,
-no smart plug paired, etc.) stay in the ``unknown`` state until the matching
-payload arrives. This is intentional and matches Home Assistant conventions:
-the catalogue is authored from the Smali contract so the integration does not
-need a code change every time a user pairs a new documented accessory.
 
 ## Requirements
 
@@ -47,22 +29,15 @@ need a code change every time a user pairs a new documented accessory.
 - SolarVault online through Wi-Fi or Ethernet.
 - HACS for the recommended installation method.
 
-## Known Limitation: Single Active Session per Account
+## Recommended Jackery Account Setup
 
-Jackery effectively allows only one active session per account. If the official Jackery app and Home Assistant use the same account at the same time, tokens and MQTT credentials rotate on every login. That causes expired-token errors, MQTT authentication errors (CONNACK rc=4/5/134/135) and temporary stale data.
+Jackery effectively allows only one active session per account. If the official Jackery app and Home Assistant use the same account at the same time, tokens and MQTT credentials can rotate. That may cause expired-token errors, MQTT authentication errors or temporary stale data.
 
-**No reliable workaround exists today.** Earlier versions of this README suggested creating a second Jackery account and sharing the SolarVault to it. That recommendation has been removed:
+Recommended setup:
 
-- The Jackery app currently does **not** offer a SolarVault share/invite flow (the QR-code-based device-sharing in the app applies only to Portable/Explorer products).
-- Multiple users have reported that Jackery is also restricting new account creation.
-
-### What to do instead
-
-- Keep the Jackery app logged out (or signed out of the SolarVault account) while Home Assistant is connected. The app stays usable for unrelated Jackery devices.
-- If you need to use the app briefly, expect Home Assistant to recover after a few minutes once the app session ends. The integration retries on a throttled schedule and surfaces a reauth request through the UI when credentials are persistently rejected.
-- Watch the diagnostics export under `mqtt_push` for `last_connect_failure_signature` and `connect_attempts` to confirm the integration is recovering.
-
-If Jackery later adds a SolarVault sharing flow or a documented service-account mechanism, this section will be updated.
+1. Create a second Jackery account.
+2. Share the SolarVault with that second account in the Jackery app.
+3. Use the second account only for Home Assistant.
 
 ## Installation
 
@@ -99,6 +74,10 @@ The setup flow asks for:
 Device ID, system ID, MQTT `macId` and region are derived from cloud and MQTT data. They are not entered manually.
 
 The same options can be changed later from the integration options. Credentials can be updated through Home Assistant's reconfigure or reauth flow without deleting the integration.
+
+## Discovery
+
+The integration has four local Home Assistant discovery entry points in `manifest.json`: Bluetooth advertisements with service UUID `0000bdee-0000-1000-8000-00805f9b34fb` and manufacturer ID `18434`, DHCP matches for `solarvault*` or `jackery*` hostnames on `80F1B2*` MAC addresses, MQTT discovery, and Zeroconf service `_jackery-solarvault._tcp.local.`. These signals only start or de-duplicate the setup flow. Authentication and the authoritative system list still come from the Jackery cloud account, and runtime live data can then be refreshed by cloud HTTP, Jackery MQTT push, BLE, or configured local third-party MQTT where available.
 
 ## Devices and Entities
 

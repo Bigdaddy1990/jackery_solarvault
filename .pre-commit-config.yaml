@@ -13,6 +13,7 @@ default_install_hook_types:
   - pre-push
 
 repos:
+
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
@@ -28,24 +29,36 @@ repos:
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^(manifest.*|docs/|scripts/)
+
+  - repo: https://github.com/cdce8p/python-typing-update
+    rev: v0.8.1
+    hooks:
+      - id: python-typing-update
+        stages: [manual]
+        args:
+          - --py314-plus
+          - --keep-updates
+          - --check
+          - --force
+
   - repo: https://github.com/JelleZijlstra/autotyping
     rev: 24.9.0
     hooks:
       - id: autotyping
         stages: [pre-commit]
         types: [python]
-        args: [--safe]
+        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.17
     hooks:
       - id: ruff-check
         args:
+          - --preview
           - --fix
           - --show-fixes
-          - --preview
-          - --target-version=py314
-          - --extend-select=RUF100
+          - --unsafe-fixes
+          - --exit-non-zero-on-fix
           - --output-format=github
         types_or:
           - python
@@ -62,10 +75,9 @@ repos:
         args:
           - --allow-multiple-documents
           - --unsafe
-        exclude: ^(docs/|scripts/)
+        exclude: ^(docs/)
       - id: check-json
       - id: check-toml
-      - id: check-ast
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: mixed-line-ending
@@ -80,7 +92,6 @@ repos:
       - id: pretty-format-json
         args:
           - --autofix
-        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/|\.smellcheck-baseline\.json)
+        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
-      - id: detect-private-key
       - id: destroyed-symlinks

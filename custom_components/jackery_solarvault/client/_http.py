@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from ..const import (
+from custom_components.jackery_solarvault.const import (
     APP_REQUEST_META,
     APP_VERSION,
     APP_VERSION_CODE,
@@ -47,11 +47,14 @@ from ..const import (
     _HTTP_RETRY_ATTEMPTS,
     _HTTP_RETRY_BACKOFF_SEC,
 )
-from ..util import chart_series_debug
+from custom_components.jackery_solarvault.util import chart_series_debug
+
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
+
+    from custom_components.jackery_solarvault.types import MqttSessionSnapshot
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,9 +88,10 @@ def _write_accepted(data: dict[str, Any]) -> bool:
         data (dict): Parsed JSON response; inspected for the top-level `data` field.
 
     Returns:
-        `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
+        `True` if the response's `data` field is not explicitly `False`, `False`
+        otherwise.
     """
-    from ..util import safe_bool
+    from custom_components.jackery_solarvault.util import safe_bool  # noqa: PLC0415
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -98,7 +102,9 @@ def _write_accepted(data: dict[str, Any]) -> bool:
 
 
 class BaseHTTPMixin:
-    """Shared HTTP infrastructure: token management, request primitives, debug, diagnostics.
+    """Shared HTTP infrastructure: token management, request primitives, debug,.
+
+    diagnostics.
 
     Subclasses (domain mixins) use ``self._get_json``, ``self._put_json``,
     ``self._post_form`` without worrying about auth, retries, or counters.
@@ -109,10 +115,13 @@ class BaseHTTPMixin:
     # ``AuthEndpointMixin``.  The concrete class ``JackeryApi`` always
     # combines both via multiple inheritance.
     async def async_login(self) -> str:
-        """Perform an authentication flow and produce a session token for use in API requests.
+        """Perform an authentication flow and produce a session token for use in API.
+
+        requests.
 
         Returns:
-            token (str): Session token string to include in authenticated request headers.
+            token (str): Session token string to include in authenticated request
+            headers.
         """
         raise NotImplementedError
 
@@ -144,6 +153,8 @@ class BaseHTTPMixin:
     last_ota_responses: dict[str, dict[str, Any]]
     last_location_responses: dict[str, dict[str, Any]]
     payload_debug_callback: Callable[[dict[str, Any]], Awaitable[None] | None] | None
+    # Optional sink invoked when an HTTP response is classified as an auth
+    # failure; the coordinator wires this to its rejection-metrics recorder.
     auth_rejection_callback: Callable[[int, object], None] | None
 
     # Transport counters
@@ -157,10 +168,13 @@ class BaseHTTPMixin:
         """Builds HTTP headers emulating the Android client for API requests.
 
         Parameters:
-                with_token (bool): If True and the client has an authentication token, include the auth token header.
+                with_token (bool): If True and the client has an authentication token,
+                include the auth token header.
 
         Returns:
-                headers (dict[str, str]): Mapping of HTTP header names to values. Includes the auth token header when `with_token` is True and a token is present.
+                headers (dict[str, str]): Mapping of HTTP header names to values.
+                Includes the auth token header when `with_token` is True and a token is
+                present.
         """
         h = {
             "accept-encoding": "gzip",
@@ -193,14 +207,18 @@ class BaseHTTPMixin:
             str: Normalized MAC identifier (33 lowercase hexadecimal characters).
 
         Raises:
-            JackeryAuthError: If the normalized value does not match 33 lowercase hexadecimal characters.
+            JackeryAuthError: If the normalized value does not match 33 lowercase
+            hexadecimal characters.
         """
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
-            raise JackeryAuthError(  # noqa: TRY003
+            msg = (
                 "Invalid mqtt_mac_id format. Expected 33 lowercase hex chars "
                 "(example: 271c55f5731fa3d9ba1fe131e088946e0)."
+            )
+            raise JackeryAuthError(
+                msg,
             )
         return mac_id
 
@@ -233,12 +251,18 @@ class BaseHTTPMixin:
         return _generate_udid(self._account)
 
     def _maybe_learn_region_code(self, systems: list[dict[str, Any]]) -> None:
-        """Set the API client's region code from the first system entry that provides a country code when no region is configured.
+        """Set the API client's region code from the first system entry that provides a.
 
-        If the client already has a region code set, this is a no-op. Otherwise, the method iterates the provided system dictionaries and, for the first item whose ``FIELD_COUNTRY_CODE`` yields a non-empty value, stores the trimmed uppercase country code on ``self._region_code`` and logs the inference.
+        country code when no region is configured.
+
+        If the client already has a region code set, this is a no-op. Otherwise, the
+        method iterates the provided system dictionaries and, for the first item whose
+        ``FIELD_COUNTRY_CODE`` yields a non-empty value, stores the trimmed uppercase
+        country code on ``self._region_code`` and logs the inference.
 
         Parameters:
-            systems (list[dict]): List of system metadata dictionaries returned by the system list API.
+            systems (list[dict]): List of system metadata dictionaries returned by the
+            system list API.
         """
         if self._region_code:
             return
@@ -254,7 +278,9 @@ class BaseHTTPMixin:
             return
 
     async def _ensure_token(self) -> str:
-        """Ensure the client holds a valid authentication token, triggering login if necessary.
+        """Ensure the client holds a valid authentication token, triggering login if.
+
+        necessary.
 
         Returns:
             str: The current authentication token.
@@ -267,7 +293,8 @@ class BaseHTTPMixin:
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError("Login succeeded without returning a token")  # noqa: TRY003
+            msg = "Login succeeded without returning a token"
+            raise JackeryAuthError(msg)
         return self._token
 
     @staticmethod
@@ -278,7 +305,8 @@ class BaseHTTPMixin:
             data (dict | Any): Parsed JSON response (expected dict) or any other value.
 
         Returns:
-            int | None: The ``code`` parsed as an integer when present as an integer or a numeric string, ``None`` otherwise.
+            int | None: The ``code`` parsed as an integer when present as an integer or
+            a numeric string, ``None`` otherwise.
         """
         if not isinstance(data, dict):
             return None
@@ -302,11 +330,14 @@ class BaseHTTPMixin:
         return None
 
     def _is_token_expired_response(self, status: int, data: object) -> bool:
-        """Detects whether an API response indicates the authentication token has expired.
+        """Detects whether an API response indicates the authentication token has.
+
+        expired.
 
         Parameters:
             status (int): HTTP status code from the response.
-            data (object): Parsed response body; expected to be a dict containing backend fields like `code` or `msg`.
+            data (object): Parsed response body; expected to be a dict containing
+            backend fields like `code` or `msg`.
 
         Returns:
             True if the response indicates the token has expired, False otherwise.
@@ -321,10 +352,13 @@ class BaseHTTPMixin:
 
     @staticmethod
     def _response_has_auth_failure_text(data: object) -> bool:
-        """Detects whether a backend response contains text indicating an authentication or authorization failure.
+        """Detects whether a backend response contains text indicating an.
+
+        authentication or authorization failure.
 
         Returns:
-            ``True`` if any auth-related marker is present in the response text, ``False`` otherwise.
+            ``True`` if any auth-related marker is present in the response text,
+            ``False`` otherwise.
         """
         if not isinstance(data, dict):
             return False
@@ -361,60 +395,234 @@ class BaseHTTPMixin:
         )
 
     def _is_auth_failure_response(self, status: int, data: object) -> bool:
-        """Determine whether an HTTP response indicates an authentication or authorization failure that should trigger re-authentication.
+        """Determine whether an HTTP response indicates an authentication or.
+
+        authorization failure that should trigger re-authentication.
 
         Parameters:
             status (int): HTTP status code of the response.
-            data (object): Parsed response payload (typically a dict) or raw response content.
+            data (object): Parsed response payload (typically a dict) or raw response
+            content.
 
         Returns:
-            bool: `True` if the response indicates an authentication or authorization failure, `False` otherwise.
+            bool: `True` if the response indicates an authentication or authorization
+            failure, `False` otherwise.
         """
-        if status in {401, 403}:
-            if self.auth_rejection_callback is not None:
+        if status in {401, 403} or self._is_token_expired_response(status, data):
+            is_failure = True
+        elif status != 200:  # noqa: PLR2004
+            is_failure = self._response_has_auth_failure_text(data)
+        else:
+            code = self._extract_code(data)
+            is_failure = code not in {
+                CODE_OK,
+                None,
+            } and self._response_has_auth_failure_text(data)
+        if is_failure and self.auth_rejection_callback is not None:
+            try:
                 self.auth_rejection_callback(status, data)
-            return True
-        if self._is_token_expired_response(status, data):
-            if self.auth_rejection_callback is not None:
-                self.auth_rejection_callback(status, data)
-            return True
-        if status != 200:  # noqa: PLR2004
-            is_auth_failure = self._response_has_auth_failure_text(data)
-            if is_auth_failure and self.auth_rejection_callback is not None:
-                self.auth_rejection_callback(status, data)
-            return is_auth_failure
-        code = self._extract_code(data)
-        is_auth_failure = code not in {
-            CODE_OK,
-            None,
-        } and self._response_has_auth_failure_text(data)
-        if is_auth_failure and self.auth_rejection_callback is not None:
-            self.auth_rejection_callback(status, data)
-        return is_auth_failure
+            except Exception as err:
+                _LOGGER.debug("auth_rejection_callback raised: %s", err, exc_info=True)
+        return is_failure
 
     @staticmethod
-    def _auth_failure_message(method: str, path: str, status: int, data: object) -> str:
-        """Build a compact auth-failure message without exposing secrets."""
-        if isinstance(data, dict):
-            code = data.get(FIELD_CODE)
-            msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
-        else:
-            code = None
-            msg = data
+    def _auth_failure_message(
+        method: str,
+        path: str,
+        status: int,
+        data: dict[str, Any],
+    ) -> str:
+        """Builds a concise authorization-failure message for an HTTP request.
+
+        Returns:
+            str: Formatted message containing the HTTP method, request path, status
+            code,
+            backend `code` value, and the backend message/error text.
+        """
+        code = data.get(FIELD_CODE)
+        msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
 
-    @staticmethod
-    def _decode_response_json(body_bytes: bytes) -> Any:  # noqa: ANN401
-        """Decode JSON from a response body that was read exactly once."""
-        return json.loads(body_bytes)
+    # --- debug --------------------------------------------------------------
+    async def _emit_payload_debug(
+        self,
+        event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
+    ) -> None:
+        """Forward a payload-debug event to the configured payload debug callback.
+
+        If no callback is configured this is a no-op. Accepts either a prepared event
+        dict
+        or a zero-argument factory that produces the event dict when invoked. If the
+        callback returns an awaitable it will be awaited. Exceptions raised by the
+        callback are caught and logged at debug level.
+        """
+        callback = self.payload_debug_callback
+        if callback is None:
+            return
+        try:
+            event = (
+                event_or_factory() if callable(event_or_factory) else event_or_factory
+            )
+            result = callback(event)
+            if inspect.isawaitable(result):
+                await result
+        except Exception as err:
+            _LOGGER.debug(
+                "Jackery payload debug logging failed: %s",
+                err,
+                exc_info=True,
+            )
 
     @staticmethod
-    def _truncated_response_text(body_bytes: bytes) -> str:
-        """Return bounded raw response text for diagnostics."""
-        return body_bytes[:HTTP_RAW_TEXT_LIMIT].decode("utf-8", errors="replace")
+    def _http_payload_debug(  # noqa: PLR0913
+        *,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+        status: int | None = None,
+        response: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Construct a structured debug event describing an HTTP request/response for.
 
+        payload debugging.
+
+        The event contains method, path, params, request_body, status, response, and
+        response_data_type; when the response payload supports chart debugging,
+        includes a `chart_series_debug` entry.
+
+        Returns:
+            dict[str, Any]: A mapping representing the debug event suitable for
+            redaction and emission.
+        """
+        payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
+        event: dict[str, Any] = {
+            "kind": "http",
+            "method": method,
+            "path": path,
+            "params": params or {},
+            "request_body": body or {},
+            "status": status,
+            "response": response or {},
+            "response_data_type": type(payload).__name__,
+        }
+        series_debug = chart_series_debug(payload)
+        if series_debug:
+            event["chart_series_debug"] = series_debug
+        return event
+
+    # --- payload normalization -----------------------------------------------
+    @staticmethod
+    def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
+        """Normalize the API response's `data` field into a dict payload.
+
+        If `FIELD_DATA` contains a dict that dict is returned. If `FIELD_DATA` is
+        `None`, an empty dict is returned. For any other value an empty dict is
+        returned and a warning is emitted.
+
+        Returns:
+            dict: The payload dict from `FIELD_DATA` when present and a dict, otherwise
+            an empty dict.
+        """
+        payload = data.get(FIELD_DATA)
+        if isinstance(payload, dict):
+            return payload
+        if payload is None:
+            return {}
+        _LOGGER.warning(
+            "Jackery %s returned unexpected data shape for dict payload: %s",
+            path,
+            type(payload).__name__,
+        )
+        return {}
+
+    @staticmethod
+    def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
+        """Return the list of dictionary items contained in the response payload.
+
+        If the response's FIELD_DATA is a list, returns only elements that are
+        dictionaries.
+        If FIELD_DATA is None, returns an empty list. For any other payload shape, logs
+        a warning
+        including `path` and returns an empty list.
+
+        Parameters:
+            data (dict[str, Any]): Parsed API response object.
+            path (str): Request path used in warning messages when the payload shape is
+            unexpected.
+
+        Returns:
+            list[dict[str, Any]]: The list of dictionary items from the payload, or an
+            empty list.
+        """
+        payload = data.get(FIELD_DATA)
+        if isinstance(payload, list):
+            return [item for item in payload if isinstance(item, dict)]
+        if payload is None:
+            return []
+        _LOGGER.warning(
+            "Jackery %s returned unexpected data shape for list payload: %s",
+            path,
+            type(payload).__name__,
+        )
+        return []
+
+    @staticmethod
+    def _select_ota_item(
+        items: list[dict[str, Any]],
+        device_sn: str,
+    ) -> dict[str, Any]:
+        """Select the OTA update entry matching the given device serial number.
+
+        Parameters:
+            items (list[dict[str, Any]]): List of OTA item dictionaries.
+            device_sn (str): Device serial number to match.
+
+        Returns:
+            dict[str, Any]: The matching item; if none match returns the first item
+            when available, otherwise an empty dict.
+        """
+        requested_sn = str(device_sn)
+        for item in items:
+            if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
+                return item
+        return items[0] if items else {}
+
+    @staticmethod
+    def _response_with_request_context(
+        data: dict[str, Any],
+        *,
+        path: str,
+        params: dict[str, str],
+        payload_request: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Add request context metadata to an API response for diagnostics.
+
+        Parameters:
+            data (dict[str, Any]): Parsed response object to copy and annotate.
+            path (str): Request path to record under request metadata.
+            params (dict[str, str]): Request query parameters to record under request
+            metadata.
+            payload_request (dict[str, str] | None): Optional metadata to insert into
+            the payload object (the response's `FIELD_DATA`) if it is a dict.
+
+        Returns:
+            dict[str, Any]: A copy of `data` with `APP_REQUEST_META` ensured at the top
+            level (containing `path` and `params`), and with `APP_REQUEST_META` added
+            to the payload dict when `payload_request` is provided.
+        """
+        response = dict(data)
+        response.setdefault(APP_REQUEST_META, {"path": path, "params": dict(params)})
+        payload = response.get(FIELD_DATA)
+        if isinstance(payload, dict) and payload_request is not None:
+            payload = dict(payload)
+            payload.setdefault(APP_REQUEST_META, dict(payload_request))
+            response[FIELD_DATA] = payload
+        return response
+
+    # --- transient retry/backoff -------------------------------------------
     @staticmethod
     def _is_transient_http_status(status: int) -> bool:
         """Return True for server-side statuses that are safe to retry."""
@@ -426,7 +634,15 @@ class BaseHTTPMixin:
         path: str,
         request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
     ) -> tuple[int, dict[str, Any]]:
-        """Run one JSON HTTP request with bounded transient retry/backoff."""
+        """Run one JSON HTTP request with bounded transient retry/backoff.
+
+        Wraps a request callable (typically the per-method ``_do`` closure) so
+        that transient server errors (HTTP 5xx) and connection-level failures
+        (``TimeoutError`` / ``aiohttp.ClientConnectionError``) are retried with
+        the backoff schedule in :data:`_HTTP_RETRY_BACKOFF_SEC`. Token-expiry
+        re-login is handled separately by the caller, so this layer only adds
+        resilience against flaky transport without changing auth semantics.
+        """
         for attempt in range(1, _HTTP_RETRY_ATTEMPTS + 1):
             try:
                 status, data = await request()
@@ -460,191 +676,53 @@ class BaseHTTPMixin:
                 delay,
             )
             await asyncio.sleep(delay)
-        raise JackeryApiError(f"{method} {path} retry loop exhausted")  # noqa: TRY003
-
-    # --- debug --------------------------------------------------------------
-    async def _emit_payload_debug(
-        self,
-        event_or_factory: dict[str, Any] | Callable[[], dict[str, Any]],
-    ) -> None:
-        """Forward a payload-debug event to the configured payload debug callback.
-
-        If no callback is configured this is a no-op. Accepts either a prepared event dict
-        or a zero-argument factory that produces the event dict when invoked. If the
-        callback returns an awaitable it will be awaited. Exceptions raised by the
-        callback are caught and logged at debug level.
-        """
-        callback = self.payload_debug_callback
-        if callback is None:
-            return
-        try:
-            event = (
-                event_or_factory() if callable(event_or_factory) else event_or_factory
-            )
-            result = callback(event)
-            if inspect.isawaitable(result):
-                await result
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Jackery payload debug logging failed: %s", err)
-
-    @staticmethod
-    def _http_payload_debug(  # noqa: PLR0913
-        *,
-        method: str,
-        path: str,
-        params: dict | None = None,
-        body: dict | None = None,
-        status: int | None = None,
-        response: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Construct a structured debug event describing an HTTP request/response for payload debugging.
-
-        The event contains method, path, params, request_body, status, response, and response_data_type; when the response payload supports chart debugging, includes a `chart_series_debug` entry.
-
-        Returns:
-            dict[str, Any]: A mapping representing the debug event suitable for redaction and emission.
-        """
-        payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
-        event: dict[str, Any] = {
-            "kind": "http",
-            "method": method,
-            "path": path,
-            "params": params or {},
-            "request_body": body or {},
-            "status": status,
-            "response": response or {},
-            "response_data_type": type(payload).__name__,
-        }
-        series_debug = chart_series_debug(payload)
-        if series_debug:
-            event["chart_series_debug"] = series_debug
-        return event
-
-    # --- payload normalization -----------------------------------------------
-    @staticmethod
-    def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
-        """Normalize the API response's `data` field into a dict payload.
-
-        If `FIELD_DATA` contains a dict that dict is returned. If `FIELD_DATA` is `None`, an empty dict is returned. For any other value an empty dict is returned and a warning is emitted.
-
-        Returns:
-            dict: The payload dict from `FIELD_DATA` when present and a dict, otherwise an empty dict.
-        """
-        payload = data.get(FIELD_DATA)
-        if isinstance(payload, dict):
-            return payload
-        if payload is None:
-            return {}
-        _LOGGER.warning(
-            "Jackery %s returned unexpected data shape for dict payload: %s",
-            path,
-            type(payload).__name__,
-        )
-        return {}
-
-    @staticmethod
-    def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
-        """Return the list of dictionary items contained in the response payload.
-
-        If the response's FIELD_DATA is a list, returns only elements that are dictionaries.
-        If FIELD_DATA is None, returns an empty list. For any other payload shape, logs a warning
-        including `path` and returns an empty list.
-
-        Parameters:
-            data (dict[str, Any]): Parsed API response object.
-            path (str): Request path used in warning messages when the payload shape is unexpected.
-
-        Returns:
-            list[dict[str, Any]]: The list of dictionary items from the payload, or an empty list.
-        """
-        payload = data.get(FIELD_DATA)
-        if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
-        if payload is None:
-            return []
-        _LOGGER.warning(
-            "Jackery %s returned unexpected data shape for list payload: %s",
-            path,
-            type(payload).__name__,
-        )
-        return []
-
-    @staticmethod
-    def _select_ota_item(
-        items: list[dict[str, Any]],
-        device_sn: str,
-    ) -> dict[str, Any]:
-        """Select the OTA update entry matching the given device serial number.
-
-        Parameters:
-            items (list[dict[str, Any]]): List of OTA item dictionaries.
-            device_sn (str): Device serial number to match.
-
-        Returns:
-            dict[str, Any]: The matching item; if none match returns the first item when available, otherwise an empty dict.
-        """
-        requested_sn = str(device_sn)
-        for item in items:
-            if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
-                return item
-        return items[0] if items else {}
-
-    @staticmethod
-    def _response_with_request_context(
-        data: dict[str, Any],
-        *,
-        path: str,
-        params: dict[str, str],
-        payload_request: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        """Add request context metadata to an API response for diagnostics.
-
-        Parameters:
-            data (dict[str, Any]): Parsed response object to copy and annotate.
-            path (str): Request path to record under request metadata.
-            params (dict[str, str]): Request query parameters to record under request metadata.
-            payload_request (dict[str, str] | None): Optional metadata to insert into the payload object (the response's `FIELD_DATA`) if it is a dict.
-
-        Returns:
-            dict[str, Any]: A copy of `data` with `APP_REQUEST_META` ensured at the top level (containing `path` and `params`), and with `APP_REQUEST_META` added to the payload dict when `payload_request` is provided.
-        """
-        response = dict(data)
-        response.setdefault(APP_REQUEST_META, {"path": path, "params": dict(params)})
-        payload = response.get(FIELD_DATA)
-        if isinstance(payload, dict) and payload_request is not None:
-            payload = dict(payload)
-            payload.setdefault(APP_REQUEST_META, dict(payload_request))
-            response[FIELD_DATA] = payload
-        return response
+        msg = f"{method} {path} retry loop exhausted"
+        raise JackeryApiError(msg)
 
     # --- generic GET with auto re-login ------------------------------------
     async def _get_json(
         self,
         path: str,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
         *,
         request_timeout: int | None = None,
-    ) -> dict:
-        """Perform an authenticated GET request to the API path and return the parsed response body.
+    ) -> dict[str, Any]:
+        """Perform an authenticated GET request to the API path and return the parsed.
+
+        response body.
 
         Parameters:
             path (str): API path (appended to the base URL).
             params (dict | None): Optional query parameters to include in the request.
-            request_timeout (int | None): Override the default request timeout in seconds.
+            request_timeout (int | None): Override the default request timeout in
+            seconds.
 
         Returns:
             dict: Parsed JSON response body.
 
         Raises:
-            JackeryAuthError: When the response indicates an authentication/authorization failure.
-            JackeryApiError: For network/timeout errors, non-200 HTTP responses, or backend errors.
+            JackeryAuthError: When the response indicates an
+            authentication/authorization failure.
+            JackeryApiError: For network/timeout errors, non-200 HTTP responses, or
+            backend errors.
         """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
         effective_timeout = request_timeout or REQUEST_TIMEOUT_SEC
 
-        async def _do() -> tuple[int, dict]:
-            """Perform an HTTP GET request and parse the response into a status code and response body."""
+        async def _do() -> tuple[int, dict[str, Any]]:
+            """Perform an HTTP GET request and parse the response into a status code.
+
+            and response body.
+
+            Attempts to decode the response as JSON; if decoding fails, captures the
+            response text truncated to HTTP_RAW_TEXT_LIMIT under FIELD_RAW_TEXT.
+
+            Returns:
+                tuple[int, dict]: A pair of the HTTP status code and the parsed
+                response body (JSON object or a dict containing `FIELD_RAW_TEXT` on
+                decode failure).
+            """
             async with self._session.get(
                 url,
                 params=params,
@@ -652,16 +730,15 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=effective_timeout),
             ) as resp:
                 status = resp.status
-                body_bytes = await resp.read()
                 try:
-                    body = self._decode_response_json(body_bytes)
+                    body = await resp.json(content_type=None)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    body = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
+                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, body
 
         self._requests_total += 1
@@ -675,9 +752,12 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"{HTTP_METHOD_GET} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}"
+            )
+            raise JackeryApiError(
+                msg,
             ) from err
 
         if self._is_token_expired_response(status, data):
@@ -687,31 +767,46 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_GET,
+                    path,
+                    _do,
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                msg = (
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
+                )
+                raise JackeryApiError(
+                    msg,
                 ) from err
 
         if FIELD_RAW_TEXT in data:
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"{HTTP_METHOD_GET} {path} returned invalid JSON: "
                 f"{data[FIELD_RAW_TEXT]!r}"
             )
+            raise JackeryApiError(
+                msg,
+            )
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_GET, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_GET, path, status, data),
             )
         if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")  # noqa: TRY003
+            msg = f"{HTTP_METHOD_GET} {path} HTTP {status}"
+            raise JackeryApiError(msg)
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+            msg = (
+                f"{HTTP_METHOD_GET} {path}"
+                f" code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+            )
+            raise JackeryApiError(
+                msg,
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -720,36 +815,53 @@ class BaseHTTPMixin:
                 params=params,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     # --- generic PUT with auto re-login ------------------------------------
-    async def _put_json(self, path: str, payload: dict) -> dict:
-        """Send a JSON PUT request to the given API path and return the parsed response; if the token is expired the method will re-authenticate and retry the request once.
+    async def _put_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Send a JSON PUT request to the given API path and return the parsed.
+
+        response; if the token is expired the method will re-authenticate and retry the
+        request once.
 
         Returns:
             dict: Parsed JSON response from the API.
 
         Raises:
-            JackeryAuthError: When the response indicates an authentication or authorization failure.
-            JackeryApiError: On network/request failures, timeouts, non-200 HTTP status, or backend error codes.
+            JackeryAuthError: When the response indicates an authentication or
+            authorization failure.
+            JackeryApiError: On network/request failures, timeouts, non-200 HTTP
+            status, or backend error codes.
         """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """Build HTTP headers for JSON requests, including authentication headers when available.
+            """Build HTTP headers for JSON requests, including authentication headers.
+
+            when available.
 
             Returns:
-                dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
+                dict[str, str]: Mapping of HTTP header names to values with the
+                content-type set to JSON and token headers included when present.
             """
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
-        async def _do() -> tuple[int, dict]:
-            """Perform an HTTP PUT to the prepared URL and return the response status and parsed body."""
+        async def _do() -> tuple[int, dict[str, Any]]:
+            """Perform an HTTP PUT to the prepared URL and return the response status.
+
+            and parsed body.
+
+            Returns:
+                A tuple (status, body) where `status` is the HTTP status code and
+                `body` is the parsed JSON response when available; if the response
+                cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT`
+                with the response text truncated to HTTP_RAW_TEXT_LIMIT.
+            """
             async with self._session.put(
                 url,
                 json=payload,
@@ -757,16 +869,15 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
-                body_bytes = await resp.read()
                 try:
-                    body = self._decode_response_json(body_bytes)
+                    body = await resp.json(content_type=None)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    body = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
+                    body = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, body
 
         self._requests_total += 1
@@ -780,39 +891,56 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"{HTTP_METHOD_PUT} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}"
+            )
+            raise JackeryApiError(
+                msg,
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                "Jackery token expired — re-login for %s %s", HTTP_METHOD_PUT, path
+                "Jackery token expired — re-login for %s %s",
+                HTTP_METHOD_PUT,
+                path,
             )
             self._auth_retries += 1
             async with self._lock:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_PUT,
+                    path,
+                    _do,
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                msg = (
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
+                )
+                raise JackeryApiError(
+                    msg,
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data),
             )
         if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")  # noqa: TRY003
+            msg = f"{HTTP_METHOD_PUT} {path} HTTP {status}"
+            raise JackeryApiError(msg)
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+            msg = (
+                f"{HTTP_METHOD_PUT} {path}"
+                f" code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
+            )
+            raise JackeryApiError(
+                msg,
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -821,33 +949,41 @@ class BaseHTTPMixin:
                 body=payload,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     # --- generic POST with auto re-login -----------------------------------
-    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict:
-        """Send a form-urlencoded POST to the Jackery API, retrying once after automatic re-login if the token is expired.
+    async def _post_form(self, path: str, fields: dict[str, Any]) -> dict[str, Any]:
+        """Send a form-urlencoded POST to the Jackery API, retrying once after.
+
+        automatic re-login if the token is expired.
 
         Parameters:
             path (str): API endpoint path appended to the base URL.
-            fields (dict[str, Any]): Form fields to send; all values will be converted to strings.
+            fields (dict[str, Any]): Form fields to send; all values will be converted
+            to strings.
 
         Returns:
             dict: Parsed JSON response from the API.
 
         Raises:
-            JackeryApiError: On network/timeout failures, non-200 HTTP status, or backend errors.
-            JackeryAuthError: When the response indicates an authentication or authorization failure.
+            JackeryApiError: On network/timeout failures, non-200 HTTP status, or
+            backend errors.
+            JackeryAuthError: When the response indicates an authentication or
+            authorization failure.
         """
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """Constructs HTTP request headers for form-encoded requests, including the form Content-Type and the current authentication token when available.
+            """Constructs HTTP request headers for form-encoded requests, including the.
+
+            form Content-Type and the current authentication token when available.
 
             Returns:
-                dict[str, str]: Mapping of header names to values for a form POST request; includes the authentication token header if the client has one.
+                dict[str, str]: Mapping of header names to values for a form POST
+                request; includes the authentication token header if the client has one.
             """
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
@@ -855,8 +991,20 @@ class BaseHTTPMixin:
 
         body = {k: str(v) for k, v in fields.items()}
 
-        async def _do() -> tuple[int, dict]:
-            """Send a POST request to the prepared URL and return the HTTP status and parsed response payload."""
+        async def _do() -> tuple[int, dict[str, Any]]:
+            """Send a POST request to the prepared URL and return the HTTP status and.
+
+            parsed response payload.
+
+            Attempts to parse the response body as JSON. If JSON parsing or
+            content-type decoding fails, returns a dictionary containing the response
+            text truncated to HTTP_RAW_TEXT_LIMIT under the key `FIELD_RAW_TEXT`.
+
+            Returns:
+                tuple[int, dict]: A pair of (HTTP status code, parsed response). The
+                response dict is either the decoded JSON object or `{FIELD_RAW_TEXT:
+                <truncated text>}` on parse failure.
+            """
             async with self._session.post(
                 url,
                 data=body,
@@ -864,16 +1012,15 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
-                body_bytes = await resp.read()
                 try:
-                    data = self._decode_response_json(body_bytes)
+                    data = await resp.json(content_type=None)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    data = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
+                    data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, data
 
         self._requests_total += 1
@@ -887,41 +1034,59 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"{HTTP_METHOD_POST} {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}"
+            )
+            raise JackeryApiError(
+                msg,
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
-                "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
+                "Jackery token expired — re-login for %s %s",
+                HTTP_METHOD_POST,
+                path,
             )
             self._auth_retries += 1
             async with self._lock:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_POST,
+                    path,
+                    _do,
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                msg = (
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
+                )
+                raise JackeryApiError(
+                    msg,
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+                self._auth_failure_message(HTTP_METHOD_POST, path, status, data),
             )
         if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")  # noqa: TRY003
+            msg = f"{HTTP_METHOD_POST} {path} HTTP {status}"
+            raise JackeryApiError(msg)
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
-                f"data={data.get(FIELD_DATA)!r}"
+            msg = (
+                f"{HTTP_METHOD_POST} {path}"
+                f" code={data.get(FIELD_CODE)}"
+                f" msg={data.get(FIELD_MSG)!r}"
+                f" data={data.get(FIELD_DATA)!r}"
+            )
+            raise JackeryApiError(
+                msg,
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -930,13 +1095,15 @@ class BaseHTTPMixin:
                 body=body,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     # --- JSON POST with auto re-login --------------------------------------
-    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict:
-        """Send a JSON POST to the Jackery API and return the parsed response, retrying once after an automatic re-login if the token is expired.
+    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Send a JSON POST to the Jackery API and return the parsed response, retrying.
+
+        once after an automatic re-login if the token is expired.
 
         Parameters:
             path (str): Request path appended to the base API URL.
@@ -949,17 +1116,30 @@ class BaseHTTPMixin:
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
-            """Build HTTP headers for JSON requests, including authentication headers when available.
+            """Build HTTP headers for JSON requests, including authentication headers.
+
+            when available.
 
             Returns:
-                dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
+                dict[str, str]: Mapping of HTTP header names to values with the
+                content-type set to JSON and token headers included when present.
             """
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
-        async def _do() -> tuple[int, dict]:
-            """Send the POST request to the given URL with the prepared JSON payload and return the HTTP status and parsed response."""
+        async def _do() -> tuple[int, dict[str, Any]]:
+            """Send the POST request to the given URL with the prepared JSON payload.
+
+            and return the HTTP status and parsed response.
+
+            Returns:
+                tuple[int, dict]: A pair of (status, data) where `status` is the HTTP
+                status code and `data` is the parsed JSON response when parsing
+                succeeds. If the response cannot be parsed as JSON, `data` is a dict
+                containing `FIELD_RAW_TEXT` with the response text truncated to
+                `HTTP_RAW_TEXT_LIMIT`.
+            """
             async with self._session.post(
                 url,
                 json=payload,
@@ -967,22 +1147,21 @@ class BaseHTTPMixin:
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
             ) as resp:
                 status = resp.status
-                body_bytes = await resp.read()
                 try:
-                    data = self._decode_response_json(body_bytes)
+                    data = await resp.json(content_type=None)
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ):
-                    data = {FIELD_RAW_TEXT: self._truncated_response_text(body_bytes)}
+                    data = {FIELD_RAW_TEXT: (await resp.text())[:HTTP_RAW_TEXT_LIMIT]}
                 return status, data
 
         self._requests_total += 1
         try:
             status, data = await self._request_json_with_retry(
-                "POST",
+                HTTP_METHOD_POST,
                 path,
                 _do,
             )
@@ -990,9 +1169,12 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"POST {path} request failed: "
                 f"{type(err).__name__}: {err or '(no message)'}"
+            )
+            raise JackeryApiError(
+                msg,
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
@@ -1001,27 +1183,38 @@ class BaseHTTPMixin:
                 self._token = None
                 await self.async_login()
             try:
-                status, data = await _do()
+                status, data = await self._request_json_with_retry(
+                    HTTP_METHOD_POST,
+                    path,
+                    _do,
+                )
             except (TimeoutError, aiohttp.ClientError) as err:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                msg = (
                     f"POST {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or '(no message)'}"
+                )
+                raise JackeryApiError(
+                    msg,
                 ) from err
 
         if self._is_auth_failure_response(status, data):
             raise JackeryAuthError(
-                self._auth_failure_message("POST", path, status, data)
+                self._auth_failure_message("POST", path, status, data),
             )
         if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"POST {path} HTTP {status}")  # noqa: TRY003
+            msg = f"POST {path} HTTP {status}"
+            raise JackeryApiError(msg)
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
+            msg = (
                 f"POST {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
                 f"data={data.get(FIELD_DATA)!r}"
+            )
+            raise JackeryApiError(
+                msg,
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -1030,7 +1223,7 @@ class BaseHTTPMixin:
                 body=payload,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
@@ -1064,7 +1257,8 @@ class BaseHTTPMixin:
             user_id (str): MQTT user identifier; falsy values are stored as None.
             seed_b64 (str): Base64-encoded MQTT seed; falsy values are stored as None.
             mac_id (str): MQTT MAC identifier; falsy values are stored as None.
-            mac_id_source (str | None): Optional source descriptor for the MAC identifier; if provided, sets the MAC ID source.
+            mac_id_source (str | None): Optional source descriptor for the MAC
+            identifier; if provided, sets the MAC ID source.
         """
         self._mqtt_user_id = user_id or None
         self._mqtt_seed_b64 = seed_b64 or None
@@ -1072,11 +1266,16 @@ class BaseHTTPMixin:
         if mac_id_source:
             self._mqtt_mac_id_source = mac_id_source
 
-    def mqtt_session_snapshot(self) -> dict[str, str] | None:
-        """Return a serializable snapshot of the current MQTT session for persistence or None if incomplete.
+    def mqtt_session_snapshot(self) -> MqttSessionSnapshot | None:
+        """Return a serializable snapshot of the current MQTT session for persistence.
+
+        or None if incomplete.
 
         Returns:
-            snapshot (dict[str, str] | None): A dict containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, `MQTT_SESSION_MAC_ID`, and `MQTT_SESSION_MAC_ID_SOURCE` when all required fields are present, otherwise `None`.
+            snapshot (dict[str, str] | None): A dict containing `MQTT_SESSION_USER_ID`,
+            `MQTT_SESSION_SEED_B64`, `MQTT_SESSION_MAC_ID`, and
+            `MQTT_SESSION_MAC_ID_SOURCE` when all required fields are present,
+            otherwise `None`.
         """
         if not (self._mqtt_user_id and self._mqtt_seed_b64 and self._mqtt_mac_id):
             return None

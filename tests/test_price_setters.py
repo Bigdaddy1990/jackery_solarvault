@@ -55,15 +55,22 @@ class _AcceptingPriceApi:
 
 
 def _coordinator() -> JackerySolarVaultCoordinator:
-    """Create a JackerySolarVaultCoordinator configured for unit tests of price-write behavior.
+    """Create a JackerySolarVaultCoordinator configured for unit tests of price-write.
 
-    The returned coordinator uses a rejecting price API, contains a single device "dev1" with EUR currency,
-    single price 0.25, platform company id 7, and system region "DE". The device index maps "dev1" to system id "sys1".
-    Internal slow cache and price overrides are empty. The coordinator's partial-update writer is replaced with a
-    function that raises AssertionError to ensure tests fail if a rejected write attempts to patch local price data.
+    behavior.
+
+    The returned coordinator uses a rejecting price API, contains a single device
+    "dev1" with EUR currency,
+    single price 0.25, platform company id 7, and system region "DE". The device index
+    maps "dev1" to system id "sys1".
+    Internal slow cache and price overrides are empty. The coordinator's partial-update
+    writer is replaced with a
+    function that raises AssertionError to ensure tests fail if a rejected write
+    attempts to patch local price data.
 
     Returns:
-        JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
+        JackerySolarVaultCoordinator: A coordinator instance preconfigured for price
+        write tests.
     """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = _RejectingPriceApi()
@@ -82,15 +89,19 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     coordinator._price_overrides = {}
 
     def _fail_push(_data: object) -> None:
-        """Assert handler used to ensure no local data patch occurs when a write is rejected.
+        """Assert handler used to ensure no local data patch occurs when a write is.
+
+        rejected.
 
         Parameters:
             _data (object): Ignored placeholder for the attempted patch payload.
 
         Raises:
-            AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
+            AssertionError: Always raised to signal that a rejected writer attempted to
+            modify local price data.
         """
-        raise AssertionError("rejected writer must not patch local price data")  # noqa: TRY003
+        msg = "rejected writer must not patch local price data"
+        raise AssertionError(msg)
 
     coordinator._push_partial_update = _fail_push
     return coordinator

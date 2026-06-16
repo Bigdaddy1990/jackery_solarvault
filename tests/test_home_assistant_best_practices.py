@@ -11,7 +11,8 @@ def _read(relative_path: str) -> str:
     """Read a file from the component directory and return its contents.
 
     Parameters:
-        relative_path (str): Path to the file relative to the component root (e.g., "sensor.py" or "translations/en.json").
+        relative_path (str): Path to the file relative to the component root (e.g.,
+        "sensor.py" or "translations/en.json").
 
     Returns:
         str: The file contents decoded as UTF-8.
@@ -20,9 +21,12 @@ def _read(relative_path: str) -> str:
 
 
 def test_read_only_platforms_define_parallel_updates_zero() -> None:
-    """Ensure coordinator-backed read-only platform modules disable parallel entity update jobs.
+    """Ensure coordinator-backed read-only platform modules disable parallel entity.
 
-    Checks that the component's sensor.py and binary_sensor.py contain the exact declaration "PARALLEL_UPDATES = 0".
+    update jobs.
+
+    Checks that the component's sensor.py and binary_sensor.py contain the exact
+    declaration "PARALLEL_UPDATES = 0".
     """
     for relative_path in ("sensor.py", "binary_sensor.py"):
         source = _read(relative_path)
@@ -30,9 +34,13 @@ def test_read_only_platforms_define_parallel_updates_zero() -> None:
 
 
 def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
-    """Ensure config_flow defines and uses the reconfigure-specific missing-entry abort reason.
+    """Ensure config_flow defines and uses the reconfigure-specific missing-entry abort.
 
-    Asserts that `config_flow.py` contains the `FLOW_ABORT_RECONFIGURE_ENTRY_MISSING` identifier and that the code calls `self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)`.
+    reason.
+
+    Asserts that `config_flow.py` contains the `FLOW_ABORT_RECONFIGURE_ENTRY_MISSING`
+    identifier and that the code calls
+    `self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)`.
     """
     source = _read("config_flow.py")
     assert "FLOW_ABORT_RECONFIGURE_ENTRY_MISSING" in source
@@ -42,9 +50,12 @@ def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
 
 
 def test_abort_translations_cover_reconfigure_entry_missing() -> None:
-    """Verify that the `config.abort.reconfigure_entry_missing` key exists in the component's root `strings.json` and in every locale JSON under `translations/`.
+    """Verify that the `config.abort.reconfigure_entry_missing` key exists in the.
 
-    This ensures the reconfigure-specific abort reason is present in the default strings and all translations.
+    component's root `strings.json` and in every locale JSON under `translations/`.
+
+    This ensures the reconfigure-specific abort reason is present in the default
+    strings and all translations.
     """
     for relative_path in ("strings.json",):
         data = json.loads(_read(relative_path))

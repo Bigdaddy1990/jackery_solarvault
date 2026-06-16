@@ -4,7 +4,8 @@ Transport Layer Architecture (MANDATORY — DO NOT VIOLATE):
 
     Layer 3 = HTTP / Cloud API  → PRIMARY control + data path
     Layer 4 = BLE               → FALLBACK for commands + live data
-    Layer 5 = MQTT              → DATA SOURCE + command transport (never sole coordinator)
+    Layer 5 = MQTT              → DATA SOURCE + command transport (never sole
+    coordinator)
 
 Rules:
   - HTTP/API is ALWAYS the primary control path (self.api.* methods).
@@ -15,10 +16,7 @@ Rules:
   - Never merge HTTP and MQTT command body formats.
 """
 
-from collections.abc import Awaitable, Callable
-from typing import Any, Final
-
-from aiomqtt import MqttError
+from typing import Final
 
 DOMAIN: Final = "jackery_solarvault"
 MANUFACTURER: Final = "Jackery"
@@ -35,45 +33,9 @@ LOGIN_TIMEOUT_SEC: Final = 60
 _HTTP_RETRY_ATTEMPTS = 3
 _HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
 
+# Diagnostics export schema version (bump on breaking diagnostics-shape changes).
+DIAGNOSTICS_SCHEMA_VERSION: Final = 1
 
-# Strict by default: no implicit wildcard subscription.
-LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
-# Track topic names with a sensible upper bound so a misconfigured broker
-# (foreign neighbours publishing on the same LAN) cannot explode memory.
-LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
-# Guardrail for unexpectedly large broker payloads.
-LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
-_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
-_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
-    "actionId",
-    "batSoc",
-    "body",
-    "cmd",
-    "data",
-    "devId",
-    "devSn",
-    "deviceId",
-    "deviceSn",
-    "gridInPw",
-    "gridOutPw",
-    "messageType",
-    "payload",
-    "pvPw",
-    "sn",
-    "soc",
-}
-_MqttErrorTuple: tuple[type[Exception], ...] = (MqttError,)
-_MAX_PENDING_MESSAGE_TASKS = 32
-_MQTT_AVAILABILITY_ONLINE = b"online"
-_MQTT_AVAILABILITY_OFFLINE = b"offline"
-_MQTT_AVAILABILITY_TOPIC_SUFFIX = "status"
-
-# Sink signature kept loose so the wiring layer can pass any async callable
-# that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
-# for the dict means the payload was not valid JSON; the raw bytes are still
-# forwarded so a future binary protocol decoder can plug in without touching
-# this module.
-LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
 
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
@@ -292,7 +254,8 @@ PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?system
 SAVE_SINGLE_MODE_PATH: Final = (
     "/v1/device/dynamic/saveSingleMode"  # form: systemId,singlePrice,currency
 )
-SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion
+# form: systemId, platformCompanyId, systemRegion
+SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"
 
 # Device/statistic endpoint group from PROTOCOL.md §2.
 DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
@@ -345,11 +308,14 @@ UPLOAD_HEADIMG_PATH: Final = "/v1/auth/headimg"
 USER_INFO_PATH: Final = "/v1/user/info"
 CANCEL_ACCOUNT_PATH: Final = "/v1/auth/cancel"
 UPDATE_REGISTER_ID_PATH: Final = "/v1/auth/updateRegisterId"
+GENERATED_JWT_PATH: Final = "/v1/auth/generatedJwt"
 
 # --- Device management endpoints ---------------------------------------------
 DEVICE_BIND_PATH: Final = "/v1/device/bind"
 DEVICE_UNBIND_PATH: Final = "/v1/device/unbind"
 DEVICE_NICKNAME_PATH: Final = "/v1/device/bind/nickname"
+DEVICE_QR_CODE_PATH: Final = "/v1/device/bind/qrcode"
+DEVICE_BLUETOOTH_KEY_PATH: Final = "/v1/device/bluetoothKey"
 DEVICE_ACCEPT_BIND_PATH: Final = "/v1/device/accept_bind"
 DEVICE_SHARED_LIST_PATH: Final = "/v1/device/bind/shared"
 DEVICE_SHARED_MANAGER_PATH: Final = "/v1/device/bind/share/list"
@@ -429,11 +395,10 @@ SUB_SHADOW_DIY_PATH: Final = "/v1/device/property/subShadow"
 SYSTEM_SHADOW_DIY_PATH: Final = "/v1/device/property/systemShadow"
 
 # Crypto material extracted from the Jackery app (iOS+Android both use these).
-# LIMITATION: The upstream protocol (crypto.layer_a_login) generates a fresh
-# random AES-128 key per login via KeyGenerator('AES').init(128).generateKey()
-# and wraps it with RSA. This integration uses a static key instead — the same
-# value observed in all captured traffic. This is a documented deviation, not
-# a hardening claim. See docs/REFERENCE_COVERAGE.md Crypto Layer A.
+# Layer A login follows source-of-truth/jackery_auth.py: generate 16 random
+# bytes, Base64-encode them, then AES-ECB the LoginBean with those 24 ASCII
+# bytes and RSA-wrap the same bytes. ``AES_KEY`` is compatibility-only; the
+# app does not require b"1234567890123456" for runtime login.
 AES_KEY: Final = b"1234567890123456"
 RSA_PUBLIC_KEY_B64: Final = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
@@ -600,7 +565,7 @@ FIELD_SWITCH: Final = "switch"
 SHELLY_CONTROL_FUNCTION_SWITCH: Final = "switch"
 SHELLY_CONTROL_ACTION_ON: Final = "on"
 SHELLY_CONTROL_ACTION_OFF: Final = "off"
-# AccSocketBody short-keys per docs/html/jackery_smali_home_assistant_report.html
+# AccSocketBody short-keys per source-of-truth/jackery_smali_home_assistant_report.html
 # §"AccSocketBody". ``op`` is already an alias for ``outPw`` (coordinator
 # merge), ``switch`` is exposed through switch/binary_sensor entities, and
 # the remaining two are documented but not observed in this installer's
@@ -907,7 +872,8 @@ FIELD_CT_POWER_FACTOR: Final = "fact"
 FIELD_CT_POWER_FACTOR1: Final = "fact1"
 FIELD_CT_POWER_FACTOR2: Final = "fact2"
 FIELD_CT_POWER_FACTOR3: Final = "fact3"
-# AccCTBody apparent / reactive power per docs/html jackery_entity_field_candidates_v2:
+# AccCTBody apparent / reactive power per source-of-
+# truth/jackery_entity_field_candidates_v2:
 # ``ap``/``ap1..3`` = apparent power (VA), ``rep``/``rep1..3`` = reactive
 # power (var). Total + per-phase variants mirror the active-power layout.
 FIELD_CT_APPARENT_POWER: Final = "ap"
@@ -918,7 +884,7 @@ FIELD_CT_REACTIVE_POWER: Final = "rep"
 FIELD_CT_REACTIVE_POWER1: Final = "rep1"
 FIELD_CT_REACTIVE_POWER2: Final = "rep2"
 FIELD_CT_REACTIVE_POWER3: Final = "rep3"
-# CtSub.funForm per docs/html/jackery_entity_field_candidates_v2.html:
+# CtSub.funForm per source-of-truth/jackery_entity_field_candidates_v2.html:
 # CT function-form / wiring-mode identifier (1-phase vs 3-phase config).
 # Exposed as diagnostic — useful for troubleshooting an unexpected CT layout.
 FIELD_CT_FUN_FORM: Final = "funForm"
@@ -1314,7 +1280,7 @@ APP_STAT_TOTAL_CHARGE: Final = "totalCharge"
 APP_STAT_TOTAL_DISCHARGE: Final = "totalDischarge"
 APP_STAT_TOTAL_CT_INPUT_ENERGY: Final = "totalInCtEnergy"
 APP_STAT_TOTAL_CT_OUTPUT_ENERGY: Final = "totalOutCtEnergy"
-# EpsStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — EPS /
+# EpsStatApi$Bean per source-of-truth/jackery_http_model_fields_v2.html — EPS /
 # off-grid in/out totals for a single dateType payload.
 APP_STAT_TOTAL_IN_EPS_ENERGY: Final = "totalInEpsEnergy"
 APP_STAT_TOTAL_OUT_EPS_ENERGY: Final = "totalOutEpsEnergy"
@@ -1332,7 +1298,7 @@ APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
 APP_STAT_TODAY_LOAD: Final = "todayLoad"
 APP_STAT_TOTAL_GENERATION: Final = "totalGeneration"
 APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
-# PvStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — separate
+# PvStatApi$Bean per source-of-truth/jackery_http_model_fields_v2.html — separate
 # from systemStatistic.totalRevenue (latter is the lifetime KPI).
 # totalSolarRevenue is the periodic Jackery cloud "PV revenue" value tied
 # to that period's PV energy and the configured tariff (singlePrice or
@@ -1460,7 +1426,7 @@ WORK_MODE_READ_ALIASES: Final = {5: "tariff"}
 TEMP_UNIT_TO_OPTION: Final = {0: "celsius", 1: "fahrenheit"}
 AUTO_OFF_HOURS: Final = (2, 8, 12, 24)
 STORM_MINUTES_DEFAULT: Final = tuple(
-    [hour * 60 for hour in range(1, 25)] + [2880, 4320]
+    [hour * 60 for hour in range(1, 25)] + [2880, 4320],
 )
 # Storm-warning lead-times below this value are treated as firmware sentinels,
 # not real user settings. The Jackery app dropdown starts at 60 minutes
@@ -1572,10 +1538,6 @@ MQTT_TOPIC_DEVICE: Final = "device"
 MQTT_TOPIC_ALERT: Final = "alert"
 MQTT_TOPIC_CONFIG: Final = "config"
 MQTT_TOPIC_NOTICE: Final = "notice"
-# Topics carrying propertyChange / devicePropertyChange and alert data need
-# at-least-once delivery. The notice topic carries high-rate diagnostic
-# frames that are not entity-backed, so QoS 0 avoids unnecessary ACK traffic.
-_QOS0_TOPIC_SUFFIXES: frozenset[str] = frozenset({MQTT_TOPIC_NOTICE})
 MQTT_TOPIC_COMMAND: Final = "command"
 # Documented app topic; integration does not publish here.
 MQTT_TOPIC_ACTION: Final = "action"
@@ -1971,7 +1933,7 @@ ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
 
 # --- Portable / Explorer powerstation command IDs (msg_id 1-53) ---------------
 # Sourced from ``com.hbxn.control.device.cmd.portable.b`` (51 portable commands
-# per docs/Jackery_2.1.1_RE_Supplement.md §3.2). All transport as
+# per source-of-truth/Jackery_2.1.1_RE_Supplement.md §3.2). All transport as
 # ``messageType=DevicePropertyChange`` with ``bleMsgType`` per row, unless noted.
 ACTION_ID_PORTABLE_OTA_PAGE_DATA: Final = 1  # ble=103 DevicePropertyChange
 ACTION_ID_PORTABLE_OTA_VERSION: Final = 2  # ble=100 DevicePropertyChange
@@ -2027,7 +1989,8 @@ ACTION_ID_PORTABLE_READ_SUB_CT: Final = 51  # ble=110 QuerySubDeviceGroupPropert
 ACTION_ID_PORTABLE_GET_WIFI_CONFIG: Final = 52  # ble=124 QueryWifiConfig
 
 # Frozenset of every portable command ID for routing in coordinator / handlers.
-# Mirrors ``MQTT_ACTION_IDS_*`` but scoped to the ``com.hbxn.control.device.cmd.portable.b`` enum.
+# Mirrors ``MQTT_ACTION_IDS_*`` but scoped to the
+# ``com.hbxn.control.device.cmd.portable.b`` enum.
 PORTABLE_ACTION_IDS: Final = frozenset({
     ACTION_ID_PORTABLE_OTA_PAGE_DATA,
     ACTION_ID_PORTABLE_OTA_VERSION,
@@ -2130,7 +2093,7 @@ SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
 })
 
 # Subdevice ``scanName`` catalog from the Jackery app's accessory enum.
-# Source: ``docs/html/jackery_smali_home_assistant_report.html`` section
+# Source: ``source-of-truth/jackery_smali_home_assistant_report.html`` section
 # "Subdevice-/Zubehör-Erkennung" — the table the app's
 # ``DeviceJackeryAccessoriesExistApi`` populates from BLE/mDNS scans.
 # Keys are the wire ``scanName`` exactly as the firmware reports them
@@ -2138,7 +2101,7 @@ SUBDEVICE_DEV_TYPES_ENUM_ONLY: Final = frozenset({
 SUBDEVICE_SCAN_NAME_DEV_TYPES: Final[dict[str, int]] = {
     # UNKNOWN sentinel: intentionally omitted at runtime (no scanName match).
     # Reference accessories.types[0] = UNKNOWN/devType=0; kept as comment
-    # for audit completeness per jackery_complete_reference.json.
+    # for audit completeness per source-of-truth/jackery_complete_reference.json.
     "shellyproem50": SUBDEVICE_DEV_TYPE_CT,
     "shellypro3em": SUBDEVICE_DEV_TYPE_CT,
     "shellypro3em63": SUBDEVICE_DEV_TYPE_CT,
@@ -2199,7 +2162,7 @@ SUBDEVICE_SCAN_NAME_MANUFACTURERS: Final[dict[str, str]] = {
 
 # Set of all known accessory ``scanName`` values.
 SUBDEVICE_SCAN_NAMES: Final[frozenset[str]] = frozenset(
-    SUBDEVICE_SCAN_NAME_DEV_TYPES.keys()
+    SUBDEVICE_SCAN_NAME_DEV_TYPES.keys(),
 )
 
 # ``DeviceJackeryAccessoriesExistApi$SCANTY`` enum values. The Jackery

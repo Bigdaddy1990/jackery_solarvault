@@ -84,37 +84,45 @@ _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 def _coerce_service_int(raw: Any) -> int:  # noqa: ANN401
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
-        raise vol.Invalid("expected integer")  # noqa: TRY003
+        msg = "expected integer"
+        raise vol.Invalid(msg)
     if isinstance(raw, int):
         return raw
     if isinstance(raw, float):
         if math.isfinite(raw) and raw.is_integer():
             return int(raw)
-        raise vol.Invalid("expected integer")  # noqa: TRY003
+        msg = "expected integer"
+        raise vol.Invalid(msg)
     if isinstance(raw, str):
         text = raw.strip()
         if not text:
-            raise vol.Invalid("expected integer")  # noqa: TRY003
+            msg = "expected integer"
+            raise vol.Invalid(msg)
         signed = text[0] in "+-"
         digits = text[1:] if signed else text
         if digits.isascii() and digits.isdecimal():
             try:
                 return int(text)
             except ValueError as err:
-                raise vol.Invalid("expected integer") from err  # noqa: TRY003
-    raise vol.Invalid("expected integer")  # noqa: TRY003
+                msg = "expected integer"
+                raise vol.Invalid(msg) from err
+    msg = "expected integer"
+    raise vol.Invalid(msg)
 
 
 def _coerce_service_float(raw: Any) -> float:  # noqa: ANN401
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
-        raise vol.Invalid("expected finite number")  # noqa: TRY003
+        msg = "expected finite number"
+        raise vol.Invalid(msg)
     try:
         parsed = float(raw)
     except (TypeError, ValueError, OverflowError) as err:
-        raise vol.Invalid("expected finite number") from err  # noqa: TRY003
+        msg = "expected finite number"
+        raise vol.Invalid(msg) from err
     if not math.isfinite(parsed):
-        raise vol.Invalid("expected finite number")  # noqa: TRY003
+        msg = "expected finite number"
+        raise vol.Invalid(msg)
     return parsed
 
 
@@ -127,7 +135,8 @@ def _coerce_service_float(raw: Any) -> float:  # noqa: ANN401
 
 RENAME_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_SYSTEM_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NUMERIC_ID_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NUMERIC_ID_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_NEW_NAME): vol.All(
         cv.string,
@@ -137,15 +146,18 @@ RENAME_SCHEMA = vol.Schema({
 })
 REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
 })
 DELETE_STORM_ALERT_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_ALERT_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
 })
 # Experimental third-party MQTT bridge — see implementation notes §15. ``username``/
@@ -155,50 +167,63 @@ DELETE_STORM_ALERT_SCHEMA = vol.Schema({
 # user verify reception against their own broker.
 SET_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_ENABLE): cv.boolean,
     vol.Required(SERVICE_FIELD_IP): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN), vol.Length(max=128)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=128),
     ),
     vol.Required(SERVICE_FIELD_PORT): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=65535)
+        vol.Coerce(int),
+        vol.Range(min=1, max=65535),
     ),
     vol.Optional(SERVICE_FIELD_USERNAME, default=""): vol.All(
-        cv.string, vol.Length(max=128)
+        cv.string,
+        vol.Length(max=128),
     ),
     vol.Optional(SERVICE_FIELD_PASSWORD, default=""): vol.All(
-        cv.string, vol.Length(max=128)
+        cv.string,
+        vol.Length(max=128),
     ),
     vol.Optional(SERVICE_FIELD_TOKEN, default=""): vol.All(
-        cv.string, vol.Length(max=512)
+        cv.string,
+        vol.Length(max=512),
     ),
 })
 QUERY_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
 })
 SEND_BLE_COMMAND_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string, vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_CMD): vol.All(
-        vol.Coerce(int), vol.Range(min=1, max=65535)
+        vol.Coerce(int),
+        vol.Range(min=1, max=65535),
     ),
     vol.Required(SERVICE_FIELD_BODY): vol.Any(dict, cv.string),
     vol.Optional(SERVICE_FIELD_FLAGS, default=0): vol.All(
-        vol.Coerce(int), vol.Range(min=0, max=65535)
+        vol.Coerce(int),
+        vol.Range(min=0, max=65535),
     ),
     vol.Optional(SERVICE_FIELD_WAIT_FOR_ACK, default=False): cv.boolean,
     vol.Optional(SERVICE_FIELD_ACK_TIMEOUT, default=5.0): vol.All(
-        vol.Coerce(float), vol.Range(min=0.5, max=60.0)
+        vol.Coerce(float),
+        vol.Range(min=0.5, max=60.0),
     ),
 })
 SEND_DEVICE_SCHEDULE_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
     vol.Required(SERVICE_FIELD_ACTION_ID): vol.All(
-        vol.Coerce(int), vol.In(MQTT_ACTION_IDS_SCHEDULE)
+        vol.Coerce(int),
+        vol.In(MQTT_ACTION_IDS_SCHEDULE),
     ),
     vol.Required(SERVICE_FIELD_BODY): vol.Any(dict, cv.string),
 })
@@ -247,7 +272,8 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
 
 
 def _coordinator_for_device(
-    hass: HomeAssistant, device_id: str
+    hass: HomeAssistant,
+    device_id: str,
 ) -> JackerySolarVaultCoordinator | None:
     """Return the coordinator whose payload contains the given device id."""
     for coordinator in _loaded_coordinators(hass):
@@ -257,7 +283,8 @@ def _coordinator_for_device(
 
 
 def _coordinator_for_system(
-    hass: HomeAssistant, system_id: str
+    hass: HomeAssistant,
+    system_id: str,
 ) -> JackerySolarVaultCoordinator | None:
     """Return the coordinator whose payload owns the given system id."""
     for coordinator in _loaded_coordinators(hass):
@@ -393,7 +420,8 @@ def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # noqa: ANN4
 
 def _reject_json_constant(constant: str) -> object:
     """Reject non-standard JSON constants such as NaN and Infinity."""
-    raise ValueError(f"invalid JSON constant: {constant}")  # noqa: TRY003
+    msg = f"invalid JSON constant: {constant}"
+    raise ValueError(msg)
 
 
 def _json_native_value(value: Any) -> Any:  # noqa: ANN401
@@ -403,17 +431,20 @@ def _json_native_value(value: Any) -> Any:  # noqa: ANN401
     if isinstance(value, float):
         if math.isfinite(value):
             return value
-        raise ValueError("body must contain only finite numbers")  # noqa: TRY003
+        msg = "body must contain only finite numbers"
+        raise ValueError(msg)
     if isinstance(value, list):
         return [_json_native_value(item) for item in value]
     if isinstance(value, dict):
         normalized: dict[str, Any] = {}
         for key, item in value.items():
             if not isinstance(key, str):
-                raise ValueError("body object keys must be strings")  # noqa: TRY003, TRY004
+                msg = "body object keys must be strings"
+                raise ValueError(msg)  # noqa: TRY004
             normalized[key] = _json_native_value(item)
         return normalized
-    raise ValueError("body must contain only JSON-compatible values")  # noqa: TRY003
+    msg = "body must contain only JSON-compatible values"
+    raise ValueError(msg)
 
 
 def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
@@ -421,8 +452,9 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     try:
         normalized = _json_native_value(body)
     except ValueError as err:
+        msg = "send_ble_command_failed"
         raise _service_validation_error(
-            "send_ble_command_failed",
+            msg,
             device_id=device_id,
             error=err,
         ) from err
@@ -441,20 +473,23 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
                 parse_constant=_reject_json_constant,
             )
         except ValueError as err:
+            msg = "send_ble_command_failed"
             raise _service_validation_error(
-                "send_ble_command_failed",
+                msg,
                 device_id=device_id,
                 error=f"body is not valid JSON: {err}",
             ) from err
         if isinstance(parsed, dict):
             return _json_native_body(parsed, device_id)
+        msg = "send_ble_command_failed"
         raise _service_validation_error(
-            "send_ble_command_failed",
+            msg,
             device_id=device_id,
             error="body JSON must be an object",
         )
+    msg = "send_ble_command_failed"
     raise _service_validation_error(
-        "send_ble_command_failed",
+        msg,
         device_id=device_id,
         error="body must be a mapping or JSON object string",
     )
@@ -612,9 +647,12 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
     try:
         ok = await coordinator.api.async_set_system_name(system_id, new_name)
     except JackeryAuthError as err:
-        raise ConfigEntryAuthFailed(  # noqa: TRY003
+        msg = (
             "Jackery credentials were rejected while renaming a system. "
             "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(
+            msg,
         ) from err
     except JackeryError as err:
         raise ServiceValidationError(
@@ -638,7 +676,8 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
 
 
 async def _async_handle_refresh_weather_plan(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
     """Trigger a weather-plan refresh on the matching coordinator."""
     device_id = _device_id_from_service(
@@ -672,7 +711,8 @@ async def _async_handle_refresh_weather_plan(
 
 
 async def _async_handle_delete_storm_alert(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
     """Delete a storm alert on the matching coordinator."""
     device_id = _device_id_from_service(
@@ -682,7 +722,8 @@ async def _async_handle_delete_storm_alert(
         extra_placeholders={"alert_id": ""},
     )
     alert_id = _storm_alert_id_from_service(
-        call.data[SERVICE_FIELD_ALERT_ID], device_id
+        call.data[SERVICE_FIELD_ALERT_ID],
+        device_id,
     )
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
@@ -712,7 +753,8 @@ async def _async_handle_delete_storm_alert(
 
 
 async def _async_handle_set_third_party_mqtt_config(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
     """Publish the experimental SET_THIRD_PARTY_MQTT_CONFIG (3046) frame."""
     device_id = _device_id_from_service(
@@ -798,7 +840,8 @@ async def _async_handle_set_third_party_mqtt_config(
 
 
 async def _async_handle_query_third_party_mqtt_config(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
     """Publish the experimental GET_THIRD_PARTY_MQTT_CONFIG (3047) frame."""
     device_id = _device_id_from_service(
@@ -838,7 +881,8 @@ async def _async_handle_query_third_party_mqtt_config(
 
 
 async def _async_handle_send_ble_command(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
     """Write one experimental binary command frame over the active BLE session."""
     device_id = _device_id_from_service(
@@ -848,8 +892,9 @@ async def _async_handle_send_ble_command(
     )
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
+        msg = "send_ble_command_failed"
         raise _service_validation_error(
-            "send_ble_command_failed",
+            msg,
             device_id=device_id,
             error="no Jackery entry owns this device id",
         )
@@ -894,14 +939,16 @@ async def _async_handle_send_ble_command(
     except ServiceValidationError:
         raise
     except (HomeAssistantError, RuntimeError, ValueError) as err:
+        msg = "send_ble_command_failed"
         raise _service_validation_error(
-            "send_ble_command_failed",
+            msg,
             device_id=device_id,
             error=err,
         ) from err
     if not sent:
+        msg = "send_ble_command_failed"
         raise _service_validation_error(
-            "send_ble_command_failed",
+            msg,
             device_id=device_id,
             error=(
                 "BLE writes are disabled or no active BLE session exists after "
@@ -1009,40 +1056,54 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
 
 def _strip_jackery_subdevice_suffix(device_id: str) -> str:
-    """Return the parent numeric Jackery device identifier by removing a recognized subdevice suffix.
+    """Return the parent numeric Jackery device identifier by removing a recognized.
+
+    subdevice suffix.
 
     Parameters:
-        device_id (str): Device identifier that may include a trailing `_suffix` (e.g., "12345_child").
+        device_id (str): Device identifier that may include a trailing `_suffix` (e.g.,
+        "12345_child").
 
     Returns:
-        str: The leading numeric device identifier if a suffix is present (e.g., "12345"), otherwise the original input.
+        str: The leading numeric device identifier if a suffix is present (e.g.,
+        "12345"), otherwise the original input.
     """
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
 
 async def _async_handle_send_device_schedule(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant,
+    call: ServiceCall,
 ) -> None:
-    """Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery device.
+    """Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery.
 
-    Resolves the provided device identifier to the owning Jackery device, parses the schedule `body` (accepts a mapping or a JSON object string), and forwards the action to the coordinator to send the schedule frame.
+    device.
+
+    Resolves the provided device identifier to the owning Jackery device, parses the
+    schedule `body` (accepts a mapping or a JSON object string), and forwards the
+    action to the coordinator to send the schedule frame.
 
     Parameters:
         call (ServiceCall): Service call whose `data` must include:
-            - `device_id` (str): device identifier or Home Assistant device registry id to resolve.
-            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018).
-            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string.
+            - `device_id` (str): device identifier or Home Assistant device registry id
+            to resolve.
+            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017,
+            3018).
+            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded
+            object string.
 
     Raises:
-        ServiceValidationError: if the device cannot be resolved to a coordinator, if `body` is invalid, or if sending the schedule fails.
+        ServiceValidationError: if the device cannot be resolved to a coordinator, if
+        `body` is invalid, or if sending the schedule fails.
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
+        msg = "send_device_schedule_failed"
         raise _service_validation_error(
-            "send_device_schedule_failed",
+            msg,
             device_id=device_id,
             error="no Jackery entry owns this device id",
         )
@@ -1054,8 +1115,9 @@ async def _async_handle_send_device_schedule(
             body=body,
         )
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+        msg = "send_device_schedule_failed"
         raise _service_validation_error(
-            "send_device_schedule_failed",
+            msg,
             device_id=device_id,
             error=err,
         ) from err

@@ -1,6 +1,7 @@
-"""Statistics backfill helpers for Jackery SolarVault."""
+"""Statistics backfill facades."""
 
-from custom_components.jackery_solarvault.stats import statistics_http_backfill_dates
-from custom_components.jackery_solarvault.util import apply_year_month_backfill
+from datetime import date
 
-__all__ = ["apply_year_month_backfill", "statistics_http_backfill_dates"]
+from . import iter_calendar_months, iter_calendar_weeks, iter_calendar_years
+
+__all__ = ["date", "iter_calendar_months", "iter_calendar_weeks", "iter_calendar_years"]

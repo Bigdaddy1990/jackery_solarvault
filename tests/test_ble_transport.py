@@ -46,7 +46,7 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
             cmd=107,
             body=b"",
             wait_for_ack=True,
-        )
+        ),
     )
     await asyncio.sleep(0)
 

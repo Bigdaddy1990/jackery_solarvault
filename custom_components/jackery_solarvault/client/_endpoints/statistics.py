@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from ...const import (
+from custom_components.jackery_solarvault.client._http import BaseHTTPMixin
+from custom_components.jackery_solarvault.const import (
     ALARM_PATH,
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_DATE_TYPE,
@@ -38,39 +39,45 @@ from ...const import (
     SYMMETRY_STAT_PATH,
     SYSTEM_STATISTIC_PATH,
 )
-from ...util import app_period_date_bounds
-from .._http import BaseHTTPMixin
+from custom_components.jackery_solarvault.util import app_period_date_bounds
 
 
 class StatisticsEndpointMixin(BaseHTTPMixin):
     """Statistics, trends, and energy endpoint methods."""
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
+    async def async_get_alarm(
+        self,
+        system_id: str | int,
+    ) -> Any:  # parsed JSON response, indexed by callers  # noqa: ANN401
         """Fetches the alarm list for the specified system.
 
         Stores the raw parsed response in `self.last_alarm_response`.
 
         Returns:
-            The backend `data` field (commonly a list of alarm dictionaries) or `None` if the field is absent.
+            The backend `data` field (commonly a list of alarm dictionaries) or `None`
+            if the field is absent.
         """
         data = await self._get_json(
-            ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            ALARM_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_alarm_response = data
         return data.get(FIELD_DATA)
 
-    async def async_get_system_statistic(self, system_id: str | int) -> dict:
+    async def async_get_system_statistic(self, system_id: str | int) -> dict[str, Any]:
         """Retrieve system KPI statistics (today and total values) for the given system.
 
         Stores the raw backend response in `self.last_statistic_response`.
 
         Returns:
-            dict: Normalized payload containing keys such as `todayLoad`, `todayBatteryDisChg`,
+            dict: Normalized payload containing keys such as `todayLoad`,
+            `todayBatteryDisChg`,
             `todayBatteryChg`, `todayGeneration`, `totalGeneration`, `totalRevenue`,
             `totalCarbon`, and `isSetPrice`.
         """
         data = await self._get_json(
-            SYSTEM_STATISTIC_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            SYSTEM_STATISTIC_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_statistic_response = data
         return self._payload_dict(data, SYSTEM_STATISTIC_PATH)
@@ -82,20 +89,27 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Fetches PV production trend data for a system over a specified period.
 
         Parameters:
             system_id (str | int): System identifier used in the request.
-            date_type (str): Period granularity (e.g., "day", "month"); used to compute date bounds.
-            begin_date (str | None): Start date in ISO format; when None the start is computed from `date_type`.
-            end_date (str | None): End date in ISO format; when None the end is computed from `date_type`.
+            date_type (str): Period granularity (e.g., "day", "month"); used to compute
+            date bounds.
+            begin_date (str | None): Start date in ISO format; when None the start is
+            computed from `date_type`.
+            end_date (str | None): End date in ISO format; when None the end is
+            computed from `date_type`.
 
         Returns:
-            dict: Normalized payload dictionary from the backend; may be empty. If non-empty, the payload will include `APP_REQUEST_META` containing the request parameters (excluding `systemId`).
+            dict: Normalized payload dictionary from the backend; may be empty. If
+            non-empty, the payload will include `APP_REQUEST_META` containing the
+            request parameters (excluding `systemId`).
         """
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -104,7 +118,9 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             APP_REQUEST_END_DATE: str(end_date),
         }
         data = await self._get_json(
-            PV_TRENDS_PATH, params=params, request_timeout=SLOW_ENDPOINT_TIMEOUT_SEC
+            PV_TRENDS_PATH,
+            params=params,
+            request_timeout=SLOW_ENDPOINT_TIMEOUT_SEC,
         )
         payload = self._payload_dict(data, PV_TRENDS_PATH)
         if payload:
@@ -114,10 +130,14 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             )
         return payload
 
-    async def async_get_device_statistic(self, device_id: str | int) -> dict:
+    async def async_get_device_statistic(self, device_id: str | int) -> dict[str, Any]:
         """Get current-day energy-flow statistics for the specified device.
 
-        The result maps metric keys to numeric string values representing kilowatt-hours (kWh). Available keys vary by device and backend; examples include `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`, `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`, `batOtAcEgy`, and `batChgEgy`.
+        The result maps metric keys to numeric string values representing
+        kilowatt-hours (kWh). Available keys vary by device and backend; examples
+        include `pvEgy`, `inEpsEgy`, `ongridOtBatEgy`, `pvOtBatEgy`, `inOngridEgy`,
+        `outOngridEgy`, `batOtGridEgy`, `outEpsEgy`, `batDisChgEgy`, `acOtBatEgy`,
+        `batOtAcEgy`, and `batChgEgy`.
 
         Parameters:
             device_id (str | int): Device identifier (`deviceId`) to query.
@@ -126,7 +146,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict: Mapping from metric key (str) to its value as a string in kWh.
         """
         data = await self._get_json(
-            DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_STATISTIC_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
@@ -143,23 +164,32 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
     ) -> dict[str, Any]:
         """Fetch period-based chart data for a specific device and date range.
 
-        The returned value is the endpoint's `data` object normalized to a dict. If absent, an empty dict is returned. An `APP_REQUEST_META` entry is added (when missing) containing the request parameters used to fetch the data, excluding `deviceId` and `systemId`, so callers can correlate the payload with the requested period.
+        The returned value is the endpoint's `data` object normalized to a dict. If
+        absent, an empty dict is returned. An `APP_REQUEST_META` entry is added (when
+        missing) containing the request parameters used to fetch the data, excluding
+        `deviceId` and `systemId`, so callers can correlate the payload with the
+        requested period.
 
         Parameters:
             path (str): Endpoint path to query.
             device_id (str | int): Device identifier to request data for.
-            date_type (str): Period granularity (e.g., day, month, year). `begin_date`/`end_date` are computed if omitted.
+            date_type (str): Period granularity (e.g., day, month, year).
+            `begin_date`/`end_date` are computed if omitted.
             begin_date (str | None): Start date for the period (computed if None).
             end_date (str | None): End date for the period (computed if None).
-            system_id (str | int | None): Optional system identifier included in the request.
+            system_id (str | int | None): Optional system identifier included in the
+            request.
 
         Returns:
-            dict[str, Any]: Normalized payload dict from the endpoint's `data` field, augmented with `APP_REQUEST_META`.
+            dict[str, Any]: Normalized payload dict from the endpoint's `data` field,
+            augmented with `APP_REQUEST_META`.
         """
         # PROTOCOL.md §2: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params: dict[str, str] = {
             FIELD_DEVICE_ID: str(device_id),
@@ -197,12 +227,16 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         Parameters:
             device_id (str | int): Device identifier.
             system_id (str | int): System identifier that the device belongs to.
-            date_type (str): Period granularity (e.g., day, month); defaults to DATE_TYPE_DAY.
-            begin_date (str | None): Inclusive start date for the period (format depends on API); when omitted the API's default period bounds are used.
-            end_date (str | None): Inclusive end date for the period (format depends on API); when omitted the API's default period bounds are used.
+            date_type (str): Period granularity (e.g., day, month); defaults to
+            DATE_TYPE_DAY.
+            begin_date (str | None): Inclusive start date for the period (format
+            depends on API); when omitted the API's default period bounds are used.
+            end_date (str | None): Inclusive end date for the period (format depends on
+            API); when omitted the API's default period bounds are used.
 
         Returns:
-            dict: Parsed response payload from the endpoint, typically containing chart series and related metadata.
+            dict: Parsed response payload from the endpoint, typically containing chart
+            series and related metadata.
         """
         return await self._async_get_device_period_stat(
             DEVICE_PV_STAT_PATH,
@@ -225,12 +259,15 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
 
         Parameters:
             device_id (str | int): Device identifier.
-            date_type (str): Period granularity (e.g., `DATE_TYPE_DAY`). Defaults to daily.
-            begin_date (str | None): Optional ISO date (YYYY-MM-DD) for the period start.
+            date_type (str): Period granularity (e.g., `DATE_TYPE_DAY`). Defaults to
+            daily.
+            begin_date (str | None): Optional ISO date (YYYY-MM-DD) for the period
+            start.
             end_date (str | None): Optional ISO date (YYYY-MM-DD) for the period end.
 
         Returns:
-            dict[str, Any]: Normalized payload dictionary containing battery statistics; empty dict if no data.
+            dict[str, Any]: Normalized payload dictionary containing battery
+            statistics; empty dict if no data.
         """
         return await self._async_get_device_period_stat(
             DEVICE_BATTERY_STAT_PATH,
@@ -251,7 +288,9 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """Fetch on-grid (home) statistics for the specified device and period.
 
         Returns:
-            Normalized response payload dict containing chart/statistics data. When present, `APP_REQUEST_META` contains the request metadata for the query (excluding `deviceId`).
+            Normalized response payload dict containing chart/statistics data. When
+            present, `APP_REQUEST_META` contains the request metadata for the query
+            (excluding `deviceId`).
         """
         return await self._async_get_device_period_stat(
             DEVICE_HOME_STAT_PATH,
@@ -278,7 +317,9 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             end_date: Optional end date for the period (ISO-like string).
 
         Returns:
-            A dictionary containing the parsed CT/smart-meter statistics payload. May include `APP_REQUEST_META` with the request parameters when a date range is supplied.
+            A dictionary containing the parsed CT/smart-meter statistics payload. May
+            include `APP_REQUEST_META` with the request parameters when a date range is
+            supplied.
         """
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
@@ -296,16 +337,21 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """Retrieve EPS (off-grid) energy input/output statistics for a device over a specified period.
+        """Retrieve EPS (off-grid) energy input/output statistics for a device over a.
+
+        specified period.
 
         Parameters:
             device_id (str | int): Device identifier (id or serial) to query.
-            date_type (str): Period granularity (e.g., "day"); defaults to DATE_TYPE_DAY.
+            date_type (str): Period granularity (e.g., "day"); defaults to
+            DATE_TYPE_DAY.
             begin_date (str | None): Optional ISO date string for period start.
             end_date (str | None): Optional ISO date string for period end.
 
         Returns:
-            dict: Parsed backend payload containing aggregates (e.g., `totalInEpsEnergy`, `totalOutEpsEnergy`) and time-series arrays (`x`, `y`, `y1`, `y2`); may include an `APP_REQUEST_META` dict with request parameters.
+            dict: Parsed backend payload containing aggregates (e.g.,
+            `totalInEpsEnergy`, `totalOutEpsEnergy`) and time-series arrays (`x`, `y`,
+            `y1`, `y2`); may include an `APP_REQUEST_META` dict with request parameters.
         """
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
@@ -319,10 +365,12 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """Retrieve today's compact energy KPIs for a device.
 
         Parameters:
-            device_sn (str): Device serial number; sent as the `deviceSn` query parameter.
+            device_sn (str): Device serial number; sent as the `deviceSn` query
+            parameter.
 
         Returns:
-            dict: Parsed JSON response containing KPI fields such as `de` (feed-in), `dg` (grid import), `dh` (home load), and `ds` (battery energy).
+            dict: Parsed JSON response containing KPI fields such as `de` (feed-in),
+            `dg` (grid import), `dh` (home load), and `ds` (battery energy).
         """
         data = await self._get_json(
             DEVICE_TODAY_ENERGY_PATH,
@@ -355,13 +403,15 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """Retrieve smart-meter (CT accessory) panel totals for the specified device.
 
         Parameters:
-            device_id (str | int): Smart-meter / CT accessory `deviceId` (not the SolarVault main deviceId).
+            device_id (str | int): Smart-meter / CT accessory `deviceId` (not the
+            SolarVault main deviceId).
 
         Returns:
             dict[str, Any]: Parsed payload containing the meter panel totals.
         """
         data = await self._get_json(
-            DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_METER_STAT_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_period_stat_responses[
             f"{DEVICE_METER_STAT_PATH}:{device_id}:panel"
@@ -375,7 +425,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         """Get socket panel totals for the specified smart socket.
 
         Returns:
-            The response `data` payload as a dict; an empty dict if the payload is missing or not a dict.
+            The response `data` payload as a dict; an empty dict if the payload is
+            missing or not a dict.
         """
         data = await self._get_json(
             DEVICE_SOCKET_STATISTIC_PATH,
@@ -396,7 +447,9 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
     ) -> dict[str, Any]:
         """Retrieve socket-chart statistics for a device over a specified period.
 
-        If the returned payload is non-empty, it will include `APP_REQUEST_META` containing the request parameters (`dateType`, `beginDate`, `endDate`) used to produce the chart (excluding `deviceId`/`systemId`).
+        If the returned payload is non-empty, it will include `APP_REQUEST_META`
+        containing the request parameters (`dateType`, `beginDate`, `endDate`) used to
+        produce the chart (excluding `deviceId`/`systemId`).
 
         Returns:
             dict: The normalized `data` payload for the device socket chart.
@@ -416,8 +469,10 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
-        """Retrieve the home energy consumption breakdown for a system over a specified period.
+    ) -> dict[str, Any]:
+        """Retrieve the home energy consumption breakdown for a system over a specified.
+
+        period.
 
         Parameters:
             system_id (str | int): Identifier of the system to query.
@@ -426,10 +481,13 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             end_date (str | None): End date for the period (optional).
 
         Returns:
-            dict: Normalized payload containing the home consumption breakdown; may be empty if no data is available.
+            dict: Normalized payload containing the home consumption breakdown; may be
+            empty if no data is available.
         """
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -438,7 +496,9 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             APP_REQUEST_END_DATE: str(end_date),
         }
         data = await self._get_json(
-            HOME_TRENDS_PATH, params=params, request_timeout=SLOW_ENDPOINT_TIMEOUT_SEC
+            HOME_TRENDS_PATH,
+            params=params,
+            request_timeout=SLOW_ENDPOINT_TIMEOUT_SEC,
         )
         payload = self._payload_dict(data, HOME_TRENDS_PATH)
         if payload:
@@ -455,17 +515,21 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Retrieve battery charge and discharge trends for the given system.
 
-        If the returned payload is non-empty, attaches request metadata under `APP_REQUEST_META`
+        If the returned payload is non-empty, attaches request metadata under
+        `APP_REQUEST_META`
         containing the request's `dateType`, `beginDate`, and `endDate`.
 
         Returns:
-            dict: Normalized payload dictionary extracted from the API response (may be empty).
+            dict: Normalized payload dictionary extracted from the API response (may be
+            empty).
         """
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -499,22 +563,32 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
         end_date: str | None = None,
         system_id: str | int | None = None,
     ) -> dict[str, Any]:
-        """Fetch period-based statistics for the given endpoint and return the normalized payload.
+        """Fetch period-based statistics for the given endpoint and return the.
+
+        normalized payload.
 
         Parameters:
             path (str): API endpoint path to query.
-            device_id (str | int | None): Optional device identifier to include as `deviceId` in the request.
-            device_sn (str | None): Optional device serial number to include as `deviceSn` in the request.
-            date_type (str): Period granularity (e.g., "day"); used to compute begin/end dates when not provided.
-            begin_date (str | None): Optional start date for the period; computed if None.
+            device_id (str | int | None): Optional device identifier to include as
+            `deviceId` in the request.
+            device_sn (str | None): Optional device serial number to include as
+            `deviceSn` in the request.
+            date_type (str): Period granularity (e.g., "day"); used to compute
+            begin/end dates when not provided.
+            begin_date (str | None): Optional start date for the period; computed if
+            None.
             end_date (str | None): Optional end date for the period; computed if None.
-            system_id (str | int | None): Optional system identifier to include as `systemId` in the request.
+            system_id (str | int | None): Optional system identifier to include as
+            `systemId` in the request.
 
         Returns:
-            dict[str, Any]: Normalized payload dictionary extracted from the endpoint response.
+            dict[str, Any]: Normalized payload dictionary extracted from the endpoint
+            response.
         """
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params: dict[str, str] = {
             APP_REQUEST_DATE_TYPE: date_type,
@@ -572,7 +646,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             end_date (str | None): End date for the period; computed if None.
 
         Returns:
-            dict[str, Any]: Dictionary containing cutoff statistics for the requested period.
+            dict[str, Any]: Dictionary containing cutoff statistics for the requested
+            period.
         """
         return await self._async_get_period_stat(
             CUTOFF_STAT_PATH,
@@ -596,7 +671,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict[str, Any]: Normalized SOC statistics payload.
         """
         data = await self._get_json(
-            SOC_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            SOC_STAT_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         return self._payload_dict(data, SOC_STAT_PATH)
 
@@ -614,7 +690,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict[str, Any]: Normalized carbon statistics payload.
         """
         data = await self._get_json(
-            CARBON_STAT_PATH, params={FIELD_DEVICE_SN: str(device_sn)}
+            CARBON_STAT_PATH,
+            params={FIELD_DEVICE_SN: str(device_sn)},
         )
         return self._payload_dict(data, CARBON_STAT_PATH)
 
@@ -632,7 +709,8 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict[str, Any]: Profit statistics payload.
         """
         data = await self._get_json(
-            PROFIT_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            PROFIT_STAT_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         return self._payload_dict(data, PROFIT_STAT_PATH)
 
@@ -652,13 +730,16 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             date_type (str): Period granularity (e.g., "day", "month").
             begin_date (str | None): Start date; computed if None.
             end_date (str | None): End date; computed if None.
-            key (str): Optional stat key filter; included in the request only if non-empty.
+            key (str): Optional stat key filter; included in the request only if
+            non-empty.
 
         Returns:
             dict[str, Any]: Normalized payload containing the box statistics.
         """
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params: dict[str, str] = {
             "deviceSn": device_sn,
@@ -685,6 +766,7 @@ class StatisticsEndpointMixin(BaseHTTPMixin):
             dict: Smart schedule prediction payload returned by the backend.
         """
         data = await self._get_json(
-            SMART_SCHEDULE_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            SMART_SCHEDULE_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         return self._payload_dict(data, SMART_SCHEDULE_PATH)

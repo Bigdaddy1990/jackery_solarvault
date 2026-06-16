@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
-_SECTION_SIZE_CAP = 4096
 
 # Kept as an import alias so tests / external callers can still reference the
 # static redact-key set when needed. Runtime redaction in this module always
@@ -50,13 +49,19 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Produce a deterministic mapping of redacted payloads with original keys replaced by stable generated labels.
+    """Produce a deterministic mapping of redacted payloads with original keys replaced.
 
-    Processes entries in a stable order (sorted by the string form of each key). Each payload is redacted using `redact_keys`; non-mapping payloads are wrapped as `{"value": payload}` before redaction.
+    by stable generated labels.
+
+    Processes entries in a stable order (sorted by the string form of each key). Each
+    payload is redacted using `redact_keys`; non-mapping payloads are wrapped as
+    `{"value": payload}` before redaction.
 
     Parameters:
-        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated labels; values are payloads to redact.
-        prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
+        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated
+        labels; values are payloads to redact.
+        prefix (str): Prefix for generated labels; labels are formatted as
+        "<prefix>_<index>" with index starting at 1.
         redact_keys (frozenset[str]): Field names to redact from each payload.
 
     Returns:
@@ -74,18 +79,26 @@ def _redacted_payload_map(
 
 
 async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this entry point
-    hass: HomeAssistant, entry: JackeryConfigEntry
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
 
-    The returned payload contains redacted copies of the entry's stored data and options, a stable mapping of labeled device payloads, and raw diagnostics from the coordinator, API responses, and transports. If diagnostics redactions are disabled for the entry, sensitive fields such as credentials, serial numbers, and `bluetoothKey` may be included unredacted.
+    The returned payload contains redacted copies of the entry's stored data and
+    options, a stable mapping of labeled device payloads, and raw diagnostics from the
+    coordinator, API responses, and transports. If diagnostics redactions are disabled
+    for the entry, sensitive fields such as credentials, serial numbers, and
+    `bluetoothKey` may be included unredacted.
 
     Returns:
         dict[str, Any]: Diagnostics export with keys:
             - `entry_data`: redacted copy of the config entry's stored data.
             - `options`: redacted copy of the config entry's options.
-            - `devices`: mapping of stable local device labels to redacted device payloads.
-            - `raw_api`: raw diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill (redacted according to the entry's redaction settings).
+            - `devices`: mapping of stable local device labels to redacted device
+            payloads.
+            - `raw_api`: raw diagnostics including coordinator metadata, API response
+            snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill
+            (redacted according to the entry's redaction settings).
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
@@ -103,27 +116,7 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             source,
         )
 
-    data_quality = _redacted_payload_map(
-        {
-            device_id: payload.get("data_quality", [])
-            for device_id, payload in (coordinator.data or {}).items()
-            if isinstance(payload, dict) and payload.get("data_quality")
-        },
-        "device",
-        redact_keys,
-    )
-    devices = _redacted_payload_map(
-        {
-            device_id: {
-                key: value for key, value in payload.items() if key != "data_quality"
-            }
-            if isinstance(payload, dict)
-            else payload
-            for device_id, payload in (coordinator.data or {}).items()
-        },
-        "device",
-        redact_keys,
-    )
+    devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)
 
     raw = {
         "coordinator": {
@@ -135,28 +128,37 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             "redactions_disabled": redactions_disabled,
         },
         "login_response": async_redact_data(
-            coordinator.api.last_login_response or {}, redact_keys
+            coordinator.api.last_login_response or {},
+            redact_keys,
         ),
         "system_list_response": async_redact_data(
-            coordinator.api.last_system_list_response or {}, redact_keys
+            coordinator.api.last_system_list_response or {},
+            redact_keys,
         ),
         "property_responses": _redacted_payload_map(
-            coordinator.api.last_property_responses, "property_response", redact_keys
+            coordinator.api.last_property_responses,
+            "property_response",
+            redact_keys,
         ),
         "alarm_response": async_redact_data(
-            coordinator.api.last_alarm_response or {}, redact_keys
+            coordinator.api.last_alarm_response or {},
+            redact_keys,
         ),
         "statistic_response": async_redact_data(
-            coordinator.api.last_statistic_response or {}, redact_keys
+            coordinator.api.last_statistic_response or {},
+            redact_keys,
         ),
         "price_response": async_redact_data(
-            coordinator.api.last_price_response or {}, redact_keys
+            coordinator.api.last_price_response or {},
+            redact_keys,
         ),
         "price_sources_response": async_redact_data(
-            coordinator.api.last_price_sources_response or {}, redact_keys
+            coordinator.api.last_price_sources_response or {},
+            redact_keys,
         ),
         "price_history_config_response": async_redact_data(
-            coordinator.api.last_price_history_config_response or {}, redact_keys
+            coordinator.api.last_price_history_config_response or {},
+            redact_keys,
         ),
         "device_statistic_responses": _redacted_payload_map(
             coordinator.api.last_device_statistic_responses,
@@ -174,22 +176,31 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             redact_keys,
         ),
         "ota_responses": _redacted_payload_map(
-            coordinator.api.last_ota_responses, "ota_response", redact_keys
+            coordinator.api.last_ota_responses,
+            "ota_response",
+            redact_keys,
         ),
         "location_responses": _redacted_payload_map(
-            coordinator.api.last_location_responses, "location_response", redact_keys
+            coordinator.api.last_location_responses,
+            "location_response",
+            redact_keys,
         ),
         "mqtt": async_redact_data(
             coordinator.mqtt_diagnostics_snapshot(
-                redact_topics=not redactions_disabled
+                redact_topics=not redactions_disabled,
             ),
             redact_keys,
         ),
         "local_mqtt": _local_mqtt_diagnostics(
-            hass, entry, coordinator, redactions_disabled
+            hass,
+            entry,
+            coordinator,
+            redactions_disabled,
         ),
         "ble_transport": _redacted_payload_map(
-            coordinator.ble_observations(), "ble_device", redact_keys
+            coordinator.ble_observations(),
+            "ble_device",
+            redact_keys,
         ),
         "statistics_backfill": async_redact_data(
             coordinator.statistics_backfill_diagnostics,
@@ -199,7 +210,10 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             coordinator.app_chart_import_diagnostics(),
             redact_keys,
         ),
-        "data_quality": async_redact_data(data_quality, redact_keys),
+        "rejection_metrics": async_redact_data(
+            coordinator.rejection_metrics.as_dict(),
+            redact_keys,
+        ),
     }
 
     return {
@@ -216,25 +230,40 @@ def _local_mqtt_diagnostics(
     coordinator: JackerySolarVaultCoordinator | None = None,
     redactions_disabled: bool = False,
 ) -> dict[str, Any]:
-    """Build a diagnostics block describing the integration's local MQTT status and configuration.
+    """Build a diagnostics block describing the integration's local MQTT status and.
 
-    When the coordinator indicates active local subscriptions, returns a block with "enabled": True, "mode": "homeassistant_mqtt_integration", "subscribed_topic_count", and a "configured_local_mqtt" mirror of host/port/auth/topic settings. If no client is available, returns "enabled": False with a concrete "disabled_reason" (one of "bridge_disabled", "missing_broker_host", "missing_broker_port", "broad_topic_filter_blocked", "missing_topic_filter", or "client_not_started") and the "configured_local_mqtt" mirror. When a client is available and no coordinator subscription indicator is present, returns the client's diagnostics snapshot.
+    configuration.
+
+    When the coordinator indicates active local subscriptions, returns a block with
+    "enabled": True, "mode": "homeassistant_mqtt_integration",
+    "subscribed_topic_count", and a "configured_local_mqtt" mirror of
+    host/port/auth/topic settings. If no client is available, returns "enabled": False
+    with a concrete "disabled_reason" (one of "bridge_disabled", "missing_broker_host",
+    "missing_broker_port", "broad_topic_filter_blocked", "missing_topic_filter", or
+    "client_not_started") and the "configured_local_mqtt" mirror. When a client is
+    available and no coordinator subscription indicator is present, returns the
+    client's diagnostics snapshot.
 
     Parameters:
-        redactions_disabled (bool): If True, request the client's diagnostics without redaction; if False, request a redacted snapshot.
+        redactions_disabled (bool): If True, request the client's diagnostics without
+        redaction; if False, request a redacted snapshot.
 
     Returns:
-        dict[str, Any]: Diagnostics block as described above — either the client's diagnostics snapshot or a structured dictionary reflecting enabled state, reason, and configured local MQTT details.
+        dict[str, Any]: Diagnostics block as described above — either the client's
+        diagnostics snapshot or a structured dictionary reflecting enabled state,
+        reason, and configured local MQTT details.
     """
     enabled = config_entry_bool_option(
-        entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE
+        entry,
+        CONF_LOCAL_MQTT_ENABLE,
+        DEFAULT_LOCAL_MQTT_ENABLE,
     )
     host = config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "").strip()
     port = str(
         entry.options.get(
             CONF_LOCAL_MQTT_PORT,
             DEFAULT_LOCAL_MQTT_PORT,
-        )
+        ),
     ).strip()
     username = config_entry_str_option(entry, CONF_LOCAL_MQTT_USERNAME, "").strip()
     password = config_entry_str_option(entry, CONF_LOCAL_MQTT_PASSWORD, "").strip()
@@ -284,21 +313,3 @@ def _local_mqtt_diagnostics(
             },
         }
     return client.diagnostics_snapshot(redact=not redactions_disabled)
-
-
-def _cap_section(value: Any) -> Any:  # noqa: ANN401
-    """Cap a diagnostics section at _SECTION_SIZE_CAP bytes of JSON.
-
-    Sections that exceed the cap are replaced with a sentinel so the overall
-    export stays well under Home Assistant's implicit ~32 KB truncation limit.
-    """
-    try:
-        import json as _json
-
-        encoded = _json.dumps(value, default=str)
-    except Exception:  # noqa: BLE001
-        return {"truncated": True, "size_bytes": -1}
-    size = len(encoded.encode())
-    if size > _SECTION_SIZE_CAP:
-        return {"truncated": True, "size_bytes": size}
-    return value

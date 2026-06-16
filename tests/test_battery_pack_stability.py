@@ -67,14 +67,16 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
     src = _read("coordinator.py")
     # Locate _merge_battery_pack_lists body
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?_merge_battery_pack_lists_fn",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
         re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
-    # The function delegates to _merge_battery_pack_lists_fn which does the stamping
-    assert "_merge_battery_pack_lists_fn" in body, body
+    assert "PACK_FIELD_LAST_SEEN_AT" in body, body
+    assert "FIELD_COMM_STATE" in body, body
+    # Stamping must happen for online packs (commState=1)
+    assert '"1"' in body, body
 
 
 def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
@@ -93,12 +95,12 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     assert match is not None, "_drop_stale_battery_packs not found"
     body = match.group(0)
     assert "tuple[list[dict[str, Any]], int, list[int]]" in body, body
-    assert "_drop_stale_battery_packs_fn" in body, body
+    assert "return packs, 0, []" in body, body
     # Cleanup must compute elapsed seconds against now
-    assert "utc_now()" in body or "threshold_seconds" in body, body
-    assert "parse_utc_datetime" in body or "threshold_seconds" in body, body
+    assert "utc_now()" in body, body
+    assert "parse_utc_datetime" in body, body
     # Dropped pack indices must be tracked
-    assert "dropped_indices" in body or "_drop_stale_battery_packs_fn" in body, body
+    assert "dropped_indices" in body, body
 
 
 def test_diagnostics_exposes_stale_pack_count() -> None:
@@ -193,16 +195,16 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
     Without this filter a smart-meter MQTT frame would create a phantom
     battery pack entry and pollute the entity-state contract.
     """
-    src = _read("subdevices/detector.py")
+    src = _read("coordinator.py")
     match = re.search(
-        r"def looks_like_battery_pack\(",
+        r"def _looks_like_battery_pack\(cls.*?(?=\n    @classmethod|\n    def )",
         src,
         re.DOTALL,
     )
     assert match is not None
-    body = src[match.start() :]
+    body = match.group(0)
     # Must reject CT meter frames + Shelly smart meters
-    assert "_CT_METER_KEYS" in body or "ct_meter" in body, body
+    assert "_CT_METER_KEYS" in body, body
     assert "shelly" in body, body
     # Must reject explicit smart-meter subtypes
     assert "SMART_METER_SUBTYPE" in body, body
@@ -217,20 +219,13 @@ def test_battery_pack_count_no_longer_capped_at_five() -> None:
     """
     src = _read("coordinator.py")
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?_merge_battery_pack_lists_fn",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
         re.DOTALL,
     )
     assert match is not None, "_merge_battery_pack_lists not found"
-    # The cap was removed at the coordinator level; verify no [:5] in the full method
-    cap_match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?(?=\n    @|\n    async def )",
-        src,
-        re.DOTALL,
-    )
-    if cap_match:
-        body = cap_match.group(0)
-        assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"
+    body = match.group(0)
+    assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"
 
 
 def test_battery_pack_merge_preserves_known_fields() -> None:
@@ -240,18 +235,18 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
     Without preservation, the version, SOC, and temperature fields learned
     during HTTP discovery would vanish on the next MQTT frame.
     """
-    src = _read("handlers/mqtt_handlers.py")
+    src = _read("coordinator.py")
     match = re.search(
-        r"def merge_battery_pack_lists\(",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
         re.DOTALL,
     )
     assert match is not None
-    body = src[match.start() :]
+    body = match.group(0)
     # Implementation must filter `None` updates (so a missing field doesn't
     # overwrite a real one) and merge per-key.
     assert "value is not None" in body, body
-    assert "merge_dict_values" in body or "merge_live_properties" in body, body
+    assert "merge_live_properties" in body, body
 
 
 # ---------- Gold-tier: dynamic-devices ----------------------------------
@@ -268,8 +263,14 @@ def test_coordinator_queues_device_removals_on_stale_pack_drop() -> None:
     src = _read("coordinator.py")
     # The merge call site must hand dropped_indices to a queue
     assert "_pending_device_removals.append" in src, src
+    # The queue must be a list of (DOMAIN, identifier) tuples
+    match = re.search(
+        r"_pending_device_removals\.append\(\s*identifier\s*\)",
+        src,
+    )
+    assert match is not None, src
     # Identifier construction must use the documented battery-pack scheme
-    assert "battery_pack_" in src, src
+    assert 'f"{device_id}_battery_pack_{pack_index}"' in src, src
 
 
 def test_async_cleanup_calls_device_registry_remove() -> None:
@@ -282,8 +283,8 @@ def test_async_cleanup_calls_device_registry_remove() -> None:
     )
     assert match is not None, "async_cleanup_pending_device_removals not found"
     body = match.group(0)
-    # Uses HA device_registry (either inline import or aliased as dr)
-    assert "device_registry" in body or "dr.async_get" in body, body
+    # Imports HA's device_registry at call time (avoids stub conflicts)
+    assert "from homeassistant.helpers import device_registry" in body, body
     # Looks up by identifier, then removes by registry-internal device.id
     assert "async_get_device" in body, body
     assert "async_remove_device" in body, body

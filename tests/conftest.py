@@ -15,14 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Enable custom integrations for every collected test without autouse."""
-    marker = pytest.mark.usefixtures("auto_enable_custom_integrations")
-    for item in items:
-        item.add_marker(marker)
-
-
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
@@ -45,10 +38,13 @@ def mock_jackery_login() -> Generator[None]:
     """
 
     async def _fake_login(api) -> str:  # noqa: ANN001, RUF029, RUF100
-        """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
+        """Set test authentication and MQTT attributes on a Jackery API instance and.
+
+        return the assigned token.
 
         Parameters:
-            api: The Jackery API client instance whose internal authentication and MQTT-related attributes will be populated for testing.
+            api: The Jackery API client instance whose internal authentication and
+            MQTT-related attributes will be populated for testing.
 
         Returns:
             str: The authentication token assigned to the API instance.
@@ -61,15 +57,15 @@ def mock_jackery_login() -> Generator[None]:
 
     with (
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
             new=_fake_login,
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_get_system_list",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
             return_value=[],
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_list_devices_legacy",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
             return_value=[],
         ),
     ):

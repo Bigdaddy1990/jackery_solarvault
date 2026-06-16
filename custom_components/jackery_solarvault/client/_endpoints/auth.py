@@ -7,8 +7,16 @@ from typing import Any
 
 import aiohttp
 
-from ...const import (
-    AES_KEY,
+from custom_components.jackery_solarvault.client._crypto import (
+    _aes_cbc_encrypt,
+    build_login_crypto_fields,
+)
+from custom_components.jackery_solarvault.client._http import (
+    BaseHTTPMixin,
+    JackeryApiError,
+    JackeryAuthError,
+)
+from custom_components.jackery_solarvault.const import (
     BASE_URL,
     CANCEL_ACCOUNT_PATH,
     CHECK_VERIFY_CODE_PATH,
@@ -28,6 +36,7 @@ from ...const import (
     HTTP_CONTENT_TYPE_FORM,
     HTTP_HEADER_CONTENT_TYPE,
     HTTP_METHOD_POST,
+    HTTP_RAW_TEXT_LIMIT,
     LOGIN_PATH,
     LOGIN_TIMEOUT_SEC,
     LOGOUT_PATH,
@@ -41,28 +50,29 @@ from ...const import (
     REGISTER_APP_ID,
     REGISTER_PATH,
     RESET_PASSWORD_PATH,
-    RSA_PUBLIC_KEY_B64,
     UPDATE_REGISTER_ID_PATH,
     UPLOAD_HEADIMG_PATH,
     USER_INFO_PATH,
     VERIFY_CODE_PATH,
 )
-from .._crypto import _aes_cbc_encrypt, _aes_ecb_encrypt, _rsa_pkcs1v15_encrypt
-from .._http import BaseHTTPMixin, JackeryApiError, JackeryAuthError
 
 
 class AuthEndpointMixin(BaseHTTPMixin):
     """Auth, login, and MQTT credential methods."""
 
-    async def async_login(self) -> str:  # noqa: PLR0914
-        """Perform the encrypted login flow and persist the returned session and MQTT credentials.
+    async def async_login(self) -> str:  # noqa: PLR0915
+        """Perform the encrypted login flow and persist the returned session and MQTT.
+
+        credentials.
 
         Returns:
             token (str): The JWT session token returned by the server.
 
         Raises:
-            JackeryAuthError: If the backend rejects credentials, reports a non-OK code, or returns no token.
-            JackeryApiError: For network errors, non-200 HTTP responses, or invalid/non-parsable JSON responses.
+            JackeryAuthError: If the backend rejects credentials, reports a non-OK
+            code, or returns no token.
+            JackeryApiError: For network errors, non-200 HTTP responses, or
+            invalid/non-parsable JSON responses.
         """
         mac_id = self._resolve_login_mac_id()
         login_bean = {
@@ -75,13 +85,7 @@ class AuthEndpointMixin(BaseHTTPMixin):
         if self._region_code:
             login_bean[FIELD_REGION_CODE] = self._region_code
 
-        plaintext = json.dumps(login_bean, ensure_ascii=False).encode("utf-8")
-        aes_blob = base64.b64encode(_aes_ecb_encrypt(plaintext, AES_KEY)).decode(
-            "ascii"
-        )
-        rsa_blob = base64.b64encode(
-            _rsa_pkcs1v15_encrypt(AES_KEY, RSA_PUBLIC_KEY_B64)
-        ).decode("ascii")
+        form_body = build_login_crypto_fields(login_bean)
 
         url = f"{BASE_URL}{LOGIN_PATH}"
 
@@ -89,9 +93,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
         # query string. This matches the captured traffic byte-for-byte.
         headers = self._headers()
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
-        form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
-        try:
+        try:  # noqa: PLW0717
             async with self._session.post(
                 url,
                 data=form_body,
@@ -99,29 +102,35 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 timeout=aiohttp.ClientTimeout(total=LOGIN_TIMEOUT_SEC),
             ) as resp:
                 if resp.status != 200:  # noqa: PLR2004
-                    raise JackeryApiError(f"Login HTTP {resp.status}")  # noqa: TRY003
-                body_bytes = await resp.read()
+                    msg = f"Login HTTP {resp.status}"
+                    raise JackeryApiError(msg)
                 try:
-                    data = self._decode_response_json(body_bytes)
+                    data = await resp.json(content_type=None)
+                    if not isinstance(data, dict):
+                        raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                        msg = (
+                            f"Login returned JSON {type(data).__name__},"
+                            f" expected object: {raw!r}"
+                        )
+                        raise JackeryApiError(
+                            msg,
+                        )
                 except (
                     aiohttp.ContentTypeError,
                     json.JSONDecodeError,
                     UnicodeDecodeError,
                     ValueError,
                 ) as err:
-                    raw = self._truncated_response_text(body_bytes)
-                    raise JackeryApiError(  # noqa: TRY003
-                        f"Login returned invalid JSON: {raw!r}"
+                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+                    msg = f"Login returned invalid JSON: {raw!r}"
+                    raise JackeryApiError(
+                        msg,
                     ) from err
         except (TimeoutError, aiohttp.ClientError) as err:
-            raise JackeryApiError(  # noqa: TRY003
-                f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
+            msg = f"Login request failed: {type(err).__name__}: {err or '(no message)'}"
+            raise JackeryApiError(
+                msg,
             ) from err
-
-        if not isinstance(data, dict):
-            raise JackeryApiError(  # noqa: TRY003
-                f"Login returned JSON {type(data).__name__}, expected object"
-            )
 
         safe_response = dict(data)
         safe_response.pop(FIELD_TOKEN, None)
@@ -138,25 +147,31 @@ class AuthEndpointMixin(BaseHTTPMixin):
                 body={"form_fields": sorted(form_body)},
                 status=200,
                 response=safe_response,
-            )
+            ),
         )
 
         if self._extract_code(data) != CODE_OK:
-            raise JackeryAuthError(  # noqa: TRY003
-                f"Login rejected (code={data.get(FIELD_CODE)}, msg={data.get(FIELD_MSG)})"
+            msg = (
+                f"Login rejected (code={data.get(FIELD_CODE)},"
+                f" msg={data.get(FIELD_MSG)})"
+            )
+            raise JackeryAuthError(
+                msg,
             )
 
+        self.last_login_response = dict(data)
         token = data.get(FIELD_TOKEN) or ""
         if not token:
-            raise JackeryAuthError("Login succeeded but no token returned")  # noqa: TRY003
+            msg = "Login succeeded but no token returned"
+            raise JackeryAuthError(msg)
 
         self._token = token
         payload = data.get(FIELD_DATA) or {}
         if not isinstance(payload, dict):
-            raise JackeryApiError(  # noqa: TRY003
-                f"Login returned {FIELD_DATA} {type(payload).__name__}, expected object"
+            msg = f"Login returned data {type(payload).__name__}, expected object"
+            raise JackeryApiError(
+                msg,
             )
-        self.last_login_response = dict(data)
         self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
         self._mqtt_seed_b64 = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_mac_id = mac_id
@@ -167,29 +182,37 @@ class AuthEndpointMixin(BaseHTTPMixin):
 
         Returns:
             dict[str, str]: Mapping with keys:
-                - ``clientId``: MQTT client identifier composed from the login user id and client suffix.
-                - ``username``: MQTT username composed from the login user id and MAC id.
-                - ``password``: Base64-encoded AES-CBC encryption of ``username`` using the login-provided seed.
+                - ``clientId``: MQTT client identifier composed from the login user id
+                and client suffix.
+                - ``username``: MQTT username composed from the login user id and MAC
+                id.
+                - ``password``: Base64-encoded AES-CBC encryption of ``username`` using
+                the login-provided seed.
                 - ``userId``: MQTT user id from the login response.
 
         Raises:
-            JackeryAuthError: If the session is missing required MQTT fields, if the MQTT seed is not valid base64, or if the decoded seed is not exactly 32 bytes.
+            JackeryAuthError: If the session is missing required MQTT fields, if the
+            MQTT seed is not valid base64, or if the decoded seed is not exactly 32
+            bytes.
         """
         await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
-            raise JackeryAuthError(  # noqa: TRY003
-                "Login response missing MQTT fields (userId/mqttPassWord/macId)"
+            msg = "Login response missing MQTT fields (userId/mqttPassWord/macId)"
+            raise JackeryAuthError(
+                msg,
             )
 
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
         except (binascii.Error, ValueError) as err:
-            raise JackeryAuthError(  # noqa: TRY003
-                "Invalid mqttPassWord base64 in login response"
+            msg = "Invalid mqttPassWord base64 in login response"
+            raise JackeryAuthError(
+                msg,
             ) from err
         if len(seed) != 32:  # noqa: PLR2004
-            raise JackeryAuthError(  # noqa: TRY003
-                f"Unexpected mqttPassWord decoded length: {len(seed)} (expected 32)"
+            msg = f"Unexpected mqttPassWord decoded length: {len(seed)} (expected 32)"
+            raise JackeryAuthError(
+                msg,
             )
 
         client_id = (
@@ -214,7 +237,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
         """Current MQTT fingerprint identifying the session's MQTT credentials.
 
         Returns:
-            tuple[str | None, str | None, str | None]: `(user_id, mac_id, seed_b64)` where
+            tuple[str | None, str | None, str | None]: `(user_id, mac_id, seed_b64)`
+            where
                 `user_id` is the MQTT user identifier or `None`,
                 `mac_id` is the MQTT MAC identifier or `None`,
                 `seed_b64` is the base64-encoded MQTT seed or `None`.
@@ -226,7 +250,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
         """Identify the source of the current MQTT MAC ID.
 
         Returns:
-            source (str): A string describing how the MQTT MAC ID was obtained (for example, the provider or method).
+            source (str): A string describing how the MQTT MAC ID was obtained (for
+            example, the provider or method).
         """
         return self._mqtt_mac_id_source
 
@@ -258,7 +283,9 @@ class AuthEndpointMixin(BaseHTTPMixin):
         region_code: str,
         verification_code: str,
     ) -> dict[str, Any]:
-        """Create a new Jackery account using the provided email, password, region code, and verification code.
+        """Create a new Jackery account using the provided email, password, region.
+
+        code, and verification code.
 
         Parameters:
             email (str): Email address for the new account.
@@ -372,7 +399,8 @@ class AuthEndpointMixin(BaseHTTPMixin):
         """Update the user's display name.
 
         Parameters:
-            nick_name (str): New display name; sent to the backend as the `nickName` field.
+            nick_name (str): New display name; sent to the backend as the `nickName`
+            field.
 
         Returns:
             dict[str, Any]: Decoded backend response data.
@@ -400,7 +428,10 @@ class AuthEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, USER_INFO_PATH)
 
     async def async_cancel_account(
-        self, *, email: str, verification_code: str
+        self,
+        *,
+        email: str,
+        verification_code: str,
     ) -> dict[str, Any]:
         """Cancel the authenticated user's account using a verification code.
 
@@ -416,11 +447,13 @@ class AuthEndpointMixin(BaseHTTPMixin):
         """Update the push notification registration ID for the authenticated account.
 
         Parameters:
-            register_id (str): Push notification registration token to associate with the account.
+            register_id (str): Push notification registration token to associate with
+            the account.
 
         Returns:
             dict: Backend response payload.
         """
         return await self._post_json(
-            UPDATE_REGISTER_ID_PATH, {"registerId": register_id}
+            UPDATE_REGISTER_ID_PATH,
+            {"registerId": register_id},
         )

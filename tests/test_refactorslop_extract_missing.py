@@ -1,362 +1,302 @@
-"""Tests for REFACTORSLOP/_extract_missing.py pure-function logic.
+"""Tests for pure functions in REFACTORSLOP/_extract_missing.py.
 
-_extract_missing.py contains module-level I/O (reads a JSON file and writes
-output files) that cannot execute in a test environment. This module loads
-only the pure helper functions -- find_symbol_node, slice_source,
-find_const_node, pick_backup -- by filtering out the I/O statements from the
-AST before executing the extracted nodes.
-"""
+The script contains module-level I/O that runs unconditionally at import time
+(reads _loss_audit_current.json, writes _missing_sources.md/.json), so we load
+it through importlib with mocked filesystem operations.
+
+Functions under test:
+  * pick_backup       – choose the preferred backup name from a list
+  * find_symbol_node  – walk an AST to locate a qualified symbol
+  * find_const_node   – locate a module-level constant assignment by name
+  * slice_source      – slice source lines for a given AST node
+"""  # noqa: RUF002
+
+from __future__ import annotations  # noqa: TID251
 
 import ast
-import textwrap
+import importlib.util
+import json
 from pathlib import Path
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
+if TYPE_CHECKING:
+    import types
 
 # ---------------------------------------------------------------------------
-# Import helper: load pure functions from _extract_missing.py
+# Load the module without triggering any real file I/O
 # ---------------------------------------------------------------------------
 
-
-def _load_extract_missing_functions() -> dict:
-    """Dynamically load only the pure helper functions from _extract_missing.py.
-
-    Module-level I/O statements (json.loads, file writes, print calls) are
-    excluded so tests can import the utility functions without side effects.
-    """
-    repo_root = Path(__file__).parent.parent
-    script_path = repo_root / "REFACTORSLOP" / "_extract_missing.py"
-    source = script_path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-
-    safe_nodes: list[ast.stmt] = []
-    for node in tree.body:
-        # Always include imports.
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            safe_nodes.append(node)
-        # Include function definitions (these are the pure helpers we test).
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            safe_nodes.append(node)
-        # Include simple constant assignments that do not perform I/O.
-        elif isinstance(node, ast.Assign):
-            src_segment = ast.get_source_segment(source, node) or ""
-            if "json.loads" not in src_segment and "read_text" not in src_segment:
-                safe_nodes.append(node)
-
-    mod = ast.Module(body=safe_nodes, type_ignores=[])
-    namespace: dict = {}
-    exec(compile(mod, str(script_path), "exec"), namespace)  # noqa: S102
-    return namespace
+_EMPTY_AUDIT = json.dumps({"TRULY_MISSING_SYMBOLS": {}, "TRULY_MISSING_CONSTS": {}})
+_MODULE_PATH = str(
+    Path(__file__).parent.parent / "REFACTORSLOP" / "_extract_missing.py",
+)
 
 
-_em = _load_extract_missing_functions()
+def _load_extract_missing() -> types.ModuleType:
+    """Import _extract_missing with all filesystem I/O suppressed."""
+    with (
+        patch("pathlib.Path.read_text", return_value=_EMPTY_AUDIT),
+        patch("pathlib.Path.write_text", return_value=None),
+    ):
+        spec = importlib.util.spec_from_file_location("_extract_missing", _MODULE_PATH)
+        assert spec is not None
+        assert spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+@pytest.fixture(scope="module")
+def em() -> types.ModuleType:
+    """Module fixture – loaded once per test-module session."""  # noqa: RUF002
+    return _load_extract_missing()
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# pick_backup
 # ---------------------------------------------------------------------------
 
 
-def _parse(source: str) -> ast.Module:
-    return ast.parse(textwrap.dedent(source))
+def test_pick_backup_chooses_pre_transfer_first(em: types.ModuleType) -> None:
+    """pre_transfer is the highest-priority backup."""
+    result = em.pick_backup(["pre_recovery", "pre_transfer", "pre_reconcile"])
+    assert result == "pre_transfer"
+
+
+def test_pick_backup_falls_back_to_pre_reconcile(em: types.ModuleType) -> None:
+    """When pre_transfer is absent, pre_reconcile is preferred over pre_recovery."""
+    result = em.pick_backup(["pre_recovery", "pre_reconcile"])
+    assert result == "pre_reconcile"
+
+
+def test_pick_backup_falls_back_to_pre_recovery(em: types.ModuleType) -> None:
+    """When only pre_recovery is available it is returned."""
+    result = em.pick_backup(["pre_recovery"])
+    assert result == "pre_recovery"
+
+
+def test_pick_backup_returns_first_element_for_unknown_names(
+    em: types.ModuleType,
+) -> None:
+    """An unrecognised backup name falls through to the first element of srcs."""
+    result = em.pick_backup(["unknown_backup"])
+    assert result == "unknown_backup"
+
+
+def test_pick_backup_single_pre_transfer(em: types.ModuleType) -> None:
+    """Single-element list is returned as-is when it matches the preference."""
+    assert em.pick_backup(["pre_transfer"]) == "pre_transfer"
+
+
+def test_pick_backup_preference_order_not_position(em: types.ModuleType) -> None:
+    """Preference is determined by PREFERENCE list order, not the input list order."""
+    # Even if pre_reconcile appears first in input, pre_transfer wins.
+    result = em.pick_backup(["pre_reconcile", "pre_transfer"])
+    assert result == "pre_transfer"
 
 
 # ---------------------------------------------------------------------------
-# pick_backup()
+# find_symbol_node – locate a qualified symbol in an AST  # noqa: RUF003
 # ---------------------------------------------------------------------------
 
 
-class TestPickBackup:
-    def test_returns_first_preference_match(self) -> None:
-        """pick_backup returns the highest-preference backup when multiple are present."""
-        # PREFERENCE order from the script is: pre_transfer, pre_reconcile, pre_recovery
-        srcs = ["pre_recovery", "pre_reconcile", "pre_transfer"]
-        result = _em["pick_backup"](srcs)
-        assert result == "pre_transfer"
-
-    def test_returns_second_preference_when_first_absent(self) -> None:
-        """pick_backup falls through to the second preference when first is missing."""
-        srcs = ["pre_recovery", "pre_reconcile"]
-        result = _em["pick_backup"](srcs)
-        assert result == "pre_reconcile"
-
-    def test_returns_last_preference_when_only_recovery(self) -> None:
-        """pick_backup returns pre_recovery when it is the only available backup."""
-        srcs = ["pre_recovery"]
-        result = _em["pick_backup"](srcs)
-        assert result == "pre_recovery"
-
-    def test_returns_first_element_when_no_preference_matches(self) -> None:
-        """pick_backup falls back to srcs[0] when no preferred backup is present."""
-        srcs = ["unknown_backup", "another_backup"]
-        result = _em["pick_backup"](srcs)
-        assert result == "unknown_backup"
-
-    def test_returns_first_element_for_single_unknown_backup(self) -> None:
-        """pick_backup returns the only element when it is an unrecognized name."""
-        srcs = ["custom_snapshot"]
-        result = _em["pick_backup"](srcs)
-        assert result == "custom_snapshot"
-
-    def test_preference_order_pre_transfer_beats_pre_reconcile(self) -> None:
-        """pre_transfer is preferred over pre_reconcile."""
-        result = _em["pick_backup"](["pre_reconcile", "pre_transfer"])
-        assert result == "pre_transfer"
-
-    def test_preference_order_pre_reconcile_beats_pre_recovery(self) -> None:
-        """pre_reconcile is preferred over pre_recovery."""
-        result = _em["pick_backup"](["pre_recovery", "pre_reconcile"])
-        assert result == "pre_reconcile"
+def _parse(src: str) -> ast.Module:
+    return ast.parse(src)
 
 
-# ---------------------------------------------------------------------------
-# find_symbol_node()
-# ---------------------------------------------------------------------------
+def test_find_symbol_node_top_level_function(em: types.ModuleType) -> None:
+    """A top-level function is found by its unqualified name."""
+    tree = _parse("def hello():\n    pass\n")
+    node = em.find_symbol_node(tree, "hello")
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "hello"
 
 
-class TestFindSymbolNode:
-    def test_finds_top_level_function(self) -> None:
-        """find_symbol_node locates a top-level function by name."""
-        tree = _parse("""
-            def my_func():
-                return 1
-        """)
-        node = _em["find_symbol_node"](tree, "my_func")
-        assert node is not None
-        assert isinstance(node, ast.FunctionDef)
-        assert node.name == "my_func"
+def test_find_symbol_node_top_level_class(em: types.ModuleType) -> None:
+    """A top-level class is found by its unqualified name."""
+    tree = _parse("class Foo:\n    pass\n")
+    node = em.find_symbol_node(tree, "Foo")
+    assert node is not None
+    assert isinstance(node, ast.ClassDef)
+    assert node.name == "Foo"
 
-    def test_finds_top_level_class(self) -> None:
-        """find_symbol_node locates a top-level class by name."""
-        tree = _parse("""
-            class MyClass:
-                pass
-        """)
-        node = _em["find_symbol_node"](tree, "MyClass")
-        assert node is not None
-        assert isinstance(node, ast.ClassDef)
-        assert node.name == "MyClass"
 
-    def test_finds_method_on_class(self) -> None:
-        """find_symbol_node resolves dotted qualnames to class methods."""
-        tree = _parse("""
-            class Coordinator:
-                def async_update(self):
-                    pass
-        """)
-        node = _em["find_symbol_node"](tree, "Coordinator.async_update")
-        assert node is not None
-        assert isinstance(node, ast.FunctionDef)
-        assert node.name == "async_update"
+def test_find_symbol_node_method(em: types.ModuleType) -> None:
+    """A class method is found via dotted qualname."""
+    src = "class Foo:\n    def bar(self):\n        return 42\n"
+    tree = _parse(src)
+    node = em.find_symbol_node(tree, "Foo.bar")
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "bar"
 
-    def test_returns_none_for_missing_symbol(self) -> None:
-        """find_symbol_node returns None when the qualname does not exist."""
-        tree = _parse("""
-            def existing():
-                pass
-        """)
-        result = _em["find_symbol_node"](tree, "nonexistent")
-        assert result is None
 
-    def test_returns_none_for_missing_nested_component(self) -> None:
-        """find_symbol_node returns None when an intermediate component is absent."""
-        tree = _parse("""
-            class Foo:
-                pass
-        """)
-        result = _em["find_symbol_node"](tree, "Foo.bar.baz")
-        assert result is None
+def test_find_symbol_node_nested_class(em: types.ModuleType) -> None:
+    """Deeply nested class is found via multi-part dotted qualname."""
+    src = "class Outer:\n    class Inner:\n        def method(self): pass\n"
+    tree = _parse(src)
+    node = em.find_symbol_node(tree, "Outer.Inner.method")
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "method"
 
-    def test_finds_async_function(self) -> None:
-        """find_symbol_node handles async function definitions."""
-        tree = _parse("""
-            async def async_setup_entry(hass, entry):
-                pass
-        """)
-        node = _em["find_symbol_node"](tree, "async_setup_entry")
-        assert node is not None
-        assert isinstance(node, ast.AsyncFunctionDef)
 
-    def test_finds_nested_function_inside_class_method(self) -> None:
-        """find_symbol_node resolves deeply nested qualnames."""
-        tree = _parse("""
-            class Api:
-                def login(self):
-                    def _inner():
-                        pass
-        """)
-        node = _em["find_symbol_node"](tree, "Api.login._inner")
-        assert node is not None
-        assert isinstance(node, ast.FunctionDef)
-        assert node.name == "_inner"
+def test_find_symbol_node_not_found_returns_none(em: types.ModuleType) -> None:
+    """A missing symbol returns None without raising."""
+    tree = _parse("x = 1\n")
+    result = em.find_symbol_node(tree, "nonexistent")
+    assert result is None
 
-    def test_returns_none_on_empty_module(self) -> None:
-        """find_symbol_node returns None when given an empty module."""
-        tree = ast.parse("")
-        result = _em["find_symbol_node"](tree, "anything")
-        assert result is None
+
+def test_find_symbol_node_partial_path_not_found(em: types.ModuleType) -> None:
+    """A valid class but wrong method name returns None."""
+    src = "class Foo:\n    def bar(self): pass\n"
+    tree = _parse(src)
+    result = em.find_symbol_node(tree, "Foo.baz")
+    assert result is None
+
+
+def test_find_symbol_node_async_function(em: types.ModuleType) -> None:
+    """Async function definitions are found like regular functions."""
+    tree = _parse("async def fetch():\n    pass\n")
+    node = em.find_symbol_node(tree, "fetch")
+    assert node is not None
+    assert isinstance(node, ast.AsyncFunctionDef)
+
+
+def test_find_symbol_node_wrong_class_in_path(em: types.ModuleType) -> None:
+    """If the first path component does not match, returns None."""
+    src = "class Foo:\n    def bar(self): pass\n"
+    tree = _parse(src)
+    result = em.find_symbol_node(tree, "Bar.bar")
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
-# find_const_node()
+# find_const_node – locate a module-level constant assignment  # noqa: RUF003
 # ---------------------------------------------------------------------------
 
 
-class TestFindConstNode:
-    def test_finds_simple_assignment(self) -> None:
-        """find_const_node locates a module-level plain assignment by name."""
-        tree = _parse("""
-            MY_CONST = 42
-        """)
-        node = _em["find_const_node"](tree, "MY_CONST")
-        assert node is not None
-        assert isinstance(node, ast.Assign)
+def test_find_const_node_simple_assign(em: types.ModuleType) -> None:
+    """A plain assignment is found by its target name."""
+    tree = _parse("FOO = 42\n")
+    node = em.find_const_node(tree, "FOO")
+    assert node is not None
+    assert isinstance(node, ast.Assign)
 
-    def test_finds_annotated_assignment(self) -> None:
-        """find_const_node locates a module-level annotated assignment."""
-        tree = _parse("""
-            TIMEOUT: int = 30
-        """)
-        node = _em["find_const_node"](tree, "TIMEOUT")
-        assert node is not None
-        assert isinstance(node, ast.AnnAssign)
 
-    def test_returns_none_for_missing_constant(self) -> None:
-        """find_const_node returns None when the name is not defined."""
-        tree = _parse("""
-            EXISTING = 1
-        """)
-        result = _em["find_const_node"](tree, "MISSING")
-        assert result is None
+def test_find_const_node_annotated_assign(em: types.ModuleType) -> None:
+    """An annotated assignment is found by its target name."""
+    tree = _parse("BAR: int = 99\n")
+    node = em.find_const_node(tree, "BAR")
+    assert node is not None
+    assert isinstance(node, ast.AnnAssign)
 
-    def test_returns_none_for_function_not_constant(self) -> None:
-        """find_const_node does not match function definitions."""
-        tree = _parse("""
-            def MY_CONST():
-                pass
-        """)
-        result = _em["find_const_node"](tree, "MY_CONST")
-        assert result is None
 
-    def test_returns_none_on_empty_module(self) -> None:
-        """find_const_node returns None for an empty module."""
-        tree = ast.parse("")
-        result = _em["find_const_node"](tree, "ANYTHING")
-        assert result is None
+def test_find_const_node_not_found_returns_none(em: types.ModuleType) -> None:
+    """A missing constant name returns None."""
+    tree = _parse("FOO = 1\n")
+    result = em.find_const_node(tree, "MISSING")
+    assert result is None
 
-    def test_finds_first_of_multiple_same_name_assignments(self) -> None:
-        """find_const_node finds the first assignment with the given name."""
-        tree = _parse("""
-            VALUE = 1
-            VALUE = 2
-        """)
-        node = _em["find_const_node"](tree, "VALUE")
-        assert node is not None
-        # There should be a result — we don't assert which assignment (first or last)
-        # but we verify the function returns something rather than None.
 
-    def test_finds_string_constant(self) -> None:
-        """find_const_node locates a string constant assignment."""
-        tree = _parse("""
-            API_BASE_URL = "https://example.com"
-        """)
-        node = _em["find_const_node"](tree, "API_BASE_URL")
-        assert node is not None
+def test_find_const_node_does_not_find_local_variables(em: types.ModuleType) -> None:
+    """Variables inside functions are NOT found at module scope."""
+    src = "def f():\n    LOCAL = 1\n"
+    tree = _parse(src)
+    result = em.find_const_node(tree, "LOCAL")
+    assert result is None
+
+
+def test_find_const_node_multiple_targets_on_one_line(em: types.ModuleType) -> None:
+    """Chained assignment returns the Assign node if either target matches."""
+    # ast.Assign supports multiple targets via tuple unpacking; simple chained
+    # assignments (A = B = 1) also produce a single Assign with two targets.
+    src = "A = B = 1\n"
+    tree = _parse(src)
+    # Both A and B share the same Assign node.
+    node_a = em.find_const_node(tree, "A")
+    node_b = em.find_const_node(tree, "B")
+    assert node_a is not None
+    assert node_b is not None
+
+
+def test_find_const_node_returns_first_occurrence(em: types.ModuleType) -> None:
+    """When the same name appears twice, the first occurrence is returned."""
+    src = "X = 1\nX = 2\n"
+    tree = _parse(src)
+    node = em.find_const_node(tree, "X")
+    assert node is not None
+    # The returned node should be the first Assign; its value should be 1.
+    assert isinstance(node, ast.Assign)
+    assert ast.literal_eval(node.value) == 1  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
-# slice_source()
+# slice_source – slice lines from a source file for a given AST node  # noqa: RUF003
 # ---------------------------------------------------------------------------
 
 
-class TestSliceSource:
-    def test_extracts_function_source_lines(self, tmp_path: Path) -> None:
-        """slice_source returns the source text for a function node."""
-        source = "x = 1\n\ndef my_func():\n    return 42\n"
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        func_node = tree.body[1]  # the FunctionDef
+def test_slice_source_extracts_correct_lines(
+    em: types.ModuleType,
+    tmp_path: Path,
+) -> None:
+    """slice_source returns exactly the lines spanned by the node."""
+    src = "x = 1\ndef f():\n    return x\n"
+    py = tmp_path / "mod.py"
+    py.write_text(src, encoding="utf-8")
 
-        result = _em["slice_source"](src_file, func_node)
+    tree = ast.parse(src)
+    func_node = tree.body[1]  # `def f()`
+    result = em.slice_source(py, func_node)
 
-        assert "def my_func" in result
-        assert "return 42" in result
+    assert "def f():" in result
+    assert "return x" in result
+    assert "x = 1" not in result
 
-    def test_includes_decorator_lines(self, tmp_path: Path) -> None:
-        """slice_source includes preceding decorator lines in the extracted source."""
-        source = "import abc\n\n@abc.abstractmethod\ndef decorated():\n    pass\n"
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        func_node = tree.body[1]  # the decorated FunctionDef
 
-        result = _em["slice_source"](src_file, func_node)
+def test_slice_source_single_line_node(em: types.ModuleType, tmp_path: Path) -> None:
+    """A single-line function is returned without extra lines."""
+    src = "def g(): pass\n"
+    py = tmp_path / "mod.py"
+    py.write_text(src, encoding="utf-8")
 
-        assert "@abc.abstractmethod" in result
-        assert "def decorated" in result
+    tree = ast.parse(src)
+    func_node = tree.body[0]
+    result = em.slice_source(py, func_node)
 
-    def test_extracts_class_source(self, tmp_path: Path) -> None:
-        """slice_source returns the full class source including its methods."""
-        source = "class Foo:\n    def bar(self):\n        return 1\n"
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        class_node = tree.body[0]
+    assert result.strip() == "def g(): pass"
 
-        result = _em["slice_source"](src_file, class_node)
 
-        assert "class Foo" in result
-        assert "def bar" in result
-        assert "return 1" in result
+def test_slice_source_includes_decorators(em: types.ModuleType, tmp_path: Path) -> None:
+    """When a node has decorators, the preceding decorator lines are included."""
+    src = "@property\ndef value(self):\n    return 42\n"
+    py = tmp_path / "mod.py"
+    py.write_text(src, encoding="utf-8")
 
-    def test_slice_starts_at_first_decorator(self, tmp_path: Path) -> None:
-        """slice_source includes all stacked decorators before the function."""
-        source = (
-            "from functools import wraps\n\n"
-            "@wraps\n@staticmethod\ndef multi_decorated():\n    pass\n"
-        )
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        func_node = tree.body[1]  # multi_decorated
+    tree = ast.parse(src)
+    func_node = tree.body[0]
+    result = em.slice_source(py, func_node)
 
-        result = _em["slice_source"](src_file, func_node)
+    assert "@property" in result
+    assert "def value" in result
 
-        assert "@wraps" in result
-        assert "@staticmethod" in result
-        assert "def multi_decorated" in result
 
-    def test_returns_only_target_function_not_full_file(self, tmp_path: Path) -> None:
-        """slice_source returns only the targeted function's lines, not the whole file."""
-        source = (
-            "HEADER = 'header'\n\n"
-            "def first():\n    pass\n\n"
-            "def second():\n    return 2\n\n"
-            "FOOTER = 'footer'\n"
-        )
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        first_func = tree.body[1]  # 'first'
+def test_slice_source_multiline_function(em: types.ModuleType, tmp_path: Path) -> None:
+    """A multi-line function body is fully included."""
+    src = "def compute(x, y):\n    a = x * 2\n    b = y + 1\n    return a + b\n"
+    py = tmp_path / "mod.py"
+    py.write_text(src, encoding="utf-8")
 
-        result = _em["slice_source"](src_file, first_func)
+    tree = ast.parse(src)
+    func_node = tree.body[0]
+    result = em.slice_source(py, func_node)
 
-        assert "def first" in result
-        assert "HEADER" not in result
-        assert "def second" not in result
-        assert "FOOTER" not in result
-
-    def test_single_line_function(self, tmp_path: Path) -> None:
-        """slice_source handles a function that occupies only a single line."""
-        source = "def noop(): pass\n"
-        src_file = tmp_path / "mod.py"
-        src_file.write_text(source, encoding="utf-8")
-        tree = ast.parse(source)
-        func_node = tree.body[0]
-
-        result = _em["slice_source"](src_file, func_node)
-
-        assert "def noop" in result
-        assert "pass" in result
+    assert "def compute" in result
+    assert "a = x * 2" in result
+    assert "b = y + 1" in result
+    assert "return a + b" in result

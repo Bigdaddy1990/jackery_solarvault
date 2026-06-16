@@ -49,6 +49,8 @@ from .const import (
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 from .entity import JackeryEntity
+from .entity_contract import DEFAULT_LIVE_SOURCES, DEFAULT_NULL_SEMANTICS
+from .exceptions import ACTION_WRITE_ERRORS
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -90,11 +92,13 @@ def _rounded_int(value: Any) -> int:  # noqa: ANN401
         int: The input rounded to the nearest integer.
 
     Raises:
-        HomeAssistantError: If the input cannot be parsed as a numeric value (message "invalid number value").
+        HomeAssistantError: If the input cannot be parsed as a numeric value (message
+        "invalid number value").
     """
     parsed = safe_float(value)
     if parsed is None:
-        raise HomeAssistantError("invalid number value")  # noqa: TRY003
+        msg = "invalid number value"
+        raise HomeAssistantError(msg)
     return round(parsed)
 
 
@@ -124,6 +128,11 @@ class JackeryNumberDescription(NumberEntityDescription):
     raise_on_setter_error: bool = True
     integer_value: bool = False
     display_precision: int | None = None
+    smali_field: str | None = None
+    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    null_semantics: str = DEFAULT_NULL_SEMANTICS
+    recorder_allowed: bool = True
+    ha_derived: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -135,17 +144,20 @@ def _wire_int(value: Any) -> int:  # noqa: ANN401
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
-        value: Input to parse; may be an int, numeric string, or other value that can represent an integer.
+        value: Input to parse; may be an int, numeric string, or other value that can
+        represent an integer.
 
     Returns:
         int: The parsed integer.
 
     Raises:
-        HomeAssistantError: If the input cannot be interpreted as an integer (error message "invalid number value").
+        HomeAssistantError: If the input cannot be interpreted as an integer (error
+        message "invalid number value").
     """
     parsed = first_nonblank_int(value)
     if parsed is None:
-        raise HomeAssistantError("invalid number value")  # noqa: TRY003
+        msg = "invalid number value"
+        raise HomeAssistantError(msg)
     return parsed
 
 
@@ -159,59 +171,76 @@ def _wire_float(value: Any) -> float:  # noqa: ANN401
         float: The parsed floating-point value.
 
     Raises:
-        HomeAssistantError: If the input cannot be parsed as a float (error message: "invalid number value").
+        HomeAssistantError: If the input cannot be parsed as a float (error message:
+        "invalid number value").
     """
     parsed = safe_float(value)
     if parsed is None:
-        raise HomeAssistantError("invalid number value")  # noqa: TRY003
+        msg = "invalid number value"
+        raise HomeAssistantError(msg)
     return parsed
 
 
 async def _set_soc_charge(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the state-of-charge (SOC) charge limit for the specified device.
 
     Parameters:
         dev_id (str): Identifier of the target device.
-        value (float): Desired SOC charge limit as a percentage; converted to an integer before sending to the coordinator.
+        value (float): Desired SOC charge limit as a percentage; converted to an
+        integer before sending to the coordinator.
     """
     await coord.async_set_soc_limits(dev_id, charge_limit=_wire_int(value))
 
 
 async def _set_soc_discharge(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the state-of-charge discharge limit (percentage) for the specified device.
 
     Parameters:
         dev_id (str): Identifier of the target device.
-        value (float): Desired discharge limit as a percentage; values are converted to an integer before being sent.
+        value (float): Desired discharge limit as a percentage; values are converted to
+        an integer before being sent.
     """
     await coord.async_set_soc_limits(dev_id, discharge_limit=_wire_int(value))
 
 
 async def _set_max_feed_grid(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
-    """Set the device maximum grid feed-in to either 800 W or 2500 W based on the provided value.
+    """Set the device maximum grid feed-in to either 800 W or 2500 W based on the.
+
+    provided value.
 
     Parameters:
-        value (float): Requested feed-in indicator; values less than or equal to 800 select 800, otherwise 2500.
+        value (float): Requested feed-in indicator; values less than or equal to 800
+        select 800, otherwise 2500.
     """
     parsed = _wire_int(value)
     await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)  # noqa: PLR2004
 
 
 async def _set_max_output_power(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the device's maximum output power via the coordinator.
 
     Parameters:
-        coord (JackerySolarVaultCoordinator): Coordinator responsible for device communication.
+        coord (JackerySolarVaultCoordinator): Coordinator responsible for device
+        communication.
         dev_id (str): Device identifier.
-        value (float): Desired maximum output power in watts; will be converted to an integer before sending.
+        value (float): Desired maximum output power in watts; will be converted to an
+        integer before sending.
 
     Raises:
         HomeAssistantError: If `value` cannot be parsed as a valid number.
@@ -220,32 +249,43 @@ async def _set_max_output_power(
 
 
 async def _set_default_power(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the default-load power preference on a device."""
     await coord.async_set_default_power(dev_id, _wire_int(value))
 
 
 async def _set_single_price(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the device's single-tariff electricity price.
 
     Parameters:
-        coord (JackerySolarVaultCoordinator): Coordinator that performs the write operation.
+        coord (JackerySolarVaultCoordinator): Coordinator that performs the write
+        operation.
         dev_id (str): Identifier of the target device.
-        value (float): Price value to write, expressed in the device's configured currency unit.
+        value (float): Price value to write, expressed in the device's configured
+        currency unit.
     """
     await coord.async_set_single_price(dev_id, value)
 
 
 async def _set_third_party_mqtt_port(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
-    """Update the device's third-party MQTT broker port in the coordinator's configuration.
+    """Update the device's third-party MQTT broker port in the coordinator's.
+
+    configuration.
 
     Parameters:
-        coord (JackerySolarVaultCoordinator): Coordinator used to apply the configuration change.
+        coord (JackerySolarVaultCoordinator): Coordinator used to apply the
+        configuration change.
         dev_id (str): Identifier of the target device.
         value (float): Port number; converted to `int` before being written.
     """
@@ -259,92 +299,145 @@ async def _set_third_party_mqtt_port(
 
 
 async def _set_portable_charge_power(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the charge power limit on a portable Explorer device (msgId=38)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=38, field="rc", value=int(value)
+        dev_id,
+        action_id=38,
+        field="rc",
+        value=int(value),
     )
 
 
 async def _set_portable_energy_storage_charge_limit(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the energy storage charge limit on a portable Explorer device (msgId=31)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=31, field="cl", value=int(value)
+        dev_id,
+        action_id=31,
+        field="cl",
+        value=int(value),
     )
 
 
 async def _set_portable_auto_shutdown_time(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the auto-shutdown time on a portable Explorer device (msgId=19)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=19, field="dt", value=int(value)
+        dev_id,
+        action_id=19,
+        field="dt",
+        value=int(value),
     )
 
 
 async def _set_portable_ac_countdown(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the AC output countdown on a portable Explorer device (msgId=34)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=34, field="acdt", value=int(value)
+        dev_id,
+        action_id=34,
+        field="acdt",
+        value=int(value),
     )
 
 
 async def _set_portable_dc_countdown(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the DC output countdown on a portable Explorer device (msgId=35)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=35, field="odct", value=int(value)
+        dev_id,
+        action_id=35,
+        field="odct",
+        value=int(value),
     )
 
 
 async def _set_portable_dc_usb_countdown(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the DC USB output countdown on a portable Explorer device (msgId=36)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=36, field="odcu", value=int(value)
+        dev_id,
+        action_id=36,
+        field="odcu",
+        value=int(value),
     )
 
 
 async def _set_portable_dc_car_countdown(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the DC car output countdown on a portable Explorer device (msgId=37)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=37, field="idc", value=int(value)
+        dev_id,
+        action_id=37,
+        field="idc",
+        value=int(value),
     )
 
 
 async def _set_portable_output_priority_soc(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
-    """Set the output priority SOC threshold on a portable Explorer device (msgId=49)."""
+    """Set the output priority SOC threshold on a portable Explorer device.
+
+    (msgId=49).
+    """
     await coord.async_portable_set_number(
-        dev_id, action_id=49, field="pss", value=int(value)
+        dev_id,
+        action_id=49,
+        field="pss",
+        value=int(value),
     )
 
 
 async def _set_portable_bluetooth_sleep(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the Bluetooth module sleep time on a portable Explorer device (msgId=44)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=44, field="ast", value=int(value)
+        dev_id,
+        action_id=44,
+        field="ast",
+        value=int(value),
     )
 
 
 async def _set_portable_output_priority(
-    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
 ) -> None:
     """Set the output priority mode on a portable Explorer device (msgId=48)."""
     await coord.async_portable_set_number(
-        dev_id, action_id=48, field="outPrio", value=int(value)
+        dev_id,
+        action_id=48,
+        field="outPrio",
+        value=int(value),
     )
 
 
@@ -356,11 +449,16 @@ async def _set_portable_output_priority(
 def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     """Compute the dynamic maximum feed-grid power value for a device payload.
 
-    Determines whether the device should expose a maximum feed-in of 800.0 or 2500.0 watts.
+    Determines whether the device should expose a maximum feed-in of 800.0 or 2500.0
+    watts.
     Priority:
-    - If either `FIELD_MAX_FEED_GRID` or `FIELD_MAX_GRID_STD_PW` in payload properties is greater than 800, returns 2500.0.
-    - If the device model code equals "3002" in `PAYLOAD_DEVICE` or `PAYLOAD_DISCOVERY`, returns 2500.0.
-    - Otherwise, uses `FIELD_MAX_OUT_PW` from properties (defaults to 2500 when missing): returns 800.0 if that value is less than or equal to 800, otherwise 2500.0.
+    - If either `FIELD_MAX_FEED_GRID` or `FIELD_MAX_GRID_STD_PW` in payload properties
+    is greater than 800, returns 2500.0.
+    - If the device model code equals "3002" in `PAYLOAD_DEVICE` or
+    `PAYLOAD_DISCOVERY`, returns 2500.0.
+    - Otherwise, uses `FIELD_MAX_OUT_PW` from properties (defaults to 2500 when
+    missing): returns 800.0 if that value is less than or equal to 800, otherwise
+    2500.0.
 
     Parameters:
         payload (dict[str, Any]): Full device payload as received from the coordinator.
@@ -387,10 +485,12 @@ def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
     """Return the discrete allowed feed-in wattage choices supported by the device.
 
     Parameters:
-        payload (dict[str, Any]): Full device payload used to derive device capabilities.
+        payload (dict[str, Any]): Full device payload used to derive device
+        capabilities.
 
     Returns:
-        tuple[float, ...]: Allowed feed-in values; either `(800.0,)` when the device's dynamic max is 800 or less, otherwise `(800.0, 2500.0)`.
+        tuple[float, ...]: Allowed feed-in values; either `(800.0,)` when the device's
+        dynamic max is 800 or less, otherwise `(800.0, 2500.0)`.
     """
     if _max_feed_grid_dynamic_max(payload) <= 800:  # noqa: PLR2004
         return (800.0,)
@@ -398,7 +498,9 @@ def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
 
 
 def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
-    """Determine the currency symbol or currency code to use for the single-tariff price.
+    """Determine the currency symbol or currency code to use for the single-tariff.
+
+    price.
 
     Checks the payload's price section and returns the first available value from
     FIELD_SINGLE_CURRENCY, FIELD_CURRENCY, FIELD_SINGLE_CURRENCY_CODE, or
@@ -416,7 +518,7 @@ def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
         or price.get(FIELD_CURRENCY)
         or price.get(FIELD_SINGLE_CURRENCY_CODE)
         or price.get(FIELD_CURRENCY_CODE)
-        or "€"
+        or "€",
     )
 
 
@@ -680,11 +782,15 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """Construct and raise a localized HomeAssistantError tied to this entity.
 
         Parameters:
-            translation_key (str): Translation key used to look up the localized error message.
-            **placeholders (object): Additional placeholder values to include in the translation placeholders; each value will be converted to a string.
+            translation_key (str): Translation key used to look up the localized error
+            message.
+            **placeholders (object): Additional placeholder values to include in the
+            translation placeholders; each value will be converted to a string.
 
         Raises:
-            HomeAssistantError: An error with `translation_domain`, `translation_key`, and `translation_placeholders` populated (includes `entity` and `device_id` plus provided placeholders).
+            HomeAssistantError: An error with `translation_domain`, `translation_key`,
+            and `translation_placeholders` populated (includes `entity` and `device_id`
+            plus provided placeholders).
         """
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -702,12 +808,19 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Determine the entity's current native value by scanning configured source keys in the selected payload section.
+        """Determine the entity's current native value by scanning configured source.
 
-        Checks each key in `entity_description.source_keys` in order and parses the first non-`None` value with `safe_float`. If `entity_description.integer_value` is true, the parsed value is rounded to the nearest integer and returned as a `float`. If no source key yields a usable value, returns `entity_description.none_fallback`.
+        keys in the selected payload section.
+
+        Checks each key in `entity_description.source_keys` in order and parses the
+        first non-`None` value with `safe_float`. If `entity_description.integer_value`
+        is true, the parsed value is rounded to the nearest integer and returned as a
+        `float`. If no source key yields a usable value, returns
+        `entity_description.none_fallback`.
 
         Returns:
-            The found native value as a `float` (rounded to an integer when configured), or `entity_description.none_fallback` (which may be `None`).
+            The found native value as a `float` (rounded to an integer when
+            configured), or `entity_description.none_fallback` (which may be `None`).
         """
         section = self._section()
         for key in self.entity_description.source_keys:
@@ -736,7 +849,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Get the unit of measurement for this entity.
 
-        If the description provides a dynamic_unit callable, its result for the current payload is returned; otherwise the description's static native_unit_of_measurement is returned.
+        If the description provides a dynamic_unit callable, its result for the current
+        payload is returned; otherwise the description's static
+        native_unit_of_measurement is returned.
 
         Returns:
             str | None: The unit of measurement, or `None` if not set.
@@ -751,10 +866,13 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
-        """Determine the discrete native values allowed for this entity based on its description and current payload.
+        """Determine the discrete native values allowed for this entity based on its.
+
+        description and current payload.
 
         Returns:
-                A tuple of allowed native values. Returns an empty tuple when there is no restriction.
+                A tuple of allowed native values. Returns an empty tuple when there is
+                no restriction.
         """
         allowed = self.entity_description.allowed_values
         if allowed is None:
@@ -764,9 +882,22 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return tuple(allowed)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Validate a native numeric value, forward it to the device via the description's setter, and refresh coordinator data.
+        """Validate a native numeric value, forward it to the device via the.
 
-        Performs parsing and range checks against the entity's native min/max, enforces discrete allowed values when present, applies the description's value_transform, and invokes the description.setter to write the prepared value. On parsing or range failure it raises an entity action error with translation key "invalid_number_range"; when the value is not one of the allowed discrete choices it raises "invalid_number_allowed_values". Authentication failures raised by the setter are propagated as ConfigEntryAuthFailed. HomeAssistantError exceptions that already carry translation metadata are re-raised; other setter failures are either converted to an entity action error with translation key "entity_action_failed" (if the description requests raising) or are logged and ignored. The coordinator is always asked to refresh after the write attempt.
+        description's setter, and refresh coordinator data.
+
+        Performs parsing and range checks against the entity's native min/max, enforces
+        discrete allowed values when present, applies the description's
+        value_transform, and invokes the description.setter to write the prepared
+        value. On parsing or range failure it raises an entity action error with
+        translation key "invalid_number_range"; when the value is not one of the
+        allowed discrete choices it raises "invalid_number_allowed_values".
+        Authentication failures raised by the setter are propagated as
+        ConfigEntryAuthFailed. HomeAssistantError exceptions that already carry
+        translation metadata are re-raised; other setter failures are either converted
+        to an entity action error with translation key "entity_action_failed" (if the
+        description requests raising) or are logged and ignored. The coordinator is
+        always asked to refresh after the write attempt.
 
         Parameters:
             value (float): The target native value to set for the entity.
@@ -798,7 +929,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         wire_value = self.entity_description.value_transform(value)
         try:
             await self.entity_description.setter(
-                self.coordinator, self._device_id, wire_value
+                self.coordinator,
+                self._device_id,
+                wire_value,
             )
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
@@ -815,7 +948,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
                 self.entity_description.key,
                 err,
             )
-        except Exception as err:  # noqa: BLE001
+        except ACTION_WRITE_ERRORS as err:
             if self.entity_description.raise_on_setter_error:
                 self._raise_action_error("entity_action_failed", error=err)
             _LOGGER.debug(
@@ -842,37 +975,52 @@ async def async_setup_entry(  # noqa: RUF029
     seen_unique_ids: set[str] = set()
 
     def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
-        """Add a NumberEntity to the collection if its unique ID has not already been seen.
+        """Add a NumberEntity to the collection if its unique ID has not already been.
+
+        seen.
 
         Parameters:
             entities (list[NumberEntity]): List to append the entity to when unique.
-            entity (NumberEntity): The entity to add; duplicates (by unique ID) are ignored.
+            entity (NumberEntity): The entity to add; duplicates (by unique ID) are
+            ignored.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="number",
+            logger=_LOGGER,
         )
 
     def _has_props(payload: dict[str, Any], *keys: str) -> bool:
-        """Determine whether any of the given keys exist in the payload's properties section.
+        """Determine whether any of the given keys exist in the payload's properties.
+
+        section.
 
         Parameters:
             payload (dict[str, Any]): Full device payload containing payload sections.
-            *keys (str): Property keys to check for presence inside the `PAYLOAD_PROPERTIES` section.
+            *keys (str): Property keys to check for presence inside the
+            `PAYLOAD_PROPERTIES` section.
 
         Returns:
-            bool: `True` if at least one key is present in the properties section, `False` otherwise.
+            bool: `True` if at least one key is present in the properties section,
+            `False` otherwise.
         """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
     def _has_price_or_system(payload: dict[str, Any]) -> bool:
-        """Determine whether the given device payload contains single-price data or a system identifier.
+        """Determine whether the given device payload contains single-price data or a.
+
+        system identifier.
 
         Parameters:
             payload (dict[str, Any]): Full device payload to inspect.
 
         Returns:
-            bool: `true` if the payload's price section contains `FIELD_SINGLE_PRICE` or `FIELD_DYNAMIC_OR_SINGLE`, or the system section contains `FIELD_ID` or `FIELD_SYSTEM_ID`; `false` otherwise.
+            bool: `true` if the payload's price section contains `FIELD_SINGLE_PRICE`
+            or `FIELD_DYNAMIC_OR_SINGLE`, or the system section contains `FIELD_ID` or
+            `FIELD_SYSTEM_ID`; `false` otherwise.
         """
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
@@ -888,7 +1036,10 @@ async def async_setup_entry(  # noqa: RUF029
         "soc_discharge_limit_set": lambda p: _has_props(p, FIELD_SOC_DISCHG_LIMIT),
         "max_output_power_set": lambda p: _has_props(p, FIELD_MAX_OUT_PW),
         "max_feed_grid": lambda p: _has_props(
-            p, FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW, FIELD_MAX_OUT_PW
+            p,
+            FIELD_MAX_FEED_GRID,
+            FIELD_MAX_GRID_STD_PW,
+            FIELD_MAX_OUT_PW,
         ),
         "default_power_set": lambda p: _has_props(p, FIELD_MAX_OUT_PW),
         "single_tariff_price_set": _has_price_or_system,
@@ -899,12 +1050,17 @@ async def async_setup_entry(  # noqa: RUF029
     }
 
     def _collect_entities() -> list[NumberEntity]:
-        """Build a list of number entities for devices whose payloads satisfy their gating predicates.
+        """Build a list of number entities for devices whose payloads satisfy their.
 
-        Iterates coordinator.data and, for each device and each description in NUMBER_DESCRIPTIONS, creates a JackeryNumber when no gating predicate is present or the predicate returns true.
+        gating predicates.
+
+        Iterates coordinator.data and, for each device and each description in
+        NUMBER_DESCRIPTIONS, creates a JackeryNumber when no gating predicate is
+        present or the predicate returns true.
 
         Returns:
-            list[NumberEntity]: NumberEntity instances ready to be added to Home Assistant.
+            list[NumberEntity]: NumberEntity instances ready to be added to Home
+            Assistant.
         """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
