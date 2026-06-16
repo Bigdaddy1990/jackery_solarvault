@@ -1,4 +1,0 @@
-
-[async_get_config_entry_diagnostics] adopted=LIVE
-   CODE <1\diagnostics.py>: async def async_get_config_entry_diagnostics(
-   CODE <pre_transfer>: async def async_get_config_entry_diagnostics(  # noqa: RUF029 - HA hook is async.
