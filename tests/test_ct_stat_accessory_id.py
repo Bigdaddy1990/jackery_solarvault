@@ -51,8 +51,8 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
                     "typeName": "Shelly Pro 3EM",
                     "deviceId": 2057219036232777730,
                     "deviceSn": "5c013b048e3c",
-                }
-            ]
+                },
+            ],
         },
     }
 

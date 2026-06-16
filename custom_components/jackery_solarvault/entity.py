@@ -8,12 +8,16 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
+    FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,
+    FIELD_SCAN_NAME,
+    FIELD_TYPE_NAME,
+    FIELD_VERSION,
     FIELD_WNAME,
     MANUFACTURER,
     PAYLOAD_ALARM,
@@ -34,7 +38,12 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .util import jackery_online_state
+from .util import (
+    jackery_online_state,
+    smart_plug_serial,
+    stable_subdevice_key,
+    subdevice_branding,
+)
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -87,10 +96,22 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _pv_trends(self) -> dict[str, Any]:
+        """Fetch the photovoltaic (PV) trends section from the device payload.
+
+        Returns:
+            dict[str, Any]: PV trends data from the device payload, or an empty dict if
+            not present.
+        """
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
-    def _alarm(self) -> Any:
+    def _alarm(self) -> object:
+        """Return the alarm payload for the device.
+
+        Returns:
+            The alarm payload object from the device payload, or None if no alarm data
+            is present.
+        """
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -123,7 +144,19 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device-registry metadata for this entity."""
+        """Build DeviceInfo for the parent SolarVault device.
+
+        Chooses the display name from `system.device_name`, then
+        `discovery.device_name`, then `properties.wname`, and falls back to `"Jackery
+        {device_id}"`. Chooses the model from `discovery.dev_model`, then
+        `device_meta.model_name`, and falls back to `"SolarVault"`. Includes
+        `serial_number` from `device_meta.device_sn` or `discovery.device_sn` when
+        present, and `sw_version` from `ota.current_version` when present.
+
+        Returns:
+            DeviceInfo: DeviceInfo containing identifiers, manufacturer, name, model,
+            and optional `serial_number` and `sw_version`.
+        """
         sys_name = self._system.get(FIELD_DEVICE_NAME)
         disc_name = self._discovery.get(FIELD_DEVICE_NAME)
         props_wname = self._properties.get(FIELD_WNAME)
@@ -134,13 +167,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             or self._device_meta.get(FIELD_MODEL_NAME)
             or "SolarVault"
         )
-        raw_sw_version = self._ota.get(FIELD_CURRENT_VERSION)
-        sw_version = str(raw_sw_version) if raw_sw_version is not None else None
-        raw_serial_number = self._device_meta.get(
-            FIELD_DEVICE_SN
-        ) or self._discovery.get(FIELD_DEVICE_SN)
-        serial_number = (
-            str(raw_serial_number) if raw_serial_number is not None else None
+        sw_version = self._ota.get(FIELD_CURRENT_VERSION) or None
+        sn = self._device_meta.get(FIELD_DEVICE_SN) or self._discovery.get(
+            FIELD_DEVICE_SN,
         )
 
         return DeviceInfo(
@@ -148,13 +177,83 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             manufacturer=MANUFACTURER,
             name=str(name),
             model=str(model),
-            serial_number=serial_number,
+            serial_number=sn,
             sw_version=sw_version,
+        )
+
+    def _build_smart_plug_device_info(
+        self,
+        plug_index: int,
+        plug: dict[str, Any],
+        plug_key: str | None = None,
+    ) -> DeviceInfo:
+        """Builds DeviceInfo metadata for a smart-plug subdevice attached to the parent.
+
+        SolarVault.
+
+        Parameters:
+            plug_index (int): 1-based index used for fallback display name and for
+            constructing a stable subdevice identifier when `plug_key` is not provided.
+            plug (dict[str, Any]): Smart-plug payload containing fields such as scan
+            name, device name, model/type names, serial/version fields and other
+            discovery data.
+            plug_key (str | None): Optional stable key to use for the subdevice
+            identifier; if omitted a stable key is derived from the plug data and index.
+
+        Returns:
+            DeviceInfo: Device registry metadata for the smart-plug including
+            identifiers, manufacturer, name, model, serial_number, sw_version, and
+            via_device.
+        """
+        base_name = (
+            self._system.get(FIELD_DEVICE_NAME)
+            or self._discovery.get(FIELD_DEVICE_NAME)
+            or self._properties.get(FIELD_WNAME)
+            or "SolarVault"
+        )
+        sn = smart_plug_serial(plug)
+        stable_key = plug_key or stable_subdevice_key("smart_plug", sn, plug_index)
+        # Branding lookup against the documented accessory catalog so the
+        # UI shows "Shelly Plus Plug S" instead of the raw "shellyplusplugs"
+        # wire identifier (PROTOCOL §3 + source-of-truth scanName table).
+        manufacturer_brand, model_label = subdevice_branding(plug.get(FIELD_SCAN_NAME))
+        display_name = (
+            plug.get(FIELD_DEVICE_NAME)
+            or model_label
+            or plug.get(FIELD_SCAN_NAME)
+            or f"Smart Plug {plug_index}"
+        )
+        model = (
+            model_label
+            or plug.get(FIELD_MODEL)
+            or plug.get(FIELD_MODEL_NAME)
+            or plug.get(FIELD_TYPE_NAME)
+            or "Smart Plug"
+        )
+        version = plug.get(FIELD_VERSION) or plug.get(FIELD_CURRENT_VERSION)
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self._device_id}_{stable_key}")},
+            manufacturer=manufacturer_brand or MANUFACTURER,
+            name=f"{base_name} {display_name}",
+            model=str(model),
+            serial_number=str(sn) if sn else None,
+            sw_version=str(version) if version else None,
+            via_device=(DOMAIN, self._device_id),
         )
 
     @property
     def available(self) -> bool:
-        """Return whether the entity is currently available."""
+        """Determine whether the entity is available.
+
+        Prefers an explicit device online indicator from device metadata or system
+        state; if that indicator parses to `False` the entity is still considered
+        available when the coordinator reports the device as locally reachable. If no
+        explicit online indicator is present, availability falls back to whether the
+        device ID exists in the coordinator data.
+
+        Returns:
+            True if the entity is available, False otherwise.
+        """
         if not super().available:
             return False
         online = self._device_meta.get(FIELD_ONLINE_STATUS)
@@ -163,5 +262,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         if online is not None:
             parsed_online = jackery_online_state(online)
             if parsed_online is not None:
+                if not parsed_online and self.coordinator.is_device_locally_reachable(
+                    self._device_id,
+                ):
+                    return True
                 return parsed_online
         return self._device_id in (self.coordinator.data or {})
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to Home Assistant."""
+        await super().async_added_to_hass()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity is about to be removed from Home Assistant."""
+        await super().async_will_remove_from_hass()

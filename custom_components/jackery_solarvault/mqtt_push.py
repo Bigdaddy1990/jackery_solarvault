@@ -1,7 +1,6 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
 from datetime import UTC, datetime
 import hashlib
@@ -9,12 +8,11 @@ import json
 import logging
 from pathlib import Path
 import ssl
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, MqttError
+from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
-from homeassistant.core import HomeAssistant
 
 from .const import (
     FIELD_BODY,
@@ -29,6 +27,13 @@ from .const import (
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from aiomqtt import Client as MQTTClient
+
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 # aiomqtt and paho-mqtt log under their own module names. Keep them at WARNING
@@ -345,7 +350,7 @@ class JackeryMqttPushClient:
     @staticmethod
     def _is_connect_auth_failure_rc(rc: int) -> bool:
         """Return True for CONNACK codes that mean credentials are rejected."""
-        return rc in (4, 5, 134, 135)
+        return rc in {4, 5, 134, 135}
 
     @staticmethod
     def _is_connect_failure_error(error: str | None) -> bool:
@@ -434,7 +439,7 @@ class JackeryMqttPushClient:
             except asyncio.CancelledError:
                 return
             except Exception as err:
-                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
+                _LOGGER.exception("Jackery MQTT %s handler failed: %s", label, err)
 
         task.add_done_callback(_log_task_result)
 

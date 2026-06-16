@@ -5,12 +5,14 @@ and credential refresh.  The coordinator calls these helpers instead of
 building MQTT payloads directly.
 """
 
+import contextlib
 import json
 import logging
+import math
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
-from ..const import (
+from custom_components.jackery_solarvault.const import (
     FIELD_ACTION_ID,
     FIELD_BODY,
     FIELD_DEVICE_SN,
@@ -21,6 +23,7 @@ from ..const import (
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
 )
+
 from .api import JackeryAuthError, JackeryError, encrypt_mqtt_body
 
 if TYPE_CHECKING:
@@ -31,15 +34,17 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd input
+def coerce_transport_cmd(cmd: Any) -> int:  # arbitrary cmd input  # noqa: ANN401
     """Coerce an arbitrary command value into an integer suitable for transport.
 
     Parameters:
         cmd (Any): Input command. Accepted forms:
             - int
             - float that is finite and has no fractional part
-            - str containing a base-10 integer or a finite integral float (e.g., "107" or "107.0")
-          The following are rejected: booleans, NaN/inf, empty strings, and values with a fractional component.
+            - str containing a base-10 integer or a finite integral float (e.g., "107"
+            or "107.0")
+          The following are rejected: booleans, NaN/inf, empty strings, and values with
+          a fractional component.
 
     Returns:
         int: The coerced integer command.
@@ -47,47 +52,54 @@ def coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401  # arbitrary cmd inpu
     Raises:
         ValueError: If the input cannot be converted to an integer.
     """
-    import contextlib
-    import math
-
     if isinstance(cmd, bool):
-        raise ValueError("cmd must be an integer")  # noqa: TRY003, TRY004
+        msg = "cmd must be an integer"
+        raise ValueError(msg)  # noqa: TRY004
     if isinstance(cmd, int):
         return cmd
     if isinstance(cmd, float):
         if not math.isfinite(cmd) or not cmd.is_integer():
-            raise ValueError("cmd must be an integer")  # noqa: TRY003
+            msg = "cmd must be an integer"
+            raise ValueError(msg)
         return int(cmd)
     if isinstance(cmd, str):
         text = cmd.strip()
         if not text:
-            raise ValueError("cmd must be an integer")  # noqa: TRY003
+            msg = "cmd must be an integer"
+            raise ValueError(msg)
         with contextlib.suppress(ValueError):
             return int(text, 10)
         with contextlib.suppress(ValueError):
             parsed = float(text)
             if math.isfinite(parsed) and parsed.is_integer():
                 return int(parsed)
-        raise ValueError("cmd must be an integer")  # noqa: TRY003
+        msg = "cmd must be an integer"
+        raise ValueError(msg)
     try:
         return int(cmd)
     except (TypeError, ValueError) as err:
-        raise ValueError("cmd must be an integer") from err  # noqa: TRY003
+        msg = "cmd must be an integer"
+        raise ValueError(msg) from err
 
 
 def command_body_for_transport(
-    body_fields: dict[str, Any], *, cmd: object
+    body_fields: dict[str, Any],
+    *,
+    cmd: object,
 ) -> dict[str, Any]:
     """Create the command body dictionary used by MQTT and BLE transports.
 
-    The provided `body_fields` are copied and returned with an added "cmd" entry only when `cmd` can be coerced to an integer greater than zero.
+    The provided `body_fields` are copied and returned with an added "cmd" entry only
+    when `cmd` can be coerced to an integer greater than zero.
 
     Parameters:
         body_fields (dict[str, Any]): Base fields to include in the returned body.
-        cmd (object): Value to coerce to an integer and include as "cmd" when greater than zero.
+        cmd (object): Value to coerce to an integer and include as "cmd" when greater
+        than zero.
 
     Returns:
-        dict[str, Any]: A dictionary containing the combined command body; includes "cmd" only if the coerced value is > 0.
+        dict[str, Any]: A dictionary containing the combined command body; includes
+        "cmd" only if the coerced value is > 0.
 
     Raises:
         ValueError: If `cmd` cannot be coerced to a valid integer.
@@ -99,10 +111,35 @@ def command_body_for_transport(
     return body
 
 
+def build_smali_command_envelope(  # noqa: PLR0913
+    *,
+    device_sn: str,
+    message_type: str,
+    action_id: int,
+    body: Any,  # noqa: ANN401
+    timestamp_ms: int,
+    version: int = 0,
+) -> dict[str, Any]:
+    """Build the app-compatible command envelope in Smali field order.
+
+    Mirrors ``HomeControlFormat`` / ``PortableControlFormat``:
+    ``deviceSn,id,version,messageType,actionId,timestamp,body``.
+    """
+    return {
+        FIELD_DEVICE_SN: device_sn,
+        "id": timestamp_ms,
+        FIELD_VERSION: version,
+        FIELD_MESSAGE_TYPE: message_type,
+        FIELD_ACTION_ID: action_id,
+        FIELD_TIMESTAMP: timestamp_ms,
+        FIELD_BODY: body,
+    }
+
+
 async def publish_mqtt_command(  # noqa: PLR0913
     *,
     mqtt: JackeryMqttPushClient,
-    api: Any,  # noqa: ANN401  # JackeryApi — avoids circular import
+    api: Any,  # JackeryApi — avoids circular import  # noqa: ANN401
     device_id: str,
     device_sn: str,
     bt_key: bytes | None,
@@ -140,10 +177,11 @@ async def publish_mqtt_command(  # noqa: PLR0913
             err,
         )
     except JackeryError as err:
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
-        raise HomeAssistantError(  # noqa: TRY003
-            f"Could not build Jackery MQTT credentials: {err}"
+        msg = f"Could not build Jackery MQTT credentials: {err}"
+        raise HomeAssistantError(
+            msg,
         ) from err
 
     user_id = creds[MQTT_CREDENTIAL_USER_ID]
@@ -166,23 +204,22 @@ async def publish_mqtt_command(  # noqa: PLR0913
     else:
         payload_str = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
 
-    payload: dict[str, Any] = {
-        "id": ts,
-        FIELD_VERSION: 0,
-        FIELD_MESSAGE_TYPE: message_type,
-        FIELD_ACTION_ID: action_id,
-        FIELD_TIMESTAMP: ts,
-        FIELD_BODY: payload_str,
-        FIELD_DEVICE_SN: device_sn,
-    }
+    payload = build_smali_command_envelope(
+        device_sn=device_sn,
+        message_type=message_type,
+        action_id=action_id,
+        body=payload_str,
+        timestamp_ms=ts,
+    )
 
     last_err: Exception | None = None
     for attempt in range(2):
-        try:
+        try:  # noqa: PLW0717
             if not mqtt.is_connected:
                 await ensure_mqtt_cb()
             if mqtt is None or not mqtt.is_connected:
-                raise RuntimeError("MQTT client is not connected")  # noqa: TRY003, TRY301
+                msg = "MQTT client is not connected"
+                raise RuntimeError(msg)  # noqa: TRY301
             await mqtt.async_publish_json(topic, payload, qos=0, retain=False)
             return  # noqa: TRY300
         except RuntimeError as err:
@@ -205,7 +242,7 @@ async def publish_mqtt_command(  # noqa: PLR0913
                 continue
 
     mqtt_last_error = mqtt.diagnostics.get("last_error") if mqtt else None
-    from homeassistant.exceptions import HomeAssistantError
+    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
     raise HomeAssistantError(
         translation_domain="jackery_solarvault",
@@ -217,8 +254,10 @@ async def publish_mqtt_command(  # noqa: PLR0913
     ) from last_err
 
 
-def _raise_config_entry_auth_failed(message: str, err: Exception) -> None:
-    """Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are invalid.
+def _raise_config_entry_auth_failed(message: str, err: Exception) -> NoReturn:
+    """Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are.
+
+    invalid.
 
     Parameters:
         message (str): Human-readable error message to attach to the raised exception.
@@ -227,6 +266,6 @@ def _raise_config_entry_auth_failed(message: str, err: Exception) -> None:
     Raises:
         ConfigEntryAuthFailed: Always raised with `message` and chained from `err`.
     """
-    from homeassistant.exceptions import ConfigEntryAuthFailed
+    from homeassistant.exceptions import ConfigEntryAuthFailed  # noqa: PLC0415
 
     raise ConfigEntryAuthFailed(message) from err

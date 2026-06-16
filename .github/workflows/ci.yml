@@ -39,11 +39,6 @@ jobs:
           category: integration
           ignore: brands
           repository: ${{ github.repository }}
-          ref: ${{ github.head_ref }}
-          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
-          persist-credentials: true
-          # Commit all changed files back to the repository
-      - uses: stefanzweifel/git-auto-commit-action@v7
 
   tests:
     name: Tests (Python 3.14)

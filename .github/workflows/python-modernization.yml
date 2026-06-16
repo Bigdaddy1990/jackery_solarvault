@@ -26,7 +26,6 @@ jobs:
           ref: ${{ github.head_ref }}
           # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
           persist-credentials: true
-
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:

@@ -55,9 +55,9 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
-    assert await api.async_set_system_name("123", "SolarVault") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
-    assert await api.async_set_system_name("123", "SolarVault") is True
+    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is False
     assert captured[0] == (
         SYSTEM_NAME_PATH,
         {FIELD_SYSTEM_NAME: "SolarVault", FIELD_ID: "123"},
@@ -154,18 +154,23 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
     api = JackeryApi.__new__(JackeryApi)
 
     async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
-        """Test stub that prevents performing an HTTP form POST for tariff-related operations.
+        """Test stub that prevents performing an HTTP form POST for tariff-related.
 
-        Used in unit tests to ensure input validation stops execution before any network request is made.
+        operations.
+
+        Used in unit tests to ensure input validation stops execution before any
+        network request is made.
 
         Parameters:
             _path (str): The request path that would have been posted to.
             _payload (dict[str, Any]): The form payload that would have been sent.
 
         Raises:
-            AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
+            AssertionError: Always raised with message "invalid tariff input must stop
+            before HTTP post".
         """
-        raise AssertionError("invalid tariff input must stop before HTTP post")  # noqa: TRY003
+        msg = "invalid tariff input must stop before HTTP post"
+        raise AssertionError(msg)
 
     api._post_form = _post_form  # noqa: SLF001
 

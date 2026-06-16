@@ -61,7 +61,7 @@ jobs:
         if: always()
         with:
           msg: apply code formatting
-
+          
       - name: Run pre-commit with fixes
         run: |
           ruff check . --fix || true
@@ -74,5 +74,3 @@ jobs:
           ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
-
-      - uses: stefanzweifel/git-auto-commit-action@v7

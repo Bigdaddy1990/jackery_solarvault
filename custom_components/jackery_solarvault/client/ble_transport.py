@@ -31,9 +31,12 @@ plumbed into :meth:`async_write_frames`.
 Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 — that is why diagnostics retain the last raw frame behind redaction.
+
+bleak / HA-bluetooth imports are deferred to the methods that need them so
+the module can be imported on systems without BlueZ during tests.
 """
 
-import asyncio
+import asyncio  # noqa: I001
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
@@ -43,7 +46,16 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..util import first_nonblank_int
+from bleak.exc import BleakError
+
+from custom_components.jackery_solarvault.const import (
+    DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
+    _KEEPALIVE_INTERVAL_SEC,
+    _RECONNECT_BACKOFF_SEC,
+    _STOP_TIMEOUT_SEC,
+)
+
+from custom_components.jackery_solarvault.util import first_nonblank_int
 from . import ble
 
 if TYPE_CHECKING:
@@ -54,31 +66,6 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
-
-# bleak / HA-bluetooth imports are deferred to the methods that need them so
-# the module can be imported on systems without BlueZ during tests.
-
-#: Default timeout for the GATT connect + notify-subscribe handshake.
-DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
-
-#: Minimum time between (re)connect attempts when the device drops the link.
-_RECONNECT_BACKOFF_SEC: float = 30.0
-
-#: Hard timeout for ``async_stop()`` to wait for in-flight connection
-#: runners to honour cancellation. HA's shutdown sequence reports tasks
-#: that exceed its own per-integration timeout (typically 30 s for
-#: ``async_unload_entry``) — keep this well below that so the listener
-#: never becomes the reason a shutdown logs "tasks still pending".
-_STOP_TIMEOUT_SEC: float = 5.0
-
-#: How often to write a no-op query frame to keep the GATT session
-#: warm. The SolarVault peripheral closes idle GATT sessions after
-#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
-#: every 6-20 s without traffic). 15 s sits comfortably below that and
-#: doubles as a property-refresh — the device answers each ``cmd=106``
-#: with a ``DevicePropertyChange`` notify that the sink merges into
-#: ``coordinator.data`` via the existing cmd=107 path.
-_KEEPALIVE_INTERVAL_SEC: float = 15.0
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +118,8 @@ def _coerce_ble_int(value: Any, field_name: str) -> int:  # noqa: ANN401
     """Coerce BLE numeric options with shared non-blank integer parsing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
-        raise ValueError(f"{field_name} must be an integer")  # noqa: TRY003
+        msg = f"{field_name} must be an integer"
+        raise ValueError(msg)
     return parsed
 
 
@@ -236,14 +224,20 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     def _record_negotiated_mtu(self, device_id: str, client: Any) -> None:  # noqa: ANN401
-        """Cache the negotiated GATT MTU for a device if the connected client exposes it.
+        """Cache the negotiated GATT MTU for a device if the connected client exposes.
 
-        Checks the connected BLE client's attributes for a usable MTU and stores it in the listener's MTU cache so subsequent writes can size frames appropriately. If no usable MTU is found, the cache is left unchanged and callers will use the module default.
+        it.
+
+        Checks the connected BLE client's attributes for a usable MTU and stores it in
+        the listener's MTU cache so subsequent writes can size frames appropriately. If
+        no usable MTU is found, the cache is left unchanged and callers will use the
+        module default.
 
         Parameters:
             device_id (str): Identifier of the BLE device.
-            client (Any): Connected BLE client object; may expose negotiated MTU as an attribute.
-        """  # noqa: E501
+            client (Any): Connected BLE client object; may expose negotiated MTU as an
+            attribute.
+        """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
             if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
@@ -267,22 +261,31 @@ class JackeryBleListener:
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
     async def _async_keep_alive_loop(self, device_id: str) -> None:
-        """Keep the device's GATT session active by periodically sending a minimal query frame.
+        """Keep the device's GATT session active by periodically sending a minimal.
 
-        At each _KEEPALIVE_INTERVAL_SEC interval this task issues a MQTT_CMD_QUERY_DEVICE_PROPERTY
-        query with an empty JSON body (b"{}") to prevent the peripheral from closing an idle GATT
-        session. The write uses wait_for_ack=False so the response is delivered via the normal
+        query frame.
+
+        At each _KEEPALIVE_INTERVAL_SEC interval this task issues a
+        MQTT_CMD_QUERY_DEVICE_PROPERTY
+        query with an empty JSON body (b"{}") to prevent the peripheral from closing an
+        idle GATT
+        session. The write uses wait_for_ack=False so the response is delivered via the
+        normal
         notify path and handled by the sink.
 
-        Cancellation: the parent connection runner cancels this task; asyncio.CancelledError
-        is allowed to propagate for a clean shutdown. Write errors are caught and logged at
+        Cancellation: the parent connection runner cancels this task;
+        asyncio.CancelledError
+        is allowed to propagate for a clean shutdown. Write errors are caught and
+        logged at
         DEBUG level and do not terminate the keep-alive loop.
-        """  # noqa: E501
+        """
         # Avoid an import cycle by deferring the ``MQTT_CMD_QUERY_DEVICE_PROPERTY``
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY
+        from custom_components.jackery_solarvault.const import (
+            MQTT_CMD_QUERY_DEVICE_PROPERTY,
+        )
 
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
@@ -293,7 +296,10 @@ class JackeryBleListener:
                     )
                     return  # stop_event fired  # noqa: TRY300
                 except TimeoutError:
-                    pass
+                    _LOGGER.debug(
+                        "Jackery BLE %s: keep-alive interval elapsed",
+                        device_id,
+                    )
                 if device_id not in self._clients:
                     return  # connection went away while we slept
                 try:
@@ -330,28 +336,42 @@ class JackeryBleListener:
         ack_cmds: tuple[int, ...] | None = None,
         mtu_override: int | None = None,
     ) -> bool:
-        """Send a command to the device over BLE by building, encrypting, chunking for the negotiated MTU, and writing one or more GATT frames.
+        """Send a command to the device over BLE by building, encrypting, chunking for.
 
-        When requested, the call can wait for a decoded notify-frame echo (ACK) from the device before returning.
+        the negotiated MTU, and writing one or more GATT frames.
+
+        When requested, the call can wait for a decoded notify-frame echo (ACK) from
+        the device before returning.
 
         Parameters:
             device_id (str): Target device identifier.
             cmd (int): Command identifier to send in the frame.
-            body (bytes): Payload bytes to include in the command; will be split into MTU-sized chunks as needed.
+            body (bytes): Payload bytes to include in the command; will be split into
+            MTU-sized chunks as needed.
             flags (int): Frame flags field included in each binary frame.
             timeout_sec (float): Per-write GATT operation timeout in seconds.
-            wait_for_ack (bool): If true, wait for a matching decoded notify-frame within `ack_timeout_sec` before returning.
-            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when `wait_for_ack` is true.
-            ack_cmds (tuple[int, ...] | None): If provided, only decoded frames whose `cmd` is in this tuple satisfy the ACK; if omitted, any decoded frame from the device qualifies.
-            mtu_override (int | None): If provided, use this MTU for chunking instead of the negotiated per-device MTU (used mainly for tests/diagnostics).
+            wait_for_ack (bool): If true, wait for a matching decoded notify-frame
+            within `ack_timeout_sec` before returning.
+            ack_timeout_sec (float): Timeout in seconds to wait for the ACK when
+            `wait_for_ack` is true.
+            ack_cmds (tuple[int, ...] | None): If provided, only decoded frames whose
+            `cmd` is in this tuple satisfy the ACK; if omitted, any decoded frame from
+            the device qualifies.
+            mtu_override (int | None): If provided, use this MTU for chunking instead
+            of the negotiated per-device MTU (used mainly for tests/diagnostics).
 
         Returns:
-            bool: `True` if the GATT write completed (and, when `wait_for_ack` is true, a matching ACK was received); `False` if there is no active BLE client for `device_id`.
+            bool: `True` if the GATT write completed (and, when `wait_for_ack` is true,
+            a matching ACK was received); `False` if there is no active BLE client for
+            `device_id`.
 
         Raises:
-            ValueError: For malformed inputs passed to lower-level helpers (e.g., invalid body/chunking arguments).
-            RuntimeError: For GATT-layer failures (write timeouts or other write errors) or when an ACK was requested but not received within `ack_timeout_sec`.
-        """  # noqa: E501
+            ValueError: For malformed inputs passed to lower-level helpers (e.g.,
+            invalid body/chunking arguments).
+            RuntimeError: For GATT-layer failures (write timeouts or other write
+            errors) or when an ACK was requested but not received within
+            `ack_timeout_sec`.
+        """
         client = self._clients.get(device_id)
         if client is None:
             _LOGGER.debug(
@@ -362,7 +382,8 @@ class JackeryBleListener:
             return False
         key = self._key_resolver(device_id)
         if key is None:
-            raise RuntimeError(f"no bluetoothKey available for device {device_id}")  # noqa: TRY003
+            msg = f"no bluetoothKey available for device {device_id}"
+            raise RuntimeError(msg)
         # Resolve the effective MTU: explicit override wins (used by
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
@@ -373,8 +394,9 @@ class JackeryBleListener:
         try:
             chunks = ble.split_body_for_mtu(body, mtu)
         except ValueError as err:
-            raise RuntimeError(  # noqa: TRY003
-                f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}",
+            msg = f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
+            raise RuntimeError(
+                msg,
             ) from err
         chunk_count = len(chunks)
         _LOGGER.debug(
@@ -414,13 +436,15 @@ class JackeryBleListener:
         except TimeoutError as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(  # noqa: TRY003
-                f"BLE write to {device_id} timed out after {timeout_sec}s",
+            msg = f"BLE write to {device_id} timed out after {timeout_sec}s"
+            raise RuntimeError(
+                msg,
             ) from err
-        except Exception as err:  # bleak surfaces BleakError + variants
+        except (BleakError, OSError, RuntimeError) as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
+            msg = f"BLE write to {device_id} failed: {err}"
+            raise RuntimeError(msg) from err
         if pending is not None:
             stats = self.stats_for(device_id)
             try:
@@ -436,9 +460,12 @@ class JackeryBleListener:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
                 stats.last_error = f"ack timeout cmd={cmd}"
-                raise RuntimeError(  # noqa: TRY003
+                msg = (
                     f"BLE ack timeout for cmd={cmd} on {device_id} after "
-                    f"{ack_timeout_sec}s",
+                    f"{ack_timeout_sec}s"
+                )
+                raise RuntimeError(
+                    msg,
                 ) from err
             stats.acks_received += 1
             stats.last_ack_at = datetime.now()
@@ -458,7 +485,7 @@ class JackeryBleListener:
         pending = _PendingAck(
             expected_cmds=(
                 frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)
-                if ack_cmds is not None and ack_cmds
+                if ack_cmds is not None
                 else None
             ),
             future=loop.create_future(),
@@ -555,15 +582,21 @@ class JackeryBleListener:
         )
 
     async def async_stop(self) -> None:
-        """Shut down the BLE listener, cancel active connection tasks, and clear pending state.
+        """Shut down the BLE listener, cancel active connection tasks, and clear.
 
-        This signals the listener to stop, unregisters any Bluetooth callbacks, cancels running per-device connection tasks and waits up to the module stop timeout for them to exit, clears the connection registry, and cancels any in-flight pending ACK futures so writers do not hang. Tasks that fail to exit within the timeout are left for the event loop to clean up. Safe to call from coordinator unload.
-        """  # noqa: E501
+        pending state.
+
+        This signals the listener to stop, unregisters any Bluetooth callbacks, cancels
+        running per-device connection tasks and waits up to the module stop timeout for
+        them to exit, clears the connection registry, and cancels any in-flight pending
+        ACK futures so writers do not hang. Tasks that fail to exit within the timeout
+        are left for the event loop to clean up. Safe to call from coordinator unload.
+        """
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -689,12 +722,20 @@ class JackeryBleListener:
         return device_id
 
     async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0915
-        """Maintain and manage a long-running BLE GATT connection for the specified device.
+        """Maintain and manage a long-running BLE GATT connection for the specified.
 
-        Subscribes to the device's notify characteristic and forwards incoming notifications to the listener, starts a keep‑alive heartbeat to keep the session active, caches the negotiated MTU and exposes the active client for outgoing writes, and updates per-device connection and frame statistics. The routine automatically attempts reconnects with backoff when the link is lost, cleans up client state and background tasks on disconnect or shutdown, and propagates cancellation so caller shutdown logic can observe task cancellation.
-        """  # noqa: E501, RUF002
-        from bleak.exc import BleakError
+        device.
+
+        Subscribes to the device's notify characteristic and forwards incoming
+        notifications to the listener, starts a keep‑alive heartbeat to keep the
+        session active, caches the negotiated MTU and exposes the active client for
+        outgoing writes, and updates per-device connection and frame statistics. The
+        routine automatically attempts reconnects with backoff when the link is lost,
+        cleans up client state and background tasks on disconnect or shutdown, and
+        propagates cancellation so caller shutdown logic can observe task cancellation.
+        """  # noqa: RUF002
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
+
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)
@@ -827,7 +868,7 @@ class JackeryBleListener:
                 device_id,
             )
             raise
-        except Exception as err:  # pragma: no cover — defensive
+        except (BleakError, OSError, RuntimeError, ValueError, TypeError) as err:
             stats.last_error = f"runner: {err}"
             _LOGGER.exception("Jackery BLE %s: connection runner crashed", device_id)
         finally:
@@ -848,10 +889,17 @@ class JackeryBleListener:
     # ------------------------------------------------------------------
 
     async def _handle_notification(self, device_id: str, raw: bytes) -> None:
-        """Process an incoming notify payload: attempt to decrypt and parse it, record a BleFrameObservation in per-device stats, resolve any pending ACKs, and forward the observation to the configured sink.
+        """Process an incoming notify payload: attempt to decrypt and parse it, record.
 
-        If a key is not available the observation is recorded with a decode error. When decryption fails the method will once attempt a base64-decoded fallback before giving up. On successful parse the method increments decoded-frame counters and resolves any registered pending ACKs for the device prior to invoking the sink. Sink exceptions are caught and logged so they do not propagate.
-        """  # noqa: E501
+        a BleFrameObservation in per-device stats, resolve any pending ACKs, and
+        forward the observation to the configured sink.
+
+        If a key is not available the observation is recorded with a decode error. When
+        decryption fails the method will once attempt a base64-decoded fallback before
+        giving up. On successful parse the method increments decoded-frame counters and
+        resolves any registered pending ACKs for the device prior to invoking the sink.
+        Sink exceptions are caught and logged so they do not propagate.
+        """
         stats = self.stats_for(device_id)
         stats.frames_received += 1
         b64 = base64.b64encode(raw).decode("ascii")
@@ -900,7 +948,7 @@ class JackeryBleListener:
             stats.frames_decode_failed += 1
         try:
             await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
+        except (RuntimeError, ValueError, TypeError, KeyError) as err:
             _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
 
 

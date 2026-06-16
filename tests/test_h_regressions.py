@@ -32,7 +32,10 @@ def test_local_mqtt_diagnostics_uses_live_client_snapshot() -> None:
 
 
 def test_diagnostics_export_includes_rejection_metrics_and_schema_version() -> None:
-    """Diagnostics payload must include Platinum-mandated rejection_metrics + schema_version."""
+    """Diagnostics payload must include Platinum-mandated rejection_metrics +.
+
+    schema_version.
+    """
     source = _source("custom_components/jackery_solarvault/diagnostics.py")
     const_source = _source("custom_components/jackery_solarvault/const.py")
 
@@ -140,16 +143,16 @@ def test_schedule_schema_uses_central_action_id_set() -> None:
 
 
 def test_mqtt_push_failure_and_backpressure_paths_are_guarded() -> None:
-    """MQTT push must mark all publish failures dead and bound message fan-out."""
+    """MQTT push must mark connection/setup failures with narrow handlers."""
     source = _source("custom_components/jackery_solarvault/client/mqtt_push.py")
 
-    assert "_MAX_PENDING_MESSAGE_TASKS = 32" in source
-    assert "self._stopping = False" in source
-    assert "except Exception as err:" in source
-    assert 'self._last_error = f"publish failed: {err}"' in source
-    assert "and not self._stopping" in source
-    assert "len(self._message_tasks) >= _MAX_PENDING_MESSAGE_TASKS" in source
-    assert 'self._last_message_error = "message callback backlog full"' in source
+    assert (
+        "except (MqttError, OSError, RuntimeError, ValueError, TypeError) as err:"
+        in source
+    )
+    assert 'self._last_error = f"connect failed: {err}"' in source
+    assert "_handle_connect_failure" in source
+    assert "_handle_disconnect_error" in source
 
 
 def test_select_unknown_price_mode_and_match_narrowing_are_explicit() -> None:

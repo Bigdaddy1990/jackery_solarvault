@@ -1,116 +1,248 @@
-"""Enforce total and critical-module coverage gates from coverage.py XML."""
+#!/usr/bin/env python3
+"""Enforce coverage gates from a coverage.py XML report."""
+
+from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable
+import re
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from xml.etree.ElementTree import Element
+import sys
+import xml.etree.ElementTree as ET
 
-from defusedxml import ElementTree as ET
+SOURCE_ROOT = Path("custom_components/jackery_solarvault")
 
-CRITICAL_MODULES = (
-    "custom_components/jackery_solarvault/coordinator.py",
-    "custom_components/jackery_solarvault/config_flow.py",
-    "custom_components/jackery_solarvault/services.py",
-    "custom_components/jackery_solarvault/data_manager.py",
+# Migration policy: refactored/new packages must stay at 100% line + branch coverage.
+PERFECT_COVERAGE_GLOBS = (
+    "handlers/*.py",
+    "setters/*.py",
+    "stats/*.py",
+    "client/_endpoints/*.py",
+)
+
+# Legacy monolith areas are raised incrementally while migration continues.
+LEGACY_CRITICAL_MODULES = frozenset(
+    {
+        "custom_components/jackery_solarvault/__init__.py",
+        "custom_components/jackery_solarvault/coordinator.py",
+        "custom_components/jackery_solarvault/sensor.py",
+        "custom_components/jackery_solarvault/util.py",
+        "custom_components/jackery_solarvault/client/api.py",
+        "custom_components/jackery_solarvault/client/mqtt_push.py",
+        "custom_components/jackery_solarvault/client/ble_transport.py",
+    }
+)
+
+HUNDRED = Decimal("100")
+JUSTIFIED_NO_COVER = re.compile(
+    r"#\s*pragma:\s*no cover\s*(?:[-—:]|because\b|for\b).+",
+    re.IGNORECASE,
 )
 
 
-def _percent(raw_rate: str | None, *, context: str) -> Decimal:
-    """Convert a coverage.py line-rate string to a percentage."""
-    if raw_rate is None:
-        raise SystemExit(f"missing line-rate attribute for {context}")
+@dataclass(frozen=True, slots=True)
+class CoverageRates:
+    """Line and branch coverage percentages for one coverage XML node."""
 
+    line: Decimal
+    branch: Decimal | None
+
+
+def _decimal_percent(raw: str, *, label: str) -> Decimal:
     try:
-        return Decimal(raw_rate) * Decimal(100)
-    except InvalidOperation as exc:
-        raise SystemExit(f"invalid line-rate for {context}: {raw_rate!r}") from exc
+        value = Decimal(raw)
+    except InvalidOperation as err:
+        raise ValueError(f"invalid {label}: {raw!r}") from err
+    if value < 0 or value > 100:
+        raise ValueError(f"{label} must be between 0 and 100: {raw!r}")
+    return value
 
 
-def _normalized_path(raw_path: str) -> str:
-    """Normalize coverage paths so XML from different runners matches gates."""
-    return raw_path.replace("\\", "/").lstrip("./")
+def _rate_to_percent(
+    raw: str | None,
+    *,
+    label: str,
+    required: bool = True,
+) -> Decimal | None:
+    if raw is None:
+        if required:
+            raise ValueError(f"coverage XML missing {label} rate")
+        return None
+    try:
+        rate = Decimal(raw)
+    except InvalidOperation as err:
+        raise ValueError(f"invalid {label} rate: {raw!r}") from err
+    if rate < 0 or rate > 1:
+        raise ValueError(f"{label} rate must be between 0 and 1: {raw!r}")
+    return rate * HUNDRED
 
 
-def _class_line_rates(root: Element) -> dict[str, Decimal]:
-    """Return the highest line coverage percentage reported for each class file."""
-    rates: dict[str, Decimal] = {}
+def _normalized_filename(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    filename = raw.replace("\\", "/").lstrip("./")
+    if filename.startswith(str(SOURCE_ROOT) + "/"):
+        return filename
+    return str(SOURCE_ROOT / filename)
+
+
+def _repo_modules(patterns: tuple[str, ...]) -> frozenset[str]:
+    modules: set[str] = set()
+    for pattern in patterns:
+        modules.update(
+            path.as_posix()
+            for path in SOURCE_ROOT.glob(pattern)
+            if path.is_file() and path.suffix == ".py"
+        )
+    return frozenset(modules)
+
+
+def _coverage_rates(root: ET.Element) -> dict[str, CoverageRates]:
+    rates: dict[str, CoverageRates] = {}
     for class_node in root.findall(".//class"):
-        filename = class_node.attrib.get("filename")
-        if not filename:
+        filename = _normalized_filename(class_node.get("filename"))
+        if filename is None:
             continue
-
-        path = _normalized_path(filename)
-        rate = _percent(class_node.attrib.get("line-rate"), context=path)
-        rates[path] = max(rate, rates.get(path, Decimal("-1")))
-
+        line = _rate_to_percent(class_node.get("line-rate"), label=f"{filename} line")
+        branch = _rate_to_percent(
+            class_node.get("branch-rate"),
+            label=f"{filename} branch",
+            required=False,
+        )
+        assert line is not None
+        rates[filename] = CoverageRates(line=line, branch=branch)
     return rates
 
 
-def _matching_rate(class_rates: dict[str, Decimal], module: str) -> Decimal | None:
-    """Find coverage for a critical module regardless of relative path prefix."""
-    normalized_module = _normalized_path(module)
-    for path, rate in class_rates.items():
-        if path == normalized_module or path.endswith(f"/{normalized_module}"):
-            return rate
-    return None
+def _format_percent(value: Decimal | None) -> str:
+    if value is None:
+        return "missing"
+    return f"{value:.2f}%"
 
 
-def _failed_module_gates(
-    class_rates: dict[str, Decimal],
-    modules: Iterable[str],
-    minimum_percent: Decimal,
-) -> list[str]:
-    """Build failure messages for critical modules below the gate."""
+def _pragma_failures() -> list[str]:
     failures: list[str] = []
-    for module in modules:
-        rate = _matching_rate(class_rates, module)
-        if rate is None:
-            failures.append(f"{module}: missing from coverage.xml")
-            continue
-        if rate < minimum_percent:
-            failures.append(f"{module}: {rate:.2f}% < {minimum_percent:.2f}%")
+    for path in SOURCE_ROOT.rglob("*.py"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for line_number, line in enumerate(lines, 1):
+            if "pragma: no cover" not in line:
+                continue
+            if JUSTIFIED_NO_COVER.search(line) is None:
+                failures.append(
+                    f"{path.as_posix()}:{line_number} has unjustified "
+                    "# pragma: no cover"
+                )
     return failures
 
 
-def _parse_args() -> argparse.Namespace:
+def enforce_coverage_gates(
+    *,
+    coverage_xml: Path,
+    total_minimum: Decimal,
+    legacy_module_minimum: Decimal,
+    perfect_module_minimum: Decimal,
+) -> list[str]:
+    """Return gate failures for the given coverage XML report."""
+    if not coverage_xml.is_file():
+        return [f"coverage xml not found: {coverage_xml}"]
+
+    root = ET.parse(coverage_xml).getroot()
+    total_line = _rate_to_percent(root.get("line-rate"), label="total line")
+    total_branch = _rate_to_percent(
+        root.get("branch-rate"),
+        label="total branch",
+        required=False,
+    )
+    assert total_line is not None
+
+    failures: list[str] = _pragma_failures()
+    if total_line < total_minimum:
+        failures.append(
+            "total line coverage "
+            f"{_format_percent(total_line)} < {total_minimum:.2f}%"
+        )
+    if total_branch is None:
+        failures.append(
+            "coverage XML missing total branch-rate; run pytest with --cov-branch"
+        )
+
+    rates = _coverage_rates(root)
+    perfect_modules = _repo_modules(PERFECT_COVERAGE_GLOBS)
+
+    for module in sorted(perfect_modules):
+        coverage = rates.get(module)
+        if coverage is None:
+            failures.append(
+                f"perfect-coverage module missing from coverage XML: {module}"
+            )
+            continue
+        if coverage.line < perfect_module_minimum:
+            failures.append(
+                f"{module} line coverage {_format_percent(coverage.line)} "
+                f"< {perfect_module_minimum:.2f}%"
+            )
+        if coverage.branch is None:
+            failures.append(
+                f"{module} missing branch-rate; run pytest with --cov-branch"
+            )
+        elif coverage.branch < perfect_module_minimum:
+            failures.append(
+                f"{module} branch coverage {_format_percent(coverage.branch)} "
+                f"< {perfect_module_minimum:.2f}%"
+            )
+
+    for module in sorted(LEGACY_CRITICAL_MODULES):
+        coverage = rates.get(module)
+        if coverage is None:
+            failures.append(
+                f"legacy critical module missing from coverage XML: {module}"
+            )
+        elif coverage.line < legacy_module_minimum:
+            failures.append(
+                f"{module} line coverage {_format_percent(coverage.line)} "
+                f"< {legacy_module_minimum:.2f}%"
+            )
+
+    return failures
+
+
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--coverage-xml", type=Path, default=Path("coverage.xml"))
-    parser.add_argument("--total-minimum-percent", type=Decimal, default=Decimal("85"))
-    parser.add_argument(
-        "--critical-module-minimum-percent", type=Decimal, default=Decimal("90")
-    )
-    return parser.parse_args()
+    parser.add_argument("--total-minimum", default="85")
+    parser.add_argument("--legacy-module-minimum", default="90")
+    parser.add_argument("--perfect-module-minimum", default="100")
+    return parser
 
 
-def main() -> int:
-    """Run coverage gate checks."""
-    args = _parse_args()
-    if not args.coverage_xml.is_file():
-        raise SystemExit(f"coverage XML not found: {args.coverage_xml}")
-
-    root = ET.parse(args.coverage_xml).getroot()
-    total_percent = _percent(root.attrib.get("line-rate"), context="total coverage")
-    failures: list[str] = []
-    if total_percent < args.total_minimum_percent:
-        failures.append(
-            f"total coverage: {total_percent:.2f}% < {args.total_minimum_percent:.2f}%"
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        failures = enforce_coverage_gates(
+            coverage_xml=args.coverage_xml,
+            total_minimum=_decimal_percent(
+                args.total_minimum,
+                label="total minimum percent",
+            ),
+            legacy_module_minimum=_decimal_percent(
+                args.legacy_module_minimum,
+                label="legacy module minimum percent",
+            ),
+            perfect_module_minimum=_decimal_percent(
+                args.perfect_module_minimum,
+                label="perfect module minimum percent",
+            ),
         )
+    except (OSError, ET.ParseError, ValueError) as err:
+        print(str(err), file=sys.stderr)
+        return 1
 
-    failures.extend(
-        _failed_module_gates(
-            _class_line_rates(root),
-            CRITICAL_MODULES,
-            args.critical_module_minimum_percent,
-        )
-    )
     if failures:
-        raise SystemExit("coverage gate failed:\n" + "\n".join(failures))
+        print("\n".join(failures), file=sys.stderr)
+        return 1
 
-    print(
-        "coverage gate passed: "
-        f"total {total_percent:.2f}% >= {args.total_minimum_percent:.2f}%"
-    )
+    print("coverage gates passed")
     return 0
 
 

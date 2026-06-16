@@ -8,6 +8,11 @@ import inspect
 import logging
 from typing import Any, NamedTuple, cast
 
+from homeassistant.core import HomeAssistant, async_get_hass_or_none
+from homeassistant.loader import async_suggest_report_issue
+
+from .frame import MissingIntegrationFrame, get_integration_frame
+
 
 def deprecated_substitute[_ObjectT: object](  # noqa: UP049
     substitute_name: str,
@@ -90,7 +95,9 @@ def get_deprecated(
 
 
 def deprecated_class[_T](  # noqa: UP049
-    replacement: str, *, breaks_in_ha_version: str | None = None
+    replacement: str,
+    *,
+    breaks_in_ha_version: str | None = None,
 ) -> Callable[[type[_T]], type[_T]]:
     """Mark class as deprecated and provide a replacement class to be used instead.
 
@@ -104,7 +111,11 @@ def deprecated_class[_T](  # noqa: UP049
 
         def __call__(self: type[Any], *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401, N807
             _print_deprecation_warning(
-                cls, replacement, "class", "instantiated", breaks_in_ha_version
+                cls,
+                replacement,
+                "class",
+                "instantiated",
+                breaks_in_ha_version,
             )
             return base_meta.__call__(self, *args, **kwargs)
 
@@ -132,7 +143,9 @@ def deprecated_class[_T](  # noqa: UP049
 
 
 def deprecated_function[**_P, _R](  # noqa: UP049
-    replacement: str, *, breaks_in_ha_version: str | None = None
+    replacement: str,
+    *,
+    breaks_in_ha_version: str | None = None,
 ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Mark function as deprecated and provide a replacement to be used instead.
 
@@ -147,7 +160,11 @@ def deprecated_function[**_P, _R](  # noqa: UP049
         def deprecated_func(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             """Wrap for the original function."""
             _print_deprecation_warning(
-                func, replacement, "function", "called", breaks_in_ha_version
+                func,
+                replacement,
+                "function",
+                "called",
+                breaks_in_ha_version,
             )
             return func(*args, **kwargs)
 
@@ -164,7 +181,6 @@ def deprecated_hass_argument[**_P, _T](  # noqa: UP049
     def _decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
         @functools.wraps(func)
         def _inner(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-            from homeassistant.core import HomeAssistant
 
             in_arg = len(args) > 0 and isinstance(args[0], HomeAssistant)
             in_kwarg = "hass" in kwargs and isinstance(kwargs["hass"], HomeAssistant)
@@ -243,10 +259,6 @@ def _print_deprecation_warning_internal_impl(  # noqa: PLR0913, PLR0917
     *,
     log_when_no_integration_is_found: bool,
 ) -> None:
-    from homeassistant.core import async_get_hass_or_none
-    from homeassistant.loader import async_suggest_report_issue
-
-    from .frame import MissingIntegrationFrame, get_integration_frame
 
     logger = logging.getLogger(module_name)
     if breaks_in_ha_version:
@@ -350,7 +362,8 @@ def check_if_deprecated_constant(name: str, module_globals: dict[str, Any]) -> A
     value = replacement = None
     description = "constant"
     if (deprecated_const := module_globals.get(_PREFIX_DEPRECATED + name)) is None:
-        raise AttributeError(f"Module {module_name!r} has no attribute {name!r}")  # noqa: TRY003
+        msg = f"Module {module_name!r} has no attribute {name!r}"
+        raise AttributeError(msg)
     if isinstance(deprecated_const, DeprecatedConstant):
         value = deprecated_const.value
         replacement = deprecated_const.replacement

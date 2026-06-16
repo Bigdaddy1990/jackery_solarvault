@@ -2,7 +2,11 @@
 
 from typing import Any
 
-from ...const import (
+from custom_components.jackery_solarvault.client._http import (
+    BaseHTTPMixin,
+    JackeryApiError,
+)
+from custom_components.jackery_solarvault.const import (
     FIELD_ACTION,
     FIELD_DATA,
     FIELD_DEVICE_ID,
@@ -15,7 +19,21 @@ from ...const import (
     SHELLY_UNBIND_ACCOUNT_PATH,
     SHELLY_UNBIND_DEVICE_PATH,
 )
-from .._http import BaseHTTPMixin, JackeryApiError
+
+
+def _data_field_accepted(data: dict[str, Any]) -> bool:
+    """Return whether a Shelly write response's ``data`` field signals acceptance.
+
+    The backend signals acceptance in the top-level ``data`` field as boolean
+    ``True`` or a truthy token (``"true"``/``"1"``/``"ok"``, case-insensitive).
+    Anything else — including a missing field — is treated as not accepted.
+    """
+    val = data.get(FIELD_DATA)
+    if val is True:
+        return True
+    if isinstance(val, (str, int)):
+        return str(val).lower() in {"true", "1", "ok"}
+    return False
 
 
 class ShellyEndpointMixin(BaseHTTPMixin):
@@ -24,7 +42,9 @@ class ShellyEndpointMixin(BaseHTTPMixin):
     async def async_get_shelly_devices(self) -> list[dict[str, Any]]:
         """Retrieve a normalized list of Shelly devices linked to the account.
 
-        Accepts multiple backend response shapes for the `data` field: a list of device dicts; a dict containing `boundDevices` or `devices` lists; or a single device dict identified by `deviceId`. Non-dict entries are ignored.
+        Accepts multiple backend response shapes for the `data` field: a list of device
+        dicts; a dict containing `boundDevices` or `devices` lists; or a single device
+        dict identified by `deviceId`. Non-dict entries are ignored.
 
         Returns:
             A list of Shelly device objects; empty list if none are present.
@@ -54,7 +74,8 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             device_id (str | int): The Shelly device identifier.
 
         Returns:
-            dict: The response `data` object parsed as a dictionary (empty dict if the payload is missing or not a dict).
+            dict: The response `data` object parsed as a dictionary (empty dict if the
+            payload is missing or not a dict).
         """
         data = await self._get_json(
             SHELLY_REALTIME_POWER_PATH,
@@ -75,17 +96,21 @@ class ShellyEndpointMixin(BaseHTTPMixin):
         Parameters:
             device_id (str | int): Identifier of the Shelly device to control.
             action (str): Action name to perform as provided by the Shelly app.
-            function (str): Function name associated with the action as provided by the Shelly app.
-            control_allowed (bool): If `False`, the call will raise a `JackeryApiError` and no request will be sent.
+            function (str): Function name associated with the action as provided by the
+            Shelly app.
+            control_allowed (bool): If `False`, the call will raise a `JackeryApiError`
+            and no request will be sent.
 
         Returns:
-            bool: `true` if the backend indicates the control request was accepted, `false` otherwise.
+            bool: `true` if the backend indicates the control request was accepted,
+            `false` otherwise.
 
         Raises:
             JackeryApiError: If `control_allowed` is `False`.
         """
         if not control_allowed:
-            raise JackeryApiError("Shelly control is not allowed for this device")  # noqa: TRY003
+            msg = "Shelly control is not allowed for this device"
+            raise JackeryApiError(msg)
         data = await self._post_form(
             SHELLY_CONTROL_PATH,
             {
@@ -94,18 +119,16 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_FUNCTION: str(function),
             },
         )
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_get_shelly_auth_url(self) -> dict[str, Any]:
-        """Retrieve the Shelly OAuth authorization URL and accompanying state for the redirect flow.
+        """Retrieve the Shelly OAuth authorization URL and accompanying state for the.
+
+        redirect flow.
 
         Returns:
-            dict: Contains `authUrl` (str) and `state` (str) for the Shelly OAuth redirect flow.
+            dict: Contains `authUrl` (str) and `state` (str) for the Shelly OAuth
+            redirect flow.
         """
         data = await self._post_form(SHELLY_AUTH_URL_PATH, {})
         return self._payload_dict(data, SHELLY_AUTH_URL_PATH)
@@ -131,12 +154,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
                 FIELD_DEVICE_ID: str(device_id),
             },
         )
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_unbind_shelly_account(self) -> bool:
         """Unbinds the Shelly account associated with the current user.
@@ -145,12 +163,7 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             True if the account unbind succeeded, False otherwise.
         """
         data = await self._post_form(SHELLY_UNBIND_ACCOUNT_PATH, {})
-        val = data.get(FIELD_DATA)
-        if val is True:
-            return True
-        if isinstance(val, (str, int)):
-            return str(val).lower() in {"true", "1", "ok"}
-        return False
+        return _data_field_accepted(data)
 
     async def async_get_shelly_binding_failures(
         self,
@@ -162,7 +175,8 @@ class ShellyEndpointMixin(BaseHTTPMixin):
             state (str): Optional state filter to narrow the binding failures query.
 
         Returns:
-            dict: Response payload containing `bindCount` (int), `failedDeviceSns` (list[str]), and `successDeviceSns` (list[str]).
+            dict: Response payload containing `bindCount` (int), `failedDeviceSns`
+            (list[str]), and `successDeviceSns` (list[str]).
         """
         params: dict[str, str] = {}
         if state:

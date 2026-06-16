@@ -14,6 +14,7 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
+
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
@@ -39,7 +40,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """Get the Store configured for persisting the MQTT session cache.
 
     Returns:
-        A Store[dict[str, Any]] configured with the module's storage key and storage version.
+        A Store[dict[str, Any]] configured with the module's storage key and storage
+        version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
@@ -47,11 +49,15 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_mqtt_session(  # noqa: PLR0911
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
-    """Load cached MQTT session credentials for the given config entry.
+    """
+    Load cached MQTT session credentials for the given config entry.
 
     Returns:
-        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes `MQTT_SESSION_MAC_ID_SOURCE` when present and non-empty.
-        None: If storage is missing or malformed, or if any required field is missing or empty.
+        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`,
+        `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes
+        `MQTT_SESSION_MAC_ID_SOURCE` when present and non-empty.
+        None: If storage is missing or malformed, or if any required field is missing
+        or empty.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -92,12 +98,14 @@ async def async_save_mqtt_session(  # noqa: PLR0913
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """Persist MQTT session fields for a config entry, overwriting any existing cached row.
+    """
+    Persist MQTT session fields for a config entry, overwriting any existing cached row.
 
     Parameters:
         hass: Home Assistant instance (storage access).
         entry_id: Config entry identifier to associate with the cached session.
-        user_id: `userId` returned by the cloud used as the MQTT client identifier/username.
+        user_id: `userId` returned by the cloud used as the MQTT client
+        identifier/username.
         seed_b64: Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
         mac_id: `macId` broker session identifier.
         mac_id_source: Optional human-readable source or provenance of `mac_id`.

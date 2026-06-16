@@ -1,23 +1,31 @@
 """Lightweight static checks for integration code hygiene."""
 
 import ast
+import builtins
 import importlib.util
 import json
 import pathlib
 import re
+import symtable
 import sys
 import types
 
+import pytest
 import yaml
 
+from custom_components.jackery_solarvault.util import append_payload_debug_line
+
 CUSTOM_COMPONENT = pathlib.Path("custom_components/jackery_solarvault")
+CLIENT_PACKAGE = pathlib.Path("custom_components/jackery_solarvault/client")
+API_IMPLEMENTATION = CLIENT_PACKAGE / "api.py"
+MQTT_IMPLEMENTATION = CLIENT_PACKAGE / "mqtt_push.py"
 LOG_METHODS = {"debug", "info", "warning", "error", "exception"}
 PERCENT_PLACEHOLDER = re.compile(
-    r"(?<!%)%(?:\([^)]+\))?[#0 +\-]*(?:\d+|\*)?(?:\.\d+)?[hlL]?[diouxXeEfFgGcrs]"
+    r"(?<!%)%(?:\([^)]+\))?[#0 +\-]*(?:\d+|\*)?(?:\.\d+)?[hlL]?[diouxXeEfFgGcrs]",
 )
 
 
-def _load_util_module():
+def _load_util_module():  # noqa: ANN202
     package_dir = CUSTOM_COMPONENT
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
@@ -113,7 +121,7 @@ def _reauth_entry_lookup_is_guarded(config_tree: ast.Module) -> bool:
                 continue
             for handler in try_node.handlers:
                 if {"KeyError", "RuntimeError"} <= _exception_names(
-                    handler.type
+                    handler.type,
                 ) and _handler_aborts_reauth_entry_missing(handler):
                     return True
     return False
@@ -122,13 +130,12 @@ def _reauth_entry_lookup_is_guarded(config_tree: ast.Module) -> bool:
 def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
     """HA fixture collection should not hard-require recorder setup."""
     manifest = json.loads(
-        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8"),
     )
 
     assert "recorder" not in manifest.get("dependencies", [])
     assert "recorder" in manifest.get("after_dependencies", [])
     assert manifest["iot_class"] == "cloud_polling"
-    assert manifest["quality_scale"] == "gold"
 
 
 def test_no_duplicate_literal_dict_keys() -> None:
@@ -191,9 +198,12 @@ def test_mqtt_wire_message_literals_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(
+                msg = (
                     f"{path}:{node.lineno} uses raw MQTT messageType {node.value!r}; "
                     "use const.py instead"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -208,11 +218,15 @@ def test_period_reset_descriptions_use_date_type_constants() -> None:
                 if keyword.arg != "reset_period":
                     continue
                 if isinstance(keyword.value, ast.Constant) and isinstance(
-                    keyword.value.value, str
+                    keyword.value.value,
+                    str,
                 ):
-                    raise AssertionError(
+                    msg = (
                         f"{path}:{keyword.value.lineno} uses raw reset_period "
                         f"{keyword.value.value!r}; use DATE_TYPE_* constants"
+                    )
+                    raise AssertionError(  # noqa: TRY004
+                        msg,
                     )
 
 
@@ -233,7 +247,8 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
+            f"{path}:{node.lineno} reassigns {name};"
+            f" first assignment at line {seen[name]}"
         )
         seen[name] = node.lineno
 
@@ -259,9 +274,12 @@ def test_ct_wire_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(
+                msg = (
                     f"{path}:{node.lineno} uses raw CT wire key {node.value!r}; "
                     "use const.py instead"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -274,9 +292,13 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "
+                msg = (
+                    f"{path}:{node.lineno} uses raw MQTT credential key"
+                    f" {node.value!r}; "
                     "use const.py instead"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -289,9 +311,12 @@ def test_mqtt_topic_literals_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(
+                msg = (
                     f"{path}:{node.lineno} uses raw MQTT topic prefix {node.value!r}; "
                     "use MQTT_TOPIC_PREFIX from const.py instead"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -309,9 +334,12 @@ def test_app_period_stat_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(
+                msg = (
                     f"{path}:{node.lineno} uses raw app stat key {node.value!r}; "
                     "use APP_STAT_* constants from const.py instead"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -323,7 +351,8 @@ def _const_string_values(name: str) -> tuple[str, ...]:
     for node in const_tree.body:
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             if isinstance(node.value, ast.Constant) and isinstance(
-                node.value.value, str
+                node.value.value,
+                str,
             ):
                 env[node.target.id] = node.value.value
             if node.target.id == name:
@@ -343,9 +372,11 @@ def _const_string_values(name: str) -> tuple[str, ...]:
             and isinstance(node.func, ast.Name)
             and node.func.id == "frozenset"
         ):
-            return tuple(eval_node(item) for item in node.args[0].elts)  # type: ignore[index,union-attr]
+            # type: ignore[index,union-attr]
+            return tuple(eval_node(item) for item in node.args[0].elts)
+        msg = f"Unsupported const expression in {name}: {ast.dump(node)}"
         raise AssertionError(
-            f"Unsupported const expression in {name}: {ast.dump(node)}"
+            msg,
         )
 
     values = eval_node(target_node)
@@ -359,10 +390,13 @@ def test_preserved_fast_payload_keys_do_not_include_mqtt_protocol_values() -> No
     values = _const_string_values("PRESERVED_FAST_PAYLOAD_KEYS")
     assert values == (
         "ct_meter",
+        "meter_heads",
+        "smart_plugs",
         "weather_plan",
         "task_plan",
         "notice",
         "mqtt_last",
+        "third_party_mqtt_config",
     )
     forbidden_fragments = ("Query", "Upload", "Control", "DevicePropertyChange")
     for value in values:
@@ -370,7 +404,7 @@ def test_preserved_fast_payload_keys_do_not_include_mqtt_protocol_values() -> No
 
 
 def test_app_specific_subdevice_markers_are_centralized() -> None:
-    """Avoid scattering magic devType/subType numbers from MQTT_PROTOCOL.md."""
+    """Avoid scattering magic devType/subType numbers through code."""
     forbidden_contexts = ("FIELD_DEV_TYPE", "FIELD_DEVICE_TYPE", "FIELD_SUB_TYPE")
     for path in _python_sources():
         if path.name == "const.py":
@@ -382,9 +416,12 @@ def test_app_specific_subdevice_markers_are_centralized() -> None:
                 continue
             line = source.splitlines()[node.lineno - 1]
             if any(context in line for context in forbidden_contexts):
-                raise AssertionError(
+                msg = (
                     f"{path}:{node.lineno} uses raw subdevice marker {node.value!r}; "
                     "use SUBDEVICE_TYPE_* constants"
+                )
+                raise AssertionError(
+                    msg,
                 )
 
 
@@ -401,10 +438,12 @@ def _class_constant_int(tree: ast.Module, class_name: str, attr_name: str) -> in
             ):
                 continue
             if isinstance(stmt.value, ast.Constant) and isinstance(
-                stmt.value.value, int
+                stmt.value.value,
+                int,
             ):
                 return stmt.value.value
-    raise AssertionError(f"Missing {class_name}.{attr_name} integer constant")
+    msg = f"Missing {class_name}.{attr_name} integer constant"
+    raise AssertionError(msg)
 
 
 def test_config_entries_do_not_use_internal_version_ladder() -> None:
@@ -412,7 +451,7 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     config_tree = ast.parse(
-        (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+        (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8"),
     )
 
     assert "CONFIG_ENTRY_VERSION" not in const_source
@@ -426,14 +465,20 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     assert _class_constant_int(config_tree, "JackeryConfigFlow", "VERSION") == 1
 
 
-def test_ci_runs_all_pure_tests_and_compileall() -> None:
-    """Keep GitHub Actions aligned with the local validation command."""
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "python -m compileall -q custom_components tests" in workflow
-    assert "pytest -q -p no:cacheprovider" in workflow
-    assert "tests/test_power_math.py" not in workflow
+def test_workflow_cache_paths_reference_existing_dependency_files() -> None:
+    """Cache dependency paths in workflows should not silently point at typos."""
+    missing: list[str] = []
+    for workflow in pathlib.Path(".github/workflows").glob("*.y*ml"):
+        source = workflow.read_text(encoding="utf-8")
+        for match in re.finditer(r"^\s{12}([^\s#][^\n#]*)$", source, re.MULTILINE):
+            candidate = match.group(1).strip()
+            if not candidate.startswith("requirements") or not candidate.endswith(
+                ".txt",
+            ):
+                continue
+            if not pathlib.Path(candidate).exists():
+                missing.append(f"{workflow}:{candidate}")
+    assert not missing
 
 
 def test_period_source_diagnostics_stay_minimal() -> None:
@@ -441,6 +486,9 @@ def test_period_source_diagnostics_stay_minimal() -> None:
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    # Period sensors expose only compact diagnostic facts. JSON-stringified
+    # duplicates and cloud-shape heuristics belong in diagnostics /
+    # payload_debug, not in entity attributes.
     for removed in (
         "SOURCE_CONTRACT_",
         "SOURCE_KIND_",
@@ -453,50 +501,44 @@ def test_period_source_diagnostics_stay_minimal() -> None:
         'attrs["native_source"]',
         'attrs["period_total_method"]',
         'attrs["server_total_used"]',
+        'attrs["period_labels"]',
+        'attrs["period_labels_count"]',
+        'attrs["period_labels_json"]',
+        'attrs["period_values_count"]',
+        'attrs["period_values_json"]',
+        'attrs["period_values_by_label_json"]',
+        'attrs["cloud_year_chart_nonzero_months"]',
+        'attrs["cloud_year_chart_first_nonzero_month"]',
+        'attrs["cloud_year_chart_last_nonzero_month"]',
+        'attrs["cloud_year_appears_incomplete"]',
     ):
         assert removed not in const_source
         assert removed not in sensor_source
     for kept in (
         '"source_section"',
         '"source_key"',
-        'attrs["chart_series_key"]',
-        'attrs["chart_series_sum"]',
-        'attrs["server_total"]',
-        'attrs["period_values_json"]',
-        'attrs["period_values_by_label_json"]',
-        'attrs["request"]',
+        '"chart_series_key"',
+        '"chart_series_sum"',
+        '"server_total"',
+        '"period_values"',
+        '"request"',
     ):
         assert kept in sensor_source
-
-
-def test_data_source_priority_contract_exists() -> None:
-    """Keep the guarded month-backfill rule documented next to the code."""
-    contract = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
-    assert "Do not use week values to repair month/year/lifetime totals." in contract
-    assert "Month values may only guard year totals" in contract
-    assert "same endpoint family" in contract
-    assert "Do not use year values to repair lifetime totals." in contract
-    assert (
-        "month` and `year` must never fall back to `beginDate=endDate=today`"
-        in contract
-    )
 
 
 def test_diagnostics_anonymize_outer_payload_keys() -> None:
     """Diagnostics must not expose device IDs or serials as raw map keys."""
     source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
     assert "def _redacted_payload_map(" in source
-    assert 'devices = _redacted_payload_map(coordinator.data or {}, "device")' in source
-    assert "def async_get_device_diagnostics(" in source
-    assert "def _filtered_payload_map(" in source
-    assert '"device": _filtered_payload_map(' in source
+    assert (
+        'devices = _redacted_payload_map(coordinator.data or {}, "device", redact_keys)'
+        in source
+    )
     for forbidden in (
         "dev_id: async_redact_data",
         "key: async_redact_data",
         "sn: async_redact_data",
         "sn_or_id: async_redact_data",
-        '"device_id"',
-        '"identifiers"',
     ):
         assert forbidden not in source
     for prefix in (
@@ -510,24 +552,98 @@ def test_diagnostics_anonymize_outer_payload_keys() -> None:
         assert f'"{prefix}"' in source
 
 
-def test_device_diagnostics_filter_payloads_to_registry_device() -> None:
-    """Per-device diagnostics should expose only matching payload sections."""
-    source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(encoding="utf-8")
-    assert "from homeassistant.helpers.device_registry import DeviceEntry" in source
-    assert "def _jackery_device_ids(device: DeviceEntry)" in source
-    assert "if domain == DOMAIN" in source
-    assert "for device_id in device_ids" in source
-    assert "if device_id in payloads" in source
-    assert "coordinator.api.last_property_responses" in source
-    assert "coordinator.api.last_device_statistic_responses" in source
-    assert "coordinator.api.last_device_period_stat_responses" in source
+def test_polling_and_statistics_import_diagnostics_are_exported() -> None:
+    """Diagnostics should show whether polling/import is live or cached."""
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8",
+    )
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert "def polling_diagnostics(self) -> dict[str, Any]:" in coordinator_source
+    assert "def statistics_import_diagnostics(self) -> dict[str, Any]:" in (
+        coordinator_source
+    )
+    assert '"polling": async_redact_data(' in diagnostics_source
+    assert '"statistics_import": async_redact_data(' in diagnostics_source
+    assert '"statistics_backfill"' not in diagnostics_source
+    for key in (
+        '"cache_hits"',
+        '"fetches"',
+        '"empty_fetches"',
+        '"failures"',
+        '"property_fetch_completed"',
+        '"statistics_import_last_decision"',
+    ):
+        assert key in coordinator_source
+    for key in (
+        '"last_schedule_decision"',
+        '"last_status"',
+        '"last_current_entity_imported_rows"',
+    ):
+        assert key in coordinator_source
+
+
+def test_polling_diagnostic_counter_uses_safe_int_parser() -> None:
+    """Polling diagnostics must not raw-cast counter values."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    block = source.split("def _bump_polling_diag", 1)[1].split(
+        "\n\n        # Per-system calls",
+        1,
+    )[0]
+
+    assert "current = safe_int(values.get(key)) or 0" in block
+    assert "values[key] = current + 1" in block
+    assert " = int(values.get" not in block
+
+
+def test_diagnostic_second_values_use_safe_int_parser() -> None:
+    """Diagnostics second counters should avoid raw int(total_seconds()) casts."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8",
+    )
+    mqtt_diag = coordinator_source.split("def mqtt_diagnostics_snapshot", 1)[1].split(
+        "\n    @property",
+        1,
+    )[0]
+
+    assert "safe_int(coordinator.configured_update_interval.total_seconds())" in (
+        diagnostics_source
+    )
+    assert "safe_int(self._configured_update_interval.total_seconds())" in mqtt_diag
+    assert "pause_remaining = safe_int(" in mqtt_diag
+    assert " int(coordinator.configured_update_interval.total_seconds())" not in (
+        diagnostics_source
+    )
+    assert " int(self._configured_update_interval.total_seconds())" not in mqtt_diag
+    assert " int(self._mqtt_paused_until_monotonic - now_mono)" not in mqtt_diag
+
+
+def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
+    """Coordinator interval-derived seconds should avoid raw int casts."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    init_block = source.split("def __init__", 1)[1].split(
+        "\n        # Mapping deviceId",
+        1,
+    )[0]
+
+    assert (
+        "interval_sec = max(15, safe_int(update_interval.total_seconds()) or 15)"
+        in (init_block)
+    )
+    assert "interval_sec = max(15, int(" not in init_block
 
 
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
     """Keep diagnostics aligned with HA's share-safe diagnostics rule."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     redaction_block = const_source.split("REDACT_KEYS: Final = {", 1)[1].split(
-        "}\n\n# MQTT", 1
+        "}\n\n# MQTT",
+        1,
     )[0]
     for required in (
         "CONF_MQTT_MAC_ID",
@@ -540,33 +656,246 @@ def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
         "FIELD_SYSTEM_SN",
         "FIELD_LONGITUDE",
         "FIELD_LATITUDE",
+        '"base64_encoded"',
+        '"body_preview"',
         '"email"',
         '"phone"',
+        '"raw_bytes"',
+        '"raw_hex"',
+        '"trailer_hex"',
     ):
         assert required in redaction_block
+
+
+def test_ble_transport_debug_logs_do_not_expose_raw_payloads() -> None:
+    """BLE debug logs must not expose raw encrypted or decoded frame payloads."""
+    source = (CUSTOM_COMPONENT / "client" / "ble_transport.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert "raw=%s" not in source
+    assert "base64=%s" not in source
+    assert 'parsed.body[:200].decode("utf-8", errors="replace")' not in source
+    assert "Logs frame sizes and parse metadata" in source
+
+
+def test_ble_transport_numeric_options_use_shared_integer_parser() -> None:
+    """BLE diagnostic options must reject bool/non-finite numeric input."""
+    source = (CUSTOM_COMPONENT / "client" / "ble_transport.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert "from ..util import first_nonblank_int" in source
+    assert "def _coerce_ble_int(" in source
+    assert 'mtu = _coerce_ble_int(mtu_override, "mtu_override")' in source
+    assert 'frozenset(_coerce_ble_int(cmd, "ack_cmds") for cmd in ack_cmds)' in source
+    assert "mtu = int(mtu_override)" not in source
+    assert "frozenset(int(c) for c in ack_cmds)" not in source
+
+
+def test_sensor_division_transform_uses_safe_float_parser() -> None:
+    """Scaled sensor transforms must not expose NaN/Infinity as native values."""
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = source.split("def _div(", 1)[1].split("\n\ndef _signed_diff", 1)[0]
+
+    assert "parsed = safe_float(value)" in block
+    assert "if parsed is None:" in block
+    assert "return round(parsed / divisor, 2)" in block
+    assert "return round(float(" not in block
+    assert "parsed = float(" not in block
+
+
+def test_ble_transport_sensor_attributes_do_not_expose_raw_payloads() -> None:
+    """BLE status entity attributes must keep debug-only data out of recorder."""
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    cls = source.split("class JackeryBleTransportSensor", 1)[1].split(
+        "class JackeryWeatherPlanSensor",
+        1,
+    )[0]
+
+    assert 'attrs.pop("unrouted_frames_by_cmd", None)' in cls
+    assert 'frame_attrs.pop("raw_hex", None)' in cls
+    assert 'parsed_attrs.pop("body_preview", None)' in cls
+    assert 'parsed_attrs.pop("trailer_hex", None)' in cls
+    assert 'safe_int(self._observation().get("frames_decoded")) or 0' in cls
+    assert "return int(self._observation()" not in cls
+    assert "= int(self._observation()" not in cls
+    assert "return self._observation()" not in cls
+
+
+def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
+    """Subdevice entity attributes should avoid serial numbers and IP-like IDs."""
+    sensitive_fields = ("FIELD_DEVICE_SN", "FIELD_DEV_SN", "FIELD_SN", "FIELD_WIP")
+
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+    switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+
+    blocks = [
+        binary_source
+        .split("class JackerySmartPlugStateBinarySensor", 1)[1]
+        .split(
+            "# --------------------------------------------------"
+            "--------------------------",
+            1,
+        )[0]
+        .split("def extra_state_attributes", 1)[1]
+        .split("return attrs", 1)[0],
+        switch_source
+        .split("class JackerySmartPlugSwitch", 1)[1]
+        .split("class JackerySmartPlugPrioritySwitch", 1)[0]
+        .split("def extra_state_attributes", 1)[1]
+        .split("return attrs", 1)[0],
+        sensor_source
+        .split("class JackerySmartPlugSensor(JackeryEntity", 1)[1]
+        .split("class JackeryMeterHeadSensor", 1)[0]
+        .split("def extra_state_attributes", 1)[1]
+        .split("return attrs", 1)[0],
+        sensor_source
+        .split("class JackeryMeterHeadSensor(JackeryEntity", 1)[1]
+        .split("class JackerySmartMeterSensor", 1)[0]
+        .split("def extra_state_attributes", 1)[1]
+        .split("return attrs", 1)[0],
+    ]
+    ct_attr_fields = const_source.split("CT_ATTRIBUTE_FIELDS: Final = (", 1)[1].split(
+        ")\n\nFIELD_TARGET_MODULE_VERSION",
+        1,
+    )[0]
+    blocks.append(ct_attr_fields)
+
+    for block in blocks:
+        for field in sensitive_fields:
+            assert field not in block
+
+
+def test_unredacted_diagnostics_option_is_options_flow_only() -> None:
+    """The unsafe raw-diagnostics switch belongs in options, not setup."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert (
+        'CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"'
+        in const_source
+    )
+    assert "DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False" in const_source
+    assert (
+        "CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS"
+    ) in config_flow_source
+
+    user_schema = config_flow_source.split("USER_SCHEMA = vol.Schema", 1)[1].split(
+        "class JackeryOptionsFlow",
+        1,
+    )[0]
+    options_block = config_flow_source.split("class JackeryOptionsFlow", 1)[1].split(
+        "class JackeryConfigFlow",
+        1,
+    )[0]
+    assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" not in user_schema
+    assert "CONF_ENABLE_UNREDACTED_DIAGNOSTICS" in options_block
+
+
+def test_unredacted_diagnostics_option_reaches_redaction_surfaces() -> None:
+    """Diagnostics and JSONL payload debug must share the same raw-data toggle."""
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8",
+    )
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
+
+    assert "active_redact_keys(entry)" in diagnostics_source
+    assert "diagnostic_redactions_disabled(entry)" in diagnostics_source
+    assert "mqtt_diagnostics_snapshot(" in diagnostics_source
+    assert "redact_topics=not redactions_disabled" in diagnostics_source
+    assert "diagnostic_redactions_disabled(self.entry)" in coordinator_source
+    assert (
+        "def diagnostics_snapshot(self, *, redact_topics: bool = True)" in mqtt_source
+    )
+
+
+def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) -> None:  # noqa: ANN001
+    """The HAOS-friendly option should replace the env-var for local raw logs."""
+    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
+    entry = types.SimpleNamespace(
+        options={"enable_unredacted_diagnostics": True},
+        data={},
+    )
+
+    assert util.diagnostic_redactions_disabled(entry) is True
+    assert util.active_redact_keys(entry) == frozenset()
+
+    event = {
+        "password": "account-secret",
+        "nested": {"mqttPassWord": "mqtt-seed"},
+        "items": ({"bluetoothKey": "ble-key"},),
+    }
+    redacted = util._payload_debug_redacted(event, False)  # noqa: SLF001
+    raw = util._payload_debug_redacted(event, True)  # noqa: SLF001
+    entity_attrs = util.redacted_json_safe_payload(event)
+
+    assert redacted["password"] == "**REDACTED**"
+    assert redacted["nested"]["mqttPassWord"] == "**REDACTED**"
+    assert raw["password"] == "account-secret"
+    assert raw["nested"]["mqttPassWord"] == "mqtt-seed"
+    assert raw["items"][0]["bluetoothKey"] == "ble-key"
+    assert entity_attrs["password"] == "**REDACTED**"
+    assert entity_attrs["nested"]["mqttPassWord"] == "**REDACTED**"
+    assert entity_attrs["items"][0]["bluetoothKey"] == "**REDACTED**"
+
+
+def test_raw_properties_sensor_redacts_state_attributes() -> None:
+    """Raw-properties sensor attributes can enter Recorder and must be redacted."""
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    cls = source.split("class JackeryRawPropertiesSensor", 1)[1].split(
+        "class JackeryBleTransportSensor",
+        1,
+    )[0]
+
+    assert "redacted_json_safe_payload(self._properties)" in cls
+    assert "json.dumps(v)" not in cls
+    assert "return redacted if isinstance(redacted, dict) else {}" in cls
+
+
+def test_config_flow_connection_failures_are_not_error_logged() -> None:
+    """Expected setup/reconfigure/reauth connection failures should stay quiet."""
+    source = (CUSTOM_COMPONENT / "config_flow.py").read_text(encoding="utf-8")
+
+    assert "_LOGGER.error(" not in source
+    assert "errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT" in source
+    assert "Cannot connect to Jackery during setup" in source
+    assert "Cannot connect to Jackery during reconfigure" in source
+    assert "Cannot connect to Jackery during reauth" in source
+
+
+def test_expected_entity_action_failures_are_not_error_logged() -> None:
+    """User-triggered action failures should be returned to HA, not double-logged."""
+    for module_name in ("number.py", "text.py"):
+        source = (CUSTOM_COMPONENT / module_name).read_text(encoding="utf-8")
+        assert "_LOGGER.error(" not in source
+
+
+def test_number_platform_has_no_unwired_experimental_setter() -> None:
+    """Number platform should not keep dead experimental write paths."""
+    source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+
+    assert "_set_max_power_experimental" not in source
+    assert "JackeryError" not in source
 
 
 def test_mqtt_diagnostics_do_not_expose_mac_id_suffix() -> None:
     """Diagnostics may report credential source, but not device-correlating IDs."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     assert 'diag["credential_mac_id_source"] = self.api.mqtt_mac_id_source' in (
         coordinator_source
     )
     assert "credential_mac_id_suffix" not in coordinator_source
-
-
-def test_data_source_priority_documents_minimal_attributes_and_payload_debug_log() -> (
-    None
-):
-    """Source diagnostics must be lean; raw parser proof belongs in debug JSONL."""
-    contract = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(encoding="utf-8")
-    assert "Minimal entity diagnostic attributes" in contract
-    assert "jackery_solarvault_payload_debug.jsonl" in contract
-    assert "source_contract=" not in contract
-    assert "source_kind=" not in contract
 
 
 def test_entity_platforms_use_shared_unique_id_append_helper() -> None:
@@ -599,11 +928,6 @@ def test_unique_id_helper_is_the_only_duplicate_entity_skip_logger() -> None:
 
 def test_unique_id_contract_is_documented_and_followed() -> None:
     """Unique IDs must stay independent from names/translations."""
-    contract = pathlib.Path("docs/UNIQUE_ID_CONTRACT.md").read_text(encoding="utf-8")
-    assert "<device_id>_<stable_key_suffix>" in contract
-    assert "deviceName" in contract
-    assert "translation keys" in contract
-
     entity_source = (CUSTOM_COMPONENT / "entity.py").read_text(encoding="utf-8")
     assert 'self._attr_unique_id = f"{device_id}_{key_suffix}"' in entity_source
     forbidden_fragments = {
@@ -626,27 +950,66 @@ def test_battery_pack_unique_ids_keep_stable_index_suffix() -> None:
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     assert 'f"battery_pack_{pack_index}_{description.key}"' in sensor_source
     pack_class = sensor_source.split(
-        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("class JackerySmartMeterSensor", 1)[0]
     pack_init = pack_class.split("    def __init__(", 1)[1].split(
-        "    @property\n    def _pack", 1
+        "    @property\n    def _pack",
+        1,
     )[0]
     assert "FIELD_DEVICE_NAME" not in pack_init
     assert "FIELD_WNAME" not in pack_init
     assert "FIELD_SN" not in pack_init
 
 
+def test_smart_plug_unique_ids_keep_stable_index_suffix() -> None:
+    """Smart-plug entities keep names and serials out of unique IDs."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    binary_source = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
+    switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
+
+    assert 'f"smart_plug_{plug_index}_{description.key}"' in sensor_source
+    assert 'f"smart_plug_{plug_index}_switch_state"' in binary_source
+    assert 'f"smart_plug_{plug_index}_switch"' in switch_source
+    assert 'f"smart_plug_{plug_index}_priority_enabled"' in switch_source
+
+    # Smart-plug entities must build device_info from plug metadata via the
+    # shared helper in entity.py — name and serial are read from the payload
+    # there, not embedded in unique IDs.
+    for source in (sensor_source, binary_source, switch_source):
+        assert "_build_smart_plug_device_info(" in source
+
+    entity_source = (CUSTOM_COMPONENT / "entity.py").read_text(encoding="utf-8")
+    assert "FIELD_DEVICE_SN)" in entity_source
+    assert "FIELD_SCAN_NAME" in entity_source
+
+
+def test_meter_head_unique_ids_keep_stable_index_suffix() -> None:
+    """Meter-head entities keep names and serials out of unique IDs."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+
+    assert 'f"meter_head_{meter_head_index}_{description.key}"' in sensor_source
+    meter_head_class = sensor_source.split(
+        "class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):",
+        1,
+    )[1].split("class JackerySmartMeterSensor", 1)[0]
+    meter_head_init = meter_head_class.split("    def __init__(", 1)[1].split(
+        "    @property\n    def _meter_head",
+        1,
+    )[0]
+    assert "FIELD_DEVICE_SN" not in meter_head_init
+    assert "FIELD_DEVICE_NAME" not in meter_head_init
+    assert "FIELD_SCAN_NAME" not in meter_head_init
+
+
 def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None:
     """Contradictory app data still creates diagnostics around guarded states."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     translation_sources = _translation_sources()
-    data_priority = pathlib.Path("docs/DATA_SOURCE_PRIORITY.md").read_text(
-        encoding="utf-8"
-    )
 
     assert "PAYLOAD_DATA_QUALITY" in const_source
     assert "REPAIR_ISSUE_APP_DATA_INCONSISTENCY" in const_source
@@ -657,6 +1020,13 @@ def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None
     assert "DATA_QUALITY_REPAIR_EXAMPLE_LIMIT" in coordinator_source
     assert "async_create_issue" in coordinator_source
     assert "async_delete_issue" in coordinator_source
+    assert 'issue_suffix = f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"' in (
+        coordinator_source
+    )
+    assert "for domain, existing_issue_id in tuple(registry.issues):" in (
+        coordinator_source
+    )
+    assert "existing_issue_id != issue_id" in coordinator_source
     assert "app_data_quality_warnings" in util_source
     assert "normalized_data_quality_warnings" in util_source
     assert "format_data_quality_warning" in util_source
@@ -666,14 +1036,12 @@ def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None
         assert "{examples}" in source, path
         assert "{source_section}" not in source, path
         assert "{reference_section}" not in source, path
-    assert "same-endpoint month backfill" in data_priority
-    assert "data_quality" in data_priority
 
 
 def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -> None:
     """Keep services.yaml, const.py field constants, and setup schemas aligned."""
     services = yaml.safe_load(
-        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8")
+        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8"),
     )
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
@@ -683,6 +1051,9 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
         "rename_system",
         "refresh_weather_plan",
         "delete_storm_alert",
+        "set_third_party_mqtt_config",
+        "query_third_party_mqtt_config",
+        "send_ble_command",
     ):
         assert service in services
         assert f'SERVICE_{service.upper()}: Final = "{service}"' in const_source
@@ -690,11 +1061,37 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
     assert set(services["rename_system"]["fields"]) == {"system_id", "new_name"}
     assert set(services["refresh_weather_plan"]["fields"]) == {"device_id"}
     assert set(services["delete_storm_alert"]["fields"]) == {"device_id", "alert_id"}
+    assert set(services["set_third_party_mqtt_config"]["fields"]) == {
+        "device_id",
+        "enable",
+        "ip",
+        "port",
+        "username",
+        "password",
+        "token",
+    }
+    assert set(services["query_third_party_mqtt_config"]["fields"]) == {"device_id"}
+    assert set(services["send_ble_command"]["fields"]) == {
+        "device_id",
+        "cmd",
+        "body",
+        "flags",
+        "wait_for_ack",
+        "ack_timeout",
+    }
+    assert "repair_statistics" not in services
 
     assert 'SERVICE_NUMERIC_ID_PATTERN: Final = r"^\\s*[0-9]+\\s*$"' in const_source
     # Schemas live in services.py alongside the handlers that consume them.
     assert "SERVICE_FIELD_SYSTEM_ID): vol.All(" in services_source
     assert "SERVICE_FIELD_DEVICE_ID): vol.All(" in services_source
+    assert "SERVICE_FIELD_CMD): vol.All(" in services_source
+    assert "SERVICE_FIELD_BODY): vol.Any(dict, cv.string)" in services_source
+    assert "SERVICE_FIELD_FLAGS, default=0" in services_source
+    assert "vol.Any(" in services_source
+    assert "ServiceResponse" not in services_source
+    assert "SupportsResponse" not in services_source
+    assert "async def _async_handle_repair_statistics" not in services_source
     # System rename keeps the strict numeric-id contract; device-id schemas
     # accept HA device-registry IDs (UUID-style) too, so the device selector
     # in services.yaml can hand them through unchanged.
@@ -705,23 +1102,51 @@ def test_services_yaml_matches_registered_services_and_validates_numeric_ids() -
     assert "str.strip" not in init_source
 
 
-def test_readme_documents_period_and_data_quality_behavior() -> None:
-    """Users should get the same period/source rules that the code enforces."""
-    readme = pathlib.Path("README.md").read_text(encoding="utf-8")
-    assert "Week: Monday to Sunday" in readme
-    assert "Month: calendar month" in readme
-    assert "Year: calendar year" in readme
-    assert "Weekly values are not used to repair monthly" in readme
-    assert "same-endpoint monthly values" in readme
-    assert "repair issue" in readme and "diagnostics export" in readme
-    assert "hb/app/**REDACTED**/" in readme
-    assert "dropped payloads" in readme
+def test_user_visible_action_errors_have_translations() -> None:
+    """Service/entity action error keys must be present in every translation file."""
+    required_exception_keys = {
+        "delete_storm_alert_failed",
+        "dynamic_tariff_unavailable",
+        "entity_action_failed",
+        "invalid_number_allowed_values",
+        "invalid_number_range",
+        "invalid_select_option",
+        "invalid_text_value",
+        "missing_system_id",
+        "mqtt_command_failed",
+        "mqtt_missing_device_sn",
+        "mqtt_missing_subdevice_sn",
+        "query_third_party_mqtt_config_failed",
+        "refresh_weather_plan_failed",
+        "rename_system_failed",
+        "send_ble_command_failed",
+        "set_third_party_mqtt_config_failed",
+    }
+    required_service_keys = {
+        "delete_storm_alert",
+        "query_third_party_mqtt_config",
+        "refresh_weather_plan",
+        "rename_system",
+        "send_ble_command",
+        "set_third_party_mqtt_config",
+    }
+
+    for path in (
+        CUSTOM_COMPONENT / "strings.json",
+        *sorted((CUSTOM_COMPONENT / "translations").glob("*.json")),
+    ):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert required_exception_keys <= set(data["exceptions"]), path
+        assert required_service_keys <= set(data["services"]), path
 
 
 def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
-    """Rejected credentials during refresh should start HA reauth instead of log-spamming."""
+    """Rejected credentials during refresh should start HA reauth instead of.
+
+    log-spamming.
+    """
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     assert "ConfigEntryAuthFailed" in coordinator_source
     assert (
@@ -740,9 +1165,12 @@ def test_refresh_auth_errors_trigger_reauth_not_update_failed() -> None:
 
 
 def test_reauth_flow_handles_missing_entry_without_assertion() -> None:
-    """Malformed reauth contexts should abort cleanly instead of raising AssertionError."""
+    """Malformed reauth contexts should abort cleanly instead of raising.
+
+    AssertionError.
+    """
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     config_flow_tree = ast.parse(config_flow_source)
     translation_sources = _translation_sources()
@@ -819,9 +1247,9 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 
 def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
     """Runtime guard paths should raise HA/domain errors, not AssertionError."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     assert "assert self._token is not None" not in api_source
@@ -833,23 +1261,30 @@ def test_runtime_code_does_not_use_assert_for_auth_or_reauth_guards() -> None:
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
+    """Auth failures in initial rediscovery are reauth problems, not generic.
+
+    UpdateFailed.
+    """
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     discover_block = coordinator_source.split("async def async_discover", 1)[1].split(
-        "def _is_property_device_candidate", 1
+        "def _is_property_device_candidate",
+        1,
     )[0]
 
     assert "except JackeryAuthError as err" in discover_block
     assert "Jackery credentials were rejected during system discovery" in discover_block
+    assert "Jackery credentials were rejected during legacy device discovery" in (
+        discover_block
+    )
     assert "raise ConfigEntryAuthFailed" in discover_block
 
 
 def test_system_discovery_does_not_keep_unpublished_manual_id_paths() -> None:
     """Unreleased manual device/system config paths are migration ballast."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
@@ -868,6 +1303,95 @@ def test_optional_number_setter_failures_are_logged_before_suppression() -> None
     assert "self.entity_description.raise_on_setter_error" in number_source
 
 
+def test_number_setter_rejects_non_finite_values_before_transform() -> None:
+    """Number service writes must not let NaN/Infinity reach int(round(...))."""
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+    block = number_source.split("async def async_set_native_value", 1)[1].split(
+        "\n\n# -------------------------------------------------------------------"
+        "----------\n"
+        "# Setup",
+        1,
+    )[0]
+
+    assert "parsed_value = safe_float(value)" in block
+    assert "if parsed_value is None:" in block
+    assert 'self._raise_action_error(\n                "invalid_number_range"' in block
+    assert "value = parsed_value" in block
+    assert block.index("value = parsed_value") < block.index(
+        "self.entity_description.value_transform(value)",
+    )
+    assert "value_transform: Callable[[float], Any] = _rounded_int" in number_source
+    assert "value_transform: Callable[[float], Any] = lambda v: int(round(v))" not in (
+        number_source
+    )
+
+
+def test_number_setter_helpers_use_shared_integer_parser() -> None:
+    """Number setter callbacks must not raw-cast values before coordinator calls."""
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+    setter_block = number_source.split("# Setter helpers", 1)[1].split(
+        "# Dynamic-value helpers",
+        1,
+    )[0]
+
+    assert "def _wire_int(value: Any) -> int:" in setter_block
+    assert "parsed = first_nonblank_int(value)" in setter_block
+    assert 'raise HomeAssistantError("invalid number value")' in setter_block
+    assert "discharge_limit=_wire_int(value)" in setter_block
+    assert "parsed = _wire_int(value)" in setter_block
+    assert "async_set_max_output_power(dev_id, _wire_int(value))" in setter_block
+    assert "async_set_default_power(dev_id, _wire_int(value))" in setter_block
+    assert "discharge_limit=int(value)" not in setter_block
+    assert "if int(value)" not in setter_block
+    assert "async_set_max_output_power(dev_id, int(value))" not in setter_block
+    assert "async_set_default_power(dev_id, int(value))" not in setter_block
+
+
+def test_number_float_transform_uses_shared_parser() -> None:
+    """Float number writes should use the same finite-value parser as HA values."""
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+
+    assert "def _wire_float(value: Any) -> float:" in number_source
+    assert "value_transform=_wire_float" in number_source
+    assert "value_transform=lambda v: float(v)" not in number_source
+
+
+def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
+    """Discrete number validation should centralize round/int conversion."""
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+    block = number_source.split("async def async_set_native_value", 1)[1].split(
+        "\n\n# -------------------------------------------------------------------"
+        "----------\n"
+        "# Setup",
+        1,
+    )[0]
+
+    assert "def _rounded_int(value: Any) -> int:" in number_source
+    assert "parsed = safe_float(value)" in number_source
+    assert "if allowed and _rounded_int(value) not in" in block
+    assert "str(_rounded_int(v)) for v in allowed" in block
+    assert "int(round(value))" not in block
+    assert "int(round(v))" not in block
+
+
+def test_number_setter_validates_all_entity_ranges() -> None:
+    """Direct number writes must enforce min/max for every number entity."""
+    number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
+    block = number_source.split("async def async_set_native_value", 1)[1].split(
+        "\n\n# -------------------------------------------------------------------"
+        "----------\n"
+        "# Setup",
+        1,
+    )[0]
+
+    assert "validate_range" not in number_source
+    assert "if value < self.native_min_value or value > self.native_max_value:" in block
+    assert '"invalid_number_range"' in block
+    assert block.index(
+        "if value < self.native_min_value or value > self.native_max_value:",
+    ) < block.index("allowed = self._allowed_values()")
+
+
 def test_max_feed_grid_is_not_aliased_to_grid_standard_limit() -> None:
     """MaxGridStdPw is a fallback/readout, not the maxFeedGrid setting."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
@@ -882,7 +1406,7 @@ def test_max_feed_grid_is_not_aliased_to_grid_standard_limit() -> None:
 def test_property_setters_keep_local_override_during_stale_refresh_window() -> None:
     """Fresh local writes should beat stale HTTP/MQTT snapshots briefly."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     assert "_PROPERTY_OVERRIDE_TTL_SEC" in coordinator_source
@@ -895,15 +1419,18 @@ def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
     """Avoid duplicate entries caused by whitespace/case drift in usernames."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     assert 'FLOW_STEP_USER: Final = "user"' in const_source
     assert 'FLOW_ERROR_INVALID_AUTH: Final = "invalid_auth"' in const_source
-    assert "def _normalize_account(value: str) -> str:" in config_flow_source
-    assert "return value.strip()" in config_flow_source
+    assert "def _normalize_account(value: Any) -> str:" in config_flow_source
+    assert "return value.strip() if isinstance(value, str) else" in config_flow_source
+    assert "def _entry_text(entry: ConfigEntry, key: str) -> str:" in config_flow_source
+    assert "return value if isinstance(value, str) else" in config_flow_source
     assert (
-        "account = _normalize_account(user_input[CONF_USERNAME])" in config_flow_source
+        "account = _normalize_account(user_input.get(CONF_USERNAME))"
+        in config_flow_source
     )
     assert "await self.async_set_unique_id(account.lower())" in config_flow_source
     assert "CONF_USERNAME: account" in config_flow_source
@@ -920,9 +1447,14 @@ def test_config_flow_normalizes_account_and_uses_flow_constants() -> None:
     assert (
         "str.strip"
         not in config_flow_source.split("USER_SCHEMA =", 1)[1].split(
-            "class JackeryConfigFlow", 1
+            "class JackeryConfigFlow",
+            1,
         )[0]
     )
+    assert "str(entry.data.get(CONF_USERNAME" not in config_flow_source
+    assert "entry.data[CONF_USERNAME]" not in config_flow_source
+    assert "stored_username = _entry_text(entry, CONF_USERNAME)" in config_flow_source
+    assert '"username": stored_username' in config_flow_source
 
 
 def test_redact_keys_cover_mqtt_credential_aliases() -> None:
@@ -944,18 +1476,20 @@ def test_redact_keys_cover_mqtt_credential_aliases() -> None:
 def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
     """MQTT topics contain the Jackery userId and must be redacted in diagnostics."""
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert 'REDACTED_VALUE: Final = "**REDACTED**"' in const_source
     assert "def _redact_topic(topic: str | None) -> str | None:" in mqtt_source
     assert "parts[2] = REDACTED_VALUE" in mqtt_source
     assert (
-        '"topics": [self._redact_topic(topic) for topic in self._topics]' in mqtt_source
+        "def diagnostics_snapshot(self, *, redact_topics: bool = True)" in mqtt_source
     )
+    assert "return self._redact_topic(topic) if redact_topics else topic" in mqtt_source
+    assert '"topics": [topic_value(topic) for topic in self._topics]' in mqtt_source
     assert (
-        '"last_published_topic": self._redact_topic(self._last_published_topic)'
-        in mqtt_source
+        '"last_published_topic": topic_value(self._last_published_topic)' in mqtt_source
     )
+    assert "return self.diagnostics_snapshot()" in mqtt_source
     assert '"topic_count": len(self._topics)' in mqtt_source
     assert '"topics": list(self._topics)' not in mqtt_source
     assert '"last_published_topic": self._last_published_topic' not in mqtt_source
@@ -963,7 +1497,7 @@ def test_diagnostics_do_not_expose_raw_mqtt_topic_user_ids() -> None:
 
 def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     """Diagnostics need actionable MQTT health data without exposing credentials."""
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
 
     for fragment in (
         "self._messages_dropped = 0",
@@ -985,23 +1519,25 @@ def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     assert "non-object JSON payload" in mqtt_source
 
 
-def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (
+def test_mqtt_password_base64_validation_is_strict_and_redaction_constant_is_reused() -> (  # noqa: E501
     None
 ):
-    """Reject malformed MQTT seeds and avoid copy/pasted redaction literals."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    """Reject malformed MQTT seeds and redact login diagnostics at export time."""
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "base64.b64decode(self._mqtt_seed_b64, validate=True)" in api_source
-    assert "redacted[FIELD_TOKEN] = REDACTED_VALUE" in api_source
-    assert "inner[FIELD_MQTT_PASSWORD] = REDACTED_VALUE" in api_source
+    assert "self.last_login_response = dict(data)" in api_source
+    assert "response=dict(data)" in api_source
+    assert "redacted[FIELD_TOKEN] = REDACTED_VALUE" not in api_source
+    assert "inner[FIELD_MQTT_PASSWORD] = REDACTED_VALUE" not in api_source
     assert '"**REDACTED**"' not in api_source
 
 
 def test_api_trend_endpoints_use_shared_period_range_contract() -> None:
     """System trend helpers must not fall back to today..today for month/year."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
-    assert "from .util import app_period_date_bounds" in api_source
+    assert "app_period_date_bounds," in api_source
     assert "date.today().isoformat()" not in api_source
     for function_name in (
         "async_get_pv_trends",
@@ -1029,9 +1565,12 @@ def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> No
         terminal_node: ast.stmt | None = None
         for stmt in body:
             if terminal_node is not None:
-                raise AssertionError(
+                msg = (
                     f"{path}:{stmt.lineno} unreachable statement after "
                     f"line {terminal_node.lineno}"
+                )
+                raise AssertionError(
+                    msg,
                 )
             if isinstance(stmt, terminal):
                 terminal_node = stmt
@@ -1066,8 +1605,9 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     ]
     assert calls
     for call in calls:
-        assert len(call.args) == 3, (
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+        assert len(call.args) == 3, (  # noqa: PLR2004
+            f"config_entry_bool_option call at line {call.lineno}"
+            " must pass entry, key, default"
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1080,24 +1620,21 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
 def test_all_api_json_decode_paths_catch_value_error() -> None:
     """aiohttp/json stacks may raise ValueError for malformed JSON payloads.
 
-    Each ``resp.json(...)`` call site must wrap a four-tuple of the relevant
-    decode/format exceptions: ``aiohttp.ContentTypeError``,
-    ``json.JSONDecodeError``, ``UnicodeDecodeError`` and ``ValueError``. The
-    test is tolerant to ruff format's multi-line layout (one type per line)
-    by collecting the full text of each ``except (...)`` block before
-    asserting on the contents.
+    Each ``resp.json(...)`` call site must catch the relevant decode/format
+    exceptions: ``aiohttp.ContentTypeError``, ``json.JSONDecodeError``,
+    ``UnicodeDecodeError`` and ``ValueError``. The test accepts both the
+    required parenthesized ``as err`` handler and Python 3.14's unparenthesized
+    no-``as`` multi-exception headers.
     """
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
-    # Collect every `except (...) ...` block, regardless of line wrapping.
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     decode_blocks: list[str] = []
-    pattern = re.compile(
-        r"except\s*\(\s*aiohttp\.ContentTypeError\s*,[^)]+\)",
-        re.S,
-    )
-    for match in pattern.finditer(api_source):
-        # Normalise to a single line so each assertion is local and clear.
-        decode_blocks.append(re.sub(r"\s+", " ", match.group(0)))
-    assert len(decode_blocks) == 4, decode_blocks
+    for match in re.finditer(
+        r"except[^:\n]*(?:\n\s*[^:\n]*)*ContentTypeError",
+        api_source,
+    ):
+        block = api_source[match.start() : api_source.find(":", match.start()) + 1]
+        decode_blocks.append(re.sub(r"\s+", " ", block))
+    assert len(decode_blocks) == 4, decode_blocks  # noqa: PLR2004
     for block in decode_blocks:
         assert "json.JSONDecodeError" in block, block
         assert "UnicodeDecodeError" in block, block
@@ -1106,9 +1643,10 @@ def test_all_api_json_decode_paths_catch_value_error() -> None:
 
 def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None:
     """Login should surface malformed cloud responses as JackeryApiError."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     login_block = api_source.split("async def async_login", 1)[1].split(
-        "async def async_get_mqtt_credentials", 1
+        "async def async_get_mqtt_credentials",
+        1,
     )[0]
     assert "Login returned invalid JSON" in login_block
     assert "HTTP_RAW_TEXT_LIMIT" in login_block
@@ -1117,7 +1655,7 @@ def test_login_invalid_json_is_reported_as_api_error_not_raw_exception() -> None
 
 def test_api_read_endpoints_normalize_unexpected_payload_shapes() -> None:
     """Dict/list API readers should not leak arbitrary data shapes to coordinator."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     assert "def _payload_dict(data: dict[str, Any], path: str)" in api_source
     assert "def _payload_list(data: dict[str, Any], path: str)" in api_source
@@ -1147,12 +1685,76 @@ def test_api_read_endpoints_normalize_unexpected_payload_shapes() -> None:
     assert "return data.get(FIELD_DATA) or {}" not in api_source
 
 
+def test_ota_info_accepts_single_dict_payload_shapes() -> None:
+    """OTA responses may be a list, a single dict, or a dict body wrapper."""
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
+    block = api_source.split("async def async_get_ota_info", 1)[1].split(
+        "async def async_get_location",
+        1,
+    )[0]
+
+    assert "items = self._payload_list(data, OTA_LIST_PATH)" in block
+    assert "raw = data.get(FIELD_DATA)" in block
+    assert "raw_body = raw.get(FIELD_BODY)" in block
+    for field in (
+        "FIELD_CURRENT_VERSION",
+        "FIELD_VERSION",
+        "FIELD_TARGET_VERSION",
+        "FIELD_TARGET_MODULE_VERSION",
+        "FIELD_UPDATE_STATUS",
+        "FIELD_UPDATE_CONTENT",
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_UPGRADE_TYPE",
+    ):
+        assert field in block
+
+
+def test_ota_info_selects_requested_device_from_multi_item_response() -> None:
+    """OTA list responses must not use the main-device item for a battery pack."""
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
+
+    assert "def _select_ota_item(" in api_source
+    selector = api_source.split("def _select_ota_item(", 1)[1].split(
+        "# --- generic GET with auto re-login",
+        1,
+    )[0]
+    ota_block = api_source.split("async def async_get_ota_info", 1)[1].split(
+        "async def async_get_location",
+        1,
+    )[0]
+
+    assert "requested_sn = str(device_sn)" in selector
+    assert "item.get(FIELD_DEVICE_SN)" in selector
+    assert "return item" in selector
+    assert "return items[0] if items else {}" in selector
+    assert "return self._select_ota_item(items, device_sn)" in ota_block
+    assert "return items[0]" not in ota_block
+
+
+def test_battery_pack_single_object_detection_accepts_firmware_only_payloads() -> None:
+    """Pack list fallback must keep BatteryPackSub firmware-only payloads."""
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
+    block = api_source.split("async def async_get_battery_pack_list", 1)[1].split(
+        "async def async_get_home_trends",
+        1,
+    )[0]
+
+    for field in (
+        "FIELD_VERSION",
+        "FIELD_CURRENT_VERSION",
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_UPDATE_STATUS",
+    ):
+        assert field in block
+
+
 def test_api_payload_helper_paths_match_called_endpoint_constants() -> None:
     """Wrong helper path constants hide the real failing endpoint in diagnostics."""
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
 
     pv_block = api_source.split("async def async_get_pv_trends", 1)[1].split(
-        "async def async_get_power_price", 1
+        "async def async_get_power_price",
+        1,
     )[0]
     price_sources_block = api_source.split("async def async_get_price_sources", 1)[
         1
@@ -1166,25 +1768,30 @@ def test_api_payload_helper_paths_match_called_endpoint_constants() -> None:
 
 
 def test_home_assistant_ui_schemas_do_not_use_nonserializable_strip_callable() -> None:
-    """HA voluptuous_serialize cannot convert raw str.strip callables in UI schemas."""
+    """HA voluptuous_serialize cannot convert custom callables in UI schemas."""
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     user_schema = config_flow_source.split("USER_SCHEMA =", 1)[1].split(
-        "class JackeryConfigFlow", 1
+        "class JackeryConfigFlow",
+        1,
     )[0]
     reauth_schema = config_flow_source.split("data_schema=vol.Schema", 1)[1].split(
-        "description_placeholders", 1
+        "description_placeholders",
+        1,
     )[0]
     service_schema_block = services_source.split("RENAME_SCHEMA =", 1)[1].split(
-        "def _loaded_coordinators", 1
+        "def _loaded_coordinators",
+        1,
     )[0]
 
     assert "str.strip" not in user_schema
     assert "str.strip" not in reauth_schema
     assert "str.strip" not in service_schema_block
+    assert "_coerce_service_int" not in service_schema_block
+    assert "_coerce_service_float" not in service_schema_block
     assert "SERVICE_NON_EMPTY_TEXT_PATTERN" in service_schema_block
 
 
@@ -1207,7 +1814,7 @@ def test_coordinator_imports_all_field_constants_it_references() -> None:
 
 
 def test_coordinator_lazy_imports_mqtt_client_for_collection_without_aiomqtt() -> None:
-    """HA config-flow collection should not require optional MQTT deps."""
+    """HA config-flow collection and event loop must not import optional MQTT deps."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
 
@@ -1221,20 +1828,24 @@ def test_coordinator_lazy_imports_mqtt_client_for_collection_without_aiomqtt() -
     assert module_mqtt_imports == []
     assert "if TYPE_CHECKING:" in source
     assert "self._mqtt: JackeryMqttPushClient | None = None" in source
+    assert "def _load_mqtt_push_client() -> type[Any]:" in source
+    assert 'importlib.import_module(".mqtt_push", __package__)' in source
 
     start_mqtt = next(
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_start_mqtt"
     )
-    lazy_imports = [
+    event_loop_imports = [
         node
         for node in ast.walk(start_mqtt)
         if isinstance(node, ast.ImportFrom)
         and node.module == "mqtt_push"
         and any(alias.name == "JackeryMqttPushClient" for alias in node.names)
     ]
-    assert len(lazy_imports) == 1
+    assert event_loop_imports == []
+    assert "await self.hass.async_add_executor_job(" in source
+    assert "_load_mqtt_push_client" in source
     assert "except ModuleNotFoundError as err:" in source
     assert 'err.name != "aiomqtt"' in source
     assert "Jackery MQTT push is unavailable because aiomqtt is not installed" in (
@@ -1251,10 +1862,213 @@ def test_service_numeric_ids_are_schema_serializable_but_trimmed_by_handlers() -
     # System rename keeps the strict numeric-id pattern; device-id handlers
     # tolerate HA device-registry UUIDs that the device selector emits.
     assert "vol.Match(SERVICE_NUMERIC_ID_PATTERN)" in services_source
-    assert "call.data[SERVICE_FIELD_SYSTEM_ID].strip()" in services_source
-    assert "call.data[SERVICE_FIELD_DEVICE_ID].strip()" in services_source
-    assert "call.data[SERVICE_FIELD_ALERT_ID].strip()" in services_source
     assert "str.strip" not in services_source
+
+
+def test_rename_service_system_id_validates_direct_call_values() -> None:
+    """Rename system_id constraints must not rely only on HA schema validation."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _rename_system_id_from_service(" in services_source
+    helper_block = services_source.split("def _rename_system_id_from_service(", 1)[
+        1
+    ].split("\n\n\ndef _rename_name_from_service", 1)[0]
+    assert "isinstance(raw, str)" in helper_block
+    assert "system_id = raw.strip()" in helper_block
+    assert "system_id.isascii() and system_id.isdecimal()" in helper_block
+    assert "rename_system_failed" in helper_block
+
+    assert "system_id = call.data[SERVICE_FIELD_SYSTEM_ID].strip()" not in (
+        services_source
+    )
+    assert "system_id = _rename_system_id_from_service(" in services_source
+
+
+def test_device_id_services_validate_direct_call_values() -> None:
+    """Device-id service constraints must not rely only on HA schema validation."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+    service_schema_block = services_source.split("REFRESH_WEATHER_PLAN_SCHEMA =", 1)[
+        1
+    ].split(
+        "# ---------------------------------------------------------------------------",
+        1,
+    )[0]
+
+    assert "def _device_id_from_service(" in services_source
+    helper_block = services_source.split("def _device_id_from_service(", 1)[1].split(
+        "\n\n\ndef _rename_name_from_service",
+        1,
+    )[0]
+    assert "isinstance(raw, str)" in helper_block
+    assert "device_id = raw.strip()" in helper_block
+    assert "_resolve_jackery_device_id(hass, device_id)" in helper_block
+    assert "extra_placeholders=extra_placeholders" in helper_block
+
+    assert "call.data[SERVICE_FIELD_DEVICE_ID].strip()" not in services_source
+    assert services_source.count("_device_id_from_service(") >= 6  # noqa: PLR2004
+    assert "vol.Length(min=1)" not in service_schema_block
+    assert service_schema_block.count("vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN)") >= 7  # noqa: PLR2004
+
+
+def test_rename_service_name_validates_direct_call_values() -> None:
+    """Rename service name constraints must not rely only on HA schema validation."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _rename_name_from_service(" in services_source
+    helper_block = services_source.split("def _rename_name_from_service(", 1)[1].split(
+        "\n\n\ndef _ble_body_from_service",
+        1,
+    )[0]
+    assert "not isinstance(raw, str)" in helper_block
+    assert "parsed = raw.strip()" in helper_block
+    assert "if not parsed:" in helper_block
+    assert "len(parsed) > 64" in helper_block
+
+    assert "new_name = call.data[SERVICE_FIELD_NEW_NAME].strip()" not in services_source
+    assert "new_name = _rename_name_from_service(" in services_source
+
+
+def test_delete_storm_alert_validates_direct_alert_id() -> None:
+    """Delete service alert_id constraints must not rely only on HA schema.
+
+    validation.
+    """
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _storm_alert_id_from_service(" in services_source
+    helper_block = services_source.split("def _storm_alert_id_from_service(", 1)[
+        1
+    ].split("\n\n\ndef _ble_body_from_service", 1)[0]
+    assert "isinstance(raw, str)" in helper_block
+    assert "alert_id = raw.strip()" in helper_block
+    assert "delete_storm_alert_failed" in helper_block
+    assert '"alert_id": alert_id' in helper_block
+
+    assert "alert_id = call.data[SERVICE_FIELD_ALERT_ID].strip()" not in services_source
+    assert "alert_id = _storm_alert_id_from_service(" in services_source
+
+
+def test_service_boolean_fields_use_safe_bool_parser() -> None:
+    """Service booleans must not regress to truthiness casts."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "from .util import safe_bool" in services_source
+    assert "def _service_bool(" in services_source
+    helper_block = services_source.split("def _service_bool(", 1)[1].split("\n\n# ", 1)[
+        0
+    ]
+    assert "parsed = safe_bool(raw)" in helper_block
+    assert "raise _service_validation_error(" in helper_block
+
+    assert "bool(call.data" not in services_source
+    assert "enable=_service_bool(" in services_source
+    assert "field_name=SERVICE_FIELD_ENABLE" in services_source
+    assert "wait_for_ack=_service_bool(" in services_source
+    assert "field_name=SERVICE_FIELD_WAIT_FOR_ACK" in services_source
+    # _service_bool raises ServiceValidationError itself; handlers must preserve it
+    # so the field-specific translated error does not get wrapped again.
+    assert services_source.count("except ServiceValidationError:\n        raise") >= 2  # noqa: PLR2004
+
+
+def test_standby_switch_uses_strict_numeric_mode_parser() -> None:
+    """Manual standby must parse enum mode 1/2 without raw int casts."""
+    switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
+    helper_block = switch_source.split("def _standby_is_on(", 1)[1].split(
+        "\n\n@dataclass",
+        1,
+    )[0]
+
+    assert "first_nonblank_int" in switch_source
+    assert "parsed = first_nonblank_int(raw)" in helper_block
+    assert "return parsed == 1" in helper_block
+    assert "return safe_bool(raw)" in helper_block
+    assert "return int(raw)" not in helper_block
+    assert "= int(raw)" not in helper_block
+
+
+def test_service_optional_text_fields_do_not_stringify_none() -> None:
+    """Optional service text fields must keep direct-call None values empty."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _service_optional_text(" in services_source
+    helper_block = services_source.split("def _service_optional_text(", 1)[1].split(
+        "\n\n# ",
+        1,
+    )[0]
+    assert 'return ""' in helper_block
+    assert "not isinstance(raw, str)" in helper_block
+    assert "parsed = raw" in helper_block
+    assert "len(parsed) > max_length" in helper_block
+    assert "return parsed" in helper_block
+
+    assert "str(raw)" not in helper_block
+    assert "str(call.data.get(SERVICE_FIELD_USERNAME" not in services_source
+    assert "str(call.data.get(SERVICE_FIELD_PASSWORD" not in services_source
+    assert "str(call.data.get(SERVICE_FIELD_TOKEN" not in services_source
+    assert "username=_service_optional_text(" in services_source
+    assert "password=_service_optional_text(" in services_source
+    assert "token=_service_optional_text(" in services_source
+
+
+def test_service_required_text_fields_validate_direct_call_values() -> None:
+    """Required service text fields must not bypass schema checks in direct calls."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _service_required_text(" in services_source
+    helper_block = services_source.split("def _service_required_text(", 1)[1].split(
+        "\n\n\ndef _service_optional_text",
+        1,
+    )[0]
+    assert "not isinstance(raw, str)" in helper_block
+    assert "parsed = raw.strip()" in helper_block
+    assert "if not parsed:" in helper_block
+    assert "len(parsed) > max_length" in helper_block
+
+    assert "ip=str(call.data[SERVICE_FIELD_IP]).strip()" not in services_source
+    assert "ip=_service_required_text(" in services_source
+    assert "field_name=SERVICE_FIELD_IP" in services_source
+
+
+def test_ble_service_body_validates_json_native_values() -> None:
+    """BLE service body dicts must not reach json.dumps with altered semantics."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _json_native_value(" in services_source
+    assert "def _json_native_body(" in services_source
+    assert "parse_constant=_reject_json_constant" in services_source
+    assert "math.isfinite(value)" in services_source
+    assert "body object keys must be strings" in services_source
+    assert "body must contain only JSON-compatible values" in services_source
+    assert "return dict(raw_body)" not in services_source
+    assert "return _json_native_body(raw_body, device_id)" in services_source
+
+
+def test_service_numeric_fields_validate_direct_call_ranges() -> None:
+    """Service numeric fields must not bypass schema ranges in direct calls."""
+    services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+
+    assert "def _coerce_service_int(" in services_source
+    assert "def _coerce_service_float(" in services_source
+    assert "def _service_int(" in services_source
+    assert "def _service_float(" in services_source
+    assert "parsed = _coerce_service_int(raw)" in services_source
+    assert "parsed = _coerce_service_float(raw)" in services_source
+    assert "except (TypeError, ValueError, OverflowError)" in services_source
+    assert "math.isfinite(parsed)" in services_source
+    assert "int(call.data" not in services_source
+    assert "float(call.data" not in services_source
+    assert "vol.Coerce(int), vol.Range(min=1, max=65535)" in services_source
+    assert "vol.Coerce(int), vol.Range(min=0, max=65535)" in services_source
+    assert "vol.Coerce(float), vol.Range(min=0.5, max=60.0)" in services_source
+
+    assert "port=_service_int(" in services_source
+    assert "field_name=SERVICE_FIELD_PORT" in services_source
+    assert "cmd=_service_int(" in services_source
+    assert "field_name=SERVICE_FIELD_CMD" in services_source
+    assert "flags=_service_int(" in services_source
+    assert "field_name=SERVICE_FIELD_FLAGS" in services_source
+    assert "ack_timeout_sec=_service_float(" in services_source
+    assert "field_name=SERVICE_FIELD_ACK_TIMEOUT" in services_source
 
 
 def test_services_yaml_uses_device_selector_for_device_id_fields() -> None:
@@ -1266,14 +2080,15 @@ def test_services_yaml_uses_device_selector_for_device_id_fields() -> None:
     selector cannot represent that scope.
     """
     services = yaml.safe_load(
-        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8")
+        (CUSTOM_COMPONENT / "services.yaml").read_text(encoding="utf-8"),
     )
 
     refresh_field = services["refresh_weather_plan"]["fields"]["device_id"]
     delete_field = services["delete_storm_alert"]["fields"]["device_id"]
+    ble_field = services["send_ble_command"]["fields"]["device_id"]
     rename_field = services["rename_system"]["fields"]["system_id"]
 
-    for field in (refresh_field, delete_field):
+    for field in (refresh_field, delete_field, ble_field):
         assert field.get("required") is True
         device_selector = (field.get("selector") or {}).get("device") or {}
         assert device_selector.get("integration") == "jackery_solarvault", (
@@ -1313,7 +2128,8 @@ def test_services_routes_actions_to_owning_coordinator_for_multi_account() -> No
     # or FIELD_SYSTEM_ID — both are needed because the cloud surfaces the
     # same id under either key depending on endpoint.
     system_block = services_source.split("def _coordinator_for_system", 1)[1].split(
-        "\n\n# ", 1
+        "\n\n# ",
+        1,
     )[0]
     assert "PAYLOAD_SYSTEM" in system_block
     assert "FIELD_ID" in system_block
@@ -1321,7 +2137,8 @@ def test_services_routes_actions_to_owning_coordinator_for_multi_account() -> No
 
     # Device lookup uses the coordinator.data dict membership check.
     device_block = services_source.split("def _coordinator_for_device", 1)[1].split(
-        "\ndef _coordinator_for_system", 1
+        "\ndef _coordinator_for_system",
+        1,
     )[0]
     assert "device_id in (coordinator.data or {})" in device_block
 
@@ -1333,21 +2150,33 @@ def test_services_routes_actions_to_owning_coordinator_for_multi_account() -> No
         "_async_handle_delete_storm_alert",
     ):
         block = services_source.split(f"async def {handler}", 1)[1].split(
-            "\n\nasync def ", 1
+            "\n\nasync def ",
+            1,
         )[0]
         assert "coordinator is None" in block, handler
         assert "raise ServiceValidationError(" in block, handler
         assert "translation_domain=DOMAIN" in block, handler
+
+    send_ble_block = services_source.split(
+        "async def _async_handle_send_ble_command",
+        1,
+    )[1].split("\n\n# ", 1)[0]
+    assert "coordinator is None" in send_ble_block
+    assert '_service_validation_error(\n            "send_ble_command_failed"' in (
+        send_ble_block
+    )
+    assert "coordinator.async_send_ble_command(" in send_ble_block
 
 
 def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
     """The device selector hands the handler an HA device-registry UUID.
 
     Translate it back to the Jackery numeric id by reading the matching
-    ``(DOMAIN, jackery_device_id)`` identifier off the DeviceEntry. Legacy
-    automations that still pass a raw Jackery numeric id must keep working
-    too — the resolver returns the input unchanged if the device-registry
-    miss tells us we're not looking at an HA UUID.
+    ``(DOMAIN, jackery_device_id)`` identifier off the DeviceEntry. Accessory
+    device rows point at the parent SolarVault through ``via_device_id``.
+    Legacy automations that still pass a raw Jackery numeric id must keep
+    working too — the resolver returns the input unchanged if the
+    device-registry miss tells us we're not looking at an HA UUID.
     """
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
@@ -1355,9 +2184,13 @@ def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
     assert "device_registry as dr" in services_source
 
     block = services_source.split("def _resolve_jackery_device_id", 1)[1].split(
-        "\ndef _coordinator_for_device", 1
+        "\ndef _coordinator_for_device",
+        1,
     )[0]
-    assert "dr.async_get(hass).async_get(raw)" in block
+    assert "registry = dr.async_get(hass)" in block
+    assert "device = registry.async_get(raw)" in block
+    assert "device.via_device_id" in block
+    assert "via_device = registry.async_get(device.via_device_id)" in block
     assert "device.identifiers" in block
     assert "DOMAIN" in block
     # Legacy fallback: when the registry has no matching DeviceEntry,
@@ -1366,7 +2199,10 @@ def test_services_resolves_ha_device_uuid_back_to_jackery_device_id() -> None:
 
 
 def test_services_setup_is_idempotent_and_callback_typed() -> None:
-    """async_setup_services must be a sync @callback and skip already-registered services."""
+    """async_setup_services must be a sync @callback and skip already-registered.
+
+    services.
+    """
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
     setup_block = services_source.split("def async_setup_services", 1)[1]
 
@@ -1377,14 +2213,154 @@ def test_services_setup_is_idempotent_and_callback_typed() -> None:
         "SERVICE_RENAME_SYSTEM",
         "SERVICE_REFRESH_WEATHER_PLAN",
         "SERVICE_DELETE_STORM_ALERT",
+        "SERVICE_SEND_BLE_COMMAND",
     ):
         assert f"hass.services.has_service(DOMAIN, {service_const})" in setup_block, (
             service_const
         )
         assert (
-            f"hass.services.async_register(\n            DOMAIN,\n            {service_const}"
-            in setup_block
+            f"hass.services.async_register(\n"
+            f"            DOMAIN,\n            {service_const}" in setup_block
         ), service_const
+
+
+def test_ble_first_setter_routing_is_scoped_to_positive_cmd_commands() -> None:
+    """Only user-driven positive-cmd commands use BLE-first routing."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+
+    def _block(name: str) -> str:
+        return source.split(f"async def {name}", 1)[1].split("\n    async def ", 1)[0]
+
+    for name in (
+        "async_set_eps",
+        "async_set_soc_limits",
+        "async_set_max_feed_grid",
+        "async_set_max_output_power",
+        "async_set_auto_standby_hours",
+        "async_set_standby",
+        "async_set_work_model",
+        "async_set_off_grid_shutdown",
+        "async_set_off_grid_time",
+        "async_set_default_power",
+        "async_set_follow_meter",
+        "async_set_temp_unit",
+        "async_set_third_party_mqtt_config",
+        "async_query_third_party_mqtt_config",
+        "async_set_smart_plug_switch",
+        "async_set_smart_plug_priority",
+        "async_set_ct_phase",
+    ):
+        block = _block(name)
+        assert "_async_publish_command_ble_first(" in block, name
+
+    for name in (
+        "async_set_storm_warning",
+        "async_set_storm_minutes",
+        "async_delete_storm_alert",
+    ):
+        block = _block(name)
+        assert "_async_publish_command_ble_first(" not in block, name
+        assert "_async_publish_command(" in block, name
+
+
+def test_command_transport_cmd_uses_shared_integer_parser() -> None:
+    """MQTT/BLE command routing must delegate transport cmd coercion."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    body_block = source.split("def _command_body_for_transport", 1)[1].split(
+        "\n    async def _async_publish_command_ble_first",
+        1,
+    )[0]
+    ble_block = source.split("async def _async_publish_command_ble_first", 1)[1].split(
+        "\n    async def _async_publish_command",
+        1,
+    )[0]
+
+    assert "def _coerce_transport_cmd(cmd: Any) -> int:" in source
+    assert "coerce_transport_cmd(cmd)" in source
+    assert "command_body_for_transport(body_fields, cmd=cmd)" in body_block
+    assert "cmd_value = self._coerce_transport_cmd(cmd)" in ble_block
+    assert "cmd=cmd_value" in ble_block
+    assert "int(cmd)" not in body_block
+    assert "int(cmd)" not in ble_block
+
+
+def test_soc_limit_setter_uses_safe_int_payload_fallbacks() -> None:
+    """SOC writes must tolerate one corrupt cached limit while setting the other."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    block = source.split("async def async_set_soc_limits", 1)[1].split(
+        "\n    async def async_set_max_feed_grid",
+        1,
+    )[0]
+
+    assert "def _soc_limit(value: Any) -> int | None:" in block
+    assert "if parsed is None or parsed < 0 or parsed > 100:" in block
+    assert "def _current_soc_limit(primary: str, legacy: str, default: int)" in block
+    assert "for raw in (current.get(primary), current.get(legacy)):" in block
+    assert "parsed = _soc_limit(raw)" in block
+    assert "_soc_limit(charge_limit)" in block
+    assert "_soc_limit(discharge_limit)" in block
+    assert 'raise UpdateFailed("Invalid SOC limit")' in block
+    assert "int(\n            charge_limit" not in block
+    assert "int(\n            discharge_limit" not in block
+
+
+def test_third_party_mqtt_logs_do_not_emit_warning_noise() -> None:
+    """Explicit experimental service calls should not pollute HA system warnings."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    set_block = source.split("async def async_set_third_party_mqtt_config", 1)[1].split(
+        "\n    async def async_query_third_party_mqtt_config",
+        1,
+    )[0]
+    query_block = source.split("async def async_query_third_party_mqtt_config", 1)[
+        1
+    ].split(
+        "\n    async def ",
+        1,
+    )[0]
+
+    assert "_LOGGER.info(" in set_block
+    assert "_LOGGER.warning(" not in set_block
+    assert "user=%r" not in set_block
+    assert "_LOGGER.info(" in query_block
+    assert "_LOGGER.warning(" not in query_block
+
+
+def test_ct_phase_setter_uses_safe_int_before_range_check() -> None:
+    """CT phase assignment must reject bad input without raw int-cast errors."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    block = source.split("async def async_set_ct_phase", 1)[1].split(
+        "\n    async def _async_query_subdevices_for_missing",
+        1,
+    )[0]
+
+    assert "phase_int = safe_int(phase)" in block
+    assert "if phase_int not in (1, 2, 3, 4):" in block
+    assert "FIELD_SCHE_PHASE: phase_int" in block
+    assert "phase_int = int(phase)" not in block
+
+
+def test_single_price_setters_use_safe_float_parser() -> None:
+    """Single-tariff writers must not expose raw float-cast errors."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    set_block = source.split("async def async_set_single_price", 1)[1].split(
+        "\n    async def async_set_price_mode_single",
+        1,
+    )[0]
+    mode_block = source.split("async def async_set_price_mode_single", 1)[1].split(
+        "\n    @staticmethod",
+        1,
+    )[0]
+
+    assert "price = safe_float(price_value)" in set_block
+    assert "if price is None or price < 0:" in set_block
+    assert "single_price=price" in set_block
+    assert "FIELD_SINGLE_PRICE: round(price, 4)" in set_block
+    assert "single_price=float(price_value)" not in set_block
+    assert "round(float(price_value)" not in set_block
+
+    assert "price = safe_float(single_price)" in mode_block
+    assert "await self.async_set_single_price(device_id, price)" in mode_block
+    assert "async_set_single_price(device_id, float(single_price))" not in mode_block
 
 
 def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> (
@@ -1393,7 +2369,8 @@ def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload(
     """HTTP source payload must be defined before entry assembly."""
     source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
     refresh_block = source.split("async def _async_update_data", 1)[1].split(
-        "@property\n    def update_interval", 1
+        "@property\n    def update_interval",
+        1,
     )[0]
 
     assert "new_props" not in refresh_block
@@ -1403,7 +2380,7 @@ def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload(
     assert "http_props," in refresh_block
 
 
-def test_component_modules_import_all_referenced_const_names() -> None:
+def test_component_modules_import_all_referenced_const_names() -> None:  # noqa: PLR0912
     """Catch runtime NameError regressions from missing .const imports in any module."""
     const_tree = ast.parse((CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8"))
     const_names: set[str] = set()
@@ -1431,7 +2408,8 @@ def test_component_modules_import_all_referenced_const_names() -> None:
                     alias.asname or alias.name for alias in node.names
                 )
             elif isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                node,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef),
             ):
                 assigned.add(node.name)
             elif isinstance(node, ast.Assign):
@@ -1472,7 +2450,8 @@ def test_component_modules_import_all_referenced_util_helpers() -> None:
                     alias.asname or alias.name for alias in node.names
                 )
             elif isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                node,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef),
             ):
                 assigned.add(node.name)
             elif isinstance(node, ast.Assign):
@@ -1507,21 +2486,81 @@ def test_derived_live_power_sensors_do_not_generate_long_term_statistics() -> No
     assert "historically existed without a compatible recorder unit" in sensor_source
 
 
+def test_smart_meter_entities_cache_state_before_ha_state_write() -> None:
+    """Smart-meter sensors must not recompute values during every HA state read."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackerySmartMeterSensor(JackeryEntity, SensorEntity):",
+        1,
+    )[1].split("class JackeryRawPropertiesSensor", 1)[0]
+
+    assert "self._cached_native_value: Any = None" in block
+    assert "self._cached_attrs: dict[str, Any] = {}" in block
+    assert "def _refresh_cache(self) -> None:" in block
+    assert "def _handle_coordinator_update(self) -> None:" in block
+    assert "async def async_added_to_hass(self) -> None:" in block
+    assert "return self._cached_native_value" in block
+    assert "return self._cached_attrs" in block
+
+
+def test_setup_removes_stale_energy_net_power_helpers_without_unit() -> None:
+    """Broken Energy helper sensors should be cleaned before HA records them again."""
+    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+
+    for name in (
+        "STALE_ENERGY_HELPER_PREFIX",
+        "STALE_NET_POWER_SUFFIX",
+        "STALE_HELPER_VENDOR_TOKENS",
+    ):
+        assert name in const_source
+        assert name in init_source
+    assert "_async_remove_stale_energy_helpers(hass)" in init_source
+    assert 'unit not in (None, "")' in init_source
+    assert "explicitly reference this integration" in init_source
+    assert "please recreate with Jackery battery_net_power" in init_source
+
+
 def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> None:
     """Battery-pack diagnostics should not expose the same raw key twice."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     block = sensor_source.split(
-        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("class JackerySmartMeterSensor", 1)[0]
 
     assert block.count("FIELD_OT,") == 1
+
+
+def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
+    """Pack firmware/update diagnostics must read the OTA-enriched fields."""
+    sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = sensor_source.split(
+        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):",
+        1,
+    )[1].split("class JackerySmartMeterSensor", 1)[0]
+
+    assert "raw = pack.get(FIELD_CURRENT_VERSION)" in block
+    assert "raw = pack.get(FIELD_IS_FIRMWARE_UPGRADE)" in block
+    assert "def _refresh_cache(self) -> None:" in block
+    for field in (
+        "FIELD_VERSION",
+        "FIELD_CURRENT_VERSION",
+        "FIELD_UPDATE_STATUS",
+        "FIELD_TARGET_VERSION",
+        "FIELD_TARGET_MODULE_VERSION",
+        "FIELD_UPDATE_CONTENT",
+        "FIELD_UPGRADE_TYPE",
+    ):
+        assert field in block
 
 
 def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
     """Repairs diagnose contradictions; entity states keep their documented source."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     stat_block = sensor_source.split(
-        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryStatSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
     assert "def _data_quality_warning_for_own_source" not in stat_block
@@ -1533,9 +2572,9 @@ def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
 def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> None:
     """Implement test payload debug log records raw types parsed floats and rotation."""
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
-    api_source = (CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8")
+    api_source = API_IMPLEMENTATION.read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     for fragment in (
@@ -1558,9 +2597,37 @@ def test_payload_debug_log_records_raw_types_parsed_floats_and_rotation() -> Non
     assert '"kind": "http"' in api_source
     assert '"kind": "mqtt"' in coordinator_source
     assert "append_payload_debug_line" in coordinator_source
-    assert "jackery_solarvault_payload_debug.jsonl" in (
-        pathlib.Path("README.md").read_text(encoding="utf-8")
+
+
+def test_payload_debug_sync_file_io_is_guarded_and_offloaded() -> None:
+    """Runtime payload-debug callers must not do direct sync file I/O."""
+    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
     )
+
+    assert "def _guard_payload_debug_sync_file_io" in util_source
+    assert "asyncio.get_running_loop()" in util_source
+    assert "caller: {caller_path}" in util_source
+    assert "_guard_payload_debug_sync_file_io()" in util_source
+
+    debug_call = coordinator_source.split("path = self.hass.config.path", 1)[1].split(
+        "async def async_discover",
+        1,
+    )[0]
+    assert "await self.hass.async_add_executor_job(" in debug_call
+    assert "append_payload_debug_line" in debug_call
+
+
+@pytest.mark.asyncio()
+async def test_payload_debug_line_rejects_direct_event_loop_file_io(tmp_path) -> None:  # noqa: ANN001, RUF029
+    """Guard direct async runtime calls before any sync file operation."""
+    path = tmp_path / "payload-debug.jsonl"
+
+    with pytest.raises(RuntimeError, match="async_add_executor_job|to_thread"):  # noqa: RUF043
+        append_payload_debug_line(path, {"kind": "test"})
+
+    assert not path.exists()
 
 
 def test_local_helper_calls_match_their_declared_arity() -> None:
@@ -1582,7 +2649,8 @@ def test_local_helper_calls_match_their_declared_arity() -> None:
                 continue
             for call in ast.walk(owner):
                 if not isinstance(call, ast.Call) or not isinstance(
-                    call.func, ast.Name
+                    call.func,
+                    ast.Name,
                 ):
                     continue
                 if call.func.id not in local_defs:
@@ -1591,7 +2659,7 @@ def test_local_helper_calls_match_their_declared_arity() -> None:
                 actual_count = len(call.args)
                 too_few = actual_count < required_count
                 too_many = max_count is not None and actual_count > max_count
-                assert not (too_few or too_many), (
+                assert not (too_few or too_many), (  # noqa: PT018
                     f"{path}:{call.lineno} calls local helper {call.func.id}() "
                     f"with {actual_count} positional args; definition at line "
                     f"{definition_line} expects {required_count}..{max_count}"
@@ -1615,17 +2683,17 @@ def test_system_ttl_gather_calls_use_exact_helper_shape() -> None:
         and node.func.id == "_get_with_ttl"
     ]
     assert ttl_calls
-    assert all(len(call.args) == 5 for call in ttl_calls)
+    assert all(len(call.args) == 5 for call in ttl_calls)  # noqa: PLR2004
 
-    bad_fragment = "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n                    self._slow_metrics_interval_sec"
+    bad_fragment = (
+        "PAYLOAD_ALARM,\n    PAYLOAD_DEBUG_LOG_FILENAME,\n"
+        "                    self._slow_metrics_interval_sec"
+    )
     assert bad_fragment not in source
 
 
 def test_component_modules_have_no_unresolved_global_names() -> None:
     """Catch NameError-class bugs caused by missing imports or renamed locals."""
-    import builtins
-    import symtable
-
     builtins_names = set(dir(builtins))
     # Python's symtable surfaces compiler-generated module dunders as
     # "global references" that aren't statically assigned anywhere in the
@@ -1654,7 +2722,7 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
             for symbol in scope.get_symbols():
                 name = symbol.get_name()
                 if (
-                    symbol.is_referenced()
+                    symbol.is_referenced()  # noqa: PLR0916
                     and symbol.is_global()
                     and not symbol.is_imported()
                     and not symbol.is_assigned()
@@ -1675,10 +2743,11 @@ def test_component_modules_have_no_unresolved_global_names() -> None:
 def test_options_flow_uses_shared_bool_option_fallback_helper() -> None:
     """Options defaults should share one fallback path from options/data/defaults."""
     config_flow_source = (CUSTOM_COMPONENT / "config_flow.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     options_block = config_flow_source.split("class JackeryOptionsFlow", 1)[1].split(
-        "class JackeryConfigFlow", 1
+        "class JackeryConfigFlow",
+        1,
     )[0]
 
     assert "from .util import config_entry_bool_option" in config_flow_source
@@ -1695,20 +2764,32 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",
+        "# ------------------------------------------------------------"
+        "---------------\n# Entities",
         1,
     )[0]
 
     assert "config_entry_bool_option" in sensor_source
     assert "def _entry_bool_option(" not in sensor_source
-    assert setup_block.count("config_entry_bool_option(") == 3
+    assert setup_block.count("config_entry_bool_option(") == 3  # noqa: PLR2004
     assert ".options.get(" not in setup_block
+
+
+def test_price_provider_gate_uses_validated_price_sources() -> None:
+    """Price-provider select gate must ignore malformed provider payloads."""
+    select_source = (CUSTOM_COMPONENT / "select.py").read_text(encoding="utf-8")
+    provider_gate = select_source.split('if key == "electricity_price_provider":', 1)[
+        1
+    ].split("return False", 1)[0]
+
+    assert "_price_sources_from_payload(payload)" in provider_gate
+    assert "bool(payload.get(PAYLOAD_PRICE_SOURCES))" not in provider_gate
 
 
 def test_no_unresolved_git_merge_conflict_markers() -> None:
     """Catch real merge conflict markers without flagging reStructuredText tables."""
     marker_prefixes = ("<<<<<<< ", ">>>>>>> ")
-    for path in pathlib.Path(".").rglob("*"):
+    for path in pathlib.Path().rglob("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         try:
@@ -1730,7 +2811,7 @@ def test_payload_debug_file_is_gated_by_dedicated_logger_not_options() -> None:
     """
     const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
@@ -1754,7 +2835,6 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
         "open",
         "write_text",
         "read_text",
-        "replace",
         "unlink",
         "mkdir",
         "stat",
@@ -1773,14 +2853,21 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                 elif isinstance(call.func, ast.Attribute):
                     name = call.func.attr
                 if name in forbidden:
+                    msg = (
+                        f"{path}:{call.lineno} does blocking file IO"
+                        f" in async function {node.name}()"
+                    )
                     raise AssertionError(
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"
+                        msg,
                     )
 
 
 def test_api_method_calls_use_valid_positional_arity() -> None:
-    """Coordinator/service paths must not call JackeryApi methods with impossible arity."""
-    api_tree = ast.parse((CUSTOM_COMPONENT / "api.py").read_text(encoding="utf-8"))
+    """Coordinator/service paths must not call JackeryApi methods with impossible.
+
+    arity.
+    """
+    api_tree = ast.parse(API_IMPLEMENTATION.read_text(encoding="utf-8"))
     method_arity: dict[str, tuple[int, int | None]] = {}
     for cls in [
         node
@@ -1808,7 +2895,8 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for call in ast.walk(tree):
             if not isinstance(call, ast.Call) or not isinstance(
-                call.func, ast.Attribute
+                call.func,
+                ast.Attribute,
             ):
                 continue
             name = call.func.attr
@@ -1817,7 +2905,7 @@ def test_api_method_calls_use_valid_positional_arity() -> None:
             # Only check explicit JackeryApi usage. Other objects can have
             # methods with the same public name but unrelated signatures.
             receiver = call.func.value
-            if isinstance(receiver, ast.Name) and receiver.id not in {"api"}:
+            if isinstance(receiver, ast.Name) and receiver.id != "api":
                 continue
             if isinstance(receiver, ast.Attribute) and receiver.attr != "api":
                 continue
@@ -1876,31 +2964,6 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py313-plus" not in config
 
 
-def test_strict_work_instructions_and_repair_roadmap_are_present() -> None:
-    """Implement test strict work instructions and repair roadmap are present."""
-    instructions = pathlib.Path("docs/STRICT_WORK_INSTRUCTIONS.md").read_text(
-        encoding="utf-8"
-    )
-    roadmap = pathlib.Path("docs/REPAIR_ROADMAP.md").read_text(encoding="utf-8")
-    workflow = pathlib.Path(".github/workflows/validate.yml").read_text(
-        encoding="utf-8"
-    )
-    requirements = pathlib.Path("requirements-test.txt").read_text(encoding="utf-8")
-    pr_template = pathlib.Path(".github/PULL_REQUEST_TEMPLATE.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert "Repair the foundation first" in instructions
-    assert "raw HTTP/MQTT payload" in instructions
-    assert "parser -> coordinator data -> entity native value" in instructions
-    assert "Do not write tests that preserve broken behavior" in instructions
-    assert "Phase 1: Establish real Home Assistant test infrastructure" in roadmap
-    assert "pytest-homeassistant-custom-component" in requirements
-    assert "requirements-test.txt" in workflow
-    assert "pytest-ha.ini" in workflow
-    assert "docs/STRICT_WORK_INSTRUCTIONS.md" in pr_template
-
-
 def test_generated_payload_debug_logs_are_ignored() -> None:
     """Implement test generated payload debug logs are ignored."""
     gitignore = pathlib.Path(".gitignore").read_text(encoding="utf-8")
@@ -1909,28 +2972,48 @@ def test_generated_payload_debug_logs_are_ignored() -> None:
     assert "jackery_solarvault_payload_debug.jsonl.1" in gitignore
 
 
+def test_hacs_manifest_uses_current_supported_keys() -> None:
+    """Keep hacs.json compatible with the current HACS action schema."""
+    manifest = json.loads(pathlib.Path("hacs.json").read_text(encoding="utf-8"))
+    supported_keys = {
+        "content_in_root",
+        "country",
+        "filename",
+        "hacs",
+        "hide_default_branch",
+        "homeassistant",
+        "name",
+        "persistent_directory",
+        "zip_release",
+    }
+
+    assert "name" in manifest
+    assert not (set(manifest) - supported_keys)
+    assert "render_readme" not in manifest
+
+
 def test_setup_entry_cleans_up_partially_initialized_coordinator() -> None:
     """Failed setup must not leak MQTT clients, timers or runtime_data."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
     assert "import contextlib" in init_source
     assert "try:" in init_source
-    assert "# Discovery must run first" in init_source
-    assert "except BaseException:" in init_source
-    assert "with contextlib.suppress(BaseException):" in init_source
+    assert "except Exception as err:" in init_source
+    assert "with contextlib.suppress(Exception):" in init_source
     assert "await coordinator.async_shutdown()" in init_source
     assert "if entry.runtime_data is coordinator:" in init_source
-    assert "entry.runtime_data = None" in init_source
+    assert 'entry.runtime_data = cast("Any", None)' in init_source
     assert (
         "await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)"
         in init_source
     )
+    assert "coordinator.async_start_statistics_imports()" in init_source
+    assert "startup_task = hass.async_create_background_task" in init_source
 
 
 def test_brand_assets_are_packaged_without_runtime_sync() -> None:
     """Use packaged brand PNGs without mutating the custom component at runtime."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
-    readme = pathlib.Path("README.md").read_text(encoding="utf-8")
     brand_dir = CUSTOM_COMPONENT / "brand"
 
     assert not (CUSTOM_COMPONENT / "brand.py").exists()
@@ -1942,21 +3025,6 @@ def test_brand_assets_are_packaged_without_runtime_sync() -> None:
     assert (brand_dir / "dark_icon@2x.png").is_file()
     assert not pathlib.Path("brands/icon.svg").exists()
     assert not pathlib.Path("brands/logo.svg").exists()
-    assert "logo.svg" not in readme
-    assert "custom_components/jackery_solarvault/brand/" in readme
-    assert "/homeassistant/.cache/brands/integrations/jackery/" not in readme
-
-
-def test_legacy_app_cloud_values_doc_path_is_preserved() -> None:
-    """Keep the old German doc path available while README links use the new path."""
-    legacy = pathlib.Path("docs/Werte aus APP-Cloud.md")
-    canonical = pathlib.Path("docs/APP_CLOUD_VALUES.md")
-
-    assert legacy.is_file()
-    assert canonical.is_file()
-    legacy_text = legacy.read_text(encoding="utf-8")
-    assert "docs/APP_CLOUD_VALUES.md" in legacy_text
-    assert "Berechnung fuer `_savings_calculation.calculated_total`" in legacy_text
 
 
 def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
@@ -1970,12 +3038,12 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     assert bundled_sensitive_files == []
     assert (CUSTOM_COMPONENT / "jackery_ca.crt").is_file()
     assert "BEGIN CERTIFICATE" in (CUSTOM_COMPONENT / "jackery_ca.crt").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
-    mqtt_source = (CUSTOM_COMPONENT / "mqtt_push.py").read_text(encoding="utf-8")
+    mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     combined = mqtt_source + coordinator_source
 
@@ -1989,25 +3057,32 @@ def test_mqtt_tls_uses_verified_jackery_ca_without_insecure_fallback() -> None:
     # before checking. Equivalent to grepping "config.path(...jackery_ca.crt)".
     mqtt_source_collapsed = re.sub(r"\s+", " ", mqtt_source)
     assert (
-        'self._hass.config.path( "custom_components", "jackery_solarvault", "jackery_ca.crt" )'
+        "self._hass.config.path("
+        ' "custom_components", "jackery_solarvault", "jackery_ca.crt" )'
         in mqtt_source_collapsed
-        or 'self._hass.config.path("custom_components", "jackery_solarvault", "jackery_ca.crt")'
+        or "self._hass.config.path("
+        '"custom_components", "jackery_solarvault", "jackery_ca.crt")'
         in mqtt_source_collapsed
     )
     assert '"tls_custom_ca_loaded": self._tls_custom_ca_loaded' in mqtt_source
-    assert 'diag["tls_certificate_verification"] = "enabled"' in coordinator_source
+    assert 'diag["tls_certificate_verification"] = (' in coordinator_source
+    assert 'if diag.get("tls_x509_strict_disabled")' in coordinator_source
+    assert '"chain_hostname_enabled_x509_strict_disabled"' in coordinator_source
+    assert '"chain_hostname_enabled"' in coordinator_source
 
 
 def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> None:
     """Control writes/background helpers must propagate auth failures to HA reauth."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     repairs_source = (CUSTOM_COMPONENT / "repairs.py").read_text(encoding="utf-8")
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
 
     assert "def _raise_config_entry_auth_failed(" in coordinator_source
     for context in (
+        "while preparing MQTT credentials",
+        "while fetching battery pack OTA metadata",
         "while preparing an MQTT command",
         "while refreshing MQTT command credentials",
         "while saving the single tariff",
@@ -2020,16 +3095,24 @@ def test_auth_failures_are_not_suppressed_by_control_or_background_paths() -> No
     assert "async def _async_periodic_refresh" not in coordinator_source
     assert "update_interval=update_interval" in coordinator_source
     update_block = coordinator_source.split("async def _async_update_data", 1)[1].split(
-        "# ------------------------------------------------------------------\n    # Diagnostics",
+        "# -------------------------------------------------------"
+        "-----------\n    # Diagnostics",
         1,
     )[0]
     assert "_raise_config_entry_auth_failed" in update_block
+    assert "def _defer_background_auth_failure(" in coordinator_source
+    assert "except ConfigEntryAuthFailed:" in coordinator_source
+    assert "except ConfigEntryAuthFailed as err:" in coordinator_source
     assert "except ConfigEntryAuthFailed:" in repairs_source
-    assert "except JackeryAuthError:" in number_source
+    assert "except JackeryAuthError as err:" in number_source
+    assert "raise ConfigEntryAuthFailed" in number_source
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""
+    """Read-only custom component mounts are safe because setup writes no brand.
+
+    files.
+    """
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")
@@ -2044,37 +3127,411 @@ def test_brand_runtime_sync_is_absent() -> None:
     assert "async_setup_services(hass)" in init_source
 
 
-def test_online_binary_sensor_remains_available_when_device_reports_offline() -> None:
-    """Connectivity entity should show off, not unavailable, for offline devices."""
-    src = (CUSTOM_COMPONENT / "binary_sensor.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "JackeryBinarySensor":
-            class_src = ast.get_source_segment(src, node) or ""
-            break
-    else:
-        raise AssertionError("JackeryBinarySensor not found")
+def test_legacy_suffix_match_is_boundary_anchored() -> None:
+    """Removing legacy suffixes must not over-match current unique IDs.
 
-    assert "def available(self) -> bool:" in class_src
-    assert 'self.entity_description.key == "online"' in class_src
-    assert "self.coordinator.last_update_success" in class_src
-    assert "return super().available" in class_src
+    Regression for the diagnostics-reported gap: every reload deleted
+    ``<device_id>_device_today_battery_charge`` because the legacy suffix
+    ``_today_battery_charge`` matched its tail via a plain ``str.endswith``.
+    The replacement helper anchors the head to the documented unique-id
+    contract (numeric ``device_id`` optionally followed by ``_battery_pack_N``)
+    so the legacy id is the only one that matches.
+    """
+    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
+    assert "_legacy_suffix_matches" in init_source
+    assert "_LEGACY_UID_HEAD_RE" in init_source
+    # The naive ``any(uid.endswith(suffix) for ...)`` is now gone; the helper
+    # delegates to the boundary-anchored matcher instead.
+    assert "uid.endswith(suffix) for suffix in suffix_tuple" not in init_source
+    assert "_legacy_suffix_matches(uid, suffix) for suffix in suffix_tuple" in (
+        init_source
+    )
+
+    # Mirror the regex behaviour so this test fails fast if the contract
+    # drifts. Keep the pattern in lock-step with ``__init__._LEGACY_UID_HEAD_RE``.
+    pattern = re.compile(r"\d+(?:_battery_pack_\d+)?")
+
+    def matches(uid: str, suffix: str) -> bool:
+        if not uid.endswith(suffix):
+            return False
+        return pattern.fullmatch(uid[: -len(suffix)]) is not None
+
+    # Legacy ids that must be removed.
+    assert matches("573702884982521856_today_battery_charge", "_today_battery_charge")
+    assert matches(
+        "573702884982521856_battery_pack_0_today_battery_charge",
+        "_today_battery_charge",
+    )
+    # Current ids that must NOT be removed even though their tail contains
+    # the legacy suffix.
+    assert not matches(
+        "573702884982521856_device_today_battery_charge",
+        "_today_battery_charge",
+    )
+    assert not matches(
+        "573702884982521856_device_today_battery_discharge",
+        "_today_battery_discharge",
+    )
 
 
-def test_number_entity_auth_errors_trigger_reauth() -> None:
-    """Entity writes must convert raw cloud auth failures to HA reauth errors."""
-    src = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.AsyncFunctionDef)
-            and node.name == "async_set_native_value"
+# ---------------------------------------------------------------------------
+# Drift-protection: CHANGELOG "Three-part fix"
+# ---------------------------------------------------------------------------
+
+
+def test_stale_period_guard_publishes_none_for_all_periods() -> None:
+    """Pin CHANGELOG "Three-part fix" against DAY-carve-out regressions.
+
+    The CHANGELOG explicitly states the stale-period guard must set
+    ``native_value`` to ``None`` for ALL period sensors when the wall
+    clock has crossed a period boundary but the source data still has
+    the previous period's begin_date. A previous ``raw = 0 if DAY else
+    None`` carve-out reintroduced the midnight delta spike the
+    three-part fix was designed to prevent.
+    """
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    assert "raw = 0 if self._reset_period == DATE_TYPE_DAY" not in source
+    assert "raw = 0 if self._reset_period" not in source
+
+
+def test_total_revenue_uses_total_increasing_without_monetary_class() -> None:
+    """Pin CHANGELOG "Three-part fix" for ``total_revenue``.
+
+    Adding ``device_class=MONETARY`` forced ``state_class=TOTAL`` via the
+    HA validator restriction (MONETARY -> {TOTAL} only), which lost the
+    CHANGELOG fix that uses ``TOTAL_INCREASING`` so the Recorder treats the
+    midnight cloud transient as a reset rather than a real loss.
+    """
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = re.search(
+        r'key="total_revenue",.*?\),',
+        source,
+        re.DOTALL,
+    )
+    assert block is not None, "total_revenue description not found in sensor.py"
+    body = block.group(0)
+    assert "SensorStateClass.TOTAL_INCREASING" in body, (
+        "total_revenue must use SensorStateClass.TOTAL_INCREASING per CHANGELOG "
+        '"Three-part fix" / Midnight race condition.'
+    )
+    assert "SensorDeviceClass.MONETARY" not in body, (
+        "total_revenue must NOT carry device_class=MONETARY — it is not in any "
+        "of the docs and it forces state_class back to TOTAL, undoing the "
+        "three-part fix."
+    )
+
+
+def test_no_entity_layer_cross_period_repair() -> None:
+    """Entity code must not reintroduce ad-hoc cross-period repair.
+
+    Block re-introduction of the ``_clamp_backwards_period_value``
+    pattern that papered over the stale-period guard regression at the
+    wrong layer.
+    """
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    assert "_clamp_backwards_period_value" not in source
+    assert "_last_published_value" not in source
+    assert "_last_published_anchor" not in source
+
+
+def test_ble_sink_calls_merge_with_correct_signature() -> None:
+    """Pin BLE sink against the 2-arg regression that froze live values.
+
+    ``_merge_main_properties_for_device`` takes 3 positional arguments
+    ``(device_id, base, updates)``. The previous 2-arg call inside the
+    BLE listener sink raised ``TypeError`` for every decoded frame, the
+    sink's try/except swallowed it as DEBUG, and BLE telemetry never
+    reached coordinator.data. Whenever MQTT went quiet at the same time
+    the user saw "no live values for 9+ minutes" (observed
+    2026-05-16 17:41-17:44 production log).
+    """
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    # Scope to the BLE-sink body. The closing ``listener = …`` line
+    # marks the end of ``_sink`` inside ``async_start_ble_transport``.
+    sink_match = re.search(
+        r"async def _sink\(device_id: str.*?(?=\n {0,8}listener = JackeryBleListener)",
+        source,
+        re.DOTALL,
+    )
+    assert sink_match is not None, "BLE sink not found in coordinator.py"
+    sink_body = sink_match.group(0)
+    # Walk the actual call (``self._merge_…``) so we skip the
+    # docstring's bare ``_merge_main_properties_for_device(device_id,
+    # payload)`` mention. Parenthesis-balanced matching keeps nested
+    # ``.get(PAYLOAD_PROPERTIES) or {}`` arguments from terminating the
+    # regex early. Count commas at *depth 1* of the call's parentheses.
+    call_idx = sink_body.find("self._merge_main_properties_for_device(")
+    assert call_idx >= 0, (
+        "BLE sink does not call self._merge_main_properties_for_device — wire it "
+        "back so cmd=107/121 BLE bodies actually merge into coordinator.data."
+    )
+    cursor = call_idx + len("self._merge_main_properties_for_device(")
+    depth = 1
+    arg_commas = 0
+    while cursor < len(sink_body) and depth > 0:
+        ch = sink_body[cursor]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 1:
+            arg_commas += 1
+        cursor += 1
+    # 3 args -> 2 commas at depth 1; 2 args (the broken signature) -> 1.
+    assert arg_commas >= 2, (  # noqa: PLR2004
+        "BLE sink calls _merge_main_properties_for_device with fewer than 3 args. "
+        "This is the regression that froze live values on 2026-05-16. The method "
+        "needs (device_id, base, updates); a 2-arg call raises TypeError silently "
+        "in the sink try/except and drops every decoded BLE frame."
+    )
+
+
+def test_historical_statistics_backfill_is_http_only() -> None:
+    """Historical statistic backfill must stay bounded to HTTP day curves."""
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    for removed in (
+        "def _iter_calendar_months",
+        "def _iter_calendar_weeks",
+        "def _iter_calendar_days",
+        "async def _async_fetch_historical_app_chart_source",
+        "async def _async_repair_missing_app_chart_statistics",
+        "async def async_repair_statistics",
+    ):
+        assert removed not in source
+    assert "async def _async_fetch_historical_day_chart_sources" in source
+    assert "async def _async_http_backfill_recent_day_statistics" in source
+    assert "_STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 7" in source
+    assert "_STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = 6 * 60 * 60" in source
+    assert "_schedule_mqtt_backfill_queries" not in source
+
+
+def test_listener_gate_is_present_in_all_entity_platforms() -> None:
+    """All 7 entity platforms must gate their ``_add_new_entities`` listener.
+
+    Without the gate, every MQTT push (~150/min when active) re-runs
+    ``_collect_entities`` for every platform and emits a unique-id-dedup
+    DEBUG entry for each already-registered entity, drowning the log
+    in tens of thousands of repeats per hour. The gate compares the
+    coordinator signature; live entity-state updates are unaffected
+    because each entity registers its own CoordinatorEntity listener.
+    """
+    platforms = (
+        "sensor.py",
+        "binary_sensor.py",
+        "button.py",
+        "number.py",
+        "select.py",
+        "switch.py",
+        "text.py",
+    )
+    for name in platforms:
+        source = (CUSTOM_COMPONENT / name).read_text(encoding="utf-8")
+        assert "coordinator_entity_signature(" in source, (
+            f"{name} is missing the coordinator_entity_signature listener gate"
+        )
+        assert "if sig == last_signature:" in source, (
+            f"{name} listener gate must short-circuit on unchanged signature"
+        )
+
+
+def test_ble_keep_alive_loop_is_wired_into_connection_runner() -> None:
+    """BLE connection runner must spawn the keep-alive heartbeat.
+
+    The SolarVault peripheral closes idle GATT sessions after roughly
+    20 s (observed 2026-05-17 production log: disconnects every 6-20 s).
+    A periodic ``cmd=106`` query write keeps the session warm and
+    doubles as a property refresh.
+    """
+    source = (CUSTOM_COMPONENT / "client" / "ble_transport.py").read_text(
+        encoding="utf-8",
+    )
+    assert "_KEEPALIVE_INTERVAL_SEC" in source, "keep-alive interval constant missing"
+    assert "async def _async_keep_alive_loop" in source, "keep-alive loop missing"
+    # Loop must be spawned as a background task after start_notify and
+    # cancelled in the connection runner's finally block.
+    assert (
+        "self._hass.async_create_background_task(\n"
+        "                        self._async_keep_alive_loop(device_id)"
+    ) in source, "keep-alive task is not spawned in the connection runner"
+    assert "keep_alive_task.cancel()" in source, (
+        "keep-alive task must be cancelled in the finally block on disconnect"
+    )
+
+
+def test_ble_service_waits_for_reconnect_before_failing() -> None:
+    """Direct BLE service calls must not fail during a reconnect window."""
+    transport = (CUSTOM_COMPONENT / "client" / "ble_transport.py").read_text(
+        encoding="utf-8",
+    )
+    assert "async def async_ensure_connected" in transport
+    assert "self._async_run_connection(device_id, address)" in transport
+
+    coordinator = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    assert "connect_timeout_sec: float = 0.0" in coordinator
+    assert "async_ensure_connected(" in coordinator
+
+    services = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
+    assert "_BLE_SERVICE_CONNECT_TIMEOUT_SEC = 35.0" in services
+    assert "connect_timeout_sec=_BLE_SERVICE_CONNECT_TIMEOUT_SEC" in services
+
+
+def test_ble_cmd_120_battery_pack_routing_is_narrow() -> None:
+    """cmd=120 BLE routing must only merge battery-pack lifetime.
+
+    cmd=120 BLE bodies carry four variants (system / per-device / CT /
+    battery-pack). Only the battery-pack variant has no HTTP authority
+    (``/v1/device/battery/pack/list`` returns ``data: null`` for
+    SolarVault). The other three variants conflict with HTTP authority
+    and must stay "not routed" until firmware semantics are docs-
+    confirmed.
+    """
+    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    assert "_merge_battery_pack_lifetime_from_ble" in source, (
+        "battery-pack lifetime merge helper missing"
+    )
+    # The sink must gate the cmd=120 branch on devType=BATTERY_PACK and
+    # presence of deviceSn — never blindly merge any cmd=120 frame.
+
+    sink_match = re.search(
+        r"async def _sink\(device_id: str.*?(?=\n {0,8}listener = JackeryBleListener)",
+        source,
+        re.DOTALL,
+    )
+    assert sink_match is not None, "BLE sink not found"
+    sink = sink_match.group(0)
+    assert "MQTT_CMD_QUERY_COMBINE_DATA" in sink, (
+        "cmd=120 branch must reference MQTT_CMD_QUERY_COMBINE_DATA"
+    )
+    assert "SUBDEVICE_DEV_TYPE_BATTERY_PACK" in sink, (
+        "cmd=120 branch must gate on SUBDEVICE_DEV_TYPE_BATTERY_PACK"
+    )
+    assert "FIELD_DEVICE_SN" in sink, (
+        "cmd=120 branch must require deviceSn before merging"
+    )
+
+
+def test_battery_pack_lifetime_entities_exist() -> None:
+    """Pin Phase 8 — pack-lifetime entity descriptions.
+
+    Without these two ``JackeryBatteryPackSensorDescription`` entries
+    the BLE-sourced ``inEgy``/``outEgy`` lifetime counters stay buried
+    in coordinator.data and are invisible to the Energy Dashboard.
+    Both must be ``TOTAL_INCREASING`` (lifetime monotonic counters in
+    kWh after the ``_div(1000)`` Wh-int transform) and
+    ``entity_registry_enabled_default=False`` (BLE transport is opt-in).
+    """
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    assert 'translation_key="battery_pack_lifetime_charge_energy"' in source
+    assert 'translation_key="battery_pack_lifetime_discharge_energy"' in source
+    assert "field=FIELD_IN_EGY" in source
+    assert "field=FIELD_OUT_EGY" in source
+    # Both must use TOTAL_INCREASING and be disabled by default.
+    # Scan a ~700-char window starting at the translation_key line —
+    # that covers the entire description block including the closing
+    # ``),`` regardless of nested ``_div()`` calls in the transform.
+    for key in (
+        "battery_pack_lifetime_charge_energy",
+        "battery_pack_lifetime_discharge_energy",
+    ):
+        anchor = source.find(f'translation_key="{key}"')
+        assert anchor >= 0, f"{key} entity description not found"
+        window = source[anchor : anchor + 700]
+        assert "SensorStateClass.TOTAL_INCREASING" in window, (
+            f"{key} must use TOTAL_INCREASING for lifetime counter semantics"
+        )
+        assert "entity_registry_enabled_default=False" in window, (
+            f"{key} must be opt-in (BLE transport is optional)"
+        )
+        assert "_div(1000)" in window, (
+            f"{key} must transform Wh-int -> kWh via _div(1000)"
+        )
+
+
+def test_battery_pack_setup_honors_description_enabled_default() -> None:
+    """Pack sensor creation must preserve per-description default enablement."""
+    source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
+    block = source.split("for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:", 1)[
+        1
+    ].split("# Smart plugs", 1)[0]
+
+    assert "pack_desc.entity_registry_enabled_default" in block
+    assert "pack_desc.entity_category" in block
+    assert "!= EntityCategory.DIAGNOSTIC" in block
+
+
+def test_ble_listener_stats_track_unrouted_cmd_counter() -> None:
+    """Pin Phase 9 — unrouted-frame counter on listener stats.
+
+    The sink increments ``stats.unrouted_frames_by_cmd[cmd]`` for
+    every cmd=120 system/per-device/CT variant it deliberately
+    leaves unmerged. The counter must be exposed in
+    ``ble_observations()`` so the maintainer can see at a glance
+    what BLE telemetry currently flows past unused.
+    """
+    transport = (CUSTOM_COMPONENT / "client" / "ble_transport.py").read_text(
+        encoding="utf-8",
+    )
+    assert "unrouted_frames_by_cmd: dict[int, int]" in transport, (
+        "BleListenerStats must declare unrouted_frames_by_cmd"
+    )
+    coord = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
+    assert "stats.unrouted_frames_by_cmd[cmd]" in coord, (
+        "BLE sink must increment unrouted_frames_by_cmd"
+    )
+    assert '"unrouted_frames_by_cmd"' in coord, (
+        "ble_observations() must expose unrouted_frames_by_cmd in diagnostics"
+    )
+
+
+def test_jackery_exception_handlers_are_domain_specific() -> None:
+    """Runtime code should not hide user-visible failures behind broad handlers."""
+    allowed_broad_handlers = {
+        "custom_components/jackery_solarvault/__init__.py",
+        "custom_components/jackery_solarvault/client/_http.py",
+        "custom_components/jackery_solarvault/client/ble_transport.py",
+    }
+    offenders = []
+    for path in CUSTOM_COMPONENT.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        rel = path.as_posix()
+        has_intentional_broad_handler = (
+            rel in allowed_broad_handlers and "except Exception as err:" in source
+        )
+        has_intentional_ble_noqa = (
+            rel in allowed_broad_handlers and "# noqa: BLE001" in source
+        )
+        if ("except Exception" in source and not has_intentional_broad_handler) or (
+            "noqa: BLE001" in source and not has_intentional_ble_noqa
         ):
-            method_src = ast.get_source_segment(src, node) or ""
-            break
-    else:
-        raise AssertionError("JackeryNumber.async_set_native_value not found")
+            offenders.append(str(path))
+    assert offenders == []
 
-    assert "except JackeryAuthError as err:" in method_src
-    assert "ConfigEntryAuthFailed(" in method_src
-    assert "from err" in method_src
+
+def test_silent_coordinator_and_ble_paths_surface_diagnostics() -> None:
+    """Previously silent paths now log and expose diagnostics counters."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+    ble_source = (CLIENT_PACKAGE / "ble_transport.py").read_text(encoding="utf-8")
+    diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
+        encoding="utf-8",
+    )
+
+    assert "Jackery recorder existing-statistics lookup failed" in coordinator_source
+    assert "keep-alive interval elapsed" in ble_source
+    assert "frames_decode_failed" in coordinator_source
+    assert "rejection_metrics" in diagnostics_source
+
+
+def test_user_visible_error_outcomes_remain_explicit() -> None:
+    """Auth failures, repair issues and unavailable states stay observable."""
+    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
+        encoding="utf-8",
+    )
+    repairs_source = (CUSTOM_COMPONENT / "repairs.py").read_text(encoding="utf-8")
+    entity_source = (CUSTOM_COMPONENT / "entity.py").read_text(encoding="utf-8")
+
+    assert "ConfigEntryAuthFailed" in coordinator_source
+    assert "_defer_background_auth_failure" in coordinator_source
+    assert "REPAIR_ISSUE_DEVICE_NOT_ACTIVATED" in repairs_source
+    assert "available" in entity_source

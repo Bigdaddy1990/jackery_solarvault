@@ -1,85 +1,77 @@
-"""Regression tests for coverage gate enforcement."""
+"""Tests for coverage gate enforcement."""
 
-import importlib
-from pathlib import Path
-from unittest.mock import patch
+from __future__ import annotations  # noqa: TID251
 
-import pytest
-from scripts import enforce_coverage_gates
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
-COVERED_CLASSES = """\
-<class filename="custom_components/jackery_solarvault/coordinator.py" line-rate="0.91" />
-<class filename="custom_components/jackery_solarvault/config_flow.py" line-rate="0.92" />
-<class filename="custom_components/jackery_solarvault/services.py" line-rate="0.93" />
-<class filename="custom_components/jackery_solarvault/data_manager.py" line-rate="0.94" />
-"""
+from scripts.enforce_coverage_gates import enforce_coverage_gates
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
-def _write_coverage_xml(path: Path, *, line_rate: str, classes: str) -> None:
+def _write_xml(path: Path, *, branch_rate: str | None = "1") -> None:
+    branch_attr = f' branch-rate="{branch_rate}"' if branch_rate is not None else ""
+    classes = "\n".join(
+        f'<class filename="{module}" line-rate="1" branch-rate="1" />'
+        for module in (
+            "custom_components/jackery_solarvault/__init__.py",
+            "custom_components/jackery_solarvault/coordinator.py",
+            "custom_components/jackery_solarvault/sensor.py",
+            "custom_components/jackery_solarvault/util.py",
+            "custom_components/jackery_solarvault/client/api.py",
+            "custom_components/jackery_solarvault/client/mqtt_push.py",
+            "custom_components/jackery_solarvault/client/ble_transport.py",
+            "custom_components/jackery_solarvault/handlers/__init__.py",
+            "custom_components/jackery_solarvault/handlers/mqtt_handlers.py",
+            "custom_components/jackery_solarvault/stats/__init__.py",
+            "custom_components/jackery_solarvault/client/_endpoints/__init__.py",
+            "custom_components/jackery_solarvault/client/_endpoints/accessories.py",
+            "custom_components/jackery_solarvault/client/_endpoints/auth.py",
+            "custom_components/jackery_solarvault/client/_endpoints/device.py",
+            "custom_components/jackery_solarvault/client/_endpoints/energy_price.py",
+            "custom_components/jackery_solarvault/client/_endpoints/misc.py",
+            "custom_components/jackery_solarvault/client/_endpoints/push.py",
+            "custom_components/jackery_solarvault/client/_endpoints/shelly.py",
+            "custom_components/jackery_solarvault/client/_endpoints/smart_mode.py",
+            "custom_components/jackery_solarvault/client/_endpoints/statistics.py",
+        )
+    )
     path.write_text(
-        f"""<?xml version="1.0" ?>
-<coverage line-rate="{line_rate}">
-  <packages>
-    <package name="jackery_solarvault">
-      <classes>
-        {classes}
-      </classes>
-    </package>
-  </packages>
-</coverage>
-""",
+        f'<coverage line-rate="1"{branch_attr}>'
+        f"<packages><package><classes>{classes}</classes></package></packages>"
+        "</coverage>",
         encoding="utf-8",
     )
 
 
-def test_import_does_not_evaluate_defusedxml_element_annotation() -> None:
-    """The module imports with defusedxml, which has no Element attribute."""
-    assert not hasattr(enforce_coverage_gates.ET, "Element")
-    importlib.reload(enforce_coverage_gates)
-
-
-def test_main_passes_when_total_and_critical_modules_meet_gates(tmp_path: Path) -> None:
-    """Valid coverage XML passing all configured gates exits cleanly."""
+def test_enforce_coverage_gates_accepts_perfect_line_and_branch(tmp_path: Path) -> None:
+    """A report with 100% line and branch coverage for target modules passes."""
     coverage_xml = tmp_path / "coverage.xml"
-    _write_coverage_xml(coverage_xml, line_rate="0.95", classes=COVERED_CLASSES)
+    _write_xml(coverage_xml)
 
-    with patch(
-        "sys.argv",
-        [
-            "enforce_coverage_gates",
-            "--coverage-xml",
-            str(coverage_xml),
-            "--total-minimum-percent",
-            "90",
-            "--critical-module-minimum-percent",
-            "90",
-        ],
-    ):
-        assert enforce_coverage_gates.main() == 0
-
-
-def test_main_fails_when_critical_module_is_below_gate(tmp_path: Path) -> None:
-    """Critical modules below the configured gate are reported."""
-    coverage_xml = tmp_path / "coverage.xml"
-    _write_coverage_xml(
-        coverage_xml,
-        line_rate="0.95",
-        classes=COVERED_CLASSES.replace(
-            'coordinator.py" line-rate="0.91', 'coordinator.py" line-rate="0.89'
-        ),
+    assert not enforce_coverage_gates(
+        coverage_xml=coverage_xml,
+        total_minimum=Decimal(85),
+        legacy_module_minimum=Decimal(90),
+        perfect_module_minimum=Decimal(100),
     )
 
-    with (
-        patch(
-            "sys.argv",
-            [
-                "enforce_coverage_gates",
-                "--coverage-xml",
-                str(coverage_xml),
-                "--critical-module-minimum-percent",
-                "90",
-            ],
-        ),
-        pytest.raises(SystemExit, match="coordinator.py: 89.00% < 90.00%"),
-    ):
-        enforce_coverage_gates.main()
+
+def test_enforce_coverage_gates_requires_branch_coverage(tmp_path: Path) -> None:
+    """CI must reject reports not produced with branch coverage enabled."""
+    coverage_xml = tmp_path / "coverage.xml"
+    _write_xml(coverage_xml, branch_rate=None)
+
+    failures = enforce_coverage_gates(
+        coverage_xml=coverage_xml,
+        total_minimum=Decimal(85),
+        legacy_module_minimum=Decimal(90),
+        perfect_module_minimum=Decimal(100),
+    )
+
+    assert (
+        "coverage XML missing total branch-rate; run pytest with --cov-branch"
+        in failures
+    )

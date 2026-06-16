@@ -1,6 +1,6 @@
 """Unit tests for custom_components.jackery_solarvault.client.local_mqtt.
 
-This is a new module introduced in this PR. Tests exercise:
+This is a new module covered by this integration. Tests exercise:
 - JackeryLocalMqttClient construction (initial state)
 - _extract_mqtt_code: numeric return-code extraction from MqttCodeError
 - _handle_connect_failure: records rc + reason in last_error
@@ -20,19 +20,21 @@ import logging
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+from aiomqtt.exceptions import MqttCodeError
 import pytest
 
-try:
-    from custom_components.jackery_solarvault.client.local_mqtt import (
-        LOCAL_MQTT_DEFAULT_TOPIC,
-        LOCAL_MQTT_MAX_TOPIC_NAMES,
-        JackeryLocalMqttClient,
-    )
-    from custom_components.jackery_solarvault.const import (
-        MQTT_CLIENT_LIBRARY,
-        REDACTED_VALUE,
-    )
+from custom_components.jackery_solarvault.client import local_mqtt as module
+from custom_components.jackery_solarvault.client.local_mqtt import (
+    LOCAL_MQTT_DEFAULT_TOPIC,
+    LOCAL_MQTT_MAX_TOPIC_NAMES,
+    JackeryLocalMqttClient,
+)
+from custom_components.jackery_solarvault.const import (
+    MQTT_CLIENT_LIBRARY,
+    REDACTED_VALUE,
+)
 
+try:
     _IMPORT_OK = True
 except SyntaxError as _syntax_err:
     _IMPORT_OK = False
@@ -157,7 +159,10 @@ def test_construction_initial_counters_are_zero() -> None:
 
 
 def test_construction_default_topic_filter_is_empty() -> None:
-    """Default topic filter is empty so the listener stays disabled unless configured."""
+    """Default topic filter is empty so the listener stays disabled unless.
+
+    configured.
+    """
     client = _make_client()
     assert client._topic_filter == LOCAL_MQTT_DEFAULT_TOPIC  # noqa: SLF001
     assert client._topic_filter == ""  # noqa: PLC1901, SLF001
@@ -176,8 +181,6 @@ def test_construction_custom_topic_filter_is_stored() -> None:
 
 def _make_mqtt_code_error(rc: Any) -> Any:  # noqa: ANN401
     """Return a MqttCodeError-shaped stub with the given rc attribute."""
-    from aiomqtt.exceptions import MqttCodeError
-
     err = MqttCodeError.__new__(MqttCodeError)
     err.rc = rc
     return err
@@ -274,7 +277,10 @@ def test_handle_disconnect_error_when_was_connected_says_disconnect() -> None:
 
 
 def test_handle_disconnect_error_when_not_yet_connected_says_connect_failed() -> None:
-    """If the client had not connected, the error message starts with 'connect failed:'."""
+    """If the client had not connected, the error message starts with 'connect.
+
+    failed:'.
+    """
     client = _make_client()
     client._handle_disconnect_error("refused", was_connected=False)  # noqa: SLF001
     assert client._last_error is not None  # noqa: SLF001
@@ -592,8 +598,6 @@ def test_utc_now_iso_two_calls_are_close_or_equal() -> None:
 
 def test_aiomqtt_transport_logger_is_kept_at_warning() -> None:
     """Per-packet aiomqtt DEBUG logs must stay disabled by default."""
-    from custom_components.jackery_solarvault.client import local_mqtt as module  # noqa: I001
-
     assert module._AIOMQTT_LOGGER.level == logging.WARNING  # noqa: SLF001
 
 

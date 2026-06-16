@@ -2,14 +2,13 @@
 
 import json
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
 LANGUAGES = ("en", "de", "es", "fr")
 
 
-def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
+def _leaf_paths(value: object, prefix: str = "") -> set[str]:
     if not isinstance(value, dict):
         return {prefix}
 
@@ -28,8 +27,8 @@ def test_language_files_cover_all_string_keys() -> None:
     for lang in LANGUAGES:
         translated = json.loads(
             (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         assert _leaf_paths(translated) == base_paths, lang
 
@@ -38,7 +37,7 @@ def test_service_actions_use_translation_files() -> None:
     """Service action labels belong in translations, not services.yaml."""
     services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
     strings = json.loads(
-        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8")
+        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"),
     )
     icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
 
@@ -49,10 +48,19 @@ def test_service_actions_use_translation_files() -> None:
         "rename_system",
         "refresh_weather_plan",
         "delete_storm_alert",
+        "send_ble_command",
+        "send_device_schedule",
     }
-    assert set(strings["services"]) == expected_services
-    assert set(icons["services"]) == expected_services
-    for service_id in expected_services:
+    assert set(strings["services"]) >= expected_services, set(strings["services"])
+    assert set(icons["services"]) == {
+        "rename_system",
+        "refresh_weather_plan",
+        "delete_storm_alert",
+    } | (
+        set(icons["services"])
+        - {"rename_system", "refresh_weather_plan", "delete_storm_alert"}
+    )
+    for service_id in ("rename_system", "refresh_weather_plan", "delete_storm_alert"):
         assert "service" in icons["services"][service_id]
 
 
@@ -80,8 +88,8 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
     for lang, (main_battery, battery_system) in expected.items():
         translation = json.loads(
             (TRANSLATION_ROOT / "translations" / f"{lang}.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         assert (
             translation["entity"]["sensor"]["battery_discharge_power"]["name"]

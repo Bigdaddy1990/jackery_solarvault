@@ -5,9 +5,9 @@ from io import StringIO
 import json
 from pathlib import Path
 import shutil
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import pytest
 from scripts.check_reference_coverage import (
     CoverageReport,
     _iter_strings,
@@ -25,6 +25,9 @@ from scripts.check_reference_coverage import (
     service_yaml_names,
     strings_service_names,
 )
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _copy_reference_fixture(tmp_path: Path) -> Path:

@@ -35,12 +35,12 @@ def test_stale_threshold_constant_is_a_full_week() -> None:
     match = re.search(
         r"BATTERY_PACK_STALE_THRESHOLD_SEC:\s*Final\s*=\s*(.+?)$",
         src,
-        re.M,
+        re.MULTILINE,
     )
     assert match is not None
     expr = match.group(1).strip()
     # Evaluate the literal expression (e.g. "7 * 24 * 3600")
-    value = eval(expr, {"__builtins__": {}}, {})
+    value = eval(expr, {"__builtins__": {}}, {})  # noqa: S307
     assert isinstance(value, int)
     assert value >= 24 * 3600, f"threshold {value}s is shorter than 24h"
     # Don't make it ridiculously long either — a year-long stale pack
@@ -67,9 +67,9 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
     src = _read("coordinator.py")
     # Locate _merge_battery_pack_lists body
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
@@ -90,7 +90,7 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
     match = re.search(
         r"def _drop_stale_battery_packs\(\s*cls.*?(?=\n    @|\n    async def )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None, "_drop_stale_battery_packs not found"
     body = match.group(0)
@@ -121,8 +121,8 @@ def test_stale_drop_helper_logic_unit() -> None:
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
-    def drop(packs):
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+        kept: list[dict[str, str]] = []
         stale = 0
         for pack in packs:
             last_seen = pack.get("_last_seen_at")
@@ -169,8 +169,8 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
         "_last_seen_at": (now - timedelta(hours=4)).isoformat(),
     }
 
-    def drop(packs):
-        kept = []
+    def drop(packs: list[dict[str, str]]) -> list[dict[str, str]]:
+        kept: list[dict[str, str]] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
             if not isinstance(last_seen, str):
@@ -199,7 +199,7 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
     match = re.search(
         r"def _looks_like_battery_pack\(cls.*?(?=\n    @classmethod|\n    def )",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
@@ -212,22 +212,20 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
     assert "NON_BATTERY_SUBDEVICE_TYPES" in body, body
 
 
-def test_battery_pack_count_capped_at_five() -> None:
-    """Hardware allows max 5 add-on packs per system. Code must cap.
+def test_battery_pack_count_no_longer_capped_at_five() -> None:
+    """Battery pack list hard-cap at 5 intentionally removed (Bug #20).
 
-    A buggy or malicious cloud response with 100 packs must not turn
-    into 100 HA devices.
+    Systems with 6+ packs were silently losing data. The cap is gone.
     """
     src = _read("coordinator.py")
-    # Several [:5] slices in the merge path
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
-    assert match is not None
+    assert match is not None, "_merge_battery_pack_lists not found"
     body = match.group(0)
-    assert body.count("[:5]") >= 2, body  # input + output
+    assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"
 
 
 def test_battery_pack_merge_preserves_known_fields() -> None:
@@ -239,16 +237,16 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
     """
     src = _read("coordinator.py")
     match = re.search(
-        r"def _merge_battery_pack_lists\(\s*cls.*?return merged\[:5\]",
+        r"def _merge_battery_pack_lists\(\s*cls.*?return merged",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None
     body = match.group(0)
     # Implementation must filter `None` updates (so a missing field doesn't
     # overwrite a real one) and merge per-key.
     assert "value is not None" in body, body
-    assert "_merge_dict_values" in body, body
+    assert "merge_live_properties" in body, body
 
 
 # ---------- Gold-tier: dynamic-devices ----------------------------------
@@ -281,7 +279,7 @@ def test_async_cleanup_calls_device_registry_remove() -> None:
     match = re.search(
         r"async def async_cleanup_pending_device_removals\(self.*?(?=\n    [@a-z])",
         src,
-        re.S,
+        re.DOTALL,
     )
     assert match is not None, "async_cleanup_pending_device_removals not found"
     body = match.group(0)

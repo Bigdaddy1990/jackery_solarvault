@@ -143,6 +143,8 @@ def test_directional_power_value_keys_absent_returns_none() -> None:
 def test_directional_power_value_zero_values_return_zero() -> None:
     """directional_power_value with present-but-zero keys returns 0.0, not None."""
     result = util.directional_power_value(
-        {"tPhasePw": 0, "tnPhasePw": 0}, ("tPhasePw",), ("tnPhasePw",)
+        {"tPhasePw": 0, "tnPhasePw": 0},
+        ("tPhasePw",),
+        ("tnPhasePw",),
     )
     assert result == pytest.approx(0.0)
