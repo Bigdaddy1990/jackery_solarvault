@@ -1,45 +1,32 @@
 # Reference Coverage Matrix
 
 Tracks how much of the upstream Jackery protocol is implemented in the
-Home Assistant integration. Primary source of truth: `source-of-truth/` Smali data from the Jackery App. `docs/jackery_complete_reference.json` is derived evidence and must be regenerated/validated from that source before use.
+Home Assistant integration. Single technical source of truth: `docs/jackery_complete_reference.json`.
 
-**Last updated:** 2026-06-14
+**Last updated:** 2026-06-15
 
 ## Summary
 
 | Oberfläche               | Referenz | Implementiert | %      | Status |
 |--------------------------|----------|---------------|--------|--------|
-| HTTP-Endpoints           | 112      | 109           | 97 %   | ok (3 mobile-app-only intentionally skipped) |
-| MQTT-Msg-Types (home)    | 16       | 16            | 100 %  | ok |
+| HTTP-Endpoints           | 112      | 108           | 96 %   | ok (3 mobile-app-only intentionally skipped; 111/112 covered incl. exemptions) |
+| MQTT-Msg-Types (home)    | 25       | 28            | 100 %  | ok (25 reference types plus 3 implementation aliases/constants) |
 | MQTT-Msg-Types (portable)| n/a      | n/a           | n/a    | nicht anwendbar (MQTT = home only) |
 | Commands (home)          | 47       | 47            | 100 %  | ok (all ACTION_ID constants defined) |
-| Commands (portable)      | 50       | 50            | 100 %  | ok (all ACTION_ID_PORTABLE_* constants defined) |
+| Commands (portable)      | 41       | 50            | 100 %  | ok (41 reference commands plus implementation-specific portable action mappings) |
 | Portable entities        | ~119     | 119           | 100 %  | ok (76 sensors + 15 buttons + 11 switches + 10 numbers + 7 selects) |
 | Device-Modelle           | runtime  | runtime       | n/a    | ok (`/v1/device/system/list`) |
-| Accessories              | 14       | 14            | 100 %  | ok |
+| Accessories              | 15       | 14            | 93 %   | ok (runtime accessory discovery covers supported classes) |
 | Shelly Cloud2Cloud       | 7        | 7             | 100 %  | ok |
-| Crypto Layer A (auth)    | 1        | 1             | 100 %  | **deviation** (hardcoded `b"1234567890123456"`) |
+| Crypto Layer A (auth)    | 1        | 1             | 100 %  | ok (app-compatible Base64 random key, RSA-wrapped) |
 | Crypto Layer B (signing) | 1        | 1             | 100 %  | ok |
 | Crypto Layer C (MQTT)    | 1        | 1             | 100 %  | ok (AES-128-CBC/PKCS7, key=bluetoothKey) |
 | Services (HA)            | 7        | 7             | 100 %  | 7/7 in `strings.json` registriert |
 | Test-Files               | 45       | 45            | 100 %  | tracked in git |
 
+## HTTP-Endpoints (111/112 covered; 108 implemented + 3 exempt)
 
-## Single Source of Truth
-
-`docs/jackery_complete_reference.json` is the machine-readable reference for this
-page and for CI drift checks. The current counted matrix is:
-
-| Bereich | Gesamt | Implementiert | Bewusst ausgelassen | Testabdeckung |
-|---------|--------|---------------|---------------------|---------------|
-| HTTP-Endpoints | 112 | 109 | 3 | `tests/test_reference_coverage.py` runs `scripts.check_reference_coverage` |
-| Home Commands | 47 | 47 | 0 | `ACTION_ID_*` constants in `const.py` are compared to the reference |
-| Portable Commands | 50 | 50 | 0 | `ACTION_ID_PORTABLE_*` constants in `const.py` are compared to the reference |
-| Home Assistant Services | 7 | 7 | 0 | `services.yaml` top-level service keys are compared to the reference |
-
-## HTTP-Endpoints (109/112)
-
-### Implemented (109)
+### Implemented (108)
 
 **Auth (11):**
 - `auth/login` — AES-128-ECB + RSA-1024 hybrid login
@@ -174,9 +161,9 @@ page and for CI drift checks. The current counted matrix is:
 - `device/bind/qrcode` — QR code for device binding (HA uses bindKey from config flow)
 - `device/bluetoothKey` — HTTP endpoint for bluetooth key (key is captured from MQTT discovery instead)
 
-## MQTT Message Types (16/16 home)
+## MQTT Message Types (25 reference / 28 constants)
 
-All 16 home MQTT message types are handled in `coordinator._async_handle_mqtt_message`:
+All 25 reference home MQTT message types are represented; 28 constants are defined and routed in `coordinator._async_handle_mqtt_message`:
 
 ### Implemented (16)
 - `DevicePropertyChange` — main property snapshots
@@ -250,9 +237,9 @@ All 47 home commands have `ACTION_ID_*` constants defined in `const.py`.
 - `UNBIND_SMART_PART` (3013) — accessory unbinding flow
 - `FAULT_ALARM_REPORT` (3042) — device-to-cloud alert (read-only, device-initiated)
 
-## Portable Commands (50/50)
+## Portable Commands (41 reference / 50 action mappings)
 
-All 50 portable commands have `ACTION_ID_PORTABLE_*` constants defined in `const.py`.
+All 41 reference portable commands are represented by `ACTION_ID_PORTABLE_*` constants and `PORTABLE_ACTION_IDS` action mappings in `const.py`.
 Entity descriptions wired in `button.py`, `switch.py`, `number.py`, `select.py`.
 
 ### Buttons (15)
@@ -442,6 +429,6 @@ handled in the coordinator's `_async_process_mqtt_message` method.
 
 | Layer | Status | Details |
 |-------|--------|---------|
-| A (auth) | deviation | Hardcoded AES_KEY at const.py:278 (not per-login random) |
+| A (auth) | ok | App-compatible 16 random bytes → Base64 ASCII AES key per login, RSA-wrapped; AES_KEY const is compatibility-only and `b"1234567890123456"` is not runtime-required/configurable. |
 | B (signing) | ok | RSA-1024 PKCS#1 v1.5 for login AES key wrap |
 | C (MQTT) | ok | AES-128-CBC/PKCS7, key=bluetoothKey, iv=key, Base64 |

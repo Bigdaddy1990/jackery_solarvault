@@ -1,0 +1,332 @@
+[
+  {
+    "class": "home/SystemBody",
+    "fields": [
+      "batInPw",
+      "batNum",
+      "batOutPw",
+      "batState",
+      "ctStat",
+      "defaultPw",
+      "energyPlanPw",
+      "funcEnable",
+      "gridInPw",
+      "gridOutPw",
+      "gridSate",
+      "inGridSidePw",
+      "isAutoStandby",
+      "isFollowMeterPw",
+      "maxFeedGrid",
+      "maxSysInPw",
+      "maxSysOutPw",
+      "offGridDown",
+      "offGridTime",
+      "ongridStat",
+      "otherLoadPw",
+      "outGridSidePw",
+      "soc",
+      "standbyPw",
+      "stat",
+      "swEpsInPw",
+      "swEpsOutPw",
+      "tempUnit",
+      "workModel",
+      "wpc",
+      "wps"
+    ]
+  },
+  {
+    "class": "home/PV",
+    "fields": [
+      "commState",
+      "name",
+      "pvPw"
+    ]
+  },
+  {
+    "class": "home/CtSub",
+    "fields": [
+      "aPhasePw",
+      "anPhasePw",
+      "bPhasePw",
+      "bnPhasePw",
+      "cPhasePw",
+      "cnPhasePw",
+      "funForm",
+      "schePhase",
+      "tPhasePw",
+      "tnPhasePw",
+      "wip"
+    ]
+  },
+  {
+    "class": "home/BatteryPackSub",
+    "fields": [
+      "batSoc",
+      "cellTemp",
+      "inPw",
+      "isFirmwareUpgrade",
+      "outPw",
+      "version"
+    ]
+  },
+  {
+    "class": "home/CollectorSub",
+    "fields": [
+      "inPw",
+      "outPw",
+      "wip"
+    ]
+  },
+  {
+    "class": "accessory/AccCTBody",
+    "fields": [
+      "ap",
+      "ap1",
+      "ap2",
+      "ap3",
+      "curr",
+      "curr1",
+      "curr2",
+      "curr3",
+      "fact",
+      "fact1",
+      "fact2",
+      "fact3",
+      "freq",
+      "power",
+      "power1",
+      "power2",
+      "power3",
+      "rep",
+      "rep1",
+      "rep2",
+      "rep3",
+      "volt",
+      "volt1",
+      "volt2",
+      "volt3"
+    ]
+  },
+  {
+    "class": "accessory/AccSocketBody",
+    "fields": [
+      "op",
+      "sc",
+      "switch",
+      "ts"
+    ]
+  },
+  {
+    "class": "battery/BatteryPackBody",
+    "fields": [
+      "deviceSn",
+      "ec",
+      "ip",
+      "isFirmwareUpgrade",
+      "it",
+      "op",
+      "ot",
+      "rb",
+      "version"
+    ]
+  },
+  {
+    "class": "home/statistic/HomeStatApi$Bean",
+    "fields": [
+      "totalInGridEnergy",
+      "totalOutGridEnergy",
+      "unit",
+      "x",
+      "y",
+      "y1",
+      "y2"
+    ]
+  },
+  {
+    "class": "home/statistic/PvStatApi$Bean",
+    "fields": [
+      "currency",
+      "totalSolarEnergy",
+      "totalSolarRevenue",
+      "unit",
+      "x",
+      "y",
+      "y1",
+      "y2",
+      "y3",
+      "y4"
+    ]
+  },
+  {
+    "class": "home/statistic/BatteryStatApi$Bean",
+    "fields": [
+      "totalCharge",
+      "totalDischarge",
+      "unit",
+      "x",
+      "y",
+      "y1",
+      "y2",
+      "y3"
+    ]
+  },
+  {
+    "class": "home/statistic/CtStatApi$Bean",
+    "fields": [
+      "totalInCtEnergy",
+      "totalOutCtEnergy",
+      "unit",
+      "x",
+      "y1",
+      "y2"
+    ]
+  },
+  {
+    "class": "home/statistic/EpsStatApi$Bean",
+    "fields": [
+      "totalInEpsEnergy",
+      "totalOutEpsEnergy",
+      "unit",
+      "x",
+      "y",
+      "y1",
+      "y2"
+    ]
+  },
+  {
+    "class": "home/statistic/SysPvStatApi$Bean",
+    "fields": [
+      "count",
+      "currency",
+      "pvSources",
+      "pvUsage",
+      "showDash",
+      "totalSolarEnergy",
+      "totalSolarRevenue",
+      "unit",
+      "weather",
+      "x",
+      "y"
+    ]
+  },
+  {
+    "class": "home/statistic/SysHomeStatApi$Bean",
+    "fields": [
+      "homeSources",
+      "totalHomeEgy",
+      "unit",
+      "x",
+      "y"
+    ]
+  },
+  {
+    "class": "home/statistic/SysBatteryStatApi$Bean",
+    "fields": [
+      "batterySources",
+      "batteryUsage",
+      "totalChgEgy",
+      "totalDisChgEgy",
+      "unit",
+      "x",
+      "y",
+      "y1",
+      "y2"
+    ]
+  },
+  {
+    "class": "home/statistic/DeviceStatSystemStatistic$Bean",
+    "fields": [
+      "isSetPrice",
+      "todayBatteryChg",
+      "todayBatteryDisChg",
+      "todayGeneration",
+      "todayLoad",
+      "totalCarbon",
+      "totalGeneration",
+      "totalRevenue"
+    ]
+  },
+  {
+    "class": "home/statistic/DeviceStatDeviceStatistic$Bean",
+    "fields": [
+      "batChgEgy",
+      "batDisChgEgy",
+      "inEpsEgy",
+      "inOngridEgy",
+      "outEpsEgy",
+      "outOngridEgy",
+      "pvEgy"
+    ]
+  },
+  {
+    "class": "TodayEnergyApi$Bean",
+    "fields": [
+      "de",
+      "dg",
+      "dh",
+      "ds"
+    ]
+  },
+  {
+    "class": "DeviceDetailApi$DeviceInfo",
+    "fields": [
+      "authorizeType",
+      "createTime",
+      "deviceCode",
+      "deviceName",
+      "deviceSecret",
+      "deviceSn",
+      "id",
+      "isDelete",
+      "manufacturerCode",
+      "modelId",
+      "modelName",
+      "onlineStatus",
+      "ownerId",
+      "randomSalt",
+      "remark",
+      "updateTime"
+    ]
+  },
+  {
+    "class": "home/UserSystemListApi$Bean",
+    "fields": [
+      "bindKey",
+      "bluetoothKey",
+      "countryCode",
+      "currency",
+      "deviceId",
+      "deviceSn",
+      "devices",
+      "gridStandard",
+      "id",
+      "onlineState",
+      "region",
+      "systemName",
+      "systemSn",
+      "systemState",
+      "timezone"
+    ]
+  },
+  {
+    "class": "home/UserSystemListApi$Device",
+    "fields": [
+      "currency",
+      "devModel",
+      "devType",
+      "deviceId",
+      "deviceName",
+      "deviceSn",
+      "iconPath",
+      "isCloud",
+      "modelCode",
+      "onlineState",
+      "productModel",
+      "rb",
+      "scanName",
+      "subType",
+      "typeName"
+    ]
+  }
+]

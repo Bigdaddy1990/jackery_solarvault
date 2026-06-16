@@ -5,10 +5,10 @@ welche Sensoren/Entitäten → welche Stats/Getter/Setter/Backfills → welche V
 Erzeugt durch read-only Audit (parallele Agenten) + erst-Hand-Verifikation der
 strittigen Punkte direkt am Code.
 
-> **Ground truth = die `docs/html/`-Anhänge**, primär die Smali-Extraktionen
-> `hbxn_commands.html` (Befehle/actionIds) und `hbxn_model_fields.html` sowie
-> `jackery_command_catalog_v2.html` / `jackery_entity_field_candidates_v2.html` /
-> `jackery_http_model_fields_v2.html` / `jackery_http_api_endpoints_v2.html`
+> **Ground truth = `source-of-truth/`**, primär die Smali-Extraktionen
+> `source-of-truth/hbxn_commands.html` (Befehle/actionIds) und `source-of-truth/hbxn_model_fields.html` sowie
+> `source-of-truth/jackery_command_catalog_v2.html` / `source-of-truth/jackery_entity_field_candidates_v2.html` /
+> `source-of-truth/jackery_http_model_fields_v2.html` / `source-of-truth/jackery_http_api_endpoints_v2.html`
 > (Modell-/Endpoint-Felder). Die **narrativen** Anhänge `APP_POLLING_MQTT.html`
 > und `MQTT_PROTOCOL.html` (und ihre `.md`-Kopien) sind abgeleitet; bei
 > Widerspruch folgt der Code hbxn/Smali. `SENSOR_SOURCE_PATHS.*` ist aus `sensor.py` generiert,
@@ -47,13 +47,13 @@ strittigen Punkte direkt am Code.
 |---|---|
 | M1 | `cell_temperature` ÷10-Skalierung (`sensor.py`) ist aus den App-Modell-Dumps nicht belegbar — am Gerät verifizieren (tenths-of-°C ist plausibel). |
 | M2 | `grid_in_power`/`grid_out_power` fassen je 3 distinkte Modellfelder via `_prop_any` zusammen (`gridInPw`/`inGridSidePw`/`inOngridPw`). Richtung korrekt; falls die Felder verschiedene Messpunkte sind, ist der Wert quellabhängig. |
-| M3 | **Felder ohne docs/html/-Modellbeleg (am Code bestätigt) — echte Abweichung gegen die Extraktion:** `stackInPw`/`stackOutPw` (stack_in/out_power, const.py:481-482) und `chargePlanPw` (charge_plan_power, const.py:484) in KEINEM `hbxn_model_fields.html`-Modell (HomeBody/SystemBody). `ongridOtBatEgy`/`pvOtBatEgy`/`batOtGridEgy` (device_today_*-Stats, const.py:945-947) NICHT im `DeviceStatDeviceStatistic$Bean` (`jackery_http_model_fields_v2.html`; dort nur batChgEgy/batDisChgEgy/inEpsEgy/inOngridEgy/outEpsEgy/outOngridEgy/pvEgy). Stehen nur in narrativen Captures (`MQTT_PROTOCOL.html`) bzw. laut `api.py:922`-Docstring laufzeitabhängig → evtl. reale, im Dump fehlende Felder, aber gegen die html-Extraktion Abweichungen. |
+| M3 | **Felder ohne `source-of-truth/`-Modellbeleg (am Code bestätigt) — echte Abweichung gegen die Extraktion:** `stackInPw`/`stackOutPw` (stack_in/out_power, const.py:481-482) und `chargePlanPw` (charge_plan_power, const.py:484) in KEINEM `source-of-truth/hbxn_model_fields.html`-Modell (HomeBody/SystemBody). `ongridOtBatEgy`/`pvOtBatEgy`/`batOtGridEgy` (device_today_*-Stats, const.py:945-947) NICHT im `DeviceStatDeviceStatistic$Bean` (`source-of-truth/jackery_http_model_fields_v2.html`; dort nur batChgEgy/batDisChgEgy/inEpsEgy/inOngridEgy/outEpsEgy/outOngridEgy/pvEgy). Stehen nur in narrativen Captures (`MQTT_PROTOCOL.html`) bzw. laut `api.py:922`-Docstring laufzeitabhängig → evtl. reale, im Dump fehlende Felder, aber gegen die html-Extraktion Abweichungen. |
 | M4 | 12 Extra-Sensoren ggü. `SENSOR_SOURCE_PATHS`-Tabelle: 8× EPS (`device_eps_stat_*`) + 4× Today-KPI (`de/dg/dh/ds`). Im Code begründet (Smali), nur nicht in der auto-gen Tabelle. |
 | M5 | BLE-Write nutzt ein Frida-verifiziertes Binärformat; das in den Smali-Docs beschriebene ASCII-Hex-Format (`DFED0001…`) ist die ältere Beschreibung. (Diesen Lauf nicht erneut verifiziert.) |
 
-### E. Gegen docs/html/ verifiziert (dieser Durchgang)
+### E. Gegen `source-of-truth/` verifiziert (dieser Durchgang)
 
-- **CT/Subdevice-Felder ↔ `jackery_entity_field_candidates_v2.html`: konform.** `const.py:551-591` ist explizit darauf verankert — CtSub (`funForm`/`schePhase`/`tPhasePw`/`tnPhasePw`/`a-c(n)PhasePw`), AccCTBody (`volt`/`curr`/`power`/`freq`/`fact`/`ap`/`rep` je Phase), PlugSub (`switchSta`/`sysSwitch`/`socketPri`/`inPw`/`outPw`), BatteryPackSub/CollectorSub/AccSocketBody. Keine Abweichung.
+- **CT/Subdevice-Felder ↔ `source-of-truth/jackery_entity_field_candidates_v2.html`: konform.** `const.py:551-591` ist explizit darauf verankert — CtSub (`funForm`/`schePhase`/`tPhasePw`/`tnPhasePw`/`a-c(n)PhasePw`), AccCTBody (`volt`/`curr`/`power`/`freq`/`fact`/`ap`/`rep` je Phase), PlugSub (`switchSta`/`sysSwitch`/`socketPri`/`inPw`/`outPw`), BatteryPackSub/CollectorSub/AccSocketBody. Keine Abweichung.
 - **Savings ↔ `APP_CLOUD_VALUES.html`: konform.** `_calculated_savings_from_year` (util.py:1628-1714) = (`totalOutGridEnergy` − `totalInGridEnergy` − `totalOutCtEnergy`), begrenzt auf `totalHomeEgy`, × `singlePrice`; `battery_gap`/`conversion_loss`/`pv_residual` separate Diagnose; `totalRevenue` roh.
 - **Backfill one-way/same-endpoint ↔ `DATA_SOURCE_PRIORITY.html`: korrekt** — eine Erweiterung (S5).
 
@@ -72,8 +72,8 @@ strittigen Punkte direkt am Code.
 | ID | Befund | Ort |
 |---|---|---|
 | **S6** | Aktiver Write-Pfad nutzt das **Binärformat** (`build_binary_frame`, Version `0x0064`), NICHT das html-dokumentierte ASCII-`DFED0001…` (Version `0001`). Der konforme ASCII-Builder (`build_plaintext_frame`) existiert, wird vom Write-Pfad aber nicht genutzt. (Code-Kommentar: Frida-Capture 2026-05-16.) | ble.py:295/344/375 vs 491-507; ble_transport.py:395 |
-| **S7** | Portable/Box-Frames `DFEC00…`/`DFEC80…` sind in den Smali-html dokumentiert, aber nicht implementiert (Home-Family-Scope). | ble.py (nur DFED) |
-| n/a | Write/Notify-Char-UUIDs `0000ee01`/`ee02` und der BLE-Frame-AES-Codec stehen NICHT in den Smali-html (Klasse `Lbb/c` fehlt dort) — im Code aus Live-Capture; gegen die html nicht verifizierbar. | ble.py:113/116 |
+| **S7** | Portable/Box-Frames `DFEC00…`/`DFEC80…` sind in `source-of-truth/` dokumentiert, aber nicht implementiert (Home-Family-Scope). | ble.py (nur DFED) |
+| n/a | Write/Notify-Char-UUIDs `0000ee01`/`ee02` und der BLE-Frame-AES-Codec stehen NICHT in `source-of-truth/` (Klasse `Lbb/c` fehlt dort) — im Code aus Live-Capture; gegen `source-of-truth/` nicht verifizierbar. | ble.py:113/116 |
 
 **Verifiziert korrekt (keine Abweichung):** alle implementierten HTTP-Endpunkte (Pfad/Verb/Params), Periodenbereiche, alle Live-Sensoren (Richtung/Einheit), alle Setter (actionId/messageType/cmd/Body/Wert gegen Smali+Frida), intern/stack/pack-Trennung, MQTT-Credential-Ableitung, unique_id-Basismuster.
 
