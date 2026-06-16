@@ -25,7 +25,9 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export  # noqa: ANN401
-    """Lazily resolves and returns the JackeryMqttPushClient symbol when accessed as a module attribute.
+    """Lazily resolves and returns the JackeryMqttPushClient symbol when accessed as a.
+
+    module attribute.
 
     Parameters:
         name (str): The attribute name being requested from the module.

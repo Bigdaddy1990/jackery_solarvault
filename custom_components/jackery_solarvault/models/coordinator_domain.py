@@ -52,7 +52,8 @@ def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
     """Return a finite integer control value or raise a coordinator error."""
     parsed = None if isinstance(value, bool) else safe_int(value)
     if parsed is None:
-        raise UpdateFailed(f"Invalid {field_name}")  # noqa: TRY003
+        msg = f"Invalid {field_name}"
+        raise UpdateFailed(msg)
     return parsed
 
 
@@ -60,5 +61,6 @@ def transport_cmd(value: Any) -> int:  # noqa: ANN401
     """Return a command integer for MQTT/BLE transport routing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
-        raise ValueError("cmd must be an integer")  # noqa: TRY003
+        msg = "cmd must be an integer"
+        raise ValueError(msg)
     return parsed

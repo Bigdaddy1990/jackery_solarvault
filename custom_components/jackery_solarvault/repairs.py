@@ -33,26 +33,30 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
     """
 
     def __init__(
-        self, entry_id: str | None, description_placeholders: dict[str, str]
+        self,
+        entry_id: str | None,
+        description_placeholders: dict[str, str],
     ) -> None:
         """Initialize the repair flow for one config entry."""
         self._entry_id = entry_id
         self._description_placeholders = description_placeholders
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Route the initial repair step to the confirmation form."""
         return await self.async_step_confirm()
 
     async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
-            return self.async_create_entry(data={})  # type: ignore[no-any-return]
-        return self.async_show_form(  # type: ignore[no-any-return]
+            return self.async_create_entry(data={})
+        return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema({}),
             description_placeholders=self._description_placeholders,
@@ -90,26 +94,30 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
     """
 
     def __init__(
-        self, entry_id: str | None, description_placeholders: dict[str, str]
+        self,
+        entry_id: str | None,
+        description_placeholders: dict[str, str],
     ) -> None:
         """Initialize the repair flow for one config entry."""
         self._entry_id = entry_id
         self._description_placeholders = description_placeholders
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Route the initial repair step to the confirmation form."""
         return await self.async_step_confirm()
 
     async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Show the confirmation form and refresh cloud data after submit."""
         if user_input is not None:
             await self._async_force_refresh()
-            return self.async_create_entry(data={})  # type: ignore[no-any-return]
-        return self.async_show_form(  # type: ignore[no-any-return]
+            return self.async_create_entry(data={})
+        return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema({}),
             description_placeholders=self._description_placeholders,
@@ -161,6 +169,7 @@ async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
             "device_id": device_id,
         }
         return DeviceNotActivatedRepairFlow(entry_id, description_placeholders)
-    raise data_entry_flow.UnknownFlow(  # noqa: TRY003
-        f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
+    msg = f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
+    raise data_entry_flow.UnknownFlow(
+        msg,
     )

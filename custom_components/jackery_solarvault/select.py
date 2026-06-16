@@ -132,15 +132,23 @@ def _storm_minutes_value(  # noqa: PLR0912
 ) -> int | None:
     """Extract the storm-warning lead time in minutes from device payload sections.
 
-    Searches for `FIELD_WPC` or `FIELD_MINS_INTERVAL` in `properties`, then `weather_plan`, then `task_plan`, and finally scans list entries in `weather_plan[FIELD_STORM]` (each entry must be a dict). Converts the first found raw value to an integer and returns it only when the parsed value is greater than or equal to `STORM_MINUTES_MIN_VALID`; otherwise returns `None`.
+    Searches for `FIELD_WPC` or `FIELD_MINS_INTERVAL` in `properties`, then
+    `weather_plan`, then `task_plan`, and finally scans list entries in
+    `weather_plan[FIELD_STORM]` (each entry must be a dict). Converts the first found
+    raw value to an integer and returns it only when the parsed value is greater than
+    or equal to `STORM_MINUTES_MIN_VALID`; otherwise returns `None`.
 
     Parameters:
-        properties (dict[str, object]): The device `properties` payload section to inspect.
-        weather_plan (dict[str, object]): The device `weather_plan` payload section to inspect.
-        task_plan (dict[str, object]): The device `task_plan` payload section to inspect.
+        properties (dict[str, object]): The device `properties` payload section to
+        inspect.
+        weather_plan (dict[str, object]): The device `weather_plan` payload section to
+        inspect.
+        task_plan (dict[str, object]): The device `task_plan` payload section to
+        inspect.
 
     Returns:
-        int | None: The storm lead time in minutes when a valid value is found, or `None` if no valid value is present.
+        int | None: The storm lead time in minutes when a valid value is found, or
+        `None` if no valid value is present.
     """
     raw: object | None = None
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
@@ -181,12 +189,18 @@ def _storm_minutes_fallback(
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
 ) -> int | None:
-    """Return `DEFAULT_STORM_WARNING_MINUTES` when a storm-enabled indicator exists but no explicit lead time.
+    """Return `DEFAULT_STORM_WARNING_MINUTES` when a storm-enabled indicator exists but.
 
-    Checks for a storm-enabled marker (`FIELD_WPS`) in `properties`, then `weather_plan`, then `task_plan`; if the marker is present and parses to an integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If `weather_plan[FIELD_STORM]` is a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
+    no explicit lead time.
+
+    Checks for a storm-enabled marker (`FIELD_WPS`) in `properties`, then
+    `weather_plan`, then `task_plan`; if the marker is present and parses to an
+    integer, returns `DEFAULT_STORM_WARNING_MINUTES`. If `weather_plan[FIELD_STORM]` is
+    a list, also returns `DEFAULT_STORM_WARNING_MINUTES`. Otherwise returns `None`.
 
     Returns:
-        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate, `None` otherwise.
+        int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate,
+        `None` otherwise.
     """
     raw = properties.get(FIELD_WPS)
     if raw is None:
@@ -223,10 +237,10 @@ def _price_source_label(source: dict[str, object]) -> str:
         or source.get(FIELD_NAME)
         or source.get(FIELD_CID)
         or source.get(FIELD_PLATFORM_COMPANY_ID)
-        or "Provider"
+        or "Provider",
     ).strip()
     country = str(
-        source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or ""
+        source.get(FIELD_COUNTRY) or source.get(FIELD_SYSTEM_REGION) or "",
     ).strip()
     company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
     label = f"{name} ({country})" if country else name
@@ -595,7 +609,7 @@ async def _ct_phase_select(entity: JackerySelect, option: str) -> None:
             error="ct meter payload missing",
         )
     ct_sn = str(
-        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ct.get("deviceSn") or ""
+        ct.get(FIELD_DEVICE_SN) or ct.get(FIELD_DEV_SN) or ct.get("deviceSn") or "",
     ).strip()
     if not ct_sn:
         _raise_select_action_error(
@@ -911,37 +925,55 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create and register select entities for devices using the module's description registry.
+    """Create and register select entities for devices using the module's description.
 
-    Select entities are created per-device when the device payload indicates support for the described selector; duplicate unique IDs are avoided. The function immediately adds any new entities and registers a listener to add entities later when the coordinator's device payload signature changes.
+    registry.
+
+    Select entities are created per-device when the device payload indicates support
+    for the described selector; duplicate unique IDs are avoided. The function
+    immediately adds any new entities and registers a listener to add entities later
+    when the coordinator's device payload signature changes.
 
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
-        entry (JackeryConfigEntry): Config entry whose runtime_data provides the coordinator and device payloads.
-        async_add_entities (AddEntitiesCallback): Callback used to register new SelectEntity instances with Home Assistant.
+        entry (JackeryConfigEntry): Config entry whose runtime_data provides the
+        coordinator and device payloads.
+        async_add_entities (AddEntitiesCallback): Callback used to register new
+        SelectEntity instances with Home Assistant.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[SelectEntity], entity: SelectEntity) -> None:
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform="select", logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="select",
+            logger=_LOGGER,
         )
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
     def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:  # noqa: PLR0911
-        """Determine whether a select entity identified by `key` should be created for a device described by `payload`.
+        """Determine whether a select entity identified by `key` should be created for.
 
-        Checks device payload fields and the `supports_advanced` flag to decide if the given select type is applicable for the device.
+        a device described by `payload`.
+
+        Checks device payload fields and the `supports_advanced` flag to decide if the
+        given select type is applicable for the device.
 
         Parameters:
-            key (str): Description key identifying the select entity type (e.g., "work_mode_select").
-            payload (dict[str, Any]): Device payload containing properties, price and weather-plan information.
-            supports_advanced (bool): Whether the device advertises advanced feature support; enables selects that otherwise require specific payload fields.
+            key (str): Description key identifying the select entity type (e.g.,
+            "work_mode_select").
+            payload (dict[str, Any]): Device payload containing properties, price and
+            weather-plan information.
+            supports_advanced (bool): Whether the device advertises advanced feature
+            support; enables selects that otherwise require specific payload fields.
 
         Returns:
-            bool: `True` if the select entity for `key` is supported for this device, `False` otherwise.
+            bool: `True` if the select entity for `key` is supported for this device,
+            `False` otherwise.
         """
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
@@ -967,7 +999,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             return True
         if key == "electricity_price_provider":
             current_company = (payload.get(PAYLOAD_PRICE) or {}).get(
-                FIELD_PLATFORM_COMPANY_ID
+                FIELD_PLATFORM_COMPANY_ID,
             )
             return bool(payload.get(PAYLOAD_PRICE_SOURCES)) or current_company not in {
                 None,
@@ -978,9 +1010,14 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         return False
 
     def _collect_entities() -> list[SelectEntity]:
-        """Collect JackerySelect entities for coordinator devices that meet the module gating rules.
+        """Collect JackerySelect entities for coordinator devices that meet the module.
 
-        Iterates coordinator.data and, for each device, instantiates a JackerySelect for each description whose key passes _gate(description.key, payload, supports_advanced). Ensures created entities have unique identifiers by filtering duplicates.
+        gating rules.
+
+        Iterates coordinator.data and, for each device, instantiates a JackerySelect
+        for each description whose key passes _gate(description.key, payload,
+        supports_advanced). Ensures created entities have unique identifiers by
+        filtering duplicates.
 
         Returns:
             list[SelectEntity]: Created JackerySelect instances for eligible devices.
@@ -991,16 +1028,22 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             for description in SELECT_DESCRIPTIONS:
                 if _gate(description.key, payload, supports_advanced):
                     _append_unique(
-                        entities, JackerySelect(coordinator, dev_id, description)
+                        entities,
+                        JackerySelect(coordinator, dev_id, description),
                     )
         return entities
 
     last_signature: tuple[Any, ...] = ()
 
     def _add_new_entities() -> None:
-        """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
+        """Detect changes in the coordinator's device payloads and register any newly.
 
-        When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature; if the signature is unchanged, take no action.
+        discovered select entities.
+
+        When the computed signature of coordinator.data differs from the last-seen
+        signature, collect eligible entities and pass them to the platform's
+        async_add_entities callback, then update the cached signature; if the signature
+        is unchanged, take no action.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

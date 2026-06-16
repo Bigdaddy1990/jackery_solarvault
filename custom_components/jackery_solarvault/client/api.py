@@ -74,8 +74,10 @@ class JackeryApi(
             session: aiohttp ClientSession used for HTTP requests.
             account: Account identifier used for authentication.
             password: Account password used for authentication.
-            mqtt_mac_id: Optional preconfigured MQTT MAC identifier; if omitted a MAC will be generated.
-            region_code: Optional region or country code; whitespace is stripped and the value is normalized to uppercase.
+            mqtt_mac_id: Optional preconfigured MQTT MAC identifier; if omitted a MAC
+            will be generated.
+            region_code: Optional region or country code; whitespace is stripped and
+            the value is normalized to uppercase.
         """
         self._session = session
         self._account = account

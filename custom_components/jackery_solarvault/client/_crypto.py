@@ -17,7 +17,10 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import MQTT_MAC_ID_PREFIX, RSA_PUBLIC_KEY_B64  # noqa: TID252
+from custom_components.jackery_solarvault.const import (
+    MQTT_MAC_ID_PREFIX,
+    RSA_PUBLIC_KEY_B64,
+)
 
 LOGIN_AES_SEED_LEN: Final = 16
 LOGIN_AES_KEY_LEN: Final = 24
@@ -37,7 +40,7 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     # Jackery Layer A protocol requires ECB.
-    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305  # noqa: S305
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -76,12 +79,15 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
         ValueError: If `bluetooth_key` is not exactly 16 bytes.
     """
     if len(bluetooth_key) != 16:  # noqa: PLR2004
-        raise ValueError(  # noqa: TRY003
+        msg = (
             "encrypt_mqtt_body: bluetoothKey must be "
             f"16 bytes, got {len(bluetooth_key)}"
         )
+        raise ValueError(
+            msg,
+        )
     plaintext = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode(
-        "utf-8"
+        "utf-8",
     )  # noqa: E501, RUF100
     ciphertext = _aes_cbc_encrypt(plaintext, bluetooth_key, bluetooth_key)
     return base64.b64encode(ciphertext).decode("ascii")
@@ -91,8 +97,9 @@ def generate_login_aes_key(random_source: RandomBytesSource = os.urandom) -> byt
     """Return the app-compatible Layer A AES key bytes for one login request."""
     seed = random_source(LOGIN_AES_SEED_LEN)
     if len(seed) != LOGIN_AES_SEED_LEN:
-        raise ValueError(  # noqa: TRY003
-            f"Layer A login AES seed must be 16 bytes, got {len(seed)}"
+        msg = f"Layer A login AES seed must be 16 bytes, got {len(seed)}"
+        raise ValueError(
+            msg,
         )
     return base64.b64encode(seed)
 
@@ -114,18 +121,21 @@ def build_login_crypto_fields(
         aes_key if aes_key is not None else generate_login_aes_key(random_source)
     )
     if len(login_aes_key) != LOGIN_AES_KEY_LEN:
-        raise ValueError(  # noqa: TRY003
-            f"Layer A login AES key must be 24 bytes, got {len(login_aes_key)}"
+        msg = f"Layer A login AES key must be 24 bytes, got {len(login_aes_key)}"
+        raise ValueError(
+            msg,
         )
     plaintext = json.dumps(
-        login_bean, separators=(",", ":"), ensure_ascii=False
+        login_bean,
+        separators=(",", ":"),
+        ensure_ascii=False,
     ).encode("utf-8")
     return {
         "aesEncryptData": base64.b64encode(
-            _aes_ecb_encrypt(plaintext, login_aes_key)
+            _aes_ecb_encrypt(plaintext, login_aes_key),
         ).decode("ascii"),
         "rsaForAesKey": base64.b64encode(
-            _rsa_pkcs1v15_encrypt(login_aes_key, RSA_PUBLIC_KEY_B64)
+            _rsa_pkcs1v15_encrypt(login_aes_key, RSA_PUBLIC_KEY_B64),
         ).decode("ascii"),
     }
 
@@ -146,8 +156,11 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
     der_bytes = base64.b64decode(public_key_b64)
     public_key = load_der_public_key(der_bytes)
     if not isinstance(public_key, rsa.RSAPublicKey):
-        raise TypeError(  # noqa: TRY003
+        msg = (
             f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
+        )
+        raise TypeError(
+            msg,
         )
     return public_key.encrypt(data, asym_padding.PKCS1v15())
 

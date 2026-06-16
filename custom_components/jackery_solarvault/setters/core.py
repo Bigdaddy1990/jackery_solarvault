@@ -17,7 +17,10 @@ async def async_publish_command(
 ) -> None:
     """Publish a command through the characterized coordinator transport stack."""
     await getattr(coordinator, chr(95) + "async_publish_command")(
-        device_id, cmd, body, **kwargs
+        device_id,
+        cmd,
+        body,
+        **kwargs,
     )
 
 
@@ -30,5 +33,8 @@ async def async_publish_command_ble_first(
 ) -> None:
     """Publish a command through BLE first, then MQTT fallback."""
     await getattr(coordinator, chr(95) + "async_publish_command_ble_first")(
-        device_id, cmd, body, **kwargs
+        device_id,
+        cmd,
+        body,
+        **kwargs,
     )

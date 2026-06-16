@@ -41,7 +41,8 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 _THIRD_PARTY_MQTT_TEXT_FIELDS: tuple[
-    tuple[str, str, str, TextMode, str | None], ...
+    tuple[str, str, str, TextMode, str | None],
+    ...,
 ] = (
     (
         "third_party_mqtt_ip",
@@ -81,31 +82,46 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 ) -> None:
     """Set up text entities for renaming Jackery system devices from a config entry.
 
-    Retrieves the coordinator from the entry and registers JackerySystemNameText entities for each device whose payload exposes a system identifier (either FIELD_ID or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of coordinator.data to only add entities when the set of devices changes, and registers a coordinator listener that updates entities on subsequent data changes; the listener is detached when the entry is unloaded.
+    Retrieves the coordinator from the entry and registers JackerySystemNameText
+    entities for each device whose payload exposes a system identifier (either FIELD_ID
+    or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of
+    coordinator.data to only add entities when the set of devices changes, and
+    registers a coordinator listener that updates entities on subsequent data changes;
+    the listener is detached when the entry is unloaded.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """Append a TextEntity to the provided list if its unique identifier has not been registered.
+        """Append a TextEntity to the provided list if its unique identifier has not.
 
-        Modifies the `entities` list by appending `entity` when its unique id is new, and records that id to prevent duplicate entities from being added.
+        been registered.
+
+        Modifies the `entities` list by appending `entity` when its unique id is new,
+        and records that id to prevent duplicate entities from being added.
 
         Parameters:
-            entities (list[TextEntity]): Target list to which the entity will be appended if allowed.
+            entities (list[TextEntity]): Target list to which the entity will be
+            appended if allowed.
             entity (TextEntity): Candidate text entity to append.
         """
         append_unique_entity(
-            entities, seen_unique_ids, entity, platform="text", logger=_LOGGER
+            entities,
+            seen_unique_ids,
+            entity,
+            platform="text",
+            logger=_LOGGER,
         )
 
     def _collect_entities() -> list[TextEntity]:
         """Collects text entities for devices that expose a system identifier.
 
-        Creates a JackerySystemNameText for each coordinator data entry whose system contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
+        Creates a JackerySystemNameText for each coordinator data entry whose system
+        contains either `FIELD_ID` or `FIELD_SYSTEM_ID`.
 
         Returns:
-            list[TextEntity]: TextEntity instances created for devices that support renaming their system.
+            list[TextEntity]: TextEntity instances created for devices that support
+            renaming their system.
         """
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
@@ -116,7 +132,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
             if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
                 _append_unique(entities, JackeryGridStandardText(coordinator, dev_id))
             if coordinator.device_supports_advanced(
-                dev_id
+                dev_id,
             ) or coordinator.device_bluetooth_key(dev_id):
                 for (
                     key_suffix,
@@ -144,7 +160,9 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     def _add_new_entities() -> None:
         """Add newly discovered text entities when the coordinator's data changes.
 
-        Checks the current signature of the coordinator data against the last seen signature; if different, collect entities and register them with `async_add_entities`, and update the stored signature.
+        Checks the current signature of the coordinator data against the last seen
+        signature; if different, collect entities and register them with
+        `async_add_entities`, and update the stored signature.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
@@ -170,7 +188,9 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     _attr_pattern = r"^.{1,64}$"
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "system_name")
@@ -179,7 +199,8 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     def native_value(self) -> str | None:
         """Return the current editable system name for the device.
 
-        Prefers the stored system name (FIELD_SYSTEM_NAME); falls back to the device product name (FIELD_DEVICE_NAME). Returns None if neither value is available.
+        Prefers the stored system name (FIELD_SYSTEM_NAME); falls back to the device
+        product name (FIELD_DEVICE_NAME). Returns None if neither value is available.
 
         Returns:
             The editable system name, the device product name, or None.
@@ -189,16 +210,23 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
-        """Rename the remote system and update local state so the change appears in the UI.
+        """Rename the remote system and update local state so the change appears in the.
 
-        Trims leading and trailing whitespace from `value`, sends the rename request to the Jackery API, applies an optimistic local update on success, and requests a coordinator refresh so dependent entities reflect the new name.
+        UI.
+
+        Trims leading and trailing whitespace from `value`, sends the rename request to
+        the Jackery API, applies an optimistic local update on success, and requests a
+        coordinator refresh so dependent entities reflect the new name.
 
         Parameters:
-            value (str): New system name; leading and trailing whitespace will be removed.
+            value (str): New system name; leading and trailing whitespace will be
+            removed.
 
         Raises:
-            ConfigEntryAuthFailed: If the API rejects credentials and re-authentication is required.
-            HomeAssistantError: If the system identifier is missing, the trimmed name is empty, or the remote API reports a failure.
+            ConfigEntryAuthFailed: If the API rejects credentials and re-authentication
+            is required.
+            HomeAssistantError: If the system identifier is missing, the trimmed name
+            is empty, or the remote API reports a failure.
         """
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
@@ -223,9 +251,12 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
         try:
             ok = await self.coordinator.api.async_set_system_name(system_id, new_name)
         except JackeryAuthError as err:
-            raise ConfigEntryAuthFailed(  # noqa: TRY003
+            msg = (
                 "Jackery credentials were rejected while renaming a system. "
                 "Re-authentication is required."
+            )
+            raise ConfigEntryAuthFailed(
+                msg,
             ) from err
         except JackeryError as err:
             _LOGGER.debug("Failed to rename system %s: %s", system_id, err)
@@ -268,7 +299,9 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
     _attr_pattern = r"^\d{1,8}$"
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the grid-standard text entity."""
         super().__init__(coordinator, device_id, "grid_standard")
@@ -295,7 +328,8 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
             )
         try:
             await self.coordinator.async_sync_grid_standard(
-                self._device_id, int(new_value)
+                self._device_id,
+                int(new_value),
             )
             await self.coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
@@ -354,7 +388,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
     def native_value(self) -> str | None:
         """Return the current plaintext value used for writes."""
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
-            self._field
+            self._field,
         )
         if value is None:
             return None

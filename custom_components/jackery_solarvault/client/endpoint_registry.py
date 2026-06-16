@@ -230,7 +230,7 @@ def render_endpoint_mapping_markdown(mapping: dict[str, JackeryEndpointMapping])
             f"| `{endpoint.path}` | `{endpoint.client_method or '—'}` | "
             f"{endpoint.http_method or '—'} | "
             f"{'yes' if endpoint.auth_required else 'no'} | "
-            f"{fields} | {status} |"
+            f"{fields} | {status} |",
         )
     rows.append("")
     return "\n".join(rows)

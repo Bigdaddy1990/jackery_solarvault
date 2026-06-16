@@ -57,7 +57,8 @@ PERIODIC_SECTION_PREFIXES: frozenset[str] = frozenset({
 def is_periodic_section(section_key: str) -> bool:
     """Determine whether a payload section contains periodic (long-term) data.
 
-    Matches either a known periodic prefix exactly or keys that start with a recognized prefix followed by an underscore (for example, `device_pv_stat_day`).
+    Matches either a known periodic prefix exactly or keys that start with a recognized
+    prefix followed by an underscore (for example, `device_pv_stat_day`).
 
     Parameters:
         section_key (str): Payload section identifier to test.
@@ -93,16 +94,24 @@ def merge_live_properties(
     base: dict[str, Any],
     update: dict[str, Any],
 ) -> dict[str, Any]:
-    """Produce a merged mapping of live device properties where populated base values are never overwritten by blank update values.
+    """Produce a merged mapping of live device properties where populated base values.
 
-    Performs an update-wins merge: dictionary values are merged recursively; non-dictionary values from `update` replace those in `base` unless the `update` value is considered blank (None, an empty or whitespace-only string, or an empty list/dict) and the corresponding `base` value is populated. The inputs are not mutated.
+    are never overwritten by blank update values.
+
+    Performs an update-wins merge: dictionary values are merged recursively;
+    non-dictionary values from `update` replace those in `base` unless the `update`
+    value is considered blank (None, an empty or whitespace-only string, or an empty
+    list/dict) and the corresponding `base` value is populated. The inputs are not
+    mutated.
 
     Parameters:
         base (dict[str, Any]): Original live properties to merge into.
-        update (dict[str, Any]): Incoming update to apply; blank values in this mapping will not replace populated values from `base`.
+        update (dict[str, Any]): Incoming update to apply; blank values in this mapping
+        will not replace populated values from `base`.
 
     Returns:
-        dict[str, Any]: A new mapping containing the merged properties with the "never blank populated keys" rule enforced.
+        dict[str, Any]: A new mapping containing the merged properties with the "never
+        blank populated keys" rule enforced.
     """
     merged: dict[str, Any] = dict(base)
     for key, value in update.items():
