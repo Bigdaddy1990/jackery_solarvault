@@ -1,7 +1,5 @@
 """Static contract tests for Jackery reference coverage documentation."""
 
-from __future__ import annotations  # noqa: TID251
-
 import ast
 import json
 from pathlib import Path

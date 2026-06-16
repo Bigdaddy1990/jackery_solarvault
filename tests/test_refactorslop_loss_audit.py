@@ -8,8 +8,6 @@ are:
   * collect_tree             – gather ModuleInfo for every .py in a directory
 """
 
-from __future__ import annotations
-
 import ast
 from dataclasses import fields
 from pathlib import Path
@@ -95,12 +93,7 @@ def test_count_stmts_single_pass() -> None:
 
 def test_count_stmts_multiple_statements() -> None:
     """Statement count includes all nested statements recursively."""
-    src = (
-        "def f():\n"
-        "    x = 1\n"
-        "    y = 2\n"
-        "    return x + y\n"
-    )
+    src = "def f():\n    x = 1\n    y = 2\n    return x + y\n"
     tree = ast.parse(src)
     func = tree.body[0]
     count = _count_stmts(func)
@@ -110,12 +103,7 @@ def test_count_stmts_multiple_statements() -> None:
 
 def test_count_stmts_nested_function() -> None:
     """Nested function bodies are counted recursively."""
-    src = (
-        "def outer():\n"
-        "    def inner():\n"
-        "        return 1\n"
-        "    return inner()\n"
-    )
+    src = "def outer():\n    def inner():\n        return 1\n    return inner()\n"
     tree = ast.parse(src)
     outer = tree.body[0]
     count = _count_stmts(outer)
@@ -127,13 +115,7 @@ def test_count_stmts_nested_function() -> None:
 
 def test_count_stmts_if_block() -> None:
     """If statement body is counted."""
-    src = (
-        "def f(x):\n"
-        "    if x:\n"
-        "        y = 1\n"
-        "        return y\n"
-        "    return 0\n"
-    )
+    src = "def f(x):\n    if x:\n        y = 1\n        return y\n    return 0\n"
     tree = ast.parse(src)
     func = tree.body[0]
     count = _count_stmts(func)
@@ -143,12 +125,7 @@ def test_count_stmts_if_block() -> None:
 
 def test_count_stmts_class_body() -> None:
     """Class body statements are counted."""
-    src = (
-        "class Foo:\n"
-        "    x: int = 0\n"
-        "    def method(self) -> None:\n"
-        "        pass\n"
-    )
+    src = "class Foo:\n    x: int = 0\n    def method(self) -> None:\n        pass\n"
     tree = ast.parse(src)
     cls = tree.body[0]
     count = _count_stmts(cls)
@@ -195,11 +172,7 @@ def test_extract_simple_function(tmp_path: Path) -> None:
 
 def test_extract_class_and_method(tmp_path: Path) -> None:
     """extract() records both the class and its method with dotted qualname."""
-    src = (
-        "class Foo:\n"
-        "    def bar(self):\n"
-        "        return 42\n"
-    )
+    src = "class Foo:\n    def bar(self):\n        return 42\n"
     py = tmp_path / "mod.py"
     py.write_text(src, encoding="utf-8")
 
@@ -266,10 +239,7 @@ def test_extract_syntax_error_returns_parse_error(tmp_path: Path) -> None:
 def test_extract_nested_class(tmp_path: Path) -> None:
     """Nested classes and their methods receive dotted qualnames."""
     src = (
-        "class Outer:\n"
-        "    class Inner:\n"
-        "        def method(self):\n"
-        "            pass\n"
+        "class Outer:\n    class Inner:\n        def method(self):\n            pass\n"
     )
     py = tmp_path / "mod.py"
     py.write_text(src, encoding="utf-8")
@@ -422,7 +392,9 @@ def test_extract_and_collect_tree_agree(tmp_path: Path) -> None:
     assert direct.parse_error == via_tree.parse_error
 
 
-def test_extract_does_not_include_local_assignments_as_constants(tmp_path: Path) -> None:
+def test_extract_does_not_include_local_assignments_as_constants(
+    tmp_path: Path,
+) -> None:
     """Variables assigned inside functions are NOT added to module-level constants."""
     src = "def f():\n    LOCAL_VAR = 1\n    return LOCAL_VAR\n"
     py = tmp_path / "mod.py"
