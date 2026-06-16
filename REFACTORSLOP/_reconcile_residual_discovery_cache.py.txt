@@ -1,3 +1,0 @@
-
-[_store] adopted=LIVE
-   doc  <1\discovery_cache.py>: """Return the HA Store used for cached discovery metadata."""
