@@ -28,11 +28,11 @@ from custom_components.jackery_solarvault.const import (
 
 def test_extract_code_uses_shared_integer_parser() -> None:
     """API code parsing rejects bool/non-finite malformed response values."""
-    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # noqa: PLR2004, S101, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # noqa: PLR2004, S101, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # noqa: S101, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # noqa: S101, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # noqa: S101, SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # noqa: PLR2004, SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # noqa: PLR2004, SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # noqa: SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # noqa: SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # noqa: SLF001
 
 
 async def test_set_system_name_accepts_only_boolean_true_response() -> None:
@@ -53,12 +53,12 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
 
     api._put_json = _put_json  # noqa: SLF001
 
-    assert await api.async_set_system_name("123", " SolarVault ") is True  # noqa: S101
-    assert await api.async_set_system_name("123", "SolarVault") is False  # noqa: S101
-    assert await api.async_set_system_name("123", "SolarVault") is False  # noqa: S101
-    assert await api.async_set_system_name("123", "SolarVault") is False  # noqa: S101
-    assert await api.async_set_system_name("123", "SolarVault") is False  # noqa: S101
-    assert captured[0] == (  # noqa: S101
+    assert await api.async_set_system_name("123", " SolarVault ") is True
+    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert await api.async_set_system_name("123", "SolarVault") is False
+    assert captured[0] == (
         SYSTEM_NAME_PATH,
         {FIELD_SYSTEM_NAME: "SolarVault", FIELD_ID: "123"},
     )
@@ -83,7 +83,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
 
     api._post_form = _post_form  # noqa: SLF001
 
-    assert (  # noqa: S101
+    assert (
         await api.async_set_single_mode(
             system_id="sys1",
             single_price=0.25,
@@ -91,7 +91,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is True
     )
-    assert (  # noqa: S101
+    assert (
         await api.async_set_single_mode(
             system_id="sys1",
             single_price=0.25,
@@ -99,7 +99,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is True
     )
-    assert (  # noqa: S101
+    assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
             platform_company_id=7,
@@ -107,7 +107,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is True
     )
-    assert (  # noqa: S101
+    assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
             platform_company_id=7,
@@ -115,7 +115,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is False
     )
-    assert (  # noqa: S101
+    assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
             platform_company_id=7,
@@ -123,7 +123,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is False
     )
-    assert (  # noqa: S101
+    assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
             platform_company_id=7,
@@ -131,7 +131,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         )
         is False
     )
-    assert captured[0] == (  # noqa: S101
+    assert captured[0] == (
         SAVE_SINGLE_MODE_PATH,
         {
             FIELD_SYSTEM_ID: "sys1",
@@ -139,7 +139,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
             FIELD_CURRENCY: "EUR",
         },
     )
-    assert captured[2] == (  # noqa: S101
+    assert captured[2] == (
         SAVE_DYNAMIC_MODE_PATH,
         {
             FIELD_SYSTEM_ID: "sys1",
@@ -199,7 +199,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
 
     api._post_form = _post_form  # noqa: SLF001
 
-    assert (  # noqa: S101
+    assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
             platform_company_id="7.0",
@@ -207,7 +207,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
         )
         is True
     )
-    assert captured == [  # noqa: S101
+    assert captured == [
         (
             SAVE_DYNAMIC_MODE_PATH,
             {
@@ -227,7 +227,7 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
     api.last_device_period_stat_responses = {}
 
     async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # noqa: RUF029
-        assert path == DEVICE_PV_STAT_PATH  # noqa: S101
+        assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
     api._get_json = _get_json  # noqa: SLF001
@@ -247,9 +247,9 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
     }
     stored = api.last_device_period_stat_responses[f"{DEVICE_PV_STAT_PATH}:dev1:day"]
 
-    assert payload == {APP_REQUEST_META: request_meta}  # noqa: S101
-    assert stored[FIELD_DATA] is None  # noqa: S101
-    assert stored[APP_REQUEST_META] == {  # noqa: S101
+    assert payload == {APP_REQUEST_META: request_meta}
+    assert stored[FIELD_DATA] is None
+    assert stored[APP_REQUEST_META] == {
         "path": DEVICE_PV_STAT_PATH,
         "params": {
             FIELD_DEVICE_ID: "dev1",
@@ -265,16 +265,16 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
     api.last_battery_pack_responses = {}
 
     async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # noqa: RUF029
-        assert path == BATTERY_PACK_PATH  # noqa: S101
+        assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
     api._get_json = _get_json  # noqa: SLF001
 
-    assert await api.async_get_battery_pack_list("sn1") == []  # noqa: S101
+    assert await api.async_get_battery_pack_list("sn1") == []
 
     stored = api.last_battery_pack_responses["sn1"]
-    assert stored[FIELD_DATA] is None  # noqa: S101
-    assert stored[APP_REQUEST_META] == {  # noqa: S101
+    assert stored[FIELD_DATA] is None
+    assert stored[APP_REQUEST_META] == {
         "path": BATTERY_PACK_PATH,
         "params": {FIELD_DEVICE_SN: "sn1"},
     }

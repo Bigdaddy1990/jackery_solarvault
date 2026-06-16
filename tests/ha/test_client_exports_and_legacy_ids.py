@@ -41,12 +41,12 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 
 def test_auth_error_is_subclass_of_error() -> None:
     """JackeryAuthError must be a subclass of JackeryError (hierarchy check)."""
-    assert issubclass(JackeryAuthError, JackeryError)  # noqa: S101
+    assert issubclass(JackeryAuthError, JackeryError)
 
 
 def test_api_error_is_subclass_of_error() -> None:
     """JackeryApiError must be a subclass of JackeryError."""
-    assert issubclass(JackeryApiError, JackeryError)  # noqa: S101
+    assert issubclass(JackeryApiError, JackeryError)
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
     __init__.py. This test verifies the import works without error.
     """
     try:
-        assert JackeryLocalMqttClient is not None  # noqa: S101
+        assert JackeryLocalMqttClient is not None
     except (SyntaxError, ImportError) as err:
         pytest.skip(f"local_mqtt module not importable: {err}")
 
@@ -71,17 +71,17 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
     The contract requires __init__.py to import from .client instead of .api.
     """
-    assert JackeryApi is not None  # noqa: S101
+    assert JackeryApi is not None
 
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    assert JackeryAuthError is not None  # noqa: S101
+    assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    assert JackeryError is not None  # noqa: S101
+    assert JackeryError is not None
 
 
 # ---------------------------------------------------------------------------
@@ -102,17 +102,17 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
 
 def test_legacy_suffix_matches_simple_digit_head() -> None:
     """A UID of the form '<digits><suffix>' must match."""
-    assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True
 
 
 def test_legacy_suffix_matches_single_digit_head() -> None:
     """A single-digit head followed by a suffix must match."""
-    assert _legacy_suffix_matches("9_some_key", "_some_key") is True  # noqa: S101
+    assert _legacy_suffix_matches("9_some_key", "_some_key") is True
 
 
 def test_legacy_suffix_matches_large_digit_head() -> None:
     """A long numeric head (device serial) must match."""
-    assert _legacy_suffix_matches("987654321_voltage", "_voltage") is True  # noqa: S101
+    assert _legacy_suffix_matches("987654321_voltage", "_voltage") is True
 
 
 # --- True cases: battery-pack head ----------------------------------------
@@ -120,17 +120,17 @@ def test_legacy_suffix_matches_large_digit_head() -> None:
 
 def test_legacy_suffix_matches_battery_pack_head() -> None:
     """A UID of the form '<digits>_battery_pack_<digits><suffix>' must match."""
-    assert _legacy_suffix_matches("12345_battery_pack_1_voltage", "_voltage") is True  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_pack_1_voltage", "_voltage") is True
 
 
 def test_legacy_suffix_matches_battery_pack_zero_index() -> None:
     """battery_pack index of 0 must be accepted."""
-    assert _legacy_suffix_matches("12345_battery_pack_0_current", "_current") is True  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_pack_0_current", "_current") is True
 
 
 def test_legacy_suffix_matches_battery_pack_multi_digit_index() -> None:
     """battery_pack index with multiple digits must match."""
-    assert _legacy_suffix_matches("99_battery_pack_12_temp", "_temp") is True  # noqa: S101
+    assert _legacy_suffix_matches("99_battery_pack_12_temp", "_temp") is True
 
 
 # --- False cases: head does not match digits pattern ----------------------
@@ -138,40 +138,40 @@ def test_legacy_suffix_matches_battery_pack_multi_digit_index() -> None:
 
 def test_legacy_suffix_matches_rejects_non_digit_head() -> None:
     """A UID whose head is not purely digits must not match."""
-    assert _legacy_suffix_matches("my_device_battery_soc", "_battery_soc") is False  # noqa: S101
+    assert _legacy_suffix_matches("my_device_battery_soc", "_battery_soc") is False
 
 
 def test_legacy_suffix_matches_rejects_alphanumeric_head() -> None:
     """A mixed alphanumeric head must not match."""
-    assert _legacy_suffix_matches("abc123_voltage", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("abc123_voltage", "_voltage") is False
 
 
 def test_legacy_suffix_matches_rejects_battery_pack_with_non_digit_index() -> None:
     """battery_pack with a non-numeric index must not match."""
-    assert _legacy_suffix_matches("12345_battery_pack_abc_voltage", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_pack_abc_voltage", "_voltage") is False
 
 
 def test_legacy_suffix_matches_rejects_suffix_mismatch() -> None:
     """When the UID does not end with the suffix, must return False."""
-    assert _legacy_suffix_matches("12345_battery_soc", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_soc", "_voltage") is False
 
 
 def test_legacy_suffix_matches_rejects_partial_suffix_match() -> None:
     """A partial suffix match (UID ends with a longer version) must return False."""
     # uid ends with "_soc" but the suffix we're checking is "_battery_soc"
     # and the head would be "12345_" which is not a pure digits head.
-    assert _legacy_suffix_matches("12345_battery_soc", "_extra_battery_soc") is False  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_soc", "_extra_battery_soc") is False
 
 
 def test_legacy_suffix_matches_rejects_empty_uid() -> None:
     """An empty UID string must not match any suffix."""
-    assert _legacy_suffix_matches("", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("", "_voltage") is False
 
 
 def test_legacy_suffix_matches_rejects_uid_matching_only_suffix() -> None:
     """A UID that consists entirely of the suffix (empty head) must not match."""
     # head would be "" which does not match \d+
-    assert _legacy_suffix_matches("_voltage", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("_voltage", "_voltage") is False
 
 
 def test_legacy_suffix_matches_current_entity_not_matched() -> None:
@@ -180,7 +180,7 @@ def test_legacy_suffix_matches_current_entity_not_matched() -> None:
     Example: '12345_pv_power_w' — head would be '12345_pv_power' which is not
     a valid legacy head (contains non-digits after the device serial).
     """
-    assert (  # noqa: S101
+    assert (
         _legacy_suffix_matches("12345_pv_power_w", "_w") is False
         or _legacy_suffix_matches("12345_pv_power_w", "_power_w") is False
     )
@@ -192,9 +192,9 @@ def test_legacy_suffix_matches_head_cannot_have_trailing_underscore() -> None:
     starts with underscore.
     """
     # "12345_battery_soc": head="12345", suffix="_battery_soc" → head matches \d+
-    assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True
     # But "12345__double_underscore": head="12345_", does NOT match \d+ (has trailing _)
-    assert (  # noqa: S101
+    assert (
         _legacy_suffix_matches("12345__double_underscore", "_double_underscore")
         is False
     )
@@ -215,25 +215,25 @@ def test_local_mqtt_result_warning_condition_fires_for_runtime_error() -> None:
     RuntimeError.
     """
     result: Any = RuntimeError("broker refused connection")
-    assert isinstance(result, BaseException)  # noqa: S101
+    assert isinstance(result, BaseException)
 
 
 def test_local_mqtt_result_warning_condition_fires_for_exception() -> None:
     """The isinstance(local_mqtt_result, BaseException) must match generic Exception."""
     result: Any = Exception("something went wrong")
-    assert isinstance(result, BaseException)  # noqa: S101
+    assert isinstance(result, BaseException)
 
 
 def test_local_mqtt_result_warning_condition_is_false_for_none() -> None:
     """When local_mqtt_result is None (success), the warning condition must be False."""
     result: Any = None
-    assert not isinstance(result, BaseException)  # noqa: S101
+    assert not isinstance(result, BaseException)
 
 
 def test_local_mqtt_result_warning_condition_is_false_for_zero() -> None:
     """Integer 0 (falsy but not an exception) must not trigger the warning."""
     result: Any = 0
-    assert not isinstance(result, BaseException)  # noqa: S101
+    assert not isinstance(result, BaseException)
 
 
 def test_local_mqtt_result_warning_logged_via_logger(
@@ -256,8 +256,8 @@ def test_local_mqtt_result_warning_logged_via_logger(
                 local_mqtt_result,
             )
 
-    assert "local MQTT listener" in caplog.text  # noqa: S101
-    assert "local broker unreachable" in caplog.text  # noqa: S101
+    assert "local MQTT listener" in caplog.text
+    assert "local broker unreachable" in caplog.text
 
 
 def test_local_mqtt_result_no_warning_when_none(
@@ -274,7 +274,7 @@ def test_local_mqtt_result_no_warning_when_none(
                 local_mqtt_result,
             )
 
-    assert "local MQTT listener" not in caplog.text  # noqa: S101
+    assert "local MQTT listener" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -287,12 +287,12 @@ def test_legacy_suffix_matches_suffix_equal_to_uid_empty_head() -> None:
     """When suffix equals the entire UID, the head is empty and must not match."""
     suffix = "12345_battery_soc"
     uid = suffix
-    assert _legacy_suffix_matches(uid, suffix) is False  # noqa: S101
+    assert _legacy_suffix_matches(uid, suffix) is False
 
 
 def test_legacy_suffix_matches_suffix_longer_than_uid() -> None:
     """When suffix is longer than the UID, endswith returns False."""
-    assert _legacy_suffix_matches("123", "_very_long_suffix_that_exceeds_uid") is False  # noqa: S101
+    assert _legacy_suffix_matches("123", "_very_long_suffix_that_exceeds_uid") is False
 
 
 # ---------------------------------------------------------------------------
@@ -309,11 +309,11 @@ def test_legacy_suffix_matches_current_style_uid_not_matched() -> None:
     """
     uid = "12345_pv_power_w"
     legacy_suffix = "_power_w"
-    assert _legacy_suffix_matches(uid, legacy_suffix) is False  # noqa: S101
+    assert _legacy_suffix_matches(uid, legacy_suffix) is False
 
 
 def test_legacy_suffix_matches_battery_pack_uid_not_matched_by_wrong_suffix() -> None:
     """battery_pack UIDs with a wrong suffix must return False."""
     uid = "12345_battery_pack_2_voltage"
-    assert _legacy_suffix_matches(uid, "_current") is False  # noqa: S101
-    assert _legacy_suffix_matches(uid, "_voltage") is True  # noqa: S101
+    assert _legacy_suffix_matches(uid, "_current") is False
+    assert _legacy_suffix_matches(uid, "_voltage") is True

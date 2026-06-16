@@ -36,7 +36,7 @@ def _frozenset_name_count(tree: ast.Module, name: str) -> int:
         if node.target.id != name or not isinstance(node.value, ast.Call):
             continue
         [arg] = node.value.args
-        assert isinstance(arg, ast.Set)  # noqa: S101
+        assert isinstance(arg, ast.Set)
         return sum(isinstance(item, ast.Name) for item in arg.elts)
     msg = f"{name} frozenset assignment not found"
     raise AssertionError(msg)
@@ -45,7 +45,7 @@ def _frozenset_name_count(tree: ast.Module, name: str) -> int:
 def _summary_row(markdown: str, label: str) -> tuple[str, ...]:
     pattern = re.compile(rf"^\| {re.escape(label)}\s*\|(.+)\|$", re.MULTILINE)
     match = pattern.search(markdown)
-    assert match is not None, f"{label} coverage row missing"  # noqa: S101
+    assert match is not None, f"{label} coverage row missing"
     return tuple(cell.strip() for cell in match.group(1).split("|"))
 
 
@@ -54,23 +54,23 @@ def test_reference_coverage_summary_matches_authoritative_json() -> None:
     reference = json.loads(REFERENCE_PATH.read_text(encoding="utf-8"))
     coverage = COVERAGE_PATH.read_text(encoding="utf-8")
 
-    assert (  # noqa: S101
+    assert (
         "Single technical source of truth:"
         " `docs/jackery_complete_reference.json`" in coverage
     )
-    assert _summary_row(coverage, "HTTP-Endpoints")[0] == str(  # noqa: S101
+    assert _summary_row(coverage, "HTTP-Endpoints")[0] == str(
         reference["counts"]["http_endpoints"],
     )
-    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[0] == str(  # noqa: S101
+    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[0] == str(
         len(reference["mqtt"]["message_types"]),
     )
-    assert _summary_row(coverage, "Commands (home)")[0] == str(  # noqa: S101
+    assert _summary_row(coverage, "Commands (home)")[0] == str(
         reference["counts"]["commands_home"],
     )
-    assert _summary_row(coverage, "Commands (portable)")[0] == str(  # noqa: S101
+    assert _summary_row(coverage, "Commands (portable)")[0] == str(
         reference["counts"]["commands_portable"],
     )
-    assert _summary_row(coverage, "Accessories")[0] == str(  # noqa: S101
+    assert _summary_row(coverage, "Accessories")[0] == str(
         reference["counts"]["accessory_types"],
     )
 
@@ -110,19 +110,19 @@ def test_reference_coverage_summary_matches_implementation_lists() -> None:
     implemented_reference_endpoints = set(client_endpoints) & reference_endpoint_paths
     exempt_reference_endpoints = set(exempt_endpoints) & reference_endpoint_paths
 
-    assert _summary_row(coverage, "HTTP-Endpoints")[1] == str(  # noqa: S101
+    assert _summary_row(coverage, "HTTP-Endpoints")[1] == str(
         len(implemented_reference_endpoints),
     )
-    assert (  # noqa: S101
+    assert (
         f"{len(implemented_reference_endpoints) + len(exempt_reference_endpoints)}"
         "/112 covered" in coverage
     )
-    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[1] == str(  # noqa: S101
+    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[1] == str(
         len(mqtt_message_constants),
     )
-    assert _summary_row(coverage, "Commands (home)")[1] == str(  # noqa: S101
+    assert _summary_row(coverage, "Commands (home)")[1] == str(
         len(home_action_id_constants),
     )
-    assert _summary_row(coverage, "Commands (portable)")[1] == str(  # noqa: S101
+    assert _summary_row(coverage, "Commands (portable)")[1] == str(
         portable_action_ids_count,
     )

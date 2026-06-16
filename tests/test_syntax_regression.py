@@ -35,7 +35,7 @@ def test_client_local_mqtt_can_be_imported() -> None:
             msg,
         ) from err
 
-    assert hasattr(mod, "JackeryLocalMqttClient"), (  # noqa: S101
+    assert hasattr(mod, "JackeryLocalMqttClient"), (
         "JackeryLocalMqttClient must be exported from client/local_mqtt.py"
     )
 
@@ -47,7 +47,7 @@ def test_client_api_can_be_imported() -> None:
         del sys.modules[mod_name]
 
     mod = importlib.import_module(mod_name)
-    assert hasattr(mod, "JackeryApi")  # noqa: S101
+    assert hasattr(mod, "JackeryApi")
 
 
 def test_client_ble_can_be_imported() -> None:
@@ -57,4 +57,4 @@ def test_client_ble_can_be_imported() -> None:
         del sys.modules[mod_name]
 
     mod = importlib.import_module(mod_name)
-    assert hasattr(mod, "build_binary_frame")  # noqa: S101
+    assert hasattr(mod, "build_binary_frame")

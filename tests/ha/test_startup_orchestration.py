@@ -150,7 +150,7 @@ class TestAsyncFinishEntryStartupAuthFailure:
             await _async_finish_entry_startup(hass, entry, coordinator)
 
         # ConfigEntryAuthFailed during auth → stored on coordinator
-        assert coordinator._mqtt_auth_failure_message is not None  # noqa: S101, SLF001
+        assert coordinator._mqtt_auth_failure_message is not None  # noqa: SLF001
 
     async def test_auth_failure_returns_early(self) -> None:  # noqa: PLR6301
         """When auth fails, _async_finish_entry_startup must return early without.
@@ -234,7 +234,7 @@ class TestAsyncFinishEntryStartupDiscovery:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert coordinator._mqtt_auth_failure_message is not None  # noqa: S101, SLF001
+        assert coordinator._mqtt_auth_failure_message is not None  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert "MQTT push could not start" in caplog.text  # noqa: S101
+        assert "MQTT push could not start" in caplog.text
 
     async def test_ble_error_logs_warning(  # noqa: PLR6301
         self,
@@ -321,7 +321,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert "BLE transport could not start" in caplog.text  # noqa: S101
+        assert "BLE transport could not start" in caplog.text
 
     async def test_local_listener_error_logs_warning(  # noqa: PLR6301
         self,
@@ -348,7 +348,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert "HA-MQTT listener could not start" in caplog.text  # noqa: S101
+        assert "HA-MQTT listener could not start" in caplog.text
 
     async def test_refresh_failed_with_cached_snapshot_sets_data(self) -> None:  # noqa: PLR6301
         """When first refresh fails with UpdateFailed and cached snapshot exists,.
@@ -404,7 +404,7 @@ class TestAsyncFinishEntryStartupGatherResults:
         ):
             await _async_finish_entry_startup(hass, entry, coordinator)
 
-        assert "first HTTP refresh failed" in caplog.text  # noqa: S101
+        assert "first HTTP refresh failed" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +434,7 @@ class TestAsyncFinishEntryStartupFinally:
             await _async_finish_entry_startup(hass, entry, coordinator)
 
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-        assert _STARTUP_TASK_RUNTIME_KEY not in bucket  # noqa: S101
+        assert _STARTUP_TASK_RUNTIME_KEY not in bucket
 
     async def test_finally_removes_startup_task_key_on_auth_failure(self) -> None:  # noqa: PLR6301
         """The startup_task key must be removed even when auth fails during startup."""
@@ -453,7 +453,7 @@ class TestAsyncFinishEntryStartupFinally:
             await _async_finish_entry_startup(hass, entry, coordinator)
 
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-        assert _STARTUP_TASK_RUNTIME_KEY not in bucket  # noqa: S101
+        assert _STARTUP_TASK_RUNTIME_KEY not in bucket
 
     async def test_finally_handles_missing_hass_data_gracefully(self) -> None:  # noqa: PLR6301
         """The finally block must not raise when hass.data has no entry bucket."""
@@ -517,8 +517,8 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
             await btn.async_press()
 
         # Must be the SAME object, not a re-wrapped one
-        assert exc_info.value is original_error  # noqa: S101
-        assert exc_info.value.translation_key == "some_specific_error"  # noqa: S101
+        assert exc_info.value is original_error
+        assert exc_info.value.translation_key == "some_specific_error"
 
     async def test_homeassistant_error_without_translation_key_is_wrapped(
         self,
@@ -537,7 +537,7 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
             await btn.async_press()
 
         # Must be wrapped with entity_action_failed
-        assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
+        assert exc_info.value.translation_key == "entity_action_failed"
 
     async def test_homeassistant_error_with_none_translation_key_is_wrapped(
         self,
@@ -554,7 +554,7 @@ class TestJackeryQueryButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
+        assert exc_info.value.translation_key == "entity_action_failed"
 
 
 # ---------------------------------------------------------------------------
@@ -583,8 +583,8 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value is original_error  # noqa: S101
-        assert exc_info.value.translation_key == "device_unreachable"  # noqa: S101
+        assert exc_info.value is original_error
+        assert exc_info.value.translation_key == "device_unreachable"
 
     async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
         self,
@@ -604,7 +604,7 @@ class TestJackeryRebootButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
+        assert exc_info.value.translation_key == "entity_action_failed"
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +636,7 @@ class TestJackeryDeleteStormAlertButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value is original_error  # noqa: S101
+        assert exc_info.value is original_error
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +668,7 @@ class TestJackeryRefreshWeatherPlanButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value is original_error  # noqa: S101
+        assert exc_info.value is original_error
 
 
 # ---------------------------------------------------------------------------
@@ -707,7 +707,7 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value is original_error  # noqa: S101
+        assert exc_info.value is original_error
 
     async def test_homeassistant_error_without_translation_key_is_wrapped(  # noqa: PLR6301
         self,
@@ -734,7 +734,7 @@ class TestJackeryReadScheduleButtonHomeAssistantErrorHandling:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
 
-        assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
+        assert exc_info.value.translation_key == "entity_action_failed"
 
 
 # ---------------------------------------------------------------------------
@@ -750,8 +750,8 @@ def test_storm_alert_id_with_float_returns_full_string_representation() -> None:
     """
     result = _storm_alert_id({"alertId": math.pi})
     # str(math.pi) = "3.141592653589793", not "3.14"
-    assert result == str(math.pi)  # noqa: S101
-    assert result == "3.141592653589793"  # noqa: S101
+    assert result == str(math.pi)
+    assert result == "3.141592653589793"
 
 
 def test_storm_alert_id_with_integer_zero_returns_string_zero() -> None:
@@ -760,7 +760,7 @@ def test_storm_alert_id_with_integer_zero_returns_string_zero() -> None:
     Boundary case: 0 is falsy but is not in {None, ''}, so it is a valid id.
     """
     result = _storm_alert_id({"alertId": 0})
-    assert result == "0"  # noqa: S101
+    assert result == "0"
 
 
 def test_storm_alert_id_with_false_alertid_returns_string_false() -> None:
@@ -771,7 +771,7 @@ def test_storm_alert_id_with_false_alertid_returns_string_false() -> None:
     # False is falsy but not None and not ""
     result = _storm_alert_id({"alertId": False})
     # False is not in {None, ""} so it will be str(False) = "False"
-    assert result == "False"  # noqa: S101
+    assert result == "False"
 
 
 # ---------------------------------------------------------------------------
@@ -788,7 +788,7 @@ def test_legacy_suffix_matches_rejects_current_schema_entity_tail_overlap() -> N
     <digits>_battery_pack_<digits> head shape.
     """
     # This is the exact regression case for legacy cleanup
-    assert (  # noqa: S101
+    assert (
         _legacy_suffix_matches(
             "12345_device_today_battery_charge",
             "_today_battery_charge",
@@ -800,19 +800,19 @@ def test_legacy_suffix_matches_rejects_current_schema_entity_tail_overlap() -> N
 def test_legacy_suffix_matches_does_not_match_when_head_has_letters() -> None:
     """A head containing letters must not match the legacy pattern."""
     # 'abc' as head should not match
-    assert _legacy_suffix_matches("abc_battery_soc", "_battery_soc") is False  # noqa: S101
+    assert _legacy_suffix_matches("abc_battery_soc", "_battery_soc") is False
 
 
 def test_legacy_suffix_matches_handles_very_long_device_id() -> None:
     """A very long numeric device ID (real Jackery serial) must match correctly."""
     # 15-digit device ID is realistic for Jackery serials
-    assert _legacy_suffix_matches("123456789012345_battery_soc", "_battery_soc") is True  # noqa: S101
+    assert _legacy_suffix_matches("123456789012345_battery_soc", "_battery_soc") is True
 
 
 def test_legacy_suffix_matches_battery_pack_large_index() -> None:
     """A battery pack with a large index must still match."""
     # Pack index 99 is unusual but valid
-    assert _legacy_suffix_matches("12345_battery_pack_99_voltage", "_voltage") is True  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_pack_99_voltage", "_voltage") is True
 
 
 def test_legacy_suffix_matches_empty_suffix_always_false() -> None:
@@ -821,8 +821,8 @@ def test_legacy_suffix_matches_empty_suffix_always_false() -> None:
     non-digits if uid does).
     """
     # Empty suffix: head = full uid. Only matches if uid itself is just digits.
-    assert _legacy_suffix_matches("12345", "") is True  # pure digit uid, empty suffix  # noqa: S101
-    assert _legacy_suffix_matches("abc_key", "") is False  # noqa: S101
+    assert _legacy_suffix_matches("12345", "") is True  # pure digit uid, empty suffix
+    assert _legacy_suffix_matches("abc_key", "") is False
 
 
 # ---------------------------------------------------------------------------
@@ -838,7 +838,7 @@ def test_api_module_uses_relative_const_import() -> None:
     This test confirms the module imports without error and that encrypt_mqtt_body
     (a new function added for this integration) is available.
     """
-    assert callable(encrypt_mqtt_body)  # noqa: S101
+    assert callable(encrypt_mqtt_body)
 
 
 def test_api_module_encrypt_mqtt_body_requires_16_byte_key() -> None:
@@ -863,7 +863,7 @@ def test_client_init_getattr_uses_import_module() -> None:
     We verify the behavior is equivalent: the class is loaded lazily and is correct.
     """
     lazy_cls = client_pkg.JackeryMqttPushClient
-    assert lazy_cls is DirectClass  # noqa: S101
+    assert lazy_cls is DirectClass
 
 
 def test_client_init_getattr_raises_attribute_error_for_unknown() -> None:
@@ -884,4 +884,4 @@ def test_custom_component_runtime_modules_use_package_relative_imports() -> None
         if "from jackery_solarvault" in source or "import jackery_solarvault" in source:
             offenders.append(str(path))
 
-    assert sorted(offenders) == []  # noqa: S101
+    assert sorted(offenders) == []

@@ -34,6 +34,7 @@ from custom_components.jackery_solarvault.const import (  # noqa: RUF100
 
 if TYPE_CHECKING:
     from aiomqtt import Client as MQTTClient
+
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)

@@ -15,7 +15,7 @@ import base64
 import hashlib
 import uuid
 
-from Crypto.Cipher import AES  # noqa: S413
+from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def decrypt_mqtt_password(mqtt_password_b64: str, password_b64: str) -> bytes:
 # Fuer HA: einmal generieren, persistent speichern, konstant wiederverwenden.
 # ---------------------------------------------------------------------------
 def device_id_from_android_id(android_id: str) -> str:  # noqa: D103
-    md5 = bytearray(hashlib.md5(android_id.encode()).digest())  # noqa: S324
+    md5 = bytearray(hashlib.md5(android_id.encode()).digest())
     md5[6] = (md5[6] & 0x0F) | 0x30  # UUID version 3
     md5[8] = (md5[8] & 0x3F) | 0x80  # variant
     return "2" + md5.hex()
@@ -338,8 +338,8 @@ def make_login_request(login_bean: dict) -> dict:
     """login_bean z.B. {'account':..,'password':..,'loginType':0,'regionCode':..,
     'registerAppId':..,'macId':..}. Liefert {'aesEncryptData','rsaForAesKey'}.
     """  # noqa: D205
-    from Crypto.Cipher import PKCS1_v1_5  # noqa: PLC0415, S413
-    from Crypto.PublicKey import RSA  # noqa: PLC0415, S413
+    from Crypto.Cipher import PKCS1_v1_5  # noqa: PLC0415
+    from Crypto.PublicKey import RSA  # noqa: PLC0415
 
     # 1) zufälligen AES-128-Key -> Base64-String (wie od.d.b())
     aes_key_str = base64.b64encode(_secrets.token_bytes(16)).decode()
@@ -407,7 +407,7 @@ if __name__ == "__main__":
     # mit einem zusammengehoerigen Paar liefert verify_against_capture True)
     creds = make_mqtt_credentials(
         user_id="2041425653828689920",
-        mqtt_password_b64="71CEWes8n5Ciem/B1eVsiaIsEI89RTsz6ATS+7GR8c0=",  # noqa: S106
+        mqtt_password_b64="71CEWes8n5Ciem/B1eVsiaIsEI89RTsz6ATS+7GR8c0=",
         device_id="271c55f5731fa3d9ba1fe131e088946e0",
     )
     for _k, _v in creds.items():

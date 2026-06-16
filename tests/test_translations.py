@@ -30,7 +30,7 @@ def test_language_files_cover_all_string_keys() -> None:
                 encoding="utf-8",
             ),
         )
-        assert _leaf_paths(translated) == base_paths, lang  # noqa: S101
+        assert _leaf_paths(translated) == base_paths, lang
 
 
 def test_service_actions_use_translation_files() -> None:
@@ -42,7 +42,7 @@ def test_service_actions_use_translation_files() -> None:
     icons = json.loads((TRANSLATION_ROOT / "icons.json").read_text(encoding="utf-8"))
 
     for hardcoded_key in ("  name:", "  description:"):
-        assert hardcoded_key not in services_yaml  # noqa: S101
+        assert hardcoded_key not in services_yaml
 
     expected_services = {
         "rename_system",
@@ -51,8 +51,8 @@ def test_service_actions_use_translation_files() -> None:
         "send_ble_command",
         "send_device_schedule",
     }
-    assert set(strings["services"]) >= expected_services, set(strings["services"])  # noqa: S101
-    assert set(icons["services"]) == {  # noqa: S101
+    assert set(strings["services"]) >= expected_services, set(strings["services"])
+    assert set(icons["services"]) == {
         "rename_system",
         "refresh_weather_plan",
         "delete_storm_alert",
@@ -61,7 +61,7 @@ def test_service_actions_use_translation_files() -> None:
         - {"rename_system", "refresh_weather_plan", "delete_storm_alert"}
     )
     for service_id in ("rename_system", "refresh_weather_plan", "delete_storm_alert"):
-        assert "service" in icons["services"][service_id]  # noqa: S101
+        assert "service" in icons["services"][service_id]
 
 
 def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
@@ -91,11 +91,11 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
                 encoding="utf-8",
             ),
         )
-        assert (  # noqa: S101
+        assert (
             translation["entity"]["sensor"]["battery_discharge_power"]["name"]
             == main_battery
         ), lang
-        assert (  # noqa: S101
+        assert (
             translation["entity"]["sensor"]["stack_out_power"]["name"] == battery_system
         ), lang
 
@@ -110,4 +110,4 @@ def test_repair_issue_translations_are_fixable_or_descriptive() -> None:
     for path in paths:
         strings = json.loads(path.read_text(encoding="utf-8"))
         for issue in strings.get("issues", {}).values():
-            assert ("description" in issue) ^ ("fix_flow" in issue), path  # noqa: S101
+            assert ("description" in issue) ^ ("fix_flow" in issue), path

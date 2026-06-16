@@ -30,7 +30,7 @@ def test_read_only_platforms_define_parallel_updates_zero() -> None:
     """
     for relative_path in ("sensor.py", "binary_sensor.py"):
         source = _read(relative_path)
-        assert "PARALLEL_UPDATES = 0" in source, relative_path  # noqa: S101
+        assert "PARALLEL_UPDATES = 0" in source, relative_path
 
 
 def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
@@ -43,8 +43,8 @@ def test_config_flow_uses_reconfigure_specific_missing_entry_abort() -> None:
     `self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)`.
     """
     source = _read("config_flow.py")
-    assert "FLOW_ABORT_RECONFIGURE_ENTRY_MISSING" in source  # noqa: S101
-    assert (  # noqa: S101
+    assert "FLOW_ABORT_RECONFIGURE_ENTRY_MISSING" in source
+    assert (
         "return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)" in source
     )
 
@@ -60,10 +60,10 @@ def test_abort_translations_cover_reconfigure_entry_missing() -> None:
     for relative_path in ("strings.json",):
         data = json.loads(_read(relative_path))
         abort = data.get("config", {}).get("abort", {})
-        assert "reconfigure_entry_missing" in abort, relative_path  # noqa: S101
+        assert "reconfigure_entry_missing" in abort, relative_path
 
     translations_dir = COMPONENT / "translations"
     for locale_file in sorted(translations_dir.glob("*.json")):
         data = json.loads(locale_file.read_text(encoding="utf-8"))
         abort = data.get("config", {}).get("abort", {})
-        assert "reconfigure_entry_missing" in abort, locale_file.name  # noqa: S101
+        assert "reconfigure_entry_missing" in abort, locale_file.name

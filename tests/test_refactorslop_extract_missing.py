@@ -42,8 +42,8 @@ def _load_extract_missing() -> types.ModuleType:
         patch("pathlib.Path.write_text", return_value=None),
     ):
         spec = importlib.util.spec_from_file_location("_extract_missing", _MODULE_PATH)
-        assert spec is not None  # noqa: S101
-        assert spec.loader is not None  # noqa: S101
+        assert spec is not None
+        assert spec.loader is not None
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return mod
@@ -63,19 +63,19 @@ def em() -> types.ModuleType:
 def test_pick_backup_chooses_pre_transfer_first(em: types.ModuleType) -> None:
     """pre_transfer is the highest-priority backup."""
     result = em.pick_backup(["pre_recovery", "pre_transfer", "pre_reconcile"])
-    assert result == "pre_transfer"  # noqa: S101
+    assert result == "pre_transfer"
 
 
 def test_pick_backup_falls_back_to_pre_reconcile(em: types.ModuleType) -> None:
     """When pre_transfer is absent, pre_reconcile is preferred over pre_recovery."""
     result = em.pick_backup(["pre_recovery", "pre_reconcile"])
-    assert result == "pre_reconcile"  # noqa: S101
+    assert result == "pre_reconcile"
 
 
 def test_pick_backup_falls_back_to_pre_recovery(em: types.ModuleType) -> None:
     """When only pre_recovery is available it is returned."""
     result = em.pick_backup(["pre_recovery"])
-    assert result == "pre_recovery"  # noqa: S101
+    assert result == "pre_recovery"
 
 
 def test_pick_backup_returns_first_element_for_unknown_names(
@@ -83,19 +83,19 @@ def test_pick_backup_returns_first_element_for_unknown_names(
 ) -> None:
     """An unrecognised backup name falls through to the first element of srcs."""
     result = em.pick_backup(["unknown_backup"])
-    assert result == "unknown_backup"  # noqa: S101
+    assert result == "unknown_backup"
 
 
 def test_pick_backup_single_pre_transfer(em: types.ModuleType) -> None:
     """Single-element list is returned as-is when it matches the preference."""
-    assert em.pick_backup(["pre_transfer"]) == "pre_transfer"  # noqa: S101
+    assert em.pick_backup(["pre_transfer"]) == "pre_transfer"
 
 
 def test_pick_backup_preference_order_not_position(em: types.ModuleType) -> None:
     """Preference is determined by PREFERENCE list order, not the input list order."""
     # Even if pre_reconcile appears first in input, pre_transfer wins.
     result = em.pick_backup(["pre_reconcile", "pre_transfer"])
-    assert result == "pre_transfer"  # noqa: S101
+    assert result == "pre_transfer"
 
 
 # ---------------------------------------------------------------------------
@@ -111,18 +111,18 @@ def test_find_symbol_node_top_level_function(em: types.ModuleType) -> None:
     """A top-level function is found by its unqualified name."""
     tree = _parse("def hello():\n    pass\n")
     node = em.find_symbol_node(tree, "hello")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.FunctionDef)  # noqa: S101
-    assert node.name == "hello"  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "hello"
 
 
 def test_find_symbol_node_top_level_class(em: types.ModuleType) -> None:
     """A top-level class is found by its unqualified name."""
     tree = _parse("class Foo:\n    pass\n")
     node = em.find_symbol_node(tree, "Foo")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.ClassDef)  # noqa: S101
-    assert node.name == "Foo"  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.ClassDef)
+    assert node.name == "Foo"
 
 
 def test_find_symbol_node_method(em: types.ModuleType) -> None:
@@ -130,9 +130,9 @@ def test_find_symbol_node_method(em: types.ModuleType) -> None:
     src = "class Foo:\n    def bar(self):\n        return 42\n"
     tree = _parse(src)
     node = em.find_symbol_node(tree, "Foo.bar")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.FunctionDef)  # noqa: S101
-    assert node.name == "bar"  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "bar"
 
 
 def test_find_symbol_node_nested_class(em: types.ModuleType) -> None:
@@ -140,16 +140,16 @@ def test_find_symbol_node_nested_class(em: types.ModuleType) -> None:
     src = "class Outer:\n    class Inner:\n        def method(self): pass\n"
     tree = _parse(src)
     node = em.find_symbol_node(tree, "Outer.Inner.method")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.FunctionDef)  # noqa: S101
-    assert node.name == "method"  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.FunctionDef)
+    assert node.name == "method"
 
 
 def test_find_symbol_node_not_found_returns_none(em: types.ModuleType) -> None:
     """A missing symbol returns None without raising."""
     tree = _parse("x = 1\n")
     result = em.find_symbol_node(tree, "nonexistent")
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_find_symbol_node_partial_path_not_found(em: types.ModuleType) -> None:
@@ -157,15 +157,15 @@ def test_find_symbol_node_partial_path_not_found(em: types.ModuleType) -> None:
     src = "class Foo:\n    def bar(self): pass\n"
     tree = _parse(src)
     result = em.find_symbol_node(tree, "Foo.baz")
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_find_symbol_node_async_function(em: types.ModuleType) -> None:
     """Async function definitions are found like regular functions."""
     tree = _parse("async def fetch():\n    pass\n")
     node = em.find_symbol_node(tree, "fetch")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.AsyncFunctionDef)  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.AsyncFunctionDef)
 
 
 def test_find_symbol_node_wrong_class_in_path(em: types.ModuleType) -> None:
@@ -173,7 +173,7 @@ def test_find_symbol_node_wrong_class_in_path(em: types.ModuleType) -> None:
     src = "class Foo:\n    def bar(self): pass\n"
     tree = _parse(src)
     result = em.find_symbol_node(tree, "Bar.bar")
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
@@ -185,23 +185,23 @@ def test_find_const_node_simple_assign(em: types.ModuleType) -> None:
     """A plain assignment is found by its target name."""
     tree = _parse("FOO = 42\n")
     node = em.find_const_node(tree, "FOO")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.Assign)  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.Assign)
 
 
 def test_find_const_node_annotated_assign(em: types.ModuleType) -> None:
     """An annotated assignment is found by its target name."""
     tree = _parse("BAR: int = 99\n")
     node = em.find_const_node(tree, "BAR")
-    assert node is not None  # noqa: S101
-    assert isinstance(node, ast.AnnAssign)  # noqa: S101
+    assert node is not None
+    assert isinstance(node, ast.AnnAssign)
 
 
 def test_find_const_node_not_found_returns_none(em: types.ModuleType) -> None:
     """A missing constant name returns None."""
     tree = _parse("FOO = 1\n")
     result = em.find_const_node(tree, "MISSING")
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_find_const_node_does_not_find_local_variables(em: types.ModuleType) -> None:
@@ -209,7 +209,7 @@ def test_find_const_node_does_not_find_local_variables(em: types.ModuleType) -> 
     src = "def f():\n    LOCAL = 1\n"
     tree = _parse(src)
     result = em.find_const_node(tree, "LOCAL")
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_find_const_node_multiple_targets_on_one_line(em: types.ModuleType) -> None:
@@ -221,8 +221,8 @@ def test_find_const_node_multiple_targets_on_one_line(em: types.ModuleType) -> N
     # Both A and B share the same Assign node.
     node_a = em.find_const_node(tree, "A")
     node_b = em.find_const_node(tree, "B")
-    assert node_a is not None  # noqa: S101
-    assert node_b is not None  # noqa: S101
+    assert node_a is not None
+    assert node_b is not None
 
 
 def test_find_const_node_returns_first_occurrence(em: types.ModuleType) -> None:
@@ -230,10 +230,10 @@ def test_find_const_node_returns_first_occurrence(em: types.ModuleType) -> None:
     src = "X = 1\nX = 2\n"
     tree = _parse(src)
     node = em.find_const_node(tree, "X")
-    assert node is not None  # noqa: S101
+    assert node is not None
     # The returned node should be the first Assign; its value should be 1.
-    assert isinstance(node, ast.Assign)  # noqa: S101
-    assert ast.literal_eval(node.value) == 1  # type: ignore[arg-type]  # noqa: S101
+    assert isinstance(node, ast.Assign)
+    assert ast.literal_eval(node.value) == 1  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -254,9 +254,9 @@ def test_slice_source_extracts_correct_lines(
     func_node = tree.body[1]  # `def f()`
     result = em.slice_source(py, func_node)
 
-    assert "def f():" in result  # noqa: S101
-    assert "return x" in result  # noqa: S101
-    assert "x = 1" not in result  # noqa: S101
+    assert "def f():" in result
+    assert "return x" in result
+    assert "x = 1" not in result
 
 
 def test_slice_source_single_line_node(em: types.ModuleType, tmp_path: Path) -> None:
@@ -269,7 +269,7 @@ def test_slice_source_single_line_node(em: types.ModuleType, tmp_path: Path) -> 
     func_node = tree.body[0]
     result = em.slice_source(py, func_node)
 
-    assert result.strip() == "def g(): pass"  # noqa: S101
+    assert result.strip() == "def g(): pass"
 
 
 def test_slice_source_includes_decorators(em: types.ModuleType, tmp_path: Path) -> None:
@@ -282,8 +282,8 @@ def test_slice_source_includes_decorators(em: types.ModuleType, tmp_path: Path) 
     func_node = tree.body[0]
     result = em.slice_source(py, func_node)
 
-    assert "@property" in result  # noqa: S101
-    assert "def value" in result  # noqa: S101
+    assert "@property" in result
+    assert "def value" in result
 
 
 def test_slice_source_multiline_function(em: types.ModuleType, tmp_path: Path) -> None:
@@ -296,7 +296,7 @@ def test_slice_source_multiline_function(em: types.ModuleType, tmp_path: Path) -
     func_node = tree.body[0]
     result = em.slice_source(py, func_node)
 
-    assert "def compute" in result  # noqa: S101
-    assert "a = x * 2" in result  # noqa: S101
-    assert "b = y + 1" in result  # noqa: S101
-    assert "return a + b" in result  # noqa: S101
+    assert "def compute" in result
+    assert "a = x * 2" in result
+    assert "b = y + 1" in result
+    assert "return a + b" in result

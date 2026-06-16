@@ -116,46 +116,46 @@ def _make_client(  # noqa: PLR0913
 def test_construction_stores_host_and_port() -> None:
     """Host and port must be stored on the instance at construction time."""
     client = _make_client(host="mqtt.local", port=8883)
-    assert client._host == "mqtt.local"  # noqa: S101, SLF001
-    assert client._port == 8883  # noqa: PLR2004, S101, SLF001
+    assert client._host == "mqtt.local"  # noqa: SLF001
+    assert client._port == 8883  # noqa: PLR2004, SLF001
 
 
 def test_construction_stores_credentials() -> None:
     """Username and password must be stored when provided."""
-    client = _make_client(username="user", password="pass")  # noqa: S106
-    assert client._username == "user"  # noqa: S101, SLF001
-    assert client._password == "pass"  # noqa: S101, S105, SLF001
+    client = _make_client(username="user", password="pass")
+    assert client._username == "user"  # noqa: SLF001
+    assert client._password == "pass"  # noqa: SLF001
 
 
 def test_construction_none_username_stays_none() -> None:
     """Passing username=None must keep _username as None (no coercion)."""
     client = _make_client(username=None)
-    assert client._username is None  # noqa: S101, SLF001
+    assert client._username is None  # noqa: SLF001
 
 
 def test_construction_empty_string_username_becomes_none() -> None:
     """Empty-string credentials are coerced to None by the constructor logic."""
     # The constructor does `self._username = username or None`
     client = _make_client(username="", password="")
-    assert client._username is None  # noqa: S101, SLF001
-    assert client._password is None  # noqa: S101, SLF001
+    assert client._username is None  # noqa: SLF001
+    assert client._password is None  # noqa: SLF001
 
 
 def test_construction_initial_state_not_connected_not_started() -> None:
     """A freshly constructed client must report not connected and not started."""
     client = _make_client()
-    assert client.is_connected is False  # noqa: S101
-    assert client.is_started is False  # noqa: S101
+    assert client.is_connected is False
+    assert client.is_started is False
 
 
 def test_construction_initial_counters_are_zero() -> None:
     """Message counters and topic tracking must start at zero/empty."""
     client = _make_client()
-    assert client._messages_received == 0  # noqa: S101, SLF001
-    assert client._messages_dropped == 0  # noqa: S101, SLF001
-    assert client._topics_seen == []  # noqa: S101, SLF001
-    assert client._topics_seen_set == set()  # noqa: S101, SLF001
-    assert client._connect_attempts == 0  # noqa: S101, SLF001
+    assert client._messages_received == 0  # noqa: SLF001
+    assert client._messages_dropped == 0  # noqa: SLF001
+    assert client._topics_seen == []  # noqa: SLF001
+    assert client._topics_seen_set == set()  # noqa: SLF001
+    assert client._connect_attempts == 0  # noqa: SLF001
 
 
 def test_construction_default_topic_filter_is_empty() -> None:
@@ -164,14 +164,14 @@ def test_construction_default_topic_filter_is_empty() -> None:
     configured.
     """
     client = _make_client()
-    assert client._topic_filter == LOCAL_MQTT_DEFAULT_TOPIC  # noqa: S101, SLF001
-    assert client._topic_filter == ""  # noqa: PLC1901, S101, SLF001
+    assert client._topic_filter == LOCAL_MQTT_DEFAULT_TOPIC  # noqa: SLF001
+    assert client._topic_filter == ""  # noqa: PLC1901, SLF001
 
 
 def test_construction_custom_topic_filter_is_stored() -> None:
     """A custom topic filter is stored verbatim."""
     client = _make_client(topic_filter="jackery/#")
-    assert client._topic_filter == "jackery/#"  # noqa: S101, SLF001
+    assert client._topic_filter == "jackery/#"  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ def _make_mqtt_code_error(rc: Any) -> Any:  # noqa: ANN401
 def test_extract_mqtt_code_returns_int_rc() -> None:
     """An integer rc attribute is returned as-is."""
     err = _make_mqtt_code_error(5)
-    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 5  # noqa: PLR2004, S101, SLF001
+    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 5  # noqa: PLR2004, SLF001
 
 
 def test_extract_mqtt_code_unwraps_rc_value() -> None:
@@ -199,13 +199,13 @@ def test_extract_mqtt_code_unwraps_rc_value() -> None:
         value = 3
 
     err = _make_mqtt_code_error(_Rc())
-    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 3  # noqa: PLR2004, S101, SLF001
+    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 3  # noqa: PLR2004, SLF001
 
 
 def test_extract_mqtt_code_returns_zero_for_missing_rc() -> None:
     """When no rc attribute is present, 0 is returned."""
     err = _make_mqtt_code_error(None)
-    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 0  # noqa: S101, SLF001
+    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 0  # noqa: SLF001
 
 
 def test_extract_mqtt_code_returns_zero_for_non_int_rc_without_value() -> None:
@@ -215,7 +215,7 @@ def test_extract_mqtt_code_returns_zero_for_non_int_rc_without_value() -> None:
         pass  # no .value
 
     err = _make_mqtt_code_error(_Rc())
-    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 0  # noqa: S101, SLF001
+    assert JackeryLocalMqttClient._extract_mqtt_code(err) == 0  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -227,22 +227,22 @@ def test_handle_connect_failure_records_last_error_with_rc_and_reason() -> None:
     """Connection rejection must set last_error to 'connect rc=N (reason)'."""
     client = _make_client()
     client._handle_connect_failure(5)  # noqa: SLF001
-    assert client._last_error is not None  # noqa: S101, SLF001
-    assert "rc=5" in client._last_error  # noqa: S101, SLF001
+    assert client._last_error is not None  # noqa: SLF001
+    assert "rc=5" in client._last_error  # noqa: SLF001
 
 
 def test_handle_connect_failure_uses_reason_for_rc_0() -> None:
     """rc=0 is 'Connection accepted' — the message must reflect the lookup."""
     client = _make_client()
     client._handle_connect_failure(0)  # noqa: SLF001
-    assert "Connection accepted" in (client._last_error or "")  # noqa: S101, SLF001
+    assert "Connection accepted" in (client._last_error or "")  # noqa: SLF001
 
 
 def test_handle_connect_failure_unknown_rc_uses_unknown_label() -> None:
     """An rc code not in MQTT_CONNACK_REASONS maps to 'unknown'."""
     client = _make_client()
     client._handle_connect_failure(99)  # noqa: SLF001
-    assert "unknown" in (client._last_error or "")  # noqa: S101, SLF001
+    assert "unknown" in (client._last_error or "")  # noqa: SLF001
 
 
 def test_handle_connect_failure_marks_not_connected() -> None:
@@ -250,7 +250,7 @@ def test_handle_connect_failure_marks_not_connected() -> None:
     client = _make_client()
     client._connected = True  # pretend it was connected  # noqa: SLF001
     client._handle_connect_failure(4)  # noqa: SLF001
-    assert client.is_connected is False  # noqa: S101
+    assert client.is_connected is False
 
 
 def test_handle_connect_failure_sets_connected_event() -> None:
@@ -259,7 +259,7 @@ def test_handle_connect_failure_sets_connected_event() -> None:
     # Clear the event so we can verify it is set.
     client._connected_event.clear()  # noqa: SLF001
     client._handle_connect_failure(2)  # noqa: SLF001
-    assert client._connected_event.is_set()  # noqa: S101, SLF001
+    assert client._connected_event.is_set()  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -271,9 +271,9 @@ def test_handle_disconnect_error_when_was_connected_says_disconnect() -> None:
     """If the client was connected, the error message starts with 'disconnect:'."""
     client = _make_client()
     client._handle_disconnect_error("broker reset", was_connected=True)  # noqa: SLF001
-    assert client._last_error is not None  # noqa: S101, SLF001
-    assert client._last_error.startswith("disconnect:")  # noqa: S101, SLF001
-    assert "broker reset" in client._last_error  # noqa: S101, SLF001
+    assert client._last_error is not None  # noqa: SLF001
+    assert client._last_error.startswith("disconnect:")  # noqa: SLF001
+    assert "broker reset" in client._last_error  # noqa: SLF001
 
 
 def test_handle_disconnect_error_when_not_yet_connected_says_connect_failed() -> None:
@@ -283,9 +283,9 @@ def test_handle_disconnect_error_when_not_yet_connected_says_connect_failed() ->
     """
     client = _make_client()
     client._handle_disconnect_error("refused", was_connected=False)  # noqa: SLF001
-    assert client._last_error is not None  # noqa: S101, SLF001
-    assert client._last_error.startswith("connect failed:")  # noqa: S101, SLF001
-    assert "refused" in client._last_error  # noqa: S101, SLF001
+    assert client._last_error is not None  # noqa: SLF001
+    assert client._last_error.startswith("connect failed:")  # noqa: SLF001
+    assert "refused" in client._last_error  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -296,19 +296,19 @@ def test_handle_disconnect_error_when_not_yet_connected_says_connect_failed() ->
 def test_handle_message_increments_received_counter() -> None:
     """Each call to _handle_message must increment messages_received by 1."""
     client = _make_client()
-    assert client._messages_received == 0  # noqa: S101, SLF001
+    assert client._messages_received == 0  # noqa: SLF001
     client._handle_message("test/topic", b'{"key": 1}')  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
     client._handle_message("test/topic", b'{"key": 2}')  # noqa: SLF001
-    assert client._messages_received == 2  # noqa: PLR2004, S101, SLF001
+    assert client._messages_received == 2  # noqa: PLR2004, SLF001
 
 
 def test_handle_message_records_new_topics() -> None:
     """First message on a topic must add it to topics_seen."""
     client = _make_client()
     client._handle_message("jackery/data", b'{"v":1}')  # noqa: SLF001
-    assert "jackery/data" in client._topics_seen  # noqa: S101, SLF001
-    assert "jackery/data" in client._topics_seen_set  # noqa: S101, SLF001
+    assert "jackery/data" in client._topics_seen  # noqa: SLF001
+    assert "jackery/data" in client._topics_seen_set  # noqa: SLF001
 
 
 def test_handle_message_does_not_duplicate_topics() -> None:
@@ -316,7 +316,7 @@ def test_handle_message_does_not_duplicate_topics() -> None:
     client = _make_client()
     client._handle_message("jackery/data", b'{"v":1}')  # noqa: SLF001
     client._handle_message("jackery/data", b'{"v":2}')  # noqa: SLF001
-    assert client._topics_seen.count("jackery/data") == 1  # noqa: S101, SLF001
+    assert client._topics_seen.count("jackery/data") == 1  # noqa: SLF001
 
 
 def test_handle_message_tracks_multiple_distinct_topics() -> None:
@@ -324,7 +324,7 @@ def test_handle_message_tracks_multiple_distinct_topics() -> None:
     client = _make_client()
     client._handle_message("a/b", b"{}")  # noqa: SLF001
     client._handle_message("c/d", b"{}")  # noqa: SLF001
-    assert len(client._topics_seen) == 2  # noqa: PLR2004, S101, SLF001
+    assert len(client._topics_seen) == 2  # noqa: PLR2004, SLF001
 
 
 def test_handle_message_caps_topic_tracking_at_max() -> None:
@@ -332,13 +332,13 @@ def test_handle_message_caps_topic_tracking_at_max() -> None:
     client = _make_client()
     for i in range(LOCAL_MQTT_MAX_TOPIC_NAMES):
         client._handle_message(f"topic/{i}", b"{}")  # noqa: SLF001
-    assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES  # noqa: S101, SLF001
-    assert not client._topics_seen_truncated  # noqa: S101, SLF001
+    assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES  # noqa: SLF001
+    assert not client._topics_seen_truncated  # noqa: SLF001
 
     # One more topic beyond the cap.
     client._handle_message("overflow/topic", b"{}")  # noqa: SLF001
-    assert client._topics_seen_truncated  # noqa: S101, SLF001
-    assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES  # noqa: S101, SLF001
+    assert client._topics_seen_truncated  # noqa: SLF001
+    assert len(client._topics_seen) == LOCAL_MQTT_MAX_TOPIC_NAMES  # noqa: SLF001
 
 
 def test_handle_message_drops_non_dict_json() -> None:
@@ -351,8 +351,8 @@ def test_handle_message_drops_non_dict_json() -> None:
     # type: ignore[method-assign]
     client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
     client._handle_message("topic", b"[1, 2, 3]")  # noqa: SLF001
-    assert client._messages_dropped == 1  # noqa: S101, SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
+    assert client._messages_dropped == 1  # noqa: SLF001
+    assert client._messages_received == 1  # noqa: SLF001
 
 
 def test_handle_message_drops_non_utf8_binary() -> None:
@@ -365,7 +365,7 @@ def test_handle_message_drops_non_utf8_binary() -> None:
     # type: ignore[method-assign]
     client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
     client._handle_message("topic", b"\xff\xfe\xfd")  # invalid UTF-8  # noqa: SLF001
-    assert client._messages_dropped == 1  # noqa: S101, SLF001
+    assert client._messages_dropped == 1  # noqa: SLF001
 
 
 def test_handle_message_drops_invalid_json_text() -> None:
@@ -378,7 +378,7 @@ def test_handle_message_drops_invalid_json_text() -> None:
     # then `if isinstance(parsed, dict): data = parsed elif parsed is not None:...`
     # invalid JSON → parsed=None → no dropped increment, data=None
     # This is the documented behaviour; dropped is only for non-object JSON.
-    assert client._messages_received == 1  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
 
 
 def test_handle_message_parses_valid_json_dict() -> None:
@@ -391,25 +391,25 @@ def test_handle_message_parses_valid_json_dict() -> None:
     client = _make_client(sink=_sink)
     client._handle_message("jackery/props", b'{"batSoc": 87}')  # noqa: SLF001
     # No drops for valid JSON object.
-    assert client._messages_dropped == 0  # noqa: S101, SLF001
+    assert client._messages_dropped == 0  # noqa: SLF001
 
 
 def test_handle_message_updates_last_topic_and_last_message_at() -> None:
     """After a message, last_topic and last_message_at must be set."""
     client = _make_client()
-    assert client._last_topic is None  # noqa: S101, SLF001
-    assert client._last_message_at is None  # noqa: S101, SLF001
+    assert client._last_topic is None  # noqa: SLF001
+    assert client._last_message_at is None  # noqa: SLF001
     client._handle_message("jackery/props", b"{}")  # noqa: SLF001
-    assert client._last_topic == "jackery/props"  # noqa: S101, SLF001
-    assert client._last_message_at is not None  # noqa: S101, SLF001
+    assert client._last_topic == "jackery/props"  # noqa: SLF001
+    assert client._last_message_at is not None  # noqa: SLF001
 
 
 def test_handle_message_string_payload_is_accepted() -> None:
     """Str payloads (not bytes) must be processed without error."""
     client = _make_client()
     client._handle_message("test/str", '{"cmd": 107}')  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
-    assert client._messages_dropped == 0  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
+    assert client._messages_dropped == 0  # noqa: SLF001
 
 
 def test_handle_message_without_sink_skips_json_parse() -> None:
@@ -420,24 +420,24 @@ def test_handle_message_without_sink_skips_json_parse() -> None:
         side_effect=AssertionError("json.loads must not be called"),
     ):
         client._handle_message("topic", b'{"cmd": 107}')  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
-    assert client._messages_dropped == 0  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
+    assert client._messages_dropped == 0  # noqa: SLF001
 
 
 def test_handle_message_topic_mismatch_increments_blocked_counter() -> None:
     """Messages outside the configured topic filter must increment blocked counter."""
     client = _make_client(topic_filter="jackery/#")
     client._handle_message("homeassistant/state", b"{}")  # noqa: SLF001
-    assert client._blocked_by_filter_count == 1  # noqa: S101, SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
+    assert client._blocked_by_filter_count == 1  # noqa: SLF001
+    assert client._messages_received == 1  # noqa: SLF001
 
 
 def test_handle_message_oversized_payload_is_dropped() -> None:
     """Oversized payloads must be dropped even when sink is not configured."""
     client = _make_client(topic_filter="topic")
     client._handle_message("topic", b"x" * (128 * 1024 + 1))  # noqa: SLF001
-    assert client._payload_too_large_count == 1  # noqa: S101, SLF001
-    assert client._messages_dropped == 1  # noqa: S101, SLF001
+    assert client._payload_too_large_count == 1  # noqa: SLF001
+    assert client._messages_dropped == 1  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -450,8 +450,8 @@ def test_diagnostics_snapshot_redacted_hides_host_and_port() -> None:
     client = _make_client(host="192.168.1.50", port=1883)
     snap = client.diagnostics_snapshot(redact=True)
     target = snap["configured_target"]
-    assert target["host"] == REDACTED_VALUE  # noqa: S101
-    assert target["port"] == REDACTED_VALUE  # noqa: S101
+    assert target["host"] == REDACTED_VALUE
+    assert target["port"] == REDACTED_VALUE
 
 
 def test_diagnostics_snapshot_unredacted_exposes_host_and_port() -> None:
@@ -459,8 +459,8 @@ def test_diagnostics_snapshot_unredacted_exposes_host_and_port() -> None:
     client = _make_client(host="192.168.1.50", port=1883)
     snap = client.diagnostics_snapshot(redact=False)
     target = snap["configured_target"]
-    assert target["host"] == "192.168.1.50"  # noqa: S101
-    assert target["port"] == 1883  # noqa: PLR2004, S101
+    assert target["host"] == "192.168.1.50"
+    assert target["port"] == 1883  # noqa: PLR2004
 
 
 def test_diagnostics_snapshot_redacted_hides_topic_names() -> None:
@@ -468,7 +468,7 @@ def test_diagnostics_snapshot_redacted_hides_topic_names() -> None:
     client = _make_client()
     client._handle_message("jackery/device/123/props", b"{}")  # noqa: SLF001
     snap = client.diagnostics_snapshot(redact=True)
-    assert snap["topics_seen"] == [REDACTED_VALUE]  # noqa: S101
+    assert snap["topics_seen"] == [REDACTED_VALUE]
 
 
 def test_diagnostics_snapshot_unredacted_exposes_topic_names() -> None:
@@ -476,7 +476,7 @@ def test_diagnostics_snapshot_unredacted_exposes_topic_names() -> None:
     client = _make_client()
     client._handle_message("jackery/device/123/props", b"{}")  # noqa: SLF001
     snap = client.diagnostics_snapshot(redact=False)
-    assert "jackery/device/123/props" in snap["topics_seen"]  # noqa: S101
+    assert "jackery/device/123/props" in snap["topics_seen"]
 
 
 def test_diagnostics_snapshot_includes_required_keys() -> None:
@@ -504,19 +504,19 @@ def test_diagnostics_snapshot_includes_required_keys() -> None:
         "payload_too_large_count",
         "library",
     }
-    assert required.issubset(snap.keys())  # noqa: S101
+    assert required.issubset(snap.keys())
 
 
 def test_diagnostics_snapshot_enabled_is_always_true() -> None:
     """The 'enabled' key must be True (the client exists ⟹ it is enabled)."""
     client = _make_client()
-    assert client.diagnostics_snapshot()["enabled"] is True  # noqa: S101
+    assert client.diagnostics_snapshot()["enabled"] is True
 
 
 def test_diagnostics_snapshot_library_key_matches_const() -> None:
     """The 'library' key must match the MQTT_CLIENT_LIBRARY constant."""
     client = _make_client()
-    assert client.diagnostics_snapshot()["library"] == MQTT_CLIENT_LIBRARY  # noqa: S101
+    assert client.diagnostics_snapshot()["library"] == MQTT_CLIENT_LIBRARY
 
 
 def test_diagnostics_snapshot_counts_are_accurate() -> None:
@@ -526,8 +526,8 @@ def test_diagnostics_snapshot_counts_are_accurate() -> None:
     client._handle_message("b", b"{}")  # noqa: SLF001
     client._handle_message("b", b"not valid json")  # no drop for invalid JSON  # noqa: SLF001
     snap = client.diagnostics_snapshot()
-    assert snap["messages_received"] == 3  # noqa: PLR2004, S101
-    assert snap["topics_seen_count"] == 2  # noqa: PLR2004, S101
+    assert snap["messages_received"] == 3  # noqa: PLR2004
+    assert snap["topics_seen_count"] == 2  # noqa: PLR2004
 
 
 def test_diagnostics_snapshot_redacted_last_topic_is_redacted_value() -> None:
@@ -535,14 +535,14 @@ def test_diagnostics_snapshot_redacted_last_topic_is_redacted_value() -> None:
     client = _make_client()
     client._handle_message("private/topic/123", b"{}")  # noqa: SLF001
     snap = client.diagnostics_snapshot(redact=True)
-    assert snap["last_topic"] == REDACTED_VALUE  # noqa: S101
+    assert snap["last_topic"] == REDACTED_VALUE
 
 
 def test_diagnostics_snapshot_last_topic_is_none_before_messages() -> None:
     """Before any messages, last_topic must be None in both redacted/unredacted."""
     client = _make_client()
-    assert client.diagnostics_snapshot(redact=True)["last_topic"] is None  # noqa: S101
-    assert client.diagnostics_snapshot(redact=False)["last_topic"] is None  # noqa: S101
+    assert client.diagnostics_snapshot(redact=True)["last_topic"] is None
+    assert client.diagnostics_snapshot(redact=False)["last_topic"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -553,20 +553,20 @@ def test_diagnostics_snapshot_last_topic_is_none_before_messages() -> None:
 def test_is_connected_reflects_connected_flag() -> None:
     """is_connected must mirror the _connected attribute."""
     client = _make_client()
-    assert client.is_connected is False  # noqa: S101
+    assert client.is_connected is False
     client._connected = True  # noqa: SLF001
-    assert client.is_connected is True  # noqa: S101
+    assert client.is_connected is True
 
 
 def test_is_started_reflects_runner_task_presence() -> None:
     """is_started must be True when _runner_task is set, False otherwise."""
     client = _make_client()
-    assert client.is_started is False  # noqa: S101
+    assert client.is_started is False
     # Simulate a task being present.
     client._runner_task = MagicMock()  # type: ignore[assignment]  # noqa: SLF001
-    assert client.is_started is True  # noqa: S101
+    assert client.is_started is True
     client._runner_task = None  # noqa: SLF001
-    assert client.is_started is False  # noqa: S101
+    assert client.is_started is False
 
 
 # ---------------------------------------------------------------------------
@@ -577,28 +577,28 @@ def test_is_started_reflects_runner_task_presence() -> None:
 def test_utc_now_iso_returns_non_empty_string() -> None:
     """_utc_now_iso must return a non-empty string."""
     ts = JackeryLocalMqttClient._utc_now_iso()  # noqa: SLF001
-    assert isinstance(ts, str)  # noqa: S101
-    assert len(ts) > 0  # noqa: S101
+    assert isinstance(ts, str)
+    assert len(ts) > 0
 
 
 def test_utc_now_iso_contains_utc_offset() -> None:
     """_utc_now_iso must include a timezone offset indicator."""
     ts = JackeryLocalMqttClient._utc_now_iso()  # noqa: SLF001
     # isoformat(UTC) produces something like '2026-05-27T12:00:00+00:00'
-    assert "+" in ts or "Z" in ts  # noqa: S101
+    assert "+" in ts or "Z" in ts
 
 
 def test_utc_now_iso_two_calls_are_close_or_equal() -> None:
     """Two consecutive calls must produce valid ISO strings (not crash)."""
     ts1 = JackeryLocalMqttClient._utc_now_iso()  # noqa: SLF001
     ts2 = JackeryLocalMqttClient._utc_now_iso()  # noqa: SLF001
-    assert isinstance(ts1, str)  # noqa: S101
-    assert isinstance(ts2, str)  # noqa: S101
+    assert isinstance(ts1, str)
+    assert isinstance(ts2, str)
 
 
 def test_aiomqtt_transport_logger_is_kept_at_warning() -> None:
     """Per-packet aiomqtt DEBUG logs must stay disabled by default."""
-    assert module._AIOMQTT_LOGGER.level == logging.WARNING  # noqa: S101, SLF001
+    assert module._AIOMQTT_LOGGER.level == logging.WARNING  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -610,5 +610,5 @@ async def test_async_stop_before_start_does_not_raise() -> None:
     """Calling async_stop before async_start must complete without error."""
     client = _make_client()
     await client.async_stop()
-    assert not client.is_connected  # noqa: S101
-    assert not client.is_started  # noqa: S101
+    assert not client.is_connected
+    assert not client.is_started

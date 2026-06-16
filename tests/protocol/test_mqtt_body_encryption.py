@@ -27,7 +27,7 @@ def test_encrypt_mqtt_body_returns_string() -> None:
     """encrypt_mqtt_body must return a str, not bytes."""
     key = b"0123456789abcdef"  # 16 bytes
     result = encrypt_mqtt_body({"cmd": 1}, key)
-    assert isinstance(result, str)  # noqa: S101
+    assert isinstance(result, str)
 
 
 def test_encrypt_mqtt_body_returns_valid_base64() -> None:
@@ -36,7 +36,7 @@ def test_encrypt_mqtt_body_returns_valid_base64() -> None:
     result = encrypt_mqtt_body({"cmd": 1}, key)
     # Should not raise
     decoded = base64.b64decode(result)
-    assert len(decoded) > 0  # noqa: S101
+    assert len(decoded) > 0
 
 
 def test_encrypt_mqtt_body_output_is_ascii() -> None:
@@ -80,7 +80,7 @@ def test_encrypt_mqtt_body_error_message_includes_actual_length() -> None:
     bad_key = b"too_short"  # 9 bytes
     with pytest.raises(ValueError) as exc_info:  # noqa: PT011
         encrypt_mqtt_body({"cmd": 1}, bad_key)
-    assert str(len(bad_key)) in str(exc_info.value)  # noqa: S101
+    assert str(len(bad_key)) in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ def test_encrypt_mqtt_body_round_trip() -> None:
     plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
 
     recovered_body = json.loads(plaintext.decode("utf-8"))
-    assert recovered_body == body  # noqa: S101
+    assert recovered_body == body
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ def test_encrypt_mqtt_body_uses_compact_json_separators() -> None:
 
     # Compact JSON: no spaces around : or ,
     decoded_str = plaintext.decode("utf-8")
-    assert " " not in decoded_str  # noqa: S101
+    assert " " not in decoded_str
 
 
 def test_encrypt_mqtt_body_handles_unicode_values() -> None:
@@ -148,7 +148,7 @@ def test_encrypt_mqtt_body_handles_unicode_values() -> None:
     plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
 
     recovered = json.loads(plaintext.decode("utf-8"))
-    assert recovered == body  # noqa: S101
+    assert recovered == body
 
 
 def test_encrypt_mqtt_body_empty_body_dict() -> None:
@@ -166,7 +166,7 @@ def test_encrypt_mqtt_body_empty_body_dict() -> None:
     plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
 
     recovered = json.loads(plaintext.decode("utf-8"))
-    assert recovered == body  # noqa: S101
+    assert recovered == body
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ def test_encrypt_mqtt_body_is_deterministic() -> None:
 
     result1 = encrypt_mqtt_body(body, key)
     result2 = encrypt_mqtt_body(body, key)
-    assert result1 == result2  # noqa: S101
+    assert result1 == result2
 
 
 def test_encrypt_mqtt_body_different_bodies_produce_different_ciphertext() -> None:
@@ -189,7 +189,7 @@ def test_encrypt_mqtt_body_different_bodies_produce_different_ciphertext() -> No
     key = b"0123456789abcdef"
     result1 = encrypt_mqtt_body({"cmd": 1}, key)
     result2 = encrypt_mqtt_body({"cmd": 2}, key)
-    assert result1 != result2  # noqa: S101
+    assert result1 != result2
 
 
 def test_encrypt_mqtt_body_different_keys_produce_different_ciphertext() -> None:
@@ -197,4 +197,4 @@ def test_encrypt_mqtt_body_different_keys_produce_different_ciphertext() -> None
     body = {"cmd": 1}
     result1 = encrypt_mqtt_body(body, b"0123456789abcdef")
     result2 = encrypt_mqtt_body(body, b"fedcba9876543210")
-    assert result1 != result2  # noqa: S101
+    assert result1 != result2

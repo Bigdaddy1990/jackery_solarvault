@@ -56,7 +56,7 @@ except SyntaxError, ImportError:
     CONF_LOCAL_MQTT_PORT = "local_mqtt_port"
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER = "third_party_mqtt_topic_filter"
     CONF_LOCAL_MQTT_USERNAME = "local_mqtt_username"
-    CONF_LOCAL_MQTT_PASSWORD = "local_mqtt_password"  # noqa: S105
+    CONF_LOCAL_MQTT_PASSWORD = "local_mqtt_password"
     DEFAULT_LOCAL_MQTT_PORT = 1883
 
 _skip_init = pytest.mark.skipif(
@@ -197,8 +197,8 @@ def test_handle_message_bytearray_utf8_json_dict_is_accepted() -> None:
     client = _make_client()
     payload = bytearray(b'{"batSoc": 80}')
     client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
-    assert client._messages_dropped == 0  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
+    assert client._messages_dropped == 0  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -213,8 +213,8 @@ def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
     client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
     payload = bytearray(b"\xff\xfe\xfd")  # invalid UTF-8 sequence
     client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_received == 1  # noqa: S101, SLF001
-    assert client._messages_dropped == 1  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
+    assert client._messages_dropped == 1  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -229,7 +229,7 @@ def test_handle_message_bytearray_json_array_increments_dropped() -> None:
     client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
     payload = bytearray(b"[1, 2, 3]")
     client._handle_message("jackery/data", payload)  # noqa: SLF001
-    assert client._messages_dropped == 1  # noqa: S101, SLF001
+    assert client._messages_dropped == 1  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -237,7 +237,7 @@ def test_handle_message_bytearray_updates_last_topic() -> None:
     """Bytearray messages must update last_topic the same as bytes messages."""
     client = _make_client()
     client._handle_message("some/topic", bytearray(b'{"x":1}'))  # noqa: SLF001
-    assert client._last_topic == "some/topic"  # noqa: S101, SLF001
+    assert client._last_topic == "some/topic"  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -253,7 +253,7 @@ def test_handle_message_bytearray_raw_bytes_forwarded_to_sink() -> None:
     # Sink is scheduled as background task; verify it's queued (raw_bytes is bytes).
     # We verify type conversion by inspecting the bytearray → bytes path.
     # The conversion bytes(payload) in the code always produces bytes.
-    assert client._messages_received == 1  # noqa: S101, SLF001
+    assert client._messages_received == 1  # noqa: SLF001
 
 
 # ===========================================================================
@@ -272,8 +272,8 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
     api.payload_debug_callback = _callback
     event = {"kind": "http", "path": "/test"}
     await api._emit_payload_debug(event)  # noqa: SLF001
-    assert len(received) == 1  # noqa: S101
-    assert received[0] is event  # noqa: S101
+    assert len(received) == 1
+    assert received[0] is event
 
 
 async def test_emit_payload_debug_with_callable_calls_callback() -> None:
@@ -290,8 +290,8 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
         return {"kind": "http", "path": "/lazy"}
 
     await api._emit_payload_debug(factory)  # noqa: SLF001
-    assert len(received) == 1  # noqa: S101
-    assert received[0] == {"kind": "http", "path": "/lazy"}  # noqa: S101
+    assert len(received) == 1
+    assert received[0] == {"kind": "http", "path": "/lazy"}
 
 
 async def test_emit_payload_debug_noop_when_callback_is_none() -> None:
@@ -326,7 +326,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
 
     api.payload_debug_callback = _async_callback
     await api._emit_payload_debug({"kind": "async"})  # noqa: SLF001
-    assert results == ["done"]  # noqa: S101
+    assert results == ["done"]
 
 
 # ===========================================================================
@@ -354,28 +354,28 @@ def test_http_payload_debug_returns_required_keys() -> None:
         "response",
         "response_data_type",
     }
-    assert required.issubset(result.keys())  # noqa: S101
-    assert result["kind"] == "http"  # noqa: S101
-    assert result["method"] == "GET"  # noqa: S101
-    assert result["path"] == "/v1/test"  # noqa: S101
+    assert required.issubset(result.keys())
+    assert result["kind"] == "http"
+    assert result["method"] == "GET"
+    assert result["path"] == "/v1/test"
 
 
 def test_http_payload_debug_none_params_becomes_empty_dict() -> None:
     """When params is None, the result must have an empty dict under 'params'."""
     result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # noqa: SLF001
-    assert result["params"] == {}  # noqa: S101
+    assert result["params"] == {}
 
 
 def test_http_payload_debug_none_body_becomes_empty_dict() -> None:
     """When body is None, 'request_body' must be an empty dict."""
     result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # noqa: SLF001
-    assert result["request_body"] == {}  # noqa: S101
+    assert result["request_body"] == {}
 
 
 def test_http_payload_debug_none_response_becomes_empty_dict() -> None:
     """When response is None, 'response' must be an empty dict."""
     result = JackeryApi._http_payload_debug(method="GET", path="/v1/test")  # noqa: SLF001
-    assert result["response"] == {}  # noqa: S101
+    assert result["response"] == {}
 
 
 def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
@@ -385,14 +385,14 @@ def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
         path="/v1/test",
         response={"code": 0, "data": {"key": "val"}},
     )
-    assert result["response_data_type"] == "dict"  # noqa: S101
+    assert result["response_data_type"] == "dict"
 
     result2 = JackeryApi._http_payload_debug(  # noqa: SLF001
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": None},
     )
-    assert result2["response_data_type"] == "NoneType"  # noqa: S101
+    assert result2["response_data_type"] == "NoneType"
 
 
 def test_http_payload_debug_response_data_type_for_list() -> None:
@@ -402,7 +402,7 @@ def test_http_payload_debug_response_data_type_for_list() -> None:
         path="/v1/test",
         response={"code": 0, "data": [1, 2, 3]},
     )
-    assert result["response_data_type"] == "list"  # noqa: S101
+    assert result["response_data_type"] == "list"
 
 
 # ===========================================================================
@@ -425,13 +425,13 @@ async def test_async_get_device_eps_stat_without_dates_uses_defaults() -> None:
 
     payload = await api.async_get_device_eps_stat("dev42")
 
-    assert captured["path"] == DEVICE_EPS_STAT_PATH  # noqa: S101
-    assert "dateType" in captured["params"]  # noqa: S101
+    assert captured["path"] == DEVICE_EPS_STAT_PATH
+    assert "dateType" in captured["params"]
     # Dates should be computed automatically (not None in params).
-    assert "beginDate" in captured["params"]  # noqa: S101
-    assert "endDate" in captured["params"]  # noqa: S101
+    assert "beginDate" in captured["params"]
+    assert "endDate" in captured["params"]
     # Result must include the EPS data.
-    assert "totalInEpsEnergy" in payload  # noqa: S101
+    assert "totalInEpsEnergy" in payload
 
 
 async def test_async_get_device_eps_stat_with_month_date_type() -> None:
@@ -448,7 +448,7 @@ async def test_async_get_device_eps_stat_with_month_date_type() -> None:
 
     await api.async_get_device_eps_stat("dev1", date_type="month")
 
-    assert captured["params"]["dateType"] == "month"  # noqa: S101
+    assert captured["params"]["dateType"] == "month"
 
 
 # ===========================================================================
@@ -461,7 +461,7 @@ def test_diagnostics_snapshot_started_false_initially() -> None:
     """A freshly constructed client must report started=False."""
     client = _make_client()
     snap = client.diagnostics_snapshot()
-    assert snap["started"] is False  # noqa: S101
+    assert snap["started"] is False
 
 
 @_skip_local_mqtt
@@ -470,7 +470,7 @@ def test_diagnostics_snapshot_started_true_when_runner_task_set() -> None:
     client = _make_client()
     client._runner_task = MagicMock()  # type: ignore[assignment]  # noqa: SLF001
     snap = client.diagnostics_snapshot()
-    assert snap["started"] is True  # noqa: S101
+    assert snap["started"] is True
 
 
 @_skip_local_mqtt
@@ -480,8 +480,8 @@ def test_diagnostics_snapshot_topics_seen_count_matches_len() -> None:
     client._handle_message("a/b", b"{}")  # noqa: SLF001
     client._handle_message("c/d", b"{}")  # noqa: SLF001
     snap = client.diagnostics_snapshot()
-    assert snap["topics_seen_count"] == len(snap["topics_seen"])  # noqa: S101
-    assert snap["topics_seen_count"] == 2  # noqa: PLR2004, S101
+    assert snap["topics_seen_count"] == len(snap["topics_seen"])
+    assert snap["topics_seen_count"] == 2  # noqa: PLR2004
 
 
 @_skip_local_mqtt
@@ -496,7 +496,7 @@ def test_diagnostics_snapshot_messages_dropped_in_snapshot() -> None:
     client._schedule_coroutine = lambda coro, label: coro.close()  # noqa: SLF001
     client._handle_message("t", b"[1,2,3]")  # non-dict JSON → dropped  # noqa: SLF001
     snap = client.diagnostics_snapshot()
-    assert snap["messages_dropped"] == 1  # noqa: S101
+    assert snap["messages_dropped"] == 1
 
 
 @_skip_local_mqtt
@@ -504,7 +504,7 @@ def test_diagnostics_snapshot_connect_attempts_initial_zero() -> None:
     """Initial connect_attempts must be 0."""
     client = _make_client()
     snap = client.diagnostics_snapshot()
-    assert snap["connect_attempts"] == 0  # noqa: S101
+    assert snap["connect_attempts"] == 0
 
 
 # ===========================================================================
@@ -520,7 +520,7 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
         enable=True,
         host="192.168.1.100",
         username="",
-        password="secret",  # noqa: S106
+        password="secret",
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
@@ -528,7 +528,7 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # Empty string username must become None (the constructor does `username or None`).
-    assert client._username is None  # noqa: S101, SLF001
+    assert client._username is None  # noqa: SLF001
 
 
 @_skip_init
@@ -546,7 +546,7 @@ async def test_async_start_local_mqtt_empty_password_stored_as_none_in_client() 
         await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._password is None  # noqa: S101, SLF001
+    assert client._password is None  # noqa: SLF001
 
 
 @_skip_init
@@ -557,15 +557,15 @@ async def test_async_start_local_mqtt_non_empty_credentials_preserved() -> None:
         enable=True,
         host="192.168.1.100",
         username="mqttuser",
-        password="mqttpass",  # noqa: S106
+        password="mqttpass",
     )
 
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
         await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._username == "mqttuser"  # noqa: S101, SLF001
-    assert client._password == "mqttpass"  # noqa: S101, S105, SLF001
+    assert client._username == "mqttuser"  # noqa: SLF001
+    assert client._password == "mqttpass"  # noqa: SLF001
 
 
 @_skip_init
@@ -578,7 +578,7 @@ async def test_async_start_local_mqtt_port_passed_to_client() -> None:
         await _async_start_local_mqtt(hass, entry, MagicMock())
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._port == 8883  # noqa: PLR2004, S101, SLF001
+    assert client._port == 8883  # noqa: PLR2004, SLF001
 
 
 @_skip_init
@@ -592,7 +592,7 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # The _async_start_local_mqtt strips the host before passing it.
-    assert client._host == "mqtt.local"  # noqa: S101, SLF001
+    assert client._host == "mqtt.local"  # noqa: SLF001
 
 
 # ===========================================================================
@@ -602,21 +602,21 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
 def test_parse_hex16_accepts_lowercase_hex_string() -> None:
     """parse_hex16 must accept lowercase hex strings (case-insensitive)."""
-    assert parse_hex16("00ff") == 0x00FF  # noqa: PLR2004, S101
-    assert parse_hex16("beef") == 0xBEEF  # noqa: PLR2004, S101
-    assert parse_hex16("0001") == 1  # noqa: S101
+    assert parse_hex16("00ff") == 0x00FF  # noqa: PLR2004
+    assert parse_hex16("beef") == 0xBEEF  # noqa: PLR2004
+    assert parse_hex16("0001") == 1
 
 
 def test_parse_hex16_accepts_mixed_case_hex_string() -> None:
     """parse_hex16 must accept mixed-case hex strings."""
-    assert parse_hex16("BeEF") == 0xBEEF  # noqa: PLR2004, S101
-    assert parse_hex16("Ff0A") == 0xFF0A  # noqa: PLR2004, S101
+    assert parse_hex16("BeEF") == 0xBEEF  # noqa: PLR2004
+    assert parse_hex16("Ff0A") == 0xFF0A  # noqa: PLR2004
 
 
 def test_parse_hex16_boundary_values() -> None:
     """parse_hex16 must correctly handle min and max 16-bit values."""
-    assert parse_hex16("0000") == 0  # noqa: S101
-    assert parse_hex16("FFFF") == 0xFFFF  # noqa: PLR2004, S101
+    assert parse_hex16("0000") == 0
+    assert parse_hex16("FFFF") == 0xFFFF  # noqa: PLR2004
 
 
 # ===========================================================================
@@ -638,9 +638,9 @@ def test_rsa_pkcs1v15_encrypt_empty_plaintext_succeeds() -> None:
     """Encrypting an empty byte string with a valid RSA key must not raise."""
     key_b64 = _make_rsa_public_key_b64()
     result = _rsa_pkcs1v15_encrypt(b"", key_b64)
-    assert isinstance(result, bytes)  # noqa: S101
+    assert isinstance(result, bytes)
     # RSA-1024 ciphertext is always 128 bytes regardless of plaintext length.
-    assert len(result) == 128  # noqa: PLR2004, S101
+    assert len(result) == 128  # noqa: PLR2004
 
 
 def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
@@ -653,8 +653,8 @@ def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
     c2 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
     # Probabilistically different due to random padding.
     # (Extremely unlikely to match; test provides regression guard.)
-    assert isinstance(c1, bytes) and isinstance(c2, bytes)  # noqa: PT018, S101
-    assert len(c1) == 128 and len(c2) == 128  # noqa: PLR2004, PT018, S101
+    assert isinstance(c1, bytes) and isinstance(c2, bytes)  # noqa: PT018
+    assert len(c1) == 128 and len(c2) == 128  # noqa: PLR2004, PT018
 
 
 # ===========================================================================
@@ -673,7 +673,7 @@ async def test_async_get_today_energy_with_special_chars_in_sn() -> None:
 
     api._get_json = _get_json  # noqa: SLF001
     await api.async_get_today_energy("HR2C-0001:AB")
-    assert captured["params"][FIELD_DEVICE_SN] == "HR2C-0001:AB"  # noqa: S101
+    assert captured["params"][FIELD_DEVICE_SN] == "HR2C-0001:AB"
 
 
 async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
@@ -687,7 +687,7 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
 
     api._get_json = _get_json  # noqa: SLF001
     await api.async_get_today_energy("SN001")
-    assert captured["path"] == DEVICE_TODAY_ENERGY_PATH  # noqa: S101
+    assert captured["path"] == DEVICE_TODAY_ENERGY_PATH
 
 
 # ===========================================================================
@@ -707,23 +707,23 @@ def test_handle_connect_failure_sets_connected_event_and_marks_not_connected() -
 
     client._handle_connect_failure(3)  # noqa: SLF001
 
-    assert client.is_connected is False  # noqa: S101
-    assert client._connected_event.is_set()  # noqa: S101, SLF001
-    assert client._last_error is not None  # noqa: S101, SLF001
-    assert "rc=3" in client._last_error  # noqa: S101, SLF001
+    assert client.is_connected is False
+    assert client._connected_event.is_set()  # noqa: SLF001
+    assert client._last_error is not None  # noqa: SLF001
+    assert "rc=3" in client._last_error  # noqa: SLF001
 
 
 @_skip_local_mqtt
 def test_handle_message_first_message_sets_last_message_at_and_last_topic() -> None:
     """After the first message, last_message_at and last_topic must be set."""
     client = _make_client()
-    assert client._last_message_at is None  # noqa: S101, SLF001
-    assert client._last_topic is None  # noqa: S101, SLF001
+    assert client._last_message_at is None  # noqa: SLF001
+    assert client._last_topic is None  # noqa: SLF001
 
     client._handle_message("dev/props", b'{"soc": 95}')  # noqa: SLF001
 
-    assert client._last_message_at is not None  # noqa: S101, SLF001
-    assert client._last_topic == "dev/props"  # noqa: S101, SLF001
+    assert client._last_message_at is not None  # noqa: SLF001
+    assert client._last_topic == "dev/props"  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -733,7 +733,7 @@ def test_topics_seen_set_and_list_stay_synchronized() -> None:
     for i in range(5):
         client._handle_message(f"topic/{i}", b"{}")  # noqa: SLF001
     # Both must have the same topics.
-    assert set(client._topics_seen) == client._topics_seen_set  # noqa: S101, SLF001
+    assert set(client._topics_seen) == client._topics_seen_set  # noqa: SLF001
 
 
 @_skip_local_mqtt
@@ -743,5 +743,5 @@ def test_diagnostics_snapshot_redacted_topics_count_matches() -> None:
     client._handle_message("a", b"{}")  # noqa: SLF001
     client._handle_message("b", b"{}")  # noqa: SLF001
     snap = client.diagnostics_snapshot(redact=True)
-    assert len(snap["topics_seen"]) == snap["topics_seen_count"]  # noqa: S101
-    assert all(t == REDACTED_VALUE for t in snap["topics_seen"])  # noqa: S101
+    assert len(snap["topics_seen"]) == snap["topics_seen_count"]
+    assert all(t == REDACTED_VALUE for t in snap["topics_seen"])

@@ -116,7 +116,7 @@ def _make_plug_sensor(
 
 def test_parallel_updates_is_zero() -> None:
     """PARALLEL_UPDATES must be 0 to disable per-entity parallel scheduling."""
-    assert PARALLEL_UPDATES == 0  # noqa: S101
+    assert PARALLEL_UPDATES == 0
 
 
 # ---------------------------------------------------------------------------
@@ -137,10 +137,10 @@ async def test_async_setup_entry_creates_binary_sensors_for_each_device() -> Non
     await async_setup_entry(None, entry, async_add_entities)
 
     # One call with BINARY_DESCRIPTIONS count of entities (no smart plugs)
-    assert async_add_entities.call_count == 1  # noqa: S101
+    assert async_add_entities.call_count == 1
     entities = async_add_entities.call_args[0][0]
-    assert len(entities) == len(BINARY_DESCRIPTIONS)  # noqa: S101
-    assert all(isinstance(e, JackeryBinarySensor) for e in entities)  # noqa: S101
+    assert len(entities) == len(BINARY_DESCRIPTIONS)
+    assert all(isinstance(e, JackeryBinarySensor) for e in entities)
 
 
 @pytest.mark.asyncio()
@@ -159,7 +159,7 @@ async def test_async_setup_entry_creates_multiple_devices() -> None:
 
     # Both devices get entities: 2 * len(BINARY_DESCRIPTIONS) entities
     entities = async_add_entities.call_args[0][0]
-    assert len(entities) == 2 * len(BINARY_DESCRIPTIONS)  # noqa: S101
+    assert len(entities) == 2 * len(BINARY_DESCRIPTIONS)
 
 
 @pytest.mark.asyncio()
@@ -220,7 +220,7 @@ async def test_async_setup_entry_creates_smart_plug_entities() -> None:
     plug_entities = [
         e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)
     ]
-    assert len(plug_entities) == 2  # noqa: PLR2004, S101
+    assert len(plug_entities) == 2  # noqa: PLR2004
 
 
 @pytest.mark.asyncio()
@@ -248,7 +248,7 @@ async def test_async_setup_entry_skips_plugs_without_serial() -> None:
         e for e in entities if isinstance(e, JackerySmartPlugStateBinarySensor)
     ]
     # Only the plug with "SN-X" should be included
-    assert len(plug_entities) == 1  # noqa: S101
+    assert len(plug_entities) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -267,9 +267,9 @@ async def test_async_setup_entry_listener_registered() -> None:
     await async_setup_entry(None, entry, async_add_entities)
 
     # async_on_unload must have been called with a callable (the unsubscribe fn)
-    assert entry.async_on_unload.called  # noqa: S101
+    assert entry.async_on_unload.called
     unsubscribe_fn = entry.async_on_unload.call_args[0][0]
-    assert callable(unsubscribe_fn)  # noqa: S101
+    assert callable(unsubscribe_fn)
 
 
 @pytest.mark.asyncio()
@@ -296,14 +296,14 @@ async def test_async_setup_entry_same_signature_no_double_add() -> None:
 
     # First call already added entities
     first_call_count = async_add_entities.call_count
-    assert first_call_count == 1  # noqa: S101
+    assert first_call_count == 1
 
     # Invoke the listener with unchanged data — signature is the same
-    assert captured_listener is not None  # noqa: S101
+    assert captured_listener is not None
     captured_listener()
 
     # async_add_entities must NOT be called again
-    assert async_add_entities.call_count == first_call_count  # noqa: S101
+    assert async_add_entities.call_count == first_call_count
 
 
 @pytest.mark.asyncio()
@@ -325,18 +325,18 @@ async def test_async_setup_entry_new_device_triggers_add() -> None:
     async_add_entities = MagicMock()
 
     await async_setup_entry(None, entry, async_add_entities)
-    assert async_add_entities.call_count == 1  # noqa: S101
+    assert async_add_entities.call_count == 1
 
     # Simulate a new device being added to coordinator data
     coordinator.data = {
         dev_id_a: _make_device_payload(),
         dev_id_b: _make_device_payload(),
     }
-    assert captured_listener is not None  # noqa: S101
+    assert captured_listener is not None
     captured_listener()
 
     # A second call must have been made with new entities for dev_b
-    assert async_add_entities.call_count == 2  # noqa: PLR2004, S101
+    assert async_add_entities.call_count == 2  # noqa: PLR2004
 
 
 # ---------------------------------------------------------------------------
@@ -347,19 +347,19 @@ async def test_async_setup_entry_new_device_triggers_add() -> None:
 def test_smart_plug_sensor_translation_key() -> None:
     """_attr_translation_key must be 'smart_plug_switch_state'."""
     sensor = _make_plug_sensor()
-    assert sensor.translation_key == "smart_plug_switch_state"  # noqa: S101
+    assert sensor.translation_key == "smart_plug_switch_state"
 
 
 def test_smart_plug_sensor_device_class() -> None:
     """_attr_device_class must be BinarySensorDeviceClass.POWER."""
     sensor = _make_plug_sensor()
-    assert sensor.device_class == BinarySensorDeviceClass.POWER  # noqa: S101
+    assert sensor.device_class == BinarySensorDeviceClass.POWER
 
 
 def test_smart_plug_sensor_icon() -> None:
     """_attr_icon must be 'mdi:power-socket-de'."""
     sensor = _make_plug_sensor()
-    assert sensor.icon == "mdi:power-socket-de"  # noqa: S101
+    assert sensor.icon == "mdi:power-socket-de"
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ def test_plug_property_returns_empty_when_coordinator_data_none() -> None:
         plug_sn="SN001",
         plug_key=plug_key,
     )
-    assert sensor._plug == {}  # noqa: S101, SLF001
+    assert sensor._plug == {}  # noqa: SLF001
 
 
 def test_plug_property_returns_empty_when_device_missing_from_data() -> None:
@@ -392,7 +392,7 @@ def test_plug_property_returns_empty_when_device_missing_from_data() -> None:
         plug_sn="SN001",
         plug_key=plug_key,
     )
-    assert sensor._plug == {}  # noqa: S101, SLF001
+    assert sensor._plug == {}  # noqa: SLF001
 
 
 def test_plug_property_returns_empty_when_smart_plugs_key_absent() -> None:
@@ -406,7 +406,7 @@ def test_plug_property_returns_empty_when_smart_plugs_key_absent() -> None:
         plug_sn="SN001",
         plug_key=plug_key,
     )
-    assert sensor._plug == {}  # noqa: S101, SLF001
+    assert sensor._plug == {}  # noqa: SLF001
 
 
 def test_plug_property_matches_by_serial_number() -> None:
@@ -430,7 +430,7 @@ def test_plug_property_matches_by_serial_number() -> None:
         plug_sn=plug_sn,
         plug_key=plug_key,
     )
-    assert sensor._plug == {"sn": plug_sn, FIELD_SWITCH_STATE: 1}  # noqa: S101, SLF001
+    assert sensor._plug == {"sn": plug_sn, FIELD_SWITCH_STATE: 1}  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -447,7 +447,7 @@ def test_is_on_switch_state_none_falls_back_to_sys_switch() -> None:
     # FIELD_SYS_SWITCH
     # Actually the code does: raw = plug.get(FIELD_SWITCH_STATE); if raw is None: raw =
     # plug.get(FIELD_SYS_SWITCH)
-    assert sensor.is_on is True  # noqa: S101
+    assert sensor.is_on is True
 
 
 def test_is_on_both_switch_state_and_sys_switch_zero() -> None:
@@ -455,7 +455,7 @@ def test_is_on_both_switch_state_and_sys_switch_zero() -> None:
     sensor = _make_plug_sensor(
         smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 0, FIELD_SYS_SWITCH: 0}],
     )
-    assert sensor.is_on is False  # noqa: S101
+    assert sensor.is_on is False
 
 
 def test_is_on_switch_state_zero_does_not_fallback_to_sys_switch() -> None:
@@ -468,7 +468,7 @@ def test_is_on_switch_state_zero_does_not_fallback_to_sys_switch() -> None:
     )
     # FIELD_SWITCH_STATE = 0 is not None, so it is used directly (not 1 from
     # FIELD_SYS_SWITCH)
-    assert sensor.is_on is False  # noqa: S101
+    assert sensor.is_on is False
 
 
 # ---------------------------------------------------------------------------
@@ -479,13 +479,13 @@ def test_is_on_switch_state_zero_does_not_fallback_to_sys_switch() -> None:
 def test_extra_state_attributes_plug_index_one() -> None:
     """extra_state_attributes must contain plug_index=1 for index-1 sensor."""
     sensor = _make_plug_sensor(plug_index=1)
-    assert sensor.extra_state_attributes["plug_index"] == 1  # noqa: S101
+    assert sensor.extra_state_attributes["plug_index"] == 1
 
 
 def test_extra_state_attributes_plug_index_five() -> None:
     """extra_state_attributes must contain plug_index for any index."""
     sensor = _make_plug_sensor(plug_index=5)
-    assert sensor.extra_state_attributes["plug_index"] == 5  # noqa: PLR2004, S101
+    assert sensor.extra_state_attributes["plug_index"] == 5  # noqa: PLR2004
 
 
 def test_extra_state_attributes_none_not_present_when_key_absent() -> None:
@@ -499,7 +499,7 @@ def test_extra_state_attributes_none_not_present_when_key_absent() -> None:
         FIELD_COMM_MODE,
         FIELD_VERSION,
     ):
-        assert key not in attrs, (  # noqa: S101
+        assert key not in attrs, (
             f"Key {key!r} should not be in attrs when absent from plug"
         )
 
@@ -512,16 +512,16 @@ def test_extra_state_attributes_switch_state_included_when_none() -> None:
     sensor = _make_plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: None}])
     attrs = sensor.extra_state_attributes
     # The key IS present in the plug dict (just with value None), so it must appear
-    assert FIELD_SWITCH_STATE in attrs  # noqa: S101
-    assert attrs[FIELD_SWITCH_STATE] is None  # noqa: S101
+    assert FIELD_SWITCH_STATE in attrs
+    assert attrs[FIELD_SWITCH_STATE] is None
 
 
 def test_extra_state_attributes_sys_switch_included() -> None:
     """extra_state_attributes includes FIELD_SYS_SWITCH when present in plug payload."""
     sensor = _make_plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}])
     attrs = sensor.extra_state_attributes
-    assert FIELD_SYS_SWITCH in attrs  # noqa: S101
-    assert attrs[FIELD_SYS_SWITCH] == 1  # noqa: S101
+    assert FIELD_SYS_SWITCH in attrs
+    assert attrs[FIELD_SYS_SWITCH] == 1
 
 
 def test_extra_state_attributes_no_plug_returns_only_plug_index() -> None:
@@ -531,7 +531,7 @@ def test_extra_state_attributes_no_plug_returns_only_plug_index() -> None:
         smart_plugs=[{"sn": "OTHER-SN"}],  # different SN → _plug returns {}
     )
     attrs = sensor.extra_state_attributes
-    assert attrs == {"plug_index": 1}  # noqa: S101
+    assert attrs == {"plug_index": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -552,20 +552,20 @@ def test_smart_plug_unique_id_format() -> None:
         dev_id=dev_id,
     )
     expected = f"{dev_id}_{plug_key}_switch_state"
-    assert sensor.unique_id == expected  # noqa: S101
+    assert sensor.unique_id == expected
 
 
 def test_smart_plug_index_stored_correctly() -> None:
     """The plug_index passed at construction must be stored and accessible."""
     expected_plug_index = 7
     sensor = _make_plug_sensor(plug_index=expected_plug_index)
-    assert sensor._plug_index == expected_plug_index  # noqa: S101, SLF001
+    assert sensor._plug_index == expected_plug_index  # noqa: SLF001
 
 
 def test_smart_plug_sn_stored_correctly() -> None:
     """The plug_sn passed at construction must be stored and accessible."""
     sensor = _make_plug_sensor(plug_sn="MY-SERIAL")
-    assert sensor._plug_sn == "MY-SERIAL"  # noqa: S101, SLF001
+    assert sensor._plug_sn == "MY-SERIAL"  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -595,7 +595,7 @@ async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
 
     await async_setup_entry(None, entry, async_add_entities)
     first_count = async_add_entities.call_count
-    assert first_count == 1  # noqa: S101
+    assert first_count == 1
 
     # Simulate a forced re-collection by clearing coordinator data and then restoring it
     # with a new device, so the signature changes and entities are collected again.
@@ -607,9 +607,9 @@ async def test_async_setup_entry_deduplicates_same_unique_ids() -> None:
     captured_listener()
 
     # Only new entities (for "new_dev") should be added
-    assert async_add_entities.call_count == 2  # noqa: PLR2004, S101
+    assert async_add_entities.call_count == 2  # noqa: PLR2004
     second_batch = async_add_entities.call_args_list[1][0][0]
     # The second batch must only contain entities for "new_dev", not for "dev_dup"
     second_device_ids = {e._device_id for e in second_batch}  # noqa: SLF001
-    assert "new_dev" in second_device_ids  # noqa: S101
-    assert "dev_dup" not in second_device_ids  # noqa: S101
+    assert "new_dev" in second_device_ids
+    assert "dev_dup" not in second_device_ids

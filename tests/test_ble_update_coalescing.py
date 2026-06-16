@@ -13,16 +13,16 @@ def _source() -> str:
 def test_ble_partial_updates_use_coalescing_queue() -> None:
     """Coordinator should queue BLE partial updates and flush them in bursts."""
     src = _source()
-    assert "_BLE_PARTIAL_UPDATE_COALESCE_SEC = " in src  # noqa: S101
-    assert "def _schedule_ble_partial_update(" in src  # noqa: S101
-    assert "async def _async_flush_ble_partial_update(" in src  # noqa: S101
-    assert "await asyncio.sleep(_BLE_PARTIAL_UPDATE_COALESCE_SEC)" in src  # noqa: S101
+    assert "_BLE_PARTIAL_UPDATE_COALESCE_SEC = " in src
+    assert "def _schedule_ble_partial_update(" in src
+    assert "async def _async_flush_ble_partial_update(" in src
+    assert "await asyncio.sleep(_BLE_PARTIAL_UPDATE_COALESCE_SEC)" in src
 
 
 def test_ble_sink_schedules_coalesced_partial_update() -> None:
     """BLE sink path should call the coalescing scheduler instead of direct push."""
     src = _source()
-    assert "_schedule_ble_partial_update(device_id, updated)" in src  # noqa: S101
+    assert "_schedule_ble_partial_update(device_id, updated)" in src
 
 
 def test_push_partial_update_is_noop_when_data_unchanged() -> None:
@@ -33,7 +33,7 @@ def test_push_partial_update_is_noop_when_data_unchanged() -> None:
         src,
         re.DOTALL,
     )
-    assert helper is not None  # noqa: S101
+    assert helper is not None
     body = helper.group(0)
-    assert "if self.data == new_data:" in body  # noqa: S101
-    assert "self.async_set_updated_data(new_data)" in body  # noqa: S101
+    assert "if self.data == new_data:" in body
+    assert "self.async_set_updated_data(new_data)" in body

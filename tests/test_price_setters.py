@@ -1,6 +1,5 @@
 """Unit tests for coordinator price writer behavior."""
 
-from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -17,6 +16,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
+from homeassistant.exceptions import HomeAssistantError
 
 
 class _RejectingPriceApi:
@@ -136,7 +136,7 @@ async def test_dynamic_price_rejects_false_api_response() -> None:
 
 def test_valid_price_sources_filters_blank_company_and_region() -> None:
     """Coordinator price-source validation rejects whitespace-only fields."""
-    assert JackerySolarVaultCoordinator._valid_price_sources([  # noqa: S101, SLF001
+    assert JackerySolarVaultCoordinator._valid_price_sources([  # noqa: SLF001
         {FIELD_PLATFORM_COMPANY_ID: "", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "  ", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "abc", FIELD_COUNTRY: "DE"},
@@ -161,7 +161,7 @@ def test_find_matching_price_source_normalizes_current_price_fields() -> None:
         FIELD_COUNTRY: "DE, AT",
     }
 
-    assert (  # noqa: S101
+    assert (
         coordinator._find_matching_price_source(  # noqa: SLF001
             "dev1",
             [source],
@@ -184,10 +184,10 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
 
     await coordinator.async_set_price_mode_dynamic("dev1")
 
-    assert api.dynamic_calls == [("sys1", 8, "DE")]  # noqa: S101
+    assert api.dynamic_calls == [("sys1", 8, "DE")]
     price = coordinator.data["dev1"][PAYLOAD_PRICE]
-    assert price[FIELD_PLATFORM_COMPANY_ID] == 8  # noqa: PLR2004, S101
-    assert price[FIELD_SYSTEM_REGION] == "DE"  # noqa: S101
+    assert price[FIELD_PLATFORM_COMPANY_ID] == 8  # noqa: PLR2004
+    assert price[FIELD_SYSTEM_REGION] == "DE"
 
 
 async def test_price_source_write_normalizes_blank_company_name() -> None:
@@ -208,4 +208,4 @@ async def test_price_source_write_normalizes_blank_company_name() -> None:
     )
 
     price = coordinator.data["dev1"][PAYLOAD_PRICE]
-    assert price[FIELD_COMPANY_NAME] == "Grid Co"  # noqa: S101
+    assert price[FIELD_COMPANY_NAME] == "Grid Co"

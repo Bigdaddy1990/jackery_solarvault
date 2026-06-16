@@ -37,15 +37,15 @@ def test_stale_threshold_constant_is_a_full_week() -> None:
         src,
         re.MULTILINE,
     )
-    assert match is not None  # noqa: S101
+    assert match is not None
     expr = match.group(1).strip()
     # Evaluate the literal expression (e.g. "7 * 24 * 3600")
     value = eval(expr, {"__builtins__": {}}, {})  # noqa: S307
-    assert isinstance(value, int)  # noqa: S101
-    assert value >= 24 * 3600, f"threshold {value}s is shorter than 24h"  # noqa: S101
+    assert isinstance(value, int)
+    assert value >= 24 * 3600, f"threshold {value}s is shorter than 24h"
     # Don't make it ridiculously long either — a year-long stale pack
     # would clutter the registry forever.
-    assert value <= 30 * 24 * 3600, f"threshold {value}s is over a month"  # noqa: S101
+    assert value <= 30 * 24 * 3600, f"threshold {value}s is over a month"
 
 
 def test_pack_field_last_seen_at_is_internal() -> None:
@@ -56,10 +56,10 @@ def test_pack_field_last_seen_at_is_internal() -> None:
     """
     src = _read("const.py")
     match = re.search(r'PACK_FIELD_LAST_SEEN_AT:\s*Final\s*=\s*"([^"]+)"', src)
-    assert match is not None  # noqa: S101
+    assert match is not None
     name = match.group(1)
-    assert name.startswith("_"), name  # noqa: S101
-    assert "last_seen" in name  # noqa: S101
+    assert name.startswith("_"), name
+    assert "last_seen" in name
 
 
 def test_merge_battery_pack_lists_stamps_online_packs() -> None:
@@ -71,12 +71,12 @@ def test_merge_battery_pack_lists_stamps_online_packs() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None  # noqa: S101
+    assert match is not None
     body = match.group(0)
-    assert "PACK_FIELD_LAST_SEEN_AT" in body, body  # noqa: S101
-    assert "FIELD_COMM_STATE" in body, body  # noqa: S101
+    assert "PACK_FIELD_LAST_SEEN_AT" in body, body
+    assert "FIELD_COMM_STATE" in body, body
     # Stamping must happen for online packs (commState=1)
-    assert '"1"' in body, body  # noqa: S101
+    assert '"1"' in body, body
 
 
 def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
@@ -92,21 +92,21 @@ def test_drop_stale_battery_packs_returns_kept_count_and_indices() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None, "_drop_stale_battery_packs not found"  # noqa: S101
+    assert match is not None, "_drop_stale_battery_packs not found"
     body = match.group(0)
-    assert "tuple[list[dict[str, Any]], int, list[int]]" in body, body  # noqa: S101
-    assert "return packs, 0, []" in body, body  # noqa: S101
+    assert "tuple[list[dict[str, Any]], int, list[int]]" in body, body
+    assert "return packs, 0, []" in body, body
     # Cleanup must compute elapsed seconds against now
-    assert "utc_now()" in body, body  # noqa: S101
-    assert "parse_utc_datetime" in body, body  # noqa: S101
+    assert "utc_now()" in body, body
+    assert "parse_utc_datetime" in body, body
     # Dropped pack indices must be tracked
-    assert "dropped_indices" in body, body  # noqa: S101
+    assert "dropped_indices" in body, body
 
 
 def test_diagnostics_exposes_stale_pack_count() -> None:
     """Diagnostics must surface the cumulative stale-pack drop counter."""
     src = _read("coordinator.py")
-    assert 'diag["stale_battery_packs_dropped"] = ' in src, src  # noqa: S101
+    assert 'diag["stale_battery_packs_dropped"] = ' in src, src
 
 
 def test_stale_drop_helper_logic_unit() -> None:
@@ -151,8 +151,8 @@ def test_stale_drop_helper_logic_unit() -> None:
     ]
     kept, stale = drop(packs)
     sns_kept = {p["deviceSn"] for p in kept}
-    assert sns_kept == {"fresh", "untagged", "corrupt"}, sns_kept  # noqa: S101
-    assert stale == 1  # noqa: S101
+    assert sns_kept == {"fresh", "untagged", "corrupt"}, sns_kept
+    assert stale == 1
 
 
 def test_offline_pack_during_short_blip_is_kept() -> None:
@@ -186,7 +186,7 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
             kept.append(p)
         return kept
 
-    assert drop([pack]) == [pack]  # noqa: S101
+    assert drop([pack]) == [pack]
 
 
 def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
@@ -201,15 +201,15 @@ def test_battery_pack_discovery_filters_smart_meter_subdevices() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None  # noqa: S101
+    assert match is not None
     body = match.group(0)
     # Must reject CT meter frames + Shelly smart meters
-    assert "_CT_METER_KEYS" in body, body  # noqa: S101
-    assert "shelly" in body, body  # noqa: S101
+    assert "_CT_METER_KEYS" in body, body
+    assert "shelly" in body, body
     # Must reject explicit smart-meter subtypes
-    assert "SMART_METER_SUBTYPE" in body, body  # noqa: S101
+    assert "SMART_METER_SUBTYPE" in body, body
     # Must reject documented non-battery sub-device types
-    assert "NON_BATTERY_SUBDEVICE_TYPES" in body, body  # noqa: S101
+    assert "NON_BATTERY_SUBDEVICE_TYPES" in body, body
 
 
 def test_battery_pack_count_no_longer_capped_at_five() -> None:
@@ -223,9 +223,9 @@ def test_battery_pack_count_no_longer_capped_at_five() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None, "_merge_battery_pack_lists not found"  # noqa: S101
+    assert match is not None, "_merge_battery_pack_lists not found"
     body = match.group(0)
-    assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"  # noqa: S101
+    assert "[:5]" not in body, "Cap [:5] still present — was Bug #20 fix reverted?"
 
 
 def test_battery_pack_merge_preserves_known_fields() -> None:
@@ -241,12 +241,12 @@ def test_battery_pack_merge_preserves_known_fields() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None  # noqa: S101
+    assert match is not None
     body = match.group(0)
     # Implementation must filter `None` updates (so a missing field doesn't
     # overwrite a real one) and merge per-key.
-    assert "value is not None" in body, body  # noqa: S101
-    assert "merge_live_properties" in body, body  # noqa: S101
+    assert "value is not None" in body, body
+    assert "merge_live_properties" in body, body
 
 
 # ---------- Gold-tier: dynamic-devices ----------------------------------
@@ -262,15 +262,15 @@ def test_coordinator_queues_device_removals_on_stale_pack_drop() -> None:
     """
     src = _read("coordinator.py")
     # The merge call site must hand dropped_indices to a queue
-    assert "_pending_device_removals.append" in src, src  # noqa: S101
+    assert "_pending_device_removals.append" in src, src
     # The queue must be a list of (DOMAIN, identifier) tuples
     match = re.search(
         r"_pending_device_removals\.append\(\s*identifier\s*\)",
         src,
     )
-    assert match is not None, src  # noqa: S101
+    assert match is not None, src
     # Identifier construction must use the documented battery-pack scheme
-    assert 'f"{device_id}_battery_pack_{pack_index}"' in src, src  # noqa: S101
+    assert 'f"{device_id}_battery_pack_{pack_index}"' in src, src
 
 
 def test_async_cleanup_calls_device_registry_remove() -> None:
@@ -281,15 +281,15 @@ def test_async_cleanup_calls_device_registry_remove() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None, "async_cleanup_pending_device_removals not found"  # noqa: S101
+    assert match is not None, "async_cleanup_pending_device_removals not found"
     body = match.group(0)
     # Imports HA's device_registry at call time (avoids stub conflicts)
-    assert "from homeassistant.helpers import device_registry" in body, body  # noqa: S101
+    assert "from homeassistant.helpers import device_registry" in body, body
     # Looks up by identifier, then removes by registry-internal device.id
-    assert "async_get_device" in body, body  # noqa: S101
-    assert "async_remove_device" in body, body  # noqa: S101
+    assert "async_get_device" in body, body
+    assert "async_remove_device" in body, body
     # Snapshot-and-clear pattern so concurrent merges do not lose entries
-    assert "self._pending_device_removals.clear()" in body, body  # noqa: S101
+    assert "self._pending_device_removals.clear()" in body, body
 
 
 def test_update_data_drains_pending_removals() -> None:
@@ -300,7 +300,7 @@ def test_update_data_drains_pending_removals() -> None:
     """
     src = _read("coordinator.py")
     # Find the cleanup invocation site
-    assert "await self.async_cleanup_pending_device_removals()" in src, src  # noqa: S101
+    assert "await self.async_cleanup_pending_device_removals()" in src, src
     # It must be guarded by a non-empty check to avoid the executor cost
     # when nothing is queued.
     pattern = re.search(
@@ -309,7 +309,7 @@ def test_update_data_drains_pending_removals() -> None:
         r"\s*await self\.async_cleanup_pending_device_removals\(\)",
         src,
     )
-    assert pattern is not None, src  # noqa: S101
+    assert pattern is not None, src
 
 
 def test_quality_scale_dynamic_devices_marked_done() -> None:
@@ -320,5 +320,5 @@ def test_quality_scale_dynamic_devices_marked_done() -> None:
         r"dynamic-devices:\s*\n\s*status:\s*(\w+)",
         qs,
     )
-    assert match is not None, qs  # noqa: S101
-    assert match.group(1) == "done", match.group(1)  # noqa: S101
+    assert match is not None, qs
+    assert match.group(1) == "done", match.group(1)

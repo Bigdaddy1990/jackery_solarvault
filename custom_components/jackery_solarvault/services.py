@@ -457,7 +457,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
             device_id=device_id,
             error=err,
         ) from err
-    assert isinstance(normalized, dict)  # noqa: S101
+    assert isinstance(normalized, dict)
     return normalized
 
 

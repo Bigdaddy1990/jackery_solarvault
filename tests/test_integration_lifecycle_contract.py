@@ -19,9 +19,9 @@ def _function_source(name: str, *, source_path: Path | None = None) -> str:
     match = re.search(
         rf"^async def {name}.*?(?=^async def |^def |^class |\Z)",
         source,
-        re.S | re.M,
+        re.DOTALL | re.MULTILINE,
     )
-    assert match is not None, f"{name} not found in {path.name}"  # noqa: S101
+    assert match is not None, f"{name} not found in {path.name}"
     return match.group(0)
 
 
@@ -30,9 +30,9 @@ def test_async_setup_does_not_mutate_brand_assets() -> None:
     init_source = _read_init()
     body = _function_source("async_setup")
 
-    assert "_async_ensure_cached_brand_images" not in init_source  # noqa: S101
-    assert "brand.py" not in init_source  # noqa: S101
-    assert "async_setup_services(hass)" in body, body  # noqa: S101
+    assert "_async_ensure_cached_brand_images" not in init_source
+    assert "brand.py" not in init_source
+    assert "async_setup_services(hass)" in body, body
 
 
 def test_unload_keeps_coordinator_alive_when_platform_unload_fails() -> None:
@@ -45,11 +45,11 @@ def test_unload_keeps_coordinator_alive_when_platform_unload_fails() -> None:
             func = node.func
             if isinstance(func, ast.Attribute):
                 calls.append(func.attr)
-    assert "async_unload_platforms" in calls, body  # noqa: S101
-    assert "async_shutdown" in calls, body  # noqa: S101
-    assert calls.index("async_unload_platforms") < calls.index("async_shutdown"), body  # noqa: S101
-    assert "if not unload_ok" in body, body  # noqa: S101
-    assert "return False" in body, body  # noqa: S101
+    assert "async_unload_platforms" in calls, body
+    assert "async_shutdown" in calls, body
+    assert calls.index("async_unload_platforms") < calls.index("async_shutdown"), body
+    assert "if not unload_ok" in body, body
+    assert "return False" in body, body
 
 
 def test_dynamic_entity_listener_callbacks_are_marked_callback() -> None:
@@ -81,4 +81,4 @@ def test_dynamic_entity_listener_callbacks_are_marked_callback() -> None:
             for decorator in add_new_entities.decorator_list
             if isinstance(decorator, ast.Name)
         }
-        assert "callback" in decorator_names, platform_file  # noqa: S101
+        assert "callback" in decorator_names, platform_file

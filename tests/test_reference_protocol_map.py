@@ -12,9 +12,9 @@ spec = importlib.util.spec_from_file_location(
     / "jackery_solarvault"
     / "protocol_map.py",
 )
-assert spec is not None  # noqa: S101
+assert spec is not None
 protocol_map = importlib.util.module_from_spec(spec)
-assert spec.loader is not None  # noqa: S101
+assert spec.loader is not None
 spec.loader.exec_module(protocol_map)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,8 +29,8 @@ def _reference() -> dict:
 def _assert_target_exists(target: str) -> None:
     file_name, _, symbol = target.partition(":")
     path = IMPLEMENTATION_ROOT / file_name
-    assert path.exists(), target  # noqa: S101
-    assert symbol, target  # noqa: S101
+    assert path.exists(), target
+    assert symbol, target
     tree = ast.parse(path.read_text(encoding="utf-8"))
     symbols = {
         node.name
@@ -44,7 +44,7 @@ def _assert_target_exists(target: str) -> None:
                 for child in node.body
                 if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
             )
-    assert symbol in symbols, target  # noqa: S101
+    assert symbol in symbols, target
 
 
 def test_http_reference_endpoints_are_mapped_or_exempted() -> None:  # noqa: D103
@@ -56,7 +56,7 @@ def test_http_reference_endpoints_are_mapped_or_exempted() -> None:  # noqa: D10
                 _assert_target_exists(protocol_map.HTTP_ENDPOINTS[path])
             elif path not in protocol_map.HTTP_ENDPOINT_EXEMPTIONS:
                 missing.append(path)
-    assert not missing  # noqa: S101
+    assert not missing
 
 
 def test_mqtt_message_types_are_routed() -> None:  # noqa: D103
@@ -65,7 +65,7 @@ def test_mqtt_message_types_are_routed() -> None:  # noqa: D103
         for message_type in _reference()["mqtt"]["message_types"]
         if message_type not in protocol_map.MQTT_MESSAGE_HANDLERS
     ]
-    assert not missing  # noqa: S101
+    assert not missing
     for target in protocol_map.MQTT_MESSAGE_HANDLERS.values():
         _assert_target_exists(target)
 
@@ -79,7 +79,7 @@ def test_command_ids_are_built_or_exempted() -> None:  # noqa: D103
             _assert_target_exists(protocol_map.COMMAND_BUILDERS[msg_id])
         elif msg_id not in protocol_map.COMMAND_EXEMPTIONS:
             missing.append(msg_id)
-    assert not missing  # noqa: S101
+    assert not missing
 
 
 def test_command_names_are_built_or_exempted() -> None:  # noqa: D103
@@ -91,7 +91,7 @@ def test_command_names_are_built_or_exempted() -> None:  # noqa: D103
         if entry["command"] not in protocol_map.COMMAND_NAME_BUILDERS
         and entry["command"] not in exempt_names
     ]
-    assert not missing  # noqa: S101
+    assert not missing
 
 
 def test_reference_dto_fields_are_consumed_or_exempted() -> None:  # noqa: D103
@@ -110,4 +110,4 @@ def test_reference_dto_fields_are_consumed_or_exempted() -> None:  # noqa: D103
             if wildcard in protocol_map.DTO_FIELD_EXEMPTIONS:
                 continue
             missing.append(key)
-    assert not missing  # noqa: S101
+    assert not missing

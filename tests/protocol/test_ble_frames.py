@@ -79,28 +79,28 @@ from homeassistant.exceptions import ServiceValidationError
 
 def test_wire_format_constants_match_smali() -> None:
     """Wire-format string literals match HomeControlFormat.smali."""
-    assert BLE_FRAME_MAGIC == "DFED"  # noqa: S101
-    assert BLE_FRAME_VERSION == "0001"  # noqa: S101
-    assert BLE_FRAME_PAYLOAD_MARKER == "0001"  # noqa: S101
-    assert BLE_AES_IV_LEN == 16  # noqa: PLR2004, S101
+    assert BLE_FRAME_MAGIC == "DFED"
+    assert BLE_FRAME_VERSION == "0001"
+    assert BLE_FRAME_PAYLOAD_MARKER == "0001"
+    assert BLE_AES_IV_LEN == 16  # noqa: PLR2004
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
     # A SolarVault 3 Pro Max captured 2026-05-16 returned a 16-byte key
     # ("hr2c0hh361336138" → AES-128), so the helpers must accept that too.
-    assert BLE_AES_KEY_LEN_AES128 == 16  # noqa: PLR2004, S101
-    assert BLE_AES_KEY_LEN_AES256 == 32  # noqa: PLR2004, S101
-    assert set(BLE_AES_KEY_LENGTHS) == {16, 32}  # noqa: S101
+    assert BLE_AES_KEY_LEN_AES128 == 16  # noqa: PLR2004
+    assert BLE_AES_KEY_LEN_AES256 == 32  # noqa: PLR2004
+    assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
     # The legacy single-value alias points at AES-128 because that is the
     # observed wild-type for SolarVault.
-    assert BLE_AES_KEY_LEN == BLE_AES_KEY_LEN_AES128  # noqa: S101
+    assert BLE_AES_KEY_LEN == BLE_AES_KEY_LEN_AES128
 
 
 def test_gatt_uuids_match_smali_and_live_capture() -> None:
     """GATT service/char UUIDs match sb/v.smali and the live HA scan capture."""
-    assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"  # noqa: S101
-    assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"  # noqa: S101
-    assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"  # noqa: S101
-    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data  # noqa: PLR2004, S101
+    assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"
+    assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"
+    assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"
+    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data  # noqa: PLR2004
 
 
 # ---------------------------------------------------------------------------
@@ -110,11 +110,11 @@ def test_gatt_uuids_match_smali_and_live_capture() -> None:
 
 def test_hex16_upper_case_4_digit_format() -> None:
     """``hex16`` produces a 4-char upper-case hex string (matches ``sb/d.d``)."""
-    assert hex16(0) == "0000"  # noqa: S101
-    assert hex16(1) == "0001"  # noqa: S101
-    assert hex16(0xBEE) == "0BEE"  # actionId 3046 = 0x0BEE  # noqa: S101
-    assert hex16(0x71) == "0071"  # cmd 113 = 0x71  # noqa: S101
-    assert hex16(0xFFFF) == "FFFF"  # noqa: S101
+    assert hex16(0) == "0000"
+    assert hex16(1) == "0001"
+    assert hex16(0xBEE) == "0BEE"  # actionId 3046 = 0x0BEE
+    assert hex16(0x71) == "0071"  # cmd 113 = 0x71
+    assert hex16(0xFFFF) == "FFFF"
 
 
 def test_hex16_rejects_out_of_range() -> None:
@@ -128,7 +128,7 @@ def test_hex16_rejects_out_of_range() -> None:
 def test_parse_hex16_round_trips() -> None:
     """``parse_hex16`` inverts ``hex16``."""
     for value in (0, 1, 0x1234, 0xBEE, 0xFFFF):
-        assert parse_hex16(hex16(value)) == value  # noqa: S101
+        assert parse_hex16(hex16(value)) == value
 
 
 def test_parse_hex16_rejects_wrong_width() -> None:
@@ -148,7 +148,7 @@ def test_parse_hex16_rejects_non_hex_characters_with_context() -> None:
 def test_hex_encode_decode_round_trip() -> None:
     """``hex_encode`` and ``hex_decode`` are inverse for arbitrary bytes."""
     data = bytes(range(256))
-    assert hex_decode(hex_encode(data)) == data  # noqa: S101
+    assert hex_decode(hex_encode(data)) == data
 
 
 # ---------------------------------------------------------------------------
@@ -159,12 +159,12 @@ def test_hex_encode_decode_round_trip() -> None:
 def test_crc16_modbus_reference_vector() -> None:
     """Standard Modbus CRC-16 of ``"123456789"`` is ``0x4B37``."""
     # https://crccalc.com — CRC-16/MODBUS (poly 0xA001, init 0xFFFF, reflected).
-    assert crc16_modbus(b"123456789") == 0x4B37  # noqa: PLR2004, S101
+    assert crc16_modbus(b"123456789") == 0x4B37  # noqa: PLR2004
 
 
 def test_crc16_hex_is_4_chars_upper() -> None:
     """``crc16_hex`` returns the CRC as a 4-char upper-case hex string."""
-    assert crc16_hex(b"123456789") == "4B37"  # noqa: S101
+    assert crc16_hex(b"123456789") == "4B37"
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ def test_aes_round_trip_with_deterministic_iv_aes256() -> None:
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"Hello, Jackery!" * 4
     ciphertext = aes_encrypt(plaintext, key, iv)
-    assert aes_decrypt(ciphertext, key, iv) == plaintext  # noqa: S101
+    assert aes_decrypt(ciphertext, key, iv) == plaintext
 
 
 def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
@@ -191,11 +191,11 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     accepting both key lengths.
     """  # noqa: D205
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # noqa: PLR2004, S101
+    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # noqa: PLR2004
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
-    assert aes_decrypt(ciphertext, key, iv) == plaintext  # noqa: S101
+    assert aes_decrypt(ciphertext, key, iv) == plaintext
 
 
 def test_aes_rejects_wrong_key_or_iv_length() -> None:
@@ -217,9 +217,9 @@ def test_random_iv_returns_fresh_16_byte_values() -> None:
     """``random_iv`` returns 16 bytes that differ between calls."""
     iv1 = random_iv()
     iv2 = random_iv()
-    assert len(iv1) == BLE_AES_IV_LEN  # noqa: S101
-    assert len(iv2) == BLE_AES_IV_LEN  # noqa: S101
-    assert iv1 != iv2  # noqa: S101
+    assert len(iv1) == BLE_AES_IV_LEN
+    assert len(iv2) == BLE_AES_IV_LEN
+    assert iv1 != iv2
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ def test_build_plaintext_frame_smali_layout() -> None:
         "000C"  # chunk_len 12 bytes
         "7B22656E61626C65223A317D"  # '{"enable":1}' hex
     )
-    assert text == expected  # noqa: S101
+    assert text == expected
 
 
 def test_parse_plaintext_frame_inverts_builder() -> None:
@@ -266,7 +266,7 @@ def test_parse_plaintext_frame_inverts_builder() -> None:
             chunk_payload=chunk,
         )
         text = build_plaintext_frame(frame)
-        assert parse_plaintext_frame(text) == frame  # noqa: S101
+        assert parse_plaintext_frame(text) == frame
 
 
 def test_parse_plaintext_frame_rejects_bad_magic_or_marker() -> None:
@@ -322,9 +322,9 @@ def test_encrypt_decrypt_round_trip_recovers_frame_aes256() -> None:
         ),
     )
     blob = encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN), random16=0x1234)
-    assert blob[:BLE_AES_IV_LEN] == bytes(BLE_AES_IV_LEN)  # noqa: S101
+    assert blob[:BLE_AES_IV_LEN] == bytes(BLE_AES_IV_LEN)
     parsed = decrypt_frame(blob, key)
-    assert parsed == frame  # noqa: S101
+    assert parsed == frame
 
 
 def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
@@ -339,7 +339,7 @@ def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
     )
     blob = encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN), random16=0xABCD)
     parsed = decrypt_frame(blob, key)
-    assert parsed == frame  # noqa: S101
+    assert parsed == frame
 
 
 def test_encrypt_frame_uses_random_iv_when_omitted() -> None:
@@ -354,7 +354,7 @@ def test_encrypt_frame_uses_random_iv_when_omitted() -> None:
     )
     blob1 = encrypt_frame(frame, key)
     blob2 = encrypt_frame(frame, key)
-    assert blob1[:BLE_AES_IV_LEN] != blob2[:BLE_AES_IV_LEN]  # noqa: S101
+    assert blob1[:BLE_AES_IV_LEN] != blob2[:BLE_AES_IV_LEN]
 
 
 def test_decrypt_rejects_crc_tampering() -> None:
@@ -380,9 +380,9 @@ def test_decrypt_rejects_crc_tampering() -> None:
 
 def test_chunk_size_matches_smali_formula() -> None:
     """``chunk_size_for_mtu(mtu) == mtu - 60`` exactly."""
-    assert chunk_size_for_mtu(247) == 187  # noqa: PLR2004, S101
-    assert chunk_size_for_mtu(100) == 40  # noqa: PLR2004, S101
-    assert chunk_size_for_mtu(61) == 1  # noqa: S101
+    assert chunk_size_for_mtu(247) == 187  # noqa: PLR2004
+    assert chunk_size_for_mtu(100) == 40  # noqa: PLR2004
+    assert chunk_size_for_mtu(61) == 1
 
 
 def test_chunk_size_refuses_too_small_mtu() -> None:
@@ -402,23 +402,23 @@ def test_split_payload_emits_correct_number_of_frames() -> None:
         ble_cmd=120,
         mtu=247,
     )
-    assert len(frames) == 3  # noqa: PLR2004, S101
-    assert frames[0].frame_index == 1  # noqa: S101
-    assert frames[0].chunk_count == 3  # noqa: PLR2004, S101
-    assert frames[-1].frame_index == 3  # noqa: PLR2004, S101
-    assert b"".join(f.chunk_payload for f in frames) == payload  # noqa: S101
+    assert len(frames) == 3  # noqa: PLR2004
+    assert frames[0].frame_index == 1
+    assert frames[0].chunk_count == 3  # noqa: PLR2004
+    assert frames[-1].frame_index == 3  # noqa: PLR2004
+    assert b"".join(f.chunk_payload for f in frames) == payload
     # All but the last chunk are at the MTU-derived max length.
     for f in frames[:-1]:
-        assert len(f.chunk_payload) == chunk_size_for_mtu(247)  # noqa: S101
-    assert len(frames[-1].chunk_payload) <= chunk_size_for_mtu(247)  # noqa: S101
+        assert len(f.chunk_payload) == chunk_size_for_mtu(247)
+    assert len(frames[-1].chunk_payload) <= chunk_size_for_mtu(247)
 
 
 def test_split_payload_handles_empty_payload() -> None:
     """An empty payload still produces one frame so query messages round-trip."""
     frames = split_payload_into_frames(b"", action_id=3046, ble_cmd=113, mtu=247)
-    assert len(frames) == 1  # noqa: S101
-    assert frames[0].chunk_count == 1  # noqa: S101
-    assert frames[0].chunk_payload == b""  # noqa: S101
+    assert len(frames) == 1
+    assert frames[0].chunk_count == 1
+    assert frames[0].chunk_payload == b""
 
 
 # ---------------------------------------------------------------------------
@@ -485,25 +485,25 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     the cloud.
     """  # noqa: D205
     key = base64.b64decode(_LIVE_KEY_B64)
-    assert len(key) == BLE_AES_KEY_LEN_AES128  # noqa: S101
+    assert len(key) == BLE_AES_KEY_LEN_AES128
 
     for raw_hex, expected_cmd, expected_body_len, body_marker in _LIVE_NOTIFY_SAMPLES:
         raw = bytes.fromhex(raw_hex)
         frame = decrypt_binary_notify(raw, key)
-        assert isinstance(frame, BleBinaryFrame)  # noqa: S101
-        assert frame.cmd == expected_cmd, (frame.cmd, expected_cmd)  # noqa: S101
-        assert frame.frame_index == 1  # noqa: S101
-        assert frame.chunk_count == 1  # noqa: S101
-        assert len(frame.body) == expected_body_len  # noqa: S101
+        assert isinstance(frame, BleBinaryFrame)
+        assert frame.cmd == expected_cmd, (frame.cmd, expected_cmd)
+        assert frame.frame_index == 1
+        assert frame.chunk_count == 1
+        assert len(frame.body) == expected_body_len
         body_text = frame.body.decode("utf-8")
-        assert body_text.startswith(body_marker)  # noqa: S101
+        assert body_text.startswith(body_marker)
         # The bodies are always JSON dicts that include the ``cmd`` field
         # mirroring the binary header — the integration's sink strips it.
         payload = _json.loads(body_text)
-        assert isinstance(payload, dict)  # noqa: S101
-        assert payload.get("cmd") == expected_cmd  # noqa: S101
+        assert isinstance(payload, dict)
+        assert payload.get("cmd") == expected_cmd
         # Trailer is always 4 bytes — assumed CRC; opaque for now.
-        assert len(frame.trailer) == 4  # noqa: PLR2004, S101
+        assert len(frame.trailer) == 4  # noqa: PLR2004
 
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
@@ -527,12 +527,12 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     plain = build_binary_frame(cmd=107, body=body, flags=42)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
     parsed = decrypt_binary_notify(blob, key)
-    assert parsed.cmd == 107  # noqa: PLR2004, S101
-    assert parsed.flags == 42  # noqa: PLR2004, S101
-    assert parsed.frame_index == 1  # noqa: S101
-    assert parsed.chunk_count == 1  # noqa: S101
-    assert parsed.body == body  # noqa: S101
-    assert parsed.trailer == b"\x00\x00\x00\x00"  # noqa: S101
+    assert parsed.cmd == 107  # noqa: PLR2004
+    assert parsed.flags == 42  # noqa: PLR2004
+    assert parsed.frame_index == 1
+    assert parsed.chunk_count == 1
+    assert parsed.body == body
+    assert parsed.trailer == b"\x00\x00\x00\x00"
 
 
 def test_listener_async_send_command_returns_false_without_client() -> None:
@@ -562,7 +562,7 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
             cmd=107,
             body=b'{"swEps":1}',
         )
-        assert sent is False  # noqa: S101
+        assert sent is False
 
     asyncio.run(_run())
 
@@ -628,13 +628,13 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
             body=b'{"swEps":1}',
             flags=42,
         )
-        assert ok is True  # noqa: S101
-        assert captured["uuid"] == BLE_WRITE_CHAR_UUID  # noqa: S101
-        assert captured["response"] is False  # noqa: S101
+        assert ok is True
+        assert captured["uuid"] == BLE_WRITE_CHAR_UUID
+        assert captured["response"] is False
         parsed = decrypt_binary_notify(captured["blob"], key)  # type: ignore[arg-type]
-        assert parsed.cmd == 107  # noqa: PLR2004, S101
-        assert parsed.flags == 42  # noqa: PLR2004, S101
-        assert parsed.body == b'{"swEps":1}'  # noqa: S101
+        assert parsed.cmd == 107  # noqa: PLR2004
+        assert parsed.flags == 42  # noqa: PLR2004
+        assert parsed.body == b'{"swEps":1}'
 
     asyncio.run(_run())
 
@@ -677,14 +677,14 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
         ),
     )
     matchers = manifest.get("bluetooth", [])
-    assert any(  # noqa: S101
+    assert any(
         m.get("service_uuid", "").lower() == BLE_SERVICE_UUID for m in matchers
     ), matchers
-    assert any(m.get("manufacturer_id") == BLE_MANUFACTURER_ID for m in matchers), (  # noqa: S101
+    assert any(m.get("manufacturer_id") == BLE_MANUFACTURER_ID for m in matchers), (
         matchers
     )
-    assert "bluetooth" in (manifest.get("after_dependencies") or [])  # noqa: S101
-    assert any(  # noqa: S101
+    assert "bluetooth" in (manifest.get("after_dependencies") or [])
+    assert any(
         req.startswith("bleak-retry-connector")
         for req in manifest.get("requirements", [])
     ), manifest.get("requirements")
@@ -692,11 +692,11 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
 def test_const_exposes_ble_option_and_field() -> None:
     """Config option + bluetoothKey field constants exist in const.py."""
-    assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"  # noqa: S101
-    assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False  # noqa: S101
-    assert const.CONF_ENABLE_BLE_WRITES == "enable_ble_writes"  # noqa: S101
-    assert const.DEFAULT_ENABLE_BLE_WRITES is False  # noqa: S101
-    assert const.FIELD_BLUETOOTH_KEY == "bluetoothKey"  # noqa: S101
+    assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
+    assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
+    assert const.CONF_ENABLE_BLE_WRITES == "enable_ble_writes"
+    assert const.DEFAULT_ENABLE_BLE_WRITES is False
+    assert const.FIELD_BLUETOOTH_KEY == "bluetoothKey"
 
 
 def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
@@ -707,7 +707,7 @@ def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
         "async_send_ble_command",
         "ble_observations",
     ):
-        assert hasattr(JackerySolarVaultCoordinator, attr), attr  # noqa: S101
+        assert hasattr(JackerySolarVaultCoordinator, attr), attr
 
 
 def test_ble_write_option_is_options_only() -> None:
@@ -717,19 +717,19 @@ def test_ble_write_option_is_options_only() -> None:
         root / "custom_components" / "jackery_solarvault" / "config_flow.py"
     ).read_text(encoding="utf-8")
 
-    assert "CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES" in source  # noqa: S101
+    assert "CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES" in source
     user_schema = source.split("USER_SCHEMA = vol.Schema(", 1)[1].split("\n})", 1)[0]
-    assert "CONF_ENABLE_BLE_WRITES" not in user_schema  # noqa: S101
+    assert "CONF_ENABLE_BLE_WRITES" not in user_schema
     options_block = source.split("class JackeryOptionsFlow", 1)[1].split(
         "class JackeryConfigFlow",
         1,
     )[0]
-    assert "CONF_ENABLE_BLE_WRITES" in options_block  # noqa: S101
+    assert "CONF_ENABLE_BLE_WRITES" in options_block
     reconfigure_block = source.split("async def async_step_reconfigure", 1)[1].split(
         "async def async_step_reauth",
         1,
     )[0]
-    assert "CONF_ENABLE_BLE_WRITES" in reconfigure_block  # noqa: S101
+    assert "CONF_ENABLE_BLE_WRITES" in reconfigure_block
 
 
 def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
@@ -742,8 +742,8 @@ def test_ble_transport_uses_coordinator_config_entry_attr() -> None:
         1
     ].split("def _ble_address_for_device", 1)[0]
 
-    assert "self._config_entry" not in ble_block  # noqa: S101
-    assert (  # noqa: S101
+    assert "self._config_entry" not in ble_block
+    assert (
         "self.entry, CONF_ENABLE_BLE_TRANSPORT, DEFAULT_ENABLE_BLE_TRANSPORT"
         in ble_block
     )
@@ -756,7 +756,7 @@ def test_ble_transport_module_exports_listener() -> None:
         "BleFrameObservation",
         "BleListenerStats",
     ):
-        assert hasattr(ble_transport, symbol), symbol  # noqa: S101
+        assert hasattr(ble_transport, symbol), symbol
 
 
 def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
@@ -797,10 +797,10 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
         before = loop.time()
         await listener.async_stop()
         elapsed = loop.time() - before
-        assert task.done(), "stuck runner task was not cancelled"  # noqa: S101
+        assert task.done(), "stuck runner task was not cancelled"
         # Must be far under the 5 s hard stop budget; in practice this
         # finishes in single-digit milliseconds.
-        assert elapsed < 1.0, f"async_stop took {elapsed:.3f}s — too slow"  # noqa: S101
+        assert elapsed < 1.0, f"async_stop took {elapsed:.3f}s — too slow"
 
     asyncio.run(_runner())
 
@@ -847,7 +847,7 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
             cmd=107,
             body={"cmd": 107},
         )
-        assert sent is False  # noqa: S101
+        assert sent is False
 
     asyncio.run(_run())
 
@@ -884,7 +884,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
             Returns:
                 int: MTU size in bytes for the device.
             """
-            assert device_id == "dev1"  # noqa: S101
+            assert device_id == "dev1"
             return 517
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -893,18 +893,18 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     coordinator._ble_listener = None  # noqa: SLF001
 
     idle = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
-    assert idle["enabled"] is True  # noqa: S101
-    assert idle["write_enabled"] is False  # noqa: S101
-    assert idle["running"] is False  # noqa: S101
-    assert idle["frames_decoded"] == 0  # noqa: S101
-    assert idle["mtu"] is None  # noqa: S101
+    assert idle["enabled"] is True
+    assert idle["write_enabled"] is False
+    assert idle["running"] is False
+    assert idle["frames_decoded"] == 0
+    assert idle["mtu"] is None
 
     coordinator._ble_listener = _Listener()  # noqa: SLF001
     running = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
-    assert running["enabled"] is True  # noqa: S101
-    assert running["running"] is True  # noqa: S101
-    assert running["frames_decoded"] == 0  # noqa: S101
-    assert running["mtu"] == 517  # noqa: PLR2004, S101
+    assert running["enabled"] is True
+    assert running["running"] is True
+    assert running["frames_decoded"] == 0
+    assert running["mtu"] == 517  # noqa: PLR2004
 
 
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
@@ -986,8 +986,8 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
             body={"cmd": 107, "swEps": 1},
             flags=42,
         )
-        assert sent is True  # noqa: S101
-        assert captured == {  # noqa: S101
+        assert sent is True
+        assert captured == {
             "device_id": "dev1",
             "cmd": 107,
             "body": b'{"cmd":107,"swEps":1}',
@@ -1088,7 +1088,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
         )
         # Router now always asks for an ACK so a silent firmware drop
         # falls back to MQTT instead of being swallowed.
-        assert captured == {  # noqa: S101
+        assert captured == {
             "device_id": "dev1",
             "cmd": 107,
             "body": {FIELD_SW_EPS: 1, "cmd": 107},
@@ -1165,7 +1165,7 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
             body_fields={FIELD_SW_EPS: 1},
             ensure_mqtt=False,
         )
-        assert captured == {  # noqa: S101
+        assert captured == {
             "device_id": "dev1",
             "message_type": "DevicePropertyChange",
             "action_id": 3022,
@@ -1259,9 +1259,9 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
     ):
         asyncio.run(_run())
 
-    assert captured["device_id"] == "dev1"  # noqa: S101
-    assert captured["body_fields"] == {FIELD_SW_EPS: 1}  # noqa: S101
-    assert "falling back to MQTT" not in caplog.text  # noqa: S101
+    assert captured["device_id"] == "dev1"
+    assert captured["body_fields"] == {FIELD_SW_EPS: 1}
+    assert "falling back to MQTT" not in caplog.text
 
 
 def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
@@ -1347,9 +1347,9 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
     ):
         asyncio.run(_run())
 
-    assert "MQTT fallback also failed" in caplog.text  # noqa: S101
-    assert "BLE=BLE ack timeout" in caplog.text  # noqa: S101
-    assert "MQTT=MQTT publish timeout" in caplog.text  # noqa: S101
+    assert "MQTT fallback also failed" in caplog.text
+    assert "BLE=BLE ack timeout" in caplog.text
+    assert "MQTT=MQTT publish timeout" in caplog.text
 
 
 def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
@@ -1412,7 +1412,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             cmd=0,
             body_fields={"wpc": 30},
         )
-        assert captured == {  # noqa: S101
+        assert captured == {
             "device_id": "dev1",
             "message_type": "SendWeatherAlert",
             "action_id": 3040,
@@ -1426,11 +1426,11 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
 def test_command_body_for_transport_parses_cmd_defensively() -> None:
     """Transport command bodies accept integral text and reject bad values."""
-    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: S101, SLF001
+    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: SLF001
         {"swEps": 1},
         cmd="107.0",  # type: ignore[arg-type]
     ) == {"swEps": 1, FIELD_CMD: 107}
-    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: S101, SLF001
+    assert JackerySolarVaultCoordinator._command_body_for_transport(  # noqa: SLF001
         {"wpc": 30},
         cmd=0,
     ) == {"wpc": 30}
@@ -1445,8 +1445,8 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # noqa: S101, SLF001
-    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # noqa: S101, SLF001
+    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # noqa: SLF001
+    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # noqa: SLF001
         "cmd": 107,
         "swEps": 1,
     }
@@ -1482,7 +1482,7 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
         },
     }
     key = JackerySolarVaultCoordinator.device_bluetooth_key(self, "573702884982521856")
-    assert key == b"hr2c0hh361336138"  # noqa: S101
+    assert key == b"hr2c0hh361336138"
 
 
 def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
@@ -1503,7 +1503,7 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
             PAYLOAD_SYSTEM_META: {FIELD_BLUETOOTH_KEY: system_key},
         },
     }
-    assert JackerySolarVaultCoordinator.device_bluetooth_key(self, "dev1") == b"D" * 16  # noqa: S101
+    assert JackerySolarVaultCoordinator.device_bluetooth_key(self, "dev1") == b"D" * 16
 
 
 def test_serial_resolver_strips_http_prefix_letter() -> None:
@@ -1524,17 +1524,17 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
         },
     }
 
-    assert (  # noqa: S101
+    assert (
         JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "R2C04000280HH3")
         == "573702884982521856"
     )
     # Exact match also works (future firmware may align them).
-    assert (  # noqa: S101
+    assert (
         JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "HR2C04000280HH3")
         == "573702884982521856"
     )
     # Unknown serial returns None so the listener can fall through quietly.
-    assert (  # noqa: S101
+    assert (
         JackerySolarVaultCoordinator.device_id_for_ble_serial(self, "DOESNOTEXIST")
         is None
     )
@@ -1639,12 +1639,12 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
             ack_timeout_sec=2.0,
         )
         sent, _ = await asyncio.gather(sender, _drive_ack())
-        assert sent is True  # noqa: S101
+        assert sent is True
         stats = listener.stats_for("dev")
-        assert stats.acks_received == 1  # noqa: S101
-        assert stats.acks_timed_out == 0  # noqa: S101
-        assert stats.last_ack_at is not None  # noqa: S101
-        assert listener._pending_acks == {}  # noqa: S101, SLF001
+        assert stats.acks_received == 1
+        assert stats.acks_timed_out == 0
+        assert stats.last_ack_at is not None
+        assert listener._pending_acks == {}  # noqa: SLF001
         # The frame round-trips through the real decoder.
         parsed = BleBinaryFrame.__name__  # smoke import
         del parsed
@@ -1700,11 +1700,11 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
                 ack_timeout_sec=0.05,
             )
         stats = listener.stats_for("dev")
-        assert stats.acks_received == 0  # noqa: S101
-        assert stats.acks_timed_out == 1  # noqa: S101
+        assert stats.acks_received == 0
+        assert stats.acks_timed_out == 1
         # Pending bucket is cleaned up so a later notify doesn't fire
         # into a dropped future.
-        assert listener._pending_acks == {}  # noqa: S101, SLF001
+        assert listener._pending_acks == {}  # noqa: SLF001
 
     asyncio.run(_run())
 
@@ -1751,7 +1751,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
                 key,
             )
             await listener._handle_notification("dev", mismatched)  # noqa: SLF001
-            assert listener._pending_acks.get("dev"), (  # noqa: S101, SLF001
+            assert listener._pending_acks.get("dev"), (  # noqa: SLF001
                 "mismatched cmd must leave the pending ack registered"
             )
             # Then the expected echo — this fulfils the future.
@@ -1770,10 +1770,10 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
             ack_cmds=(111,),
         )
         sent, _ = await asyncio.gather(sender, _drive_wrong_cmd_then_right_cmd())
-        assert sent is True  # noqa: S101
+        assert sent is True
         stats = listener.stats_for("dev")
-        assert stats.acks_received == 1  # noqa: S101
-        assert stats.acks_timed_out == 0  # noqa: S101
+        assert stats.acks_received == 1
+        assert stats.acks_timed_out == 0
 
     asyncio.run(_run())
 
@@ -1788,7 +1788,7 @@ def test_listener_rejects_non_integer_ack_cmd_filter() -> None:
             # type: ignore[attr-defined]
             listener._register_pending_ack("dev", (True,))  # noqa: SLF001
 
-        assert listener._pending_acks == {}  # type: ignore[attr-defined]  # noqa: S101, SLF001
+        assert listener._pending_acks == {}  # type: ignore[attr-defined]  # noqa: SLF001
 
     asyncio.run(_run())
 
@@ -1811,9 +1811,9 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
 
         await listener.async_stop()
 
-        assert ack_a.future.cancelled()  # noqa: S101
-        assert ack_b.future.cancelled()  # noqa: S101
-        assert listener._pending_acks == {}  # noqa: S101, SLF001
+        assert ack_a.future.cancelled()
+        assert ack_b.future.cancelled()
+        assert listener._pending_acks == {}  # noqa: SLF001
 
     asyncio.run(_run())
 
@@ -1867,7 +1867,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             )
         # Pending bucket cleared so a stray late notify cannot fulfil a
         # future the caller already gave up on.
-        assert listener._pending_acks == {}  # noqa: S101, SLF001
+        assert listener._pending_acks == {}  # noqa: SLF001
 
     asyncio.run(_run())
 
@@ -1943,11 +1943,11 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             ack_cmds=(107, 111),
             mtu_override=120,
         )
-        assert sent is True  # noqa: S101
-        assert captured["wait_for_ack"] is True  # noqa: S101
-        assert captured["ack_timeout_sec"] == 3.5  # noqa: PLR2004, RUF069, S101
-        assert captured["ack_cmds"] == (107, 111)  # noqa: S101
-        assert captured["mtu_override"] == 120  # noqa: PLR2004, S101
+        assert sent is True
+        assert captured["wait_for_ack"] is True
+        assert captured["ack_timeout_sec"] == 3.5  # noqa: PLR2004, RUF069
+        assert captured["ack_cmds"] == (107, 111)
+        assert captured["mtu_override"] == 120  # noqa: PLR2004
 
     asyncio.run(_run())
 
@@ -1960,24 +1960,24 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
 def test_split_body_for_mtu_matches_smali_budget() -> None:
     """Body chunks honour the smali ``mtu - 60`` per-frame budget."""
     # Default MTU (247) → 187 bytes per chunk, matching the Android app.
-    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187  # noqa: PLR2004, S101
+    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187  # noqa: PLR2004
     body = b"a" * 400
     chunks = split_body_for_mtu(body, DEFAULT_BLE_MTU)
-    assert [len(c) for c in chunks] == [187, 187, 26]  # noqa: S101
-    assert b"".join(chunks) == body  # noqa: S101
+    assert [len(c) for c in chunks] == [187, 187, 26]
+    assert b"".join(chunks) == body
 
     # Empty body still emits one envelope so the writer can ship a header
     # for cmd=0 queries.
-    assert split_body_for_mtu(b"", DEFAULT_BLE_MTU) == [b""]  # noqa: S101
+    assert split_body_for_mtu(b"", DEFAULT_BLE_MTU) == [b""]
 
     # Tiny MTU honours the same formula (70 - 60 = 10 bytes/chunk).
-    assert split_body_for_mtu(b"abcdefghij", 70) == [b"abcdefghij"]  # noqa: S101
-    assert split_body_for_mtu(b"abcdefghij" * 3, 70) == [  # noqa: S101
+    assert split_body_for_mtu(b"abcdefghij", 70) == [b"abcdefghij"]
+    assert split_body_for_mtu(b"abcdefghij" * 3, 70) == [
         b"abcdefghij",
         b"abcdefghij",
         b"abcdefghij",
     ]
-    assert split_body_for_mtu(b"x" * 25, 70) == [b"x" * 10, b"x" * 10, b"x" * 5]  # noqa: S101
+    assert split_body_for_mtu(b"x" * 25, 70) == [b"x" * 10, b"x" * 10, b"x" * 5]
 
 
 def test_split_body_for_mtu_rejects_mtu_below_overhead() -> None:
@@ -2004,8 +2004,8 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
             *,
             response: bool,
         ) -> None:
-            assert uuid == BLE_WRITE_CHAR_UUID  # noqa: S101
-            assert response is False  # noqa: S101
+            assert uuid == BLE_WRITE_CHAR_UUID
+            assert response is False
             writes.append(bytes(blob))
 
     async def _run() -> None:
@@ -2033,20 +2033,20 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
             cmd=107,
             body=body,
         )
-        assert sent is True  # noqa: S101
+        assert sent is True
         # Two writes for 209 bytes at MTU 247 (187 + 22).
-        assert len(writes) == 2  # noqa: PLR2004, S101
+        assert len(writes) == 2  # noqa: PLR2004
         first = decrypt_binary_notify(writes[0], key)
         second = decrypt_binary_notify(writes[1], key)
-        assert first.frame_index == 1  # noqa: S101
-        assert first.chunk_count == 2  # noqa: PLR2004, S101
-        assert first.cmd == 107  # noqa: PLR2004, S101
-        assert len(first.body) == 187  # noqa: PLR2004, S101
-        assert second.frame_index == 2  # noqa: PLR2004, S101
-        assert second.chunk_count == 2  # noqa: PLR2004, S101
-        assert second.cmd == 107  # noqa: PLR2004, S101
-        assert second.body == body[187:]  # noqa: S101
-        assert first.body + second.body == body  # noqa: S101
+        assert first.frame_index == 1
+        assert first.chunk_count == 2  # noqa: PLR2004
+        assert first.cmd == 107  # noqa: PLR2004
+        assert len(first.body) == 187  # noqa: PLR2004
+        assert second.frame_index == 2  # noqa: PLR2004
+        assert second.chunk_count == 2  # noqa: PLR2004
+        assert second.cmd == 107  # noqa: PLR2004
+        assert second.body == body[187:]
+        assert first.body + second.body == body
 
     asyncio.run(_run())
 
@@ -2090,12 +2090,12 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
             body=body,
             mtu_override=70,
         )
-        assert sent is True  # noqa: S101
-        assert len(writes) == 3  # noqa: PLR2004, S101
+        assert sent is True
+        assert len(writes) == 3  # noqa: PLR2004
         parsed = [decrypt_binary_notify(w, key) for w in writes]
-        assert [p.frame_index for p in parsed] == [1, 2, 3]  # noqa: S101
-        assert all(p.chunk_count == 3 for p in parsed)  # noqa: PLR2004, S101
-        assert b"".join(p.body for p in parsed) == body  # noqa: S101
+        assert [p.frame_index for p in parsed] == [1, 2, 3]
+        assert all(p.chunk_count == 3 for p in parsed)  # noqa: PLR2004
+        assert b"".join(p.body for p in parsed) == body
 
     asyncio.run(_run())
 
@@ -2154,10 +2154,10 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     """An un-learnt device id surfaces the Android-app default MTU."""
     listener = _build_bare_listener()
     # type: ignore[attr-defined]
-    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU  # noqa: S101
+    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU
     listener._mtu["known"] = 120  # type: ignore[attr-defined]  # noqa: SLF001
     # type: ignore[attr-defined]
-    assert listener.mtu_for_device("known") == 120  # noqa: PLR2004, S101
+    assert listener.mtu_for_device("known") == 120  # noqa: PLR2004
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -2168,7 +2168,7 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
         mtu_size = 185
 
     listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]  # noqa: SLF001
-    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]  # noqa: PLR2004, S101
+    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]  # noqa: PLR2004
 
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
@@ -2185,9 +2185,9 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]  # noqa: SLF001
     # Both fall back to the default — the cache stays untouched.
     # type: ignore[attr-defined]
-    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU  # noqa: S101
+    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU
     # type: ignore[attr-defined]
-    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU  # noqa: S101
+    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU
 
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
@@ -2217,8 +2217,8 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         blob = encrypt_binary_notify(build_binary_frame(cmd=120, body=b"{}"), key)
         await listener._handle_notification("dev", blob)  # noqa: SLF001
 
-        assert stats.frames_decoded == 1  # noqa: S101
-        assert stats.last_error is None  # noqa: S101
+        assert stats.frames_decoded == 1
+        assert stats.last_error is None
 
     asyncio.run(_run())
 
@@ -2280,13 +2280,13 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             ack_timeout_sec=2.0,
         )
         sent, _ = await asyncio.gather(sender, _drive_ack_after_writes())
-        assert sent is True  # noqa: S101
-        assert len(writes) == 2  # noqa: PLR2004, S101
+        assert sent is True
+        assert len(writes) == 2  # noqa: PLR2004
         stats = listener.stats_for("dev")
-        assert stats.acks_received == 1  # noqa: S101
-        assert stats.acks_timed_out == 0  # noqa: S101
+        assert stats.acks_received == 1
+        assert stats.acks_timed_out == 0
         # No leftover pending ack — one notify cleared the registry.
-        assert listener._pending_acks == {}  # noqa: S101, SLF001
+        assert listener._pending_acks == {}  # noqa: SLF001
 
     asyncio.run(_run())
 
@@ -2323,14 +2323,14 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
         updated,
         body,
     )
-    assert touched is True  # noqa: S101
+    assert touched is True
     pack = updated["battery_packs"][0]
-    assert pack["inEgy"] == 5648  # noqa: PLR2004, S101
-    assert pack["outEgy"] == 5095  # noqa: PLR2004, S101
+    assert pack["inEgy"] == 5648  # noqa: PLR2004
+    assert pack["outEgy"] == 5095  # noqa: PLR2004
     # Existing fields preserved.
-    assert pack["batSoc"] == 53  # noqa: PLR2004, S101
-    assert pack["inPw"] == 0  # noqa: S101
-    assert pack["outPw"] == 200  # noqa: PLR2004, S101
+    assert pack["batSoc"] == 53  # noqa: PLR2004
+    assert pack["inPw"] == 0
+    assert pack["outPw"] == 200  # noqa: PLR2004
 
 
 def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
@@ -2361,15 +2361,15 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
         updated,
         body,
     )
-    assert touched is True  # noqa: S101
-    assert len(updated["battery_packs"]) == 2  # noqa: PLR2004, S101
+    assert touched is True
+    assert len(updated["battery_packs"]) == 2  # noqa: PLR2004
     pack = updated["battery_packs"][1]
-    assert pack["deviceSn"] == "DIFFERENT_PACK_SN"  # noqa: S101
-    assert pack["devType"] == 1  # noqa: S101
-    assert pack["subType"] == 0  # noqa: S101
-    assert pack["inEgy"] == 88  # noqa: PLR2004, S101
-    assert pack["outEgy"] == 99  # noqa: PLR2004, S101
-    assert "_last_seen_at" in pack  # noqa: S101
+    assert pack["deviceSn"] == "DIFFERENT_PACK_SN"
+    assert pack["devType"] == 1
+    assert pack["subType"] == 0
+    assert pack["inEgy"] == 88  # noqa: PLR2004
+    assert pack["outEgy"] == 99  # noqa: PLR2004
+    assert "_last_seen_at" in pack
 
 
 def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None:
@@ -2382,4 +2382,4 @@ def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None
         updated,
         body,
     )
-    assert touched is False  # noqa: S101
+    assert touched is False

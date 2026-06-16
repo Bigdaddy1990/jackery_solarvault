@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING, Any
 
 from custom_components.jackery_solarvault.const import (
     FIELD_CONTROL_ALLOWED,
-    FIELD_DEV_TYPE,
     FIELD_DEVICE_CODE,
+    FIELD_DEV_TYPE,
     FIELD_HOST,
     FIELD_ICON,
     FIELD_ICON_PATH,
-    FIELD_IN_PW,
     FIELD_INTEGRATOR_ENABLED,
+    FIELD_IN_PW,
     FIELD_IP,
     FIELD_IS_CLOUD,
     FIELD_ONLINE,

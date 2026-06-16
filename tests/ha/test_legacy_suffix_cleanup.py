@@ -42,7 +42,7 @@ class TestLegacySuffixMatches:
 
     def test_plain_digits_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Numeric head followed by _suffix must return True."""
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches(
                 "123456_today_battery_charge",
                 "_today_battery_charge",
@@ -52,11 +52,11 @@ class TestLegacySuffixMatches:
 
     def test_single_digit_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Single digit head with suffix must return True."""
-        assert _legacy_suffix_matches("1_battery_level", "_battery_level") is True  # noqa: S101
+        assert _legacy_suffix_matches("1_battery_level", "_battery_level") is True
 
     def test_many_digit_head_and_suffix(self) -> None:  # noqa: PLR6301
         """Long numeric head with suffix must return True."""
-        assert _legacy_suffix_matches("9999999999_online", "_online") is True  # noqa: S101
+        assert _legacy_suffix_matches("9999999999_online", "_online") is True
 
     # --- Positive matches: battery-pack head ---
 
@@ -65,14 +65,14 @@ class TestLegacySuffixMatches:
 
         True.
         """
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches("123_battery_pack_1_cell_voltage", "_cell_voltage")
             is True
         )
 
     def test_battery_pack_double_digit_index(self) -> None:  # noqa: PLR6301
         """Battery-pack head with two-digit index must match."""
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches("123456_battery_pack_12_charge", "_charge") is True
         )
 
@@ -82,7 +82,7 @@ class TestLegacySuffixMatches:
         """A suffix embedded in a longer current key must not match."""
         # "_today_battery_charge" is a legacy suffix; current key adds "device_" in
         # between
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches(
                 "123456_device_today_battery_charge",
                 "_today_battery_charge",
@@ -92,39 +92,39 @@ class TestLegacySuffixMatches:
 
     def test_does_not_match_when_head_has_non_digit_prefix(self) -> None:  # noqa: PLR6301
         """A non-numeric head prefix must not match."""
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches("abc_today_battery_charge", "_today_battery_charge")
             is False
         )
 
     def test_does_not_match_when_suffix_not_at_end(self) -> None:  # noqa: PLR6301
         """Suffix that is not at the end must not match."""
-        assert _legacy_suffix_matches("123_online_extra", "_online") is False  # noqa: S101
+        assert _legacy_suffix_matches("123_online_extra", "_online") is False
 
     def test_does_not_match_when_uid_is_only_suffix(self) -> None:  # noqa: PLR6301
         """UID equal to the suffix only (no head) must not match."""
-        assert (  # noqa: S101
+        assert (
             _legacy_suffix_matches("_today_battery_charge", "_today_battery_charge")
             is False
         )
 
     def test_does_not_match_when_head_has_trailing_non_digit(self) -> None:  # noqa: PLR6301
         """Head with trailing letters must not match."""
-        assert _legacy_suffix_matches("123abc_online", "_online") is False  # noqa: S101
+        assert _legacy_suffix_matches("123abc_online", "_online") is False
 
     # --- Edge cases for empty suffix ---
 
     def test_empty_suffix_matches_plain_numeric_uid(self) -> None:  # noqa: PLR6301
         """Empty suffix must return True if uid is a plain numeric string."""
-        assert _legacy_suffix_matches("123456", "") is True  # noqa: S101
+        assert _legacy_suffix_matches("123456", "") is True
 
     def test_empty_suffix_matches_battery_pack_uid(self) -> None:  # noqa: PLR6301
         """Empty suffix must return True if uid is a battery-pack head."""
-        assert _legacy_suffix_matches("123_battery_pack_1", "") is True  # noqa: S101
+        assert _legacy_suffix_matches("123_battery_pack_1", "") is True
 
     def test_empty_suffix_does_not_match_arbitrary_string(self) -> None:  # noqa: PLR6301
         """Empty suffix with non-head uid must return False."""
-        assert _legacy_suffix_matches("abc_something", "") is False  # noqa: S101
+        assert _legacy_suffix_matches("abc_something", "") is False
 
     # --- No false positives for common mismatches ---
 
@@ -133,7 +133,7 @@ class TestLegacySuffixMatches:
         # Current uid: <dev_id>_smart_plug_<sn>_switch_state
         # Legacy suffix: _switch_state would not be preceded by a plain digits head
         uid = "123456_smart_plug_sn001_switch_state"
-        assert _legacy_suffix_matches(uid, "_switch_state") is False  # noqa: S101
+        assert _legacy_suffix_matches(uid, "_switch_state") is False
 
     def test_regression_device_today_battery_charge(self) -> None:  # noqa: PLR6301
         """Regression: 'device_today_battery_charge' current uid must NOT match legacy.
@@ -143,17 +143,17 @@ class TestLegacySuffixMatches:
         # This is the exact regression that caused statistics gaps at a user site
         current_uid = "123456_device_today_battery_charge"
         legacy_suffix = "_today_battery_charge"
-        assert _legacy_suffix_matches(current_uid, legacy_suffix) is False  # noqa: S101
+        assert _legacy_suffix_matches(current_uid, legacy_suffix) is False
 
     def test_regression_legacy_today_battery_charge_does_match(self) -> None:  # noqa: PLR6301
         """Legacy uid '123456_today_battery_charge' must still be cleaned up."""
         legacy_uid = "123456_today_battery_charge"
         legacy_suffix = "_today_battery_charge"
-        assert _legacy_suffix_matches(legacy_uid, legacy_suffix) is True  # noqa: S101
+        assert _legacy_suffix_matches(legacy_uid, legacy_suffix) is True
 
     def test_no_match_when_head_is_empty(self) -> None:  # noqa: PLR6301
         """Head of empty string does not match the legacy head pattern."""
-        assert _legacy_suffix_matches("_online", "_online") is False  # noqa: S101
+        assert _legacy_suffix_matches("_online", "_online") is False
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ class TestAsyncCallIfPresent:
                 called.append("called")
 
         await _async_call_if_present(_Obj(), "my_method")
-        assert called == ["called"]  # noqa: S101
+        assert called == ["called"]
 
     async def test_calls_sync_method_when_present(self) -> None:  # noqa: PLR6301
         """Calls a non-async callable when it is present on obj."""
@@ -184,7 +184,7 @@ class TestAsyncCallIfPresent:
                 called.append("sync")
 
         await _async_call_if_present(_Obj(), "my_sync")
-        assert called == ["sync"]  # noqa: S101
+        assert called == ["sync"]
 
     async def test_does_nothing_when_attribute_absent(self) -> None:  # noqa: PLR6301
         """No error is raised when the named attribute does not exist."""
@@ -220,7 +220,7 @@ class TestAsyncCallIfPresent:
                 return _inner()
 
         await _async_call_if_present(_Obj(), "my_method")
-        assert awaited == [True]  # noqa: S101
+        assert awaited == [True]
 
     async def test_works_with_async_mock(self) -> None:  # noqa: PLR6301
         """Works when the method is an AsyncMock."""
@@ -255,7 +255,7 @@ class TestDeferCoordinatorAuthFailure:
         _defer_coordinator_auth_failure(coordinator, err)
 
         # The coordinator mock captures the attribute assignment
-        assert coordinator._mqtt_auth_failure_message == str(err)  # noqa: S101, SLF001
+        assert coordinator._mqtt_auth_failure_message == str(err)  # noqa: SLF001
 
     def test_message_matches_str_of_error(self) -> None:  # noqa: PLR6301
         """The message stored on the coordinator must equal str(err)."""
@@ -265,7 +265,7 @@ class TestDeferCoordinatorAuthFailure:
 
         _defer_coordinator_auth_failure(coordinator, err)
 
-        assert coordinator._mqtt_auth_failure_message == message  # noqa: S101, SLF001
+        assert coordinator._mqtt_auth_failure_message == message  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ class TestAsyncDiscoverWithCacheFallback:
         coordinator = MagicMock()
         coordinator.async_discover = AsyncMock()
         result = await _async_discover_with_cache_fallback(coordinator)
-        assert result is True  # noqa: S101
+        assert result is True
         coordinator.async_discover.assert_called_once()
 
     async def test_returns_false_on_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
@@ -292,7 +292,7 @@ class TestAsyncDiscoverWithCacheFallback:
 
         result = await _async_discover_with_cache_fallback(coordinator)
 
-        assert result is False  # noqa: S101
+        assert result is False
         coordinator._defer_background_auth_failure.assert_called_once_with(err)  # noqa: SLF001
 
     async def test_defers_auth_failure_on_config_entry_auth_failed(self) -> None:  # noqa: PLR6301
@@ -316,7 +316,7 @@ class TestAsyncDiscoverWithCacheFallback:
 
         result = await _async_discover_with_cache_fallback(coordinator)
 
-        assert result is True  # noqa: S101
+        assert result is True
 
     async def test_uses_cache_on_update_failed(self) -> None:  # noqa: PLR6301
         """Loads cached discovery snapshot when UpdateFailed and cache available."""
@@ -327,7 +327,7 @@ class TestAsyncDiscoverWithCacheFallback:
 
         result = await _async_discover_with_cache_fallback(coordinator)
 
-        assert result is True  # noqa: S101
+        assert result is True
         coordinator.async_set_updated_data.assert_called_once_with(cached)
 
     async def test_does_not_set_data_when_no_cache(self) -> None:  # noqa: PLR6301
@@ -478,7 +478,7 @@ class TestLoadDotenvIfPresent:
             key = "JACKERY_TEST_ABSENT_KEY_XYZ"
             os.environ.pop(key, None)
             await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) is None  # noqa: S101
+            assert os.environ.get(key) is None
 
     async def test_loads_jackery_env_var_from_env_file(self) -> None:  # noqa: PLR6301
         """JACKERY_* keys from .env must be added to os.environ."""
@@ -489,7 +489,7 @@ class TestLoadDotenvIfPresent:
                 env_file = Path(tmpdir) / ".env"
                 env_file.write_text(f"{key}=test_value_42\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) == "test_value_42"  # noqa: S101
+            assert os.environ.get(key) == "test_value_42"
         finally:
             os.environ.pop(key, None)
 
@@ -502,7 +502,7 @@ class TestLoadDotenvIfPresent:
                 env_file = Path(tmpdir) / ".env"
                 env_file.write_text(f"{key}=should_be_ignored\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) is None  # noqa: S101
+            assert os.environ.get(key) is None
         finally:
             os.environ.pop(key, None)
 
@@ -515,7 +515,7 @@ class TestLoadDotenvIfPresent:
                 env_file = Path(tmpdir) / ".env"
                 env_file.write_text(f"# {key}=not_set\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) is None  # noqa: S101
+            assert os.environ.get(key) is None
         finally:
             os.environ.pop(key, None)
 
@@ -541,8 +541,8 @@ class TestLoadDotenvIfPresent:
                     encoding="utf-8",
                 )
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key_single) == "single_quoted"  # noqa: S101
-            assert os.environ.get(key_double) == "double_quoted"  # noqa: S101
+            assert os.environ.get(key_single) == "single_quoted"
+            assert os.environ.get(key_double) == "double_quoted"
         finally:
             for k in (key_single, key_double):
                 os.environ.pop(k, None)
@@ -556,7 +556,7 @@ class TestLoadDotenvIfPresent:
                 env_file = Path(tmpdir) / ".env"
                 env_file.write_text(f"{key}=new_value\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) == "original_value"  # noqa: S101
+            assert os.environ.get(key) == "original_value"
         finally:
             os.environ.pop(key, None)
 
@@ -569,7 +569,7 @@ class TestLoadDotenvIfPresent:
                 env_file = Path(tmpdir) / ".env"
                 env_file.write_text(f"\n\n{key}=after_blank\n\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
-            assert os.environ.get(key) == "after_blank"  # noqa: S101
+            assert os.environ.get(key) == "after_blank"
         finally:
             os.environ.pop(key, None)
 
@@ -585,7 +585,7 @@ class TestLoadDotenvIfPresent:
                 env_file.write_text(content + "\n", encoding="utf-8")
                 await _load_dotenv_if_present(Path(tmpdir))
             for i, k in enumerate(keys):
-                assert os.environ.get(k) == f"value_{i}", f"Key {k} not loaded"  # noqa: S101
+                assert os.environ.get(k) == f"value_{i}", f"Key {k} not loaded"
         finally:
             for k in keys:
                 os.environ.pop(k, None)

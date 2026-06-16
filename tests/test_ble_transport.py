@@ -53,4 +53,4 @@ async def test_send_command_discards_pending_ack_when_cancelled() -> None:
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    assert listener._pending_acks == {}  # noqa: S101, SLF001
+    assert listener._pending_acks == {}  # noqa: SLF001

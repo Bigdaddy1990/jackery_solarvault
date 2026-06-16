@@ -91,7 +91,7 @@ def test_unique_id_contains_plug_key() -> None:
         plug_key=plug_key,
     )
 
-    assert sensor.unique_id == f"{dev_id}_{plug_key}_switch_state"  # noqa: S101
+    assert sensor.unique_id == f"{dev_id}_{plug_key}_switch_state"
 
 
 def test_unique_id_does_not_use_raw_index() -> None:
@@ -109,7 +109,7 @@ def test_unique_id_does_not_use_raw_index() -> None:
     )
 
     # Old format would be "999_smart_plug_1_switch_state" — must not exist.
-    assert sensor.unique_id != f"{dev_id}_smart_plug_{plug_index}_switch_state"  # noqa: S101
+    assert sensor.unique_id != f"{dev_id}_smart_plug_{plug_index}_switch_state"
 
 
 def test_unique_id_stable_across_index_changes() -> None:
@@ -137,8 +137,8 @@ def test_unique_id_stable_across_index_changes() -> None:
     # part.
     # The stable key for the same SN must be identical (index falls back only if SN is
     # empty).
-    assert plug_key_a == plug_key_b  # both use serial "STABLE-SN"  # noqa: S101
-    assert sensor_a.unique_id == sensor_b.unique_id  # noqa: S101
+    assert plug_key_a == plug_key_b  # both use serial "STABLE-SN"
+    assert sensor_a.unique_id == sensor_b.unique_id
 
 
 def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
@@ -146,7 +146,7 @@ def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
     plug_sn = "SN-KEY-TEST"
     plug_key = stable_subdevice_key("smart_plug", plug_sn, 1)
     sensor = _plug_sensor(plug_sn=plug_sn, plug_index=1, plug_key=plug_key)
-    assert sensor._plug_key == plug_key  # noqa: S101, SLF001
+    assert sensor._plug_key == plug_key  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -157,19 +157,19 @@ def test_plug_key_attribute_stored(self: None = None) -> None:  # noqa: PT028
 def test_is_on_returns_true_when_switch_state_is_1() -> None:
     """is_on is True when FIELD_SWITCH_STATE is 1."""
     sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 1}])
-    assert sensor.is_on is True  # noqa: S101
+    assert sensor.is_on is True
 
 
 def test_is_on_returns_false_when_switch_state_is_0() -> None:
     """is_on is False when FIELD_SWITCH_STATE is 0."""
     sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SWITCH_STATE: 0}])
-    assert sensor.is_on is False  # noqa: S101
+    assert sensor.is_on is False
 
 
 def test_is_on_falls_back_to_sys_switch_when_switch_state_absent() -> None:
     """is_on uses FIELD_SYS_SWITCH when FIELD_SWITCH_STATE is absent."""
     sensor = _plug_sensor(smart_plugs=[{"sn": "SN001", FIELD_SYS_SWITCH: 1}])
-    assert sensor.is_on is True  # noqa: S101
+    assert sensor.is_on is True
 
 
 def test_is_on_returns_none_when_no_state_fields() -> None:
@@ -177,7 +177,7 @@ def test_is_on_returns_none_when_no_state_fields() -> None:
     sensor = _plug_sensor(
         smart_plugs=[{"sn": "SN001"}],  # no state fields
     )
-    assert sensor.is_on is None  # noqa: S101
+    assert sensor.is_on is None
 
 
 def test_is_on_returns_none_when_plug_not_found() -> None:
@@ -186,7 +186,7 @@ def test_is_on_returns_none_when_plug_not_found() -> None:
         plug_sn="SN001",
         smart_plugs=[{"sn": "SN999", FIELD_SWITCH_STATE: 1}],  # different SN
     )
-    assert sensor.is_on is None  # noqa: S101
+    assert sensor.is_on is None
 
 
 # ---------------------------------------------------------------------------
@@ -198,8 +198,8 @@ def test_extra_state_attributes_always_contains_plug_index() -> None:
     """extra_state_attributes must always include the captured plug_index."""
     sensor = _plug_sensor(plug_index=2)
     attrs = sensor.extra_state_attributes
-    assert "plug_index" in attrs  # noqa: S101
-    assert attrs["plug_index"] == 2  # noqa: PLR2004, S101
+    assert "plug_index" in attrs
+    assert attrs["plug_index"] == 2  # noqa: PLR2004
 
 
 def test_extra_state_attributes_includes_device_name_when_present() -> None:
@@ -208,7 +208,7 @@ def test_extra_state_attributes_includes_device_name_when_present() -> None:
         smart_plugs=[{"sn": "SN001", FIELD_DEVICE_NAME: "Living Room Plug"}],
     )
     attrs = sensor.extra_state_attributes
-    assert attrs[FIELD_DEVICE_NAME] == "Living Room Plug"  # noqa: S101
+    assert attrs[FIELD_DEVICE_NAME] == "Living Room Plug"
 
 
 def test_extra_state_attributes_omits_absent_fields() -> None:
@@ -217,10 +217,10 @@ def test_extra_state_attributes_omits_absent_fields() -> None:
         smart_plugs=[{"sn": "SN001"}],  # Only sn, no diagnostic fields
     )
     attrs = sensor.extra_state_attributes
-    assert FIELD_SCAN_NAME not in attrs  # noqa: S101
-    assert FIELD_COMM_STATE not in attrs  # noqa: S101
-    assert FIELD_COMM_MODE not in attrs  # noqa: S101
-    assert FIELD_VERSION not in attrs  # noqa: S101
+    assert FIELD_SCAN_NAME not in attrs
+    assert FIELD_COMM_STATE not in attrs
+    assert FIELD_COMM_MODE not in attrs
+    assert FIELD_VERSION not in attrs
 
 
 def test_extra_state_attributes_includes_optional_diagnostic_fields() -> None:
@@ -239,12 +239,12 @@ def test_extra_state_attributes_includes_optional_diagnostic_fields() -> None:
         ],
     )
     attrs = sensor.extra_state_attributes
-    assert attrs[FIELD_SCAN_NAME] == "shellyplusplugs"  # noqa: S101
-    assert attrs[FIELD_COMM_STATE] == 1  # noqa: S101
-    assert attrs[FIELD_COMM_MODE] == 2  # noqa: PLR2004, S101
-    assert attrs[FIELD_SWITCH_STATE] == 1  # noqa: S101
-    assert attrs[FIELD_SYS_SWITCH] == 1  # noqa: S101
-    assert attrs[FIELD_VERSION] == "1.0.3"  # noqa: S101
+    assert attrs[FIELD_SCAN_NAME] == "shellyplusplugs"
+    assert attrs[FIELD_COMM_STATE] == 1
+    assert attrs[FIELD_COMM_MODE] == 2  # noqa: PLR2004
+    assert attrs[FIELD_SWITCH_STATE] == 1
+    assert attrs[FIELD_SYS_SWITCH] == 1
+    assert attrs[FIELD_VERSION] == "1.0.3"
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ def test_plug_lookup_by_serial_not_position() -> None:
         plug_key=plug_key,
     )
 
-    assert sensor.is_on is True  # noqa: S101
+    assert sensor.is_on is True
 
 
 def test_plug_lookup_returns_empty_dict_when_serial_not_found() -> None:
@@ -289,7 +289,7 @@ def test_plug_lookup_returns_empty_dict_when_serial_not_found() -> None:
         plug_key=plug_key,
     )
 
-    assert sensor._plug == {}  # noqa: S101, SLF001
+    assert sensor._plug == {}  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -300,13 +300,13 @@ def test_plug_lookup_returns_empty_dict_when_serial_not_found() -> None:
 def test_stable_subdevice_key_normalizes_serial_to_lowercase() -> None:
     """stable_subdevice_key normalises to lowercase."""
     key = stable_subdevice_key("smart_plug", "SN-ABC-001", 1)
-    assert key == key.lower()  # noqa: S101
+    assert key == key.lower()
 
 
 def test_stable_subdevice_key_uses_fallback_index_for_none_identity() -> None:
     """When identity is None, stable_subdevice_key falls back to the index."""
     key = stable_subdevice_key("smart_plug", None, 3)
-    assert "3" in key  # noqa: S101
+    assert "3" in key
 
 
 def test_stable_subdevice_key_uses_fallback_index_for_empty_identity() -> None:
@@ -315,24 +315,24 @@ def test_stable_subdevice_key_uses_fallback_index_for_empty_identity() -> None:
     index.
     """
     key = stable_subdevice_key("smart_plug", "", 5)
-    assert "5" in key  # noqa: S101
+    assert "5" in key
 
 
 def test_stable_subdevice_key_replaces_special_chars_with_underscore() -> None:
     """Non-alphanumeric characters in the identity are replaced with underscores."""
     key = stable_subdevice_key("smart_plug", "AB:CD:EF-01", 1)
-    assert ":" not in key  # noqa: S101
-    assert "-" not in key  # noqa: S101
+    assert ":" not in key
+    assert "-" not in key
 
 
 def test_stable_subdevice_key_is_deterministic() -> None:
     """Same inputs always produce the same key."""
     a = stable_subdevice_key("smart_plug", "SN123", 1)
     b = stable_subdevice_key("smart_plug", "SN123", 1)
-    assert a == b  # noqa: S101
+    assert a == b
 
 
 def test_stable_subdevice_key_includes_prefix() -> None:
     """The resulting key must start with the given prefix."""
     key = stable_subdevice_key("smart_plug", "SN123", 1)
-    assert key.startswith("smart_plug_")  # noqa: S101
+    assert key.startswith("smart_plug_")

@@ -56,8 +56,8 @@ async def test_emit_payload_debug_passes_dict_to_callback() -> None:
     event: dict[str, Any] = {"kind": "http", "path": "/v1/auth/login"}
     await api._emit_payload_debug(event)  # noqa: SLF001
 
-    assert len(received) == 1  # noqa: S101
-    assert received[0] is event  # noqa: S101
+    assert len(received) == 1
+    assert received[0] is event
 
 
 async def test_emit_payload_debug_passes_callable_to_callback() -> None:
@@ -78,9 +78,9 @@ async def test_emit_payload_debug_passes_callable_to_callback() -> None:
 
     await api._emit_payload_debug(factory)  # noqa: SLF001
 
-    assert len(received) == 1  # noqa: S101
-    assert received[0] == {"kind": "http", "path": "/v1/test"}  # noqa: S101
-    assert factory_called == [True]  # noqa: S101
+    assert len(received) == 1
+    assert received[0] == {"kind": "http", "path": "/v1/test"}
+    assert factory_called == [True]
 
 
 async def test_emit_payload_debug_suppresses_callback_exception() -> None:
@@ -109,7 +109,7 @@ async def test_emit_payload_debug_awaits_async_callback() -> None:
 
     await api._emit_payload_debug({"kind": "http", "path": "/v1/test"})  # noqa: SLF001
 
-    assert awaited == [True]  # noqa: S101
+    assert awaited == [True]
 
 
 async def test_emit_payload_debug_async_callback_exception_suppressed() -> None:
@@ -150,12 +150,12 @@ async def test_http_payload_debug_returns_dict_with_required_keys() -> None:  # 
         status=200,
         response={"code": 0, "data": {"foo": "bar"}},
     )
-    assert isinstance(result, dict)  # noqa: S101
-    assert result["kind"] == "http"  # noqa: S101
-    assert result["method"] == "GET"  # noqa: S101
-    assert result["path"] == "/v1/device/property"  # noqa: S101
-    assert result["status"] == 200  # noqa: PLR2004, S101
-    assert "response_data_type" in result  # noqa: S101
+    assert isinstance(result, dict)
+    assert result["kind"] == "http"
+    assert result["method"] == "GET"
+    assert result["path"] == "/v1/device/property"
+    assert result["status"] == 200  # noqa: PLR2004
+    assert "response_data_type" in result
 
 
 async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
@@ -181,10 +181,10 @@ async def test_http_payload_debug_pre_built_dict_received_by_callback() -> None:
     )
     await api._emit_payload_debug(event)  # noqa: SLF001
 
-    assert len(received) == 1  # noqa: S101
-    assert isinstance(received[0], dict)  # noqa: S101
-    assert received[0]["kind"] == "http"  # noqa: S101
-    assert received[0]["method"] == "POST"  # noqa: S101
+    assert len(received) == 1
+    assert isinstance(received[0], dict)
+    assert received[0]["kind"] == "http"
+    assert received[0]["method"] == "POST"
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ def test_decrypt_binary_notify_version_mismatch_does_not_raise() -> None:
     body = b'{"cmd":107}'
     blob = _make_tampered_notify(cmd=107, body=body, key=key)
     result = decrypt_binary_notify(blob, key)
-    assert isinstance(result, BleBinaryFrame)  # noqa: S101
+    assert isinstance(result, BleBinaryFrame)
 
 
 def test_decrypt_binary_notify_version_mismatch_returns_correct_cmd() -> None:
@@ -226,7 +226,7 @@ def test_decrypt_binary_notify_version_mismatch_returns_correct_cmd() -> None:
     body = b'{"cmd":121,"swEps":0}'
     blob = _make_tampered_notify(cmd=121, body=body, key=key)
     result = decrypt_binary_notify(blob, key)
-    assert result.cmd == 121  # noqa: PLR2004, S101
+    assert result.cmd == 121  # noqa: PLR2004
 
 
 def test_decrypt_binary_notify_version_mismatch_returns_correct_body() -> None:
@@ -235,7 +235,7 @@ def test_decrypt_binary_notify_version_mismatch_returns_correct_body() -> None:
     body = b'{"cmd":107,"batSoc":80}'
     blob = _make_tampered_notify(cmd=107, body=body, key=key)
     result = decrypt_binary_notify(blob, key)
-    assert result.body == body  # noqa: S101
+    assert result.body == body
 
 
 def test_decrypt_binary_notify_valid_version_still_succeeds() -> None:
@@ -247,8 +247,8 @@ def test_decrypt_binary_notify_valid_version_still_succeeds() -> None:
     ciphertext = aes_encrypt(plain, key, iv)
     blob = iv + ciphertext
     result = decrypt_binary_notify(blob, key)
-    assert result.cmd == 107  # noqa: PLR2004, S101
-    assert result.body == body  # noqa: S101
+    assert result.cmd == 107  # noqa: PLR2004
+    assert result.body == body
 
 
 def test_decrypt_binary_notify_version_mismatch_empty_body() -> None:
@@ -256,8 +256,8 @@ def test_decrypt_binary_notify_version_mismatch_empty_body() -> None:
     key = b"hr2c0hh361336138"
     blob = _make_tampered_notify(cmd=0, body=b"", key=key)
     result = decrypt_binary_notify(blob, key)
-    assert isinstance(result, BleBinaryFrame)  # noqa: S101
-    assert result.body == b""  # noqa: S101
+    assert isinstance(result, BleBinaryFrame)
+    assert result.body == b""
 
 
 # ---------------------------------------------------------------------------
@@ -284,15 +284,15 @@ def test_client_init_getattr_attribute_error_message_contains_name() -> None:
     """The AttributeError raised for an unknown name must include the name."""
     with pytest.raises(AttributeError) as exc_info:
         _ = client_pkg.DoesNotExist  # type: ignore[attr-defined]
-    assert "DoesNotExist" in str(exc_info.value)  # noqa: S101
+    assert "DoesNotExist" in str(exc_info.value)
 
 
 def test_client_init_direct_imports_work_without_getattr() -> None:
     """Public symbols must be importable directly without going through __getattr__."""
-    assert JackeryApi is not None  # noqa: S101
-    assert JackeryApiError is not None  # noqa: S101
-    assert JackeryAuthError is not None  # noqa: S101
-    assert JackeryError is not None  # noqa: S101
+    assert JackeryApi is not None
+    assert JackeryApiError is not None
+    assert JackeryAuthError is not None
+    assert JackeryError is not None
 
 
 def test_client_init_jackery_mqtt_push_client_via_getattr() -> None:
@@ -304,6 +304,6 @@ def test_client_init_jackery_mqtt_push_client_via_getattr() -> None:
     """
     try:
         cls = client_pkg.JackeryMqttPushClient
-        assert cls is not None  # noqa: S101
+        assert cls is not None
     except ImportError:
         pytest.skip("mqtt_push module not available in test environment")

@@ -39,7 +39,7 @@ def test_battery_pack_frame_is_routed() -> None:
         "inEgy": 45000,
         "outEgy": 38000,
     }
-    assert _should_route(payload), "battery-pack cmd=120 frame must be routed"  # noqa: S101
+    assert _should_route(payload), "battery-pack cmd=120 frame must be routed"
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ def test_system_level_frame_is_not_routed() -> None:
         "batChgEgy": 99140,
         "batDisChgEgy": 85590,
     }
-    assert not _should_route(payload), "system-level cmd=120 frame must NOT be routed"  # noqa: S101
+    assert not _should_route(payload), "system-level cmd=120 frame must NOT be routed"
 
 
 def test_per_device_non_pack_frame_is_not_routed() -> None:
@@ -76,7 +76,7 @@ def test_per_device_non_pack_frame_is_not_routed() -> None:
         "deviceSn": "MAIN_DEVICE_SN",
         "pvEgy": 350370,
     }
-    assert not _should_route(payload), "per-device non-pack cmd=120 must NOT be routed"  # noqa: S101
+    assert not _should_route(payload), "per-device non-pack cmd=120 must NOT be routed"
 
 
 def test_ct_phase_lifetime_frame_is_not_routed() -> None:
@@ -93,7 +93,7 @@ def test_ct_phase_lifetime_frame_is_not_routed() -> None:
         "aPhaseEgy": 29276,
         "tPhaseEgy": 29276,
     }
-    assert not _should_route(payload), "CT-phase cmd=120 frame must NOT be routed"  # noqa: S101
+    assert not _should_route(payload), "CT-phase cmd=120 frame must NOT be routed"
 
 
 def test_battery_pack_frame_without_sn_is_not_routed() -> None:
@@ -104,6 +104,6 @@ def test_battery_pack_frame_without_sn_is_not_routed() -> None:
         "inEgy": 45000,
         "outEgy": 38000,
     }
-    assert not _should_route(payload), (  # noqa: S101
+    assert not _should_route(payload), (
         "battery-pack frame with no SN must NOT be routed"
     )

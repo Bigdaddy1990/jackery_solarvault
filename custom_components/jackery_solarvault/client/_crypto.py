@@ -40,7 +40,7 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     # Jackery Layer A protocol requires ECB.
-    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305  # noqa: S305
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 

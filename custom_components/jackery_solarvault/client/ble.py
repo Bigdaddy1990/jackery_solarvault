@@ -376,7 +376,7 @@ def build_binary_frame(  # noqa: PLR0913
         + _BINARY_FRAME_PAYLOAD_MARKER_BE
         + len(body).to_bytes(2, "big")
     )
-    assert len(header) == _BINARY_FRAME_HEADER_LEN  # noqa: S101
+    assert len(header) == _BINARY_FRAME_HEADER_LEN
     return header + body + trailer
 
 

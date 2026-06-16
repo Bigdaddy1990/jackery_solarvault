@@ -130,7 +130,7 @@ def _make_local_mqtt_entry(  # noqa: PLR0913
 
 def test_local_mqtt_runtime_key_value() -> None:
     """The runtime key must be 'local_mqtt_client' exactly."""
-    assert _LOCAL_MQTT_RUNTIME_KEY == "local_mqtt_client"  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY == "local_mqtt_client"
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ def test_local_mqtt_client_returns_none_when_domain_absent() -> None:
     hass = _FakeHass()
     entry = _FakeEntry()
     result = _local_mqtt_client(hass, entry)
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_local_mqtt_client_returns_none_when_entry_bucket_absent() -> None:
@@ -152,7 +152,7 @@ def test_local_mqtt_client_returns_none_when_entry_bucket_absent() -> None:
     hass.data[DOMAIN] = {}
     entry = _FakeEntry()
     result = _local_mqtt_client(hass, entry)
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_local_mqtt_client_returns_none_when_bucket_is_not_dict() -> None:
@@ -161,7 +161,7 @@ def test_local_mqtt_client_returns_none_when_bucket_is_not_dict() -> None:
     entry = _FakeEntry(entry_id="eid1")
     hass.data[DOMAIN] = {"eid1": "not-a-dict"}
     result = _local_mqtt_client(hass, entry)
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_local_mqtt_client_returns_none_when_key_absent() -> None:
@@ -170,7 +170,7 @@ def test_local_mqtt_client_returns_none_when_key_absent() -> None:
     entry = _FakeEntry(entry_id="eid1")
     hass.data[DOMAIN] = {"eid1": {}}
     result = _local_mqtt_client(hass, entry)
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_local_mqtt_client_returns_none_when_value_is_not_client() -> None:
@@ -179,7 +179,7 @@ def test_local_mqtt_client_returns_none_when_value_is_not_client() -> None:
     entry = _FakeEntry(entry_id="eid1")
     hass.data[DOMAIN] = {"eid1": {_LOCAL_MQTT_RUNTIME_KEY: "wrong-type"}}
     result = _local_mqtt_client(hass, entry)
-    assert result is None  # noqa: S101
+    assert result is None
 
 
 def test_local_mqtt_client_returns_stored_client() -> None:
@@ -197,7 +197,7 @@ def test_local_mqtt_client_returns_stored_client() -> None:
     )
     hass.data[DOMAIN] = {"eid1": {_LOCAL_MQTT_RUNTIME_KEY: client}}
     result = _local_mqtt_client(hass, entry)
-    assert result is client  # noqa: S101
+    assert result is client
 
 
 # ---------------------------------------------------------------------------
@@ -213,11 +213,11 @@ async def test_async_start_local_mqtt_does_nothing_when_disabled() -> None:
     await _async_start_local_mqtt(hass, entry)
 
     # No client stored.
-    assert DOMAIN not in hass.data or not hass.data.get(DOMAIN, {}).get(  # noqa: S101
+    assert DOMAIN not in hass.data or not hass.data.get(DOMAIN, {}).get(
         entry.entry_id,
         {},
     ).get(_LOCAL_MQTT_RUNTIME_KEY)
-    assert not entry._unload_callbacks  # noqa: S101, SLF001
+    assert not entry._unload_callbacks  # noqa: SLF001
 
 
 async def test_async_start_local_mqtt_does_nothing_when_host_is_empty() -> None:
@@ -228,8 +228,8 @@ async def test_async_start_local_mqtt_does_nothing_when_host_is_empty() -> None:
     await _async_start_local_mqtt(hass, entry)
 
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket  # noqa: S101
-    assert not entry._unload_callbacks  # noqa: S101, SLF001
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
+    assert not entry._unload_callbacks  # noqa: SLF001
 
 
 async def test_async_start_local_mqtt_does_nothing_when_host_is_whitespace() -> None:
@@ -240,7 +240,7 @@ async def test_async_start_local_mqtt_does_nothing_when_host_is_whitespace() -> 
     await _async_start_local_mqtt(hass, entry)
 
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
 
 
 async def test_async_start_local_mqtt_does_nothing_when_topic_filter_is_empty() -> None:
@@ -255,7 +255,7 @@ async def test_async_start_local_mqtt_does_nothing_when_topic_filter_is_empty() 
     await _async_start_local_mqtt(hass, entry)
 
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
 
 
 async def test_async_start_local_mqtt_blocks_broad_wildcard_filter() -> None:
@@ -270,7 +270,7 @@ async def test_async_start_local_mqtt_blocks_broad_wildcard_filter() -> None:
     await _async_start_local_mqtt(hass, entry)
 
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
 
 
 async def test_async_start_local_mqtt_stores_client_in_hass_data() -> None:
@@ -294,8 +294,8 @@ async def test_async_start_local_mqtt_stores_client_in_hass_data() -> None:
     client = (
         hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get(_LOCAL_MQTT_RUNTIME_KEY)
     )
-    assert isinstance(client, JackeryLocalMqttClient)  # noqa: S101
-    assert started  # async_start was called  # noqa: S101
+    assert isinstance(client, JackeryLocalMqttClient)
+    assert started  # async_start was called
 
 
 async def test_async_start_local_mqtt_registers_unload_callback() -> None:
@@ -306,7 +306,7 @@ async def test_async_start_local_mqtt_registers_unload_callback() -> None:
     with patch.object(JackeryLocalMqttClient, "async_start", new_callable=AsyncMock):
         await _async_start_local_mqtt(hass, entry)
 
-    assert len(entry._unload_callbacks) == 1  # noqa: S101, SLF001
+    assert len(entry._unload_callbacks) == 1  # noqa: SLF001
 
 
 async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client() -> (
@@ -321,7 +321,7 @@ async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client()
 
     # Verify client is stored.
     bucket = hass.data[DOMAIN][entry.entry_id]
-    assert _LOCAL_MQTT_RUNTIME_KEY in bucket  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY in bucket
 
     # Run the unload callback.
     stop_called: list[bool] = []
@@ -334,9 +334,9 @@ async def test_async_start_local_mqtt_unload_callback_stops_and_removes_client()
         callback = entry._unload_callbacks[0]  # noqa: SLF001
         await callback()
 
-    assert stop_called  # stop was called  # noqa: S101
+    assert stop_called  # stop was called
     # Key must be removed from bucket.
-    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
 
 
 async def test_async_start_local_mqtt_unload_does_not_fail_when_stop_raises() -> None:
@@ -383,7 +383,7 @@ async def test_async_start_local_mqtt_unload_does_not_remove_different_client() 
         await callback()
 
     # The new (different) client must NOT be removed.
-    assert bucket.get(_LOCAL_MQTT_RUNTIME_KEY) is new_client  # noqa: S101
+    assert bucket.get(_LOCAL_MQTT_RUNTIME_KEY) is new_client
 
 
 async def test_async_start_local_mqtt_client_id_uses_entry_id_prefix() -> None:
@@ -396,7 +396,7 @@ async def test_async_start_local_mqtt_client_id_uses_entry_id_prefix() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._client_id == f"ha-jackery-{entry_id[:8]}"  # noqa: S101, SLF001
+    assert client._client_id == f"ha-jackery-{entry_id[:8]}"  # noqa: SLF001
 
 
 async def test_async_start_local_mqtt_passes_topic_filter_to_client() -> None:
@@ -412,7 +412,7 @@ async def test_async_start_local_mqtt_passes_topic_filter_to_client() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._topic_filter == "hb/app/+/device"  # noqa: S101, SLF001
+    assert client._topic_filter == "hb/app/+/device"  # noqa: SLF001
 
 
 async def test_async_start_local_mqtt_second_call_is_idempotent() -> None:
@@ -431,4 +431,4 @@ async def test_async_start_local_mqtt_second_call_is_idempotent() -> None:
         await _async_start_local_mqtt(hass, entry)
 
     # Each call registers one unload callback.
-    assert len(entry._unload_callbacks) == 2  # noqa: PLR2004, S101, SLF001
+    assert len(entry._unload_callbacks) == 2  # noqa: PLR2004, SLF001

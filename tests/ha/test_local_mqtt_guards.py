@@ -48,27 +48,27 @@ class TestBlockedLocalMqttTopicFilters:
 
     def test_contains_hash(self) -> None:  # noqa: PLR6301
         """The blocked set must contain '#'."""
-        assert "#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+        assert "#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
     def test_contains_plus_hash(self) -> None:  # noqa: PLR6301
         """The blocked set must contain '+/#'."""
-        assert "+/#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+        assert "+/#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
     def test_is_frozenset(self) -> None:  # noqa: PLR6301
         """_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS must be a frozenset."""
-        assert isinstance(_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS, frozenset)  # noqa: S101
+        assert isinstance(_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS, frozenset)
 
     def test_scoped_filter_is_not_blocked(self) -> None:  # noqa: PLR6301
         """A scoped topic filter like 'jackery/#' must NOT be in the blocked set."""
-        assert "jackery/#" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
-        assert "home/devices/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+        assert "jackery/#" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
+        assert "home/devices/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
     def test_empty_string_is_not_in_blocked_set(self) -> None:  # noqa: PLR6301
         """Empty string must not be blocked (it is handled separately by emptiness.
 
         check).
         """
-        assert "" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+        assert "" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-abc"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_returns_none_when_entry_id_not_in_hass_data(self) -> None:  # noqa: PLR6301
         """When the entry_id key is absent from hass.data[DOMAIN], must return None."""
@@ -97,7 +97,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-xyz"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_returns_none_when_bucket_is_not_dict(self) -> None:  # noqa: PLR6301
         """When the bucket is not a dict (e.g. a string), must return None."""
@@ -107,7 +107,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-abc"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_returns_none_when_local_mqtt_key_absent(self) -> None:  # noqa: PLR6301
         """When the bucket dict has no 'local_mqtt_client' key, must return None."""
@@ -117,7 +117,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-abc"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_returns_none_when_stored_value_is_wrong_type(self) -> None:  # noqa: PLR6301
         """When the stored value is not a JackeryLocalMqttClient, must return None."""
@@ -129,7 +129,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-abc"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_returns_client_when_stored_correctly(self) -> None:  # noqa: PLR6301
         """When a JackeryLocalMqttClient is stored, must return it."""
@@ -142,7 +142,7 @@ class TestLocalMqttClient:
         entry.entry_id = "entry-abc"
 
         result = _local_mqtt_client(hass, entry)
-        assert result is mock_client  # noqa: S101
+        assert result is mock_client
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ class TestAsyncStartLocalMqttGuards:
             ):
                 await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
-        assert "blocked" in caplog.text.lower() or "CPU safety" in caplog.text  # noqa: S101
+        assert "blocked" in caplog.text.lower() or "CPU safety" in caplog.text
 
     async def test_skips_and_warns_when_topic_filter_is_plus_hash(  # noqa: PLR6301
         self,
@@ -309,7 +309,7 @@ class TestAsyncStartLocalMqttGuards:
             ):
                 await _async_start_local_mqtt(hass, entry, coordinator)
             mock_cls.assert_not_called()
-        assert "blocked" in caplog.text.lower() or "+/#" in caplog.text  # noqa: S101
+        assert "blocked" in caplog.text.lower() or "+/#" in caplog.text
 
     async def test_starts_client_when_all_conditions_met(self) -> None:  # noqa: PLR6301
         """When all conditions are met with a scoped topic filter, the client is.
@@ -368,7 +368,7 @@ class TestAsyncStartLocalMqttGuards:
         # Client should be stored in hass.data[DOMAIN][entry_id]
         domain_data = hass.data.get(DOMAIN, {})
         entry_data = domain_data.get("entry-12345", {})
-        assert entry_data.get(_LOCAL_MQTT_RUNTIME_KEY) is mock_client  # noqa: S101
+        assert entry_data.get(_LOCAL_MQTT_RUNTIME_KEY) is mock_client
 
     async def test_unload_callback_registered(self) -> None:  # noqa: PLR6301
         """entry.async_on_unload must be called to register the stop callback."""
@@ -442,7 +442,7 @@ class TestLocalMqttSink:
         ):
             await _async_start_local_mqtt(hass, entry, coordinator)
 
-        assert captured_sink is not None  # noqa: S101
+        assert captured_sink is not None
         # Simulate a message arriving
         test_data = {"pv_power": 1000}
         await captured_sink("jackery/data/device1", test_data, b"raw")
@@ -524,8 +524,8 @@ class TestRsaPkcs1V15Encrypt:
 
         result = _rsa_pkcs1v15_encrypt(b"test payload", b64_key)
         # RSA-2048 PKCS#1 v1.5 output must be 256 bytes
-        assert len(result) == 256  # noqa: PLR2004, S101
-        assert isinstance(result, bytes)  # noqa: S101
+        assert len(result) == 256  # noqa: PLR2004
+        assert isinstance(result, bytes)
 
     def test_error_message_includes_actual_key_type(self) -> None:  # noqa: PLR6301
         """TypeError message must mention the actual key type found."""
@@ -536,7 +536,7 @@ class TestRsaPkcs1V15Encrypt:
         with pytest.raises(TypeError) as exc_info:
             _rsa_pkcs1v15_encrypt(b"data", b64_key)
         # The error message should mention the actual type
-        assert (  # noqa: S101
+        assert (
             "EllipticCurve" in str(exc_info.value)
             or "EC" in str(exc_info.value)
             or "got" in str(exc_info.value)
@@ -554,38 +554,38 @@ class TestGenerateUdid:
     def test_output_starts_with_mqtt_mac_id_prefix(self) -> None:  # noqa: PLR6301
         """The generated UDID must start with MQTT_MAC_ID_PREFIX."""
         result = _generate_udid("test@example.com")
-        assert result.startswith(MQTT_MAC_ID_PREFIX)  # noqa: S101
+        assert result.startswith(MQTT_MAC_ID_PREFIX)
 
     def test_output_is_deterministic(self) -> None:  # noqa: PLR6301
         """Same seed must produce the same UDID."""
         result1 = _generate_udid("user@example.com")
         result2 = _generate_udid("user@example.com")
-        assert result1 == result2  # noqa: S101
+        assert result1 == result2
 
     def test_different_seeds_produce_different_udids(self) -> None:  # noqa: PLR6301
         """Different seeds must produce different UDIDs."""
         result1 = _generate_udid("user1@example.com")
         result2 = _generate_udid("user2@example.com")
-        assert result1 != result2  # noqa: S101
+        assert result1 != result2
 
     def test_output_has_expected_length(self) -> None:  # noqa: PLR6301
         """MQTT_MAC_ID_PREFIX (1 char) + 32 hex chars UUID = 33 chars total."""
         result = _generate_udid("seed")
         prefix_len = len(MQTT_MAC_ID_PREFIX)
         # Total length = prefix + 32 UUID chars (UUID with dashes removed)
-        assert len(result) == prefix_len + 32  # noqa: S101
+        assert len(result) == prefix_len + 32
 
     def test_output_contains_no_dashes(self) -> None:  # noqa: PLR6301
         """The UUID portion must have no dashes."""
         result = _generate_udid("some_account")
         uuid_part = result[len(MQTT_MAC_ID_PREFIX) :]
-        assert "-" not in uuid_part  # noqa: S101
+        assert "-" not in uuid_part
 
     def test_output_is_lowercase_hex_after_prefix(self) -> None:  # noqa: PLR6301
         """The UUID portion (after prefix) must be lowercase hexadecimal."""
         result = _generate_udid("test_seed")
         uuid_part = result[len(MQTT_MAC_ID_PREFIX) :]
-        assert re.fullmatch(r"[0-9a-f]{32}", uuid_part), (  # noqa: S101
+        assert re.fullmatch(r"[0-9a-f]{32}", uuid_part), (
             f"UUID part '{uuid_part}' is not lowercase hex"
         )
 
@@ -597,14 +597,14 @@ class TestGenerateUdid:
 
 def test_blocked_filters_does_not_block_scoped_mqtt_topic() -> None:
     """A deep scoped topic like 'jackery/SV3/12345/+/state' must not be blocked."""
-    assert "jackery/SV3/12345/+/state" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+    assert "jackery/SV3/12345/+/state" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 def test_blocked_filters_are_exactly_two_entries() -> None:
     """The blocked filters set must have exactly 2 entries: '#' and '+/#'."""
-    assert len(_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS) == 2  # noqa: PLR2004, S101
+    assert len(_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS) == 2  # noqa: PLR2004
 
 
 def test_local_mqtt_runtime_key_is_expected_string() -> None:
     """_LOCAL_MQTT_RUNTIME_KEY must equal 'local_mqtt_client'."""
-    assert _LOCAL_MQTT_RUNTIME_KEY == "local_mqtt_client"  # noqa: S101
+    assert _LOCAL_MQTT_RUNTIME_KEY == "local_mqtt_client"

@@ -11,24 +11,21 @@ are:
 from __future__ import annotations
 
 import ast
-import sys
 from dataclasses import fields
 from pathlib import Path
-
-import pytest
+import sys
 
 # ---------------------------------------------------------------------------
 # Import the module under test (no file I/O at module level for this script)
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from REFACTORSLOP._loss_audit import (  # noqa: E402
+from REFACTORSLOP._loss_audit import (
     ModuleInfo,
     SymbolInfo,
     _count_stmts,
     collect_tree,
     extract,
 )
-
 
 # ---------------------------------------------------------------------------
 # SymbolInfo dataclass

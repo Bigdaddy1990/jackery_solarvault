@@ -51,7 +51,7 @@ def test_enforce_coverage_gates_accepts_perfect_line_and_branch(tmp_path: Path) 
     coverage_xml = tmp_path / "coverage.xml"
     _write_xml(coverage_xml)
 
-    assert not enforce_coverage_gates(  # noqa: S101
+    assert not enforce_coverage_gates(
         coverage_xml=coverage_xml,
         total_minimum=Decimal(85),
         legacy_module_minimum=Decimal(90),
@@ -71,7 +71,7 @@ def test_enforce_coverage_gates_requires_branch_coverage(tmp_path: Path) -> None
         perfect_module_minimum=Decimal(100),
     )
 
-    assert (  # noqa: S101
+    assert (
         "coverage XML missing total branch-rate; run pytest with --cov-branch"
         in failures
     )

@@ -13,22 +13,22 @@ from pytest_homeassistant_custom_component.common import (
 def test_load_fixture() -> None:
     """Test load_fixture can load fixture file."""
     data = json.loads(load_fixture("test_data.json"))
-    assert data == {"test_key": "test_value"}  # noqa: S101
+    assert data == {"test_key": "test_value"}
 
 
 def test_load_json_value_fixture() -> None:
     """Test load_json_value_fixture can load fixture file."""
     data = load_json_value_fixture("test_data.json")
-    assert data == {"test_key": "test_value"}  # noqa: S101
+    assert data == {"test_key": "test_value"}
 
 
 def test_load_json_array_fixture() -> None:
     """Test load_json_array_fixture can load fixture file."""
     data = load_json_array_fixture("test_array.json")
-    assert data == [{"test_key1": "test_value1"}, {"test_key2": "test_value2"}]  # noqa: S101
+    assert data == [{"test_key1": "test_value1"}, {"test_key2": "test_value2"}]
 
 
 def test_load_json_object_fixture() -> None:
     """Test load_json_object_fixture can load fixture file."""
     data = load_json_object_fixture("test_data.json")
-    assert data == {"test_key": "test_value"}  # noqa: S101
+    assert data == {"test_key": "test_value"}

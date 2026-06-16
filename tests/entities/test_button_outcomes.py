@@ -73,7 +73,7 @@ class TestDeleteStormAlertButtonAvailable:
         coordinator = _make_mock_coordinator("dev1", {})
         btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="ghost-id")
         # _alert returns {} because no weather_plan exists → bool({}) is False
-        assert btn.available is False  # noqa: S101
+        assert btn.available is False
 
     def test_available_is_false_when_weather_plan_is_empty(  # noqa: PLR6301
         self,
@@ -86,7 +86,7 @@ class TestDeleteStormAlertButtonAvailable:
             "dev1",
             alert_id="missing-alert",
         )
-        assert btn.available is False  # noqa: S101
+        assert btn.available is False
 
     def test_available_is_false_when_alert_id_not_in_storm_list(  # noqa: PLR6301
         self,
@@ -103,7 +103,7 @@ class TestDeleteStormAlertButtonAvailable:
             "dev1",
             alert_id="target-alert",
         )
-        assert btn.available is False  # noqa: S101
+        assert btn.available is False
 
     def test_available_is_true_when_alert_exists_and_coordinator_healthy(  # noqa: PLR6301
         self,
@@ -124,7 +124,7 @@ class TestDeleteStormAlertButtonAvailable:
         # (set to True in _make_mock_coordinator) then available must be True.
         # We cannot easily call super().available in isolation but can assert the
         # _alert property is non-empty and that available is not unconditionally False.
-        assert btn._alert != {}  # noqa: S101, SLF001
+        assert btn._alert != {}  # noqa: SLF001
 
     def test_available_alert_is_removed_when_storm_cleared(  # noqa: PLR6301
         self,
@@ -138,12 +138,12 @@ class TestDeleteStormAlertButtonAvailable:
         coordinator = _make_mock_coordinator("dev1", payload)
         btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="temp-alert")
         # Alert is present → _alert is non-empty
-        assert btn._alert != {}  # noqa: S101, SLF001
+        assert btn._alert != {}  # noqa: SLF001
 
         # Now clear the storm list (simulates coordinator refresh removing the alert)
         coordinator.data["dev1"]["weather_plan"]["storm"] = []
-        assert btn._alert == {}  # noqa: S101, SLF001
-        assert btn.available is False  # noqa: S101
+        assert btn._alert == {}  # noqa: SLF001
+        assert btn.available is False
 
 
 # ---------------------------------------------------------------------------
@@ -177,8 +177,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
         # Must be the exact same error, not a wrapped copy
-        assert exc_info.value is translated_err  # noqa: S101
-        assert exc_info.value.translation_key == "reboot_not_supported"  # noqa: S101
+        assert exc_info.value is translated_err
+        assert exc_info.value.translation_key == "reboot_not_supported"
 
     async def test_refresh_weather_plan_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
@@ -198,8 +198,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         btn = JackeryRefreshWeatherPlanButton(coordinator, "12345")
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
-        assert exc_info.value is translated_err  # noqa: S101
-        assert exc_info.value.translation_key == "weather_plan_unavailable"  # noqa: S101
+        assert exc_info.value is translated_err
+        assert exc_info.value.translation_key == "weather_plan_unavailable"
 
     async def test_read_schedule_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
@@ -226,8 +226,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         )
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
-        assert exc_info.value is translated_err  # noqa: S101
-        assert exc_info.value.translation_key == "schedule_read_failed"  # noqa: S101
+        assert exc_info.value is translated_err
+        assert exc_info.value.translation_key == "schedule_read_failed"
 
     async def test_delete_storm_alert_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
@@ -247,8 +247,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         btn = JackeryDeleteStormAlertButton(coordinator, "12345", alert_id="my-alert")
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
-        assert exc_info.value is translated_err  # noqa: S101
-        assert exc_info.value.translation_key == "alert_already_deleted"  # noqa: S101
+        assert exc_info.value is translated_err
+        assert exc_info.value.translation_key == "alert_already_deleted"
 
     async def test_query_button_reraises_translated_ha_error(  # noqa: PLR6301
         self,
@@ -278,8 +278,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         btn = JackeryQueryButton(coordinator, "dev1", description=desc)
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
-        assert exc_info.value is translated_err  # noqa: S101
-        assert exc_info.value.translation_key == "mqtt_send_failed"  # noqa: S101
+        assert exc_info.value is translated_err
+        assert exc_info.value.translation_key == "mqtt_send_failed"
 
     async def test_untranslated_ha_error_is_wrapped_by_reboot_button(  # noqa: PLR6301
         self,
@@ -294,8 +294,8 @@ class TestTranslatedHomeAssistantErrorReRaise:
         with pytest.raises(HomeAssistantError) as exc_info:
             await btn.async_press()
         # Must be a NEW wrapped error with entity_action_failed key
-        assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
-        assert exc_info.value is not untranslated_err  # noqa: S101
+        assert exc_info.value.translation_key == "entity_action_failed"
+        assert exc_info.value is not untranslated_err
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ class TestAsyncSetup:
             "custom_components.jackery_solarvault.async_setup_services",
         ) as mock_services:
             result = await async_setup(hass, {})
-        assert result is True  # noqa: S101
+        assert result is True
         mock_services.assert_called_once_with(hass)
 
     async def test_async_setup_calls_services_setup(self) -> None:  # noqa: PLR6301
@@ -325,8 +325,8 @@ class TestAsyncSetup:
             side_effect=calls.append,
         ):
             await async_setup(hass, {})
-        assert len(calls) == 1  # noqa: S101
-        assert calls[0] is hass  # noqa: S101
+        assert len(calls) == 1
+        assert calls[0] is hass
 
 
 # ---------------------------------------------------------------------------
@@ -341,13 +341,13 @@ def test_query_button_descriptions_count_is_28() -> None:
     This test pins the count so that accidental additions or deletions are caught
     immediately.
     """
-    assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004, S101
+    assert len(QUERY_BUTTON_DESCRIPTIONS) == 28  # noqa: PLR2004
 
 
 def test_query_button_descriptions_unique_action_ids() -> None:
     """Every description must have a unique action_id."""
     action_ids = [desc.action_id for desc in QUERY_BUTTON_DESCRIPTIONS]
-    assert len(action_ids) == len(set(action_ids)), "Duplicate action_id found"  # noqa: S101
+    assert len(action_ids) == len(set(action_ids)), "Duplicate action_id found"
 
 
 def test_query_button_descriptions_unique_cmds() -> None:
@@ -357,7 +357,7 @@ def test_query_button_descriptions_unique_cmds() -> None:
         desc for desc in QUERY_BUTTON_DESCRIPTIONS if desc.dev_type is None
     ]
     cmds = [desc.cmd for desc in non_subdevice]
-    assert len(cmds) == len(set(cmds)), "Duplicate cmd among non-subdevice descriptions"  # noqa: S101
+    assert len(cmds) == len(set(cmds)), "Duplicate cmd among non-subdevice descriptions"
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ def test_query_button_has_config_entity_category() -> None:
     )
     coordinator = _make_mock_coordinator("dev1")
     btn = JackeryQueryButton(coordinator, "dev1", description=desc)
-    assert btn._attr_entity_category is EntityCategory.CONFIG  # noqa: S101, SLF001
+    assert btn._attr_entity_category is EntityCategory.CONFIG  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -390,19 +390,19 @@ def test_storm_alert_id_zero_integer_is_valid_boundary() -> None:
     """Integer 0 alertId must return '0' (0 is not in {None, ''})."""
     # 0 is falsy but NOT in {None, ""}, so it must be returned as "0".
     result = _storm_alert_id({"alertId": 0})
-    assert result == "0"  # noqa: S101
+    assert result == "0"
 
 
 def test_storm_alert_id_false_boolean_is_valid_boundary() -> None:
     """Boolean False alertId must return 'False' (not in {None, ''})."""
     result = _storm_alert_id({"alertId": False})
-    assert result == "False"  # noqa: S101
+    assert result == "False"
 
 
 def test_storm_alert_id_non_empty_string_returned_as_is() -> None:
     """A simple string alertId must be returned unchanged."""
     result = _storm_alert_id({"alertId": "storm-2026-001"})
-    assert result == "storm-2026-001"  # noqa: S101
+    assert result == "storm-2026-001"
 
 
 # ---------------------------------------------------------------------------
@@ -413,7 +413,7 @@ def test_storm_alert_id_non_empty_string_returned_as_is() -> None:
 def test_legacy_suffix_matches_digits_only_head_with_underscore_prefix_suffix() -> None:
     """A digits-only head followed by a suffix starting with '_' must match."""
     # head = "99999", suffix = "_today_battery_charge" → must match
-    assert (  # noqa: S101
+    assert (
         _legacy_suffix_matches("99999_today_battery_charge", "_today_battery_charge")
         is True
     )
@@ -421,13 +421,13 @@ def test_legacy_suffix_matches_digits_only_head_with_underscore_prefix_suffix() 
 
 def test_legacy_suffix_matches_rejects_head_with_leading_letter() -> None:
     """Head containing a leading letter must not match (not a pure-digit head)."""
-    assert _legacy_suffix_matches("A12345_battery_soc", "_battery_soc") is False  # noqa: S101
+    assert _legacy_suffix_matches("A12345_battery_soc", "_battery_soc") is False
 
 
 def test_legacy_suffix_matches_rejects_battery_pack_missing_trailing_digits() -> None:
     """battery_pack head without index digits must not match."""
     # "12345_battery_pack_" — no index after last underscore
-    assert _legacy_suffix_matches("12345_battery_pack__voltage", "_voltage") is False  # noqa: S101
+    assert _legacy_suffix_matches("12345_battery_pack__voltage", "_voltage") is False
 
 
 def test_legacy_suffix_matches_prevents_current_entity_deletion_regression() -> None:
@@ -440,7 +440,7 @@ def test_legacy_suffix_matches_prevents_current_entity_deletion_regression() -> 
     uid = "12345_device_today_battery_charge"
     legacy_suffix = "_today_battery_charge"
     # head = "12345_device" → NOT a pure-digits head → must return False
-    assert _legacy_suffix_matches(uid, legacy_suffix) is False  # noqa: S101
+    assert _legacy_suffix_matches(uid, legacy_suffix) is False
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +462,7 @@ async def test_async_unload_entry_returns_false_when_unload_platforms_fails() ->
 
     result = await async_unload_entry(hass, entry)
 
-    assert result is False  # noqa: S101
+    assert result is False
 
 
 async def test_async_unload_entry_returns_true_when_platforms_unloaded() -> None:
@@ -481,7 +481,7 @@ async def test_async_unload_entry_returns_true_when_platforms_unloaded() -> None
     ):
         result = await async_unload_entry(hass, entry)
 
-    assert result is True  # noqa: S101
+    assert result is True
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +501,7 @@ def test_delete_storm_alert_button_available_with_integer_zero_alert_id() -> Non
     # The button must be constructed with alert_id="0" (str(0))
     btn = JackeryDeleteStormAlertButton(coordinator, "dev1", alert_id="0")
     # _alert must find the alert (since _storm_alert_id({alertId: 0}) == "0")
-    assert btn._alert != {}  # noqa: S101, SLF001
+    assert btn._alert != {}  # noqa: SLF001
 
 
 # ---------------------------------------------------------------------------
@@ -511,17 +511,17 @@ def test_delete_storm_alert_button_available_with_integer_zero_alert_id() -> Non
 
 def test_blocked_topic_filters_hash_symbol_membership() -> None:
     """'#' must be in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS."""
-    assert "#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+    assert "#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 def test_blocked_topic_filters_plus_hash_membership() -> None:
     """'+/#' must be in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS."""
-    assert "+/#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+    assert "+/#" in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 def test_blocked_topic_filters_scoped_topic_not_blocked() -> None:
     """'hb/app/+/status' must NOT be in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS."""
-    assert "hb/app/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: S101
+    assert "hb/app/+/status" not in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 # ---------------------------------------------------------------------------
@@ -550,5 +550,5 @@ async def test_read_schedule_button_wraps_untranslated_ha_error() -> None:
     with pytest.raises(HomeAssistantError) as exc_info:
         await btn.async_press()
     # Must be wrapped with entity_action_failed key
-    assert exc_info.value.translation_key == "entity_action_failed"  # noqa: S101
-    assert exc_info.value is not plain_err  # noqa: S101
+    assert exc_info.value.translation_key == "entity_action_failed"
+    assert exc_info.value is not plain_err

@@ -5,10 +5,10 @@ from typing import Any
 
 from custom_components.jackery_solarvault.const import (
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
-    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
     FIELD_MAC,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
@@ -88,10 +88,10 @@ def test_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info["name"] == "Discovery Name"  # noqa: S101
-    assert info["model"] == "Pro Model"  # noqa: S101
-    assert info["serial_number"] == "SN1"  # noqa: S101
-    assert info["sw_version"] is None  # noqa: S101
+    assert info["name"] == "Discovery Name"
+    assert info["model"] == "Pro Model"
+    assert info["serial_number"] == "SN1"
+    assert info["sw_version"] is None
 
 
 def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
@@ -116,10 +116,10 @@ def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
         },
     )
 
-    assert info["name"] == "Main Name Plug A"  # noqa: S101
-    assert info["model"] == "Socket Model"  # noqa: S101
-    assert info["serial_number"] == "SN2"  # noqa: S101
-    assert info["sw_version"] == "1.2.3"  # noqa: S101
+    assert info["name"] == "Main Name Plug A"
+    assert info["model"] == "Socket Model"
+    assert info["serial_number"] == "SN2"
+    assert info["sw_version"] == "1.2.3"
 
 
 def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
@@ -146,10 +146,10 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info["name"] == "Main Name Zusatzbatterie 1"  # noqa: S101
-    assert info["model"] == "Battery Model"  # noqa: S101
-    assert info["serial_number"] == "Pack SN"  # noqa: S101
-    assert info["sw_version"] == "2.3.4"  # noqa: S101
+    assert info["name"] == "Main Name Zusatzbatterie 1"
+    assert info["model"] == "Battery Model"
+    assert info["serial_number"] == "Pack SN"
+    assert info["sw_version"] == "2.3.4"
 
 
 def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
@@ -177,10 +177,10 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info["name"] == "Main Name Meter A"  # noqa: S101
-    assert info["model"] == "Meter Model"  # noqa: S101
-    assert info["serial_number"] == "Meter SN"  # noqa: S101
-    assert info["sw_version"] == "3.4.5"  # noqa: S101
+    assert info["name"] == "Main Name Meter A"
+    assert info["model"] == "Meter Model"
+    assert info["serial_number"] == "Meter SN"
+    assert info["sw_version"] == "3.4.5"
 
 
 def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
@@ -200,6 +200,6 @@ def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info["name"] == "Main Name Smart Meter"  # noqa: S101
-    assert info["model"] == "Smart Meter"  # noqa: S101
-    assert info["serial_number"] == "Meter MAC"  # noqa: S101
+    assert info["name"] == "Main Name Smart Meter"
+    assert info["model"] == "Smart Meter"
+    assert info["serial_number"] == "Meter MAC"

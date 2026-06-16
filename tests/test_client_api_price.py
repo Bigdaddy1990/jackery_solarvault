@@ -43,13 +43,13 @@ async def test_set_single_mode_formats_numeric_price() -> None:
 
     api._post_form = fake_post_form  # type: ignore[method-assign]  # noqa: SLF001
 
-    assert await api.async_set_single_mode(  # noqa: S101
+    assert await api.async_set_single_mode(
         system_id=123,
         single_price="0.28000",
         currency=" EUR ",
     )
 
-    assert calls == [  # noqa: S101
+    assert calls == [
         (
             SAVE_SINGLE_MODE_PATH,
             {
@@ -173,7 +173,7 @@ async def test_login_rejection_does_not_update_last_success_response() -> None:
     with pytest.raises(JackeryAuthError):
         await api.async_login()
 
-    assert api.last_login_response is None  # noqa: S101
+    assert api.last_login_response is None
 
 
 @pytest.mark.asyncio()
@@ -201,9 +201,9 @@ async def test_get_json_rejects_unparseable_success_body() -> None:
             return _Response()
 
     api = JackeryApi(cast("aiohttp.ClientSession", _Session()), "account", "password")
-    api._token = "token"  # noqa: S105, SLF001
+    api._token = "token"  # noqa: SLF001
 
     with pytest.raises(JackeryApiError, match="returned invalid JSON"):
         await api.async_get_device_property("123")
 
-    assert api.last_property_responses == {}  # noqa: S101
+    assert api.last_property_responses == {}

@@ -33,29 +33,29 @@ class TestWarnings:
     def test_warnings_no_args_returns_empty_dict(self) -> None:  # noqa: PLR6301
         """warnings() with no arguments should return an empty dict."""
         result = yaml.warnings()
-        assert result == {}  # noqa: S101
-        assert isinstance(result, dict)  # noqa: S101
+        assert result == {}
+        assert isinstance(result, dict)
 
     def test_warnings_none_arg_returns_empty_dict(self) -> None:  # noqa: PLR6301
         """warnings(None) is equivalent to no-arg call and returns an empty dict."""
         result = yaml.warnings(None)
-        assert result == {}  # noqa: S101
+        assert result == {}
 
     def test_warnings_with_dict_arg_returns_none(self) -> None:  # noqa: PLR6301
         """warnings({...}) should return None (no-op for non-None settings)."""
         result = yaml.warnings({"CheckUTF8": True})
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_warnings_with_empty_dict_arg_returns_none(self) -> None:  # noqa: PLR6301
         """warnings({}) — empty dict is not None, so should return None."""
         result = yaml.warnings({})
-        assert result is None  # noqa: S101
+        assert result is None
 
     def test_warnings_with_falsy_nonempty_arg_returns_none(self) -> None:  # noqa: PLR6301
         """Any non-None value for settings, including 0 or False, returns None."""
-        assert yaml.warnings(0) is None  # noqa: S101
-        assert yaml.warnings(False) is None  # noqa: S101
-        assert yaml.warnings("") is None  # noqa: S101
+        assert yaml.warnings(0) is None
+        assert yaml.warnings(False) is None
+        assert yaml.warnings("") is None
 
 
 # ---------------------------------------------------------------------------
@@ -74,13 +74,13 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, constructor_fn, Loader=None)
 
-        assert tag in _loader.Loader.yaml_constructors  # noqa: S101
-        assert tag in _loader.FullLoader.yaml_constructors  # noqa: S101
-        assert tag in _loader.UnsafeLoader.yaml_constructors  # noqa: S101
+        assert tag in _loader.Loader.yaml_constructors
+        assert tag in _loader.FullLoader.yaml_constructors
+        assert tag in _loader.UnsafeLoader.yaml_constructors
 
         # Functional check: loading a node with this tag returns the sentinel
-        result = yaml.load(f"{tag} value", Loader=_loader.Loader)  # noqa: S506
-        assert result is sentinel  # noqa: S101
+        result = yaml.load(f"{tag} value", Loader=_loader.Loader)
+        assert result is sentinel
 
     def test_add_constructor_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
         self,
@@ -99,10 +99,10 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, constructor_fn, Loader=IsolatedLoader)
 
-        assert tag in IsolatedLoader.yaml_constructors  # noqa: S101
-        assert tag not in _loader.Loader.yaml_constructors  # noqa: S101
-        assert tag not in _loader.FullLoader.yaml_constructors  # noqa: S101
-        assert tag not in _loader.UnsafeLoader.yaml_constructors  # noqa: S101
+        assert tag in IsolatedLoader.yaml_constructors
+        assert tag not in _loader.Loader.yaml_constructors
+        assert tag not in _loader.FullLoader.yaml_constructors
+        assert tag not in _loader.UnsafeLoader.yaml_constructors
 
     def test_add_constructor_loader_none_functional_round_trip(self) -> None:  # noqa: PLR6301
         """Constructor registered with Loader=None is invoked when loading."""
@@ -114,8 +114,8 @@ class TestAddConstructor:
 
         yaml.add_constructor(tag, my_constructor, Loader=None)
 
-        result = yaml.load(f"{tag} anything", Loader=_loader.Loader)  # noqa: S506
-        assert result is expected  # noqa: S101
+        result = yaml.load(f"{tag} anything", Loader=_loader.Loader)
+        assert result is expected
 
     def test_add_constructor_specific_loader_end_to_end(self) -> None:  # noqa: PLR6301
         """Constructor registered on a specific loader subclass is invoked correctly."""
@@ -128,8 +128,8 @@ class TestAddConstructor:
         yaml.add_constructor(tag, lambda loader, node: return_value, Loader=MyLoader)
 
         # Custom loader API is under test.
-        result = yaml.load(f"{tag} whatever", Loader=MyLoader)  # nosec B506  # noqa: S506
-        assert result is return_value  # noqa: S101
+        result = yaml.load(f"{tag} whatever", Loader=MyLoader)  # nosec B506
+        assert result is return_value
 
 
 # ---------------------------------------------------------------------------
@@ -147,9 +147,9 @@ class TestAddMultiConstructor:
 
         yaml.add_multi_constructor(prefix, multi_fn, Loader=None)
 
-        assert prefix in _loader.Loader.yaml_multi_constructors  # noqa: S101
-        assert prefix in _loader.FullLoader.yaml_multi_constructors  # noqa: S101
-        assert prefix in _loader.UnsafeLoader.yaml_multi_constructors  # noqa: S101
+        assert prefix in _loader.Loader.yaml_multi_constructors
+        assert prefix in _loader.FullLoader.yaml_multi_constructors
+        assert prefix in _loader.UnsafeLoader.yaml_multi_constructors
 
     def test_add_multi_constructor_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
         self,
@@ -163,10 +163,10 @@ class TestAddMultiConstructor:
         multi_fn = lambda loader, suffix, node: suffix  # noqa: E731
         yaml.add_multi_constructor(prefix, multi_fn, Loader=IsolatedLoader)
 
-        assert prefix in IsolatedLoader.yaml_multi_constructors  # noqa: S101
-        assert prefix not in _loader.Loader.yaml_multi_constructors  # noqa: S101
-        assert prefix not in _loader.FullLoader.yaml_multi_constructors  # noqa: S101
-        assert prefix not in _loader.UnsafeLoader.yaml_multi_constructors  # noqa: S101
+        assert prefix in IsolatedLoader.yaml_multi_constructors
+        assert prefix not in _loader.Loader.yaml_multi_constructors
+        assert prefix not in _loader.FullLoader.yaml_multi_constructors
+        assert prefix not in _loader.UnsafeLoader.yaml_multi_constructors
 
     def test_add_multi_constructor_functional_with_default_loaders(self) -> None:  # noqa: PLR6301
         """Multi-constructor registered with Loader=None is invoked during load."""
@@ -178,9 +178,9 @@ class TestAddMultiConstructor:
             return f"value:{suffix}"
 
         yaml.add_multi_constructor(prefix, multi_fn, Loader=None)
-        result = yaml.load(f"{prefix}mysuffix value", Loader=_loader.Loader)  # noqa: S506
-        assert "mysuffix" in results  # noqa: S101
-        assert result == "value:mysuffix"  # noqa: S101
+        result = yaml.load(f"{prefix}mysuffix value", Loader=_loader.Loader)
+        assert "mysuffix" in results
+        assert result == "value:mysuffix"
 
 
 # ---------------------------------------------------------------------------
@@ -203,14 +203,14 @@ class TestAddImplicitResolver:
         for loader_cls in (_loader.Loader, _loader.FullLoader, _loader.UnsafeLoader):
             resolvers_for_underscore = loader_cls.yaml_implicit_resolvers.get("_", [])
             tags_for_underscore = [t for t, _ in resolvers_for_underscore]
-            assert tag in tags_for_underscore, (  # noqa: S101
+            assert tag in tags_for_underscore, (
                 f"Expected tag '{tag}' in"
                 f" {loader_cls.__name__}.yaml_implicit_resolvers['_']"
             )
 
         # Also check Dumper
         dumper_resolvers = yaml.Dumper.yaml_implicit_resolvers.get("_", [])
-        assert tag in [t for t, _ in dumper_resolvers]  # noqa: S101
+        assert tag in [t for t, _ in dumper_resolvers]
 
     def test_add_implicit_resolver_with_specific_loader_only_registers_on_that_loader(  # noqa: PLR6301
         self,
@@ -226,7 +226,7 @@ class TestAddImplicitResolver:
 
         # Should be on IsolatedLoader
         wildcard_resolvers = IsolatedLoader.yaml_implicit_resolvers.get(None, [])
-        assert tag in [t for t, _ in wildcard_resolvers]  # noqa: S101
+        assert tag in [t for t, _ in wildcard_resolvers]
 
         loader_wildcard = _loader.Loader.yaml_implicit_resolvers.get(None, [])
         full_loader_wildcard = _loader.FullLoader.yaml_implicit_resolvers.get(None, [])
@@ -234,9 +234,9 @@ class TestAddImplicitResolver:
             None,
             [],
         )  # noqa: E501, RUF100
-        assert tag not in [t for t, _ in loader_wildcard]  # noqa: S101
-        assert tag not in [t for t, _ in full_loader_wildcard]  # noqa: S101
-        assert tag not in [t for t, _ in unsafe_loader_wildcard]  # noqa: S101
+        assert tag not in [t for t, _ in loader_wildcard]
+        assert tag not in [t for t, _ in full_loader_wildcard]
+        assert tag not in [t for t, _ in unsafe_loader_wildcard]
 
     def test_add_implicit_resolver_with_first_none_registers_under_wildcard_key(  # noqa: PLR6301
         self,
@@ -252,7 +252,7 @@ class TestAddImplicitResolver:
 
         # first=None means "wildcard" → stored under key None
         wildcard_resolvers = IsolatedLoader.yaml_implicit_resolvers.get(None, [])
-        assert tag in [t for t, _ in wildcard_resolvers]  # noqa: S101
+        assert tag in [t for t, _ in wildcard_resolvers]
 
 
 # ---------------------------------------------------------------------------
@@ -294,8 +294,8 @@ class TestAddRepresenter:
 
         obj = MyTaggedType("hello")
         result = yaml.dump(obj, Dumper=IsolatedDumper)
-        assert "!mytaggedtype" in result  # noqa: S101
-        assert "hello" in result  # noqa: S101
+        assert "!mytaggedtype" in result
+        assert "hello" in result
 
     def test_add_multi_representer_registers_on_specified_dumper(self) -> None:  # noqa: PLR6301
         """add_multi_representer registers the callable on the given Dumper class."""
@@ -312,7 +312,7 @@ class TestAddRepresenter:
         yaml.add_multi_representer(BaseType, multi_rep, Dumper=IsolatedDumper)
 
         # Verify registration
-        assert BaseType in IsolatedDumper.yaml_multi_representers  # noqa: S101
+        assert BaseType in IsolatedDumper.yaml_multi_representers
 
     def test_add_representer_called_via_module_level_api(self) -> None:  # noqa: PLR6301
         """add_representer correctly forwards the call to Dumper.add_representer."""
@@ -329,7 +329,7 @@ class TestAddRepresenter:
                 super().add_representer(data_type, representer)
 
         yaml.add_representer(AnotherType, lambda d, v: None, Dumper=TrackedDumper)
-        assert AnotherType in TrackedDumper.registered  # noqa: S101
+        assert AnotherType in TrackedDumper.registered
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +356,7 @@ class TestConstructYamlBinary:
         sc = self._make_safe_constructor()
 
         result = sc.construct_yaml_binary(node)
-        assert result == raw  # noqa: S101
+        assert result == raw
 
     def test_valid_base64_empty_bytes(self) -> None:
         """construct_yaml_binary handles base64-encoded empty bytes."""
@@ -364,7 +364,7 @@ class TestConstructYamlBinary:
         sc = self._make_safe_constructor()
 
         result = sc.construct_yaml_binary(node)
-        assert result == b""  # noqa: S101
+        assert result == b""
 
     def test_valid_base64_binary_data(self) -> None:
         """construct_yaml_binary decodes arbitrary binary (non-ASCII) data correctly."""
@@ -374,7 +374,7 @@ class TestConstructYamlBinary:
         sc = self._make_safe_constructor()
 
         result = sc.construct_yaml_binary(node)
-        assert result == raw  # noqa: S101
+        assert result == raw
 
     def test_non_ascii_scalar_raises_constructor_error(self) -> None:
         """construct_yaml_binary raises ConstructorError for non-ASCII scalar input."""
@@ -403,12 +403,12 @@ class TestConstructYamlBinary:
         yaml_src = f"!!binary '{b64}'"
 
         result = yaml.safe_load(yaml_src)
-        assert result == raw  # noqa: S101
+        assert result == raw
 
     def test_construct_yaml_binary_uses_decodebytes_directly(self) -> None:  # noqa: PLR6301
         """Regression: construct_yaml_binary calls decodebytes without a hasattr guard."""  # noqa: E501
         source = inspect.getsource(SafeConstructor.construct_yaml_binary)
-        assert "decodebytes" in source  # noqa: S101
+        assert "decodebytes" in source
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ class TestConstructPythonBytes:
         fc = self._make_full_constructor()
 
         result = fc.construct_python_bytes(node)
-        assert result == raw  # noqa: S101
+        assert result == raw
 
     def test_valid_base64_empty_value(self) -> None:
         """construct_python_bytes handles base64 encoding of empty bytes."""
@@ -443,7 +443,7 @@ class TestConstructPythonBytes:
         fc = self._make_full_constructor()
 
         result = fc.construct_python_bytes(node)
-        assert result == b""  # noqa: S101
+        assert result == b""
 
     def test_non_ascii_raises_constructor_error(self) -> None:
         """construct_python_bytes raises ConstructorError for non-ASCII scalar content."""  # noqa: E501
@@ -473,12 +473,12 @@ class TestConstructPythonBytes:
         fc = self._make_full_constructor()
 
         result = fc.construct_python_bytes(node)
-        assert result == raw  # noqa: S101
+        assert result == raw
 
     def test_construct_python_bytes_uses_decodebytes_directly(self) -> None:  # noqa: PLR6301
         """Regression: construct_python_bytes calls decodebytes without a hasattr guard."""  # noqa: E501
         source = inspect.getsource(FullConstructor.construct_python_bytes)
-        assert "decodebytes" in source  # noqa: S101
+        assert "decodebytes" in source
 
 
 # ---------------------------------------------------------------------------
@@ -507,13 +507,13 @@ class TestYAMLObjectMetaclass:
                 self.x = x
 
         # Constructor should be registered on IsolatedLoader
-        assert (  # noqa: S101
+        assert (
             "!test_metaclass_registration_unique_3c1a"
             in IsolatedLoader.yaml_constructors
         )
 
         # Representer should be registered on IsolatedDumper
-        assert MyYAMLObj in IsolatedDumper.yaml_representers  # noqa: S101
+        assert MyYAMLObj in IsolatedDumper.yaml_representers
 
     def test_class_without_yaml_tag_does_not_register(self) -> None:  # noqa: PLR6301
         """A YAMLObject subclass with yaml_tag=None does not register anything."""
@@ -531,7 +531,7 @@ class TestYAMLObjectMetaclass:
 
         # Should not have any new tag registered
         # (the class's yaml_tag is None, so no registration should occur)
-        assert None not in IsolatedLoader.yaml_constructors or (  # noqa: S101
+        assert None not in IsolatedLoader.yaml_constructors or (
             IsolatedLoader.yaml_constructors.get(None) != MyUntaggedObj.from_yaml
         )
 
@@ -549,12 +549,12 @@ class TestYAMLObjectMetaclass:
 
         p = Point(1.5, 2.5)
         serialized = yaml.dump(p)
-        assert "!test_point_metaclass_unique_7f4b" in serialized  # noqa: S101
+        assert "!test_point_metaclass_unique_7f4b" in serialized
 
-        loaded = yaml.load(serialized, Loader=yaml.Loader)  # noqa: S506
-        assert isinstance(loaded, Point)  # noqa: S101
-        assert loaded.x == pytest.approx(1.5)  # noqa: S101
-        assert loaded.y == pytest.approx(2.5)  # noqa: S101
+        loaded = yaml.load(serialized, Loader=yaml.Loader)
+        assert isinstance(loaded, Point)
+        assert loaded.x == pytest.approx(1.5)
+        assert loaded.y == pytest.approx(2.5)
 
     def test_yaml_object_with_list_of_loaders_registers_on_each(self) -> None:  # noqa: PLR6301
         """When yaml_loader is a list, metaclass registers from_yaml on every loader."""
@@ -572,8 +572,8 @@ class TestYAMLObjectMetaclass:
             yaml_loader = [LoaderA, LoaderB]  # noqa: RUF012
             yaml_dumper = yaml.Dumper
 
-        assert tag in LoaderA.yaml_constructors  # noqa: S101
-        assert tag in LoaderB.yaml_constructors  # noqa: S101
+        assert tag in LoaderA.yaml_constructors
+        assert tag in LoaderB.yaml_constructors
 
 
 # ---------------------------------------------------------------------------
@@ -599,13 +599,13 @@ class TestAddPathResolver:
         # yaml_path_resolvers maps (path_tuple, kind) -> tag_string
         for loader_cls in (_loader.Loader, _loader.FullLoader, _loader.UnsafeLoader):
             found = tag in loader_cls.yaml_path_resolvers.values()
-            assert found, (  # noqa: S101
+            assert found, (
                 f"Expected path resolver tag '{tag}' in"
                 f" {loader_cls.__name__}.yaml_path_resolvers values"
             )
 
         # Also check Dumper
-        assert tag in yaml.Dumper.yaml_path_resolvers.values()  # noqa: S101
+        assert tag in yaml.Dumper.yaml_path_resolvers.values()
 
     def test_add_path_resolver_specific_loader_registers_only_on_that_loader(  # noqa: PLR6301
         self,
@@ -619,7 +619,7 @@ class TestAddPathResolver:
 
         yaml.add_path_resolver(tag, path, Loader=IsolatedLoader)
 
-        assert tag in IsolatedLoader.yaml_path_resolvers.values()  # noqa: S101
-        assert tag not in _loader.Loader.yaml_path_resolvers.values()  # noqa: S101
-        assert tag not in _loader.FullLoader.yaml_path_resolvers.values()  # noqa: S101
-        assert tag not in _loader.UnsafeLoader.yaml_path_resolvers.values()  # noqa: S101
+        assert tag in IsolatedLoader.yaml_path_resolvers.values()
+        assert tag not in _loader.Loader.yaml_path_resolvers.values()
+        assert tag not in _loader.FullLoader.yaml_path_resolvers.values()
+        assert tag not in _loader.UnsafeLoader.yaml_path_resolvers.values()

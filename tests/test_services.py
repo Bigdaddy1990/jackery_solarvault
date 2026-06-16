@@ -4,11 +4,6 @@ from dataclasses import dataclass
 import sys
 from typing import TYPE_CHECKING, ClassVar, cast
 
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    HomeAssistantError,
-    ServiceValidationError,
-)
 import pytest
 import voluptuous as vol
 
@@ -32,6 +27,11 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_TOKEN,
     SERVICE_FIELD_USERNAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
+)
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
 )
 
 if TYPE_CHECKING:
@@ -161,15 +161,15 @@ def test_resolve_jackery_device_id_follows_subdevice_parent(
 
     monkeypatch.setattr(services.dr, "async_get", lambda _hass: registry)
 
-    assert (  # noqa: S101
+    assert (
         services._resolve_jackery_device_id(_hass(), "smart-plug-ha-id")  # noqa: SLF001
         == "573702884982521856"
     )
-    assert (  # noqa: S101
+    assert (
         services._resolve_jackery_device_id(_hass(), "solarvault-ha-id")  # noqa: SLF001
         == "573702884982521856"
     )
-    assert (  # noqa: S101
+    assert (
         services._resolve_jackery_device_id(_hass(), "573702884982521856")  # noqa: SLF001
         == "573702884982521856"
     )
@@ -195,9 +195,9 @@ async def test_rename_service_rejects_false_api_result(
             }),
         )
 
-    assert err.value.translation_key == "rename_system_failed"  # noqa: S101
-    assert coordinator.api.calls == [("123", "SolarVault")]  # noqa: S101
-    assert coordinator.refreshed is False  # noqa: S101
+    assert err.value.translation_key == "rename_system_failed"
+    assert coordinator.api.calls == [("123", "SolarVault")]
+    assert coordinator.refreshed is False
 
 
 async def test_rename_service_reauth_on_auth_error(
@@ -350,8 +350,8 @@ async def test_rename_service_rejects_direct_invalid_system_id(
             }),
         )
 
-    assert err.value.translation_key == "rename_system_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "rename_system_failed"
+    assert err.value.translation_placeholders == {
         "system_id": expected_system_id,
         "error": expected_error,
     }
@@ -386,13 +386,13 @@ async def test_rename_service_rejects_direct_invalid_new_name(
             }),
         )
 
-    assert err.value.translation_key == "rename_system_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "rename_system_failed"
+    assert err.value.translation_placeholders == {
         "system_id": "123",
         "error": expected_error,
     }
-    assert coordinator.api.calls == []  # noqa: S101
-    assert coordinator.refreshed is False  # noqa: S101
+    assert coordinator.api.calls == []
+    assert coordinator.refreshed is False
 
 
 async def test_refresh_weather_plan_service_translates_home_assistant_error(
@@ -433,8 +433,8 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
             _call({SERVICE_FIELD_DEVICE_ID: "dev1"}),
         )
 
-    assert err.value.translation_key == "refresh_weather_plan_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "refresh_weather_plan_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "MQTT command failed for dev1",
     }
@@ -473,8 +473,8 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
             _call({SERVICE_FIELD_DEVICE_ID: device_id}),
         )
 
-    assert err.value.translation_key == "refresh_weather_plan_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "refresh_weather_plan_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "",
         "error": expected_error,
     }
@@ -516,8 +516,8 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
             }),
         )
 
-    assert err.value.translation_key == "delete_storm_alert_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "delete_storm_alert_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "alert_id": "",
         "error": "alert_id must not be empty",
@@ -580,7 +580,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
         }),
     )
 
-    assert coordinator.calls == [  # noqa: S101
+    assert coordinator.calls == [
         {
             "device_id": "dev1",
             "enable": False,
@@ -649,7 +649,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
         }),
     )
 
-    assert coordinator.calls == [  # noqa: S101
+    assert coordinator.calls == [
         {
             "device_id": "dev1",
             "enable": True,
@@ -703,8 +703,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
             }),
         )
 
-    assert err.value.translation_key == "set_third_party_mqtt_config_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "username must be text",
     }
@@ -743,8 +743,8 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
             }),
         )
 
-    assert err.value.translation_key == "set_third_party_mqtt_config_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "enable must be a boolean",
     }
@@ -798,8 +798,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
             }),
         )
 
-    assert err.value.translation_key == "set_third_party_mqtt_config_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": expected_error,
     }
@@ -879,8 +879,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
             }),
         )
 
-    assert err.value.translation_key == "set_third_party_mqtt_config_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "ip must not be empty",
     }
@@ -915,8 +915,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
             }),
         )
 
-    assert err.value.translation_key == "set_third_party_mqtt_config_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "set_third_party_mqtt_config_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "token must be at most 512 characters",
     }
@@ -989,7 +989,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
         }),
     )
 
-    assert coordinator.calls[0]["wait_for_ack"] is False  # noqa: S101
+    assert coordinator.calls[0]["wait_for_ack"] is False
 
 
 async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
@@ -1030,8 +1030,8 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
             }),
         )
 
-    assert err.value.translation_key == "send_ble_command_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "send_ble_command_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "wait_for_ack must be a boolean",
     }
@@ -1102,8 +1102,8 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
             }),
         )
 
-    assert err.value.translation_key == "send_ble_command_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "send_ble_command_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": expected_error,
     }
@@ -1164,8 +1164,8 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
             _call({SERVICE_FIELD_DEVICE_ID: "dev1", **call_data}),
         )
 
-    assert err.value.translation_key == "send_ble_command_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "send_ble_command_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": expected_error,
     }
@@ -1209,8 +1209,8 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
             }),
         )
 
-    assert err.value.translation_key == "send_ble_command_failed"  # noqa: S101
-    assert err.value.translation_placeholders == {  # noqa: S101
+    assert err.value.translation_key == "send_ble_command_failed"
+    assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "ack_timeout must be a number",
     }

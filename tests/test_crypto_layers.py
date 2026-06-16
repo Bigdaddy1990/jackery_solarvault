@@ -33,7 +33,7 @@ def _pkcs7_unpad(padded: bytes) -> bytes:
 
 
 def _aes_ecb_decrypt(ciphertext: bytes, key: bytes) -> bytes:
-    decryptor = Cipher(algorithms.AES(key), modes.ECB()).decryptor()  # nosec B305  # noqa: S305
+    decryptor = Cipher(algorithms.AES(key), modes.ECB()).decryptor()  # nosec B305
     return decryptor.update(ciphertext) + decryptor.finalize()
 
 
@@ -62,15 +62,15 @@ def test_layer_a_login_crypto_matches_app_fixed_vector() -> None:
         "/ZpRrelbQDPFvXwSvRSVuq0VDtRXdQe/fXnowEZjUyWCLX+ZSNXoCdzJNCsDtWYe"
         "1+yG1kbsxi4p49b+bdq49g=="
     )
-    assert fields["aesEncryptData"] == expected  # noqa: S101
+    assert fields["aesEncryptData"] == expected
     plaintext = _pkcs7_unpad(
         _aes_ecb_decrypt(base64.b64decode(fields["aesEncryptData"]), aes_key),
     )
-    assert json.loads(plaintext.decode("utf-8")) == login_bean  # noqa: S101
-    assert base64.b64decode(fields["rsaForAesKey"])  # noqa: S101
+    assert json.loads(plaintext.decode("utf-8")) == login_bean
+    assert base64.b64decode(fields["rsaForAesKey"])
 
     injected_fields = build_login_crypto_fields(login_bean, aes_key=aes_key)
-    assert injected_fields["aesEncryptData"] == expected  # noqa: S101
+    assert injected_fields["aesEncryptData"] == expected
 
 
 def test_layer_a_login_key_uses_injectable_random_source() -> None:
@@ -81,8 +81,8 @@ def test_layer_a_login_key_uses_injectable_random_source() -> None:
         calls.append(length)
         return bytes(range(length))
 
-    assert generate_login_aes_key(fake_random) == base64.b64encode(bytes(range(16)))  # noqa: S101
-    assert calls == [16]  # noqa: S101
+    assert generate_login_aes_key(fake_random) == base64.b64encode(bytes(range(16)))
+    assert calls == [16]
 
 
 def test_layer_a_login_runtime_code_does_not_use_static_const_aes_key() -> None:
@@ -91,9 +91,9 @@ def test_layer_a_login_runtime_code_does_not_use_static_const_aes_key() -> None:
         ROOT / "custom_components/jackery_solarvault/client/_endpoints/auth.py"
     ).read_text(encoding="utf-8")
 
-    assert "AES_KEY" not in auth_source  # noqa: S101
-    assert "1234567890123456" not in auth_source  # noqa: S101
-    assert "build_login_crypto_fields(login_bean)" in auth_source  # noqa: S101
+    assert "AES_KEY" not in auth_source
+    assert "1234567890123456" not in auth_source
+    assert "build_login_crypto_fields(login_bean)" in auth_source
 
 
 def test_layer_c_mqtt_payload_crypto_uses_bluetooth_key_only() -> None:
@@ -104,13 +104,13 @@ def test_layer_c_mqtt_payload_crypto_uses_bluetooth_key_only() -> None:
     ciphertext = base64.b64decode(encrypt_mqtt_body(body, bluetooth_key))
     plaintext = _pkcs7_unpad(_aes_cbc_decrypt(ciphertext, bluetooth_key, bluetooth_key))
 
-    assert plaintext == b'{"cmd":107,"value":"on"}'  # noqa: S101
+    assert plaintext == b'{"cmd":107,"value":"on"}'
 
 
 def test_mqtt_connect_password_is_not_layer_c_payload_crypto() -> None:
     """MQTT connect password derives from mqttPassWord seed, not bluetoothKey."""
     api = JackeryApi(object(), "account", "password")  # type: ignore[arg-type]
-    api._token = "token"  # noqa: S105, SLF001
+    api._token = "token"  # noqa: SLF001
     api._mqtt_user_id = "user-1"  # noqa: SLF001
     api._mqtt_mac_id = "02abcdef0123456789abcdef01234567"  # noqa: SLF001
     seed = bytes(range(32))
@@ -122,8 +122,8 @@ def test_mqtt_connect_password_is_not_layer_c_payload_crypto() -> None:
         _aes_cbc_decrypt(mqtt_password_ciphertext, seed, seed[:16]),
     )
 
-    assert mqtt_plaintext == b"user-1@02abcdef0123456789abcdef01234567"  # noqa: S101
-    assert credentials[MQTT_CREDENTIAL_PASSWORD] != encrypt_mqtt_body(  # noqa: S101
+    assert mqtt_plaintext == b"user-1@02abcdef0123456789abcdef01234567"
+    assert credentials[MQTT_CREDENTIAL_PASSWORD] != encrypt_mqtt_body(
         {"cmd": 107},
         b"0123456789abcdef",
     )

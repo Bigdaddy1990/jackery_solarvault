@@ -15,13 +15,12 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
-from collections.abc import Awaitable, Callable
 import hashlib
 import inspect
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 import aiohttp
@@ -55,8 +54,8 @@ from .const import (
     DEVICE_PV_STAT_PATH,
     DEVICE_STATISTIC_PATH,
     FIELD_ACCOUNT,
-    FIELD_BAT_SOC,
     FIELD_BATTERY_PACKS,
+    FIELD_BAT_SOC,
     FIELD_BODY,
     FIELD_CELL_TEMP,
     FIELD_CODE,
@@ -105,8 +104,8 @@ from .const import (
     MQTT_CLIENT_ID_SUFFIX,
     MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
     MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
     MQTT_MAC_ID_PREFIX,
     MQTT_USERNAME_SEPARATOR,
     OTA_LIST_PATH,
@@ -121,13 +120,16 @@ from .const import (
     RSA_PUBLIC_KEY_B64,
     SAVE_DYNAMIC_MODE_PATH,
     SAVE_SINGLE_MODE_PATH,
-    SYS_VERSION,
     SYSTEM_LIST_PATH,
     SYSTEM_NAME_PATH,
     SYSTEM_STATISTIC_PATH,
+    SYS_VERSION,
     USER_AGENT,
 )
 from .util import app_period_date_bounds, chart_series_debug
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -489,7 +491,7 @@ class JackeryApi:
             data.get("error"),
             data.get(FIELD_RAW_TEXT),
         ]
-        text = " ".join(str(part) for part in parts if part not in (None, "")).lower()
+        text = " ".join(str(part) for part in parts if part not in {None, ""}).lower()
         if not text:
             return False
         return any(
@@ -519,14 +521,14 @@ class JackeryApi:
         self, status: int, data: dict[str, Any] | Any
     ) -> bool:
         """Classify HTTP/API authorization failures for HA reauth handling."""
-        if status in (401, 403):
+        if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
             return True
         if status != 200:
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
-        return code not in (CODE_OK, None) and self._response_has_auth_failure_text(
+        return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
             data
         )
 
@@ -671,7 +673,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
@@ -1118,7 +1120,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             raise JackeryApiError(
                 f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"
             )
@@ -1214,7 +1216,7 @@ class JackeryApi:
         if status != 200:
             raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")
         code = self._extract_code(data)
-        if code not in (CODE_OK, None):
+        if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
             raise JackeryApiError(
                 f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
