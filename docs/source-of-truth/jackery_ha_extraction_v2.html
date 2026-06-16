@@ -1,0 +1,110 @@
+{
+  "files_analyzed": {
+    "com.zip": {
+      "zip_files": 7758,
+      "smali_files": 7758,
+      "hbxn_smali": 320
+    },
+    "com3.zip": {
+      "zip_files": 3361,
+      "smali_files": 3361,
+      "hbxn_smali": 84
+    },
+    "com5.zip": {
+      "zip_files": 3395,
+      "smali_files": 3395,
+      "hbxn_smali": 2547
+    },
+    "coil.zip": {
+      "zip_files": 353,
+      "smali_files": 353
+    },
+    "zendesk.zip": {
+      "zip_files": 1707,
+      "smali_files": 1707
+    },
+    "okhttp3.zip": {
+      "zip_files": 389,
+      "smali_files": 389
+    }
+  },
+  "cloud": {
+    "base_url": "https://iot.jackeryapp.com/",
+    "request_prefix": "v1/",
+    "headers_found": {
+      "Accept-Language": "from qd/l.a()",
+      "token": "from qd/e.f()",
+      "platform": "2",
+      "app_version": "v2.0.1",
+      "app_version_code": "87",
+      "sys_version": "Android <release>,level <sdk>/<abis>",
+      "model": "<manufacturer>/<device model>",
+      "network": "mobile or wifi"
+    },
+    "login": {
+      "endpoint": "auth/login",
+      "request_fields": [
+        "aesEncryptData",
+        "rsaForAesKey"
+      ],
+      "login_bean_fields": [
+        "account",
+        "loginType",
+        "macId",
+        "password",
+        "phone",
+        "regionCode",
+        "registerAppId",
+        "verificationCode"
+      ],
+      "crypto_observed": [
+        "AES for LoginBean JSON",
+        "RSA/ECB/PKCS1Padding for AES key"
+      ]
+    }
+  },
+  "mqtt": {
+    "command_envelope": "{\"deviceSn\":\"%s\",\"id\":%s,\"version\":%s,\"messageType\":\"%s\",\"actionId\":%s,\"timestamp\":%s,\"body\":%s}",
+    "version_value_in_formatter": 0,
+    "third_party_mqtt_config_fields": [
+      "enable",
+      "ip",
+      "port",
+      "userName",
+      "password",
+      "token"
+    ],
+    "set_third_party_mqtt": {
+      "family": "home",
+      "msg_id": 3046,
+      "ble_msg_type": 113,
+      "messageType": "ThirdPartMQTTConfig"
+    },
+    "get_third_party_mqtt": {
+      "family": "home",
+      "msg_id": 3047,
+      "ble_msg_type": 114,
+      "messageType": "QueryThirdPartMQTTConfig"
+    },
+    "topic_names_found": false
+  },
+  "ble": {
+    "service_uuid_found": "0000bdee-0000-1000-8000-00805f9b34fb",
+    "frame_formats": [
+      "DFED0001%s%s%s%s0001%s%s",
+      "DFEC00%s%s%s%s",
+      "DFEC80%s%s%s%s%s%s"
+    ],
+    "missing_for_active_ble": [
+      "Lbb/c;",
+      "Lbb/d;",
+      "Lsb/* helper classes",
+      "transport enum Lfb/b;"
+    ]
+  },
+  "counts": {
+    "http_endpoints": 112,
+    "commands": 88,
+    "model_field_rows": 694
+  }
+}
