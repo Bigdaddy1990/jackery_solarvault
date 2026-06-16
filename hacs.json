@@ -6,10 +6,9 @@
     "CH",
     "US",
     "GB",
-    "NL",
-    "FR"
+    "FR",
+    "ES"
   ],
-  "homeassistant": "2026.6.1",
   "name": "Jackery SolarVault",
-  "zip_release": false
+  "render_readme": true,
 }

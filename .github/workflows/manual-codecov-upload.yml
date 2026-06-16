@@ -8,14 +8,13 @@ on:
 # the shared coverage upload steps to avoid drift.
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   coverage:
     name: Collect and upload coverage
     uses: ./.github/workflows/reusable-python-tests.yml
-    secrets: inherit
     with:
       python-version: "3.14"
       run-codecov: true

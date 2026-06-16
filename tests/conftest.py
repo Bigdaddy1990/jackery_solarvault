@@ -6,23 +6,13 @@ configures pytest-asyncio and provides a couple of helpers shared
 across config-flow and entry-setup tests.
 """
 
-from typing import TYPE_CHECKING
+from collections.abc import Generator
 from unittest.mock import patch
 
 import pytest
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
-
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """Enable custom integrations for every collected test without autouse."""
-    marker = pytest.mark.usefixtures("auto_enable_custom_integrations")
-    for item in items:
-        item.add_marker(marker)
-
-
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
 ) -> None:
@@ -35,7 +25,7 @@ def auto_enable_custom_integrations(
     """
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_jackery_login() -> Generator[None]:
     """Stub Jackery auth and discovery calls across the test.
 
@@ -64,15 +54,15 @@ def mock_jackery_login() -> Generator[None]:
 
     with (
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_login",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_login",
             new=_fake_login,
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_get_system_list",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_get_system_list",
             return_value=[],
         ),
         patch(
-            "custom_components.jackery_solarvault.client.api.JackeryApi.async_list_devices_legacy",
+            "custom_components.jackery_solarvault.api.JackeryApi.async_list_devices_legacy",
             return_value=[],
         ),
     ):

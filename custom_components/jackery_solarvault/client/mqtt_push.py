@@ -34,7 +34,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from aiomqtt import Client as MQTTClient
-
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
