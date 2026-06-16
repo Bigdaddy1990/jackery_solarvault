@@ -16,10 +16,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref }}
-          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
-          persist-credentials: true
       - name: Dependency Review
         uses: actions/dependency-review-action@v5.0.0
         
