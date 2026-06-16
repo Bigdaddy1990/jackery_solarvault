@@ -3,6 +3,7 @@ aiomqtt>=2.5.1,<2.6.0
 aiousbwatcher>=1.1.1
 annotated-doc>=0.0.4
 annotated-types>=0.6.0
+annotatedyaml>=1.0.2
 astral>=2.2
 attrs>=17.3.0
 autotyping>=24.9.0
