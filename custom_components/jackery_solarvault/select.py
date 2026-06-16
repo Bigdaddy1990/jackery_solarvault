@@ -926,9 +926,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Create select entities for devices in the config entry.
-    
+    """Create select entities for devices in the config entry.
+
     Registers entities for each device based on device capabilities. Entities are added
     immediately and updated whenever the coordinator detects new or changed devices.
     """
@@ -1028,9 +1027,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """
-        Detect changes in the coordinator's device payloads and register any newly discovered select entities.
-        
+        """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
+
         When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature. If the signature is unchanged, take no action.
         """
         nonlocal last_signature

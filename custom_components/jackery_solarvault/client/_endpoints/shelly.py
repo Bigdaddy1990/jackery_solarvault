@@ -22,16 +22,15 @@ from custom_components.jackery_solarvault.const import (
 
 
 def _data_field_accepted(data: dict[str, Any]) -> bool:
-    """
-    Determine if a Shelly write response's data field signals acceptance.
-    
+    """Determine if a Shelly write response's data field signals acceptance.
+
     The backend signals acceptance in the top-level data field as boolean True
     or a truthy token ("true"/"1"/"ok", case-insensitive). Anything else, including
     a missing field, is treated as not accepted.
-    
+
     Parameters:
         data (dict[str, Any]): Response data dictionary to check.
-    
+
     Returns:
         bool: True if the data field signals acceptance, False otherwise.
     """
@@ -44,16 +43,15 @@ def _data_field_accepted(data: dict[str, Any]) -> bool:
 
 
 def _data_field_accepted(data: dict[str, Any]) -> bool:
-    """
-    Determine if a Shelly write response's data field signals acceptance.
-    
+    """Determine if a Shelly write response's data field signals acceptance.
+
     The backend signals acceptance in the top-level data field as boolean True
     or a truthy token ("true"/"1"/"ok", case-insensitive). Anything else, including
     a missing field, is treated as not accepted.
-    
+
     Parameters:
         data (dict[str, Any]): Response data dictionary to check.
-    
+
     Returns:
         bool: True if the data field signals acceptance, False otherwise.
     """

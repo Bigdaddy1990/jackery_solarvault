@@ -850,9 +850,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Set up button entities for coordinator-managed devices.
-    
+    """Set up button entities for coordinator-managed devices.
+
     Discovers and registers unique button entities for each device tracked by the
     coordinator, including query buttons, weather plan refresh, schedule readers,
     reboot, and storm alert deletion buttons. Avoids duplicate entity registration
@@ -1071,9 +1070,8 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """
-        Execute the configured query action for this entity's device.
-        
+        """Execute the configured query action for this entity's device.
+
         Raises an error if the device is offline. Propagates ConfigEntryAuthFailed
         unchanged. If a HomeAssistantError with a translation_key is raised, it is
         propagated unchanged; any other exception is converted and raised with
@@ -1135,9 +1133,8 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """
-        Reboot the device and request the coordinator to refresh its data.
-        
+        """Reboot the device and request the coordinator to refresh its data.
+
         Raises HomeAssistantError if the device is offline or the reboot command fails.
         """
         if not self.available:
@@ -1297,9 +1294,8 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """
-        Trigger a read of the device schedule for the configured task type and refresh the coordinator.
-        
+        """Trigger a read of the device schedule for the configured task type and refresh the coordinator.
+
         Raises:
             ConfigEntryAuthFailed: Re-raised when authentication has failed.
             HomeAssistantError: Raised if the device is offline or if the schedule read fails.

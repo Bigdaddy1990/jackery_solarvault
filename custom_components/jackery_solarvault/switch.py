@@ -997,19 +997,18 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Create and register switch entities for devices and smart plugs based on coordinator data.
-    
+    """Create and register switch entities for devices and smart plugs based on coordinator data.
+
     Discover description-driven device switches and per-smart-plug switches (including
     priority switches when present), avoid duplicate unique IDs, and gate creation of
     certain description-driven switches by observed device properties or
     advanced-capability support. Register a listener that re-evaluates the coordinator
     data signature and adds newly discovered entities only when the signature changes.
-    
+
     Parameters:
-    	hass (HomeAssistant): The Home Assistant instance.
-    	entry (JackeryConfigEntry): The config entry for this integration.
-    	async_add_entities (AddEntitiesCallback): Callback to register new switch entities.
+        hass (HomeAssistant): The Home Assistant instance.
+        entry (JackeryConfigEntry): The config entry for this integration.
+        async_add_entities (AddEntitiesCallback): Callback to register new switch entities.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()

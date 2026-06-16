@@ -39,7 +39,7 @@ _KEY_CACHED_AT: Final = "cached_at"
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """
     Provides the Store for MQTT session cache persistence.
-    
+
     Returns:
         A Store configured for MQTT session cache.
     """
@@ -51,7 +51,7 @@ async def async_load_mqtt_session(  # noqa: PLR0911
 ) -> dict[str, str] | None:
     """
     Load cached MQTT session credentials for the given config entry.
-    
+
     Returns:
         A dictionary with keys MQTT_SESSION_USER_ID, MQTT_SESSION_SEED_B64,
         and MQTT_SESSION_MAC_ID mapped to their string values. Includes

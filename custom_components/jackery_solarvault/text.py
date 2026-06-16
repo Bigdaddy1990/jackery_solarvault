@@ -81,9 +81,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Register and keep updated text configuration entities for Jackery SolarVault devices.
-    
+    """Register and keep updated text configuration entities for Jackery SolarVault devices.
+
     Retrieves the coordinator from the entry and creates text entities for each device
     based on supported configuration fields: system name (if device has a system identifier),
     grid standard (if present), and third-party MQTT fields (if device supports advanced
@@ -162,9 +161,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """
-        Register text entities when the coordinator's device data changes.
-        """
+        """Register text entities when the coordinator's device data changes."""
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

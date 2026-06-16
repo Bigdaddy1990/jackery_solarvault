@@ -45,7 +45,7 @@ _KEY_VALUES: Final = "values"
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """
     Create a configured store instance for the module's midnight snapshot cache.
-    
+
     Returns:
         A Store configured with the module's storage key and version.
     """
@@ -67,10 +67,10 @@ async def async_load_daily_cache(
 ) -> dict[str, dict[str, Any]]:
     """
     Load and validate cached midnight snapshots for a config entry.
-    
+
     Parameters:
     	entry_id (str): Config entry identifier.
-    
+
     Returns:
     	dict[str, dict[str, Any]]: A mapping from device ID to snapshot objects.
     	Each snapshot has keys "day" (ISO date string) and "values" (metric to
@@ -117,9 +117,9 @@ async def async_save_daily_cache(
 ) -> None:
     """
     Persist per-device midnight snapshot data for a configuration entry.
-    
+
     Cleans and writes the provided snapshots into the module's persistent store for the given entry ID. Non-dict payloads, non-string days, non-dict values, non-string metric keys, and values that cannot be converted to int are omitted. Existing store data for other entries is preserved; invalid fields in the provided snapshots are silently dropped rather than raising errors.
-    
+
     Parameters:
         entry_id: Configuration entry identifier whose snapshots will be stored.
         snapshots: Mapping from device ID to snapshot payloads. Each payload should contain:
@@ -167,13 +167,13 @@ def daily_delta(  # noqa: PLR0911
 ) -> int | None:
     """
     Compute today's energy delta by subtracting the stored midnight anchor from the current lifetime counter.
-    
+
     Parameters:
         snapshot (dict | None): Snapshot containing the midnight anchor for the metric.
         metric_key (str): Key identifying the metric anchor in the snapshot.
         current_lifetime_wh (float | None): Current lifetime energy counter for the metric.
         today (date): Local date to validate against the snapshot's stored day.
-    
+
     Returns:
         int | None: Energy delta in watt-hours when snapshot is valid for today and both values convert to integers with current >= anchor; `None` otherwise.
     """
@@ -297,7 +297,7 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 def local_daily_signature(snapshots: Mapping[str, Any]) -> str:
     """
     Return a deterministic JSON string representation of snapshots.
-    
+
     Returns:
         A JSON string with stable key ordering suitable for change detection.
     """

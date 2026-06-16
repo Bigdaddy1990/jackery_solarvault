@@ -1076,15 +1076,14 @@ async def _async_handle_send_device_schedule(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> None:
-    """
-    Send a device schedule frame to a Jackery device.
-    
+    """Send a device schedule frame to a Jackery device.
+
     Parameters:
         call (ServiceCall): Service call whose `data` must include:
             - `device_id` (str): device identifier or Home Assistant device registry id to resolve
             - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018)
             - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string
-    
+
     Raises:
         ServiceValidationError: if the device cannot be resolved, the body is invalid, or sending fails
     """
@@ -1117,9 +1116,8 @@ async def _async_handle_send_device_schedule(
 def _entry_for_coordinator(
     hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
 ) -> ConfigEntry | None:
-    """
-    Locate the loaded config entry that owns a coordinator.
-    
+    """Locate the loaded config entry that owns a coordinator.
+
     Returns:
         The matching ConfigEntry, or None if not found.
     """
@@ -1138,9 +1136,8 @@ def _text_field(  # noqa: PLR0913
     max_length: int | None = None,
     numeric: bool = False,
 ) -> str:
-    """
-    Validate and extract a required text field from a service call with optional length and numeric constraints.
-    
+    """Validate and extract a required text field from a service call with optional length and numeric constraints.
+
     Parameters:
         call (ServiceCall): The service call containing the field data.
         field (str): The name of the field to extract.
@@ -1148,10 +1145,10 @@ def _text_field(  # noqa: PLR0913
         placeholder_key (str): The key for the field value in error message placeholders.
         max_length (int | None): Maximum allowed field length; if None, no constraint is applied.
         numeric (bool): If True, the field value must contain only digits.
-    
+
     Returns:
         str: The validated field value with leading and trailing whitespace removed.
-    
+
     Raises:
         ServiceValidationError: If the field is not a string, is empty after stripping, exceeds max_length, or fails numeric validation when enabled.
     """
@@ -1180,17 +1177,16 @@ def _text_field(  # noqa: PLR0913
 
 
 def _optional_text(call: ServiceCall, field: str, label: str) -> str:
-    """
-    Retrieve an optional text field from a service call.
-    
+    """Retrieve an optional text field from a service call.
+
     Parameters:
-    	label (str): Human-readable label for the field, used in error messages.
-    
+        label (str): Human-readable label for the field, used in error messages.
+
     Returns:
-    	str: The field value if it is a string; empty string if the field is absent or None.
-    
+        str: The field value if it is a string; empty string if the field is absent or None.
+
     Raises:
-    	ValueError: If the field is present but not a string.
+        ValueError: If the field is present but not a string.
     """
     raw = call.data.get(field, "")
     if raw is None:
