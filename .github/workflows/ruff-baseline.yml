@@ -43,4 +43,3 @@ jobs:
           git add -A
           git commit -m "chore: ruff baseline (format+fix)"
           git push origin "HEAD:${GITHUB_REF_NAME}"
-

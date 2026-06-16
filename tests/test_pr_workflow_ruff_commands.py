@@ -111,7 +111,9 @@ def test_autofix_yml_initial_ruff_format_uses_dot_target() -> None:
         for line in cmd.splitlines()
         if line.strip().startswith("ruff format")
     ]
-    assert ruff_format_lines, "autofix.yml must contain at least one ruff format command"
+    assert ruff_format_lines, (
+        "autofix.yml must contain at least one ruff format command"
+    )
     for line in ruff_format_lines:
         assert " . " in line or line.endswith((" .", " . || true")), (
             f"ruff format command must include explicit '.' target: {line!r}"
@@ -159,9 +161,7 @@ def test_autofix_yml_first_ruff_format_command_matches_expected() -> None:
             run = step.get("run", "")
             if isinstance(run, str) and run.strip() == "ruff format . || true":
                 return  # found the expected command
-    pytest.fail(
-        "autofix.yml must contain a step with exactly: ruff format . || true"
-    )
+    pytest.fail("autofix.yml must contain a step with exactly: ruff format . || true")
 
 
 # ---------------------------------------------------------------------------
@@ -293,9 +293,9 @@ def test_reusable_tests_yml_coverage_gate_step_uses_total_minimum_flag() -> None
 def test_reusable_tests_yml_coverage_gate_calls_enforce_coverage_gates() -> None:
     """enforce_coverage_gates must still be invoked in the reusable workflow."""
     source = REUSABLE_TESTS_YML.read_text(encoding="utf-8")
-    assert "enforce_coverage_gates" in source or "scripts.enforce_coverage_gates" in source, (
-        "reusable-python-tests.yml must invoke scripts.enforce_coverage_gates"
-    )
+    assert (
+        "enforce_coverage_gates" in source or "scripts.enforce_coverage_gates" in source
+    ), "reusable-python-tests.yml must invoke scripts.enforce_coverage_gates"
 
 
 # ---------------------------------------------------------------------------

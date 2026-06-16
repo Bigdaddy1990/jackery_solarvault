@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Enforce coverage gates from a coverage.py XML report."""
 
-from __future__ import annotations
 
 import argparse
 import re

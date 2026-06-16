@@ -46,9 +46,7 @@ def test_dup_const_audit_contains_literal_repr_function() -> None:
 def test_dup_const_audit_contains_collect_function() -> None:
     """_dup_const_audit.py must define a 'collect' function."""
     content = DUP_CONST_AUDIT_PATH.read_text(encoding="utf-8")
-    assert "def collect" in content, (
-        "_dup_const_audit.py must define collect()"
-    )
+    assert "def collect" in content, "_dup_const_audit.py must define collect()"
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +113,7 @@ def _literal_repr_equiv(node: ast.AST) -> str | None:
     """Python 3-compatible equivalent of _dup_const_audit.literal_repr()."""
     try:
         return repr(ast.literal_eval(node))
-    except (ValueError, TypeError, SyntaxError):
+    except ValueError, TypeError, SyntaxError:
         try:
             return f"<expr:{ast.unparse(node)}>"
         except Exception:  # noqa: BLE001
@@ -136,7 +134,7 @@ def _collect_equiv(source: str) -> dict[str, str | None]:
     out: dict[str, str | None] = {}
     try:
         tree = ast.parse(source)
-    except (SyntaxError, UnicodeDecodeError):
+    except SyntaxError, UnicodeDecodeError:
         return out
 
     for node in tree.body:
@@ -298,11 +296,7 @@ class TestCollectEquivalent:
 
     def test_duplicate_detection_collects_all_occurrences(self) -> None:
         """collect() captures all constant names in the module (for dup detection)."""
-        source = (
-            "FIELD_A = 'field_a'\n"
-            "FIELD_B = 'field_b'\n"
-            "FIELD_C = 'field_c'\n"
-        )
+        source = "FIELD_A = 'field_a'\nFIELD_B = 'field_b'\nFIELD_C = 'field_c'\n"
         result = _collect_equiv(source)
         assert len(result) == 3
         assert "FIELD_A" in result
