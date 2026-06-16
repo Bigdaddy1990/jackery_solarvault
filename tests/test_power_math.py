@@ -27,19 +27,19 @@ def _load_util_module() -> types.ModuleType:
         "custom_components.jackery_solarvault.const",
         package_dir / "const.py",
     )
-    assert const_spec is not None
+    assert const_spec is not None  # noqa: S101
     const_module = importlib.util.module_from_spec(const_spec)
     sys.modules[const_spec.name] = const_module
-    assert const_spec.loader is not None
+    assert const_spec.loader is not None  # noqa: S101
     const_spec.loader.exec_module(const_module)
 
     spec = importlib.util.spec_from_file_location(
         "custom_components.jackery_solarvault.util",
         package_dir / "util.py",
     )
-    assert spec is not None
+    assert spec is not None  # noqa: S101
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
+    assert spec.loader is not None  # noqa: S101
     spec.loader.exec_module(module)
     return module
 
@@ -51,19 +51,19 @@ def test_app_period_range_contract() -> None:
     """Implement test app period range contract."""
     today = util.date(2026, 5, 3)
 
-    assert util.app_period_range("day", today=today) == (
+    assert util.app_period_range("day", today=today) == (  # noqa: S101
         util.date(2026, 5, 3),
         util.date(2026, 5, 3),
     )
-    assert util.app_period_range("week", today=today) == (
+    assert util.app_period_range("week", today=today) == (  # noqa: S101
         util.date(2026, 4, 27),
         util.date(2026, 5, 3),
     )
-    assert util.app_period_range("month", today=today) == (
+    assert util.app_period_range("month", today=today) == (  # noqa: S101
         util.date(2026, 5, 1),
         util.date(2026, 5, 31),
     )
-    assert util.app_period_range("year", today=today) == (
+    assert util.app_period_range("year", today=today) == (  # noqa: S101
         util.date(2026, 1, 1),
         util.date(2026, 12, 31),
     )
@@ -71,15 +71,15 @@ def test_app_period_range_contract() -> None:
 
 def test_app_period_range_handles_boundaries_and_leap_years() -> None:
     """Implement test app period range handles boundaries and leap years."""
-    assert util.app_period_range("week", today=util.date(2026, 1, 1)) == (
+    assert util.app_period_range("week", today=util.date(2026, 1, 1)) == (  # noqa: S101
         util.date(2025, 12, 29),
         util.date(2026, 1, 4),
     )
-    assert util.app_period_range("month", today=util.date(2024, 2, 15)) == (
+    assert util.app_period_range("month", today=util.date(2024, 2, 15)) == (  # noqa: S101
         util.date(2024, 2, 1),
         util.date(2024, 2, 29),
     )
-    assert util.app_period_range("month", today=util.date(2026, 2, 15)) == (
+    assert util.app_period_range("month", today=util.date(2026, 2, 15)) == (  # noqa: S101
         util.date(2026, 2, 1),
         util.date(2026, 2, 28),
     )
@@ -90,27 +90,32 @@ def test_app_period_range_rejects_unknown_date_types() -> None:
     try:
         util.app_period_range("quarter", today=util.date(2026, 5, 3))
     except ValueError as err:
-        assert "Unsupported Jackery app period dateType" in str(err)  # noqa: PT017
+        assert "Unsupported Jackery app period dateType" in str(err)  # noqa: PT017, S101
     else:
-        raise AssertionError("unknown Jackery app dateType was silently accepted")  # noqa: TRY003
+        msg = "unknown Jackery app dateType was silently accepted"
+        raise AssertionError(msg)
 
 
 def test_app_period_date_bounds_fills_only_missing_sides() -> None:
     """Implement test app period date bounds fills only missing sides."""
     today = util.date(2026, 5, 3)
 
-    assert util.app_period_date_bounds("month", today=today) == (
+    assert util.app_period_date_bounds("month", today=today) == (  # noqa: S101
         "2026-05-01",
         "2026-05-31",
     )
-    assert util.app_period_date_bounds(
-        "month", begin_date="2026-05-02", today=today
+    assert util.app_period_date_bounds(  # noqa: S101
+        "month",
+        begin_date="2026-05-02",
+        today=today,
     ) == (
         "2026-05-02",
         "2026-05-31",
     )
-    assert util.app_period_date_bounds(
-        "month", end_date=util.date(2026, 5, 20), today=today
+    assert util.app_period_date_bounds(  # noqa: S101
+        "month",
+        end_date=util.date(2026, 5, 20),
+        today=today,
     ) == (
         "2026-05-01",
         "2026-05-20",
@@ -130,14 +135,15 @@ def test_app_period_date_bounds_rejects_bad_manual_bounds() -> None:
         try:
             util.app_period_date_bounds("month", today=today, **kwargs)
         except ValueError as err:
-            assert "Jackery app period" in str(err)  # noqa: PT017
+            assert "Jackery app period" in str(err)  # noqa: PT017, S101
         else:
-            raise AssertionError(f"invalid app period bounds were accepted: {kwargs!r}")  # noqa: TRY003
+            msg = f"invalid app period bounds were accepted: {kwargs!r}"
+            raise AssertionError(msg)
 
 
 def test_app_period_date_bounds_strips_manual_date_strings() -> None:
     """Implement test app period date bounds strips manual date strings."""
-    assert util.app_period_date_bounds(
+    assert util.app_period_date_bounds(  # noqa: S101
         "month",
         begin_date=" 2026-05-02 ",
         end_date=" 2026-05-03 ",
@@ -147,7 +153,7 @@ def test_app_period_date_bounds_strips_manual_date_strings() -> None:
 
 def test_app_period_date_bounds_converts_datetime_to_date_only() -> None:
     """Implement test app period date bounds converts datetime to date only."""
-    assert util.app_period_date_bounds(
+    assert util.app_period_date_bounds(  # noqa: S101
         "month",
         begin_date=util.datetime(2026, 5, 2, 12, 30),
         end_date=util.datetime(2026, 5, 3, 23, 59),
@@ -157,7 +163,7 @@ def test_app_period_date_bounds_converts_datetime_to_date_only() -> None:
 
 def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
     """Implement test app period request kwargs uses snake case method arguments."""
-    assert util.app_period_request_kwargs("week", today=util.date(2026, 5, 3)) == {
+    assert util.app_period_request_kwargs("week", today=util.date(2026, 5, 3)) == {  # noqa: S101
         "date_type": "week",
         "begin_date": "2026-04-27",
         "end_date": "2026-05-03",
@@ -166,11 +172,11 @@ def test_app_period_request_kwargs_uses_snake_case_method_arguments() -> None:
 
 def test_parse_utc_datetime_normalizes_iso_z_and_naive_values() -> None:
     """Battery-pack stale cleanup needs stable UTC timestamp parsing."""
-    assert util.parse_utc_datetime("2026-05-06T10:23:07Z").isoformat() == (
+    assert util.parse_utc_datetime("2026-05-06T10:23:07Z").isoformat() == (  # noqa: S101
         "2026-05-06T10:23:07+00:00"
     )
-    assert util.parse_utc_datetime(
-        util.datetime(2026, 5, 6, 10, 23, 7)
+    assert util.parse_utc_datetime(  # noqa: S101
+        util.datetime(2026, 5, 6, 10, 23, 7),
     ).isoformat() == ("2026-05-06T10:23:07+00:00")
 
 
@@ -179,19 +185,20 @@ def test_parse_utc_datetime_rejects_invalid_values() -> None:
     try:
         util.parse_utc_datetime("not-a-time")
     except ValueError as err:
-        assert "invalid UTC timestamp" in str(err)  # noqa: PT017
+        assert "invalid UTC timestamp" in str(err)  # noqa: PT017, S101
     else:
-        raise AssertionError("expected ValueError")  # noqa: TRY003
+        msg = "expected ValueError"
+        raise AssertionError(msg)
 
 
 def test_app_month_request_kwargs_builds_explicit_calendar_month() -> None:
     """Historical year backfill must query explicit month ranges."""
-    assert util.app_month_request_kwargs(2026, 4) == {
+    assert util.app_month_request_kwargs(2026, 4) == {  # noqa: S101
         "date_type": "month",
         "begin_date": "2026-04-01",
         "end_date": "2026-04-30",
     }
-    assert util.app_month_request_kwargs(2024, 2)["end_date"] == "2024-02-29"
+    assert util.app_month_request_kwargs(2024, 2)["end_date"] == "2024-02-29"  # noqa: S101
 
 
 def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
@@ -203,30 +210,35 @@ def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
         "cPhasePw": 68.8,
     }
 
-    assert util.signed_phase_power_values(ct) == [2.9, -70.2, 68.8]
-    assert round(util.smart_meter_net_power(ct), 2) == pytest.approx(1.5)
-    assert round(
-        util.calculated_smart_meter_power(ct, "net_import"), 2
+    assert util.signed_phase_power_values(ct) == [2.9, -70.2, 68.8]  # noqa: S101
+    assert round(util.smart_meter_net_power(ct), 2) == pytest.approx(1.5)  # noqa: S101
+    assert round(  # noqa: S101
+        util.calculated_smart_meter_power(ct, "net_import"),
+        2,
     ) == pytest.approx(1.5)
-    assert round(
-        util.calculated_smart_meter_power(ct, "net_export"), 2
+    assert round(  # noqa: S101
+        util.calculated_smart_meter_power(ct, "net_export"),
+        2,
     ) == pytest.approx(0.0)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_import"), 2
+    assert round(  # noqa: S101
+        util.calculated_smart_meter_power(ct, "gross_import"),
+        2,
     ) == pytest.approx(71.7)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_export"), 2
+    assert round(  # noqa: S101
+        util.calculated_smart_meter_power(ct, "gross_export"),
+        2,
     ) == pytest.approx(70.2)
-    assert round(
-        util.calculated_smart_meter_power(ct, "gross_flow"), 2
+    assert round(  # noqa: S101
+        util.calculated_smart_meter_power(ct, "gross_flow"),
+        2,
     ) == pytest.approx(141.9)
 
 
 def test_smart_meter_net_falls_back_to_total_fields() -> None:
     """Implement test smart meter net falls back to total fields."""
-    assert util.smart_meter_net_power({"tPhasePw": 10}) == 10  # noqa: PLR2004
-    assert util.smart_meter_net_power({"tnPhasePw": 15}) == -15  # noqa: PLR2004
-    assert util.smart_meter_net_power({"tPhasePw": 3, "tnPhasePw": 7}) == -4  # noqa: PLR2004
+    assert util.smart_meter_net_power({"tPhasePw": 10}) == 10  # noqa: PLR2004, S101
+    assert util.smart_meter_net_power({"tnPhasePw": 15}) == -15  # noqa: PLR2004, S101
+    assert util.smart_meter_net_power({"tPhasePw": 3, "tnPhasePw": 7}) == -4  # noqa: PLR2004, S101
 
 
 def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
@@ -242,10 +254,10 @@ def test_smart_meter_net_prefers_app_total_over_phase_sum() -> None:
         "tnPhasePw": 429,
     }
 
-    assert sum(util.signed_phase_power_values(ct)) == -3  # noqa: PLR2004
-    assert util.smart_meter_net_power(ct) == -429  # noqa: PLR2004
-    assert util.calculated_smart_meter_power(ct, "net_export") == 429  # noqa: PLR2004
-    assert util.calculated_smart_meter_power(ct, "gross_flow") == 429  # noqa: PLR2004
+    assert sum(util.signed_phase_power_values(ct)) == -3  # noqa: PLR2004, S101
+    assert util.smart_meter_net_power(ct) == -429  # noqa: PLR2004, S101
+    assert util.calculated_smart_meter_power(ct, "net_export") == 429  # noqa: PLR2004, S101
+    assert util.calculated_smart_meter_power(ct, "gross_flow") == 429  # noqa: PLR2004, S101
 
 
 def test_jackery_corrected_home_consumption_discharging() -> None:
@@ -259,12 +271,12 @@ def test_jackery_corrected_home_consumption_discharging() -> None:
 
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
-    assert result is not None
-    assert round(result.value, 2) == pytest.approx(71.7)
-    assert round(result.smart_meter_net_power, 2) == pytest.approx(1.5)
-    assert result.jackery_input_power == pytest.approx(0.0)
-    assert result.jackery_output_power == pytest.approx(70.2)
-    assert result.source == "smart_meter_net_minus_input_plus_output"
+    assert result is not None  # noqa: S101
+    assert round(result.value, 2) == pytest.approx(71.7)  # noqa: S101
+    assert round(result.smart_meter_net_power, 2) == pytest.approx(1.5)  # noqa: S101
+    assert result.jackery_input_power == pytest.approx(0.0)  # noqa: S101
+    assert result.jackery_output_power == pytest.approx(70.2)  # noqa: S101
+    assert result.source == "smart_meter_net_minus_input_plus_output"  # noqa: S101
 
 
 def test_jackery_corrected_home_consumption_charging() -> None:
@@ -274,12 +286,12 @@ def test_jackery_corrected_home_consumption_charging() -> None:
 
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
-    assert result is not None
-    assert result.value == 100  # noqa: PLR2004
-    assert result.smart_meter_net_power == 300  # noqa: PLR2004
-    assert result.jackery_input_power == 200  # noqa: PLR2004
-    assert result.jackery_output_power == pytest.approx(0.0)
-    assert result.source == "smart_meter_net_minus_input_plus_output"
+    assert result is not None  # noqa: S101
+    assert result.value == 100  # noqa: PLR2004, S101
+    assert result.smart_meter_net_power == 300  # noqa: PLR2004, S101
+    assert result.jackery_input_power == 200  # noqa: PLR2004, S101
+    assert result.jackery_output_power == pytest.approx(0.0)  # noqa: S101
+    assert result.source == "smart_meter_net_minus_input_plus_output"  # noqa: S101
 
 
 def test_grid_side_helpers_prefer_ongrid_fields_from_live_diagnostics() -> None:
@@ -293,8 +305,8 @@ def test_grid_side_helpers_prefer_ongrid_fields_from_live_diagnostics() -> None:
         "gridInPw": 0,
     }
 
-    assert util.jackery_grid_side_input_power(props) == 0
-    assert util.jackery_grid_side_output_power(props) == 385  # noqa: PLR2004
+    assert util.jackery_grid_side_input_power(props) == 0  # noqa: S101
+    assert util.jackery_grid_side_output_power(props) == 385  # noqa: PLR2004, S101
 
 
 def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
@@ -317,58 +329,75 @@ def test_jackery_reported_home_load_preferred_from_live_diagnostics() -> None:
 
     result = util.jackery_corrected_home_consumption_power(ct, props)
 
-    assert result is not None
-    assert result.value == 408  # noqa: PLR2004
-    assert result.smart_meter_net_power == 11  # noqa: PLR2004
-    assert result.jackery_input_power == 0
-    assert result.jackery_output_power == 408  # noqa: PLR2004
-    assert result.source == "otherLoadPw"
+    assert result is not None  # noqa: S101
+    assert result.value == 408  # noqa: PLR2004, S101
+    assert result.smart_meter_net_power == 11  # noqa: PLR2004, S101
+    assert result.jackery_input_power == 0  # noqa: S101
+    assert result.jackery_output_power == 408  # noqa: PLR2004, S101
+    assert result.source == "otherLoadPw"  # noqa: S101
 
 
 def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
     """Implement test jackery reported home load does not require ct payload."""
     result = util.jackery_corrected_home_consumption_power({}, {"otherLoadPw": 385})
 
-    assert result is not None
-    assert result.value == 385  # noqa: PLR2004
-    assert result.smart_meter_net_power is None
-    assert result.source == "otherLoadPw"
+    assert result is not None  # noqa: S101
+    assert result.value == 385  # noqa: PLR2004, S101
+    assert result.smart_meter_net_power is None  # noqa: S101
+    assert result.source == "otherLoadPw"  # noqa: S101
 
 
 def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -> None:
-    """Implement test jackery corrected home consumption requires ct for fallback formula."""
-    assert (
+    """Implement test jackery corrected home consumption requires ct for fallback.
+
+    formula.
+    """
+    assert (  # noqa: S101
         util.jackery_corrected_home_consumption_power({}, {"outGridSidePw": 70}) is None
     )
-    assert util.jackery_corrected_home_consumption_power({"tPhasePw": 10}, {}) is None
+    assert util.jackery_corrected_home_consumption_power({"tPhasePw": 10}, {}) is None  # noqa: S101
 
 
 def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -> None:
-    """Implement test period trend totals use same chart series logic for week month year."""
+    """Implement test period trend totals use same chart series logic for week month.
+
+    year.
+    """
     week = {"totalHomeEgy": "999", "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.42, 0.0]}
     month = {"totalHomeEgy": "999", "y": [15.53, 0.42] + [0.0] * 29}
     year = {"totalHomeEgy": "999", "y": [0.0, 0.0, 0.0, 0.0, 15.95] + [0.0] * 7}
 
-    assert util.trend_series_total(
-        week, "home_trends_week", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        week,
+        "home_trends_week",
+        "totalHomeEgy",
     ) == pytest.approx(74.72)
-    assert util.trend_series_total(
-        month, "home_trends_month", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        month,
+        "home_trends_month",
+        "totalHomeEgy",
     ) == pytest.approx(15.95)
-    assert util.trend_series_total(
-        year, "home_trends_year", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        year,
+        "home_trends_year",
+        "totalHomeEgy",
     ) == pytest.approx(15.95)
 
 
 def test_period_trend_entities_can_be_created_from_series_without_server_total() -> (
     None
 ):
-    """Implement test period trend entities can be created from series without server total."""
+    """Implement test period trend entities can be created from series without server.
+
+    total.
+    """
     source = {"y": [0.0, 1.25, None, 2.75]}
 
-    assert util.trend_payload_has_value(source, "home_trends_month", "totalHomeEgy")
-    assert util.trend_series_total(
-        source, "home_trends_month", "totalHomeEgy"
+    assert util.trend_payload_has_value(source, "home_trends_month", "totalHomeEgy")  # noqa: S101
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "home_trends_month",
+        "totalHomeEgy",
     ) == pytest.approx(4.0)
 
 
@@ -387,17 +416,25 @@ def test_battery_month_and_year_follow_week_series_keys() -> None:
         "y2": [0.0, 0.0, 0.0, 0.0, 3.72] + [0.0] * 7,
     }
 
-    assert util.trend_series_total(
-        month, "battery_trends_month", "totalChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        month,
+        "battery_trends_month",
+        "totalChgEgy",
     ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        month, "battery_trends_month", "totalDisChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        month,
+        "battery_trends_month",
+        "totalDisChgEgy",
     ) == pytest.approx(3.72)
-    assert util.trend_series_total(
-        year, "battery_trends_year", "totalChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        year,
+        "battery_trends_year",
+        "totalChgEgy",
     ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        year, "battery_trends_year", "totalDisChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        year,
+        "battery_trends_year",
+        "totalDisChgEgy",
     ) == pytest.approx(3.72)
 
 
@@ -412,14 +449,20 @@ def test_device_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        pv_month, "device_pv_stat_month", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        pv_month,
+        "device_pv_stat_month",
+        "totalSolarEnergy",
     ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalCharge"
+    assert util.trend_series_total(  # noqa: S101
+        battery_month,
+        "device_battery_stat_month",
+        "totalCharge",
     ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        battery_month, "device_battery_stat_month", "totalDischarge"
+    assert util.trend_series_total(  # noqa: S101
+        battery_month,
+        "device_battery_stat_month",
+        "totalDischarge",
     ) == pytest.approx(3.25)
 
 
@@ -440,17 +483,25 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
         "y2": [1.25, 2.0],
     }
 
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalInGridEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        grid_month,
+        "device_home_stat_month",
+        "totalInGridEnergy",
     ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        grid_month, "device_home_stat_month", "totalOutGridEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        grid_month,
+        "device_home_stat_month",
+        "totalOutGridEnergy",
     ) == pytest.approx(1.0)
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalInCtEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        ct_month,
+        "device_ct_stat_month",
+        "totalInCtEnergy",
     ) == pytest.approx(3.5)
-    assert util.trend_series_total(
-        ct_month, "device_ct_stat_month", "totalOutCtEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        ct_month,
+        "device_ct_stat_month",
+        "totalOutCtEnergy",
     ) == pytest.approx(3.25)
 
 
@@ -464,17 +515,17 @@ def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
         "y2": [],
     }
 
-    assert util.trend_series_has_value(
+    assert util.trend_series_has_value(  # noqa: S101
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
-    assert util.trend_series_has_value(
+    assert util.trend_series_has_value(  # noqa: S101
         source,
         "device_ct_stat_month",
         "totalOutCtEnergy",
     )
-    assert util.trend_series_total(
+    assert util.trend_series_total(  # noqa: S101
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
@@ -491,12 +542,12 @@ def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:
         "y2": [0.0, 0.0],
     }
 
-    assert util.trend_series_has_value(
+    assert util.trend_series_has_value(  # noqa: S101
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
-    assert util.trend_series_total(
+    assert util.trend_series_total(  # noqa: S101
         source,
         "device_ct_stat_month",
         "totalInCtEnergy",
@@ -507,7 +558,7 @@ def test_period_trend_totals_ignore_day_power_curves_in_watts() -> None:
     """Implement test period trend totals ignore day power curves in watts."""
     source = {"unit": "W", "y": [256, 332, 456]}
 
-    assert util.trend_series_total(source, "home_trends_month", "totalHomeEgy") is None
+    assert util.trend_series_total(source, "home_trends_month", "totalHomeEgy") is None  # noqa: S101
 
 
 def test_period_trend_totals_from_latest_diagnostics() -> None:
@@ -534,41 +585,65 @@ def test_period_trend_totals_from_latest_diagnostics() -> None:
         "y2": [0.0, 0.0, 0.0, 0.0, 3.82] + [0.0] * 7,
     }
 
-    assert util.trend_series_total(
-        pv_week, "pv_trends_week", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        pv_week,
+        "pv_trends_week",
+        "totalSolarEnergy",
     ) == pytest.approx(107.95)
-    assert util.trend_series_total(
-        pv_month, "pv_trends_month", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        pv_month,
+        "pv_trends_month",
+        "totalSolarEnergy",
     ) == pytest.approx(22.29)
-    assert util.trend_series_total(
-        pv_year, "pv_trends_year", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        pv_year,
+        "pv_trends_year",
+        "totalSolarEnergy",
     ) == pytest.approx(22.29)
-    assert util.trend_series_total(
-        home_week, "home_trends_week", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        home_week,
+        "home_trends_week",
+        "totalHomeEgy",
     ) == pytest.approx(74.82)
-    assert util.trend_series_total(
-        home_month, "home_trends_month", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        home_month,
+        "home_trends_month",
+        "totalHomeEgy",
     ) == pytest.approx(16.05)
-    assert util.trend_series_total(
-        home_year, "home_trends_year", "totalHomeEgy"
+    assert util.trend_series_total(  # noqa: S101
+        home_year,
+        "home_trends_year",
+        "totalHomeEgy",
     ) == pytest.approx(16.05)
-    assert util.trend_series_total(
-        bat_week, "battery_trends_week", "totalChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_week,
+        "battery_trends_week",
+        "totalChgEgy",
     ) == pytest.approx(17.55)
-    assert util.trend_series_total(
-        bat_week, "battery_trends_week", "totalDisChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_week,
+        "battery_trends_week",
+        "totalDisChgEgy",
     ) == pytest.approx(15.98)
-    assert util.trend_series_total(
-        bat_month, "battery_trends_month", "totalChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_month,
+        "battery_trends_month",
+        "totalChgEgy",
     ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        bat_month, "battery_trends_month", "totalDisChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_month,
+        "battery_trends_month",
+        "totalDisChgEgy",
     ) == pytest.approx(3.82)
-    assert util.trend_series_total(
-        bat_year, "battery_trends_year", "totalChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_year,
+        "battery_trends_year",
+        "totalChgEgy",
     ) == pytest.approx(3.49)
-    assert util.trend_series_total(
-        bat_year, "battery_trends_year", "totalDisChgEgy"
+    assert util.trend_series_total(  # noqa: S101
+        bat_year,
+        "battery_trends_year",
+        "totalDisChgEgy",
     ) == pytest.approx(3.82)
 
 
@@ -591,7 +666,7 @@ def test_trend_series_points_build_week_daily_buckets() -> None:
         today=util.date(2026, 5, 3),
     )
 
-    assert points == [
+    assert points == [  # noqa: S101
         util.TrendStatisticPoint(util.date(2026, 4, 27), 12.54),
         util.TrendStatisticPoint(util.date(2026, 4, 28), 15.3),
         util.TrendStatisticPoint(util.date(2026, 4, 29), 15.57),
@@ -621,7 +696,7 @@ def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None
         today=util.date(2026, 5, 3),
     )
 
-    assert points == [
+    assert points == [  # noqa: S101
         util.TrendStatisticPoint(util.date(2026, 5, 1), 3.49),
         util.TrendStatisticPoint(util.date(2026, 5, 2), 4.35),
         util.TrendStatisticPoint(util.date(2026, 5, 3), 0.0),
@@ -651,7 +726,7 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
         today=util.date(2026, 5, 3),
     )
 
-    assert points == [
+    assert points == [  # noqa: S101
         util.TrendStatisticPoint(util.date(2026, 1, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 2, 1), 0.0),
         util.TrendStatisticPoint(util.date(2026, 3, 1), 0.0),
@@ -662,7 +737,7 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
 
 def test_external_trend_statistic_id_uses_colon_external_id() -> None:
     """Implement test external trend statistic id uses colon external id."""
-    assert (
+    assert (  # noqa: S101
         util.external_trend_statistic_id(
             "jackery_solarvault",
             "ABC-123",
@@ -716,30 +791,33 @@ def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
 
     warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
 
-    assert [warning.reason for warning in warnings] == ["year_less_than_week"]
-    assert warnings[0].source_section == "device_home_stat_year"
-    assert warnings[0].source_value == pytest.approx(30.28)
-    assert warnings[0].reference_section == "device_home_stat_week"
-    assert warnings[0].reference_value == pytest.approx(89.08)
-    assert warnings[0].source_request == {
+    assert [warning.reason for warning in warnings] == ["year_less_than_week"]  # noqa: S101
+    assert warnings[0].source_section == "device_home_stat_year"  # noqa: S101
+    assert warnings[0].source_value == pytest.approx(30.28)  # noqa: S101
+    assert warnings[0].reference_section == "device_home_stat_week"  # noqa: S101
+    assert warnings[0].reference_value == pytest.approx(89.08)  # noqa: S101
+    assert warnings[0].source_request == {  # noqa: S101
         "dateType": "year",
         "beginDate": "2026-01-01",
         "endDate": "2026-12-31",
     }
-    assert warnings[0].reference_request == {
+    assert warnings[0].reference_request == {  # noqa: S101
         "dateType": "week",
         "beginDate": "2026-04-27",
         "endDate": "2026-05-03",
     }
-    assert warnings[0].source_chart_series_key == "y2"
-    assert warnings[0].reference_chart_series_key == "y2"
-    assert warnings[0].total_method == "chart_series_sum"
+    assert warnings[0].source_chart_series_key == "y2"  # noqa: S101
+    assert warnings[0].reference_chart_series_key == "y2"  # noqa: S101
+    assert warnings[0].total_method == "chart_series_sum"  # noqa: S101
 
 
-def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (
+def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (  # noqa: E501
     None
 ):
-    """Implement test app data quality does not warn month less than week across month boundary."""
+    """Implement test app data quality does not warn month less than week across month.
+
+    boundary.
+    """
     payload = {
         "device_home_stat_week": {
             "unit": "kWh",
@@ -760,7 +838,7 @@ def test_app_data_quality_does_not_warn_month_less_than_week_across_month_bounda
 
     warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
 
-    assert not warnings
+    assert not warnings  # noqa: S101
 
 
 def test_app_data_quality_ignores_missing_day_total() -> None:
@@ -780,11 +858,14 @@ def test_app_data_quality_ignores_missing_day_total() -> None:
 
     warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
 
-    assert not warnings
+    assert not warnings  # noqa: S101
 
 
 def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() -> None:
-    """Implement test app data quality warns when lifetime generation is lower than year."""
+    """Implement test app data quality warns when lifetime generation is lower than.
+
+    year.
+    """
     payload = {
         "statistic": {"totalGeneration": "41.31"},
         "device_pv_stat_year": {
@@ -796,9 +877,9 @@ def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() ->
 
     warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
 
-    assert [warning.reason for warning in warnings] == ["lifetime_less_than_year"]
-    assert warnings[0].source_section == "statistic"
-    assert warnings[0].reference_section == "device_pv_stat_year"
+    assert [warning.reason for warning in warnings] == ["lifetime_less_than_year"]  # noqa: S101
+    assert warnings[0].source_section == "statistic"  # noqa: S101
+    assert warnings[0].reference_section == "device_pv_stat_year"  # noqa: S101
 
 
 def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
@@ -831,18 +912,21 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         warning_a,
     ])
 
-    assert normalized == [warning_c, warning_a]
-    assert util.format_data_quality_warning(normalized[0]) == (
+    assert normalized == [warning_c, warning_a]  # noqa: S101
+    assert util.format_data_quality_warning(normalized[0]) == (  # noqa: S101
         "PV energy: statistic=41.31 < device_pv_stat_year=126.97"
     )
-    assert util.format_data_quality_warning(normalized[1]) == (
+    assert util.format_data_quality_warning(normalized[1]) == (  # noqa: S101
         "Device grid-side output energy: device_home_stat_year=30.28 "
         "< device_home_stat_week=89.08"
     )
 
 
 def test_data_quality_warning_format_includes_request_ranges_when_available() -> None:
-    """Implement test data quality warning format includes request ranges when available."""
+    """Implement test data quality warning format includes request ranges when.
+
+    available.
+    """
     warning = util.AppDataQualityWarning(
         level="warning",
         reason="year_less_than_week",
@@ -867,20 +951,20 @@ def test_data_quality_warning_format_includes_request_ranges_when_available() ->
         total_method="chart_series_sum",
     ).as_dict()
 
-    assert warning["source_request"] == {
+    assert warning["source_request"] == {  # noqa: S101
         "dateType": "year",
         "beginDate": "2026-01-01",
         "endDate": "2026-12-31",
     }
-    assert warning["reference_request"] == {
+    assert warning["reference_request"] == {  # noqa: S101
         "dateType": "week",
         "beginDate": "2026-04-27",
         "endDate": "2026-05-03",
     }
-    assert warning["source_chart_series_key"] == "y2"
-    assert warning["reference_chart_series_key"] == "y2"
-    assert warning["total_method"] == "chart_series_sum"
-    assert util.format_data_quality_warning(warning) == (
+    assert warning["source_chart_series_key"] == "y2"  # noqa: S101
+    assert warning["reference_chart_series_key"] == "y2"  # noqa: S101
+    assert warning["total_method"] == "chart_series_sum"  # noqa: S101
+    assert util.format_data_quality_warning(warning) == (  # noqa: S101
         "Device grid-side output energy: device_home_stat_year=40.45 "
         "< device_home_stat_week=99.25 "
         "[device_home_stat_year: year 2026-01-01..2026-12-31; "
@@ -1001,9 +1085,9 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
     util.guard_statistic_totals_from_year(payload)
 
     year = payload["device_pv_stat_year"]
-    assert year["totalSolarEnergy"] == pytest.approx(228.02)
-    assert year["totalSolarRevenue"] == pytest.approx(63.86)
-    assert year["y"] == [
+    assert year["totalSolarEnergy"] == pytest.approx(228.02)  # noqa: S101
+    assert year["totalSolarRevenue"] == pytest.approx(63.86)  # noqa: S101
+    assert year["y"] == [  # noqa: S101
         0.0,
         0.0,
         0.0,
@@ -1017,24 +1101,24 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         0.0,
         0.0,
     ]
-    assert year["_year_month_backfill"]["corrected"]["totalSolarEnergy"] == {
+    assert year["_year_month_backfill"]["corrected"]["totalSolarEnergy"] == {  # noqa: S101
         "raw_total": 81.51,
         "corrected_total": 228.02,
         "series_key": "y",
         "months": [4, 5],
     }
-    assert payload["statistic"]["totalGeneration"] == pytest.approx(228.02)
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        46.72
+    assert payload["statistic"]["totalGeneration"] == pytest.approx(228.02)  # noqa: S101
+    assert payload["statistic"]["totalRevenue"] == pytest.approx(  # noqa: S101
+        46.72,
     )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["totalCarbon"] == pytest.approx(227.33)
-    assert payload["statistic"]["_savings_calculation"][
+    assert payload["statistic"]["totalCarbon"] == pytest.approx(227.33)  # noqa: S101
+    assert payload["statistic"]["_savings_calculation"][  # noqa: S101
         "calculated_total"
     ] == pytest.approx(46.72)
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(
-        166.86
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(  # noqa: S101
+        166.86,
     )
-    assert payload["statistic"]["_savings_calculation"]["source_energy"] == {
+    assert payload["statistic"]["_savings_calculation"]["source_energy"] == {  # noqa: S101
         "pv_year_kwh": 228.02,
         "device_grid_side_input_year_kwh": 0.11,
         "device_grid_side_output_year_kwh": 166.97,
@@ -1090,25 +1174,25 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
                 "x": list(range(1, 32)),
                 "y": [81.51] + [0.0] * 30,
             },
-        }
+        },
     }
 
     util.apply_year_month_backfill(payload, month_history)
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["device_pv_stat_year"]["totalSolarEnergy"] == "228.02"
-    assert "_year_month_backfill" not in payload["device_pv_stat_year"]
-    assert payload["statistic"]["totalGeneration"] == "300.00"
-    assert payload["statistic"]["totalRevenue"] == "84.00"
-    assert (
+    assert payload["device_pv_stat_year"]["totalSolarEnergy"] == "228.02"  # noqa: S101
+    assert "_year_month_backfill" not in payload["device_pv_stat_year"]  # noqa: S101
+    assert payload["statistic"]["totalGeneration"] == "300.00"  # noqa: S101
+    assert payload["statistic"]["totalRevenue"] == "84.00"  # noqa: S101
+    assert (  # noqa: S101
         payload["statistic"]["_savings_calculation"]["published_value_source"]
         == "cloud_total"
     )
-    assert (
+    assert (  # noqa: S101
         payload["statistic"]["_savings_calculation"]["decision"]
         == "cloud_total_is_lifetime_higher_than_ytd_calculated"
     )
-    assert "_total_lower_bound_guard" not in payload["statistic"]
+    assert "_total_lower_bound_guard" not in payload["statistic"]  # noqa: S101
 
 
 def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
@@ -1143,16 +1227,17 @@ def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        46.75
+    assert payload["statistic"]["totalRevenue"] == pytest.approx(  # noqa: S101
+        46.75,
     )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["_savings_calculation"][
+    assert payload["statistic"]["_savings_calculation"][  # noqa: S101
         "calculated_total"
     ] == pytest.approx(46.75)
-    assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]
-    assert (
+    assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]  # noqa: S101
+    assert (  # noqa: S101
         payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_matches_pv_revenue_not_savings"  # has_prior_lifetime_gen=False for this test
+        # has_prior_lifetime_gen=False for this test
+        == "cloud_total_matches_pv_revenue_not_savings"
     )
 
 
@@ -1186,16 +1271,16 @@ def test_total_savings_subtracts_ct_export_when_available() -> None:
 
     util.guard_statistic_totals_from_year(payload)
 
-    assert payload["statistic"]["totalRevenue"] == pytest.approx(
-        44.8
+    assert payload["statistic"]["totalRevenue"] == pytest.approx(  # noqa: S101
+        44.8,
     )  # Bug B2 fixed: calculated publishes
-    assert payload["statistic"]["_savings_calculation"][
+    assert payload["statistic"]["_savings_calculation"][  # noqa: S101
         "calculated_total"
     ] == pytest.approx(44.8)
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(
-        160.0
+    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == pytest.approx(  # noqa: S101
+        160.0,
     )
-    assert (
+    assert (  # noqa: S101
         payload["statistic"]["_savings_calculation"]["method"]
         == "device_grid_side_output_minus_ct_export_bounded_by_home"
     )
@@ -1203,21 +1288,21 @@ def test_total_savings_subtracts_ct_export_when_available() -> None:
 
 def test_safe_int_decimal_strings_and_bad_values() -> None:
     """Implement test safe int decimal strings and bad values."""
-    assert util.safe_int("8") == 8  # noqa: PLR2004
-    assert util.safe_int("8.0") is None
-    assert util.safe_int("3.14") is None
-    assert util.safe_int(8.9) is None
-    assert util.safe_int(True) is None
-    assert util.safe_int(None) is None
-    assert util.safe_int("not-a-number") is None
+    assert util.safe_int("8") == 8  # noqa: PLR2004, S101
+    assert util.safe_int("8.0") is None  # noqa: S101
+    assert util.safe_int("3.14") is None  # noqa: S101
+    assert util.safe_int(8.9) is None  # noqa: S101
+    assert util.safe_int(True) is None  # noqa: S101
+    assert util.safe_int(None) is None  # noqa: S101
+    assert util.safe_int("not-a-number") is None  # noqa: S101
 
 
 def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
     """Implement test safe float parses decimal comma without deleting it."""
-    assert util.safe_float("40,96") == pytest.approx(40.96)
-    assert util.safe_float(" 59,43 ") == pytest.approx(59.43)
-    assert util.safe_float("40,96") != 4096  # noqa: PLR2004
-    assert util.safe_float("1,2,3") is None
+    assert util.safe_float("40,96") == pytest.approx(40.96)  # noqa: S101
+    assert util.safe_float(" 59,43 ") == pytest.approx(59.43)  # noqa: S101
+    assert util.safe_float("40,96") != 4096  # noqa: PLR2004, S101
+    assert util.safe_float("1,2,3") is None  # noqa: S101
 
 
 def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -> None:
@@ -1234,8 +1319,10 @@ def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -
         "y": ["0", "0", "40,96", "0"],
     }
 
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == pytest.approx(40.96)
     # Without an array context the month section is plain decimal.
     month_source = {
@@ -1243,17 +1330,21 @@ def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -
         "totalSolarEnergy": "40.96",
         "y": ["0", "0", "40,96", "0"],
     }
-    assert util.trend_series_total(
-        month_source, "device_pv_stat_month", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        month_source,
+        "device_pv_stat_month",
+        "totalSolarEnergy",
     ) == pytest.approx(40.96)
-    assert (
+    assert (  # noqa: S101
         util.trend_series_total(source, "device_pv_stat_year", "totalSolarEnergy")
         != 4096  # noqa: PLR2004
     )
 
 
 def test_device_year_compact_bucket_expands_previous_and_current_months() -> None:
-    """Documented spec example from REPAIR_ROADMAP.md ("Device year compact bucket expansion").
+    """Documented spec example from REPAIR_ROADMAP.md ("Device year compact bucket.
+
+    expansion").
 
     Raw series ``[0,0,0,0,"13.26",0,...]`` is published as
     ``[0,0,0,13,0.26,0,...]`` (April=13, May=0.26).
@@ -1271,14 +1362,20 @@ def test_device_year_compact_bucket_expands_previous_and_current_months() -> Non
         },
     }
 
-    assert util.effective_trend_series_values(
-        source, "device_battery_stat_year", "totalDischarge"
+    assert util.effective_trend_series_values(  # noqa: S101
+        source,
+        "device_battery_stat_year",
+        "totalDischarge",
     ) == [0.0, 0.0, 0.0, 13.0, 0.26, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_battery_stat_year", "totalDischarge"
+    assert util.effective_period_total_value(  # noqa: S101
+        source,
+        "device_battery_stat_year",
+        "totalDischarge",
     ) == pytest.approx(13.26)
-    assert util.trend_series_total(
-        source, "device_battery_stat_year", "totalDischarge"
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "device_battery_stat_year",
+        "totalDischarge",
     ) == pytest.approx(13.26)
 
 
@@ -1306,14 +1403,20 @@ def test_device_year_real_payload_is_published_unchanged_when_total_matches_raw(
         },
     }
 
-    assert util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert util.effective_trend_series_values(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.effective_period_total_value(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert util.effective_period_total_value(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == pytest.approx(71.72)
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == pytest.approx(71.72)
 
 
@@ -1341,11 +1444,15 @@ def test_device_year_inconsistent_payload_publishes_raw_without_repair() -> None
 
     # Raw is published verbatim — no silent "repair" to either 71.72 or 143.
     values = util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     )
-    assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert values == [0.0, 0.0, 0.0, 0.0, 71.72, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # noqa: S101
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == pytest.approx(71.72)
 
 
@@ -1363,11 +1470,15 @@ def test_month_series_does_not_use_compact_year_expansion() -> None:
         },
     }
 
-    assert util.effective_trend_series_values(
-        source, "device_battery_stat_month", "totalDischarge"
+    assert util.effective_trend_series_values(  # noqa: S101
+        source,
+        "device_battery_stat_month",
+        "totalDischarge",
     ) == [13.26, 0.0, 0.0]
-    assert util.trend_series_total(
-        source, "device_battery_stat_month", "totalDischarge"
+    assert util.trend_series_total(  # noqa: S101
+        source,
+        "device_battery_stat_month",
+        "totalDischarge",
     ) == pytest.approx(13.26)
 
 
@@ -1385,8 +1496,10 @@ def test_device_year_compact_parts_expand_fraction_and_previous_buckets() -> Non
         },
     }
 
-    assert util.effective_trend_series_values(
-        source, "device_pv_stat_year", "totalSolarEnergy"
+    assert util.effective_trend_series_values(  # noqa: S101
+        source,
+        "device_pv_stat_year",
+        "totalSolarEnergy",
     ) == [3.05, 3.0, 0.0]
 
 
@@ -1409,7 +1522,7 @@ def test_verify_and_backfill_rejects_negative_and_nan_values(
     expected: float | None,
 ) -> None:
     """Invalid energy values must not propagate into recorder statistics."""
-    assert util.verify_and_backfill(cloud_value, local_value) == expected
+    assert util.verify_and_backfill(cloud_value, local_value) == expected  # noqa: S101
 
 
 def test_config_entry_bool_option_parses_legacy_string_values() -> None:
@@ -1419,15 +1532,15 @@ def test_config_entry_bool_option_parses_legacy_string_values() -> None:
         options: ClassVar[dict[str, str]] = {"enabled": "false"}
         data: ClassVar[dict[str, bool | str]] = {"enabled": True, "fallback": "yes"}
 
-    assert util.config_entry_bool_option(Entry(), "enabled", True) is False
-    assert util.config_entry_bool_option(Entry(), "fallback", False) is True
-    assert util.config_entry_bool_option(Entry(), "missing", True) is True
+    assert util.config_entry_bool_option(Entry(), "enabled", True) is False  # noqa: S101
+    assert util.config_entry_bool_option(Entry(), "fallback", False) is True  # noqa: S101
+    assert util.config_entry_bool_option(Entry(), "missing", True) is True  # noqa: S101
 
 
 def test_jackery_online_state_parses_numeric_and_text_markers() -> None:
     """Entity availability must handle Jackery string markers safely."""
-    assert util.jackery_online_state("0") is False
-    assert util.jackery_online_state("1") is True
-    assert util.jackery_online_state("offline") is False
-    assert util.jackery_online_state("online") is True
-    assert util.jackery_online_state("unknown") is None
+    assert util.jackery_online_state("0") is False  # noqa: S101
+    assert util.jackery_online_state("1") is True  # noqa: S101
+    assert util.jackery_online_state("offline") is False  # noqa: S101
+    assert util.jackery_online_state("online") is True  # noqa: S101
+    assert util.jackery_online_state("unknown") is None  # noqa: S101

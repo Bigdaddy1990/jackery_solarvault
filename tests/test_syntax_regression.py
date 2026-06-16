@@ -12,7 +12,8 @@ import sys
 def test_client_local_mqtt_can_be_imported() -> None:
     """client/local_mqtt.py must be importable without SyntaxError.
 
-    The invalid syntax would add ``except json.JSONDecodeError, ValueError:`` which is Python 2
+    The invalid syntax would add ``except json.JSONDecodeError, ValueError:`` which is
+    Python 2
     syntax and must be written as ``except (json.JSONDecodeError, ValueError):``
     in Python 3. This test catches that class of regression.
     """
@@ -24,15 +25,17 @@ def test_client_local_mqtt_can_be_imported() -> None:
     try:
         mod = importlib.import_module(mod_name)
     except SyntaxError as err:
-        raise AssertionError(  # noqa: TRY003
-            f"client/local_mqtt.py has a SyntaxError — fix the except clause: {err}",
+        msg = f"client/local_mqtt.py has a SyntaxError — fix the except clause: {err}"
+        raise AssertionError(
+            msg,
         ) from err
     except ImportError as err:
-        raise AssertionError(  # noqa: TRY003
-            f"client/local_mqtt.py raised ImportError — check dependencies: {err}",
+        msg = f"client/local_mqtt.py raised ImportError — check dependencies: {err}"
+        raise AssertionError(
+            msg,
         ) from err
 
-    assert hasattr(mod, "JackeryLocalMqttClient"), (
+    assert hasattr(mod, "JackeryLocalMqttClient"), (  # noqa: S101
         "JackeryLocalMqttClient must be exported from client/local_mqtt.py"
     )
 
@@ -44,7 +47,7 @@ def test_client_api_can_be_imported() -> None:
         del sys.modules[mod_name]
 
     mod = importlib.import_module(mod_name)
-    assert hasattr(mod, "JackeryApi")
+    assert hasattr(mod, "JackeryApi")  # noqa: S101
 
 
 def test_client_ble_can_be_imported() -> None:
@@ -54,4 +57,4 @@ def test_client_ble_can_be_imported() -> None:
         del sys.modules[mod_name]
 
     mod = importlib.import_module(mod_name)
-    assert hasattr(mod, "build_binary_frame")
+    assert hasattr(mod, "build_binary_frame")  # noqa: S101

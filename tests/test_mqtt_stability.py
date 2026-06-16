@@ -20,6 +20,7 @@ session against accidental regressions:
 import datetime
 from pathlib import Path
 import re
+import re as _re
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
@@ -44,24 +45,24 @@ def test_mqtt_client_disables_internal_reconnect_loop() -> None:
     src = _read("mqtt_push.py")
     coordinator_src = _read("coordinator.py")
     # No internal loop around the aiomqtt context manager.
-    assert "while True" not in src, src
-    assert "while not self._" not in src, src
+    assert "while True" not in src, src  # noqa: S101
+    assert "while not self._" not in src, src  # noqa: S101
     # Coordinator owns reconnect throttling.
-    assert "MQTT_RECONNECT_THROTTLE_SEC" in coordinator_src, coordinator_src
+    assert "MQTT_RECONNECT_THROTTLE_SEC" in coordinator_src, coordinator_src  # noqa: S101
     # No leftover gmqtt-era retry knobs.
-    assert '"reconnect_retries"' not in src, src
-    assert '"reconnect_delay"' not in src, src
+    assert '"reconnect_retries"' not in src, src  # noqa: S101
+    assert '"reconnect_delay"' not in src, src  # noqa: S101
 
 
 def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
     """Credential-change detection must not keep another raw password copy."""
     src = _read("mqtt_push.py")
-    assert "import hashlib" in src, src
-    assert "self._fingerprint: str | None = None" in src, src
-    assert "def _credential_fingerprint(" in src, src
-    assert "hashlib.sha256()" in src, src
-    assert "fingerprint = self._credential_fingerprint(" in src, src
-    assert "fingerprint = (client_id, username, password)" not in src, src
+    assert "import hashlib" in src, src  # noqa: S101
+    assert "self._fingerprint: str | None = None" in src, src  # noqa: S101
+    assert "def _credential_fingerprint(" in src, src  # noqa: S101
+    assert "hashlib.sha256()" in src, src  # noqa: S101
+    assert "fingerprint = self._credential_fingerprint(" in src, src  # noqa: S101
+    assert "fingerprint = (client_id, username, password)" not in src, src  # noqa: S101
 
 
 def test_every_connect_resubscribes_all_topics() -> None:
@@ -72,14 +73,15 @@ def test_every_connect_resubscribes_all_topics() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.DOTALL,
     )
-    assert runner_match is not None, "_async_run_session not found"
+    assert runner_match is not None, "_async_run_session not found"  # noqa: S101
     body = runner_match.group(0)
-    assert "for topic in self._topics" in body, body
-    assert "await client.subscribe(" in body, body
+    assert "for topic in self._topics" in body, body  # noqa: S101
+    assert "await client.subscribe(" in body, body  # noqa: S101
 
 
 def test_every_connect_triggers_snapshot_callback() -> None:
@@ -92,14 +94,15 @@ def test_every_connect_triggers_snapshot_callback() -> None:
     """
     src = _read("mqtt_push.py")
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         src,
         re.DOTALL,
     )
-    assert runner_match is not None
+    assert runner_match is not None  # noqa: S101
     body = runner_match.group(0)
-    assert "self._connect_callback" in body, body
-    assert "_schedule_coroutine" in body, body
+    assert "self._connect_callback" in body, body  # noqa: S101
+    assert "_schedule_coroutine" in body, body  # noqa: S101
 
 
 def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
@@ -111,27 +114,29 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|"
+        r"\n    def |\nclass )",
         src,
         re.DOTALL,
     )
-    assert on_disc_match is not None, "_handle_disconnect_error not found"
+    assert on_disc_match is not None, "_handle_disconnect_error not found"  # noqa: S101
     body = on_disc_match.group(0)
     # The handler must preserve connect-failure signatures and bail out
     # without overwriting them.
-    assert "_is_connect_failure_error" in body, body
-    assert "connect rc=" in src, src
+    assert "_is_connect_failure_error" in body, body  # noqa: S101
+    assert "connect rc=" in src, src  # noqa: S101
     # And the connect-failure mapper itself must produce the rc=… signature
     # so ``_is_connect_failure_error`` can detect it.
     fail_match = re.search(
-        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|"
+        r"\n    def |\nclass )",
         src,
         re.DOTALL,
     )
-    assert fail_match is not None, "_handle_connect_failure not found"
+    assert fail_match is not None, "_handle_connect_failure not found"  # noqa: S101
     fail_body = fail_match.group(0)
-    assert "MQTT_CONNACK_REASONS" in fail_body, fail_body
-    assert 'f"connect rc={rc}' in fail_body, fail_body
+    assert "MQTT_CONNACK_REASONS" in fail_body, fail_body  # noqa: S101
+    assert 'f"connect rc={rc}' in fail_body, fail_body  # noqa: S101
 
 
 def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> None:
@@ -152,22 +157,23 @@ def test_failed_connect_stop_does_not_write_disconnect_to_closed_socket() -> Non
     """
     src = _read("mqtt_push.py")
     stop_match = re.search(
-        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|\n    async def |\n    def |\nclass )",
+        r"async def _async_stop_locked\(self.*?(?=\n    @staticmethod|"
+        r"\n    async def |\n    def |\nclass )",
         src,
         re.DOTALL,
     )
-    assert stop_match is not None
+    assert stop_match is not None  # noqa: S101
     body = stop_match.group(0)
     # The legacy gmqtt-era manual-disconnect dance is gone.
-    assert "client.disconnect()" not in body, body
-    assert "client.disconnect" not in body, body
-    assert "_was_connected" not in body, body
+    assert "client.disconnect()" not in body, body  # noqa: S101
+    assert "client.disconnect" not in body, body  # noqa: S101
+    assert "_was_connected" not in body, body  # noqa: S101
     # The runner task is what gets torn down; aiomqtt's context manager
     # handles the socket lifecycle on cancel.
-    assert "task = self._runner_task" in body, body
-    assert "task.cancel()" in body, body
+    assert "task = self._runner_task" in body, body  # noqa: S101
+    assert "task.cancel()" in body, body  # noqa: S101
     # No leftover legacy flag anywhere in the module.
-    assert "_was_connected" not in src, src
+    assert "_was_connected" not in src, src  # noqa: S101
 
 
 def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
@@ -183,20 +189,20 @@ def test_transient_mqtt_connect_failures_are_debug_not_warning_noise() -> None:
     coordinator_src = _read("coordinator.py")
 
     # The legacy filter must be gone.
-    assert "_GmqttConnectionNoiseFilter" not in mqtt_src
-    assert "logger=_GMQTT_LOGGER" not in mqtt_src
+    assert "_GmqttConnectionNoiseFilter" not in mqtt_src  # noqa: S101
+    assert "logger=_GMQTT_LOGGER" not in mqtt_src  # noqa: S101
     # Connect failures have differentiated severity.
-    assert "_is_connect_auth_failure_rc" in mqtt_src
-    assert '_LOGGER.warning("Jackery MQTT connect failed: %s", message)' in mqtt_src
-    assert '_LOGGER.debug("Jackery MQTT connect failed: %s", message)' in mqtt_src
+    assert "_is_connect_auth_failure_rc" in mqtt_src  # noqa: S101
+    assert '_LOGGER.warning("Jackery MQTT connect failed: %s", message)' in mqtt_src  # noqa: S101
+    assert '_LOGGER.debug("Jackery MQTT connect failed: %s", message)' in mqtt_src  # noqa: S101
     # Generic setup-error path stays at debug.
-    assert '_LOGGER.debug("Jackery MQTT connect setup failed: %s", err)' in mqtt_src
+    assert '_LOGGER.debug("Jackery MQTT connect setup failed: %s", err)' in mqtt_src  # noqa: S101
     # Coordinator-side messaging stays informational, not warn-spammy.
-    assert "Jackery MQTT initial connect did not complete" in coordinator_src
-    assert '_LOGGER.warning("Jackery MQTT initial connect did not complete' not in (
+    assert "Jackery MQTT initial connect did not complete" in coordinator_src  # noqa: S101
+    assert '_LOGGER.warning("Jackery MQTT initial connect did not complete' not in (  # noqa: S101
         coordinator_src
     )
-    assert (
+    assert (  # noqa: S101
         '_LOGGER.warning(\n                    "Jackery MQTT TLS/connect check failed'
         not in (coordinator_src)
     )
@@ -214,23 +220,23 @@ def test_diagnostics_exposes_stale_subscription_signals() -> None:
         src,
         re.DOTALL,
     )
-    assert diag_match is not None, "diagnostics_snapshot method not found"
+    assert diag_match is not None, "diagnostics_snapshot method not found"  # noqa: S101
     body = diag_match.group(0)
-    assert "seconds_since_last_message" in body, body
-    assert "mqtt_silent_for_too_long" in body, body
+    assert "seconds_since_last_message" in body, body  # noqa: S101
+    assert "mqtt_silent_for_too_long" in body, body  # noqa: S101
     # diagnostics() must delegate to diagnostics_snapshot()
-    assert "diagnostics_snapshot" in src
+    assert "diagnostics_snapshot" in src  # noqa: S101
 
 
 def test_silent_threshold_constant_is_sane() -> None:
     """MQTT_SILENT_THRESHOLD_SEC must be a positive int in a useful range."""
     src = _read("const.py")
     match = re.search(r"MQTT_SILENT_THRESHOLD_SEC:\s*Final\s*=\s*(\d+)", src)
-    assert match is not None, src
+    assert match is not None, src  # noqa: S101
     threshold = int(match.group(1))
     # Real Jackery heartbeats every ~30 s; we want to flag silence
     # well after that but before users complain about stale data.
-    assert 60 <= threshold <= 1800, threshold  # noqa: PLR2004
+    assert 60 <= threshold <= 1800, threshold  # noqa: PLR2004, S101
 
 
 def test_seconds_since_last_message_handles_no_messages() -> None:
@@ -245,13 +251,13 @@ def test_seconds_since_last_message_handles_no_messages() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None, "_seconds_since_last_message not found"
+    assert match is not None, "_seconds_since_last_message not found"  # noqa: S101
     body = match.group(0)
     # Returns None if last_message_at is None
-    assert "if self._last_message_at is None" in body, body
-    assert "return None" in body, body
+    assert "if self._last_message_at is None" in body, body  # noqa: S101
+    assert "return None" in body, body  # noqa: S101
     # Never returns negative values
-    assert "max(0.0," in body or "max(0," in body, body
+    assert "max(0.0," in body or "max(0," in body, body  # noqa: S101
 
 
 def test_silent_detector_only_active_when_connected() -> None:
@@ -266,11 +272,11 @@ def test_silent_detector_only_active_when_connected() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None
+    assert match is not None  # noqa: S101
     body = match.group(0)
-    assert "if not self._connected" in body, body
+    assert "if not self._connected" in body, body  # noqa: S101
     # Must return False before flagging silence
-    assert "return False" in body, body
+    assert "return False" in body, body  # noqa: S101
 
 
 def test_keepalive_is_set_on_connect() -> None:
@@ -283,7 +289,7 @@ def test_keepalive_is_set_on_connect() -> None:
     keepalive_lines = [
         line.strip() for line in src.splitlines() if "keepalive=" in line
     ]
-    assert keepalive_lines == ["keepalive=MQTT_KEEPALIVE_SEC,"]
+    assert keepalive_lines == ["keepalive=MQTT_KEEPALIVE_SEC,"]  # noqa: S101
 
 
 def test_silent_threshold_logic_unit() -> None:
@@ -314,27 +320,27 @@ def test_silent_threshold_logic_unit() -> None:
     stale = (now - datetime.timedelta(seconds=900)).isoformat()
 
     # Healthy: just received a message
-    assert silent(True, fresh, fresh, now) is False
+    assert silent(True, fresh, fresh, now) is False  # noqa: S101
     # Stale: last message 15 minutes ago
-    assert silent(True, stale, stale, now) is True
+    assert silent(True, stale, stale, now) is True  # noqa: S101
     # Disconnected: never silent
-    assert silent(False, stale, stale, now) is False
+    assert silent(False, stale, stale, now) is False  # noqa: S101
     # Connected but never received a message AND just connected: not silent yet
-    assert silent(True, None, fresh, now) is False
+    assert silent(True, None, fresh, now) is False  # noqa: S101
     # Connected but never received a message AND been connected for 15 min: silent
-    assert silent(True, None, stale, now) is True
+    assert silent(True, None, stale, now) is True  # noqa: S101
 
 
 def test_coordinator_refresh_does_not_suppress_reauth_failures() -> None:
     """Scheduled coordinator polling must not wrap auth failures."""
     src = _read("coordinator.py")
-    assert "async def _async_periodic_refresh" not in src
-    assert "async_track_time_interval" not in src
-    assert "update_interval=update_interval" in src
+    assert "async def _async_periodic_refresh" not in src  # noqa: S101
+    assert "async_track_time_interval" not in src  # noqa: S101
+    assert "update_interval=update_interval" in src  # noqa: S101
     match = re.search(r"async def _async_update_data\(.*?\n    # --", src, re.DOTALL)
-    assert match is not None
+    assert match is not None  # noqa: S101
     body = match.group(0)
-    assert "_raise_config_entry_auth_failed" in body, body
+    assert "_raise_config_entry_auth_failed" in body, body  # noqa: S101
 
 
 def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
@@ -352,42 +358,44 @@ def test_passive_disconnect_triggers_immediate_reconnect_recovery() -> None:
     coord_src = _read("coordinator.py")
 
     # MQTT client surfaces the disconnect_callback parameter.
-    assert (
+    assert (  # noqa: S101
         "disconnect_callback: Callable[[], Awaitable[None]] | None = None" in mqtt_src
     ), mqtt_src
-    assert "self._disconnect_callback = disconnect_callback" in mqtt_src, mqtt_src
+    assert "self._disconnect_callback = disconnect_callback" in mqtt_src, mqtt_src  # noqa: S101
 
     # The session runner routes through the callback only after a real
     # session — not after a CONNACK rejection.
     runner_match = re.search(
-        r"async def _async_run_session\(.*?(?=\n    def |\n    async def |\n    @|\nclass )",
+        r"async def _async_run_session\(.*?(?="
+        r"\n    def |\n    async def |\n    @|\nclass )",
         mqtt_src,
         re.DOTALL,
     )
-    assert runner_match is not None
+    assert runner_match is not None  # noqa: S101
     body = runner_match.group(0)
-    assert "was_connected = connected" in body, body
-    assert "self._disconnect_callback is not None" in body, body
-    assert '"disconnect-recover"' in body, body
+    assert "was_connected = connected" in body, body  # noqa: S101
+    assert "self._disconnect_callback is not None" in body, body  # noqa: S101
+    assert '"disconnect-recover"' in body, body  # noqa: S101
 
     # Coordinator wires the disconnect callback at client construction.
-    assert "disconnect_callback=self._async_handle_mqtt_disconnect" in coord_src, (
+    assert "disconnect_callback=self._async_handle_mqtt_disconnect" in coord_src, (  # noqa: S101
         coord_src
     )
 
     # Recovery handler resets the throttle and force-reconnects.
     handler_match = re.search(
-        r"async def _async_handle_mqtt_disconnect\(self\).*?(?=\n    async def |\n    @|\nclass |\n    def )",
+        r"async def _async_handle_mqtt_disconnect\(self\).*?(?="
+        r"\n    async def |\n    @|\nclass |\n    def )",
         coord_src,
         re.DOTALL,
     )
-    assert handler_match is not None
+    assert handler_match is not None  # noqa: S101
     handler_body = handler_match.group(0)
-    assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body
-    assert "_async_ensure_mqtt(force=True" in handler_body, (
+    assert "self._last_mqtt_connect_attempt = 0.0" in handler_body, handler_body  # noqa: S101
+    assert "_async_ensure_mqtt(force=True" in handler_body, (  # noqa: S101
         handler_body
     )  # may also have wait_connected=True
-    assert "JackeryAuthError" in handler_body, handler_body
+    assert "JackeryAuthError" in handler_body, handler_body  # noqa: S101
 
 
 def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
@@ -403,33 +411,33 @@ def test_failed_http_refresh_does_not_advance_mqtt_keepalive() -> None:
         src,
         re.DOTALL,
     )
-    assert match is not None
+    assert match is not None  # noqa: S101
     body = match.group(0)
-    assert "finally:" not in body, body
-    assert (
+    assert "finally:" not in body, body  # noqa: S101
+    assert (  # noqa: S101
         "self._last_http_refresh_completed_monotonic =" in body
     )  # may use intermediate variable
     # Find first assignment of _last_http_refresh_completed_monotonic
-    import re as _re
 
     m = _re.search(r"self._last_http_refresh_completed_monotonic = ", body)
-    assert m is not None
+    assert m is not None  # noqa: S101
     assignment_offset = m.start()
     # Keepalive advance is gated by property_fetch_completed so skipped
     # HTTP refreshes (when MQTT is live) do not advance the keepalive window.
-    assert "if property_fetch_completed:" in body, "guard missing"
+    assert "if property_fetch_completed:" in body, "guard missing"  # noqa: S101
     gate_m = _re.search(r"if property_fetch_completed:", body)
-    assert gate_m is not None
+    assert gate_m is not None  # noqa: S101
     gate_offset = gate_m.start()
-    assert assignment_offset > gate_offset, "assignment must be after gate"
+    assert assignment_offset > gate_offset, "assignment must be after gate"  # noqa: S101
 
     skip_match = re.search(
-        r"def _should_skip_fast_property_fetch\(self\).*?(?=\n    def |\n    @|\nclass )",
+        r"def _should_skip_fast_property_fetch\(self\).*?(?="
+        r"\n    def |\n    @|\nclass )",
         src,
         _re.DOTALL,
     )
-    assert skip_match is not None, "_should_skip_fast_property_fetch not found"
+    assert skip_match is not None, "_should_skip_fast_property_fetch not found"  # noqa: S101
     skip_body = skip_match.group(0)
     # Function must guard against empty data and missing MQTT
-    assert "self.data" in skip_body or "self._mqtt" in skip_body, skip_body
-    assert "return False" in skip_body, skip_body
+    assert "self.data" in skip_body or "self._mqtt" in skip_body, skip_body  # noqa: S101
+    assert "return False" in skip_body, skip_body  # noqa: S101

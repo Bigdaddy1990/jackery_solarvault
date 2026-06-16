@@ -35,8 +35,8 @@ def test_local_mqtt_diagnostics_disabled_when_bridge_off() -> None:
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result["enabled"] is False
-    assert result["disabled_reason"] == "bridge_disabled"
+    assert result["enabled"] is False  # noqa: S101
+    assert result["disabled_reason"] == "bridge_disabled"  # noqa: S101
 
 
 def test_local_mqtt_diagnostics_blocks_broad_topic_filter() -> None:
@@ -53,8 +53,8 @@ def test_local_mqtt_diagnostics_blocks_broad_topic_filter() -> None:
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result["enabled"] is False
-    assert result["disabled_reason"] == "broad_topic_filter_blocked"
+    assert result["enabled"] is False  # noqa: S101
+    assert result["disabled_reason"] == "broad_topic_filter_blocked"  # noqa: S101
 
 
 def test_local_mqtt_diagnostics_requires_topic_filter() -> None:
@@ -71,5 +71,5 @@ def test_local_mqtt_diagnostics_requires_topic_filter() -> None:
 
     result = _local_mqtt_diagnostics(hass, entry, redactions_disabled=False)
 
-    assert result["enabled"] is False
-    assert result["disabled_reason"] == "missing_topic_filter"
+    assert result["enabled"] is False  # noqa: S101
+    assert result["disabled_reason"] == "missing_topic_filter"  # noqa: S101

@@ -1,7 +1,34 @@
 """Source-level MQTT protocol contract checks."""
 
 import ast
+import asyncio
 from pathlib import Path
+
+from custom_components.jackery_solarvault.const import (
+    ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    FIELD_ACTION_ID,
+    FIELD_BAT_OUT_PW,
+    FIELD_BAT_SOC,
+    FIELD_BODY,
+    FIELD_CMD,
+    FIELD_MESSAGE_TYPE,
+    FIELD_SOC,
+    FIELD_THIRD_PARTY_MQTT_ENABLE,
+    FIELD_THIRD_PARTY_MQTT_IP,
+    FIELD_THIRD_PARTY_MQTT_PASSWORD,
+    FIELD_THIRD_PARTY_MQTT_PORT,
+    FIELD_THIRD_PARTY_MQTT_USERNAME,
+    FIELD_WNAME,
+    MQTT_CMD_QUERY_DEVICE_PROPERTY,
+    MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    PAYLOAD_MQTT_LAST,
+    PAYLOAD_PROPERTIES,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
@@ -26,14 +53,17 @@ def _read(path: Path) -> str:
 
 
 def _function_source(path: Path, name: str) -> str:
-    """Return the exact source text for a top-level function or async function defined in a Python file.
+    """Return the exact source text for a top-level function or async function defined.
+
+    in a Python file.
 
     Parameters:
         path (Path): Path to the Python source file to read.
         name (str): Name of the function or async function to extract.
 
     Returns:
-        str: The source code lines comprising the named function, including its signature and body.
+        str: The source code lines comprising the named function, including its
+        signature and body.
 
     Raises:
         AssertionError: If the named function is not found in the given file.
@@ -46,9 +76,10 @@ def _function_source(path: Path, name: str) -> str:
             isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and node.name == name
         ):
-            assert node.end_lineno is not None
+            assert node.end_lineno is not None  # noqa: S101
             return "\n".join(lines[node.lineno - 1 : node.end_lineno])
-    raise AssertionError(f"{name} not found in {path}")  # noqa: TRY003
+    msg = f"{name} not found in {path}"
+    raise AssertionError(msg)
 
 
 def test_mqtt_setter_commands_match_app_protocol() -> None:
@@ -65,48 +96,48 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
     smali is the source of truth.
     """
     eps = _function_source(COORDINATOR_PATH, "async_set_eps")
-    assert "action_id=ACTION_ID_EPS_ENABLED" in eps
-    assert "FIELD_SW_EPS" in eps
+    assert "action_id=ACTION_ID_EPS_ENABLED" in eps  # noqa: S101
+    assert "FIELD_SW_EPS" in eps  # noqa: S101
     const_source = _read(CONST_PATH)
-    assert "ACTION_ID_EPS_ENABLED: Final = 3022" in const_source
-    assert "ACTION_ID_STANDBY: Final = 3023" in const_source
+    assert "ACTION_ID_EPS_ENABLED: Final = 3022" in const_source  # noqa: S101
+    assert "ACTION_ID_STANDBY: Final = 3023" in const_source  # noqa: S101
 
     # 3038 maxOutPw routes via DevicePropertyChange (cmd=107).
     max_output = _function_source(COORDINATOR_PATH, "async_set_max_output_power")
-    assert "message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE" in max_output
-    assert "cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE" in max_output
+    assert "message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE" in max_output  # noqa: S101
+    assert "cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE" in max_output  # noqa: S101
 
     # 3028 carries BOTH SOC limits in one frame — verified against smali.
     soc_limits = _function_source(COORDINATOR_PATH, "async_set_soc_limits")
-    assert "ACTION_ID_SOC_LIMITS" in soc_limits
-    assert "ACTION_ID_SOC_CHARGE_LIMIT" not in soc_limits
-    assert "ACTION_ID_SOC_DISCHARGE_LIMIT" not in soc_limits
-    assert "FIELD_SOC_CHG_LIMIT" in soc_limits
-    assert "FIELD_SOC_DISCHG_LIMIT" in soc_limits
-    assert "ACTION_ID_SOC_LIMITS: Final = 3028" in const_source
+    assert "ACTION_ID_SOC_LIMITS" in soc_limits  # noqa: S101
+    assert "ACTION_ID_SOC_CHARGE_LIMIT" not in soc_limits  # noqa: S101
+    assert "ACTION_ID_SOC_DISCHARGE_LIMIT" not in soc_limits  # noqa: S101
+    assert "FIELD_SOC_CHG_LIMIT" in soc_limits  # noqa: S101
+    assert "FIELD_SOC_DISCHG_LIMIT" in soc_limits  # noqa: S101
+    assert "ACTION_ID_SOC_LIMITS: Final = 3028" in const_source  # noqa: S101
 
     # 3026 SUB_SET_CT_SCHEDULE_PHASE — body verified 2026-05-14.
     ct_phase = _function_source(COORDINATOR_PATH, "async_set_ct_phase")
-    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in ct_phase
-    assert "ACTION_ID_CT_PHASE" in ct_phase
-    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in ct_phase
-    assert "SUBDEVICE_DEV_TYPE_CT" in ct_phase
-    assert "FIELD_SCHE_PHASE" in ct_phase
+    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in ct_phase  # noqa: S101
+    assert "ACTION_ID_CT_PHASE" in ct_phase  # noqa: S101
+    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in ct_phase  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_CT" in ct_phase  # noqa: S101
+    assert "FIELD_SCHE_PHASE" in ct_phase  # noqa: S101
 
     query_combine = _function_source(COORDINATOR_PATH, "async_query_system_info")
-    assert "ACTION_ID_QUERY_COMBINE_DATA" in query_combine
-    assert "cmd=MQTT_CMD_QUERY_COMBINE_DATA" in query_combine
+    assert "ACTION_ID_QUERY_COMBINE_DATA" in query_combine  # noqa: S101
+    assert "cmd=MQTT_CMD_QUERY_COMBINE_DATA" in query_combine  # noqa: S101
 
     query_device = _function_source(COORDINATOR_PATH, "async_query_device_info")
-    assert "MQTT_MESSAGE_QUERY_DEVICE_PROPERTY" in query_device
-    assert "ACTION_ID_QUERY_DEVICE_PROPERTY" in query_device
-    assert "cmd=MQTT_CMD_QUERY_DEVICE_PROPERTY" in query_device
+    assert "MQTT_MESSAGE_QUERY_DEVICE_PROPERTY" in query_device  # noqa: S101
+    assert "ACTION_ID_QUERY_DEVICE_PROPERTY" in query_device  # noqa: S101
+    assert "cmd=MQTT_CMD_QUERY_DEVICE_PROPERTY" in query_device  # noqa: S101
 
     query_backfill = _function_source(
         COORDINATOR_PATH,
         "_async_query_system_info_for_missing",
     )
-    assert "async_query_device_info" in query_backfill
+    assert "async_query_device_info" in query_backfill  # noqa: S101
 
 
 def test_third_party_mqtt_bridge_setter_uses_smali_protocol() -> None:
@@ -114,23 +145,23 @@ def test_third_party_mqtt_bridge_setter_uses_smali_protocol() -> None:
     const_source = _read(CONST_PATH)
     handler = _function_source(COORDINATOR_PATH, "_async_handle_mqtt_message")
     # ActionIds / cmd values straight from HomeCmdAction.smali.
-    assert "ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG: Final = 3046" in const_source
-    assert "ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = (" in const_source
-    assert "3047  # cmd=114 QueryThirdPartMQTTConfig" in const_source
-    assert (
+    assert "ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG: Final = 3046" in const_source  # noqa: S101
+    assert "ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = (" in const_source  # noqa: S101
+    assert "3047  # cmd=114 QueryThirdPartMQTTConfig" in const_source  # noqa: S101
+    assert (  # noqa: S101
         'PAYLOAD_THIRD_PARTY_MQTT_CONFIG: Final = "third_party_mqtt_config"'
         in const_source
     )
-    assert (
+    assert (  # noqa: S101
         'MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG: Final = "ThirdPartMQTTConfig"'
         in const_source
     )
-    assert (
+    assert (  # noqa: S101
         'MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "QueryThirdPartMQTTConfig"'
         in const_source
     )
-    assert "MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113" in const_source
-    assert "MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114" in const_source
+    assert "MQTT_CMD_THIRD_PARTY_MQTT_CONFIG: Final = 113" in const_source  # noqa: S101
+    assert "MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = 114" in const_source  # noqa: S101
 
     # Body keys per ThirdPartyMqttBody.smali.
     for line in (
@@ -141,12 +172,12 @@ def test_third_party_mqtt_bridge_setter_uses_smali_protocol() -> None:
         'FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"',
         'FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"',
     ):
-        assert line in const_source
+        assert line in const_source  # noqa: S101
 
     setter = _function_source(COORDINATOR_PATH, "async_set_third_party_mqtt_config")
-    assert "MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG" in setter
-    assert "ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG" in setter
-    assert "MQTT_CMD_THIRD_PARTY_MQTT_CONFIG" in setter
+    assert "MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG" in setter  # noqa: S101
+    assert "ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG" in setter  # noqa: S101
+    assert "MQTT_CMD_THIRD_PARTY_MQTT_CONFIG" in setter  # noqa: S101
     for field in (
         "FIELD_THIRD_PARTY_MQTT_ENABLE",
         "FIELD_THIRD_PARTY_MQTT_IP",
@@ -155,51 +186,35 @@ def test_third_party_mqtt_bridge_setter_uses_smali_protocol() -> None:
         "FIELD_THIRD_PARTY_MQTT_PASSWORD",
         "FIELD_THIRD_PARTY_MQTT_TOKEN",
     ):
-        assert field in setter
+        assert field in setter  # noqa: S101
 
     query = _function_source(COORDINATOR_PATH, "async_query_third_party_mqtt_config")
-    assert "MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG" in query
-    assert "ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG" in query
-    assert "MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG" in query
-    assert "is_third_party_mqtt_config =" in handler
-    assert "updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG]" in handler
-    assert "_THIRD_PARTY_MQTT_CONFIG_KEYS" in _read(COORDINATOR_PATH)
+    assert "MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG" in query  # noqa: S101
+    assert "ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG" in query  # noqa: S101
+    assert "MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG" in query  # noqa: S101
+    assert "is_third_party_mqtt_config =" in handler  # noqa: S101
+    assert "updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG]" in handler  # noqa: S101
+    assert "_THIRD_PARTY_MQTT_CONFIG_KEYS" in _read(COORDINATOR_PATH)  # noqa: S101
 
 
 def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
     """Third-party MQTT config responses belong in their own payload bucket."""
-    import asyncio
-
-    from custom_components.jackery_solarvault.const import (
-        ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
-        FIELD_ACTION_ID,
-        FIELD_BODY,
-        FIELD_CMD,
-        FIELD_MESSAGE_TYPE,
-        FIELD_THIRD_PARTY_MQTT_ENABLE,
-        FIELD_THIRD_PARTY_MQTT_IP,
-        FIELD_THIRD_PARTY_MQTT_PASSWORD,
-        FIELD_THIRD_PARTY_MQTT_PORT,
-        FIELD_THIRD_PARTY_MQTT_USERNAME,
-        MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
-        MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
-        PAYLOAD_PROPERTIES,
-        PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
-    )
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
 
     async def _run() -> None:
-        """Exercise the coordinator's third-party MQTT query handling and assert correct bucketing of response payload.
+        """Exercise the coordinator's third-party MQTT query handling and assert.
 
-        Creates a minimal JackerySolarVaultCoordinator instance with required stubs, injects a QueryThirdPartMQTTConfig MQTT message, and verifies the coordinator:
+        correct bucketing of response payload.
+
+        Creates a minimal JackerySolarVaultCoordinator instance with required stubs,
+        injects a QueryThirdPartMQTTConfig MQTT message, and verifies the coordinator:
         - does not merge third-party MQTT fields into the main `properties` map,
         - stores the full third-party config under `third_party_mqtt_config`,
-        - and that `_sanitize_main_properties` returns an empty dict for the provided body.
+        - and that `_sanitize_main_properties` returns an empty dict for the provided
+        body.
 
         Raises:
-            AssertionError: If any of the expected storage or sanitization conditions are not met.
+            AssertionError: If any of the expected storage or sanitization conditions
+            are not met.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"soc": 40}}}
@@ -211,7 +226,10 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:
-                _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
+                _event_or_factory (object): An event object or a zero-argument factory
+                callable that would produce an event when the debug mechanism is
+                active. This function currently ignores the argument and returns
+                without side effects.
             """
             return
 
@@ -219,7 +237,8 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             """Store a partial update payload into the test capture dictionary.
 
             Parameters:
-                new_data (dict[str, object]): Partial update payload to capture under the key "data".
+                new_data (dict[str, object]): Partial update payload to capture under
+                the key "data".
             """
             captured["data"] = new_data
 
@@ -246,14 +265,14 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         )
 
         data = captured["data"]
-        assert isinstance(data, dict)
+        assert isinstance(data, dict)  # noqa: S101
         entry = data["dev"]
-        assert isinstance(entry, dict)
-        assert FIELD_THIRD_PARTY_MQTT_IP not in entry[PAYLOAD_PROPERTIES]
-        assert FIELD_THIRD_PARTY_MQTT_PORT not in entry[PAYLOAD_PROPERTIES]
-        assert FIELD_THIRD_PARTY_MQTT_ENABLE not in entry[PAYLOAD_PROPERTIES]
-        assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == body
-        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # noqa: SLF001
+        assert isinstance(entry, dict)  # noqa: S101
+        assert FIELD_THIRD_PARTY_MQTT_IP not in entry[PAYLOAD_PROPERTIES]  # noqa: S101
+        assert FIELD_THIRD_PARTY_MQTT_PORT not in entry[PAYLOAD_PROPERTIES]  # noqa: S101
+        assert FIELD_THIRD_PARTY_MQTT_ENABLE not in entry[PAYLOAD_PROPERTIES]  # noqa: S101
+        assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == body  # noqa: S101
+        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # noqa: S101, SLF001
 
     asyncio.run(_run())
 
@@ -261,67 +280,73 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 def test_smart_plug_subdevice_protocol_is_wired() -> None:
     """Smart-plug query and setter use the app-captured subdevice protocol."""
     const_source = _read(CONST_PATH)
-    assert "ACTION_ID_SUBDEVICE_3032" in const_source
-    assert "ACTION_ID_CONTROL_SOCKET_SWITCH" in const_source
-    assert "ACTION_ID_CONTROL_SOCKET_PRIORITY" in const_source
-    assert "SUBDEVICE_DEV_TYPE_SOCKET: Final = 6" in const_source
+    assert "ACTION_ID_SUBDEVICE_3032" in const_source  # noqa: S101
+    assert "ACTION_ID_CONTROL_SOCKET_SWITCH" in const_source  # noqa: S101
+    assert "ACTION_ID_CONTROL_SOCKET_PRIORITY" in const_source  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_SOCKET: Final = 6" in const_source  # noqa: S101
 
     query = _function_source(COORDINATOR_PATH, "async_query_smart_plugs")
-    assert "ACTION_ID_SUBDEVICE_3032" in query
-    assert "MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY" in query
-    assert "SUBDEVICE_DEV_TYPE_SOCKET" in query
+    assert "ACTION_ID_SUBDEVICE_3032" in query  # noqa: S101
+    assert "MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY" in query  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_SOCKET" in query  # noqa: S101
 
     setter = _function_source(COORDINATOR_PATH, "async_set_smart_plug_switch")
-    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in setter
-    assert "ACTION_ID_CONTROL_SOCKET_SWITCH" in setter
-    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in setter
-    assert "FIELD_DEVICE_SN: plug_sn" in setter
-    assert "FIELD_SYS_SWITCH: 1 if on else 0" in setter
+    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in setter  # noqa: S101
+    assert "ACTION_ID_CONTROL_SOCKET_SWITCH" in setter  # noqa: S101
+    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in setter  # noqa: S101
+    assert "FIELD_DEVICE_SN: plug_sn" in setter  # noqa: S101
+    assert "FIELD_SYS_SWITCH: 1 if on else 0" in setter  # noqa: S101
 
     priority = _function_source(COORDINATOR_PATH, "async_set_smart_plug_priority")
-    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in priority
-    assert "ACTION_ID_CONTROL_SOCKET_PRIORITY" in priority
-    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in priority
-    assert "FIELD_DEVICE_SN: plug_sn" in priority
-    assert "FIELD_SOCKET_PRIORITY: 1 if enabled else 0" in priority
+    assert "MQTT_MESSAGE_CONTROL_SUB_DEVICE" in priority  # noqa: S101
+    assert "ACTION_ID_CONTROL_SOCKET_PRIORITY" in priority  # noqa: S101
+    assert "MQTT_CMD_CONTROL_SUB_DEVICE" in priority  # noqa: S101
+    assert "FIELD_DEVICE_SN: plug_sn" in priority  # noqa: S101
+    assert "FIELD_SOCKET_PRIORITY: 1 if enabled else 0" in priority  # noqa: S101
 
 
 def test_smart_plug_statistics_are_read_only_app_paths() -> None:
-    """Validate that smart-plug statistics are read-only and wired to the app's read-only REST/API paths.
+    """Validate that smart-plug statistics are read-only and wired to the app's.
 
-    Asserts that the integration defines the smart-plug statistic REST paths and JSON field constants, that the API exposes the endpoints using those constants and underlying `_get_json` / `_async_get_device_period_stat` helpers, and that the coordinator and sensors provide enrichment, stat ID mapping, and sensor descriptions for today/total energy with daily reset behavior.
+    read-only REST/API paths.
+
+    Asserts that the integration defines the smart-plug statistic REST paths and JSON
+    field constants, that the API exposes the endpoints using those constants and
+    underlying `_get_json` / `_async_get_device_period_stat` helpers, and that the
+    coordinator and sensors provide enrichment, stat ID mapping, and sensor
+    descriptions for today/total energy with daily reset behavior.
     """
     const_source = _read(CONST_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     sensor_source = _read(SENSOR_PATH)
 
-    assert "DEVICE_SOCKET_STATISTIC_PATH" in const_source
-    assert '"/v1/device/stat/smartSocketStatistic"' in const_source
-    assert 'DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"' in const_source
-    assert 'FIELD_SMART_SOCKET_ID: Final = "smartSocketId"' in const_source
-    assert 'FIELD_TODAY_ENERGY: Final = "todayEgy"' in const_source
-    assert 'FIELD_TOTAL_ENERGY: Final = "totalEgy"' in const_source
+    assert "DEVICE_SOCKET_STATISTIC_PATH" in const_source  # noqa: S101
+    assert '"/v1/device/stat/smartSocketStatistic"' in const_source  # noqa: S101
+    assert 'DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"' in const_source  # noqa: S101
+    assert 'FIELD_SMART_SOCKET_ID: Final = "smartSocketId"' in const_source  # noqa: S101
+    assert 'FIELD_TODAY_ENERGY: Final = "todayEgy"' in const_source  # noqa: S101
+    assert 'FIELD_TOTAL_ENERGY: Final = "totalEgy"' in const_source  # noqa: S101
 
     panel = _function_source(API_PATH, "async_get_device_socket_statistic")
-    assert "DEVICE_SOCKET_STATISTIC_PATH" in panel
-    assert "FIELD_SMART_SOCKET_ID" in panel
-    assert "_get_json" in panel
+    assert "DEVICE_SOCKET_STATISTIC_PATH" in panel  # noqa: S101
+    assert "FIELD_SMART_SOCKET_ID" in panel  # noqa: S101
+    assert "_get_json" in panel  # noqa: S101
 
     chart = _function_source(API_PATH, "async_get_device_socket_stat")
-    assert "DEVICE_SOCKET_STAT_PATH" in chart
-    assert "_async_get_device_period_stat" in chart
+    assert "DEVICE_SOCKET_STAT_PATH" in chart  # noqa: S101
+    assert "_async_get_device_period_stat" in chart  # noqa: S101
 
-    assert "_enrich_smart_plug_statistics" in coordinator_source
-    assert "async_get_device_socket_statistic" in coordinator_source
-    assert "_subdevice_stat_id" in coordinator_source
-    assert "SUBDEVICE_DEV_TYPE_SOCKET" in coordinator_source
-    assert "FIELD_TODAY_ENERGY" in coordinator_source
-    assert "FIELD_TOTAL_ENERGY" in coordinator_source
+    assert "_enrich_smart_plug_statistics" in coordinator_source  # noqa: S101
+    assert "async_get_device_socket_statistic" in coordinator_source  # noqa: S101
+    assert "_subdevice_stat_id" in coordinator_source  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_SOCKET" in coordinator_source  # noqa: S101
+    assert "FIELD_TODAY_ENERGY" in coordinator_source  # noqa: S101
+    assert "FIELD_TOTAL_ENERGY" in coordinator_source  # noqa: S101
 
-    assert "smart_plug_today_energy" in sensor_source
-    assert "smart_plug_total_energy" in sensor_source
-    assert "SMART_PLUG_STATISTIC_FIELDS" in sensor_source
-    assert "reset_period=DATE_TYPE_DAY" in sensor_source
+    assert "smart_plug_today_energy" in sensor_source  # noqa: S101
+    assert "smart_plug_total_energy" in sensor_source  # noqa: S101
+    assert "SMART_PLUG_STATISTIC_FIELDS" in sensor_source  # noqa: S101
+    assert "reset_period=DATE_TYPE_DAY" in sensor_source  # noqa: S101
 
 
 def test_meter_head_subdevice_protocol_is_wired() -> None:
@@ -329,51 +354,51 @@ def test_meter_head_subdevice_protocol_is_wired() -> None:
     const_source = _read(CONST_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     sensor_source = _read(SENSOR_PATH)
-    assert "ACTION_ID_SUBDEVICE_3033" in const_source
-    assert "SUBDEVICE_DEV_TYPE_METER_HEAD: Final = 4" in const_source
-    assert 'PAYLOAD_METER_HEADS: Final = "meter_heads"' in const_source
-    assert "DEVICE_METER_STAT_PATH" in const_source
-    assert '"/v1/device/stat/meter"' in const_source
-    assert 'FIELD_CHARGING_ENERGY: Final = "chargingEnergy"' in const_source
-    assert 'FIELD_DISCHARGING_ENERGY: Final = "dischargingEnergy"' in const_source
+    assert "ACTION_ID_SUBDEVICE_3033" in const_source  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_METER_HEAD: Final = 4" in const_source  # noqa: S101
+    assert 'PAYLOAD_METER_HEADS: Final = "meter_heads"' in const_source  # noqa: S101
+    assert "DEVICE_METER_STAT_PATH" in const_source  # noqa: S101
+    assert '"/v1/device/stat/meter"' in const_source  # noqa: S101
+    assert 'FIELD_CHARGING_ENERGY: Final = "chargingEnergy"' in const_source  # noqa: S101
+    assert 'FIELD_DISCHARGING_ENERGY: Final = "dischargingEnergy"' in const_source  # noqa: S101
 
     query = _function_source(COORDINATOR_PATH, "async_query_meter_heads")
-    assert "ACTION_ID_SUBDEVICE_3033" in query
-    assert "MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY" in query
-    assert "SUBDEVICE_DEV_TYPE_METER_HEAD" in query
+    assert "ACTION_ID_SUBDEVICE_3033" in query  # noqa: S101
+    assert "MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY" in query  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPE_METER_HEAD" in query  # noqa: S101
 
     panel = _function_source(API_PATH, "async_get_device_meter_stat")
-    assert "DEVICE_METER_STAT_PATH" in panel
-    assert "FIELD_DEVICE_ID" in panel
-    assert "_get_json" in panel
+    assert "DEVICE_METER_STAT_PATH" in panel  # noqa: S101
+    assert "FIELD_DEVICE_ID" in panel  # noqa: S101
+    assert "_get_json" in panel  # noqa: S101
 
     merge = _function_source(COORDINATOR_PATH, "_merge_subdevice_data")
     # The HomeSubBody.CollectorBody array key is ``collectors`` (verified
     # against the Jackery app smali); the integration looks it up via the
     # named ``FIELD_COLLECTORS`` constant.
-    assert "FIELD_COLLECTORS" in merge
-    assert 'FIELD_COLLECTORS: Final = "collectors"' in const_source
-    assert "PAYLOAD_METER_HEADS" in merge
-    assert "_merge_subdevice_lists_by_sn" in merge
+    assert "FIELD_COLLECTORS" in merge  # noqa: S101
+    assert 'FIELD_COLLECTORS: Final = "collectors"' in const_source  # noqa: S101
+    assert "PAYLOAD_METER_HEADS" in merge  # noqa: S101
+    assert "_merge_subdevice_lists_by_sn" in merge  # noqa: S101
 
     query_backfill = _function_source(
         COORDINATOR_PATH,
         "_async_query_subdevices_for_missing",
     )
-    assert "_has_meter_head_accessory" in query_backfill
-    assert "async_query_meter_heads" in query_backfill
+    assert "_has_meter_head_accessory" in query_backfill  # noqa: S101
+    assert "async_query_meter_heads" in query_backfill  # noqa: S101
 
-    assert "_enrich_meter_head_statistics" in coordinator_source
-    assert "async_get_device_meter_stat" in coordinator_source
-    assert "_subdevice_stat_id" in coordinator_source
-    assert "FIELD_CHARGING_ENERGY" in coordinator_source
-    assert "FIELD_DISCHARGING_ENERGY" in coordinator_source
+    assert "_enrich_meter_head_statistics" in coordinator_source  # noqa: S101
+    assert "async_get_device_meter_stat" in coordinator_source  # noqa: S101
+    assert "_subdevice_stat_id" in coordinator_source  # noqa: S101
+    assert "FIELD_CHARGING_ENERGY" in coordinator_source  # noqa: S101
+    assert "FIELD_DISCHARGING_ENERGY" in coordinator_source  # noqa: S101
 
-    assert "METER_HEAD_SENSOR_DESCRIPTIONS" in sensor_source
-    assert "JackeryMeterHeadSensor" in sensor_source
-    assert "meter_head_charging_energy" in sensor_source
-    assert "meter_head_discharging_energy" in sensor_source
-    assert "_attr_entity_registry_enabled_default = False" in sensor_source
+    assert "METER_HEAD_SENSOR_DESCRIPTIONS" in sensor_source  # noqa: S101
+    assert "JackeryMeterHeadSensor" in sensor_source  # noqa: S101
+    assert "meter_head_charging_energy" in sensor_source  # noqa: S101
+    assert "meter_head_discharging_energy" in sensor_source  # noqa: S101
+    assert "_attr_entity_registry_enabled_default = False" in sensor_source  # noqa: S101
 
 
 def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
@@ -387,10 +412,10 @@ def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
         "SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY: Final = 9",
         "SUBDEVICE_DEV_TYPE_WATER_LEAK: Final = 10",
     ):
-        assert name in const_source
+        assert name in const_source  # noqa: S101
 
-    assert "SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION" in const_source
-    assert "SUBDEVICE_DEV_TYPES_ENUM_ONLY" in const_source
+    assert "SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION" in const_source  # noqa: S101
+    assert "SUBDEVICE_DEV_TYPES_ENUM_ONLY" in const_source  # noqa: S101
     queryable = const_source.split("SUBDEVICE_DEV_TYPES_WITH_QUERY_ACTION", 1)[1].split(
         "SUBDEVICE_DEV_TYPES_ENUM_ONLY",
         1,
@@ -406,10 +431,10 @@ def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
         "SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY",
         "SUBDEVICE_DEV_TYPE_WATER_LEAK",
     ):
-        assert f"{name}," not in queryable
-        assert f"{name}," in enum_only
+        assert f"{name}," not in queryable  # noqa: S101
+        assert f"{name}," in enum_only  # noqa: S101
 
-    assert (
+    assert (  # noqa: S101
         "MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3032, 3033, 3037})"
         in const_source
     )
@@ -420,32 +445,28 @@ def test_mqtt_action_id_routing_uses_shared_integer_parser() -> None:
     handler = _function_source(COORDINATOR_PATH, "_async_handle_mqtt_message")
     subdevice = _function_source(COORDINATOR_PATH, "_is_subdevice_payload")
 
-    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in handler
-    assert "cmd = first_nonblank_int(body.get(FIELD_CMD))" in handler
-    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in subdevice
-    assert "action_id = payload.get(FIELD_ACTION_ID)" not in handler
-    assert "body.get(FIELD_CMD) ==" not in handler
-    assert "int(action_id)" not in subdevice
+    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in handler  # noqa: S101
+    assert "cmd = first_nonblank_int(body.get(FIELD_CMD))" in handler  # noqa: S101
+    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in subdevice  # noqa: S101
+    assert "action_id = payload.get(FIELD_ACTION_ID)" not in handler  # noqa: S101
+    assert "body.get(FIELD_CMD) ==" not in handler  # noqa: S101
+    assert "int(action_id)" not in subdevice  # noqa: S101
 
 
 def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
     """MQTT command routing tolerates text cmd IDs from payloads."""
-    import asyncio
-
-    from custom_components.jackery_solarvault.const import (
-        FIELD_BODY,
-        FIELD_CMD,
-        MQTT_CMD_QUERY_DEVICE_PROPERTY,
-        PAYLOAD_PROPERTIES,
-    )
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
 
     async def _run() -> None:
-        """Run a minimal coordinator test that sends an MQTT action message containing a text-form command and verifies the device property update is applied.
+        """Run a minimal coordinator test that sends an MQTT action message containing.
 
-        This helper constructs a minimal JackerySolarVaultCoordinator instance with stubbed debug and push callbacks, delivers an MQTT "action" payload whose `FIELD_CMD` is a text string (e.g., "{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0") and a body containing a `new` property, and asserts the coordinator merges that `new` value into the device's `PAYLOAD_PROPERTIES` and that a partial update was pushed.
+        a text-form command and verifies the device property update is applied.
+
+        This helper constructs a minimal JackerySolarVaultCoordinator instance with
+        stubbed debug and push callbacks, delivers an MQTT "action" payload whose
+        `FIELD_CMD` is a text string (e.g., "{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0") and a
+        body containing a `new` property, and asserts the coordinator merges that `new`
+        value into the device's `PAYLOAD_PROPERTIES` and that a partial update was
+        pushed.
         """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"old": 1}}}
@@ -457,7 +478,10 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:
-                _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
+                _event_or_factory (object): An event object or a zero-argument factory
+                callable that would produce an event when the debug mechanism is
+                active. This function currently ignores the argument and returns
+                without side effects.
             """
             return
 
@@ -465,7 +489,8 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
             """Store a partial update payload into the test capture dictionary.
 
             Parameters:
-                new_data (dict[str, object]): Partial update payload to capture under the key "data".
+                new_data (dict[str, object]): Partial update payload to capture under
+                the key "data".
             """
             captured["data"] = new_data
 
@@ -485,35 +510,33 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         )
 
         data = captured["data"]
-        assert isinstance(data, dict)
-        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2  # noqa: PLR2004
+        assert isinstance(data, dict)  # noqa: S101
+        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2  # noqa: PLR2004, S101
 
     asyncio.run(_run())
 
 
 def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> None:
-    """Verify _is_subdevice_payload accepts numeric action IDs provided as strings and rejects invalid non-numeric values.
+    """Verify _is_subdevice_payload accepts numeric action IDs provided as strings and.
 
-    Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice action IDs, while `True` and `float('nan')` are rejected.
+    rejects invalid non-numeric values.
+
+    Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice
+    action IDs, while `True` and `float('nan')` are rejected.
     """
-    from custom_components.jackery_solarvault.const import FIELD_ACTION_ID
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: S101, SLF001
         {FIELD_ACTION_ID: "3032"},
         {},
     )
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: S101, SLF001
         {FIELD_ACTION_ID: "3032.0"},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: S101, SLF001
         {FIELD_ACTION_ID: True},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: SLF001
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # noqa: S101, SLF001
         {FIELD_ACTION_ID: float("nan")},
         {},
     )
@@ -526,24 +549,13 @@ def test_mqtt_payload_buckets_survive_http_refresh() -> None:
         ")",
         1,
     )[0]
-    assert "PAYLOAD_CT_METER" in preserved
-    assert "PAYLOAD_METER_HEADS" in preserved
-    assert "PAYLOAD_SMART_PLUGS" in preserved
+    assert "PAYLOAD_CT_METER" in preserved  # noqa: S101
+    assert "PAYLOAD_METER_HEADS" in preserved  # noqa: S101
+    assert "PAYLOAD_SMART_PLUGS" in preserved  # noqa: S101
 
 
 def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
     """Stale HTTP property snapshots must not create SOC spikes."""
-    from custom_components.jackery_solarvault.const import (
-        FIELD_BAT_OUT_PW,
-        FIELD_BAT_SOC,
-        FIELD_SOC,
-        FIELD_WNAME,
-        PAYLOAD_MQTT_LAST,
-        PAYLOAD_PROPERTIES,
-    )
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
 
     class _Mqtt:
         def __init__(self, *, silent: bool) -> None:
@@ -554,8 +566,10 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
 
             Returns:
                 snapshot (dict[str, object]): Mapping with:
-                    - "connected": `True` if the coordinator is currently connected to MQTT.
-                    - "mqtt_silent_for_too_long": boolean flag taken from `self.silent` indicating whether MQTT has been silent for too long.
+                    - "connected": `True` if the coordinator is currently connected to
+                    MQTT.
+                    - "mqtt_silent_for_too_long": boolean flag taken from `self.silent`
+                    indicating whether MQTT has been silent for too long.
             """
             return {
                 "connected": True,
@@ -582,69 +596,76 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
     self._mqtt = _Mqtt(silent=False)
     guarded = self._http_properties_with_live_overrides(entry, http_props)
 
-    assert guarded[FIELD_SOC] == 49  # noqa: PLR2004
-    assert guarded[FIELD_BAT_SOC] == 51  # noqa: PLR2004
-    assert guarded[FIELD_BAT_OUT_PW] == 300  # noqa: PLR2004
-    assert guarded[FIELD_WNAME] == "new-wifi"
+    assert guarded[FIELD_SOC] == 49  # noqa: PLR2004, S101
+    assert guarded[FIELD_BAT_SOC] == 51  # noqa: PLR2004, S101
+    assert guarded[FIELD_BAT_OUT_PW] == 300  # noqa: PLR2004, S101
+    assert guarded[FIELD_WNAME] == "new-wifi"  # noqa: S101
 
     self._mqtt = _Mqtt(silent=True)
     unguarded = self._http_properties_with_live_overrides(entry, http_props)
 
-    assert unguarded[FIELD_SOC] == 78  # noqa: PLR2004
-    assert unguarded[FIELD_BAT_SOC] == 74  # noqa: PLR2004
-    assert unguarded[FIELD_BAT_OUT_PW] == 163  # noqa: PLR2004
+    assert unguarded[FIELD_SOC] == 78  # noqa: PLR2004, S101
+    assert unguarded[FIELD_BAT_SOC] == 74  # noqa: PLR2004, S101
+    assert unguarded[FIELD_BAT_OUT_PW] == 163  # noqa: PLR2004, S101
 
 
 def test_fault_alarm_report_is_routed_as_alarm_payload() -> None:
     """UploadDeviceAlert actionId 3042 must not be merged into properties."""
     const_source = _read(CONST_PATH)
-    assert (
+    assert (  # noqa: S101
         'MQTT_MESSAGE_UPLOAD_DEVICE_ALERT: Final = "UploadDeviceAlert"' in const_source
     )
-    assert "MQTT_CMD_UPLOAD_DEVICE_ALERT: Final = 122" in const_source
-    assert "ACTION_ID_FAULT_ALARM_REPORT: Final = 3042" in const_source
-    assert "MQTT_ACTION_IDS_ALARM" in const_source
+    assert "MQTT_CMD_UPLOAD_DEVICE_ALERT: Final = 122" in const_source  # noqa: S101
+    assert "ACTION_ID_FAULT_ALARM_REPORT: Final = 3042" in const_source  # noqa: S101
+    assert "MQTT_ACTION_IDS_ALARM" in const_source  # noqa: S101
 
     handler = _function_source(COORDINATOR_PATH, "_async_handle_mqtt_message")
-    assert "is_alarm =" in handler
-    assert "MQTT_MESSAGE_UPLOAD_DEVICE_ALERT" in handler
-    assert "MQTT_CMD_UPLOAD_DEVICE_ALERT" in handler
-    assert "MQTT_ACTION_IDS_ALARM" in handler
-    assert "elif not is_alarm:" in handler
-    assert "updated[PAYLOAD_ALARM] = body if body else payload" in handler
+    assert "is_alarm =" in handler  # noqa: S101
+    assert "MQTT_MESSAGE_UPLOAD_DEVICE_ALERT" in handler  # noqa: S101
+    assert "MQTT_CMD_UPLOAD_DEVICE_ALERT" in handler  # noqa: S101
+    assert "MQTT_ACTION_IDS_ALARM" in handler  # noqa: S101
+    assert "elif not is_alarm:" in handler  # noqa: S101
+    assert "updated[PAYLOAD_ALARM] = body if body else payload" in handler  # noqa: S101
 
 
 def test_mqtt_uses_captured_qos_zero() -> None:
     """Verify MQTT publish and subscribe usage is configured to QoS 0.
 
-    Asserts that the mqtt_push module declares a captured QoS of 0, that subscriptions use `qos=0`, and that the coordinator publishes JSON messages with `qos=0` and `retain=False`.
+    Asserts that the mqtt_push module declares a captured QoS of 0, that subscriptions
+    use `qos=0`, and that the coordinator publishes JSON messages with `qos=0` and
+    `retain=False`.
     """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
-    assert "qos: int = 0" in mqtt_source
-    assert "subscribe(topic, qos=0)" in mqtt_source
-    assert (
+    assert "qos: int = 0" in mqtt_source  # noqa: S101
+    assert "subscribe(topic, qos=0)" in mqtt_source  # noqa: S101
+    assert (  # noqa: S101
         "async_publish_json(topic, payload, qos=0, retain=False)" in coordinator_source
     )
 
 
 def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
-    """Verify MQTT payloads using the 'data' field are normalized to the 'body' field across the codebase.
+    """Verify MQTT payloads using the 'data' field are normalized to the 'body' field.
 
-    Asserts that the relevant constants for `data`/`body` and the ControlCombine message/cmd exist in const.py, and that mqtt_push and the coordinator normalize `FIELD_DATA` into `FIELD_BODY` by reading `data.get(FIELD_DATA)` and assigning it to `data[FIELD_BODY]` / `payload[FIELD_DATA]`.
+    across the codebase.
+
+    Asserts that the relevant constants for `data`/`body` and the ControlCombine
+    message/cmd exist in const.py, and that mqtt_push and the coordinator normalize
+    `FIELD_DATA` into `FIELD_BODY` by reading `data.get(FIELD_DATA)` and assigning it
+    to `data[FIELD_BODY]` / `payload[FIELD_DATA]`.
     """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     const_source = _read(CONST_PATH)
 
-    assert 'FIELD_DATA: Final = "data"' in const_source
-    assert 'FIELD_BODY: Final = "body"' in const_source
-    assert 'MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"' in const_source
-    assert "MQTT_CMD_CONTROL_COMBINE: Final = 121" in const_source
-    assert "alt_body = data.get(FIELD_DATA)" in mqtt_source
-    assert "data[FIELD_BODY] = alt_body" in mqtt_source
-    assert "alt_body = payload.get(FIELD_DATA)" in coordinator_source
+    assert 'FIELD_DATA: Final = "data"' in const_source  # noqa: S101
+    assert 'FIELD_BODY: Final = "body"' in const_source  # noqa: S101
+    assert 'MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"' in const_source  # noqa: S101
+    assert "MQTT_CMD_CONTROL_COMBINE: Final = 121" in const_source  # noqa: S101
+    assert "alt_body = data.get(FIELD_DATA)" in mqtt_source  # noqa: S101
+    assert "data[FIELD_BODY] = alt_body" in mqtt_source  # noqa: S101
+    assert "alt_body = payload.get(FIELD_DATA)" in coordinator_source  # noqa: S101
 
 
 def test_mqtt_topics_follow_documented_app_layout() -> None:
@@ -653,7 +674,7 @@ def test_mqtt_topics_follow_documented_app_layout() -> None:
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
-    assert 'MQTT_TOPIC_PREFIX: Final = "hb/app"' in const_source
+    assert 'MQTT_TOPIC_PREFIX: Final = "hb/app"' in const_source  # noqa: S101
     for name, suffix in {
         "MQTT_TOPIC_DEVICE": "device",
         "MQTT_TOPIC_ALERT": "alert",
@@ -662,27 +683,27 @@ def test_mqtt_topics_follow_documented_app_layout() -> None:
         "MQTT_TOPIC_COMMAND": "command",
         "MQTT_TOPIC_ACTION": "action",
     }.items():
-        assert f'{name}: Final = "{suffix}"' in const_source
+        assert f'{name}: Final = "{suffix}"' in const_source  # noqa: S101
     for name in (
         "MQTT_TOPIC_DEVICE",
         "MQTT_TOPIC_ALERT",
         "MQTT_TOPIC_CONFIG",
         "MQTT_TOPIC_NOTICE",
     ):
-        assert name in const_source
-    assert "MQTT_TOPIC_PREFIX" in mqtt_source
-    assert "MQTT_TOPIC_SUFFIXES" in mqtt_source
-    assert "MQTT_TOPIC_COMMAND" in coordinator_source
+        assert name in const_source  # noqa: S101
+    assert "MQTT_TOPIC_PREFIX" in mqtt_source  # noqa: S101
+    assert "MQTT_TOPIC_SUFFIXES" in mqtt_source  # noqa: S101
+    assert "MQTT_TOPIC_COMMAND" in coordinator_source  # noqa: S101
 
 
 def test_mqtt_connect_requests_full_app_snapshot() -> None:
     """On reconnect the integration asks the app protocol for a fresh snapshot."""
     connected = _function_source(COORDINATOR_PATH, "_async_mqtt_connected")
-    assert "_async_query_system_info_for_missing" in connected
-    assert "_async_query_weather_plan_for_missing" in connected
-    assert "_async_query_subdevices_for_missing" in connected
-    assert "force=True" in connected
-    assert "ensure_mqtt=False" in connected
+    assert "_async_query_system_info_for_missing" in connected  # noqa: S101
+    assert "_async_query_weather_plan_for_missing" in connected  # noqa: S101
+    assert "_async_query_subdevices_for_missing" in connected  # noqa: S101
+    assert "force=True" in connected  # noqa: S101
+    assert "ensure_mqtt=False" in connected  # noqa: S101
 
 
 def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
@@ -699,15 +720,15 @@ def test_mqtt_credentials_are_derived_from_active_login_session() -> None:
         "async_get_mqtt_credentials",
     )
 
-    assert "self._mqtt_user_id" in login
-    assert "FIELD_USER_ID" in login
-    assert "self._mqtt_seed_b64" in login
-    assert "FIELD_MQTT_PASSWORD" in login
-    assert "self._mqtt_mac_id = mac_id" in login
-    assert "base64.b64decode(self._mqtt_seed_b64, validate=True)" in credentials
-    assert "_aes_cbc_encrypt" in credentials
-    assert "MQTT_CLIENT_ID_SUFFIX" in api_source
-    assert "MQTT_USERNAME_SEPARATOR" in api_source
+    assert "self._mqtt_user_id" in login  # noqa: S101
+    assert "FIELD_USER_ID" in login  # noqa: S101
+    assert "self._mqtt_seed_b64" in login  # noqa: S101
+    assert "FIELD_MQTT_PASSWORD" in login  # noqa: S101
+    assert "self._mqtt_mac_id = mac_id" in login  # noqa: S101
+    assert "base64.b64decode(self._mqtt_seed_b64, validate=True)" in credentials  # noqa: S101
+    assert "_aes_cbc_encrypt" in credentials  # noqa: S101
+    assert "MQTT_CLIENT_ID_SUFFIX" in api_source  # noqa: S101
+    assert "MQTT_USERNAME_SEPARATOR" in api_source  # noqa: S101
 
 
 def test_setup_passes_configured_login_context_to_api() -> None:
@@ -715,10 +736,10 @@ def test_setup_passes_configured_login_context_to_api() -> None:
     init_source = _read(
         ROOT / "custom_components" / "jackery_solarvault" / "__init__.py",
     )
-    assert "CONF_MQTT_MAC_ID" in init_source
-    assert "CONF_REGION_CODE" in init_source
-    assert "mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID)" in init_source
-    assert "region_code=entry.data.get(CONF_REGION_CODE)" in init_source
+    assert "CONF_MQTT_MAC_ID" in init_source  # noqa: S101
+    assert "CONF_REGION_CODE" in init_source  # noqa: S101
+    assert "mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID)" in init_source  # noqa: S101
+    assert "region_code=entry.data.get(CONF_REGION_CODE)" in init_source  # noqa: S101
 
 
 def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
@@ -726,7 +747,7 @@ def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
     api_path = ROOT / "custom_components" / "jackery_solarvault" / "client" / "api.py"
     for name in ("_put_json", "_post_form"):
         source = _function_source(api_path, name)
-        assert "def _request_headers()" in source
-        assert "headers=_request_headers()" in source
-        assert "self._token = None" in source
-        assert "await self._ensure_token()" in source
+        assert "def _request_headers()" in source  # noqa: S101
+        assert "headers=_request_headers()" in source  # noqa: S101
+        assert "self._token = None" in source  # noqa: S101
+        assert "await self._ensure_token()" in source  # noqa: S101

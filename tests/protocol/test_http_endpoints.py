@@ -26,10 +26,11 @@ ENDPOINTS_PATH = (
 
 def _load_registry() -> ModuleType:
     spec = importlib.util.spec_from_file_location(
-        "endpoint_registry_contract", REGISTRY_PATH
+        "endpoint_registry_contract",
+        REGISTRY_PATH,
     )
-    assert spec is not None
-    assert spec.loader is not None
+    assert spec is not None  # noqa: S101
+    assert spec.loader is not None  # noqa: S101
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -59,7 +60,7 @@ def test_all_non_exempt_csv_endpoints_have_client_methods() -> None:
         if not endpoint.exempted and not endpoint.implemented
     )
 
-    assert not missing
+    assert not missing  # noqa: S101
 
 
 def test_endpoint_mapping_references_existing_client_methods() -> None:
@@ -75,7 +76,7 @@ def test_endpoint_mapping_references_existing_client_methods() -> None:
         and endpoint.client_method not in client_methods
     )
 
-    assert not stale
+    assert not stale  # noqa: S101
 
 
 def test_mobile_only_endpoints_are_explicit_exemptions() -> None:
@@ -83,7 +84,7 @@ def test_mobile_only_endpoints_are_explicit_exemptions() -> None:
     registry = _load_registry()
     mapping = registry.load_csv_endpoint_mapping()
 
-    assert registry.EXEMPT_ENDPOINTS == {
+    assert registry.EXEMPT_ENDPOINTS == {  # noqa: S101
         "auth/generatedJwt": (
             "mobile app push JWT; HA does not register mobile push identity"
         ),
@@ -94,14 +95,14 @@ def test_mobile_only_endpoints_are_explicit_exemptions() -> None:
             "mobile BLE key fetch; HA captures bluetoothKey from MQTT/discovery"
         ),
     }
-    assert all(mapping[path].exempted for path in registry.EXEMPT_ENDPOINTS)
+    assert all(mapping[path].exempted for path in registry.EXEMPT_ENDPOINTS)  # noqa: S101
 
 
 def test_documentation_is_generated_from_endpoint_mapping() -> None:
     """Ensure endpoint documentation is generated from the registry."""
     registry = _load_registry()
     expected = registry.render_endpoint_mapping_markdown(
-        registry.load_csv_endpoint_mapping()
+        registry.load_csv_endpoint_mapping(),
     )
 
-    assert DOC_PATH.read_text(encoding="utf-8") == expected
+    assert DOC_PATH.read_text(encoding="utf-8") == expected  # noqa: S101

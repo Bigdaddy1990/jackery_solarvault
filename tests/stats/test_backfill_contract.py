@@ -139,7 +139,8 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
             if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
                 continue
             if isinstance(node.value, ast.Constant) and isinstance(
-                node.value.value, str
+                node.value.value,
+                str,
             ):
                 assignments[node.targets[0].id] = node.value.value
             continue
@@ -147,7 +148,8 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
             if not isinstance(node.target, ast.Name):
                 continue
             if isinstance(node.value, ast.Constant) and isinstance(
-                node.value.value, str
+                node.value.value,
+                str,
             ):
                 assignments[node.target.id] = node.value.value
     return assignments
@@ -193,11 +195,11 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
                 _const_keyword(call, "reset_period"),
             )
 
-    assert set(found) == set(expected)
+    assert set(found) == set(expected)  # noqa: S101
     for key, reset_period in expected.items():
         state_class, actual_reset_period = found[key]
-        assert state_class == "TOTAL", key
-        assert actual_reset_period == reset_period, key
+        assert state_class == "TOTAL", key  # noqa: S101
+        assert actual_reset_period == reset_period, key  # noqa: S101
 
 
 def test_documented_stat_paths_match_const_values() -> None:
@@ -214,7 +216,7 @@ def test_documented_stat_paths_match_const_values() -> None:
     }
     assignments = _const_string_assignments(CONST_PATH)
     for key, value in expected_paths.items():
-        assert assignments.get(key) == value, key
+        assert assignments.get(key) == value, key  # noqa: S101
 
 
 def test_week_month_year_sensors_keep_same_source_family() -> None:
@@ -231,7 +233,7 @@ def test_week_month_year_sensors_keep_same_source_family() -> None:
     for family, prefix in expected_source_prefix.items():
         for period in ("week", "month", "year"):
             key = f"{family}_{period}_energy"
-            assert metadata[key]["section"] == f"{prefix}_{period}", key
+            assert metadata[key]["section"] == f"{prefix}_{period}", key  # noqa: S101
 
 
 def test_device_day_sensors_fallback_to_day_period_sources() -> None:
@@ -256,15 +258,15 @@ def test_device_day_sensors_fallback_to_day_period_sources() -> None:
         ),
     }
     for key, (primary_section, fallback) in expected.items():
-        assert metadata[key]["section"] == primary_section, key
-        assert metadata[key]["fallback_sources"] == fallback, key
+        assert metadata[key]["section"] == primary_section, key  # noqa: S101
+        assert metadata[key]["fallback_sources"] == fallback, key  # noqa: S101
 
-    assert (
+    assert (  # noqa: S101
         metadata["device_today_battery_discharge"]["section"]
         == "device_battery_stat_day"
     )
-    assert metadata["device_today_battery_discharge"]["stat_key"] == "totalDischarge"
-    assert metadata["device_today_battery_discharge"]["fallback_sources"] == (
+    assert metadata["device_today_battery_discharge"]["stat_key"] == "totalDischarge"  # noqa: S101
+    assert metadata["device_today_battery_discharge"]["fallback_sources"] == (  # noqa: S101
         ("device_statistic", "batDisChgEgy"),
     )
 
@@ -273,23 +275,23 @@ def test_ct_period_stats_remain_removed_from_polling_and_chart_imports() -> None
     """Implement test ct period stats remain removed from polling and chart imports."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
-    assert "device_ct_stat_day" not in source
-    assert "device_ct_stat_week" not in source
-    assert "device_ct_stat_month" not in source
-    assert "device_ct_stat_year" not in source
+    assert "device_ct_stat_day" not in source  # noqa: S101
+    assert "device_ct_stat_week" not in source  # noqa: S101
+    assert "device_ct_stat_month" not in source  # noqa: S101
+    assert "device_ct_stat_year" not in source  # noqa: S101
     const_source = CONST_PATH.read_text(encoding="utf-8")
     chart_metric_block = const_source.partition("APP_CHART_STAT_METRICS")[2].partition(
-        ")\n\n# Service names"
+        ")\n\n# Service names",
     )[0]
-    assert "device_ct_stat" not in chart_metric_block
+    assert "device_ct_stat" not in chart_metric_block  # noqa: S101
 
 
 def test_external_chart_import_uses_raw_app_period_points() -> None:
     """Implement test external chart import uses raw app period points."""
     source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
-    assert "trend_series_points(" in source
-    assert "Only rows before the rewritten range" in source
+    assert "trend_series_points(" in source  # noqa: S101
+    assert "Only rows before the rewritten range" in source  # noqa: S101
 
 
 def test_device_period_stats_poll_all_app_periods() -> None:
@@ -299,16 +301,16 @@ def test_device_period_stats_poll_all_app_periods() -> None:
     # Collapse whitespace so multi-line ruff format doesn't break the
     # substring asserts (the call may wrap across lines after formatting).
     flat = re.sub(r"\s+", " ", source)
-    assert "for date_type in APP_PERIOD_DATE_TYPES" in flat
-    assert (
+    assert "for date_type in APP_PERIOD_DATE_TYPES" in flat  # noqa: S101
+    assert (  # noqa: S101
         "self._app_period_section( APP_SECTION_PV_STAT, date_type )" in flat
         or "self._app_period_section(APP_SECTION_PV_STAT, date_type)" in flat
     )
-    assert (
+    assert (  # noqa: S101
         "self._app_period_section( APP_SECTION_BATTERY_STAT, date_type )" in flat
         or "self._app_period_section(APP_SECTION_BATTERY_STAT, date_type)" in flat
     )
-    assert (
+    assert (  # noqa: S101
         "self._app_period_section( APP_SECTION_HOME_STAT, date_type )" in flat
         or "self._app_period_section(APP_SECTION_HOME_STAT, date_type)" in flat
     )
@@ -322,17 +324,18 @@ def test_period_ranges_are_explicit_full_app_periods() -> None:
         ROOT / "custom_components" / "jackery_solarvault" / "util.py"
     ).read_text(encoding="utf-8")
 
-    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range requirement
-    assert "requires explicit app ranges" in coordinator_source
+    # Comment format changed: PROTOCOL.md §2 also satisfies the explicit-range
+    # requirement
+    assert "requires explicit app ranges" in coordinator_source  # noqa: S101
     # coordinator uses _local_today() which wraps dt_util.now() with timezone
-    assert (
+    assert (  # noqa: S101
         "app_period_request_kwargs(date_type, today=self._local_today())"
         in coordinator_source
     )
-    assert "app_period_date_bounds(" in api_source
-    assert "begin = today - timedelta(days=today.weekday())" in util_source
-    assert "calendar.monthrange(today.year, today.month)" in util_source
-    assert "today.replace(month=12, day=31)" in util_source
+    assert "app_period_date_bounds(" in api_source  # noqa: S101
+    assert "begin = today - timedelta(days=today.weekday())" in util_source  # noqa: S101
+    assert "calendar.monthrange(today.year, today.month)" in util_source  # noqa: S101
+    assert "today.replace(month=12, day=31)" in util_source  # noqa: S101
 
 
 def test_obsolete_period_entities_are_not_created() -> None:
@@ -341,7 +344,7 @@ def test_obsolete_period_entities_are_not_created() -> None:
     INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
-    assert "JackeryPvTrendsTodaySensor" not in sensor_source
+    assert "JackeryPvTrendsTodaySensor" not in sensor_source  # noqa: S101
     for key in (
         "grid_import_week_energy",
         "grid_import_month_energy",
@@ -350,11 +353,11 @@ def test_obsolete_period_entities_are_not_created() -> None:
         "grid_export_month_energy",
         "grid_export_year_energy",
     ):
-        assert f'key="{key}"' not in sensor_source
-        assert f"_{key}" in const_source
+        assert f'key="{key}"' not in sensor_source  # noqa: S101
+        assert f"_{key}" in const_source  # noqa: S101
 
-    assert "_pv_today_energy" in const_source
-    assert "_system_pv_today_energy" in const_source
+    assert "_pv_today_energy" in const_source  # noqa: S101
+    assert "_system_pv_today_energy" in const_source  # noqa: S101
 
 
 def test_non_app_diagnostic_sensors_are_not_created() -> None:
@@ -371,8 +374,8 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         "JackerySystemMetaSensor",
         "JackeryLocationSensor",
     ):
-        assert f"_append_unique({class_name}" not in sensor_source
-        assert class_name in sensor_source
+        assert f"_append_unique({class_name}" not in sensor_source  # noqa: S101
+        assert class_name in sensor_source  # noqa: S101
 
     for suffix in (
         "_raw_properties",
@@ -382,7 +385,7 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
         "_latitude",
         "_longitude",
     ):
-        assert suffix in const_source
+        assert suffix in const_source  # noqa: S101
 
 
 # Diagnostic/raw entities should stay available for users who need them without
@@ -395,16 +398,14 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     binary_source = (COMPONENT_PATH / "binary_sensor.py").read_text(encoding="utf-8")
 
-    assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source
+    assert "description.entity_category != EntityCategory.DIAGNOSTIC" in sensor_source  # noqa: S101
     # Bug #12 fix: diagnostic binary sensor visibility is now controlled by
     # entity_registry_enabled_default directly, not the category override.
-    assert (
+    assert (  # noqa: S101
         "description.entity_category != EntityCategory.DIAGNOSTIC" not in binary_source
     )
-    assert "enabled_default=pack_desc.entity_category" in sensor_source
-    assert "_attr_entity_registry_enabled_default = False" in sensor_source
-
-    import re
+    assert "enabled_default=pack_desc.entity_category" in sensor_source  # noqa: S101
+    assert "_attr_entity_registry_enabled_default = False" in sensor_source  # noqa: S101
 
     pattern = re.compile(
         r"Jackery(?:Stat)?SensorDescription\(\s*\n"
@@ -415,7 +416,7 @@ def test_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     )
     found = set(pattern.findall(sensor_source))
     missing = INTENTIONALLY_DISABLED_BY_DEFAULT - found
-    assert not missing, (
+    assert not missing, (  # noqa: S101
         f"Whitelisted diagnostic keys no longer diagnostic: {sorted(missing)}. "
         f"Either add the entity category back or remove from "
         f"INTENTIONALLY_DISABLED_BY_DEFAULT."
@@ -434,18 +435,18 @@ def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
         "_charge_plan_power",
         "_function_enable_flags",
     ):
-        assert suffix in const_source
+        assert suffix in const_source  # noqa: S101
 
 
 def test_external_app_chart_statistics_are_period_scoped() -> None:
     """Implement test external app chart statistics are period scoped."""
     source = CONST_PATH.read_text(encoding="utf-8")
 
-    assert "DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY" in source
-    assert "DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY" in source
-    assert "DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY" in source
-    assert 'DATE_TYPE_MONTH: "daily"' not in source
-    assert 'DATE_TYPE_YEAR: "monthly"' not in source
+    assert "DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY" in source  # noqa: S101
+    assert "DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY" in source  # noqa: S101
+    assert "DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY" in source  # noqa: S101
+    assert 'DATE_TYPE_MONTH: "daily"' not in source  # noqa: S101
+    assert 'DATE_TYPE_YEAR: "monthly"' not in source  # noqa: S101
 
 
 def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
@@ -469,7 +470,7 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
             "ce mois",
             "cette année",
         ):
-            assert forbidden not in source
+            assert forbidden not in source  # noqa: S101
 
 
 def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
@@ -486,38 +487,39 @@ def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
         for key, (device_class, _state_class) in found.items()
         if device_class == "ENERGY"
     }
-    assert energy_keys == {
+    assert energy_keys == {  # noqa: S101
         "savings_energy",
         "savings_battery_loss_year_energy",
         "savings_conversion_loss_year_energy",
         "savings_pv_residual_year_energy",
     }
-    assert found["savings_energy"][1] == "TOTAL"
-    assert found["savings_battery_loss_year_energy"][1] == "TOTAL"
-    assert found["savings_conversion_loss_year_energy"][1] == "TOTAL"  # Bug #7 fix
-    assert found["savings_pv_residual_year_energy"][1] == "TOTAL"  # Bug #7 fix
-    assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
-    assert found["savings_price"] == (None, "MEASUREMENT")
+    assert found["savings_energy"][1] == "TOTAL"  # noqa: S101
+    assert found["savings_battery_loss_year_energy"][1] == "TOTAL"  # noqa: S101
+    assert found["savings_conversion_loss_year_energy"][1] == "TOTAL"  # Bug #7 fix  # noqa: S101
+    assert found["savings_pv_residual_year_energy"][1] == "TOTAL"  # Bug #7 fix  # noqa: S101
+    assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")  # noqa: S101
+    assert found["savings_price"] == (None, "MEASUREMENT")  # noqa: S101
 
 
 def test_savings_price_rounding_uses_named_precision_constant() -> None:
     """Savings price precision should be named, not an unexplained literal."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
 
-    assert "SAVINGS_PRICE_PRECISION = 5" in sensor_source
-    assert "round(value, SAVINGS_PRICE_PRECISION)" in sensor_source
-    assert "round(value, 5)" not in sensor_source
+    assert "SAVINGS_PRICE_PRECISION = 5" in sensor_source  # noqa: S101
+    assert "round(value, SAVINGS_PRICE_PRECISION)" in sensor_source  # noqa: S101
+    assert "round(value, 5)" not in sensor_source  # noqa: S101
 
 
 def test_conversion_loss_required_component_check_uses_components_values() -> None:
     """Conversion-loss sensor should validate all component values directly."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     block = sensor_source.split(
-        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("BATTERY_PACK_SENSOR_DESCRIPTIONS", 1)[0]
 
-    assert "if any(value is None for value in c.values()):" in block
-    assert "required = (" not in block
+    assert "if any(value is None for value in c.values()):" in block  # noqa: S101
+    assert "required = (" not in block  # noqa: S101
 
 
 def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
@@ -525,10 +527,10 @@ def test_non_period_stat_source_diagnostics_are_not_overbuilt() -> None:
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
-    assert "SOURCE_CONTRACT_" not in const_source
-    assert "SOURCE_KIND_" not in const_source
-    assert 'attrs["source_contract"]' not in sensor_source
-    assert 'attrs["source_kind"]' not in sensor_source
+    assert "SOURCE_CONTRACT_" not in const_source  # noqa: S101
+    assert "SOURCE_KIND_" not in const_source  # noqa: S101
+    assert 'attrs["source_contract"]' not in sensor_source  # noqa: S101
+    assert 'attrs["source_kind"]' not in sensor_source  # noqa: S101
 
 
 def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
@@ -550,15 +552,15 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
                 _const_keyword(call, "reset_period"),
             )
 
-    assert set(found) == set(matrix)
+    assert set(found) == set(matrix)  # noqa: S101
     for key, expected in matrix.items():
-        assert found[key] == expected, key
+        assert found[key] == expected, key  # noqa: S101
 
     for call in calls:
         key = _const_keyword(call, "key")
         reset_period = _const_keyword(call, "reset_period")
         if isinstance(key, str) and reset_period in {"day", "week", "month", "year"}:
-            assert _state_class_keyword(call) == "TOTAL", key
+            assert _state_class_keyword(call) == "TOTAL", key  # noqa: S101
 
 
 # ---------- 2.3.3+: Midnight period race condition guards ---------------
@@ -582,12 +584,12 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
         / "sensor.py"
     ).read_text(encoding="utf-8")
     # The last_reset property must consult begin_date metadata
-    assert "_period_begin_from_meta" in sensor_source
+    assert "_period_begin_from_meta" in sensor_source  # noqa: S101
     # And must NOT just return _period_start unconditionally
-    assert "begin_iso = self._period_begin_from_meta()" in sensor_source
+    assert "begin_iso = self._period_begin_from_meta()" in sensor_source  # noqa: S101
     # The fallback to wall-clock _period_start is documented and only
     # applies when begin_iso is None
-    assert "if begin_iso is None:" in sensor_source
+    assert "if begin_iso is None:" in sensor_source  # noqa: S101
 
 
 def test_period_sensors_do_not_publish_stale_period_totals() -> None:
@@ -605,21 +607,20 @@ def test_period_sensors_do_not_publish_stale_period_totals() -> None:
         / "sensor.py"
     ).read_text(encoding="utf-8")
     # The helper exists
-    assert "def _is_period_data_stale(self) -> bool:" in sensor_source
+    assert "def _is_period_data_stale(self) -> bool:" in sensor_source  # noqa: S101
     # And is consulted in _refresh_cache before assigning native_value
-    assert (
+    assert (  # noqa: S101
         "stale_period = self._reset_period and self._is_period_data_stale()"
         in sensor_source
     )
     # The stale path explicitly publishes 0 for day sensors and None for
     # longer periods.
-    import re
 
     flat = re.sub(r"\s+", " ", sensor_source)
     # Three-part fix: day/week stale sensors use server_total (not 0) to avoid
     # midnight delta bugs. Month/year sensors use None (unavailable).
-    assert "raw = server_total" in flat, "stale-period day guard must use server_total"
-    assert "DATE_TYPE_MONTH, DATE_TYPE_YEAR" in flat, (
+    assert "raw = server_total" in flat, "stale-period day guard must use server_total"  # noqa: S101
+    assert "DATE_TYPE_MONTH, DATE_TYPE_YEAR" in flat, (  # noqa: S101
         "stale guard must split by period type"
     )
 
@@ -628,25 +629,26 @@ def test_empty_day_period_entities_can_be_created_from_sibling_charts() -> None:
     """Empty day endpoints must not leave existing PV day entities restored only."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
 
-    assert "def _day_period_sibling_has_value" in sensor_source
-    assert "for date_type in (DATE_TYPE_MONTH, DATE_TYPE_WEEK, DATE_TYPE_YEAR):" in (
+    assert "def _day_period_sibling_has_value" in sensor_source  # noqa: S101
+    assert "for date_type in (DATE_TYPE_MONTH, DATE_TYPE_WEEK, DATE_TYPE_YEAR):" in (  # noqa: S101
         sensor_source
     )
-    assert "reset_period = _period_from_stat_description(description)" in sensor_source
-    assert "reset_period=reset_period" in sensor_source
+    assert "reset_period = _period_from_stat_description(description)" in sensor_source  # noqa: S101
+    assert "reset_period=reset_period" in sensor_source  # noqa: S101
 
 
 def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
     """Day sensors use today's month/week bucket when the day endpoint is empty."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     stat_block = sensor_source.split(
-        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryStatSensor(JackeryEntity, SensorEntity):",
+        1,
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
-    assert "def _chart_value_for_day" in sensor_source
-    assert "def _current_day_bucket_from_period_chart" in stat_block
-    assert "_current_day_bucket_from_period_chart(" in stat_block
-    assert "current_day_bucket_from_" in stat_block
+    assert "def _chart_value_for_day" in sensor_source  # noqa: S101
+    assert "def _current_day_bucket_from_period_chart" in stat_block  # noqa: S101
+    assert "_current_day_bucket_from_period_chart(" in stat_block  # noqa: S101
+    assert "current_day_bucket_from_" in stat_block  # noqa: S101
 
 
 def test_total_revenue_state_class_compatible_with_monetary_device_class() -> None:
@@ -672,8 +674,8 @@ def test_total_revenue_state_class_compatible_with_monetary_device_class() -> No
         re.DOTALL | re.MULTILINE,
     )
     match = pattern.search(sensor_source)
-    assert match is not None, "total_revenue description not found"
-    assert match.group(1) == "TOTAL", (
+    assert match is not None, "total_revenue description not found"  # noqa: S101
+    assert match.group(1) == "TOTAL", (  # noqa: S101
         f"total_revenue uses state_class={match.group(1)!r}; "
         "MONETARY device_class only allows TOTAL or None per HA validation"
     )

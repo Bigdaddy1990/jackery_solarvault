@@ -40,11 +40,11 @@ def test_active_entity_descriptions_have_smali_contract_metadata() -> None:
     """Every active description must map to Smali or HA-derived data."""
     for desc in _all_active_descriptions():
         field = contract_field(desc)  # type: ignore[arg-type]
-        assert field
-        assert desc.data_sources
-        assert set(desc.data_sources) <= {"REST", "MQTT", "BLE"}
-        assert desc.null_semantics
-        assert isinstance(desc.recorder_allowed, bool)
+        assert field  # noqa: S101
+        assert desc.data_sources  # noqa: S101
+        assert set(desc.data_sources) <= {"REST", "MQTT", "BLE"}  # noqa: S101
+        assert desc.null_semantics  # noqa: S101
+        assert isinstance(desc.recorder_allowed, bool)  # noqa: S101
 
 
 def test_no_active_entity_exists_for_legacy_agent_documentation_only() -> None:
@@ -58,4 +58,4 @@ def test_no_active_entity_exists_for_legacy_agent_documentation_only() -> None:
                 getattr(desc, "smali_field", ""),
             )
         ).lower()
-        assert "agent" not in searchable
+        assert "agent" not in searchable  # noqa: S101

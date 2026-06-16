@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.stats.validators import verify_and_bac
 
 def test_coordinator_facade_exports_characterized_class() -> None:
     """Facade preserves the public coordinator class identity."""
-    assert JackerySolarVaultCoordinator is LegacyCoordinator
+    assert JackerySolarVaultCoordinator is LegacyCoordinator  # noqa: S101
 
 
 def test_live_merge_facade_delegates_existing_behavior() -> None:
@@ -28,14 +28,16 @@ def test_live_merge_facade_delegates_existing_behavior() -> None:
         """Minimal merge target."""
 
         def _merge_main_properties(
-            self, entry: dict[str, Any], properties: dict[str, Any]
+            self,
+            entry: dict[str, Any],
+            properties: dict[str, Any],
         ) -> None:
             entry.setdefault("properties", {}).update(properties)
 
     entry: dict[str, object] = {}
     merge_main_properties(CoordinatorStub(), entry, {"soc": 80})  # type: ignore[arg-type]
 
-    assert entry == {"properties": {"soc": 80}}
+    assert entry == {"properties": {"soc": 80}}  # noqa: S101
 
 
 @pytest.mark.parametrize(
@@ -50,10 +52,12 @@ def test_live_merge_facade_delegates_existing_behavior() -> None:
     ],
 )
 def test_verify_and_backfill_matches_documented_hierarchy(
-    cloud: float | None, local: float | None, expected: float | None
+    cloud: float | None,
+    local: float | None,
+    expected: float | None,
 ) -> None:
     """Stats validator preserves documented cloud/local hierarchy."""
-    assert verify_and_backfill(cloud, local) == expected
+    assert verify_and_backfill(cloud, local) == expected  # noqa: S101
 
 
 async def test_command_facade_delegates_publish_command() -> None:
@@ -80,4 +84,4 @@ async def test_command_facade_delegates_publish_command() -> None:
         qos=1,  # type: ignore[arg-type]
     )
 
-    assert calls == [("dev-1", 123, {"maxOutPw": 800}, {"qos": 1})]
+    assert calls == [("dev-1", 123, {"maxOutPw": 800}, {"qos": 1})]  # noqa: S101

@@ -45,7 +45,7 @@ def test_price_sources_from_payload_filters_invalid_entries() -> None:
         ],
     }
 
-    assert _price_sources_from_payload(payload) == [
+    assert _price_sources_from_payload(payload) == [  # noqa: S101
         {FIELD_PLATFORM_COMPANY_ID: 9, FIELD_COUNTRY: "  ", FIELD_SYSTEM_REGION: "AT"},
         {FIELD_PLATFORM_COMPANY_ID: 8, FIELD_COUNTRY: "DE"},
     ]
@@ -63,7 +63,7 @@ def test_price_provider_helpers_normalize_whitespace() -> None:
         _payload={PAYLOAD_PRICE_SOURCES: [source]},
     )
 
-    assert (
+    assert (  # noqa: S101
         _price_source_label({
             FIELD_PLATFORM_COMPANY_ID: " 8.0 ",
             FIELD_COUNTRY: " ",
@@ -72,14 +72,14 @@ def test_price_provider_helpers_normalize_whitespace() -> None:
         })
         == "Grid Co (DE) #8"
     )
-    assert _price_source_matches_current(source, " 8.0 ", " de ")
-    assert _price_mode_dynamic_available(entity)
-    assert _price_provider_current(entity) == "Grid Co (DE, AT) #8"
+    assert _price_source_matches_current(source, " 8.0 ", " de ")  # noqa: S101
+    assert _price_mode_dynamic_available(entity)  # noqa: S101
+    assert _price_provider_current(entity) == "Grid Co (DE, AT) #8"  # noqa: S101
 
 
 def test_price_source_label_falls_back_from_blank_company_name() -> None:
     """Provider labels should not render blank names."""
-    assert (
+    assert (  # noqa: S101
         _price_source_label({
             FIELD_COMPANY_NAME: "  ",
             FIELD_NAME: "Grid Co",
@@ -97,9 +97,9 @@ def test_price_provider_current_ignores_blank_company_id() -> None:
         _payload={PAYLOAD_PRICE_SOURCES: []},
     )
 
-    assert _price_provider_current(entity) is None
-    assert not _price_mode_dynamic_available(entity)
+    assert _price_provider_current(entity) is None  # noqa: S101
+    assert not _price_mode_dynamic_available(entity)  # noqa: S101
 
     entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"  # noqa: SLF001
-    assert _price_provider_current(entity) is None
-    assert not _price_mode_dynamic_available(entity)
+    assert _price_provider_current(entity) is None  # noqa: S101
+    assert not _price_mode_dynamic_available(entity)  # noqa: S101

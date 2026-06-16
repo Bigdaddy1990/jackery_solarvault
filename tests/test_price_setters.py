@@ -55,15 +55,22 @@ class _AcceptingPriceApi:
 
 
 def _coordinator() -> JackerySolarVaultCoordinator:
-    """Create a JackerySolarVaultCoordinator configured for unit tests of price-write behavior.
+    """Create a JackerySolarVaultCoordinator configured for unit tests of price-write.
 
-    The returned coordinator uses a rejecting price API, contains a single device "dev1" with EUR currency,
-    single price 0.25, platform company id 7, and system region "DE". The device index maps "dev1" to system id "sys1".
-    Internal slow cache and price overrides are empty. The coordinator's partial-update writer is replaced with a
-    function that raises AssertionError to ensure tests fail if a rejected write attempts to patch local price data.
+    behavior.
+
+    The returned coordinator uses a rejecting price API, contains a single device
+    "dev1" with EUR currency,
+    single price 0.25, platform company id 7, and system region "DE". The device index
+    maps "dev1" to system id "sys1".
+    Internal slow cache and price overrides are empty. The coordinator's partial-update
+    writer is replaced with a
+    function that raises AssertionError to ensure tests fail if a rejected write
+    attempts to patch local price data.
 
     Returns:
-        JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
+        JackerySolarVaultCoordinator: A coordinator instance preconfigured for price
+        write tests.
     """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = _RejectingPriceApi()
@@ -82,15 +89,19 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     coordinator._price_overrides = {}  # noqa: SLF001
 
     def _fail_push(_data: object) -> None:
-        """Assert handler used to ensure no local data patch occurs when a write is rejected.
+        """Assert handler used to ensure no local data patch occurs when a write is.
+
+        rejected.
 
         Parameters:
             _data (object): Ignored placeholder for the attempted patch payload.
 
         Raises:
-            AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
+            AssertionError: Always raised to signal that a rejected writer attempted to
+            modify local price data.
         """
-        raise AssertionError("rejected writer must not patch local price data")  # noqa: TRY003
+        msg = "rejected writer must not patch local price data"
+        raise AssertionError(msg)
 
     coordinator._push_partial_update = _fail_push  # noqa: SLF001
     return coordinator
@@ -125,7 +136,7 @@ async def test_dynamic_price_rejects_false_api_response() -> None:
 
 def test_valid_price_sources_filters_blank_company_and_region() -> None:
     """Coordinator price-source validation rejects whitespace-only fields."""
-    assert JackerySolarVaultCoordinator._valid_price_sources([  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._valid_price_sources([  # noqa: S101, SLF001
         {FIELD_PLATFORM_COMPANY_ID: "", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "  ", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "abc", FIELD_COUNTRY: "DE"},
@@ -150,7 +161,7 @@ def test_find_matching_price_source_normalizes_current_price_fields() -> None:
         FIELD_COUNTRY: "DE, AT",
     }
 
-    assert (
+    assert (  # noqa: S101
         coordinator._find_matching_price_source(  # noqa: SLF001
             "dev1",
             [source],
@@ -173,10 +184,10 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
 
     await coordinator.async_set_price_mode_dynamic("dev1")
 
-    assert api.dynamic_calls == [("sys1", 8, "DE")]
+    assert api.dynamic_calls == [("sys1", 8, "DE")]  # noqa: S101
     price = coordinator.data["dev1"][PAYLOAD_PRICE]
-    assert price[FIELD_PLATFORM_COMPANY_ID] == 8  # noqa: PLR2004
-    assert price[FIELD_SYSTEM_REGION] == "DE"
+    assert price[FIELD_PLATFORM_COMPANY_ID] == 8  # noqa: PLR2004, S101
+    assert price[FIELD_SYSTEM_REGION] == "DE"  # noqa: S101
 
 
 async def test_price_source_write_normalizes_blank_company_name() -> None:
@@ -197,4 +208,4 @@ async def test_price_source_write_normalizes_blank_company_name() -> None:
     )
 
     price = coordinator.data["dev1"][PAYLOAD_PRICE]
-    assert price[FIELD_COMPANY_NAME] == "Grid Co"
+    assert price[FIELD_COMPANY_NAME] == "Grid Co"  # noqa: S101

@@ -24,11 +24,11 @@ def test_endpoint_backoff_is_recorded_for_known_error_codes() -> None:
 
     handled = coordinator._endpoint_backoff_note_failure("dev:1:battery_stat", err)  # noqa: SLF001
 
-    assert handled is True
+    assert handled is True  # noqa: S101
     state = coordinator._endpoint_backoff["dev:1:battery_stat"]  # noqa: SLF001
-    assert state["code"] == 10422  # noqa: PLR2004
-    assert state["level"] == 0
-    assert coordinator._endpoint_backoff_active(  # noqa: SLF001
+    assert state["code"] == 10422  # noqa: PLR2004, S101
+    assert state["level"] == 0  # noqa: S101
+    assert coordinator._endpoint_backoff_active(  # noqa: S101, SLF001
         "dev:1:battery_stat",
         time.monotonic(),
     )
@@ -40,20 +40,20 @@ def test_endpoint_backoff_escalates_and_resets_on_success() -> None:
     err = JackeryError("request failed code=10432")
     key = "dev:1:eps_stat"
 
-    assert coordinator._endpoint_backoff_note_failure(key, err) is True  # noqa: SLF001
+    assert coordinator._endpoint_backoff_note_failure(key, err) is True  # noqa: S101, SLF001
     first = dict(coordinator._endpoint_backoff[key])  # noqa: SLF001
-    assert first["level"] == 0
+    assert first["level"] == 0  # noqa: S101
 
-    assert coordinator._endpoint_backoff_note_failure(key, err) is True  # noqa: SLF001
+    assert coordinator._endpoint_backoff_note_failure(key, err) is True  # noqa: S101, SLF001
     second = dict(coordinator._endpoint_backoff[key])  # noqa: SLF001
-    assert second["level"] == 1
-    assert (
+    assert second["level"] == 1  # noqa: S101
+    assert (  # noqa: S101
         _ENDPOINT_BACKOFF_DELAYS_SEC[second["level"]]
         > _ENDPOINT_BACKOFF_DELAYS_SEC[first["level"]]
     )
 
     coordinator._endpoint_backoff_note_success(key)  # noqa: SLF001
-    assert key not in coordinator._endpoint_backoff  # noqa: SLF001
+    assert key not in coordinator._endpoint_backoff  # noqa: S101, SLF001
 
 
 def test_endpoint_backoff_ignores_unrelated_errors() -> None:
@@ -63,8 +63,8 @@ def test_endpoint_backoff_ignores_unrelated_errors() -> None:
 
     handled = coordinator._endpoint_backoff_note_failure("dev:1:home_stat", err)  # noqa: SLF001
 
-    assert handled is False
-    assert coordinator._endpoint_backoff == {}  # noqa: SLF001
+    assert handled is False  # noqa: S101
+    assert coordinator._endpoint_backoff == {}  # noqa: S101, SLF001
 
 
 def test_endpoint_backoff_is_wired_for_period_stat_endpoints() -> None:
@@ -72,9 +72,9 @@ def test_endpoint_backoff_is_wired_for_period_stat_endpoints() -> None:
     src = Path("custom_components/jackery_solarvault/coordinator.py").read_text(
         encoding="utf-8",
     )
-    assert "backoff_key=backoff_pv_key" in src
-    assert "backoff_key=backoff_battery_key" in src
-    assert "backoff_key=backoff_home_key" in src
-    assert "backoff_key=backoff_ct_key" in src
-    assert "backoff_key=backoff_eps_key" in src
-    assert "backoff_key=backoff_today_key" in src
+    assert "backoff_key=backoff_pv_key" in src  # noqa: S101
+    assert "backoff_key=backoff_battery_key" in src  # noqa: S101
+    assert "backoff_key=backoff_home_key" in src  # noqa: S101
+    assert "backoff_key=backoff_ct_key" in src  # noqa: S101
+    assert "backoff_key=backoff_eps_key" in src  # noqa: S101
+    assert "backoff_key=backoff_today_key" in src  # noqa: S101

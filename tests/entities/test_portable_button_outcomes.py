@@ -1,4 +1,6 @@
-"""Tests for QUERY_BUTTON_DESCRIPTIONS including the portable/Explorer powerstation buttons.
+"""Tests for QUERY_BUTTON_DESCRIPTIONS including the portable/Explorer powerstation.
+
+buttons.
 
 This test file covers:
 - Total count of QUERY_BUTTON_DESCRIPTIONS (SolarVault + portable buttons)
@@ -16,6 +18,26 @@ from custom_components.jackery_solarvault.button import (
     QUERY_BUTTON_DESCRIPTIONS,
     JackeryQueryButton,
     JackeryQueryButtonDescription,
+    _portable_get_charge_plan,  # noqa: PLC2701
+    _portable_power_off,  # noqa: PLC2701
+    _portable_power_pack_blink,  # noqa: PLC2701
+    _portable_read_device_info,  # noqa: PLC2701
+    _portable_restart,  # noqa: PLC2701
+    _portable_sync_mqtt_info,  # noqa: PLC2701
+)
+from custom_components.jackery_solarvault.const import (
+    ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
+    ACTION_ID_PORTABLE_POWER_OFF,
+    ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+    ACTION_ID_PORTABLE_READ_DEVICE_INFO,
+    ACTION_ID_PORTABLE_RESTART,
+    ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
+    FIELD_CMD,
+    FIELD_DEV_TYPE,
+    FIELD_MESSAGE_TYPE,
+    FIELD_REBOOT,
+    MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+    MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
 )
 
 # The expected total count: 14 SolarVault + 14 portable = 28 entries
@@ -68,69 +90,73 @@ class TestQueryButtonDescriptionsStructure:
 
     def test_is_a_tuple(self) -> None:  # noqa: PLR6301
         """QUERY_BUTTON_DESCRIPTIONS must be a tuple."""
-        assert isinstance(QUERY_BUTTON_DESCRIPTIONS, tuple)
+        assert isinstance(QUERY_BUTTON_DESCRIPTIONS, tuple)  # noqa: S101
 
     def test_total_count_includes_portable_buttons(self) -> None:  # noqa: PLR6301
         """Total count must include both SolarVault and portable buttons."""
-        assert len(QUERY_BUTTON_DESCRIPTIONS) == _EXPECTED_TOTAL_COUNT, (
-            f"Expected {_EXPECTED_TOTAL_COUNT} descriptions, got {len(QUERY_BUTTON_DESCRIPTIONS)}. "
+        assert len(QUERY_BUTTON_DESCRIPTIONS) == _EXPECTED_TOTAL_COUNT, (  # noqa: S101
+            f"Expected {_EXPECTED_TOTAL_COUNT} descriptions,"
+            f" got {len(QUERY_BUTTON_DESCRIPTIONS)}. "
             f"Keys present: {[d.key for d in QUERY_BUTTON_DESCRIPTIONS]}"
         )
 
     def test_all_entries_are_query_button_description_instances(self) -> None:  # noqa: PLR6301
         """Every entry must be a JackeryQueryButtonDescription instance."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert isinstance(desc, JackeryQueryButtonDescription), (
+            assert isinstance(desc, JackeryQueryButtonDescription), (  # noqa: S101
                 f"Entry {desc!r} is not a JackeryQueryButtonDescription"
             )
 
     def test_all_keys_are_unique(self) -> None:  # noqa: PLR6301
         """Every description key must be unique."""
         keys = [desc.key for desc in QUERY_BUTTON_DESCRIPTIONS]
-        assert len(keys) == len(set(keys)), (
+        assert len(keys) == len(set(keys)), (  # noqa: S101
             f"Duplicate keys found: {[k for k in keys if keys.count(k) > 1]}"
         )
 
     def test_all_icons_use_mdi_prefix(self) -> None:  # noqa: PLR6301
         """Every description icon must start with 'mdi:'."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert desc.icon.startswith("mdi:"), (
-                f"Description '{desc.key}' has icon '{desc.icon}' which does not start with 'mdi:'"
+            assert desc.icon.startswith("mdi:"), (  # noqa: S101
+                f"Description '{desc.key}' has icon '{desc.icon}'"
+                " which does not start with 'mdi:'"
             )
 
     def test_all_actions_are_callable(self) -> None:  # noqa: PLR6301
         """Every description action must be callable."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert callable(desc.action), (
+            assert callable(desc.action), (  # noqa: S101
                 f"Description '{desc.key}' has non-callable action: {desc.action!r}"
             )
 
     def test_all_message_types_are_strings(self) -> None:  # noqa: PLR6301
         """Every description message_type must be a non-empty string."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert isinstance(desc.message_type, str) and desc.message_type, (  # noqa: PT018
-                f"Description '{desc.key}' has invalid message_type: {desc.message_type!r}"
+            assert isinstance(desc.message_type, str) and desc.message_type, (  # noqa: PT018, S101
+                f"Description '{desc.key}' has invalid"
+                f" message_type: {desc.message_type!r}"
             )
 
     def test_all_action_ids_are_positive_integers(self) -> None:  # noqa: PLR6301
         """Every description action_id must be a positive integer."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert isinstance(desc.action_id, int) and desc.action_id > 0, (  # noqa: PT018
+            assert isinstance(desc.action_id, int) and desc.action_id > 0, (  # noqa: PT018, S101
                 f"Description '{desc.key}' has invalid action_id: {desc.action_id!r}"
             )
 
     def test_all_cmds_are_non_negative_integers(self) -> None:  # noqa: PLR6301
         """Every description cmd must be a non-negative integer."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert isinstance(desc.cmd, int) and desc.cmd >= 0, (  # noqa: PT018
+            assert isinstance(desc.cmd, int) and desc.cmd >= 0, (  # noqa: PT018, S101
                 f"Description '{desc.key}' has invalid cmd: {desc.cmd!r}"
             )
 
     def test_translation_key_matches_key_for_all_entries(self) -> None:  # noqa: PLR6301
         """Each description's translation_key must match its key."""
         for desc in QUERY_BUTTON_DESCRIPTIONS:
-            assert desc.translation_key == desc.key, (
-                f"Description '{desc.key}' has mismatched translation_key: '{desc.translation_key}'"
+            assert desc.translation_key == desc.key, (  # noqa: S101
+                f"Description '{desc.key}' has mismatched"
+                f" translation_key: '{desc.translation_key}'"
             )
 
 
@@ -146,7 +172,7 @@ class TestSolarVaultKeys:
         """All 14 expected SolarVault keys must be in QUERY_BUTTON_DESCRIPTIONS."""
         actual_keys = {desc.key for desc in QUERY_BUTTON_DESCRIPTIONS}
         missing = _SOLARVAULT_KEYS - actual_keys
-        assert not missing, f"Missing SolarVault keys: {missing}"
+        assert not missing, f"Missing SolarVault keys: {missing}"  # noqa: S101
 
     def test_subdevice_keys_have_dev_type(self) -> None:  # noqa: PLR6301
         """SolarVault subdevice-query keys must have a non-None dev_type."""
@@ -159,7 +185,7 @@ class TestSolarVaultKeys:
         }
         for desc in QUERY_BUTTON_DESCRIPTIONS:
             if desc.key in subdevice_keys:
-                assert desc.dev_type is not None, (
+                assert desc.dev_type is not None, (  # noqa: S101
                     f"SolarVault subdevice key '{desc.key}' must have dev_type set"
                 )
 
@@ -174,8 +200,9 @@ class TestSolarVaultKeys:
         }
         for desc in QUERY_BUTTON_DESCRIPTIONS:
             if desc.key in non_subdevice_sv_keys:
-                assert desc.dev_type is None, (
-                    f"Non-subdevice SolarVault key '{desc.key}' must have dev_type=None, "
+                assert desc.dev_type is None, (  # noqa: S101
+                    f"Non-subdevice SolarVault key '{desc.key}'"
+                    " must have dev_type=None, "
                     f"got {desc.dev_type}"
                 )
 
@@ -192,13 +219,16 @@ class TestPortableButtonKeys:
         """All 14 expected portable keys must be in QUERY_BUTTON_DESCRIPTIONS."""
         actual_keys = {desc.key for desc in QUERY_BUTTON_DESCRIPTIONS}
         missing = _PORTABLE_KEYS - actual_keys
-        assert not missing, f"Missing portable keys: {missing}"
+        assert not missing, f"Missing portable keys: {missing}"  # noqa: S101
 
     def test_portable_buttons_have_no_dev_type(self) -> None:  # noqa: PLR6301
-        """All portable buttons must have dev_type=None (they address the main device)."""
+        """All portable buttons must have dev_type=None (they address the main.
+
+        device).
+        """
         for desc in QUERY_BUTTON_DESCRIPTIONS:
             if desc.key in _PORTABLE_KEYS:
-                assert desc.dev_type is None, (
+                assert desc.dev_type is None, (  # noqa: S101
                     f"Portable button '{desc.key}' must not have dev_type set, "
                     f"got {desc.dev_type}"
                 )
@@ -206,21 +236,21 @@ class TestPortableButtonKeys:
     def test_portable_restart_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_restart must use cmd=96 (msgId=45)."""
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
-        assert desc.cmd == 96  # noqa: PLR2004
+        assert desc.cmd == 96  # noqa: PLR2004, S101
 
     def test_portable_power_off_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_power_off must use cmd=97 (msgId=46)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_power_off"
         )
-        assert desc.cmd == 97  # noqa: PLR2004
+        assert desc.cmd == 97  # noqa: PLR2004, S101
 
     def test_portable_power_pack_blink_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_power_pack_blink must use cmd=98 (msgId=39)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_power_pack_blink"
         )
-        assert desc.cmd == 98  # noqa: PLR2004
+        assert desc.cmd == 98  # noqa: PLR2004, S101
 
     def test_portable_refresh_device_info_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_device_info must use cmd=3 (msgId=6)."""
@@ -229,7 +259,7 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_device_info"
         )
-        assert desc.cmd == 3  # noqa: PLR2004
+        assert desc.cmd == 3  # noqa: PLR2004, S101
 
     def test_portable_refresh_wifi_list_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_wifi_list must use cmd=1 (msgId=5)."""
@@ -238,7 +268,7 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_wifi_list"
         )
-        assert desc.cmd == 1
+        assert desc.cmd == 1  # noqa: S101
 
     def test_portable_refresh_battery_packs_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_battery_packs must use cmd=6 (msgId=8)."""
@@ -247,7 +277,7 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_battery_packs"
         )
-        assert desc.cmd == 6  # noqa: PLR2004
+        assert desc.cmd == 6  # noqa: PLR2004, S101
 
     def test_portable_refresh_electricity_count_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_electricity_count must use cmd=7 (msgId=9)."""
@@ -256,21 +286,21 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_electricity_count"
         )
-        assert desc.cmd == 7  # noqa: PLR2004
+        assert desc.cmd == 7  # noqa: PLR2004, S101
 
     def test_portable_sync_time_zone_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_sync_time_zone must use cmd=8 (msgId=25)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_sync_time_zone"
         )
-        assert desc.cmd == 8  # noqa: PLR2004
+        assert desc.cmd == 8  # noqa: PLR2004, S101
 
     def test_portable_sync_mqtt_info_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_sync_mqtt_info must use cmd=99 (msgId=50)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_sync_mqtt_info"
         )
-        assert desc.cmd == 99  # noqa: PLR2004
+        assert desc.cmd == 99  # noqa: PLR2004, S101
 
     def test_portable_refresh_wifi_config_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_wifi_config must use cmd=124 (msgId=52)."""
@@ -279,14 +309,14 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_refresh_wifi_config"
         )
-        assert desc.cmd == 124  # noqa: PLR2004
+        assert desc.cmd == 124  # noqa: PLR2004, S101
 
     def test_portable_get_charge_plan_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_get_charge_plan must use cmd=15 (msgId=26)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_get_charge_plan"
         )
-        assert desc.cmd == 15  # noqa: PLR2004
+        assert desc.cmd == 15  # noqa: PLR2004, S101
 
     def test_portable_current_charge_plan_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_current_charge_plan must use cmd=21 (msgId=30)."""
@@ -295,7 +325,7 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_current_charge_plan"
         )
-        assert desc.cmd == 21  # noqa: PLR2004
+        assert desc.cmd == 21  # noqa: PLR2004, S101
 
     def test_portable_get_peaks_troughs_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_get_peaks_troughs must use cmd=131 (msgId=43)."""
@@ -304,19 +334,19 @@ class TestPortableButtonKeys:
             for d in QUERY_BUTTON_DESCRIPTIONS
             if d.key == "portable_get_peaks_troughs"
         )
-        assert desc.cmd == 131  # noqa: PLR2004
+        assert desc.cmd == 131  # noqa: PLR2004, S101
 
     def test_portable_refresh_sub_ct_has_correct_cmd(self) -> None:  # noqa: PLR6301
         """portable_refresh_sub_ct must use cmd=110 (msgId=51)."""
         desc = next(
             d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_refresh_sub_ct"
         )
-        assert desc.cmd == 110  # noqa: PLR2004
+        assert desc.cmd == 110  # noqa: PLR2004, S101
 
     def test_portable_keys_have_portable_prefix_in_key(self) -> None:  # noqa: PLR6301
         """All portable keys must start with 'portable_'."""
         for key in _PORTABLE_KEYS:
-            assert key.startswith("portable_"), (
+            assert key.startswith("portable_"), (  # noqa: S101
                 f"Portable key '{key}' does not start with 'portable_'"
             )
 
@@ -330,15 +360,10 @@ class TestPortableButtonActions:
     """Tests that portable button actions call async_send_portable_command."""
 
     async def test_portable_restart_calls_send_portable_command(self) -> None:  # noqa: PLR6301
-        """_portable_restart action must call async_send_portable_command on the coordinator."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_restart,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_RESTART,
-            FIELD_REBOOT,
-        )
+        """_portable_restart action must call async_send_portable_command on the.
 
+        coordinator.
+        """
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -352,15 +377,10 @@ class TestPortableButtonActions:
         )
 
     async def test_portable_power_off_calls_send_portable_command(self) -> None:  # noqa: PLR6301
-        """_portable_power_off action must call async_send_portable_command on the coordinator."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_power_off,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_POWER_OFF,
-            FIELD_REBOOT,
-        )
+        """_portable_power_off action must call async_send_portable_command on the.
 
+        coordinator.
+        """
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -375,13 +395,6 @@ class TestPortableButtonActions:
 
     async def test_portable_power_pack_blink_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_power_pack_blink action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_power_pack_blink,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_POWER_PACK_BLINK,
-        )
-
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -396,13 +409,6 @@ class TestPortableButtonActions:
 
     async def test_portable_read_device_info_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_read_device_info action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_read_device_info,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_READ_DEVICE_INFO,
-        )
-
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -417,14 +423,6 @@ class TestPortableButtonActions:
 
     async def test_portable_get_charge_plan_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_get_charge_plan action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_get_charge_plan,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
-            MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
-        )
-
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -440,13 +438,6 @@ class TestPortableButtonActions:
 
     async def test_portable_sync_mqtt_info_calls_send_portable_command(self) -> None:  # noqa: PLR6301
         """_portable_sync_mqtt_info action must call async_send_portable_command."""
-        from custom_components.jackery_solarvault.button import (
-            _portable_sync_mqtt_info,  # noqa: PLC2701
-        )
-        from custom_components.jackery_solarvault.const import (
-            ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
-        )
-
         coordinator = MagicMock()
         coordinator.async_send_portable_command = AsyncMock()
 
@@ -475,41 +466,44 @@ class TestJackeryQueryButtonWithPortableDescriptions:
         return coordinator
 
     def test_portable_restart_button_has_correct_message_type(self) -> None:
-        """JackeryQueryButton with portable_restart description must have DEVICE_PROPERTY_CHANGE message type."""
-        from custom_components.jackery_solarvault.const import (
-            MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
-        )
+        """JackeryQueryButton with portable_restart description must have.
 
+        DEVICE_PROPERTY_CHANGE message type.
+        """
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
         coordinator = self._make_coordinator()
         btn = JackeryQueryButton(coordinator, "dev123", description=desc)
         attrs = btn.extra_state_attributes
-        from custom_components.jackery_solarvault.const import FIELD_MESSAGE_TYPE
 
-        assert attrs[FIELD_MESSAGE_TYPE] == MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE
+        assert attrs[FIELD_MESSAGE_TYPE] == MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE  # noqa: S101
 
     def test_portable_restart_button_has_no_dev_type_in_attrs(self) -> None:
-        """JackeryQueryButton with portable description must NOT include devType in attrs."""
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
+        """JackeryQueryButton with portable description must NOT include devType in.
 
+        attrs.
+        """
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
         coordinator = self._make_coordinator()
         btn = JackeryQueryButton(coordinator, "dev123", description=desc)
         attrs = btn.extra_state_attributes
-        assert FIELD_DEV_TYPE not in attrs
+        assert FIELD_DEV_TYPE not in attrs  # noqa: S101
 
     def test_portable_restart_button_cmd_is_in_attrs(self) -> None:
-        """JackeryQueryButton with portable_restart must include cmd=96 in extra_state_attributes."""
-        from custom_components.jackery_solarvault.const import FIELD_CMD
+        """JackeryQueryButton with portable_restart must include cmd=96 in.
 
+        extra_state_attributes.
+        """
         desc = next(d for d in QUERY_BUTTON_DESCRIPTIONS if d.key == "portable_restart")
         coordinator = self._make_coordinator()
         btn = JackeryQueryButton(coordinator, "dev123", description=desc)
         attrs = btn.extra_state_attributes
-        assert attrs[FIELD_CMD] == 45  # noqa: PLR2004
+        assert attrs[FIELD_CMD] == 45  # noqa: PLR2004, S101
 
     def test_portable_unique_id_does_not_clash_with_solarvault(self) -> None:
-        """Portable button unique IDs must not match any SolarVault button unique IDs."""
+        """Portable button unique IDs must not match any SolarVault button unique.
+
+        IDs.
+        """
         coordinator = self._make_coordinator()
         solarvault_ids = set()
         portable_ids = set()
@@ -520,7 +514,7 @@ class TestJackeryQueryButtonWithPortableDescriptions:
                 solarvault_ids.add(uid)
             elif desc.key in _PORTABLE_KEYS:
                 portable_ids.add(uid)
-        assert not solarvault_ids.intersection(portable_ids), (
+        assert not solarvault_ids.intersection(portable_ids), (  # noqa: S101
             "Some portable button unique IDs clash with SolarVault unique IDs"
         )
 
@@ -533,19 +527,23 @@ class TestJackeryQueryButtonWithPortableDescriptions:
 def test_portable_restart_in_descriptions() -> None:
     """Regression: portable_restart must exist in QUERY_BUTTON_DESCRIPTIONS."""
     keys = [d.key for d in QUERY_BUTTON_DESCRIPTIONS]
-    assert "portable_restart" in keys
+    assert "portable_restart" in keys  # noqa: S101
 
 
 def test_portable_power_off_in_descriptions() -> None:
     """Regression: portable_power_off must exist in QUERY_BUTTON_DESCRIPTIONS."""
     keys = [d.key for d in QUERY_BUTTON_DESCRIPTIONS]
-    assert "portable_power_off" in keys
+    assert "portable_power_off" in keys  # noqa: S101
 
 
 def test_no_portable_button_has_subdevice_dev_type() -> None:
-    """Boundary: no portable button should address a subdevice (they address the main device)."""
+    """Boundary: no portable button should address a subdevice (they address the main.
+
+    device).
+    """
     for desc in QUERY_BUTTON_DESCRIPTIONS:
         if desc.key.startswith("portable_"):
-            assert desc.dev_type is None, (
-                f"Portable button '{desc.key}' must not set dev_type; got {desc.dev_type}"
+            assert desc.dev_type is None, (  # noqa: S101
+                f"Portable button '{desc.key}' must not set"
+                f" dev_type; got {desc.dev_type}"
             )

@@ -51,12 +51,12 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
                     "typeName": "Shelly Pro 3EM",
                     "deviceId": 2057219036232777730,
                     "deviceSn": "5c013b048e3c",
-                }
-            ]
+                },
+            ],
         },
     }
 
-    assert (
+    assert (  # noqa: S101
         JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)  # noqa: SLF001
         == "2057219036232777730"
     )
@@ -65,13 +65,13 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
 def test_accessory_id_none_without_smart_meter() -> None:
     """No CT accessory present → None (caller then falls back to main id)."""
     idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
-    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # noqa: S101, SLF001
 
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
     source = {PAYLOAD_CT_METER: {"devType": 3, "deviceId": 2057219036232777730}}
-    assert (
+    assert (  # noqa: S101
         JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)  # noqa: SLF001
         == "2057219036232777730"
     )
@@ -91,20 +91,20 @@ def test_ct_stat_call_uses_accessory_id_not_main_device_id() -> None:
     """The /v1/device/stat/ct call must pass ct_stat_device_id, not dev_id."""
     src = _coordinator_src()
     # The CT-stat call resolves to the accessory-scoped id.
-    assert re.search(r"async_get_device_ct_stat\(\s*ct_stat_device_id", src), (
+    assert re.search(r"async_get_device_ct_stat\(\s*ct_stat_device_id", src), (  # noqa: S101
         "CT-stat call must use ct_stat_device_id (accessory id), not the main dev_id"
     )
     # And that id is derived with a fallback to the main id.
-    assert "ct_stat_device_id = ct_dev_id or dev_id" in src
+    assert "ct_stat_device_id = ct_dev_id or dev_id" in src  # noqa: S101
 
 
 def test_extras_fetch_is_wired_to_accessory_resolver() -> None:
     """The slow-metrics caller must resolve and pass the CT accessory id."""
     src = _coordinator_src()
-    assert "_smart_meter_accessory_device_id(idx)" in src, (
+    assert "_smart_meter_accessory_device_id(idx)" in src, (  # noqa: S101
         "caller must resolve the CT accessory deviceId from the discovery index"
     )
     # _fetch_device_extras must accept the resolved id.
-    assert re.search(r"_fetch_device_extras\([\s\S]{0,200}ct_dev_id", src), (
+    assert re.search(r"_fetch_device_extras\([\s\S]{0,200}ct_dev_id", src), (  # noqa: S101
         "_fetch_device_extras must accept ct_dev_id"
     )

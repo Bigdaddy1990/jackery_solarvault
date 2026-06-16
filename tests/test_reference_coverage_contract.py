@@ -1,11 +1,11 @@
 """Static contract tests for Jackery reference coverage documentation."""
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: TID251
 
 import ast
 import json
-import re
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE_PATH = ROOT / "docs" / "jackery_complete_reference.json"
@@ -22,10 +22,11 @@ CONST_PATH = ROOT / "custom_components" / "jackery_solarvault" / "const.py"
 
 def _literal_assignment(tree: ast.Module, name: str) -> object:
     for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):  # noqa: SIM102
             if node.target.id == name and node.value is not None:
                 return ast.literal_eval(node.value)
-    raise AssertionError(f"{name} assignment not found")
+    msg = f"{name} assignment not found"
+    raise AssertionError(msg)
 
 
 def _frozenset_name_count(tree: ast.Module, name: str) -> int:
@@ -35,15 +36,16 @@ def _frozenset_name_count(tree: ast.Module, name: str) -> int:
         if node.target.id != name or not isinstance(node.value, ast.Call):
             continue
         [arg] = node.value.args
-        assert isinstance(arg, ast.Set)
+        assert isinstance(arg, ast.Set)  # noqa: S101
         return sum(isinstance(item, ast.Name) for item in arg.elts)
-    raise AssertionError(f"{name} frozenset assignment not found")
+    msg = f"{name} frozenset assignment not found"
+    raise AssertionError(msg)
 
 
 def _summary_row(markdown: str, label: str) -> tuple[str, ...]:
     pattern = re.compile(rf"^\| {re.escape(label)}\s*\|(.+)\|$", re.MULTILINE)
     match = pattern.search(markdown)
-    assert match is not None, f"{label} coverage row missing"
+    assert match is not None, f"{label} coverage row missing"  # noqa: S101
     return tuple(cell.strip() for cell in match.group(1).split("|"))
 
 
@@ -52,21 +54,24 @@ def test_reference_coverage_summary_matches_authoritative_json() -> None:
     reference = json.loads(REFERENCE_PATH.read_text(encoding="utf-8"))
     coverage = COVERAGE_PATH.read_text(encoding="utf-8")
 
-    assert "Single technical source of truth: `docs/jackery_complete_reference.json`" in coverage
-    assert _summary_row(coverage, "HTTP-Endpoints")[0] == str(
-        reference["counts"]["http_endpoints"]
+    assert (  # noqa: S101
+        "Single technical source of truth:"
+        " `docs/jackery_complete_reference.json`" in coverage
     )
-    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[0] == str(
-        len(reference["mqtt"]["message_types"])
+    assert _summary_row(coverage, "HTTP-Endpoints")[0] == str(  # noqa: S101
+        reference["counts"]["http_endpoints"],
     )
-    assert _summary_row(coverage, "Commands (home)")[0] == str(
-        reference["counts"]["commands_home"]
+    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[0] == str(  # noqa: S101
+        len(reference["mqtt"]["message_types"]),
     )
-    assert _summary_row(coverage, "Commands (portable)")[0] == str(
-        reference["counts"]["commands_portable"]
+    assert _summary_row(coverage, "Commands (home)")[0] == str(  # noqa: S101
+        reference["counts"]["commands_home"],
     )
-    assert _summary_row(coverage, "Accessories")[0] == str(
-        reference["counts"]["accessory_types"]
+    assert _summary_row(coverage, "Commands (portable)")[0] == str(  # noqa: S101
+        reference["counts"]["commands_portable"],
+    )
+    assert _summary_row(coverage, "Accessories")[0] == str(  # noqa: S101
+        reference["counts"]["accessory_types"],
     )
 
 
@@ -105,19 +110,19 @@ def test_reference_coverage_summary_matches_implementation_lists() -> None:
     implemented_reference_endpoints = set(client_endpoints) & reference_endpoint_paths
     exempt_reference_endpoints = set(exempt_endpoints) & reference_endpoint_paths
 
-    assert _summary_row(coverage, "HTTP-Endpoints")[1] == str(
-        len(implemented_reference_endpoints)
+    assert _summary_row(coverage, "HTTP-Endpoints")[1] == str(  # noqa: S101
+        len(implemented_reference_endpoints),
     )
-    assert (
-        f"{len(implemented_reference_endpoints) + len(exempt_reference_endpoints)}/112 covered"
-        in coverage
+    assert (  # noqa: S101
+        f"{len(implemented_reference_endpoints) + len(exempt_reference_endpoints)}"
+        "/112 covered" in coverage
     )
-    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[1] == str(
-        len(mqtt_message_constants)
+    assert _summary_row(coverage, "MQTT-Msg-Types (home)")[1] == str(  # noqa: S101
+        len(mqtt_message_constants),
     )
-    assert _summary_row(coverage, "Commands (home)")[1] == str(
-        len(home_action_id_constants)
+    assert _summary_row(coverage, "Commands (home)")[1] == str(  # noqa: S101
+        len(home_action_id_constants),
     )
-    assert _summary_row(coverage, "Commands (portable)")[1] == str(
-        portable_action_ids_count
+    assert _summary_row(coverage, "Commands (portable)")[1] == str(  # noqa: S101
+        portable_action_ids_count,
     )

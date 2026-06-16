@@ -44,16 +44,16 @@ async def test_setup_and_unload_round_trip(
             return_value=None,
         ),
     ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
+        assert await hass.config_entries.async_setup(entry.entry_id)  # noqa: S101
         await hass.async_block_till_done()
-        assert entry.state == ConfigEntryState.LOADED
+        assert entry.state == ConfigEntryState.LOADED  # noqa: S101
 
         # runtime_data is populated with the coordinator instance
-        assert entry.runtime_data is not None
+        assert entry.runtime_data is not None  # noqa: S101
 
-        assert await hass.config_entries.async_unload(entry.entry_id)
+        assert await hass.config_entries.async_unload(entry.entry_id)  # noqa: S101
         await hass.async_block_till_done()
-        assert entry.state == ConfigEntryState.NOT_LOADED
+        assert entry.state == ConfigEntryState.NOT_LOADED  # noqa: S101
 
 
 async def test_services_register_on_setup(
@@ -87,6 +87,6 @@ async def test_services_register_on_setup(
         await hass.async_block_till_done()
 
     services = hass.services.async_services_for_domain(DOMAIN)
-    assert "rename_system" in services
-    assert "refresh_weather_plan" in services
-    assert "delete_storm_alert" in services
+    assert "rename_system" in services  # noqa: S101
+    assert "refresh_weather_plan" in services  # noqa: S101
+    assert "delete_storm_alert" in services  # noqa: S101

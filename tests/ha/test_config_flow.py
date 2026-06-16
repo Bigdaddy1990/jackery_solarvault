@@ -34,8 +34,8 @@ async def test_user_flow_happy_path(
         DOMAIN,
         context={"source": config_entries.SOURCE_USER},
     )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["type"] == FlowResultType.FORM  # noqa: S101
+    assert result["step_id"] == "user"  # noqa: S101
 
     result2 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -44,9 +44,9 @@ async def test_user_flow_happy_path(
             CONF_PASSWORD: "correct-password",
         },
     )
-    assert result2["type"] == FlowResultType.CREATE_ENTRY
-    assert result2["title"] == "user@example.com"
-    assert (
+    assert result2["type"] == FlowResultType.CREATE_ENTRY  # noqa: S101
+    assert result2["title"] == "user@example.com"  # noqa: S101
+    assert (  # noqa: S101
         result2["data"]
         == {
             CONF_USERNAME: "user@example.com",
@@ -70,12 +70,14 @@ async def test_user_flow_invalid_credentials(hass: HomeAssistant) -> None:
                 CONF_PASSWORD: "wrong-password",
             },
         )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {"base": "invalid_auth"}
+    assert result["type"] == FlowResultType.FORM  # noqa: S101
+    assert result["errors"] == {"base": "invalid_auth"}  # noqa: S101
 
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
-    """Show a "cannot_connect" form error when the API raises a network error during the user config flow.
+    """Show a "cannot_connect" form error when the API raises a network error during.
+
+    the user config flow.
 
     Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
     """
@@ -91,8 +93,8 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
                 CONF_PASSWORD: "any-password",
             },
         )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {"base": "cannot_connect"}
+    assert result["type"] == FlowResultType.FORM  # noqa: S101
+    assert result["errors"] == {"base": "cannot_connect"}  # noqa: S101
 
 
 async def test_user_flow_unique_id_dedup(
@@ -119,8 +121,8 @@ async def test_user_flow_unique_id_dedup(
             CONF_PASSWORD: "pass2",
         },
     )
-    assert result2["type"] == FlowResultType.ABORT
-    assert result2["reason"] == "already_configured"
+    assert result2["type"] == FlowResultType.ABORT  # noqa: S101
+    assert result2["reason"] == "already_configured"  # noqa: S101
 
 
 async def test_reauth_flow_updates_password_and_reloads(
@@ -140,26 +142,29 @@ async def test_reauth_flow_updates_password_and_reloads(
 
     # Trigger reauth from the entry
     result = await entry.start_reauth_flow(hass)
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "reauth_confirm"
+    assert result["type"] == FlowResultType.FORM  # noqa: S101
+    assert result["step_id"] == "reauth_confirm"  # noqa: S101
 
     # Submit a new password
     result2 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {CONF_PASSWORD: "new-password"},
     )
-    assert result2["type"] == FlowResultType.ABORT
-    assert result2["reason"] == FLOW_ABORT_REAUTH_SUCCESSFUL
+    assert result2["type"] == FlowResultType.ABORT  # noqa: S101
+    assert result2["reason"] == FLOW_ABORT_REAUTH_SUCCESSFUL  # noqa: S101
 
     # Entry data must reflect the new password without changing username
-    assert entry.data[CONF_PASSWORD] == "new-password"
-    assert entry.data[CONF_USERNAME] == "user@example.com"
+    assert entry.data[CONF_PASSWORD] == "new-password"  # noqa: S101
+    assert entry.data[CONF_USERNAME] == "user@example.com"  # noqa: S101
 
 
 async def test_options_flow_persists_local_mqtt_topic_filter_default(
     hass: HomeAssistant,
 ) -> None:
-    """Options flow must persist the local MQTT topic-filter option and default it to empty."""
+    """Options flow must persist the local MQTT topic-filter option and default it to.
+
+    empty.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="user@example.com",
@@ -172,12 +177,12 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["type"] == FlowResultType.FORM
-    assert flow["step_id"] == "init"
+    assert flow["type"] == FlowResultType.FORM  # noqa: S101
+    assert flow["step_id"] == "init"  # noqa: S101
 
     result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""  # noqa: PLC1901
+    assert result["type"] == FlowResultType.CREATE_ENTRY  # noqa: S101
+    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""  # noqa: PLC1901, S101
 
 
 async def test_options_flow_accepts_local_mqtt_topic_filter_value(
@@ -196,7 +201,7 @@ async def test_options_flow_accepts_local_mqtt_topic_filter_value(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["type"] == FlowResultType.FORM
+    assert flow["type"] == FlowResultType.FORM  # noqa: S101
 
     result = await hass.config_entries.options.async_configure(
         flow["flow_id"],
@@ -204,5 +209,5 @@ async def test_options_flow_accepts_local_mqtt_topic_filter_value(
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/app/+/device",
         },
     )
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == "hb/app/+/device"
+    assert result["type"] == FlowResultType.CREATE_ENTRY  # noqa: S101
+    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == "hb/app/+/device"  # noqa: S101

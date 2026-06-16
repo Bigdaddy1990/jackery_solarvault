@@ -7,6 +7,7 @@ Covers:
 - async_get_today_energy: new today-energy KPI endpoint
 """
 
+import binascii
 from typing import Any
 
 import pytest
@@ -40,7 +41,8 @@ def _make_rsa_public_key_b64() -> str:
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
         k = rsa.generate_private_key(65537, 1024)
-        der = k.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        der = k.public_key().public_bytes(Encoding.DER,
+        PublicFormat.SubjectPublicKeyInfo)
         print(base64.b64encode(der).decode())
     The value below is a real 1024-bit RSA SubjectPublicKeyInfo DER blob.
     """
@@ -53,13 +55,16 @@ def _make_rsa_public_key_b64() -> str:
 
 
 def _make_ec_public_key_b64() -> str:
-    """Return a DER-encoded P-256 EC public key as base64 (not RSA, so TypeError expected).
+    """Return a DER-encoded P-256 EC public key as base64 (not RSA, so TypeError.
+
+    expected).
 
     Generated with:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
         k = ec.generate_private_key(ec.SECP256R1())
-        der = k.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        der = k.public_key().public_bytes(Encoding.DER,
+        PublicFormat.SubjectPublicKeyInfo)
         print(base64.b64encode(der).decode())
     """
     # Real P-256 SubjectPublicKeyInfo DER, base64-encoded.
@@ -74,9 +79,9 @@ def test_rsa_pkcs1v15_encrypt_accepts_valid_rsa_key() -> None:
     key_b64 = _make_rsa_public_key_b64()
     plaintext = b"test payload"
     result = _rsa_pkcs1v15_encrypt(plaintext, key_b64)
-    assert isinstance(result, bytes)
+    assert isinstance(result, bytes)  # noqa: S101
     # RSA-1024 ciphertext is always 128 bytes.
-    assert len(result) == 128  # noqa: PLR2004
+    assert len(result) == 128  # noqa: PLR2004, S101
 
 
 def test_rsa_pkcs1v15_encrypt_rejects_non_rsa_key_with_type_error() -> None:
@@ -91,7 +96,7 @@ def test_rsa_pkcs1v15_encrypt_error_message_names_actual_type() -> None:
     ec_b64 = _make_ec_public_key_b64()
     with pytest.raises(TypeError) as exc_info:
         _rsa_pkcs1v15_encrypt(b"data", ec_b64)
-    assert "RSAPublicKey" in str(exc_info.value) or "RSA" in str(exc_info.value)
+    assert "RSAPublicKey" in str(exc_info.value) or "RSA" in str(exc_info.value)  # noqa: S101
 
 
 def test_rsa_pkcs1v15_encrypt_rejects_invalid_base64() -> None:
@@ -101,8 +106,6 @@ def test_rsa_pkcs1v15_encrypt_rejects_invalid_base64() -> None:
     helper does not wrap it, so the test pins that specific exception type
     rather than the blind ``Exception`` (which Ruff B017 forbids).
     """
-    import binascii
-
     with pytest.raises(binascii.Error):
         _rsa_pkcs1v15_encrypt(b"data", "not-valid-base64!!!")
 
@@ -115,41 +118,41 @@ def test_rsa_pkcs1v15_encrypt_rejects_invalid_base64() -> None:
 def test_generate_udid_has_correct_prefix() -> None:
     """Generated UDID must start with MQTT_MAC_ID_PREFIX ('2')."""
     result = _generate_udid("user@example.com")
-    assert result.startswith(MQTT_MAC_ID_PREFIX)
+    assert result.startswith(MQTT_MAC_ID_PREFIX)  # noqa: S101
 
 
 def test_generate_udid_is_33_hex_chars() -> None:
     """Generated UDID must be exactly 33 lowercase hex characters (prefix + 32)."""
     result = _generate_udid("user@example.com")
-    assert len(result) == 33  # noqa: PLR2004
-    assert result.isalnum()
-    assert result == result.lower()
+    assert len(result) == 33  # noqa: PLR2004, S101
+    assert result.isalnum()  # noqa: S101
+    assert result == result.lower()  # noqa: S101
 
 
 def test_generate_udid_contains_no_dashes() -> None:
     """Generated UDID must not contain UUID dashes."""
     result = _generate_udid("user@example.com")
-    assert "-" not in result
+    assert "-" not in result  # noqa: S101
 
 
 def test_generate_udid_is_deterministic() -> None:
     """The same seed must always produce the same UDID."""
     seed = "stable-seed@example.com"
-    assert _generate_udid(seed) == _generate_udid(seed)
+    assert _generate_udid(seed) == _generate_udid(seed)  # noqa: S101
 
 
 def test_generate_udid_differs_for_different_seeds() -> None:
     """Different seeds must produce different UDIDs."""
     a = _generate_udid("user1@example.com")
     b = _generate_udid("user2@example.com")
-    assert a != b
+    assert a != b  # noqa: S101
 
 
 def test_generate_udid_handles_unicode_seed() -> None:
     """Non-ASCII seed characters must be encoded as UTF-8 without error."""
     result = _generate_udid("ユーザー@例.com")
-    assert len(result) == 33  # noqa: PLR2004
-    assert result.startswith(MQTT_MAC_ID_PREFIX)
+    assert len(result) == 33  # noqa: PLR2004, S101
+    assert result.startswith(MQTT_MAC_ID_PREFIX)  # noqa: S101
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +180,9 @@ async def test_async_get_device_eps_stat_calls_correct_path() -> None:
         end_date="2026-05-27",
     )
 
-    assert captured["path"] == DEVICE_EPS_STAT_PATH
-    assert captured["params"][FIELD_DEVICE_ID] == "dev1"
-    assert "totalInEpsEnergy" in payload
+    assert captured["path"] == DEVICE_EPS_STAT_PATH  # noqa: S101
+    assert captured["params"][FIELD_DEVICE_ID] == "dev1"  # noqa: S101
+    assert "totalInEpsEnergy" in payload  # noqa: S101
 
 
 async def test_async_get_device_eps_stat_stores_raw_response() -> None:
@@ -200,7 +203,7 @@ async def test_async_get_device_eps_stat_stores_raw_response() -> None:
     )
 
     key = f"{DEVICE_EPS_STAT_PATH}:dev1:{DATE_TYPE_DAY}"
-    assert key in api.last_device_period_stat_responses
+    assert key in api.last_device_period_stat_responses  # noqa: S101
 
 
 async def test_async_get_device_eps_stat_returns_empty_dict_for_null_payload() -> None:
@@ -221,11 +224,11 @@ async def test_async_get_device_eps_stat_returns_empty_dict_for_null_payload() -
     )
 
     # APP_REQUEST_META is always injected even for null payloads.
-    assert APP_REQUEST_META in payload
+    assert APP_REQUEST_META in payload  # noqa: S101
     meta = payload[APP_REQUEST_META]
-    assert meta["dateType"] == DATE_TYPE_DAY
-    assert meta["beginDate"] == "2026-05-27"
-    assert meta["endDate"] == "2026-05-27"
+    assert meta["dateType"] == DATE_TYPE_DAY  # noqa: S101
+    assert meta["beginDate"] == "2026-05-27"  # noqa: S101
+    assert meta["endDate"] == "2026-05-27"  # noqa: S101
 
 
 async def test_async_get_device_eps_stat_integer_device_id_is_stringified() -> None:
@@ -247,7 +250,7 @@ async def test_async_get_device_eps_stat_integer_device_id_is_stringified() -> N
         end_date="2026-05-27",
     )
 
-    assert captured["params"][FIELD_DEVICE_ID] == "12345"
+    assert captured["params"][FIELD_DEVICE_ID] == "12345"  # noqa: S101
 
 
 # ---------------------------------------------------------------------------
@@ -270,9 +273,9 @@ async def test_async_get_today_energy_calls_correct_path_with_device_sn() -> Non
 
     result = await api.async_get_today_energy("SN123456")
 
-    assert captured["path"] == DEVICE_TODAY_ENERGY_PATH
-    assert captured["params"][FIELD_DEVICE_SN] == "SN123456"
-    assert result == expected_response[FIELD_DATA]
+    assert captured["path"] == DEVICE_TODAY_ENERGY_PATH  # noqa: S101
+    assert captured["params"][FIELD_DEVICE_SN] == "SN123456"  # noqa: S101
+    assert result == expected_response[FIELD_DATA]  # noqa: S101
 
 
 async def test_async_get_today_energy_device_sn_is_stringified() -> None:
@@ -288,7 +291,7 @@ async def test_async_get_today_energy_device_sn_is_stringified() -> None:
 
     await api.async_get_today_energy("98765")  # type: ignore[arg-type]
 
-    assert captured["params"][FIELD_DEVICE_SN] == "98765"
+    assert captured["params"][FIELD_DEVICE_SN] == "98765"  # noqa: S101
 
 
 async def test_async_get_today_energy_returns_payload_dict() -> None:
@@ -305,7 +308,7 @@ async def test_async_get_today_energy_returns_payload_dict() -> None:
     api._get_json = _get_json  # noqa: SLF001
 
     result = await api.async_get_today_energy("HR2C12345")
-    assert result == full_response[FIELD_DATA]
+    assert result == full_response[FIELD_DATA]  # noqa: S101
 
 
 async def test_async_get_today_energy_forwards_empty_payload() -> None:
@@ -318,7 +321,7 @@ async def test_async_get_today_energy_forwards_empty_payload() -> None:
     api._get_json = _get_json  # noqa: SLF001
 
     result = await api.async_get_today_energy("SN000")
-    assert result == {}
+    assert result == {}  # noqa: S101
 
 
 # ---------------------------------------------------------------------------
@@ -347,4 +350,4 @@ async def test_async_get_device_eps_stat_does_not_include_system_id() -> None:
 
     # FIELD_SYSTEM_ID / "systemId" must not appear in params since the EPS method
     # does not accept a system_id argument.
-    assert "systemId" not in captured["params"]
+    assert "systemId" not in captured["params"]  # noqa: S101

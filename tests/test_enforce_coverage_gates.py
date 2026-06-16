@@ -1,11 +1,14 @@
 """Tests for coverage gate enforcement."""
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: TID251
 
 from decimal import Decimal
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from scripts.enforce_coverage_gates import enforce_coverage_gates
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_xml(path: Path, *, branch_rate: str | None = "1") -> None:
@@ -48,11 +51,11 @@ def test_enforce_coverage_gates_accepts_perfect_line_and_branch(tmp_path: Path) 
     coverage_xml = tmp_path / "coverage.xml"
     _write_xml(coverage_xml)
 
-    assert not enforce_coverage_gates(
+    assert not enforce_coverage_gates(  # noqa: S101
         coverage_xml=coverage_xml,
-        total_minimum=Decimal("85"),
-        legacy_module_minimum=Decimal("90"),
-        perfect_module_minimum=Decimal("100"),
+        total_minimum=Decimal(85),
+        legacy_module_minimum=Decimal(90),
+        perfect_module_minimum=Decimal(100),
     )
 
 
@@ -63,12 +66,12 @@ def test_enforce_coverage_gates_requires_branch_coverage(tmp_path: Path) -> None
 
     failures = enforce_coverage_gates(
         coverage_xml=coverage_xml,
-        total_minimum=Decimal("85"),
-        legacy_module_minimum=Decimal("90"),
-        perfect_module_minimum=Decimal("100"),
+        total_minimum=Decimal(85),
+        legacy_module_minimum=Decimal(90),
+        perfect_module_minimum=Decimal(100),
     )
 
-    assert (
+    assert (  # noqa: S101
         "coverage XML missing total branch-rate; run pytest with --cov-branch"
         in failures
     )
