@@ -30,7 +30,16 @@ async def async_send_ble_command(  # noqa: PLR0913
     ack_cmds: tuple[int, ...] | None = None,
     mtu_override: int | None = None,
 ) -> bool:
-    """Send one BLE command through the coordinator-owned listener."""
+    """
+    Send a BLE command to a device.
+    
+    Parameters:
+        body (dict or bytes): Command payload.
+        ack_cmds (tuple of int, optional): Command IDs to recognize as acknowledgments.
+    
+    Returns:
+        True if the command was sent successfully, False otherwise.
+    """
     return await coordinator._async_send_ble_command_impl(  # noqa: SLF001
         device_id,
         cmd=cmd,
@@ -44,7 +53,12 @@ async def async_send_ble_command(  # noqa: PLR0913
 
 
 def ble_observations(coordinator: JackerySolarVaultCoordinator) -> dict[str, Any]:
-    """Return BLE diagnostic observations from the coordinator listener."""
+    """
+    Retrieve BLE diagnostic observations from the coordinator listener.
+    
+    Returns:
+    	dict[str, Any]: A dictionary containing BLE diagnostic observations.
+    """
     return coordinator._ble_observations_impl()  # noqa: SLF001
 
 

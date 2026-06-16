@@ -37,11 +37,11 @@ _KEY_CACHED_AT: Final = "cached_at"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Get the Store configured for persisting the MQTT session cache.
-
+    """
+    Provides the Store for MQTT session cache persistence.
+    
     Returns:
-        A Store[dict[str, Any]] configured with the module's storage key and storage
-        version.
+        A Store configured for MQTT session cache.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
@@ -51,13 +51,12 @@ async def async_load_mqtt_session(  # noqa: PLR0911
 ) -> dict[str, str] | None:
     """
     Load cached MQTT session credentials for the given config entry.
-
+    
     Returns:
-        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`,
-        `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes
-        `MQTT_SESSION_MAC_ID_SOURCE` when present and non-empty.
-        None: If storage is missing or malformed, or if any required field is missing
-        or empty.
+        A dictionary with keys MQTT_SESSION_USER_ID, MQTT_SESSION_SEED_B64,
+        and MQTT_SESSION_MAC_ID mapped to their string values. Includes
+        MQTT_SESSION_MAC_ID_SOURCE if present and non-empty. Returns None if
+        storage is missing, malformed, or any required field is missing or empty.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):

@@ -88,7 +88,14 @@ class AppDataQualityWarning(NamedTuple):
 def normalized_data_quality_warnings(
     warnings: list[Any],
 ) -> list[dict[str, Any]]:
-    """Return deterministic, de-duplicated data-quality warnings."""
+    """
+    De-duplicate data-quality warnings based on reason, metric key, and source and reference values.
+    
+    Keeps the first occurrence of each unique warning and filters out non-dictionary items. Returns results in deterministic sorted order.
+    
+    Returns:
+        A list of de-duplicated warning dictionaries.
+    """
     deduped: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
     for warning in warnings:
         if not isinstance(warning, dict):
@@ -106,7 +113,15 @@ def normalized_data_quality_warnings(
 
 
 def _format_request_range(request: object) -> str | None:
-    """Return a compact dateType/range summary for diagnostics messages."""
+    """
+    Format a compact date range summary from a request object.
+    
+    Parameters:
+        request (object): A request object containing optional date fields.
+    
+    Returns:
+        str | None: A formatted date range string if the request is a dict with date information, None otherwise.
+    """
     if not isinstance(request, dict):
         return None
     date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
@@ -124,7 +139,14 @@ def _format_request_range(request: object) -> str | None:
 
 
 def format_data_quality_warning(warning: dict[str, Any]) -> str:
-    """Produce a compact, deterministic repair-safe warning message."""
+    """
+    Format a data quality warning dictionary into a diagnostic message.
+    
+    Produces a string showing the metric name and a comparison of source and reference values across sections, with optional request date ranges.
+    
+    Returns:
+        A formatted warning string in the form "metric: source_section=source_value < reference_section=reference_value" with optional date ranges appended in brackets.
+    """
     metric = (
         warning.get(DATA_QUALITY_KEY_LABEL)
         or warning.get(DATA_QUALITY_KEY_METRIC_KEY)
@@ -160,7 +182,18 @@ def app_data_quality_warnings(
     today: date | None = None,
     tolerance: float = 0.05,
 ) -> list[AppDataQualityWarning]:
-    """Detect contradictory app statistics without mutating source data."""
+    """
+    Identify logical inconsistencies in app statistics across time periods and between lifetime and yearly totals.
+    
+    Detects contradictory numeric relationships by comparing statistics across day/week/month/year periods and checking if lifetime generation is less than yearly generation. Warnings are generated when logical relationships violate constraints beyond the tolerance threshold.
+    
+    Parameters:
+        today (date | None): The reference date for determining week/month/year boundaries. Defaults to today's date.
+        tolerance (float): The threshold for allowable differences in period comparisons. Defaults to 0.05.
+    
+    Returns:
+        list[AppDataQualityWarning]: Warnings for detected logical inconsistencies.
+    """
     from custom_components.jackery_solarvault.util import (
         app_period_range,
         safe_float,
@@ -184,9 +217,26 @@ def app_data_quality_warnings(
     warnings: list[AppDataQualityWarning] = []
 
     def _section(prefix: str, date_type: str) -> str:
+        """
+        Constructs a section name from a prefix and date type.
+        
+        Returns:
+            str: A section name formatted as {prefix}_{date_type}.
+        """
         return f"{prefix}_{date_type}"
 
     def _period_total(prefix: str, date_type: str, stat_key: str) -> float | None:
+        """
+        Retrieve the total value for a specified period and statistic metric.
+        
+        Parameters:
+            prefix: Prefix used to construct the payload section name.
+            date_type: The period type (day, week, month, year, etc.).
+            stat_key: The statistic key to retrieve.
+        
+        Returns:
+            The total value as a float, or None if the section does not contain a dictionary.
+        """
         section = _section(prefix, date_type)
         source = payload.get(section)
         if not isinstance(source, dict):
@@ -196,6 +246,12 @@ def app_data_quality_warnings(
         return safe_float(source.get(stat_key))
 
     def _request_for_section(section: str) -> dict[str, Any] | None:
+        """
+        Extract the request metadata from a payload section.
+        
+        Returns:
+            A copy of the request metadata dictionary if present, `None` otherwise.
+        """
         source = payload.get(section)
         if not isinstance(source, dict):
             return None
@@ -203,7 +259,12 @@ def app_data_quality_warnings(
         return dict(request) if isinstance(request, dict) else None
 
     def _chart_series_key_for_section(section: str, stat_key: str) -> str | None:
-        """Return the chart-series key for a payload section/statistic."""
+        """
+        Retrieve the chart-series key for a payload section.
+        
+        Returns:
+            str | None: The chart-series key if the section exists as a dictionary, `None` otherwise.
+        """
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 

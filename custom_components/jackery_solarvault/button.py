@@ -850,19 +850,14 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up app-command Button entities for devices in the config entry.
-
-    Create a JackeryRebootButton for each coordinator-managed device that either
-    reports support for advanced features or exposes the reboot property, avoid
-    registering duplicate entities, and only add entities when the coordinator-derived
-    device signature changes. Registers a coordinator listener to update discovery when
-    the signature changes.
-
-    Parameters:
-        entry (JackeryConfigEntry): Config entry whose runtime_data contains the
-        integration coordinator.
-        async_add_entities (AddEntitiesCallback): Callback to register new ButtonEntity
-        instances with Home Assistant.
+    """
+    Set up button entities for coordinator-managed devices.
+    
+    Discovers and registers unique button entities for each device tracked by the
+    coordinator, including query buttons, weather plan refresh, schedule readers,
+    reboot, and storm alert deletion buttons. Avoids duplicate entity registration
+    and only updates discovery when the coordinator data signature changes. Registers
+    a listener to keep discovery in sync with coordinator updates.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
@@ -1076,12 +1071,13 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Execute the query action defined by this entity's query description.
-
-        Calls the configured action callable for this entity's device. Propagates
-        ConfigEntryAuthFailed; if a HomeAssistantError with a `translation_key` is
-        raised it is propagated unchanged; any other exception is converted and raised
-        via this entity's `_raise_action_error` helper.
+        """
+        Execute the configured query action for this entity's device.
+        
+        Raises an error if the device is offline. Propagates ConfigEntryAuthFailed
+        unchanged. If a HomeAssistantError with a translation_key is raised, it is
+        propagated unchanged; any other exception is converted and raised with
+        translated error context.
         """
         if not self.available:
             self._raise_action_error("device is offline")
@@ -1139,11 +1135,10 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Reboot the associated device and request the coordinator to refresh its data.
-
-        If authentication fails, the original ConfigEntryAuthFailed is propagated. A
-        HomeAssistantError that already has a `translation_key` is re-raised unchanged;
-        all other exceptions are converted and surfaced via `_raise_action_error`.
+        """
+        Reboot the device and request the coordinator to refresh its data.
+        
+        Raises HomeAssistantError if the device is offline or the reboot command fails.
         """
         if not self.available:
             self._raise_action_error("device is offline")
@@ -1302,15 +1297,12 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Trigger a device schedule read for the configured task bucket and request a.
-
-        coordinator refresh.
-
+        """
+        Trigger a read of the device schedule for the configured task type and refresh the coordinator.
+        
         Raises:
             ConfigEntryAuthFailed: Re-raised when authentication has failed.
-            HomeAssistantError: Re-raised unchanged if it already has a
-            `translation_key`; other exceptions are converted into a translated
-            `HomeAssistantError` indicating the entity action failed.
+            HomeAssistantError: Raised if the device is offline or if the schedule read fails.
         """
         if not self.available:
             self._raise_action_error("device is offline")

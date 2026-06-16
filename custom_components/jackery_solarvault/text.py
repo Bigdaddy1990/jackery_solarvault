@@ -81,14 +81,16 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up text entities for renaming Jackery system devices from a config entry.
-
-    Retrieves the coordinator from the entry and registers JackerySystemNameText
-    entities for each device whose payload exposes a system identifier (either FIELD_ID
-    or FIELD_SYSTEM_ID). Prevents duplicate registrations, computes a signature of
-    coordinator.data to only add entities when the set of devices changes, and
-    registers a coordinator listener that updates entities on subsequent data changes;
-    the listener is detached when the entry is unloaded.
+    """
+    Register and keep updated text configuration entities for Jackery SolarVault devices.
+    
+    Retrieves the coordinator from the entry and creates text entities for each device
+    based on supported configuration fields: system name (if device has a system identifier),
+    grid standard (if present), and third-party MQTT fields (if device supports advanced
+    features or Bluetooth). Prevents duplicate entity registrations by tracking unique IDs,
+    and uses a signature of coordinator data to detect when the set of devices or
+    configuration changes. Registers a coordinator listener that automatically adds new
+    entities on subsequent data changes, with cleanup handled on entry unload.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
@@ -160,11 +162,8 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """Add newly discovered text entities when the coordinator's data changes.
-
-        Checks the current signature of the coordinator data against the last seen
-        signature; if different, collect entities and register them with
-        `async_add_entities`, and update the stored signature.
+        """
+        Register text entities when the coordinator's device data changes.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

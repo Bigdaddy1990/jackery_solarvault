@@ -1076,26 +1076,17 @@ async def _async_handle_send_device_schedule(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> None:
-    """Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery.
-
-    device.
-
-    Resolves the provided device identifier to the owning Jackery device, parses the
-    schedule `body` (accepts a mapping or a JSON object string), and forwards the
-    action to the coordinator to send the schedule frame.
-
+    """
+    Send a device schedule frame to a Jackery device.
+    
     Parameters:
         call (ServiceCall): Service call whose `data` must include:
-            - `device_id` (str): device identifier or Home Assistant device registry id
-            to resolve.
-            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017,
-            3018).
-            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded
-            object string.
-
+            - `device_id` (str): device identifier or Home Assistant device registry id to resolve
+            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018)
+            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string
+    
     Raises:
-        ServiceValidationError: if the device cannot be resolved to a coordinator, if
-        `body` is invalid, or if sending the schedule fails.
+        ServiceValidationError: if the device cannot be resolved, the body is invalid, or sending fails
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)
@@ -1126,7 +1117,12 @@ async def _async_handle_send_device_schedule(
 def _entry_for_coordinator(
     hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
 ) -> ConfigEntry | None:
-    """Locate the loaded config entry that owns a coordinator."""
+    """
+    Locate the loaded config entry that owns a coordinator.
+    
+    Returns:
+        The matching ConfigEntry, or None if not found.
+    """
     for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
         if getattr(loaded_entry, "runtime_data", None) is coordinator:
             return loaded_entry
@@ -1142,6 +1138,23 @@ def _text_field(  # noqa: PLR0913
     max_length: int | None = None,
     numeric: bool = False,
 ) -> str:
+    """
+    Validate and extract a required text field from a service call with optional length and numeric constraints.
+    
+    Parameters:
+        call (ServiceCall): The service call containing the field data.
+        field (str): The name of the field to extract.
+        translation_key (str): The translation key for error messages.
+        placeholder_key (str): The key for the field value in error message placeholders.
+        max_length (int | None): Maximum allowed field length; if None, no constraint is applied.
+        numeric (bool): If True, the field value must contain only digits.
+    
+    Returns:
+        str: The validated field value with leading and trailing whitespace removed.
+    
+    Raises:
+        ServiceValidationError: If the field is not a string, is empty after stripping, exceeds max_length, or fails numeric validation when enabled.
+    """
     raw = call.data.get(field)
     if not isinstance(raw, str):
         value = ""
@@ -1167,6 +1180,18 @@ def _text_field(  # noqa: PLR0913
 
 
 def _optional_text(call: ServiceCall, field: str, label: str) -> str:
+    """
+    Retrieve an optional text field from a service call.
+    
+    Parameters:
+    	label (str): Human-readable label for the field, used in error messages.
+    
+    Returns:
+    	str: The field value if it is a string; empty string if the field is absent or None.
+    
+    Raises:
+    	ValueError: If the field is present but not a string.
+    """
     raw = call.data.get(field, "")
     if raw is None:
         return ""

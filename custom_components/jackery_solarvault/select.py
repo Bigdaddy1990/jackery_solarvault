@@ -926,21 +926,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create and register select entities for devices using the module's description.
-
-    registry.
-
-    Select entities are created per-device when the device payload indicates support
-    for the described selector; duplicate unique IDs are avoided. The function
-    immediately adds any new entities and registers a listener to add entities later
-    when the coordinator's device payload signature changes.
-
-    Parameters:
-        hass (HomeAssistant): Home Assistant core instance.
-        entry (JackeryConfigEntry): Config entry whose runtime_data provides the
-        coordinator and device payloads.
-        async_add_entities (AddEntitiesCallback): Callback used to register new
-        SelectEntity instances with Home Assistant.
+    """
+    Create select entities for devices in the config entry.
+    
+    Registers entities for each device based on device capabilities. Entities are added
+    immediately and updated whenever the coordinator detects new or changed devices.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
@@ -1038,14 +1028,10 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """Detect changes in the coordinator's device payloads and register any newly.
-
-        discovered select entities.
-
-        When the computed signature of coordinator.data differs from the last-seen
-        signature, collect eligible entities and pass them to the platform's
-        async_add_entities callback, then update the cached signature; if the signature
-        is unchanged, take no action.
+        """
+        Detect changes in the coordinator's device payloads and register any newly discovered select entities.
+        
+        When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature. If the signature is unchanged, take no action.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

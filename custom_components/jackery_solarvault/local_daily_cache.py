@@ -43,11 +43,11 @@ _KEY_VALUES: Final = "values"
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
-    """Provide the Home Assistant Store configured for the module's local midnight
-    snapshot cache.
-
+    """
+    Create a configured store instance for the module's midnight snapshot cache.
+    
     Returns:
-        The `Store` configured with this module's storage key and version.
+        A Store configured with the module's storage key and version.
     """
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
@@ -65,22 +65,17 @@ def _isoformat_day(today: date) -> str:
 async def async_load_daily_cache(
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
-    """Load cached midnight snapshots for a config entry.
-
-    Returns a mapping keyed by device_id where each value is a snapshot object with the
-    shape
-    {"day": "YYYY-MM-DD", "values": {metric: wh}}. Malformed store entries are ignored;
-    an
-    empty dict is returned when the store is missing or contains no valid snapshots.
-    Callers
-    should compare each snapshot's "day" to the current date before using its values.
-
+    """
+    Load and validate cached midnight snapshots for a config entry.
+    
     Parameters:
-        entry_id (str): Config entry identifier whose snapshots to load.
-
+    	entry_id (str): Config entry identifier.
+    
     Returns:
-        dict[str, dict[str, Any]]: Device-id -> snapshot mapping containing validated
-        and normalized snapshot data.
+    	dict[str, dict[str, Any]]: A mapping from device ID to snapshot objects.
+    	Each snapshot has keys "day" (ISO date string) and "values" (metric to
+    	watt-hour mapping). Malformed entries are silently skipped; returns an empty
+    	dict if no valid snapshots exist.
     """
     data = await _store(hass).async_load()
     if not isinstance(data, dict):
@@ -120,22 +115,16 @@ async def async_save_daily_cache(
     *,
     snapshots: dict[str, dict[str, Any]],
 ) -> None:
-    """Persist per-device midnight snapshot data for a configuration entry.
-
-    Cleans and writes `snapshots` into the module's persistent store for `entry_id`.
-    The function accepts a mapping of device IDs to payloads of the form `{"day":
-    "YYYY-MM-DD", "values": {metric: number}}`; non-dict payloads, non-string days,
-    non-dict values, non-string metric keys, and values that cannot be converted to
-    `int` are omitted. Existing store data for other entries is preserved; invalid
-    fields in the provided snapshots are dropped rather than raising errors.
-
+    """
+    Persist per-device midnight snapshot data for a configuration entry.
+    
+    Cleans and writes the provided snapshots into the module's persistent store for the given entry ID. Non-dict payloads, non-string days, non-dict values, non-string metric keys, and values that cannot be converted to int are omitted. Existing store data for other entries is preserved; invalid fields in the provided snapshots are silently dropped rather than raising errors.
+    
     Parameters:
-        hass: HomeAssistant instance (provided by the caller).
         entry_id: Configuration entry identifier whose snapshots will be stored.
-        snapshots: Mapping from device ID to snapshot payloads. Each payload should
-        contain:
-            - "day": ISO date string ("YYYY-MM-DD").
-            - "values": mapping of metric keys (str) to numeric values (int|float|None).
+        snapshots: Mapping from device ID to snapshot payloads. Each payload should contain:
+            - "day": ISO date string (format "YYYY-MM-DD").
+            - "values": mapping of metric keys (str) to numeric values (int, float, or None).
     """
     store = _store(hass)
     data = await store.async_load()
@@ -177,23 +166,16 @@ def daily_delta(  # noqa: PLR0911
     today: date,
 ) -> int | None:
     """
-    Compute today's energy delta by subtracting the stored midnight anchor from the
-    current lifetime counter.
-
+    Compute today's energy delta by subtracting the stored midnight anchor from the current lifetime counter.
+    
     Parameters:
-        snapshot (dict | None): Stored snapshot expected to contain `"day"` (ISO date
-        string) and `"values"` (mapping metric keys to anchored Wh values).
-        metric_key (str): Key in `snapshot["values"]` identifying the metric anchor to
-        use.
-        current_lifetime_wh (int | float | None): Current lifetime energy counter for
-        the metric; if `None` the delta is disabled.
-        today (date): Local date used to validate that `snapshot["day"]` matches the
-        current day.
-
+        snapshot (dict | None): Snapshot containing the midnight anchor for the metric.
+        metric_key (str): Key identifying the metric anchor in the snapshot.
+        current_lifetime_wh (float | None): Current lifetime energy counter for the metric.
+        today (date): Local date to validate against the snapshot's stored day.
+    
     Returns:
-        int | None: Delta in watt-hours as an `int` when the snapshot is valid for
-        `today`, the anchor exists and both the anchor and current value convert to
-        integers and `current >= anchor`; `None` otherwise.
+        int | None: Energy delta in watt-hours when snapshot is valid for today and both values convert to integers with current >= anchor; `None` otherwise.
     """
     if current_lifetime_wh is None:
         return None
@@ -314,15 +296,10 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 
 def local_daily_signature(snapshots: Mapping[str, Any]) -> str:
     """
-    Produce a stable JSON signature for a snapshots mapping.
-
-    Parameters:
-        snapshots (Mapping[str, Any]): Mapping of device IDs to per-device snapshot
-        objects; used to detect content changes.
-
+    Return a deterministic JSON string representation of snapshots.
+    
     Returns:
-        signature (str): Deterministic JSON string representation of `snapshots`
-        (stable key ordering) suitable for change detection.
+        A JSON string with stable key ordering suitable for change detection.
     """
     return json.dumps(snapshots, sort_keys=True, default=str)
 
