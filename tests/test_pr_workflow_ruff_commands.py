@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AUTOFIX_YML = REPO_ROOT / ".github" / "workflows" / "autofix.yml"
 PRE_COMMIT_LITE_YML = REPO_ROOT / ".github" / "workflows" / "pre-commit-ci-lite.yml"
@@ -114,7 +113,7 @@ def test_autofix_yml_initial_ruff_format_uses_dot_target() -> None:
     ]
     assert ruff_format_lines, "autofix.yml must contain at least one ruff format command"
     for line in ruff_format_lines:
-        assert " . " in line or line.endswith(" .") or line.endswith(" . || true"), (
+        assert " . " in line or line.endswith((" .", " . || true")), (
             f"ruff format command must include explicit '.' target: {line!r}"
         )
 
@@ -183,7 +182,7 @@ def test_pre_commit_lite_yml_is_valid_yaml() -> None:
 
 
 def test_pre_commit_lite_yml_ruff_check_uses_dot_target() -> None:
-    """ruff check in pre-commit-ci-lite.yml must target '.' explicitly.
+    """Ruff check in pre-commit-ci-lite.yml must target '.' explicitly.
 
     The PR changed ``ruff check --fix --preview --target-version py314 || true``
     to ``ruff check . --fix --preview --target-version py314 || true``.
@@ -206,7 +205,7 @@ def test_pre_commit_lite_yml_ruff_check_uses_dot_target() -> None:
 
 
 def test_pre_commit_lite_yml_ruff_format_uses_dot_target() -> None:
-    """ruff format in pre-commit-ci-lite.yml must target '.' explicitly."""
+    """Ruff format in pre-commit-ci-lite.yml must target '.' explicitly."""
     doc = _load_yaml(PRE_COMMIT_LITE_YML)
     commands = _collect_run_commands(doc)
     ruff_format_lines = [
@@ -372,7 +371,7 @@ def test_autofix_yml_no_bare_ruff_format_without_dot() -> None:
     for line in lines:
         stripped = line.strip()
         # 'ruff format' followed immediately by end-of-line or || (no path arg)
-        if stripped == "ruff format" or stripped == "ruff format || true":
+        if stripped in {"ruff format", "ruff format || true"}:
             pytest.fail(
                 f"autofix.yml contains bare 'ruff format' without '.': {line!r}"
             )
@@ -384,7 +383,7 @@ def test_pre_commit_lite_yml_no_bare_ruff_format_without_dot() -> None:
     lines = source.splitlines()
     for line in lines:
         stripped = line.strip()
-        if stripped == "ruff format" or stripped == "ruff format || true":
+        if stripped in {"ruff format", "ruff format || true"}:
             pytest.fail(
                 f"pre-commit-ci-lite.yml contains bare 'ruff format' without '.': {line!r}"
             )

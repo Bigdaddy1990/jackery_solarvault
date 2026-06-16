@@ -9,11 +9,9 @@ syntax issue to help contributors identify and fix it.
 """
 
 import ast
-import textwrap
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DUP_CONST_AUDIT_PATH = REPO_ROOT / "REFACTORSLOP" / "_dup_const_audit.py"
