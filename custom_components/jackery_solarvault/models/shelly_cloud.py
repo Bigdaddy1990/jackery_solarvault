@@ -10,15 +10,15 @@ Source: coordinator.py lines 3131-3296 (Phase 6 extraction).
 
 from typing import TYPE_CHECKING, Any
 
-from custom_components.jackery_solarvault.const import (
+from ..const import (
     FIELD_CONTROL_ALLOWED,
-    FIELD_DEVICE_CODE,
     FIELD_DEV_TYPE,
+    FIELD_DEVICE_CODE,
     FIELD_HOST,
     FIELD_ICON,
     FIELD_ICON_PATH,
-    FIELD_INTEGRATOR_ENABLED,
     FIELD_IN_PW,
+    FIELD_INTEGRATOR_ENABLED,
     FIELD_IP,
     FIELD_IS_CLOUD,
     FIELD_ONLINE,
@@ -38,19 +38,18 @@ from custom_components.jackery_solarvault.const import (
     SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
 )
-from custom_components.jackery_solarvault.handlers.mqtt_handlers import (
+from ..handlers.mqtt_handlers import (
     merge_smart_plug_lists,
     merge_subdevice_list_by_identity,
     merge_subdevice_lists_by_sn,
 )
-from custom_components.jackery_solarvault.subdevices.detector import (
+from ..subdevices.detector import (
     entry_subdevice_candidates,
     subdevice_dev_type,
     subdevice_id,
     subdevice_identity_values,
     subdevice_serial,
 )
-
 from .property_merge import merge_dict_values
 
 if TYPE_CHECKING:
@@ -60,16 +59,13 @@ if TYPE_CHECKING:
 def shelly_cloud_api_device_id(item: dict[str, Any]) -> str | None:
     """Determine the native Shelly Cloud device identifier for a device payload.
 
-    Returns the Shelly-native device id used by Shelly Cloud realtime/control APIs when
-    the provided item represents a Shelly Cloud-related payload (e.g., identified as
-    Shelly, marked as cloud, or containing host/device code). Selection preference:
+    Returns the Shelly-native device id used by Shelly Cloud realtime/control APIs when the provided item represents a Shelly Cloud-related payload (e.g., identified as Shelly, marked as cloud, or containing host/device code). Selection preference:
     - a non-empty, non-numeric deviceId when present,
     - otherwise a subdevice serial-based id if available,
     - otherwise a generic subdevice id.
 
     Returns:
-        str: Device id suitable for Shelly Cloud APIs, or `None` if the item does not
-        indicate a Shelly Cloud payload.
+        str: Device id suitable for Shelly Cloud APIs, or `None` if the item does not indicate a Shelly Cloud payload.
     """
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
     is_shelly = scan_name.startswith("shelly")
@@ -99,28 +95,18 @@ def shelly_cloud_api_device_id(item: dict[str, Any]) -> str | None:
 def normalize_shelly_cloud_payload(
     source: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Normalize and flatten a Shelly Cloud DeviceItem or RealData payload into.
+    """Normalize and flatten a Shelly Cloud DeviceItem or RealData payload into subdevice fields.
 
-    subdevice fields.
-
-    Creates a shallow copy of all keys from `source` whose values are not None, merges
-    any dictionary found under FIELD_POWER_BODY into the top-level result, and sets
-    several fallback fields when their canonical counterparts are present:
-    - copies FIELD_SWITCH into FIELD_SWITCH_STATE and FIELD_SYS_SWITCH if those keys
-    are missing,
-    - copies FIELD_OP -> FIELD_OUT_PW, FIELD_IP -> FIELD_IN_PW, and FIELD_ONLINE ->
-    FIELD_ONLINE_STATUS when missing.
-    If FIELD_SCAN_NAME is present and (lowercased) matches an entry in
-    SUBDEVICE_SCAN_NAME_DEV_TYPES, rewrites FIELD_SCAN_NAME to the lowercased value and
-    sets FIELD_DEV_TYPE from the mapping when missing.
+    Creates a shallow copy of all keys from `source` whose values are not None, merges any dictionary found under FIELD_POWER_BODY into the top-level result, and sets several fallback fields when their canonical counterparts are present:
+    - copies FIELD_SWITCH into FIELD_SWITCH_STATE and FIELD_SYS_SWITCH if those keys are missing,
+    - copies FIELD_OP -> FIELD_OUT_PW, FIELD_IP -> FIELD_IN_PW, and FIELD_ONLINE -> FIELD_ONLINE_STATUS when missing.
+    If FIELD_SCAN_NAME is present and (lowercased) matches an entry in SUBDEVICE_SCAN_NAME_DEV_TYPES, rewrites FIELD_SCAN_NAME to the lowercased value and sets FIELD_DEV_TYPE from the mapping when missing.
 
     Parameters:
-        source (Mapping[str, Any]): Original Shelly Cloud payload (DeviceItem or
-        RealData).
+        source (Mapping[str, Any]): Original Shelly Cloud payload (DeviceItem or RealData).
 
     Returns:
-        dict[str, Any]: A normalized, flattened dictionary suitable for subdevice
-        merging.
+        dict[str, Any]: A normalized, flattened dictionary suitable for subdevice merging.
     """
     normalized = {key: value for key, value in source.items() if value is not None}
     power_body = normalized.get(FIELD_POWER_BODY)
@@ -152,8 +138,7 @@ def shelly_cloud_device_matches_entry(
 ) -> bool:
     """Determine whether the given Shelly Cloud device belongs to the provided entry.
 
-    Checks for any overlap between the set of subdevice identity values derived from
-    `shelly_device` and the identity sets of the entry's subdevice candidates.
+    Checks for any overlap between the set of subdevice identity values derived from `shelly_device` and the identity sets of the entry's subdevice candidates.
 
     Returns:
         `True` if any subdevice identity intersects, `False` otherwise.
@@ -171,22 +156,13 @@ def merge_shelly_cloud_item(  # noqa: PLR0911, PLR0912
     entry: dict[str, Any],
     source: Mapping[str, Any],
 ) -> bool:
-    """Merge a normalized Shelly Cloud device/realtime payload into the appropriate.
+    """Merge a normalized Shelly Cloud device/realtime payload into the appropriate buckets of an entry.
 
-    buckets of an entry.
-
-    Normalizes the provided payload, marks it as a cloud-sourced item when relevant
-    keys are present, and attempts to merge the normalized subdevice into one of the
-    entry's buckets (CT meter, smart plugs, or meter heads). If a specific device type
-    is determined, the payload is merged into the corresponding bucket; otherwise an
-    identity-based fallback attempts to merge into any matching bucket. The function
-    mutates `entry` in place.
+    Normalizes the provided payload, marks it as a cloud-sourced item when relevant keys are present, and attempts to merge the normalized subdevice into one of the entry's buckets (CT meter, smart plugs, or meter heads). If a specific device type is determined, the payload is merged into the corresponding bucket; otherwise an identity-based fallback attempts to merge into any matching bucket. The function mutates `entry` in place.
 
     Parameters:
-        entry (dict[str, Any]): The entry to update; updated in place when a merge
-        occurs.
-        source (Mapping[str, Any]): The raw Shelly Cloud device or realtime payload to
-        normalize and merge.
+        entry (dict[str, Any]): The entry to update; updated in place when a merge occurs.
+        source (Mapping[str, Any]): The raw Shelly Cloud device or realtime payload to normalize and merge.
 
     Returns:
         bool: `True` if `entry` was modified by the merge, `False` otherwise.
@@ -262,12 +238,10 @@ def shelly_cloud_device_ids(entry: dict[str, Any]) -> list[str]:
     """Collects known Shelly Cloud device identifiers associated with an entry.
 
     Parameters:
-        entry (dict[str, Any]): Entry dictionary containing stored device/subdevice
-        descriptors.
+        entry (dict[str, Any]): Entry dictionary containing stored device/subdevice descriptors.
 
     Returns:
-        list[str]: Deduplicated list of Shelly Cloud device IDs discovered for the
-        given entry.
+        list[str]: Deduplicated list of Shelly Cloud device IDs discovered for the given entry.
     """
     ids: list[str] = []
     for candidate in entry_subdevice_candidates(entry):

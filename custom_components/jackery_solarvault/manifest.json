@@ -2,58 +2,24 @@
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
   "after_dependencies": [
-    "bluetooth",
-    "dhcp",
-    "mqtt",
-    "recorder",
-    "zeroconf"
-  ],
-  "bluetooth": [
-    {
-      "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb",
-      "manufacturer_id": 18434,
-      "connectable": true
-    }
+    "recorder"
   ],
   "codeowners": [
     "@Bigdaddy1990"
   ],
   "config_flow": true,
   "dependencies": [],
-  "dhcp": [
-    {
-      "hostname": "solarvault*",
-      "macaddress": "80F1B2*"
-    },
-    {
-      "hostname": "jackery*",
-      "macaddress": "80F1B2*"
-    }
-  ],
-  "mqtt": [],
   "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
   "loggers": [
     "custom_components.jackery_solarvault",
-    "custom_components.jackery_solarvault.client",
-    "custom_components.jackery_solarvault.client.api",
-    "custom_components.jackery_solarvault.client.ble",
-    "custom_components.jackery_solarvault.client.ble_transport",
-    "custom_components.jackery_solarvault.client.local_mqtt",
-    "custom_components.jackery_solarvault.client.mqtt_push",
-    "aiohttp",
     "aiomqtt"
   ],
-  "quality_scale": "custom",
+  "quality_scale": "gold",
   "requirements": [
-    "aiomqtt==2.5.1",
-    "bleak-retry-connector>=3.5.0",
-    "cryptography"
+    "aiomqtt>=2.3.0"
   ],
-  "version": "0.1.1",
-  "zeroconf": [
-    "_jackery-solarvault._tcp.local."
-  ]
+  "version": "0.1.0"
 }

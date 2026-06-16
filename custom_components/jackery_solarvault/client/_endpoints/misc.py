@@ -2,8 +2,7 @@
 
 from typing import Any
 
-from custom_components.jackery_solarvault.client._http import BaseHTTPMixin
-from custom_components.jackery_solarvault.const import (
+from ...const import (
     ALARM_DETAIL_PATH,
     ALERT_SYNC_PATH,
     APP_VERSION_PATH,
@@ -19,6 +18,7 @@ from custom_components.jackery_solarvault.const import (
     PRIVACY_CONSENT_PATH,
     ZONE_LIST_PATH,
 )
+from .._http import BaseHTTPMixin
 
 
 class MiscEndpointMixin(BaseHTTPMixin):
@@ -28,8 +28,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
         """Check whether a newer app version is available.
 
         Returns:
-            dict[str, Any]: Dictionary containing the backend's normalized version
-            information.
+            dict[str, Any]: Dictionary containing the backend's normalized version information.
         """
         data = await self._get_json(APP_VERSION_PATH)
         return self._payload_dict(data, APP_VERSION_PATH)
@@ -37,8 +36,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
     async def async_get_banner_list(self) -> list[dict[str, Any]]:
         """Get the list of banner entries from the backend.
 
-        Each item is a dictionary representing a banner and has been normalized via the
-        client's payload parser.
+        Each item is a dictionary representing a banner and has been normalized via the client's payload parser.
 
         Returns:
             list[dict[str, Any]]: Banner entry dictionaries.
@@ -59,8 +57,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
         Parameters:
             contact_info (str): Contact information to include with the feedback.
             content (str): Feedback message.
-            device_sn (str): Device serial number to associate with the feedback, if
-            any.
+            device_sn (str): Device serial number to associate with the feedback, if any.
             image (str): Base64-encoded image to attach to the feedback, if any.
 
         Returns:
@@ -95,15 +92,12 @@ class MiscEndpointMixin(BaseHTTPMixin):
         return self._payload_list(data, FAQ_ANSWER_PATH)
 
     async def async_agree_privacy_consent(
-        self,
-        *,
-        pending_agree_version_ids: str,
+        self, *, pending_agree_version_ids: str
     ) -> dict[str, Any]:
         """Record agreement to one or more privacy consent versions.
 
         Parameters:
-            pending_agree_version_ids (str): Comma-separated privacy version IDs to
-            agree to.
+            pending_agree_version_ids (str): Comma-separated privacy version IDs to agree to.
 
         Returns:
             dict: Response payload returned by the backend.
@@ -117,24 +111,19 @@ class MiscEndpointMixin(BaseHTTPMixin):
         """Determine whether the backend requires an updated privacy consent.
 
         Returns:
-            dict: Server response containing privacy update information, including
-            whether an update is required and any related metadata.
+            dict: Server response containing privacy update information, including whether an update is required and any related metadata.
         """
         data = await self._get_json(PRIVACY_CHECK_PATH)
         return self._payload_dict(data, PRIVACY_CHECK_PATH)
 
     async def async_get_product_instruction(
-        self,
-        *,
-        dev_sn: str,
-        type: str = "",
+        self, *, dev_sn: str, type: str = ""
     ) -> dict[str, Any]:
         """Retrieve product instructions for a given device.
 
         Parameters:
             dev_sn (str): Device serial number used to query instructions.
-            type (str): Optional instruction type filter; when empty, no type filter is
-            applied.
+            type (str): Optional instruction type filter; when empty, no type filter is applied.
 
         Returns:
             dict[str, Any]: Normalized instruction payload returned by the backend.
@@ -155,16 +144,13 @@ class MiscEndpointMixin(BaseHTTPMixin):
         return self._payload_list(data, ZONE_LIST_PATH)
 
     async def async_get_gcs_list(self, *, country: str) -> list[dict[str, Any]]:
-        """Retrieve the list of grid-connection (GCS) standards for the specified.
-
-        country.
+        """Retrieve the list of grid-connection (GCS) standards for the specified country.
 
         Parameters:
             country (str): Country code.
 
         Returns:
-            list[dict[str, Any]]: List of grid standard entries, each represented as a
-            dictionary.
+            list[dict[str, Any]]: List of grid standard entries, each represented as a dictionary.
         """
         data = await self._get_json(GCS_LIST_PATH, params={"country": country})
         return self._payload_list(data, GCS_LIST_PATH)
@@ -176,8 +162,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
             alarm_key (str): Alarm identifier to fetch.
 
         Returns:
-            alarm_detail (dict[str, Any]): Dictionary of alarm detail fields and their
-            values.
+            alarm_detail (dict[str, Any]): Dictionary of alarm detail fields and their values.
         """
         data = await self._get_json(ALARM_DETAIL_PATH, params={"alarmKey": alarm_key})
         return self._payload_dict(data, ALARM_DETAIL_PATH)
@@ -193,8 +178,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
             dict: Backend response data.
         """
         return await self._post_json(
-            ALERT_SYNC_PATH,
-            {"content": content, "id": str(id)},
+            ALERT_SYNC_PATH, {"content": content, "id": str(id)}
         )
 
     async def async_get_offline_statistics(self) -> dict[str, Any]:
@@ -207,10 +191,7 @@ class MiscEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, OFFLINE_STAT_PATH)
 
     async def async_get_power3(
-        self,
-        *,
-        device_sn: str,
-        properties: str,
+        self, *, device_sn: str, properties: str
     ) -> dict[str, Any]:
         """Retrieve Power3 property values for a device.
 

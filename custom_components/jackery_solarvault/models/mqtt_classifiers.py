@@ -9,7 +9,7 @@ Source: coordinator.py lines 2135-2181 (Phase 2c extraction).
 
 from typing import Any
 
-from custom_components.jackery_solarvault.const import (
+from ..const import (
     ACTION_ID_GET_DEVICE_OTA_VERSION,
     ACTION_ID_GET_TIME_ZONE,
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -45,8 +45,7 @@ def is_alarm_message(
 ) -> bool:
     """Determine whether an MQTT message represents an alarm or alert.
 
-    Checks the message type, action ID, and the command field in `body` for known
-    alarm/alert indicators.
+    Checks the message type, action ID, and the command field in `body` for known alarm/alert indicators.
 
     Returns:
         `true` if the message is an alarm or alert, `false` otherwise.
@@ -63,19 +62,15 @@ def is_third_party_mqtt_config_message(
     action_id: int | None,
     body: dict[str, Any],
 ) -> bool:
-    """Determine whether an MQTT message represents a third-party MQTT configuration.
-
-    operation.
+    """Determine whether an MQTT message represents a third-party MQTT configuration operation.
 
     Parameters:
         msg_type (str | None): The message type to check.
         action_id (int | None): The numeric action identifier to check.
-        body (dict[str, Any]): The message payload; the function checks
-        `body.get(FIELD_CMD)` for command matching.
+        body (dict[str, Any]): The message payload; the function checks `body.get(FIELD_CMD)` for command matching.
 
     Returns:
-        True if the message type, action id, or `body[FIELD_CMD]` indicates a
-        third-party MQTT config request or query, False otherwise.
+        True if the message type, action id, or `body[FIELD_CMD]` indicates a third-party MQTT config request or query, False otherwise.
     """
     return (
         msg_type
@@ -120,8 +115,7 @@ def is_wifi_list_message(
     """Determine whether the MQTT message requests the WiFi list.
 
     Parameters:
-        action_id (int | None): Action identifier from the message header; may match
-        ACTION_ID_READ_WIFI_LIST.
+        action_id (int | None): Action identifier from the message header; may match ACTION_ID_READ_WIFI_LIST.
         body (dict[str, Any]): Message payload; may contain a command under FIELD_CMD.
 
     Returns:
@@ -140,8 +134,7 @@ def is_time_zone_config_message(
     """Identify MQTT messages that request or provide the device time zone.
 
     Parameters:
-        action_id (int | None): Message action identifier that may indicate a time zone
-        get/send.
+        action_id (int | None): Message action identifier that may indicate a time zone get/send.
         body (dict[str, Any]): Message payload; `FIELD_CMD` may contain the command key.
 
     Returns:
@@ -175,15 +168,11 @@ def is_mqtt_connect_info_message(
     """Determine whether a message requests or synchronizes MQTT connection information.
 
     Parameters:
-        action_id (int | None): Numeric action identifier from the message metadata;
-        may be None.
-        body (dict[str, Any]): Message body; the function checks the value under
-        `FIELD_CMD`.
+        action_id (int | None): Numeric action identifier from the message metadata; may be None.
+        body (dict[str, Any]): Message body; the function checks the value under `FIELD_CMD`.
 
     Returns:
-        bool: `True` if `action_id` equals `ACTION_ID_SYNC_MQTT_CONNECT_INFO` or
-        `body.get(FIELD_CMD)` equals `MQTT_CMD_SYNC_MQTT_CONNECT_INFO`, `False`
-        otherwise.
+        bool: `True` if `action_id` equals `ACTION_ID_SYNC_MQTT_CONNECT_INFO` or `body.get(FIELD_CMD)` equals `MQTT_CMD_SYNC_MQTT_CONNECT_INFO`, `False` otherwise.
     """
     return (
         action_id == ACTION_ID_SYNC_MQTT_CONNECT_INFO

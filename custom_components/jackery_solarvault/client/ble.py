@@ -29,8 +29,7 @@ Wire format (from ``HomeControlFormat.smali`` line 420-587):
         <ACTION_ID>      # 16-bit big-endian, hex-encoded (4 chars)
         <BLE_CMD>        # 16-bit big-endian, hex-encoded (4 chars)
         "0001"           # 2-byte payload-type marker (JSON chunk)
-        <CHUNK_LEN>      # 16-bit big-endian, hex-encoded (4 chars) — byte count of
-        <CHUNK_HEX>/2
+        <CHUNK_LEN>      # 16-bit big-endian, hex-encoded (4 chars) — byte count of <CHUNK_HEX>/2
         <CHUNK_HEX>      # hex-encoded payload bytes
 
     crc_suffix = sb_b_crc16(plaintext_hex_frame)     # 4-char hex (16-bit)
@@ -62,31 +61,64 @@ import secrets
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
-from custom_components.jackery_solarvault.const import (
-    BLE_AES_IV_LEN,
-    BLE_AES_KEY_LEN,
-    BLE_AES_KEY_LENGTHS,
+_LOGGER = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Wire-format constants
+# ---------------------------------------------------------------------------
+
+#: Magic prefix that every plaintext frame starts with.
+BLE_FRAME_MAGIC: str = "DFED"
+
+#: Protocol version following the magic. Constant in the app's
+#: ``BLE_SEND_DATA_FORMAT_HEX = "DFED0001%s%s%s%s0001%s%s"``.
+BLE_FRAME_VERSION: str = "0001"
+
+#: Payload-type marker between the header block and the chunk length.
+BLE_FRAME_PAYLOAD_MARKER: str = "0001"
+
+#: Length in hex characters of every fixed-width 16-bit field.
+_HEX16_WIDTH: int = 4
+
+#: Key lengths (in bytes) accepted by the BLE crypto helpers.
+#:
+#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
+#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
+#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
+#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
+#: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
+#: AES-128 or AES-256 from the key length implicitly. Both are listed here
+#: so callers can pick the right one without hard-coding either.
+BLE_AES_KEY_LEN_AES128: int = 16
+BLE_AES_KEY_LEN_AES256: int = 32
+
+#: Tuple of accepted key lengths, used for input validation.
+BLE_AES_KEY_LENGTHS: tuple[int, ...] = (
     BLE_AES_KEY_LEN_AES128,
     BLE_AES_KEY_LEN_AES256,
-    BLE_FRAME_MAGIC,
-    BLE_FRAME_PAYLOAD_MARKER,
-    BLE_FRAME_VERSION,
-    BLE_MANUFACTURER_ID,
-    BLE_NOTIFY_CHAR_UUID,
-    BLE_SERVICE_UUID,
-    BLE_WRITE_CHAR_UUID,
-    DEFAULT_BLE_MTU,
-    _BINARY_FRAME_HEADER_LEN,
-    _BINARY_FRAME_MAGIC_BE,
-    _BINARY_FRAME_PAYLOAD_MARKER_BE,
-    _BINARY_FRAME_TRAILER_LEN,
-    _BINARY_FRAME_VERSION_BE,
-    _BLE_FRAME_OVERHEAD,
-    _HEADER_HEX_LEN,
-    _HEX16_WIDTH,
 )
 
-_LOGGER = logging.getLogger(__name__)
+# Backwards-compatible alias kept until call sites migrate; new code should
+# branch on the actual key length the device returns.
+BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
+
+#: AES-CBC IV length in bytes.
+BLE_AES_IV_LEN: int = 16
+
+#: GATT service UUID advertised by the SolarVault BLE radio.
+BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
+
+#: Write-without-response characteristic (app -> device).
+BLE_WRITE_CHAR_UUID: str = "0000ee01-0000-1000-8000-00805f9b34fb"
+
+#: Notify characteristic (device -> app); needs CCCD ``0x2902`` enabled.
+BLE_NOTIFY_CHAR_UUID: str = "0000ee02-0000-1000-8000-00805f9b34fb"
+
+#: Bluetooth SIG company identifier under which the SolarVault advertises
+#: its serial number in the manufacturer-data field.
+BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
+
 
 # ---------------------------------------------------------------------------
 # Low-level hex helpers (mirror ``sb.d.d`` in the app)
@@ -97,15 +129,13 @@ def hex16(value: int) -> str:
     """Encode a 16-bit unsigned integer as a 4-character uppercase hexadecimal string.
 
     Returns:
-        A 4-character uppercase hex string representing the input value (e.g. 0 ->
-        "0000", 65535 -> "FFFF").
+        A 4-character uppercase hex string representing the input value (e.g. 0 -> "0000", 65535 -> "FFFF").
 
     Raises:
         ValueError: If `value` is not between 0 and 0xFFFF (inclusive).
     """
     if not 0 <= value <= 0xFFFF:  # noqa: PLR2004
-        msg = f"hex16: {value} does not fit into 16 bits"
-        raise ValueError(msg)
+        raise ValueError(f"hex16: {value} does not fit into 16 bits")  # noqa: TRY003
     return f"{value:04X}"
 
 
@@ -119,25 +149,20 @@ def parse_hex16(text: str) -> int:
         int: Integer value represented by `text`.
 
     Raises:
-        ValueError: If `text` is not exactly 4 characters long or contains invalid
-        hexadecimal digits.
+        ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
     """
     if len(text) != _HEX16_WIDTH:
-        msg = f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         )
     try:
         return int(text, 16)
     except ValueError as err:
-        msg = "parse_hex16: expected hex chars"
-        raise ValueError(msg) from err
+        raise ValueError("parse_hex16: expected hex chars") from err  # noqa: TRY003
 
 
 def hex_encode(data: bytes) -> str:
-    """Produce an uppercase hexadecimal string of the given bytes with no separators or.
-
-    "0x" prefix.
+    """Produce an uppercase hexadecimal string of the given bytes with no separators or "0x" prefix.
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
@@ -190,28 +215,22 @@ def _validate_key_len(key: bytes, *, fn: str) -> None:
 
     Parameters:
         key (bytes): AES key to validate.
-        fn (str): Name of the calling function; used as a prefix in the raised error
-        message.
+        fn (str): Name of the calling function; used as a prefix in the raised error message.
 
     Raises:
         ValueError: If `len(key)` is not 16 or 32; message is prefixed with `fn`.
     """
     if len(key) not in BLE_AES_KEY_LENGTHS:
-        msg = (
+        raise ValueError(  # noqa: TRY003
             f"{fn}: key must be one of {BLE_AES_KEY_LENGTHS} bytes "
             f"(got {len(key)} bytes)"
-        )
-        raise ValueError(
-            msg,
         )
 
 
 def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
     """Encrypts plaintext using AES in CBC mode with PKCS#7 padding.
 
-    Key length selects the AES variant: 16 bytes → AES-128, 32 bytes → AES-256. The
-    caller-provided IV must be exactly 16 bytes; providing a different IV length raises
-    ValueError.
+    Key length selects the AES variant: 16 bytes → AES-128, 32 bytes → AES-256. The caller-provided IV must be exactly 16 bytes; providing a different IV length raises ValueError.
 
     Parameters:
         plaintext (bytes): Data to be encrypted.
@@ -226,8 +245,7 @@ def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
     """
     _validate_key_len(key, fn="aes_encrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        msg = f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes"
-        raise ValueError(msg)
+        raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
@@ -238,8 +256,7 @@ def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
 def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
     """Decrypt AES-CBC-PKCS7 ciphertext using the provided key and IV.
 
-    Accepts 16-byte (AES-128) or 32-byte (AES-256) keys; IV must be exactly 16 bytes.
-    The function removes PKCS#7 padding and returns the resulting plaintext.
+    Accepts 16-byte (AES-128) or 32-byte (AES-256) keys; IV must be exactly 16 bytes. The function removes PKCS#7 padding and returns the resulting plaintext.
 
     Parameters:
         ciphertext (bytes): Ciphertext to decrypt (AES-CBC, block-aligned).
@@ -250,13 +267,11 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
         bytes: Decrypted plaintext with PKCS#7 padding removed.
 
     Raises:
-        ValueError: If `key` length is not 16 or 32 bytes, if `iv` is not 16 bytes, or
-        if the ciphertext is malformed or padding is invalid.
+        ValueError: If `key` length is not 16 or 32 bytes, if `iv` is not 16 bytes, or if the ciphertext is malformed or padding is invalid.
     """
     _validate_key_len(key, fn="aes_decrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        msg = f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes"
-        raise ValueError(msg)
+        raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
     decryptor = cipher.decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
@@ -267,6 +282,44 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
 def random_iv() -> bytes:
     """Generate a fresh 16-byte CBC IV using a cryptographic RNG."""
     return secrets.token_bytes(BLE_AES_IV_LEN)
+
+
+# ---------------------------------------------------------------------------
+# Observed binary frame layout (device → app notify on char 0xEE02)
+# ---------------------------------------------------------------------------
+#
+# Live capture 2026-05-16 against a SolarVault 3 Pro Max (via an ESPHome BLE
+# proxy) gave the *real* wire format. The smali-reconstructed layout in
+# ``build_plaintext_frame`` / ``parse_plaintext_frame`` above stores all
+# header fields as ASCII hex; what actually goes over the air is the same
+# logical fields but **packed as big-endian binary** inside the encrypted
+# payload. The 16-byte IV is plaintext-prefixed to every frame.
+#
+# Wire structure (after :func:`aes_decrypt`):
+#
+#   bytes 0..1   magic  = 0xDFED
+#   bytes 2..3   0x0064 (constant in every observed frame — possibly
+#                       a protocol-version / framing-version marker)
+#   bytes 4..5   frame_index  (big-endian uint16, 1-based)
+#   bytes 6..7   chunk_count  (big-endian uint16)
+#   bytes 8..9   flags / actionId hint (purpose not yet pinned; the
+#                       decoded JSON also carries ``cmd``, so this is
+#                       redundant for routing)
+#   bytes 10..11 ble_cmd      (big-endian uint16; matches MQTT cmd:
+#                       107 = DevicePropertyChange, 121 = ControlCombine,
+#                       110 = QuerySubDeviceGroupProperty, etc.)
+#   bytes 12..13 payload-type marker = 0x0001
+#   bytes 14..15 body_length  (big-endian uint16, bytes in ``body``)
+#   bytes 16..16+body_length   body — JSON for SolarVault telemetry
+#   final 4 bytes              trailer (probable CRC-32; not yet
+#                              re-derived from any documented helper —
+#                              treated as opaque on decode for now)
+
+_BINARY_FRAME_HEADER_LEN: int = 16
+_BINARY_FRAME_TRAILER_LEN: int = 4
+_BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
+_BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
+_BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 
 
 @dataclass(frozen=True, slots=True)
@@ -335,8 +388,7 @@ def build_binary_frame(  # noqa: PLR0913
         flags (int): 16-bit flags field. Defaults to 0.
         frame_index (int): 1-based frame index in the message sequence. Defaults to 1.
         chunk_count (int): Total number of chunks in the message. Defaults to 1.
-        trailer (bytes): 4-byte opaque trailer appended after the body. Defaults to
-        b"\\x00\\x00\\x00\\x00".
+        trailer (bytes): 4-byte opaque trailer appended after the body. Defaults to b"\\x00\\x00\\x00\\x00".
 
     Returns:
         bytes: The assembled plaintext binary frame (header || body || trailer).
@@ -347,24 +399,18 @@ def build_binary_frame(  # noqa: PLR0913
             0xFFFF bytes, or if `trailer` is not exactly 4 bytes.
     """
     if not 0 <= cmd <= 0xFFFF:  # noqa: PLR2004
-        msg = f"cmd {cmd} does not fit into 16 bits"
-        raise ValueError(msg)
+        raise ValueError(f"cmd {cmd} does not fit into 16 bits")  # noqa: TRY003
     if not 0 <= flags <= 0xFFFF:  # noqa: PLR2004
-        msg = f"flags {flags} does not fit into 16 bits"
-        raise ValueError(msg)
+        raise ValueError(f"flags {flags} does not fit into 16 bits")  # noqa: TRY003
     if not 1 <= frame_index <= 0xFFFF:  # noqa: PLR2004
-        msg = f"frame_index {frame_index} out of range"
-        raise ValueError(msg)
+        raise ValueError(f"frame_index {frame_index} out of range")  # noqa: TRY003
     if not 1 <= chunk_count <= 0xFFFF:  # noqa: PLR2004
-        msg = f"chunk_count {chunk_count} out of range"
-        raise ValueError(msg)
+        raise ValueError(f"chunk_count {chunk_count} out of range")  # noqa: TRY003
     if len(body) > 0xFFFF:  # noqa: PLR2004
-        msg = f"body too long: {len(body)} bytes"
-        raise ValueError(msg)
+        raise ValueError(f"body too long: {len(body)} bytes")  # noqa: TRY003
     if len(trailer) != _BINARY_FRAME_TRAILER_LEN:
-        msg = f"trailer must be {_BINARY_FRAME_TRAILER_LEN} bytes, got {len(trailer)}"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"trailer must be {_BINARY_FRAME_TRAILER_LEN} bytes, got {len(trailer)}"
         )
     header = (
         _BINARY_FRAME_MAGIC_BE
@@ -404,42 +450,31 @@ def encrypt_binary_notify(
     """
     actual_iv = random_iv() if iv is None else iv
     if len(actual_iv) != BLE_AES_IV_LEN:
-        msg = f"iv must be {BLE_AES_IV_LEN} bytes"
-        raise ValueError(msg)
+        raise ValueError(f"iv must be {BLE_AES_IV_LEN} bytes")  # noqa: TRY003
     ciphertext = aes_encrypt(plaintext_frame, key, actual_iv)
     return actual_iv + ciphertext
 
 
 def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
-    """Decrypt a raw notify payload (IV || ciphertext) and parse the contained binary.
+    """Decrypt a raw notify payload (IV || ciphertext) and parse the contained binary frame header.
 
-    frame header.
-
-    Expects `raw` as 16-byte IV concatenated with AES-CBC ciphertext; decrypts the
-    ciphertext and validates the binary-frame structure (magic, payload marker,
-    declared body length, and trailer). Raises `ValueError` for any structural or
-    length mismatch (too-short input, ciphertext not AES-block-aligned, wrong magic or
-    payload marker, or truncated body).
+    Expects `raw` as 16-byte IV concatenated with AES-CBC ciphertext; decrypts the ciphertext and validates the binary-frame structure (magic, payload marker, declared body length, and trailer). Raises `ValueError` for any structural or length mismatch (too-short input, ciphertext not AES-block-aligned, wrong magic or payload marker, or truncated body).
 
     Returns:
-        BleBinaryFrame: Parsed frame with `frame_index`, `chunk_count`, `flags`, `cmd`,
-        `body`, and 4-byte `trailer`.
+        BleBinaryFrame: Parsed frame with `frame_index`, `chunk_count`, `flags`, `cmd`, `body`, and 4-byte `trailer`.
     """
     if len(raw) < BLE_AES_IV_LEN + _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
-        msg = f"notify too short: {len(raw)} bytes"
-        raise ValueError(msg)
+        raise ValueError(f"notify too short: {len(raw)} bytes")  # noqa: TRY003
     iv = raw[:BLE_AES_IV_LEN]
     ciphertext = raw[BLE_AES_IV_LEN:]
     if len(ciphertext) % 16 != 0:
-        msg = f"ciphertext is not aligned to AES block size: {len(ciphertext)} bytes"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"ciphertext is not aligned to AES block size: {len(ciphertext)} bytes"
         )
     plaintext = aes_decrypt(ciphertext, key, iv)
     if not plaintext.startswith(_BINARY_FRAME_MAGIC_BE):
-        msg = f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
         # Soft assertion - every frame seen so far carries 0x0064 here.
@@ -450,8 +485,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
             plaintext[2:4].hex(),
         )
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
-        msg = f"unexpected payload marker {plaintext[12:14].hex()!r}"
-        raise ValueError(msg)
+        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")  # noqa: TRY003
     frame_index = int.from_bytes(plaintext[4:6], "big")
     chunk_count = int.from_bytes(plaintext[6:8], "big")
     flags = int.from_bytes(plaintext[8:10], "big")
@@ -461,12 +495,9 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         len(plaintext)
         < _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
     ):
-        msg = (
+        raise ValueError(  # noqa: TRY003
             f"frame truncated: body_length={body_length} but plaintext is "
             f"{len(plaintext)} bytes"
-        )
-        raise ValueError(
-            msg,
         )
     body = plaintext[_BINARY_FRAME_HEADER_LEN : _BINARY_FRAME_HEADER_LEN + body_length]
     trailer = plaintext[
@@ -508,22 +539,18 @@ class BleFrame:
 def build_plaintext_frame(frame: BleFrame) -> str:
     """Serialize a BleFrame into the plaintext hex-string frame layout.
 
-    The result contains the protocol magic, version, header fields (frame index, chunk
-    count, action id, BLE command),
-    the payload marker, the payload length, and the hex-encoded chunk payload — without
-    CRC or encryption.
+    The result contains the protocol magic, version, header fields (frame index, chunk count, action id, BLE command),
+    the payload marker, the payload length, and the hex-encoded chunk payload — without CRC or encryption.
 
     Returns:
-        str: Hex-string representation of the plaintext frame suitable for
-        CRC-appending and AES encryption.
+        str: Hex-string representation of the plaintext frame suitable for CRC-appending and AES encryption.
 
     Raises:
         ValueError: If the chunk_payload's hex encoding has an odd length.
     """
     chunk_hex = hex_encode(frame.chunk_payload)
     if len(chunk_hex) % 2 != 0:
-        msg = "chunk_payload must serialise to an even hex length"
-        raise ValueError(msg)
+        raise ValueError("chunk_payload must serialise to an even hex length")  # noqa: TRY003
     return (
         BLE_FRAME_MAGIC
         + BLE_FRAME_VERSION
@@ -535,6 +562,12 @@ def build_plaintext_frame(frame: BleFrame) -> str:
         + hex16(len(frame.chunk_payload))
         + chunk_hex
     )
+
+
+# Length of the fixed header before the variable-width ``CHUNK_HEX`` field:
+# magic(4) + version(4) + frame_idx(4) + chunk_cnt(4) + action_id(4)
+# + ble_cmd(4) + payload_marker(4) + chunk_len(4) = 32 hex chars.
+_HEADER_HEX_LEN: int = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4
 
 
 def parse_plaintext_frame(text: str) -> BleFrame:
@@ -557,16 +590,13 @@ def parse_plaintext_frame(text: str) -> BleFrame:
         hex data, or any hex field fails to parse.
     """
     if len(text) < _HEADER_HEX_LEN:
-        msg = "frame too short"
-        raise ValueError(msg)
+        raise ValueError("frame too short")  # noqa: TRY003
     if not text.startswith(BLE_FRAME_MAGIC):
-        msg = f"frame does not start with {BLE_FRAME_MAGIC!r}"
-        raise ValueError(msg)
+        raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")  # noqa: TRY003
     cursor = len(BLE_FRAME_MAGIC)
     version = text[cursor : cursor + _HEX16_WIDTH]
     if version != BLE_FRAME_VERSION:
-        msg = f"unexpected protocol version {version!r}"
-        raise ValueError(msg)
+        raise ValueError(f"unexpected protocol version {version!r}")  # noqa: TRY003
     cursor += _HEX16_WIDTH
     frame_index = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
@@ -578,20 +608,16 @@ def parse_plaintext_frame(text: str) -> BleFrame:
     cursor += _HEX16_WIDTH
     marker = text[cursor : cursor + _HEX16_WIDTH]
     if marker != BLE_FRAME_PAYLOAD_MARKER:
-        msg = f"unexpected payload marker {marker!r}"
-        raise ValueError(msg)
+        raise ValueError(f"unexpected payload marker {marker!r}")  # noqa: TRY003
     cursor += _HEX16_WIDTH
     chunk_len = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
     expected_hex_len = chunk_len * 2
     chunk_hex = text[cursor : cursor + expected_hex_len]
     if len(chunk_hex) != expected_hex_len:
-        msg = (
+        raise ValueError(  # noqa: TRY003
             f"chunk payload truncated: expected {expected_hex_len} hex chars, "
             f"have {len(chunk_hex)}"
-        )
-        raise ValueError(
-            msg,
         )
     return BleFrame(
         frame_index=frame_index,
@@ -608,20 +634,14 @@ def parse_plaintext_frame(text: str) -> BleFrame:
 
 
 def _append_random_and_crc(plaintext_frame: str, random16: int | None) -> str:
-    """Append a 16-bit hex tag and a 4-hex-digit Modbus CRC-16 suffix to a plaintext.
-
-    hex-frame string.
+    """Append a 16-bit hex tag and a 4-hex-digit Modbus CRC-16 suffix to a plaintext hex-frame string.
 
     Parameters:
-        plaintext_frame (str): Hex-string plaintext frame (header + payload) to be
-        extended.
-        random16 (int | None): 16-bit integer to use as the tag (0..0xFFFF). If None, a
-        random value is chosen.
+        plaintext_frame (str): Hex-string plaintext frame (header + payload) to be extended.
+        random16 (int | None): 16-bit integer to use as the tag (0..0xFFFF). If None, a random value is chosen.
 
     Returns:
-        str: The input string followed by a 4-character uppercase hex tag and a
-        4-character uppercase CRC-16 (Modbus) computed over the UTF-8 bytes of
-        (plaintext_frame + tag).
+        str: The input string followed by a 4-character uppercase hex tag and a 4-character uppercase CRC-16 (Modbus) computed over the UTF-8 bytes of (plaintext_frame + tag).
     """
     if random16 is None:
         random16 = secrets.randbelow(0x10000)
@@ -638,26 +658,18 @@ def encrypt_frame(
     iv: bytes | None = None,
     random16: int | None = None,
 ) -> bytes:
-    """Serialize a BleFrame to the plaintext hex-frame format, append a 16-bit random.
+    """Serialize a BleFrame to the plaintext hex-frame format, append a 16-bit random tag and CRC-16, and encrypt the result.
 
-    tag and CRC-16, and encrypt the result.
-
-    The plaintext frame is built from `frame`, a 16-bit random tag is appended (or
-    `random16` is used if provided), then a Modbus CRC-16 over the UTF-8 bytes is
-    appended. The concatenated UTF-8 bytes are encrypted with AES-CBC-PKCS7 using `key`
-    and `iv` (generated if omitted).
+    The plaintext frame is built from `frame`, a 16-bit random tag is appended (or `random16` is used if provided), then a Modbus CRC-16 over the UTF-8 bytes is appended. The concatenated UTF-8 bytes are encrypted with AES-CBC-PKCS7 using `key` and `iv` (generated if omitted).
 
     Parameters:
         frame (BleFrame): Logical frame to serialize and encrypt.
         key (bytes): AES key (must be a supported length).
-        iv (bytes | None): Optional 16-byte IV to use for AES-CBC. If `None`, a
-        cryptographically random IV is generated.
-        random16 (int | None): Optional 16-bit random tag to append before CRC. If
-        `None`, a random value in [0, 0xFFFF] is chosen.
+        iv (bytes | None): Optional 16-byte IV to use for AES-CBC. If `None`, a cryptographically random IV is generated.
+        random16 (int | None): Optional 16-bit random tag to append before CRC. If `None`, a random value in [0, 0xFFFF] is chosen.
 
     Returns:
-        bytes: The concatenation of the 16-byte IV and the AES ciphertext (`iv ||
-        ciphertext`).
+        bytes: The concatenation of the 16-byte IV and the AES ciphertext (`iv || ciphertext`).
     """
     plaintext_frame = build_plaintext_frame(frame)
     payload = _append_random_and_crc(plaintext_frame, random16)
@@ -667,73 +679,79 @@ def encrypt_frame(
 
 
 def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
-    """Decrypt a BLE plaintext frame encrypted with AES-CBC-PKCS7 and return the parsed.
+    """Decrypt a BLE plaintext frame encrypted with AES-CBC-PKCS7 and return the parsed BleFrame.
 
-    BleFrame.
-
-    Decrypts an IV-prefixed blob (16-byte IV || ciphertext), verifies the trailing
-    Modbus CRC-16 over the plaintext-with-tag, removes the appended 16-bit random tag,
-    and parses the remaining hex-string plaintext into a BleFrame.
+    Decrypts an IV-prefixed blob (16-byte IV || ciphertext), verifies the trailing Modbus CRC-16 over the plaintext-with-tag, removes the appended 16-bit random tag, and parses the remaining hex-string plaintext into a BleFrame.
 
     Returns:
         BleFrame: The parsed frame extracted from the decrypted and verified plaintext.
 
     Raises:
-        ValueError: If the input blob is shorter than IV + one AES block, if the
-        decrypted plaintext is too short to contain the random tag and CRC, or if the
-        CRC verification fails.
+        ValueError: If the input blob is shorter than IV + one AES block, if the decrypted plaintext is too short to contain the random tag and CRC, or if the CRC verification fails.
     """
     if len(blob) < BLE_AES_IV_LEN + algorithms.AES.block_size // 8:
-        msg = "ciphertext blob too short"
-        raise ValueError(msg)
+        raise ValueError("ciphertext blob too short")  # noqa: TRY003
     iv = blob[:BLE_AES_IV_LEN]
     ciphertext = blob[BLE_AES_IV_LEN:]
     plaintext = aes_decrypt(ciphertext, key, iv).decode("utf-8")
     if len(plaintext) < _HEX16_WIDTH * 2:
-        msg = "plaintext too short to carry random tag + CRC"
-        raise ValueError(msg)
+        raise ValueError("plaintext too short to carry random tag + CRC")  # noqa: TRY003
     crc_received = plaintext[-_HEX16_WIDTH:]
     body = plaintext[:-_HEX16_WIDTH]
     crc_expected = crc16_hex(body.encode("utf-8"))
     if crc_received.upper() != crc_expected.upper():
-        msg = f"CRC mismatch: payload says {crc_received!r}, computed {crc_expected!r}"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"CRC mismatch: payload says {crc_received!r}, computed {crc_expected!r}"
         )
     # Strip the trailing 16-bit random tag the app appends before the CRC.
     frame_text = body[:-_HEX16_WIDTH]
     return parse_plaintext_frame(frame_text)
 
 
+# ---------------------------------------------------------------------------
+# Chunking helper (encode side, for Phase 3b setters)
+# ---------------------------------------------------------------------------
+#
+# The app sizes each chunk at ``(MTU - 60) * 2`` *hex characters*, i.e. the
+# raw payload-byte budget per frame is ``MTU - 60``. The default BLE 5.0
+# MTU is 23 (= 3 bytes/chunk after the 60-byte overhead), but the app
+# typically negotiates 247-byte MTU on Android → ~187 bytes/chunk. The
+# device may negotiate something else; this helper takes the negotiated
+# value as a parameter and refuses to chunk below the minimum.
+
+
+_BLE_FRAME_OVERHEAD: int = 60
+
+#: MTU the official Jackery Android app negotiates with the SolarVault.
+#: Used as a fallback when the bleak transport doesn't expose
+#: ``client.mtu_size`` (some backends only learn the value after the
+#: first long write). Matches the value pinned by
+#: :func:`chunk_size_for_mtu` to ``247 - 60 = 187`` payload bytes/frame.
+DEFAULT_BLE_MTU: int = 247
+
+
 def chunk_size_for_mtu(mtu: int) -> int:
     """Compute the maximum payload byte count per BLE frame for a given MTU.
 
-    Raises ValueError if mtu is less than or equal to 60 because the frame overhead
-    requires at least a 61-byte MTU.
+    Raises ValueError if mtu is less than or equal to 60 because the frame overhead requires at least a 61-byte MTU.
 
     Returns:
         int: Maximum number of payload bytes allowed in a single frame (mtu - 60).
     """
     if mtu <= _BLE_FRAME_OVERHEAD:
-        msg = f"BLE MTU {mtu} is below the {_BLE_FRAME_OVERHEAD}-byte frame overhead"
-        raise ValueError(
-            msg,
+        raise ValueError(  # noqa: TRY003
+            f"BLE MTU {mtu} is below the {_BLE_FRAME_OVERHEAD}-byte frame overhead"
         )
     return mtu - _BLE_FRAME_OVERHEAD
 
 
 def split_body_for_mtu(body: bytes, mtu: int) -> list[bytes]:
-    """Split a byte payload into chunks sized to fit a single binary-frame payload for.
+    """Split a byte payload into chunks sized to fit a single binary-frame payload for the given MTU.
 
-    the given MTU.
-
-    Each returned chunk's length does not exceed the per-frame payload capacity derived
-    from `mtu`. If `body` is empty, returns `[b""]` so the sender still emits one
-    envelope.
+    Each returned chunk's length does not exceed the per-frame payload capacity derived from `mtu`. If `body` is empty, returns `[b""]` so the sender still emits one envelope.
 
     Returns:
-        list[bytes]: A list of byte chunks ready to be embedded in individual binary
-        frames.
+        list[bytes]: A list of byte chunks ready to be embedded in individual binary frames.
     """
     size = chunk_size_for_mtu(mtu)
     if not body:
@@ -750,10 +768,7 @@ def split_payload_into_frames(
 ) -> list[BleFrame]:
     """Split a payload into BLE-sized frames for the given MTU.
 
-    Non-empty payloads are sliced into chunks of size chunk_size_for_mtu(mtu); each
-    chunk is returned as a BleFrame with a 1-based frame_index, the total chunk_count,
-    and the provided action_id and ble_cmd. For an empty payload, returns a single
-    BleFrame with an empty chunk_payload and chunk_count set to 1.
+    Non-empty payloads are sliced into chunks of size chunk_size_for_mtu(mtu); each chunk is returned as a BleFrame with a 1-based frame_index, the total chunk_count, and the provided action_id and ble_cmd. For an empty payload, returns a single BleFrame with an empty chunk_payload and chunk_count set to 1.
 
     Parameters:
         payload (bytes): The full logical payload to split.
@@ -775,7 +790,7 @@ def split_payload_into_frames(
                 action_id=action_id,
                 ble_cmd=ble_cmd,
                 chunk_payload=b"",
-            ),
+            )
         ]
     chunks = [
         payload[offset : offset + chunk_size]

@@ -2,8 +2,7 @@
 
 from typing import Any
 
-from custom_components.jackery_solarvault.client._http import BaseHTTPMixin
-from custom_components.jackery_solarvault.const import (
+from ...const import (
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
     ACCESSORIES_LIST_PATH,
@@ -14,17 +13,14 @@ from custom_components.jackery_solarvault.const import (
     SUB_SHADOW_PATH,
     SYSTEM_SHADOW_PATH,
 )
+from .._http import BaseHTTPMixin
 
 
 class AccessoriesEndpointMixin(BaseHTTPMixin):
     """Accessories, sub-device, and smart accessories endpoint methods."""
 
     async def async_get_accessories(
-        self,
-        *,
-        devices: str,
-        id: str | int,
-        parent_device_id: str | int,
+        self, *, devices: str, id: str | int, parent_device_id: str | int
     ) -> dict[str, Any]:
         """Fetch accessories data for the specified device(s).
 
@@ -53,37 +49,29 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
             devices (str): Comma-separated device IDs to check.
 
         Returns:
-            dict[str, Any]: Mapping of each device ID to the existence information
-            returned by the backend.
+            dict[str, Any]: Mapping of each device ID to the existence information returned by the backend.
         """
         data = await self._get_json(ACCESSORIES_EXIST_PATH, params={"devices": devices})
         return self._payload_dict(data, ACCESSORIES_EXIST_PATH)
 
     async def async_get_accessories_list(
-        self,
-        device_id: str | int,
+        self, device_id: str | int
     ) -> list[dict[str, Any]]:
         """List accessories for a device.
 
         Parameters:
-            device_id (str | int): Identifier of the device whose accessories will be
-            listed.
+            device_id (str | int): Identifier of the device whose accessories will be listed.
 
         Returns:
-            list[dict[str, Any]]: List of accessory entries as dictionaries from the
-            API response.
+            list[dict[str, Any]]: List of accessory entries as dictionaries from the API response.
         """
         data = await self._get_json(
-            ACCESSORIES_LIST_PATH,
-            params={FIELD_DEVICE_ID: str(device_id)},
+            ACCESSORIES_LIST_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
         return self._payload_list(data, ACCESSORIES_LIST_PATH)
 
     async def async_set_accessories_name(
-        self,
-        *,
-        device_name: str,
-        id: str | int,
+        self, *, device_name: str, id: str | int
     ) -> dict[str, Any]:
         """Set the display name for an accessory.
 
@@ -100,17 +88,12 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
         )
 
     async def async_check_jackery_accessories_exist(
-        self,
-        *,
-        device_sn_infos: str,
+        self, *, device_sn_infos: str
     ) -> dict[str, Any]:
-        """Determine whether Jackery accessories exist for the provided device serial.
-
-        numbers.
+        """Determine whether Jackery accessories exist for the provided device serial numbers.
 
         Parameters:
-            device_sn_infos (str): Device serial number info string as accepted by the
-            API.
+            device_sn_infos (str): Device serial number info string as accepted by the API.
 
         Returns:
             dict: The API response payload for the existence check.
@@ -130,11 +113,7 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
         return await self._post_json(ACCESSORIES_SYNC_PATH, {})
 
     async def async_get_sub_shadow(
-        self,
-        *,
-        dev_type: str,
-        device_sn: str,
-        sub_device_sn: str,
+        self, *, dev_type: str, device_sn: str, sub_device_sn: str
     ) -> dict[str, Any]:
         """Retrieve the property shadow for a sub-device.
 
@@ -157,10 +136,7 @@ class AccessoriesEndpointMixin(BaseHTTPMixin):
         return self._payload_dict(data, SUB_SHADOW_PATH)
 
     async def async_get_system_shadow(
-        self,
-        *,
-        device_sn: str,
-        diy_sn: str,
+        self, *, device_sn: str, diy_sn: str
     ) -> dict[str, Any]:
         """Retrieve the system property shadow for a device.
 
