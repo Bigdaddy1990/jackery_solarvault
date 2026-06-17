@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Enforce coverage gates from a coverage.py XML report."""
 
-from __future__ import annotations
-
 import argparse
-import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -22,17 +20,15 @@ PERFECT_COVERAGE_GLOBS = (
 )
 
 # Legacy monolith areas are raised incrementally while migration continues.
-LEGACY_CRITICAL_MODULES = frozenset(
-    {
-        "custom_components/jackery_solarvault/__init__.py",
-        "custom_components/jackery_solarvault/coordinator.py",
-        "custom_components/jackery_solarvault/sensor.py",
-        "custom_components/jackery_solarvault/util.py",
-        "custom_components/jackery_solarvault/client/api.py",
-        "custom_components/jackery_solarvault/client/mqtt_push.py",
-        "custom_components/jackery_solarvault/client/ble_transport.py",
-    }
-)
+LEGACY_CRITICAL_MODULES = frozenset({
+    "custom_components/jackery_solarvault/__init__.py",
+    "custom_components/jackery_solarvault/coordinator.py",
+    "custom_components/jackery_solarvault/sensor.py",
+    "custom_components/jackery_solarvault/util.py",
+    "custom_components/jackery_solarvault/client/api.py",
+    "custom_components/jackery_solarvault/client/mqtt_push.py",
+    "custom_components/jackery_solarvault/client/ble_transport.py",
+})
 
 HUNDRED = Decimal("100")
 JUSTIFIED_NO_COVER = re.compile(
@@ -159,8 +155,7 @@ def enforce_coverage_gates(
     failures: list[str] = _pragma_failures()
     if total_line < total_minimum:
         failures.append(
-            "total line coverage "
-            f"{_format_percent(total_line)} < {total_minimum:.2f}%"
+            f"total line coverage {_format_percent(total_line)} < {total_minimum:.2f}%"
         )
     if total_branch is None:
         failures.append(

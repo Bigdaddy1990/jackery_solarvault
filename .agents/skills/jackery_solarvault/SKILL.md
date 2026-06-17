@@ -10,7 +10,7 @@ This skill introduces the core development patterns and conventions used in the 
 
 ### File Naming
 - Use **snake_case** for all file names.
-  - **Example:**  
+  - **Example:**
     ```plaintext
     solar_controller.py
     battery_manager.py
@@ -18,14 +18,14 @@ This skill introduces the core development patterns and conventions used in the 
 
 ### Import Style
 - Use **relative imports** within the codebase.
-  - **Example:**  
+  - **Example:**
     ```python
     from .battery_manager import BatteryManager
     ```
 
 ### Export Style
 - Use **named exports** by explicitly defining what is available for import.
-  - **Example:**  
+  - **Example:**
     ```python
     __all__ = ["BatteryManager", "SolarController"]
     ```
@@ -33,7 +33,7 @@ This skill introduces the core development patterns and conventions used in the 
 ### Commit Messages
 - Freeform, concise messages (average 43 characters).
 - No strict prefixing required.
-  - **Example:**  
+  - **Example:**
     ```
     Add battery status monitor
     Fix voltage calculation bug
@@ -42,7 +42,7 @@ This skill introduces the core development patterns and conventions used in the 
 ## Workflows
 
 ### Code Contribution
-**Trigger:** When adding new features or fixing bugs  
+**Trigger:** When adding new features or fixing bugs
 **Command:** `/contribute`
 
 1. Create a new branch for your feature or fix.
@@ -52,7 +52,7 @@ This skill introduces the core development patterns and conventions used in the 
 5. Open a pull request for review.
 
 ### Testing Code
-**Trigger:** When verifying code correctness  
+**Trigger:** When verifying code correctness
 **Command:** `/test`
 
 1. Identify or create test files matching the `*.test.ts` pattern.

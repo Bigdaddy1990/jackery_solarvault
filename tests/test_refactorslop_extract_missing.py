@@ -11,8 +11,6 @@ Functions under test:
   * slice_source      – slice source lines for a given AST node
 """  # noqa: RUF002
 
-from __future__ import annotations  # noqa: TID251
-
 import ast
 import importlib.util
 import json

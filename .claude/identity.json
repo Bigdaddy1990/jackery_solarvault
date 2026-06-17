@@ -1,14 +1,14 @@
 {
-  "version": "2.0",
-  "technicalLevel": "technical",
-  "preferredStyle": {
-    "verbosity": "detailed",
-    "codeComments": true,
-    "explanations": true
-  },
+  "createdAt": "2026-06-17T15:37:05.909Z",
   "domains": [
     "python"
   ],
+  "preferredStyle": {
+    "codeComments": true,
+    "explanations": true,
+    "verbosity": "detailed"
+  },
   "suggestedBy": "ecc-tools-repo-analysis",
-  "createdAt": "2026-06-17T15:37:05.909Z"
+  "technicalLevel": "technical",
+  "version": "2.0"
 }

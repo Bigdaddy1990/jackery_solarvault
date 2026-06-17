@@ -410,4 +410,3 @@ Include a workflow for ruff baseline linting (e.g., .github/workflows/ruff-basel
 ## Evidence
 
 - Pattern in architecture.configFiles: .github/workflows/ruff-baseline.yml
-
