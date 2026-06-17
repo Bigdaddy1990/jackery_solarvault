@@ -1,0 +1,6 @@
+interface:
+  display_name: "Jackery Solarvault"
+  short_description: "Repo-specific patterns and workflows for jackery_solarvault"
+  default_prompt: "Use the jackery_solarvault repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
