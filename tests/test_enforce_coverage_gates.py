@@ -1,7 +1,5 @@
 """Tests for coverage gate enforcement."""
 
-from __future__ import annotations  # noqa: TID251
-
 from decimal import Decimal
 from typing import TYPE_CHECKING
 

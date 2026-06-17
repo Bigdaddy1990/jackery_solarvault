@@ -35,6 +35,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 
 from custom_components.jackery_solarvault import (
@@ -57,8 +59,6 @@ from custom_components.jackery_solarvault.client.mqtt_push import (
     JackeryMqttPushClient as DirectClass,
 )
 from custom_components.jackery_solarvault.const import DOMAIN
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
 # ---------------------------------------------------------------------------
 # Stubs
