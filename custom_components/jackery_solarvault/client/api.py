@@ -12,12 +12,10 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ._crypto import (
-    _generate_udid,  # noqa: F401
-    _rsa_pkcs1v15_encrypt,  # noqa: F401
-    build_login_crypto_fields,  # noqa: F401
-    encrypt_mqtt_body,  # noqa: F401
-    generate_login_aes_key,  # noqa: F401
+from ._crypto import (  # noqa: F401  — public re-export
+    _generate_udid,
+    _rsa_pkcs1v15_encrypt,
+    encrypt_mqtt_body,
 )
 from ._endpoints.accessories import AccessoriesEndpointMixin
 from ._endpoints.auth import AuthEndpointMixin
@@ -28,12 +26,12 @@ from ._endpoints.push import PushEndpointMixin
 from ._endpoints.shelly import ShellyEndpointMixin
 from ._endpoints.smart_mode import SmartModeEndpointMixin
 from ._endpoints.statistics import StatisticsEndpointMixin
-from ._http import (
-    BaseHTTPMixin,  # noqa: F401
-    JackeryApiError,  # noqa: F401
-    JackeryAuthError,  # noqa: F401
-    JackeryError,  # noqa: F401
-    _write_accepted,  # noqa: F401
+from ._http import (  # noqa: F401  — public re-export for error hierarchy
+    BaseHTTPMixin,
+    JackeryApiError,
+    JackeryAuthError,
+    JackeryError,
+    _write_accepted,
 )
 
 if TYPE_CHECKING:
@@ -74,10 +72,8 @@ class JackeryApi(
             session: aiohttp ClientSession used for HTTP requests.
             account: Account identifier used for authentication.
             password: Account password used for authentication.
-            mqtt_mac_id: Optional preconfigured MQTT MAC identifier; if omitted a MAC
-            will be generated.
-            region_code: Optional region or country code; whitespace is stripped and
-            the value is normalized to uppercase.
+            mqtt_mac_id: Optional preconfigured MQTT MAC identifier; if omitted a MAC will be generated.
+            region_code: Optional region or country code; whitespace is stripped and the value is normalized to uppercase.
         """
         self._session = session
         self._account = account
@@ -106,7 +102,6 @@ class JackeryApi(
         self.last_ota_responses: dict[str, dict[str, Any]] = {}
         self.last_location_responses: dict[str, dict[str, Any]] = {}
         self.payload_debug_callback = None
-        self.auth_rejection_callback = None
 
         # Transport counters for diagnostic sensors (reset on HA restart).
         self._requests_total = 0

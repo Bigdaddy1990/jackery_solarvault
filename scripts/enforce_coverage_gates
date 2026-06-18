@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""Executable wrapper for scripts.enforce_coverage_gates."""
+
+from enforce_coverage_gates import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())

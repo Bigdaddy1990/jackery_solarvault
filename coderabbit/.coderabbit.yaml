@@ -7,7 +7,7 @@ review_status: true
 commit_status: true
 fail_commit_status: true
 enable_free_tier: true
-inheritance: false
+inheritance: true
 reviews.auto_review.auto_pause_after_reviewed_commits: true
 reviews:
   profile: assertive

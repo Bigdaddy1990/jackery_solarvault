@@ -21,6 +21,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 import pytest
 
 from custom_components.jackery_solarvault.binary_sensor import (
@@ -43,7 +44,6 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_SMART_PLUGS,
 )
 from custom_components.jackery_solarvault.util import stable_subdevice_key
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 if TYPE_CHECKING:
     from collections.abc import Callable

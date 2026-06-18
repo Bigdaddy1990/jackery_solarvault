@@ -11,7 +11,7 @@ Source: coordinator.py lines 2389-3421 (Phase 5 extraction).
 from datetime import UTC, datetime
 from typing import Any
 
-from custom_components.jackery_solarvault.const import (
+from ..const import (
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     DEVICE_LIFETIME_COUNTER_KEYS,
     FIELD_ACTION_ID,
@@ -20,11 +20,11 @@ from custom_components.jackery_solarvault.const import (
     FIELD_COMM_STATE,
     FIELD_CURRENT_VERSION,
     FIELD_DATA,
-    FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
     FIELD_DEV_ID,
     FIELD_DEV_SN,
     FIELD_DEV_TYPE,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_SN,
     FIELD_IN_EGY,
     FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_MESSAGE_TYPE,
@@ -46,14 +46,9 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_BATTERY_PACKS,
     SUBDEVICE_ONLY_PROPERTY_KEYS,
 )
-from custom_components.jackery_solarvault.models.property_merge import (
-    merge_dict_values,
-    sync_property_aliases,
-)
-from custom_components.jackery_solarvault.subdevices.detector import (
-    subdevice_identity_values,
-)
-from custom_components.jackery_solarvault.util import safe_float
+from ..models.property_merge import merge_dict_values, sync_property_aliases
+from ..subdevices.detector import subdevice_identity_values
+from ..util import safe_float
 
 # ---------------------------------------------------------------------------
 # MQTT envelope normalization
@@ -63,20 +58,12 @@ from custom_components.jackery_solarvault.util import safe_float
 def normalize_local_mqtt_payload(
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    """Wrap a body-only LAN MQTT payload into the expected cloud-MQTT envelope when.
+    """Wrap a body-only LAN MQTT payload into the expected cloud-MQTT envelope when necessary.
 
-    necessary.
-
-    When the payload already contains any of FIELD_BODY, FIELD_DATA,
-    FIELD_MESSAGE_TYPE, or FIELD_ACTION_ID, the payload is returned unchanged.
-    Otherwise the original payload is placed under FIELD_BODY and any present device
-    identifier keys (FIELD_DEVICE_ID, FIELD_DEV_ID, FIELD_DEVICE_SN, FIELD_DEV_SN,
-    FIELD_SN) are copied to the envelope.
+    When the payload already contains any of FIELD_BODY, FIELD_DATA, FIELD_MESSAGE_TYPE, or FIELD_ACTION_ID, the payload is returned unchanged. Otherwise the original payload is placed under FIELD_BODY and any present device identifier keys (FIELD_DEVICE_ID, FIELD_DEV_ID, FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN) are copied to the envelope.
 
     Returns:
-        dict: The original payload (if already envelope-like) or a new envelope
-        containing the payload under FIELD_BODY with copied device identifier keys when
-        present.
+        dict: The original payload (if already envelope-like) or a new envelope containing the payload under FIELD_BODY with copied device identifier keys when present.
     """
     if any(
         key in payload
@@ -117,16 +104,9 @@ _MAIN_PROPERTY_ALIAS_PAIRS = (
 
 
 def sanitize_main_properties(props: dict[str, Any]) -> dict[str, Any]:
-    """Remove accessory-only properties and normalize PV channel fields for a main.
+    """Remove accessory-only properties and normalize PV channel fields for a main device properties mapping.
 
-    device properties mapping.
-
-    This returns a new properties dictionary with keys listed in
-    SUBDEVICE_ONLY_PROPERTY_KEYS removed. For each PV channel key
-    (FIELD_PV1..FIELD_PV4), if the value is a numeric scalar it is replaced by a dict
-    containing FIELD_PV_PW set to that numeric value; existing dicts or None values for
-    PV channels are left unchanged. Finally, main-property aliases are synchronized via
-    _MAIN_PROPERTY_ALIAS_PAIRS before returning.
+    This returns a new properties dictionary with keys listed in SUBDEVICE_ONLY_PROPERTY_KEYS removed. For each PV channel key (FIELD_PV1..FIELD_PV4), if the value is a numeric scalar it is replaced by a dict containing FIELD_PV_PW set to that numeric value; existing dicts or None values for PV channels are left unchanged. Finally, main-property aliases are synchronized via _MAIN_PROPERTY_ALIAS_PAIRS before returning.
 
     Returns:
         dict[str, Any]: The cleaned and alias-normalized properties mapping.
@@ -148,18 +128,13 @@ def sanitize_main_properties(props: dict[str, Any]) -> dict[str, Any]:
 def normalize_ble_main_lifetime_counters(
     source: dict[str, Any],
 ) -> dict[str, Any]:
-    """Convert BLE main-device lifetime energy counters from watt-hours to.
-
-    kilowatt-hours.
+    """Convert BLE main-device lifetime energy counters from watt-hours to kilowatt-hours.
 
     Parameters:
-        source (dict[str, Any]): Source property mapping that may contain lifetime
-        energy counter keys in watt-hours.
+        source (dict[str, Any]): Source property mapping that may contain lifetime energy counter keys in watt-hours.
 
     Returns:
-        dict[str, Any]: A shallow copy of `source` where any keys listed in
-        DEVICE_LIFETIME_COUNTER_KEYS that contain numeric values are converted from Wh
-        to kWh and rounded to five decimal places; other keys are unchanged.
+        dict[str, Any]: A shallow copy of `source` where any keys listed in DEVICE_LIFETIME_COUNTER_KEYS that contain numeric values are converted from Wh to kWh and rounded to five decimal places; other keys are unchanged.
     """
     normalized = dict(source)
     for key in DEVICE_LIFETIME_COUNTER_KEYS:
@@ -175,19 +150,12 @@ def normalize_ble_main_lifetime_counters(
 
 
 def merge_battery_pack_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Merge incremental battery-pack telemetry into an existing pack list while.
+    """Merge incremental battery-pack telemetry into an existing pack list while preserving learned and static fields.
 
-    preserving learned and static fields.
-
-    Overlay non-null fields from up to the first five update entries onto up to the
-    first five existing dict items, matching by device SN (FIELD_DEVICE_SN /
-    FIELD_DEV_SN / FIELD_SN) and falling back to list position when no SN match exists.
-    Non-dict and None entries from the prior list are ignored; the result is capped to
-    five items. The function updates a pack's PACK_FIELD_LAST_SEEN_AT timestamp only
-    when its commState transitions to "1".
+    Overlay non-null fields from up to the first five update entries onto up to the first five existing dict items, matching by device SN (FIELD_DEVICE_SN / FIELD_DEV_SN / FIELD_SN) and falling back to list position when no SN match exists. Non-dict and None entries from the prior list are ignored; the result is capped to five items. The function updates a pack's PACK_FIELD_LAST_SEEN_AT timestamp only when its commState transitions to "1".
 
     Returns:
         Merged list of battery pack dictionaries (up to five items).
@@ -247,30 +215,22 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Merge a list of subdevice telemetry entries with incoming updates, matching by.
-
-    device serial number when available.
+    """Merge a list of subdevice telemetry entries with incoming updates, matching by device serial number when available.
 
     This returns a new list of subdevice dicts produced by:
     - copying dict items from `current` (non-dict entries are ignored),
     - removing keys with `None` values from each update before applying,
-    - attempting to match each update to an existing item by serial number (checked in
-    order: `deviceSn`, `devSn`, `sn`),
-    - if no serial-number match exists, falling back to the update's positional index
-    when that index exists in the current list,
-    - appending the update as a new item when neither a serial match nor a positional
-    fallback is available,
-    - overlaying update keys onto the matched item (existing keys are preserved when
-    not present in the update).
+    - attempting to match each update to an existing item by serial number (checked in order: `deviceSn`, `devSn`, `sn`),
+    - if no serial-number match exists, falling back to the update's positional index when that index exists in the current list,
+    - appending the update as a new item when neither a serial match nor a positional fallback is available,
+    - overlaying update keys onto the matched item (existing keys are preserved when not present in the update).
 
     Parameters:
-        current: Prior list-like state (may be None); only dict items are considered
-        and copied.
-        updates: Sequence of update dicts to merge; update keys with value `None` are
-        ignored.
+        current: Prior list-like state (may be None); only dict items are considered and copied.
+        updates: Sequence of update dicts to merge; update keys with value `None` are ignored.
 
     Returns:
         list[dict[str, Any]]: The merged list of subdevice dictionaries.
@@ -307,30 +267,19 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Merge Shelly Cloud accessory data by stable identity values and return an.
+    """Merge Shelly Cloud accessory data by stable identity values and return an updated list.
 
-    updated list.
-
-    Builds a working copy of `current` (ignoring non-dict entries), removes keys with
-    `None` from `update`, and computes identity values via `subdevice_identity_values`.
-    If any existing item's identity set intersects the update's identity set, overlays
-    the update onto that first matching item (using `merge_dict_values`) and returns
-    the merged list. If no match is found and the cleaned update has identity values,
-    appends the cleaned update. Non-dict entries in `current` are ignored in the
-    resulting list.
+    Builds a working copy of `current` (ignoring non-dict entries), removes keys with `None` from `update`, and computes identity values via `subdevice_identity_values`. If any existing item's identity set intersects the update's identity set, overlays the update onto that first matching item (using `merge_dict_values`) and returns the merged list. If no match is found and the cleaned update has identity values, appends the cleaned update. Non-dict entries in `current` are ignored in the resulting list.
 
     Parameters:
-        current (Any): Prior list-like state; dict items are copied and non-dict
-        entries are ignored.
-        update (dict[str, Any]): Incoming accessory data; keys with `None` are
-        discarded before matching.
+        current (Any): Prior list-like state; dict items are copied and non-dict entries are ignored.
+        update (dict[str, Any]): Incoming accessory data; keys with `None` are discarded before matching.
 
     Returns:
-        list[dict[str, Any]]: New list of subdevice dicts with the update merged into a
-        matching identity entry or appended when no match exists.
+        list[dict[str, Any]]: New list of subdevice dicts with the update merged into a matching identity entry or appended when no match exists.
     """
     cleaned = {key: value for key, value in update.items() if value is not None}
     merged: list[dict[str, Any]] = [
@@ -347,24 +296,17 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Merge incremental smart-plug telemetry entries using device serial numbers to.
-
-    align updates with existing entries.
+    """Merge incremental smart-plug telemetry entries using device serial numbers to align updates with existing entries.
 
     Parameters:
-        current (Any): Prior list-like smart-plug state; may be None and may contain
-        non-dict items — only dictionary items are considered when merging.
-        updates (list[dict[str, Any]]): List of update dictionaries; update entries
-        have `None` values removed before being merged.
+        current (Any): Prior list-like smart-plug state; may be None and may contain non-dict items — only dictionary items are considered when merging.
+        updates (list[dict[str, Any]]): List of update dictionaries; update entries have `None` values removed before being merged.
 
     Returns:
-        list[dict[str, Any]]: Merged list of smart-plug dictionaries where updates are
-        overlaid onto existing entries matched by device serial number
-        (`deviceSn`/`devSn`/`sn`) or, when no serial match exists, merged by positional
-        fallback or appended.
+        list[dict[str, Any]]: Merged list of smart-plug dictionaries where updates are overlaid onto existing entries matched by device serial number (`deviceSn`/`devSn`/`sn`) or, when no serial match exists, merged by positional fallback or appended.
     """
     return merge_subdevice_lists_by_sn(current, updates)
 
@@ -426,32 +368,20 @@ def drop_stale_battery_packs(
 def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
     """Extract the parent device identifier from a payload slice.
 
-    Searches top-level keys in order: "deviceId", "device_id", then "id". If none are
-    present or valid, and the payload contains a "properties" dict, searches "deviceId"
-    and "device_id" there. Accepts string or integer values and returns the value as a
-    stripped string.
+    Searches top-level keys in order: "deviceId", "device_id", then "id". If none are present or valid, and the payload contains a "properties" dict, searches "deviceId" and "device_id" there. Accepts string or integer values and returns the value as a stripped string.
 
     Returns:
-        device_id (str | None): The extracted device identifier as a stripped string if
-        found, `None` otherwise.
+        device_id (str | None): The extracted device identifier as a stripped string if found, `None` otherwise.
     """
     for key in ("deviceId", "device_id", "id"):
         value = payload.get(key)
-        if (
-            isinstance(value, str | int)
-            and not isinstance(value, bool)
-            and str(value).strip()
-        ):
+        if isinstance(value, str | int) and str(value).strip():
             return str(value).strip()
     props = payload.get("properties")
     if isinstance(props, dict):
         for key in ("deviceId", "device_id"):
             value = props.get(key)
-            if (
-                isinstance(value, str | int)
-                and not isinstance(value, bool)
-                and str(value).strip()
-            ):
+            if isinstance(value, str | int) and str(value).strip():
                 return str(value).strip()
     return None
 
@@ -465,19 +395,12 @@ def merge_battery_pack_lifetime_from_ble(  # noqa: PLR0911, PLR0912
     updated: dict[str, Any],
     body: dict[str, Any],
 ) -> bool:
-    """Merge lifetime energy counters from a BLE payload into the matching battery pack.
+    """Merge lifetime energy counters from a BLE payload into the matching battery pack entry.
 
-    entry.
-
-    Updates the `updated["batteryPacks"]` list when a pack with a matching serial
-    number (from the payload) has its `inEgy` or `outEgy` changed, or when no matching
-    pack exists (a minimal pack is appended containing the counters and identifying
-    fields). Does nothing and returns `False` if the payload lacks a device serial,
-    `batteryPacks` is not a list, or neither `inEgy` nor `outEgy` are present.
+    Updates the `updated["batteryPacks"]` list when a pack with a matching serial number (from the payload) has its `inEgy` or `outEgy` changed, or when no matching pack exists (a minimal pack is appended containing the counters and identifying fields). Does nothing and returns `False` if the payload lacks a device serial, `batteryPacks` is not a list, or neither `inEgy` nor `outEgy` are present.
 
     Returns:
-        `True` if `updated["batteryPacks"]` was modified (existing pack fields changed
-        or a new minimal pack appended), `False` otherwise.
+        `True` if `updated["batteryPacks"]` was modified (existing pack fields changed or a new minimal pack appended), `False` otherwise.
     """
     sn = body.get(FIELD_DEVICE_SN)
     if not sn:
@@ -553,15 +476,11 @@ def merge_battery_pack_lifetime_from_ble(  # noqa: PLR0911, PLR0912
 def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
     """Merge OTA metadata into a battery pack dictionary in place.
 
-    Copies the OTA version (from `currentVersion` or `version`) into both `version` and
-    `currentVersion` on the pack. For each OTA key (isFirmwareUpgrade, targetVersion,
-    targetModuleVersion, updateStatus, updateContent, upgradeType), if the key exists
-    in `ota` and its value is not None, writes that key/value into `pack`.
+    Copies the OTA version (from `currentVersion` or `version`) into both `version` and `currentVersion` on the pack. For each OTA key (isFirmwareUpgrade, targetVersion, targetModuleVersion, updateStatus, updateContent, upgradeType), if the key exists in `ota` and its value is not None, writes that key/value into `pack`.
 
     Parameters:
         pack (dict[str, Any]): Battery pack object to update in-place.
-        ota (dict[str, Any]): OTA metadata source whose fields will be merged into
-        `pack`.
+        ota (dict[str, Any]): OTA metadata source whose fields will be merged into `pack`.
     """
     current_version = ota.get(FIELD_CURRENT_VERSION) or ota.get(FIELD_VERSION)
     if current_version is not None:
@@ -580,29 +499,19 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # noqa: ANN401  # loose prior-state list, duck-typed via `current or []`
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Merge OTA metadata into an existing battery-pack list by matching serial numbers.
+    """Merge OTA metadata into an existing battery-pack list by matching serial numbers and return an updated list capped to five entries.
 
-    and return an updated list capped to five entries.
-
-    The function copies up to the first five dict items from `current`, then overlays
-    OTA-related fields from `ota_updates` onto matching packs. Matching prefers
-    serial-number keys (`deviceSn`, `devSn`, `sn`) and falls back to the update's
-    position when no SN match exists. Only OTA keys that are present in an update and
-    not `None` are applied. The function does not modify last-seen timestamps and
-    always returns at most five pack dicts.
+    The function copies up to the first five dict items from `current`, then overlays OTA-related fields from `ota_updates` onto matching packs. Matching prefers serial-number keys (`deviceSn`, `devSn`, `sn`) and falls back to the update's position when no SN match exists. Only OTA keys that are present in an update and not `None` are applied. The function does not modify last-seen timestamps and always returns at most five pack dicts.
 
     Parameters:
-        current (Any): Prior pack list (may be None or a heterogeneous sequence); only
-        dict items are considered.
-        ota_updates (list[dict[str, Any]]): Sequence of OTA update dicts; each may
-        include serial-number keys and OTA fields.
+        current (Any): Prior pack list (may be None or a heterogeneous sequence); only dict items are considered.
+        ota_updates (list[dict[str, Any]]): Sequence of OTA update dicts; each may include serial-number keys and OTA fields.
 
     Returns:
-        list[dict[str, Any]]: Updated list of battery pack dicts (maximum length 5)
-        with OTA fields merged where applicable.
+        list[dict[str, Any]]: Updated list of battery pack dicts (maximum length 5) with OTA fields merged where applicable.
     """
     merged: list[dict[str, Any]] = [
         dict(item) for item in current or [] if isinstance(item, dict)
@@ -646,9 +555,7 @@ def merge_battery_pack_ota_lists(
 
 
 def app_period_section(prefix: str, date_type: str) -> str:
-    """Builds a normalized key for an app period section by joining prefix and.
-
-    date_type with an underscore.
+    """Builds a normalized key for an app period section by joining prefix and date_type with an underscore.
 
     Returns:
         section_key (str): The combined key in the form "<prefix>_<date_type>".
