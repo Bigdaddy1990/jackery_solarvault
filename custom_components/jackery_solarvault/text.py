@@ -1,14 +1,13 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from homeassistant.components.text import TextEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .api import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
@@ -18,9 +17,15 @@ from .const import (
     FIELD_SYSTEM_NAME,
     PAYLOAD_SYSTEM,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
@@ -134,7 +139,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
                 "Re-authentication is required."
             ) from err
         except JackeryError as err:
-            _LOGGER.error("Failed to rename system %s: %s", system_id, err)
+            _LOGGER.exception("Failed to rename system %s: %s", system_id, err)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="rename_system_failed",

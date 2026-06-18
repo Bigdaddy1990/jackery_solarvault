@@ -73,12 +73,11 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 import json
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -96,12 +95,10 @@ from homeassistant.const import (
     UnitOfPower,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import JackeryConfigEntry
 from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_LABELS,
@@ -177,9 +174,9 @@ from .const import (
     FIELD_CT_STATE,
     FIELD_CURRENT_VERSION,
     FIELD_DEFAULT_PW,
-    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_EC,
     FIELD_ENERGY_PLAN_PW,
@@ -216,8 +213,8 @@ from .const import (
     FIELD_OFF_GRID_DOWN,
     FIELD_OFF_GRID_DOWN_TIME,
     FIELD_OFF_GRID_TIME,
-    FIELD_ON_GRID_STAT,
     FIELD_ONGRID_STAT,
+    FIELD_ON_GRID_STAT,
     FIELD_OP,
     FIELD_OT,
     FIELD_OTHER_LOAD_PW,
@@ -279,10 +276,8 @@ from .const import (
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
-    HomeConsumptionPower,
     append_unique_entity,
     calculated_smart_meter_power,
     compact_json,
@@ -303,6 +298,16 @@ from .util import (
     trend_series_key,
     trend_series_total,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
+    from .util import HomeConsumptionPower
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -2282,7 +2287,7 @@ async def async_setup_entry(
                     # add-on battery cards use BatteryPackSub entries. `batNum`
                     # is the expected pack/card count, not a reason to collapse
                     # the first pack into the main device.
-                    pack_count = min(5, max(len(valid_packs), max(0, bat_num)))
+                    pack_count = min(5, max(len(valid_packs), 0, bat_num))
                 for index in range(1, pack_count + 1):
                     valid_packs[index - 1] if index <= len(valid_packs) else {}
                     for pack_desc in BATTERY_PACK_SENSOR_DESCRIPTIONS:
@@ -2675,7 +2680,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                     and len(values) == 12
                 ):
                     nonzero_months = [
-                        i for i, v in enumerate(values) if v not in (0, None, 0.0)
+                        i for i, v in enumerate(values) if v not in {0, None}
                     ]
                     attrs["cloud_year_chart_nonzero_months"] = len(nonzero_months)
                     if nonzero_months:
