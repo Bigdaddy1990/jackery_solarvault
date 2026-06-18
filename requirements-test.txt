@@ -34,9 +34,9 @@ ruff>=0.15.17
 serialx
 smellcheck
 types-aiofiles
-types-atomicwrites1
+types-atomicwrites
 types-caldav
-types-chardet6
+types-chardet
 types-croniter
 types-decorator
 types-pexpect

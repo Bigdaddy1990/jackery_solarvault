@@ -102,16 +102,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         entities: list[BinarySensorEntity],
         entity: BinarySensorEntity,
     ) -> None:
-        """Append a binary sensor entity to a list if its unique ID has not been.
-
-        recorded.
-
-        Parameters:
-            entities (list[BinarySensorEntity]): Target list to which the entity will
-            be appended when its unique ID is new.
-            entity (BinarySensorEntity): Binary sensor entity whose unique ID will be
-            checked and recorded.
-        """
+        """Append a binary sensor entity when its unique ID is new."""
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -121,22 +112,11 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         )
 
     def _collect_entities() -> list[BinarySensorEntity]:
-        """Builds binary sensor entities for each device and its smart plugs from the.
+        """Build binary sensor entities from coordinator device payloads.
 
-        coordinator payload.
-
-        Creates one JackeryBinarySensor for each description in BINARY_DESCRIPTIONS and
-        one
-        JackerySmartPlugStateBinarySensor for each smart plug that exposes a serial
-        number.
-        Smart-plug entities receive a stable 1-based `plug_index` and a deterministic
-        `plug_key` derived from the plug serial and index to preserve entity identity
-        when
-        the payload order changes.
-
-        Returns:
-            list[BinarySensorEntity]: List of constructed BinarySensorEntity instances
-            ready to be added.
+        Smart-plug entities use a stable 1-based ``plug_index`` and deterministic
+        ``plug_key`` derived from the plug serial and index so entity identity is
+        preserved when the payload order changes.
         """
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():

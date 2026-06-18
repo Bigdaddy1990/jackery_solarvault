@@ -980,15 +980,7 @@ async def async_setup_entry(  # noqa: RUF029
     seen_unique_ids: set[str] = set()
 
     def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
-        """Add a NumberEntity to the collection if its unique ID has not already been.
-
-        seen.
-
-        Parameters:
-            entities (list[NumberEntity]): List to append the entity to when unique.
-            entity (NumberEntity): The entity to add; duplicates (by unique ID) are
-            ignored.
-        """
+        """Add a number entity when its unique ID has not already been seen."""
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -998,35 +990,12 @@ async def async_setup_entry(  # noqa: RUF029
         )
 
     def _has_props(payload: dict[str, Any], *keys: str) -> bool:
-        """Determine whether any of the given keys exist in the payload's properties.
-
-        section.
-
-        Parameters:
-            payload (dict[str, Any]): Full device payload containing payload sections.
-            *keys (str): Property keys to check for presence inside the
-            `PAYLOAD_PROPERTIES` section.
-
-        Returns:
-            bool: `True` if at least one key is present in the properties section,
-            `False` otherwise.
-        """
+        """Return whether any key exists in the payload properties section."""
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
     def _has_price_or_system(payload: dict[str, Any]) -> bool:
-        """Determine whether the given device payload contains single-price data or a.
-
-        system identifier.
-
-        Parameters:
-            payload (dict[str, Any]): Full device payload to inspect.
-
-        Returns:
-            bool: `true` if the payload's price section contains `FIELD_SINGLE_PRICE`
-            or `FIELD_DYNAMIC_OR_SINGLE`, or the system section contains `FIELD_ID` or
-            `FIELD_SYSTEM_ID`; `false` otherwise.
-        """
+        """Return whether the payload has price controls or system identifiers."""
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (
