@@ -3,11 +3,11 @@
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 import pytest
 
 from custom_components.jackery_solarvault.const import DOMAIN
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant

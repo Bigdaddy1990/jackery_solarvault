@@ -16,6 +16,7 @@ import json as _json
 import logging
 from pathlib import Path
 
+from homeassistant.exceptions import ServiceValidationError
 import pytest
 
 from custom_components.jackery_solarvault import const, services
@@ -23,9 +24,9 @@ from custom_components.jackery_solarvault.client import ble_transport
 from custom_components.jackery_solarvault.client.ble import (
     BLE_AES_IV_LEN,
     BLE_AES_KEY_LEN,
-    BLE_AES_KEY_LENGTHS,
     BLE_AES_KEY_LEN_AES128,
     BLE_AES_KEY_LEN_AES256,
+    BLE_AES_KEY_LENGTHS,
     BLE_FRAME_MAGIC,
     BLE_FRAME_PAYLOAD_MARKER,
     BLE_FRAME_VERSION,
@@ -70,7 +71,6 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from homeassistant.exceptions import ServiceValidationError
 
 # ---------------------------------------------------------------------------
 # Constants — pinned to the smali-verified literals
