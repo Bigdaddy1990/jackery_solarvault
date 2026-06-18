@@ -135,7 +135,7 @@ jobs:
       CODECOV_UPLOAD_ALLOWED: ${{ inputs.run-codecov && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
