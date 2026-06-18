@@ -42,12 +42,6 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_YEAR,
     PAYLOAD_STATISTIC,
 )
-from custom_components.jackery_solarvault.util import (
-    app_period_range,
-    safe_float,
-    trend_series_key,
-    trend_series_total,
-)
 
 
 class AppDataQualityWarning(NamedTuple):
@@ -211,6 +205,13 @@ def app_data_quality_warnings(
     Returns:
         list[AppDataQualityWarning]: Warnings for detected logical inconsistencies.
     """
+    from custom_components.jackery_solarvault.util import (  # noqa: PLC0415
+        app_period_range,
+        safe_float,
+        trend_series_key,
+        trend_series_total,
+    )
+
     if today is None:
         today = date.today()  # noqa: DTZ011
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)

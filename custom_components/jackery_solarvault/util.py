@@ -13,6 +13,8 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
+from custom_components.jackery_solarvault.stats import data_quality as _data_quality
+
 from .const import (
     APP_CHART_LABELS,
     APP_CHART_SERIES_Y,
@@ -68,18 +70,13 @@ from .const import (
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATA_QUALITY_KEY_LABEL,
-    DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
-    DATA_QUALITY_KEY_REASON,
-    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
-    DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
     DATA_QUALITY_KEY_SOURCE_SECTION,
     DATA_QUALITY_KEY_SOURCE_VALUE,
-    DATA_QUALITY_KEY_TOTAL_METHOD,
     DATA_QUALITY_LEVEL_WARNING,
     DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
     DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
@@ -126,6 +123,9 @@ from .const import (
     TASK_PLAN_BODY,
     TASK_PLAN_TASKS,
 )
+
+AppDataQualityWarning = _data_quality.AppDataQualityWarning
+normalized_data_quality_warnings = _data_quality.normalized_data_quality_warnings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -991,120 +991,6 @@ class TrendStatisticPoint(NamedTuple):
 
     start_date: date | datetime
     value: float
-
-
-class AppDataQualityWarning(NamedTuple):
-    """One non-mutating warning about contradictory app statistics."""
-
-    level: str
-    reason: str
-    metric_key: str
-    label: str
-    source_section: str
-    source_value: float
-    reference_section: str
-    reference_value: float
-    source_request: dict[str, Any] | None = None
-    reference_request: dict[str, Any] | None = None
-    source_chart_series_key: str | None = None
-    reference_chart_series_key: str | None = None
-    total_method: str | None = None
-
-    def as_dict(self) -> dict[str, object]:
-        """Return a deterministic diagnostics dictionary representing this data-quality.
-
-        warning.
-
-        The mapping always includes the keys:
-        - DATA_QUALITY_KEY_LEVEL: warning level
-        - DATA_QUALITY_KEY_REASON: human-readable reason code or text
-        - DATA_QUALITY_KEY_METRIC_KEY: metric identifier
-        - DATA_QUALITY_KEY_LABEL: metric label
-        - DATA_QUALITY_KEY_SOURCE_SECTION: source section name
-        - DATA_QUALITY_KEY_SOURCE_VALUE: source numeric value (rounded where applicable)
-        - DATA_QUALITY_KEY_REFERENCE_SECTION: reference section name
-        - DATA_QUALITY_KEY_REFERENCE_VALUE: reference numeric value (rounded where
-        applicable)
-
-        When present on the instance, the mapping also includes:
-        - DATA_QUALITY_KEY_SOURCE_REQUEST: a shallow copy of the source request metadata
-        - DATA_QUALITY_KEY_REFERENCE_REQUEST: a shallow copy of the reference request
-        metadata
-        - DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY: the chart-series key used for the
-        source
-        - DATA_QUALITY_KEY_TOTAL_METHOD: the method used to derive totals (e.g.,
-        "chart_series_sum")
-
-        Returns:
-            dict[str, object]: Diagnostic dictionary containing required fields and any
-            available optional fields.
-        """
-        payload: dict[str, object] = {
-            DATA_QUALITY_KEY_LEVEL: self.level,
-            DATA_QUALITY_KEY_REASON: self.reason,
-            DATA_QUALITY_KEY_METRIC_KEY: self.metric_key,
-            DATA_QUALITY_KEY_LABEL: self.label,
-            DATA_QUALITY_KEY_SOURCE_SECTION: self.source_section,
-            DATA_QUALITY_KEY_SOURCE_VALUE: self.source_value,
-            DATA_QUALITY_KEY_REFERENCE_SECTION: self.reference_section,
-            DATA_QUALITY_KEY_REFERENCE_VALUE: self.reference_value,
-        }
-        if self.source_request is not None:
-            payload[DATA_QUALITY_KEY_SOURCE_REQUEST] = dict(self.source_request)
-        if self.reference_request is not None:
-            payload[DATA_QUALITY_KEY_REFERENCE_REQUEST] = dict(self.reference_request)
-        if self.source_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
-                self.source_chart_series_key
-            )
-        if self.reference_chart_series_key is not None:
-            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
-                self.reference_chart_series_key
-            )
-        if self.total_method is not None:
-            payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
-        return payload
-
-    # --- restored from 24.05\24.05\custom_components\jackery_solarvault\util.py ---
-    def _stat_source_shape(self: Any) -> tuple[tuple[str, str], ...]:
-        """Return keys that can change the statistic entity set."""
-        if not isinstance(self, dict):
-            return ()
-        shape: list[tuple[str, str]] = []
-        for key, value in self.items():
-            key_text = str(key)
-            if key_text.startswith("_") or value is None:
-                continue
-            if isinstance(value, list):
-                if any(safe_float(item) is not None for item in value):
-                    shape.append((key_text, "list"))
-                continue
-            shape.append((key_text, "value"))
-        return tuple(sorted(shape))
-
-
-def normalized_data_quality_warnings(
-    warnings: list[Any],
-) -> list[dict[str, Any]]:
-    """Return deterministic, de-duplicated data-quality warnings."""
-    deduped: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
-    for warning in warnings:
-        if not isinstance(warning, dict):
-            continue
-
-        def _key_part(value: object) -> str:
-            return "" if value is None else str(value)
-
-        key = (
-            _key_part(warning.get(DATA_QUALITY_KEY_REASON)),
-            _key_part(warning.get(DATA_QUALITY_KEY_METRIC_KEY)),
-            _key_part(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION)),
-            _key_part(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)),
-            _key_part(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION)),
-            _key_part(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE)),
-        )
-        deduped.setdefault(key, dict(warning))
-    return [deduped[key] for key in sorted(deduped)]
 
 
 def _format_request_range(request: object) -> str | None:
