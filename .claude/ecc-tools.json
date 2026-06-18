@@ -1,0 +1,275 @@
+{
+  "adapters": {
+    "claudeCode": {
+      "commandPaths": [],
+      "identityPath": ".claude/identity.json",
+      "skillPath": ".claude/skills/jackery_solarvault/SKILL.md"
+    },
+    "codex": {
+      "agentsGuidePath": ".codex/AGENTS.md",
+      "configPath": ".codex/config.toml",
+      "skillPath": ".agents/skills/jackery_solarvault/SKILL.md"
+    }
+  },
+  "blockedRemovalComponents": [],
+  "blockedRemovalPackages": [],
+  "conflictingPackages": [],
+  "dependencyGraph": {
+    "runtime-core": [],
+    "workflow-pack": [
+      "runtime-core"
+    ]
+  },
+  "effectiveProfile": "developer",
+  "files": [
+    {
+      "description": "Repository-specific Claude Code skill generated from git history.",
+      "moduleId": "runtime-core",
+      "path": ".claude/skills/jackery_solarvault/SKILL.md"
+    },
+    {
+      "description": "Codex-facing copy of the generated repository skill.",
+      "moduleId": "runtime-core",
+      "path": ".agents/skills/jackery_solarvault/SKILL.md"
+    },
+    {
+      "description": "Codex skill metadata so the repo skill appears cleanly in the skill interface.",
+      "moduleId": "runtime-core",
+      "path": ".agents/skills/jackery_solarvault/agents/openai.yaml"
+    },
+    {
+      "description": "Suggested identity.json baseline derived from repository conventions.",
+      "moduleId": "runtime-core",
+      "path": ".claude/identity.json"
+    },
+    {
+      "description": "Repo-local Codex MCP and multi-agent baseline aligned with ECC defaults.",
+      "moduleId": "runtime-core",
+      "path": ".codex/config.toml"
+    },
+    {
+      "description": "Codex usage guide that points at the generated repo skill and workflow bundle.",
+      "moduleId": "runtime-core",
+      "path": ".codex/AGENTS.md"
+    },
+    {
+      "description": "Read-only explorer role config for Codex multi-agent work.",
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/explorer.toml"
+    },
+    {
+      "description": "Read-only reviewer role config focused on correctness and security.",
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/reviewer.toml"
+    },
+    {
+      "description": "Read-only docs researcher role config for API verification.",
+      "moduleId": "runtime-core",
+      "path": ".codex/agents/docs-researcher.toml"
+    },
+    {
+      "description": "Continuous-learning instincts derived from repository patterns.",
+      "moduleId": "runtime-core",
+      "path": ".claude/homunculus/instincts/inherited/jackery_solarvault-instincts.yaml"
+    }
+  ],
+  "generatedAt": "2026-06-17T15:36:47.521Z",
+  "generatedBy": "ecc-tools",
+  "managedFiles": [
+    ".claude/skills/jackery_solarvault/SKILL.md",
+    ".agents/skills/jackery_solarvault/SKILL.md",
+    ".agents/skills/jackery_solarvault/agents/openai.yaml",
+    ".claude/identity.json",
+    ".codex/config.toml",
+    ".codex/AGENTS.md",
+    ".codex/agents/explorer.toml",
+    ".codex/agents/reviewer.toml",
+    ".codex/agents/docs-researcher.toml",
+    ".claude/homunculus/instincts/inherited/jackery_solarvault-instincts.yaml"
+  ],
+  "moduleFiles": {
+    "runtime-core": [
+      ".claude/skills/jackery_solarvault/SKILL.md",
+      ".agents/skills/jackery_solarvault/SKILL.md",
+      ".agents/skills/jackery_solarvault/agents/openai.yaml",
+      ".claude/identity.json",
+      ".codex/config.toml",
+      ".codex/AGENTS.md",
+      ".codex/agents/explorer.toml",
+      ".codex/agents/reviewer.toml",
+      ".codex/agents/docs-researcher.toml",
+      ".claude/homunculus/instincts/inherited/jackery_solarvault-instincts.yaml"
+    ]
+  },
+  "modules": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "packageFiles": {
+    "runtime-core": [
+      ".claude/skills/jackery_solarvault/SKILL.md",
+      ".agents/skills/jackery_solarvault/SKILL.md",
+      ".agents/skills/jackery_solarvault/agents/openai.yaml",
+      ".claude/identity.json",
+      ".codex/config.toml",
+      ".codex/AGENTS.md",
+      ".codex/agents/explorer.toml",
+      ".codex/agents/reviewer.toml",
+      ".codex/agents/docs-researcher.toml",
+      ".claude/homunculus/instincts/inherited/jackery_solarvault-instincts.yaml"
+    ]
+  },
+  "packages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "profile": "developer",
+  "profiles": {
+    "effective": "developer",
+    "effectiveAlias": "developer",
+    "recommended": "full",
+    "recommendedAlias": "full",
+    "requested": "full",
+    "requestedAlias": "full"
+  },
+  "recommendedProfile": "full",
+  "referenceSetReadiness": {
+    "items": [
+      {
+        "evidence": [],
+        "id": "deep-analyzer-corpus",
+        "label": "Deep analyzer corpus",
+        "recommendation": "Add analyzer fixture, golden, benchmark, or reference-set files that can catch analyzer regressions.",
+        "status": "missing"
+      },
+      {
+        "evidence": [
+          "tests/test_enforce_coverage_gates.py",
+          "tests/test_reference_coverage_contract.py"
+        ],
+        "id": "rag-evaluator",
+        "label": "RAG/evaluator comparison",
+        "recommendation": "Add retrieval or evaluator reference-set comparison fixtures with expected ranking behavior.",
+        "status": "present"
+      },
+      {
+        "evidence": [],
+        "id": "pr-salvage",
+        "label": "PR salvage/review corpus",
+        "recommendation": "Add stale-PR, review-thread, reopen-flow, or salvage reference cases for queue cleanup automation.",
+        "status": "missing"
+      },
+      {
+        "evidence": [],
+        "id": "discussion-triage",
+        "label": "Discussion triage corpus",
+        "recommendation": "Add public discussion triage fixtures, golden cases, or reference sets for informational, answered, and no-response classifications.",
+        "status": "missing"
+      },
+      {
+        "evidence": [],
+        "id": "harness-compatibility",
+        "label": "Harness compatibility",
+        "recommendation": "Add cross-harness, adapter-compliance, or harness-audit evidence for Claude, Codex, OpenCode, Zed, dmux, and agent surfaces.",
+        "status": "missing"
+      },
+      {
+        "evidence": [],
+        "id": "security-evidence",
+        "label": "Security evidence",
+        "recommendation": "Attach security evidence such as SBOMs, SARIF, audit reports, or AgentShield evidence packs.",
+        "status": "missing"
+      },
+      {
+        "evidence": [],
+        "id": "ci-failure-mode",
+        "label": "CI failure-mode evidence",
+        "recommendation": "Add captured CI failure logs, dry-run fixtures, or troubleshooting docs for common workflow failure modes.",
+        "status": "missing"
+      }
+    ],
+    "present": 1,
+    "score": 14,
+    "total": 7
+  },
+  "repo": "https://github.com/Bigdaddy1990/jackery_solarvault",
+  "requestedAddComponents": [],
+  "requestedAddPackages": [],
+  "requestedComponents": [
+    "repo-baseline",
+    "workflow-automation",
+    "security-audits",
+    "research-tooling",
+    "team-rollout",
+    "governance-controls"
+  ],
+  "requestedModules": [
+    "runtime-core",
+    "workflow-pack",
+    "agentshield-pack",
+    "research-pack",
+    "team-config-sync",
+    "enterprise-controls"
+  ],
+  "requestedPackages": [
+    "runtime-core",
+    "workflow-pack",
+    "agentshield-pack",
+    "research-pack",
+    "team-config-sync",
+    "enterprise-controls"
+  ],
+  "requestedProfile": "full",
+  "requestedRemoveComponents": [],
+  "requestedRemovePackages": [],
+  "requestedRootPackages": [
+    "runtime-core",
+    "workflow-pack",
+    "agentshield-pack",
+    "research-pack",
+    "team-config-sync",
+    "enterprise-controls"
+  ],
+  "resolutionOrder": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "schemaVersion": "1.0",
+  "selectedComponents": [
+    "repo-baseline",
+    "workflow-automation"
+  ],
+  "selectedModules": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "selectedPackages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "selectedRootPackages": [
+    "runtime-core",
+    "workflow-pack"
+  ],
+  "tier": "free",
+  "tierFilteredComponents": [
+    "security-audits",
+    "research-tooling",
+    "team-rollout",
+    "governance-controls"
+  ],
+  "tierFilteredPackages": [
+    "agentshield-pack",
+    "research-pack",
+    "team-config-sync",
+    "enterprise-controls"
+  ],
+  "tierFilteredRootPackages": [
+    "agentshield-pack",
+    "research-pack",
+    "team-config-sync",
+    "enterprise-controls"
+  ],
+  "version": "1.3",
+  "workflows": []
+}
