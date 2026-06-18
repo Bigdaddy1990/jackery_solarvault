@@ -14,9 +14,6 @@ All tests use lightweight stubs so no Home Assistant fixtures are required.
 from typing import Any
 from unittest.mock import MagicMock
 
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.const import EntityCategory
-
 from custom_components.jackery_solarvault.binary_sensor import (
     BINARY_DESCRIPTIONS,
     JackeryBinaryDescription,
@@ -29,6 +26,8 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_DEVICE,
     PAYLOAD_PROPERTIES,
 )
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.const import EntityCategory
 
 # ---------------------------------------------------------------------------
 # Helpers
