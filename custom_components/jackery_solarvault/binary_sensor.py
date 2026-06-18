@@ -1,9 +1,8 @@
 """Binary sensor platform for Jackery SolarVault."""
 
-from collections.abc import Callable
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -11,14 +10,20 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.core import callback
 
-from . import JackeryConfigEntry
 from .const import FIELD_ETH_PORT, FIELD_ONLINE_STATUS, FIELD_SW_EPS_STATE
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, safe_bool
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +80,7 @@ async def async_setup_entry(
 
     def _collect_entities() -> list[BinarySensorEntity]:
         entities: list[BinarySensorEntity] = []
-        for dev_id, _payload in (coordinator.data or {}).items():
+        for dev_id in coordinator.data or {}:
             for desc in BINARY_DESCRIPTIONS:
                 _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
         return entities

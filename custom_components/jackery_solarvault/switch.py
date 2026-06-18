@@ -7,18 +7,15 @@ section, an optional task-plan fallback and the coordinator setter that pushes
 the new state to the cloud / MQTT command path.
 """
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import JackeryConfigEntry
 from .const import (
     DOMAIN,
     FIELD_AUTO_STANDBY,
@@ -31,9 +28,17 @@ from .const import (
     PAYLOAD_PROPERTIES,
     PAYLOAD_WEATHER_PLAN,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import append_unique_entity, safe_bool, task_plan_value
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on

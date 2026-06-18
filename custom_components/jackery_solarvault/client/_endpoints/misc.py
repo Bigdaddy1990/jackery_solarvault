@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from ...const import (
+from jackery_solarvault.client._http import BaseHTTPMixin
+from jackery_solarvault.const import (
     ALARM_DETAIL_PATH,
     ALERT_SYNC_PATH,
     APP_VERSION_PATH,
@@ -18,7 +19,6 @@ from ...const import (
     PRIVACY_CONSENT_PATH,
     ZONE_LIST_PATH,
 )
-from .._http import BaseHTTPMixin
 
 
 class MiscEndpointMixin(BaseHTTPMixin):

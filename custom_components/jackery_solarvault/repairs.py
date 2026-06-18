@@ -1,16 +1,19 @@
 """Repair flows for Jackery SolarVault."""
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+import voluptuous as vol
 
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-import voluptuous as vol
 
 from .const import DOMAIN, REPAIR_ISSUE_APP_DATA_INCONSISTENCY
 from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
