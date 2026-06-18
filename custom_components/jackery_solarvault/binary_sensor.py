@@ -90,32 +90,10 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Discover and register binary sensor entities for a Jackery device.
+    """Discover and register binary sensor entities for a Jackery device.
 
     Monitors the coordinator for updates and registers new entities when the device
     data changes.
-    """
-    ```
-
-    ```python
-    """
-    Append entity to list if its unique ID has not been seen before.
-    """
-    ```
-
-    ```python
-    """
-    Construct binary sensor entities from current coordinator data.
-
-    Returns:
-        list[BinarySensorEntity]: Newly constructed entities.
-    """
-    ```
-
-    ```python
-    """
-    Register new entities if the coordinator data signature has changed.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
@@ -188,8 +166,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """
-        Register new binary sensor entities when the coordinator's entity signature changes.
+        """Register new binary sensor entities when the coordinator's entity signature changes.
 
         Compares the current entity signature to the stored one and registers entities if
         they differ.

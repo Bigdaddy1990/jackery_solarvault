@@ -1430,7 +1430,9 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             `translation_key` are re-raised, other exceptions are converted and raised
             via the entity's `_raise_action_error`.
         """
-        if not self.available:
+        if not super().available:
+            self._raise_action_error("device is offline")
+        if not self._alert:
             self._raise_action_error("storm alert is no longer active")
         try:
             await self.coordinator.async_delete_storm_alert(

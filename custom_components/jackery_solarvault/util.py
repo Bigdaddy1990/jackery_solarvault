@@ -71,6 +71,7 @@ from .const import (
     DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
+    DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
@@ -1056,6 +1057,10 @@ class AppDataQualityWarning(NamedTuple):
             payload[DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY] = (
                 self.source_chart_series_key
             )
+        if self.reference_chart_series_key is not None:
+            payload[DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY] = (
+                self.reference_chart_series_key
+            )
         if self.total_method is not None:
             payload[DATA_QUALITY_KEY_TOTAL_METHOD] = self.total_method
         return payload
@@ -1086,13 +1091,17 @@ def normalized_data_quality_warnings(
     for warning in warnings:
         if not isinstance(warning, dict):
             continue
+
+        def _key_part(value: object) -> str:
+            return "" if value is None else str(value)
+
         key = (
-            str(warning.get(DATA_QUALITY_KEY_REASON) or ""),
-            str(warning.get(DATA_QUALITY_KEY_METRIC_KEY) or ""),
-            str(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION) or ""),
-            str(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE) or ""),
-            str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION) or ""),
-            str(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE) or ""),
+            _key_part(warning.get(DATA_QUALITY_KEY_REASON)),
+            _key_part(warning.get(DATA_QUALITY_KEY_METRIC_KEY)),
+            _key_part(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION)),
+            _key_part(warning.get(DATA_QUALITY_KEY_SOURCE_VALUE)),
+            _key_part(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION)),
+            _key_part(warning.get(DATA_QUALITY_KEY_REFERENCE_VALUE)),
         )
         deduped.setdefault(key, dict(warning))
     return [deduped[key] for key in sorted(deduped)]

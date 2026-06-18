@@ -42,27 +42,6 @@ def _data_field_accepted(data: dict[str, Any]) -> bool:
     return False
 
 
-def _data_field_accepted(data: dict[str, Any]) -> bool:
-    """Determine if a Shelly write response's data field signals acceptance.
-
-    The backend signals acceptance in the top-level data field as boolean True
-    or a truthy token ("true"/"1"/"ok", case-insensitive). Anything else, including
-    a missing field, is treated as not accepted.
-
-    Parameters:
-        data (dict[str, Any]): Response data dictionary to check.
-
-    Returns:
-        bool: True if the data field signals acceptance, False otherwise.
-    """
-    val = data.get(FIELD_DATA)
-    if val is True:
-        return True
-    if isinstance(val, (str, int)):
-        return str(val).lower() in {"true", "1", "ok"}
-    return False
-
-
 class ShellyEndpointMixin(BaseHTTPMixin):
     """Mixin providing Shelly-related cloud API endpoints."""
 

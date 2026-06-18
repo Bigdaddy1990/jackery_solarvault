@@ -970,22 +970,7 @@ async def async_setup_entry(  # noqa: RUF029
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """
-    Determine whether the payload contains single-price data or a system identifier.
-
-    Parameters:
-        payload (dict[str, Any]): Full device payload to inspect.
-
-    Returns:
-        bool: `True` if the payload's price section contains `FIELD_SINGLE_PRICE`
-        or `FIELD_DYNAMIC_OR_SINGLE`, or the system section contains `FIELD_ID` or
-        `FIELD_SYSTEM_ID`; `False` otherwise.
-    """
-
-    ---
-
-    """
-    Collect and add new number entities when coordinator data changes.
+    """Collect and add new number entities when coordinator data changes.
 
     Compares the current coordinator signature to detect changes in coordinator data; if
     changed, collects entities and registers them. This callback is invoked immediately
@@ -1094,9 +1079,7 @@ async def async_setup_entry(  # noqa: RUF029
 
     @callback
     def _add_new_entities() -> None:
-        """
-        Collect and register new number entities when coordinator data changes.
-        """
+        """Collect and register new number entities when coordinator data changes."""
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
