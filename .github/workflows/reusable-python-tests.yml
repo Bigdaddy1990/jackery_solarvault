@@ -303,7 +303,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.COVERAGE_XML) != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -318,7 +318,7 @@ jobs:
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           (steps.codecov_coverage_upload.outcome == 'failure' ||
           steps.codecov_coverage_upload.outcome == 'skipped')
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -332,7 +332,7 @@ jobs:
         if: >-
           always() && !cancelled() && env.CODECOV_UPLOAD_ALLOWED == 'true' &&
           hashFiles(env.JUNIT_PATH) != ''
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -364,6 +364,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
         run: |
           python -m scripts.publish_coverage \
             --coverage-xml "${{ env.COVERAGE_XML }}" \
@@ -372,10 +376,10 @@ jobs:
             --mode pages \
             --pages-branch "${{ env.PAGES_BRANCH }}" \
             --pages-prefix "${{ env.PAGES_PREFIX }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}" \
-            --commit-sha "${{ github.sha }}" \
-            --ref "${{ github.ref }}"
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT" \
+            --commit-sha "$COMMIT_SHA" \
+            --ref "$REF"
 
       - name: Upload GitHub Pages bundle
         if: inputs.publish-pages == true && steps.pytest.outcome == 'success'
