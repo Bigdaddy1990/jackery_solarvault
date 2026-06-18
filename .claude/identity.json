@@ -1,0 +1,14 @@
+{
+  "createdAt": "2026-06-17T15:37:05.909Z",
+  "domains": [
+    "python"
+  ],
+  "preferredStyle": {
+    "codeComments": true,
+    "explanations": true,
+    "verbosity": "detailed"
+  },
+  "suggestedBy": "ecc-tools-repo-analysis",
+  "technicalLevel": "technical",
+  "version": "2.0"
+}

@@ -1,0 +1,412 @@
+# Instincts generated from https://github.com/Bigdaddy1990/jackery_solarvault
+# Generated: 2026-06-17T15:37:05.909Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: jackery_solarvault-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Commit Length
+
+## Action
+
+Keep commit messages concise (~43 characters)
+
+## Evidence
+
+- Average commit message length: 43 chars
+- Based on 2 commits
+
+---
+id: jackery_solarvault-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: jackery_solarvault-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: jackery_solarvault-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: jackery_solarvault-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: jackery_solarvault-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: jackery_solarvault-instinct-file-naming
+trigger: "When creating a new Python file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct File Naming
+
+## Action
+
+Name the file using snake_case
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+
+---
+id: jackery_solarvault-instinct-function-naming
+trigger: "When defining a new function in Python"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: jackery_solarvault-instinct-class-naming
+trigger: "When defining a new class in Python"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: jackery_solarvault-instinct-constant-naming
+trigger: "When defining a constant in Python"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: jackery_solarvault-instinct-import-style
+trigger: "When importing modules in Python"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: jackery_solarvault-instinct-export-style
+trigger: "When exporting symbols from a Python module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: jackery_solarvault-instinct-test-location
+trigger: "When adding new tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Test Location
+
+## Action
+
+Place test files in the separate 'tests' folder
+
+## Evidence
+
+- Pattern in architecture.folderStructure.commonFolders
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: jackery_solarvault-instinct-test-type
+trigger: "When writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Test Type
+
+## Action
+
+Write unit tests
+
+## Evidence
+
+- Pattern in testing.testTypes
+
+---
+id: jackery_solarvault-instinct-test-file-pattern
+trigger: "When naming a test file"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Test File Pattern
+
+## Action
+
+Use the pattern '*.test.ts'
+
+## Evidence
+
+- Pattern in testing.filePattern
+
+---
+id: jackery_solarvault-instinct-coverage-config
+trigger: "When configuring tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Coverage Config
+
+## Action
+
+Ensure coverage configuration is present
+
+## Evidence
+
+- Pattern in testing.coverageConfig
+
+---
+id: jackery_solarvault-instinct-commit-format-freeform
+trigger: "When writing a commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Commit Format Freeform
+
+## Action
+
+Use a freeform commit message without a required prefix
+
+## Evidence
+
+- Pattern in commits.type
+- Examples: 'Fix shell injection vulnerability in GitHub Pages publish step'
+
+---
+id: jackery_solarvault-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Commit Length
+
+## Action
+
+Keep the commit message concise (around 43 characters on average)
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: jackery_solarvault-instinct-autofix-workflow
+trigger: "When configuring CI workflows"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Autofix Workflow
+
+## Action
+
+Include a workflow for code autofix (e.g., .github/workflows/autofix.yml)
+
+## Evidence
+
+- Pattern in architecture.configFiles: .github/workflows/autofix.yml
+
+---
+id: jackery_solarvault-instinct-python-tests-workflow
+trigger: "When configuring CI workflows"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Python Tests Workflow
+
+## Action
+
+Include a reusable workflow for Python tests (e.g., .github/workflows/reusable-python-tests.yml)
+
+## Evidence
+
+- Pattern in architecture.configFiles: .github/workflows/reusable-python-tests.yml
+
+---
+id: jackery_solarvault-instinct-ruff-baseline-workflow
+trigger: "When configuring CI workflows"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: Bigdaddy1990/jackery_solarvault
+---
+
+# Jackery_solarvault Instinct Ruff Baseline Workflow
+
+## Action
+
+Include a workflow for ruff baseline linting (e.g., .github/workflows/ruff-baseline.yml)
+
+## Evidence
+
+- Pattern in architecture.configFiles: .github/workflows/ruff-baseline.yml
