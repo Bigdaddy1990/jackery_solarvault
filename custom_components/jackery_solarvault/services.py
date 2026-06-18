@@ -20,10 +20,11 @@ All three actions follow the same routing contract:
 import logging
 from typing import Any
 
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+import voluptuous as vol
+
+from homeassistant.core import callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
-import voluptuous as vol
 
 from .api import JackeryError
 from .const import (
@@ -42,7 +43,6 @@ from .const import (
     SERVICE_RENAME_SYSTEM,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .util import safe_bool
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
