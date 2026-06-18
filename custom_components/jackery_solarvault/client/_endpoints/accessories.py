@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from ...const import (
+from jackery_solarvault.client._http import BaseHTTPMixin
+from jackery_solarvault.const import (
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
     ACCESSORIES_LIST_PATH,
@@ -13,7 +14,6 @@ from ...const import (
     SUB_SHADOW_PATH,
     SYSTEM_SHADOW_PATH,
 )
-from .._http import BaseHTTPMixin
 
 
 class AccessoriesEndpointMixin(BaseHTTPMixin):

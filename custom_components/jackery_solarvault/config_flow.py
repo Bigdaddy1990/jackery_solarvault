@@ -1,19 +1,14 @@
 """Config flow for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import voluptuous as vol
 
 from .api import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
@@ -40,6 +35,11 @@ from .const import (
     FLOW_STEP_USER,
 )
 from .util import config_entry_bool_option
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.error("Cannot connect to Jackery: %s", err)
+                _LOGGER.exception("Cannot connect to Jackery: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
@@ -227,7 +227,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 except JackeryAuthError:
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
                 except JackeryError as err:
-                    _LOGGER.error(
+                    _LOGGER.exception(
                         "Cannot connect to Jackery during reconfigure: %s", err
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
@@ -302,7 +302,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.error("Cannot connect to Jackery during reauth: %s", err)
+                _LOGGER.exception("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_update_reload_and_abort(

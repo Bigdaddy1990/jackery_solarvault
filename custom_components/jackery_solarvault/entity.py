@@ -8,9 +8,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,

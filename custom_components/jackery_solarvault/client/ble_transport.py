@@ -43,7 +43,8 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..util import first_nonblank_int
+from jackery_solarvault.util import first_nonblank_int
+
 from . import ble
 
 if TYPE_CHECKING:
@@ -695,6 +696,7 @@ class JackeryBleListener:
         """  # noqa: E501, RUF002
         from bleak.exc import BleakError
         from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
+
         from homeassistant.components import bluetooth
 
         stats = self.stats_for(device_id)

@@ -1,15 +1,19 @@
 """Diagnostics support for Jackery SolarVault."""
 
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntry
 
-from . import JackeryConfigEntry
 from .const import DOMAIN, REDACT_KEYS
-from .coordinator import JackerySolarVaultCoordinator
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.device_registry import DeviceEntry
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 
 def _redacted_payload_map(
@@ -24,9 +28,7 @@ def _redacted_payload_map(
     outer keys with stable local labels.
     """
     redacted: dict[str, Any] = {}
-    for index, key in enumerate(
-        sorted(payloads, key=lambda value: str(value)), start=1
-    ):
+    for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
         label = f"{prefix}_{index}"
         if isinstance(payload, dict):

@@ -19,7 +19,6 @@ devType
 import math
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 import pytest
 
 from custom_components.jackery_solarvault.button import (
@@ -37,8 +36,8 @@ from custom_components.jackery_solarvault.button import (
 from custom_components.jackery_solarvault.const import (
     FIELD_ALERT_ID,
     FIELD_CMD,
-    FIELD_DEV_TYPE,
     FIELD_DEVICE_SN,
+    FIELD_DEV_TYPE,
     FIELD_END_TS,
     FIELD_MANUAL,
     FIELD_MESSAGE_TYPE,
@@ -48,6 +47,7 @@ from custom_components.jackery_solarvault.const import (
     TIMER_TASK_TYPE_SMART_PLUG,
     TIMER_TASK_TYPE_TIME_ELEC,
 )
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 # ---------------------------------------------------------------------------
 # Helpers — import the module-level functions under test
