@@ -1080,12 +1080,16 @@ async def _async_handle_send_device_schedule(
 
     Parameters:
         call (ServiceCall): Service call whose `data` must include:
-            - `device_id` (str): device identifier or Home Assistant device registry id to resolve
-            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018)
-            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string
+            - `device_id` (str): device identifier or Home Assistant device
+              registry id to resolve
+            - `action_id` (int): schedule action identifier (one of 3015,
+              3016, 3017, 3018)
+            - `body` (dict | str): schedule payload as a mapping or a
+              JSON-encoded object string
 
     Raises:
-        ServiceValidationError: if the device cannot be resolved, the body is invalid, or sending fails
+        ServiceValidationError: if the device cannot be resolved, the body is
+        invalid, or sending fails
     """
     raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
     device_id = _resolve_jackery_device_id(hass, raw)

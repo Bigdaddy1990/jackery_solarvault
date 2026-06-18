@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from custom_components.jackery_solarvault.client._http import (
+from custom_components.jackery_solarvault.client._http import (  # noqa: PLC2701
     BaseHTTPMixin,
     JackeryApiError,
 )

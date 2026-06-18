@@ -166,10 +166,10 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """Register new binary sensor entities when the coordinator's entity signature changes.
+        """Register binary sensors when the coordinator signature changes.
 
-        Compares the current entity signature to the stored one and registers entities if
-        they differ.
+        Compares the current entity signature to the stored one and registers
+        entities if they differ.
         """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)

@@ -1294,11 +1294,12 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Trigger a read of the device schedule for the configured task type and refresh the coordinator.
+        """Read the configured device schedule and refresh the coordinator.
 
         Raises:
             ConfigEntryAuthFailed: Re-raised when authentication has failed.
-            HomeAssistantError: Raised if the device is offline or if the schedule read fails.
+            HomeAssistantError: Raised if the device is offline or if the
+            schedule read fails.
         """
         if not self.available:
             self._raise_action_error("device is offline")
