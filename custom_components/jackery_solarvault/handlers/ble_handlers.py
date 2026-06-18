@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def ble_writes_enabled(coordinator: JackerySolarVaultCoordinator) -> bool:
     """Return whether BLE writes are enabled for a coordinator entry."""
-    return coordinator._ble_writes_enabled_impl()  # noqa: SLF001
+    return coordinator._ble_writes_enabled()  # noqa: SLF001
 
 
 async def async_send_ble_command(  # noqa: PLR0913
@@ -39,7 +39,7 @@ async def async_send_ble_command(  # noqa: PLR0913
     Returns:
         True if the command was sent successfully, False otherwise.
     """
-    return await coordinator._async_send_ble_command_impl(  # noqa: SLF001
+    return await coordinator.async_send_ble_command(
         device_id,
         cmd=cmd,
         body=body,
@@ -57,11 +57,11 @@ def ble_observations(coordinator: JackerySolarVaultCoordinator) -> dict[str, Any
     Returns:
         dict[str, Any]: A dictionary containing BLE diagnostic observations.
     """
-    return coordinator._ble_observations_impl()  # noqa: SLF001
+    return coordinator.ble_observations()
 
 
 async def async_start_ble_transport(
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
     """Start the coordinator-owned BLE listener."""
-    await coordinator._async_start_ble_transport_impl()  # noqa: SLF001
+    await coordinator.async_start_ble_transport()
