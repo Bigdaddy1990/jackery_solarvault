@@ -203,12 +203,14 @@ jobs:
           ruff format .
 
       - name: Prepare coverage directories
+        env:
+          PUBLISH_PAGES: ${{ inputs.publish-pages }}
         run: |
-          mkdir -p "$(dirname '${{ env.COVERAGE_XML }}')"
-          mkdir -p "${{ env.COVERAGE_HTML_DIR }}"
-          mkdir -p "$(dirname '${{ env.JUNIT_PATH }}')"
-          if [ "${{ inputs.publish-pages }}" = 'true' ]; then
-            mkdir -p "${{ env.PAGES_ARTIFACT_DIR }}"
+          mkdir -p "$(dirname "$COVERAGE_XML")"
+          mkdir -p "$COVERAGE_HTML_DIR"
+          mkdir -p "$(dirname "$JUNIT_PATH")"
+          if [ "$PUBLISH_PAGES" = 'true' ]; then
+            mkdir -p "$PAGES_ARTIFACT_DIR"
           fi
 
       - name: Run pytest
