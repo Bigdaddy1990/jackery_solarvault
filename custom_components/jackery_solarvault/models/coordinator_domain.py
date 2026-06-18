@@ -8,9 +8,8 @@ orchestrates.
 import json
 from typing import Any
 
-from homeassistant.helpers.update_coordinator import UpdateFailed
-
 from custom_components.jackery_solarvault.util import first_nonblank_int, safe_int
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def stable_payload_debug_signature(event: dict[str, Any]) -> str:
