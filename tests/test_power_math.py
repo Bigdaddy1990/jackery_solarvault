@@ -882,6 +882,110 @@ def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() ->
     assert warnings[0].reference_section == "device_pv_stat_year"
 
 
+def test_app_data_quality_warns_when_year_is_lower_than_month() -> None:
+    """Year totals lower than current-month totals are reported."""
+    payload = {
+        "device_home_stat_month": {"totalOutGridEnergy": "2.00", "y2": [2.0]},
+        "device_home_stat_year": {
+            "totalOutGridEnergy": "1.00",
+            "y2": [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 6))
+
+    assert [warning.reason for warning in warnings] == ["year_less_than_month"]
+    assert warnings[0].source_section == "device_home_stat_year"
+    assert warnings[0].source_value == pytest.approx(1.0)
+    assert warnings[0].reference_section == "device_home_stat_month"
+    assert warnings[0].reference_value == pytest.approx(2.0)
+
+
+def test_app_data_quality_warns_when_month_is_lower_than_week() -> None:
+    """Month totals lower than an in-month week total are reported."""
+    payload = {
+        "device_home_stat_week": {"totalOutGridEnergy": "2.00", "y2": [2.0]},
+        "device_home_stat_month": {"totalOutGridEnergy": "1.00", "y2": [1.0]},
+        "device_home_stat_year": {
+            "totalOutGridEnergy": "3.00",
+            "y2": [0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 6))
+
+    assert [warning.reason for warning in warnings] == ["month_less_than_week"]
+    assert warnings[0].source_section == "device_home_stat_month"
+    assert warnings[0].source_value == pytest.approx(1.0)
+    assert warnings[0].reference_section == "device_home_stat_week"
+    assert warnings[0].reference_value == pytest.approx(2.0)
+
+
+def test_app_data_quality_warns_when_week_is_lower_than_day() -> None:
+    """Day totals higher than the current-week total are reported."""
+    payload = {
+        "device_home_stat_day": {"totalOutGridEnergy": "3.00"},
+        "device_home_stat_week": {"totalOutGridEnergy": "1.00", "y2": [1.0]},
+        "device_home_stat_month": {"totalOutGridEnergy": "4.00", "y2": [4.0]},
+        "device_home_stat_year": {
+            "totalOutGridEnergy": "5.00",
+            "y2": [0.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 6))
+
+    assert [warning.reason for warning in warnings] == ["week_less_than_day"]
+    assert warnings[0].source_section == "device_home_stat_week"
+    assert warnings[0].source_value == pytest.approx(1.0)
+    assert warnings[0].reference_section == "device_home_stat_day"
+    assert warnings[0].reference_value == pytest.approx(3.0)
+
+
+def test_app_data_quality_warns_when_zero_day_is_unconfirmed() -> None:
+    """A zero day with non-zero adjacent period totals is reported."""
+    payload = {
+        "device_home_stat_day": {"totalOutGridEnergy": "0.00"},
+        "device_home_stat_week": {"totalOutGridEnergy": "2.00", "y2": [2.0]},
+        "device_home_stat_month": {"totalOutGridEnergy": "3.00", "y2": [3.0]},
+        "device_home_stat_year": {
+            "totalOutGridEnergy": "4.00",
+            "y2": [0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+    }
+
+    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 6))
+
+    assert [warning.reason for warning in warnings] == ["zero_unconfirmed"]
+    assert warnings[0].source_section == "device_home_stat_day"
+    assert warnings[0].source_value == pytest.approx(0.0)
+    assert warnings[0].reference_section == "device_home_stat_week"
+    assert warnings[0].reference_value == pytest.approx(2.0)
+
+
+def test_data_quality_warning_normalization_preserves_zero_values() -> None:
+    """Deduplication treats numeric zero as a real warning value."""
+    zero_warning = util.AppDataQualityWarning(
+        level="warning",
+        reason="zero_unconfirmed",
+        metric_key="device_ongrid_output_energy",
+        label="Device grid-side output energy",
+        source_section="device_home_stat_day",
+        source_value=0.0,
+        reference_section="device_home_stat_week",
+        reference_value=2.0,
+    ).as_dict()
+    missing_warning = dict(zero_warning)
+    missing_warning.pop("source_value")
+
+    normalized = util.normalized_data_quality_warnings([
+        missing_warning,
+        zero_warning,
+    ])
+
+    assert normalized == [missing_warning, zero_warning]
+
+
 def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
     """Implement test data quality warnings are normalized and formatted for repairs."""
     warning_a = util.AppDataQualityWarning(

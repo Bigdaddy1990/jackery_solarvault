@@ -28,11 +28,11 @@ from custom_components.jackery_solarvault.const import (
 
 def test_extract_code_uses_shared_integer_parser() -> None:
     """API code parsing rejects bool/non-finite malformed response values."""
-    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # noqa: PLR2004, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # noqa: PLR2004, SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # noqa: SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # noqa: SLF001
-    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # noqa: SLF001
+    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # noqa: PLR2004
+    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # noqa: PLR2004
+    assert JackeryApi._extract_code({FIELD_CODE: True}) is None
+    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None
+    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None
 
 
 async def test_set_system_name_accepts_only_boolean_true_response() -> None:
@@ -51,7 +51,7 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    api._put_json = _put_json  # noqa: SLF001
+    api._put_json = _put_json
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
@@ -81,7 +81,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    api._post_form = _post_form  # noqa: SLF001
+    api._post_form = _post_form
 
     assert (
         await api.async_set_single_mode(
@@ -172,7 +172,7 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
         msg = "invalid tariff input must stop before HTTP post"
         raise AssertionError(msg)
 
-    api._post_form = _post_form  # noqa: SLF001
+    api._post_form = _post_form
 
     with pytest.raises(JackeryApiError, match="single_price"):
         await api.async_set_single_mode(
@@ -188,8 +188,15 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
         )
 
 
-async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
-    """API writer should accept app-style integral text without truncation."""
+@pytest.mark.parametrize(
+    ["company_id", "expected_company_id"],
+    [["7.0", 7], [7.0, 7], [9007199254740993, 9007199254740993]],
+)
+async def test_dynamic_tariff_writer_accepts_integral_company_id_values(
+    company_id: str | float,
+    expected_company_id: int,
+) -> None:
+    """API writer should accept app-style integral values without truncation."""
     api = JackeryApi.__new__(JackeryApi)
     captured: list[tuple[str, dict[str, Any]]] = []
 
@@ -197,12 +204,12 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
         captured.append((path, payload))
         return {FIELD_DATA: True}
 
-    api._post_form = _post_form  # noqa: SLF001
+    api._post_form = _post_form
 
     assert (
         await api.async_set_dynamic_mode(
             system_id="sys1",
-            platform_company_id="7.0",
+            platform_company_id=company_id,
             system_region=" DE ",
         )
         is True
@@ -212,11 +219,28 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
             SAVE_DYNAMIC_MODE_PATH,
             {
                 FIELD_SYSTEM_ID: "sys1",
-                FIELD_PLATFORM_COMPANY_ID: 7,
+                FIELD_PLATFORM_COMPANY_ID: expected_company_id,
                 FIELD_SYSTEM_REGION: "DE",
             },
         ),
     ]
+
+
+async def test_dynamic_tariff_writer_rejects_bool_company_id() -> None:
+    """API writer should not treat bool as an integer company id."""
+    api = JackeryApi.__new__(JackeryApi)
+
+    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
+        raise AssertionError("invalid tariff input must stop before HTTP post")  # noqa: TRY003
+
+    api._post_form = _post_form
+
+    with pytest.raises(JackeryApiError, match="platform_company_id"):
+        await api.async_set_dynamic_mode(
+            system_id="sys1",
+            platform_company_id=True,
+            system_region="DE",
+        )
 
 
 async def test_device_period_diagnostics_keep_request_context_for_null_payload() -> (
@@ -230,7 +254,7 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
         assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     payload = await api.async_get_device_pv_stat(
         "dev1",
@@ -268,7 +292,7 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
         assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     assert await api.async_get_battery_pack_list("sn1") == []
 

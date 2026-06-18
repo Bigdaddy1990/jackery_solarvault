@@ -1,4 +1,11 @@
 -r requirements-test.txt
+defusedxml>=0.7.1
 homeassistant>=2026.6.3
 prek
 pytest-homeassistant
+mypy
+pytest-homeassistant-custom-component
+uv
+ruff
+pre-commit
+

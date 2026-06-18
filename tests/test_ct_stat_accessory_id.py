@@ -57,7 +57,7 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
     }
 
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)  # noqa: SLF001
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)
         == "2057219036232777730"
     )
 
@@ -65,14 +65,14 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
 def test_accessory_id_none_without_smart_meter() -> None:
     """No CT accessory present → None (caller then falls back to main id)."""
     idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
-    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # noqa: SLF001
+    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None
 
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
     source = {PAYLOAD_CT_METER: {"devType": 3, "deviceId": 2057219036232777730}}
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)  # noqa: SLF001
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)
         == "2057219036232777730"
     )
 

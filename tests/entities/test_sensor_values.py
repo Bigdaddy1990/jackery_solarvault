@@ -102,7 +102,7 @@ def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
         PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
     })
 
-    info = entity._build_smart_plug_device_info(  # noqa: SLF001
+    info = entity._build_smart_plug_device_info(
         2,
         {
             FIELD_DEVICE_NAME: " ",
@@ -142,7 +142,7 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._pack_index = 1  # noqa: SLF001
+    entity._pack_index = 1
 
     info = entity.device_info
 
@@ -173,7 +173,7 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._meter_head_index = 1  # noqa: SLF001
+    entity._meter_head_index = 1
 
     info = entity.device_info
 

@@ -42,6 +42,11 @@ from .const import (
     SERVICE_RENAME_SYSTEM,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .util import safe_bool
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant, ServiceCall
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -273,3 +278,127 @@ def async_setup_services(hass: HomeAssistant) -> None:
             _handle_delete_storm_alert,
             schema=DELETE_STORM_ALERT_SCHEMA,
         )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_THIRD_PARTY_MQTT_CONFIG):
+
+        async def _handle_set_third_party_mqtt(call: ServiceCall) -> None:
+            await _async_handle_set_third_party_mqtt_config(hass, call)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
+            _handle_set_third_party_mqtt,
+            schema=SET_THIRD_PARTY_MQTT_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG):
+
+        async def _handle_query_third_party_mqtt(call: ServiceCall) -> None:
+            await _async_handle_query_third_party_mqtt_config(hass, call)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+            _handle_query_third_party_mqtt,
+            schema=QUERY_THIRD_PARTY_MQTT_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_BLE_COMMAND):
+
+        async def _handle_send_ble_command(call: ServiceCall) -> None:
+            await _async_handle_send_ble_command(hass, call)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SEND_BLE_COMMAND,
+            _handle_send_ble_command,
+            schema=SEND_BLE_COMMAND_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SEND_DEVICE_SCHEDULE):
+
+        async def _handle_send_device_schedule(call: ServiceCall) -> None:
+            await _async_handle_send_device_schedule(hass, call)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SEND_DEVICE_SCHEDULE,
+            _handle_send_device_schedule,
+            schema=SEND_DEVICE_SCHEDULE_SCHEMA,
+        )
+
+
+def _strip_jackery_subdevice_suffix(device_id: str) -> str:
+    """Return the parent numeric Jackery device identifier by removing a recognized.
+
+    subdevice suffix.
+
+    Parameters:
+        device_id (str): Device identifier that may include a trailing `_suffix` (e.g.,
+        "12345_child").
+
+    Returns:
+        str: The leading numeric device identifier if a suffix is present (e.g.,
+        "12345"), otherwise the original input.
+    """
+    match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
+    return match.group(1) if match else device_id
+
+
+async def _async_handle_send_device_schedule(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Send a device schedule frame to a Jackery device.
+
+    Parameters:
+        call (ServiceCall): Service call whose `data` must include:
+            - `device_id` (str): device identifier or Home Assistant device
+              registry id to resolve
+            - `action_id` (int): schedule action identifier (one of 3015,
+              3016, 3017, 3018)
+            - `body` (dict | str): schedule payload as a mapping or a
+              JSON-encoded object string
+
+    Raises:
+        ServiceValidationError: if the device cannot be resolved, the body is
+        invalid, or sending fails
+    """
+    raw = call.data[SERVICE_FIELD_DEVICE_ID].strip()
+    device_id = _resolve_jackery_device_id(hass, raw)
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "send_device_schedule_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    body = _ble_body_from_service(call.data[SERVICE_FIELD_BODY], device_id)
+    try:
+        await coordinator.async_send_device_schedule(
+            device_id,
+            action_id=int(call.data[SERVICE_FIELD_ACTION_ID]),
+            body=body,
+        )
+    except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+        msg = "send_device_schedule_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+
+
+def _entry_for_coordinator(
+    hass: HomeAssistant, coordinator: JackerySolarVaultCoordinator
+) -> ConfigEntry | None:
+    """Locate the loaded config entry that owns a coordinator.
+
+    Returns:
+        The matching ConfigEntry, or None if not found.
+    """
+    for loaded_entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        if getattr(loaded_entry, "runtime_data", None) is coordinator:
+            return loaded_entry
+    return None

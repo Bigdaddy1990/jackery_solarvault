@@ -47,6 +47,14 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 async def async_load_mqtt_session(  # noqa: PLR0911
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, str] | None:
+    """
+    Load cached MQTT session credentials for the given config entry.
+
+    Returns:
+        A dictionary with keys MQTT_SESSION_USER_ID, MQTT_SESSION_SEED_B64,
+        and MQTT_SESSION_MAC_ID mapped to their string values. Includes
+        MQTT_SESSION_MAC_ID_SOURCE if present and non-empty. Returns None if
+        storage is missing, malformed, or any required field is missing or empty.
     """Load cached MQTT session credentials for the given config entry.
 
     Returns:
@@ -92,12 +100,14 @@ async def async_save_mqtt_session(  # noqa: PLR0913
     mac_id_source: str | None = None,
     cached_at: float | None = None,
 ) -> None:
-    """Persist MQTT session fields for a config entry, overwriting any existing cached row.
+    """
+    Persist MQTT session fields for a config entry, overwriting any existing cached row.
 
     Parameters:
         hass: Home Assistant instance (storage access).
         entry_id: Config entry identifier to associate with the cached session.
-        user_id: `userId` returned by the cloud used as the MQTT client identifier/username.
+        user_id: `userId` returned by the cloud used as the MQTT client
+        identifier/username.
         seed_b64: Base64-encoded `mqttPassWord` seed used to derive MQTT credentials.
         mac_id: `macId` broker session identifier.
         mac_id_source: Optional human-readable source or provenance of `mac_id`.

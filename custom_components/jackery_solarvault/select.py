@@ -582,7 +582,11 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create description-driven select entities."""
+    """Create select entities for devices in the config entry.
+
+    Registers entities for each device based on device capabilities. Entities are added
+    immediately and updated whenever the coordinator detects new or changed devices.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -637,8 +641,19 @@ async def async_setup_entry(
                     )
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     @callback
     def _add_new_entities() -> None:
+        """Detect changes in the coordinator's device payloads and register any newly discovered select entities.
+
+        When the computed signature of coordinator.data differs from the last-seen signature, collect eligible entities and pass them to the platform's async_add_entities callback, then update the cached signature. If the signature is unchanged, take no action.
+        """
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)

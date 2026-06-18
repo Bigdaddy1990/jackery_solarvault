@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 from typing import Any, NamedTuple
 
+from custom_components.jackery_solarvault.stats import data_quality as _data_quality
+
 from .const import (
     APP_CHART_LABELS,
     APP_CHART_SERIES_Y,
@@ -59,18 +61,15 @@ from .const import (
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATA_QUALITY_KEY_LABEL,
-    DATA_QUALITY_KEY_LEVEL,
     DATA_QUALITY_KEY_METRIC_KEY,
     DATA_QUALITY_KEY_REASON,
     DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_REFERENCE_REQUEST,
     DATA_QUALITY_KEY_REFERENCE_SECTION,
     DATA_QUALITY_KEY_REFERENCE_VALUE,
-    DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY,
     DATA_QUALITY_KEY_SOURCE_REQUEST,
     DATA_QUALITY_KEY_SOURCE_SECTION,
     DATA_QUALITY_KEY_SOURCE_VALUE,
-    DATA_QUALITY_KEY_TOTAL_METHOD,
     DATA_QUALITY_LEVEL_WARNING,
     DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR,
     DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK,
@@ -100,6 +99,12 @@ from .const import (
     TASK_PLAN_TASKS,
 )
 
+AppDataQualityWarning = _data_quality.AppDataQualityWarning
+normalized_data_quality_warnings = _data_quality.normalized_data_quality_warnings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    import logging
 
 def config_entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a bool option with legacy setup-data fallback.
@@ -481,6 +486,7 @@ class TrendStatisticPoint(NamedTuple):
     value: float
 
 
+def _format_request_range(request: object) -> str | None:
 class AppDataQualityWarning(NamedTuple):
     """One non-mutating warning about contradictory app statistics."""
 

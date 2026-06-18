@@ -171,7 +171,7 @@ async def test_async_get_device_eps_stat_calls_correct_path() -> None:
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: {"totalInEpsEnergy": "1.5"}}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     payload = await api.async_get_device_eps_stat(
         "dev1",
@@ -193,7 +193,7 @@ async def test_async_get_device_eps_stat_stores_raw_response() -> None:
     async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {FIELD_CODE: 0, FIELD_DATA: {"totalOutEpsEnergy": "0.5"}}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     await api.async_get_device_eps_stat(
         "dev1",
@@ -214,7 +214,7 @@ async def test_async_get_device_eps_stat_returns_empty_dict_for_null_payload() -
     async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     payload = await api.async_get_device_eps_stat(
         "dev1",
@@ -241,7 +241,7 @@ async def test_async_get_device_eps_stat_integer_device_id_is_stringified() -> N
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     await api.async_get_device_eps_stat(
         12345,
@@ -269,7 +269,7 @@ async def test_async_get_today_energy_calls_correct_path_with_device_sn() -> Non
         captured["params"] = dict(params)
         return expected_response
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     result = await api.async_get_today_energy("SN123456")
 
@@ -287,7 +287,7 @@ async def test_async_get_today_energy_device_sn_is_stringified() -> None:
         captured["params"] = dict(params)
         return {}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     await api.async_get_today_energy("98765")  # type: ignore[arg-type]
 
@@ -305,7 +305,7 @@ async def test_async_get_today_energy_returns_payload_dict() -> None:
     async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return full_response
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     result = await api.async_get_today_energy("HR2C12345")
     assert result == full_response[FIELD_DATA]
@@ -318,7 +318,7 @@ async def test_async_get_today_energy_forwards_empty_payload() -> None:
     async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # noqa: RUF029
         return {}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     result = await api.async_get_today_energy("SN000")
     assert result == {}
@@ -339,7 +339,7 @@ async def test_async_get_device_eps_stat_does_not_include_system_id() -> None:
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # noqa: SLF001
+    api._get_json = _get_json
 
     await api.async_get_device_eps_stat(
         "dev1",

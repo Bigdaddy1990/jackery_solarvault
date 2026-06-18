@@ -36,7 +36,16 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the platform from a config entry."""
+    """Register and keep updated text configuration entities for Jackery SolarVault devices.
+
+    Retrieves the coordinator from the entry and creates text entities for each device
+    based on supported configuration fields: system name (if device has a system identifier),
+    grid standard (if present), and third-party MQTT fields (if device supports advanced
+    features or Bluetooth). Prevents duplicate entity registrations by tracking unique IDs,
+    and uses a signature of coordinator data to detect when the set of devices or
+    configuration changes. Registers a coordinator listener that automatically adds new
+    entities on subsequent data changes, with cleanup handled on entry unload.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -54,8 +63,16 @@ async def async_setup_entry(
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     @callback
     def _add_new_entities() -> None:
+        """Register text entities when the coordinator's device data changes."""
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)

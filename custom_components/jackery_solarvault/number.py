@@ -435,20 +435,28 @@ async def async_setup_entry(
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create description-driven number entities."""
+    """Collect and add new number entities when coordinator data changes.
+
+    Compares the current coordinator signature to detect changes in coordinator data; if
+    changed, collects entities and registers them. This callback is invoked immediately
+    during setup and whenever the coordinator updates.
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append(entities: list[NumberEntity], entity: NumberEntity) -> None:
+        """Add a number entity when its unique ID has not already been seen."""
         append_unique_entity(
             entities, seen_unique_ids, entity, platform="number", logger=_LOGGER
         )
 
     def _has_props(payload: dict[str, Any], *keys: str) -> bool:
+        """Return whether any key exists in the payload properties section."""
         props = payload.get(PAYLOAD_PROPERTIES) or {}
         return any(k in props for k in keys)
 
     def _has_price_or_system(payload: dict[str, Any]) -> bool:
+        """Return whether the payload has price controls or system identifiers."""
         price = payload.get(PAYLOAD_PRICE) or {}
         system = payload.get(PAYLOAD_SYSTEM) or {}
         return (
@@ -478,8 +486,16 @@ async def async_setup_entry(
                     _append(entities, JackeryNumber(coordinator, dev_id, description))
         return entities
 
+    last_signature: tuple[Any, ...] = ()
+
     @callback
     def _add_new_entities() -> None:
+        """Collect and register new number entities when coordinator data changes."""
+        nonlocal last_signature
+        sig = coordinator_entity_signature(coordinator.data)
+        if sig == last_signature:
+            return
+        last_signature = sig
         entities = _collect_entities()
         if entities:
             async_add_entities(entities)
