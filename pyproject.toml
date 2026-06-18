@@ -398,13 +398,6 @@ max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
-"**/client/api.py" = ["F821", "E402"]  # debug pkcs7 pad test + mid-file imports
-"**/client/_endpoints/*.py" = ["PLR0904", "PLC2701"]  # domain mixins; import private sibling modules _http/_crypto
-"**/_coordinator_legacy.py" = ["PLC0415"]  # intentional lazy imports (optional HA recorder, circular-import guards)
-"**/client/ble_transport.py" = ["PLC0415", "PLC2701"]  # deferred imports; imports private constants from const.py
-"**/client/_http.py" = ["PLC2701"]  # imports private retry constants from const.py
-"**/client/ble.py" = ["PLC2701"]  # imports private BLE frame constants from const.py
-"**/protocol_map.py" = ["E501"]  # API-path → file:method registry; single-token values cannot be line-wrapped
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
