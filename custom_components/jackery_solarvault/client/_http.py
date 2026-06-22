@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from ..const import (
+from jackery_solarvault.const import (
     APP_REQUEST_META,
     APP_VERSION,
     APP_VERSION_CODE,
@@ -44,7 +44,8 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import chart_series_debug
+from jackery_solarvault.util import chart_series_debug
+
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
@@ -85,7 +86,7 @@ def _write_accepted(data: dict[str, Any]) -> bool:
     Returns:
         `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
     """
-    from ..util import safe_bool
+    from jackery_solarvault.util import safe_bool
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 

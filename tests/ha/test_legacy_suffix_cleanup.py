@@ -18,9 +18,6 @@ import tempfile
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.update_coordinator import UpdateFailed
-
 from custom_components.jackery_solarvault import (
     _async_call_if_present,  # noqa: PLC2701
     _async_discover_with_cache_fallback,  # noqa: PLC2701
@@ -30,6 +27,8 @@ from custom_components.jackery_solarvault import (
     _legacy_suffix_matches,  # noqa: PLC2701
     _load_dotenv_if_present,  # noqa: PLC2701
 )
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 # ---------------------------------------------------------------------------
 # _legacy_suffix_matches

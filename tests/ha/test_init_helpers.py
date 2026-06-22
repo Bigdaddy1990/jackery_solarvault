@@ -16,7 +16,6 @@ import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.exceptions import ConfigEntryAuthFailed
 import pytest
 
 from custom_components.jackery_solarvault import (
@@ -50,6 +49,7 @@ from custom_components.jackery_solarvault.const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 # ---------------------------------------------------------------------------
 # Stubs
