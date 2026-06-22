@@ -1,21 +1,18 @@
 """DataUpdateCoordinator for Jackery SolarVault."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import json
 import logging
 import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryApi, JackeryAuthError, JackeryError
+from .api import JackeryAuthError, JackeryError
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_DEFAULT_PW,
@@ -73,12 +70,12 @@ from .const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_AUTO_STANDBY,
-    FIELD_BAT_NUM,
-    FIELD_BAT_SOC,
     FIELD_BATTERIES,
     FIELD_BATTERY_PACK,
-    FIELD_BATTERY_PACK_LIST,
     FIELD_BATTERY_PACKS,
+    FIELD_BATTERY_PACK_LIST,
+    FIELD_BAT_NUM,
+    FIELD_BAT_SOC,
     FIELD_BIND_KEY,
     FIELD_BODY,
     FIELD_CELL_TEMP,
@@ -93,15 +90,15 @@ from .const import (
     FIELD_CURRENT_VERSION,
     FIELD_DATA,
     FIELD_DEFAULT_PW,
-    FIELD_DEV_ID,
-    FIELD_DEV_MODEL,
-    FIELD_DEV_SN,
-    FIELD_DEV_TYPE,
+    FIELD_DEVICES,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_TYPE,
-    FIELD_DEVICES,
+    FIELD_DEV_ID,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
+    FIELD_DEV_TYPE,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_ID,
     FIELD_IN_PW,
@@ -144,9 +141,9 @@ from .const import (
     FIELD_TEMP_UNIT,
     FIELD_TIMESTAMP,
     FIELD_TYPE_NAME,
+    FIELD_UPDATES,
     FIELD_UPDATE_CONTENT,
     FIELD_UPDATE_STATUS,
-    FIELD_UPDATES,
     FIELD_VERSION,
     FIELD_WNAME,
     FIELD_WORK_MODEL,
@@ -164,8 +161,8 @@ from .const import (
     MQTT_CMD_QUERY_WEATHER_PLAN,
     MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
     MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
     MQTT_LIVE_THRESHOLD_SEC,
     MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
     MQTT_MESSAGE_CONTROL_COMBINE,
@@ -188,8 +185,8 @@ from .const import (
     PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_CT_METER,
     PAYLOAD_DATA_QUALITY,
-    PAYLOAD_DEBUG_LOG_FILENAME,
     PAYLOAD_DEBUG_LOGGER_NAME,
+    PAYLOAD_DEBUG_LOG_FILENAME,
     PAYLOAD_DEBUG_THROTTLE_SEC,
     PAYLOAD_DEVICE,
     PAYLOAD_DEVICE_META,
@@ -225,6 +222,13 @@ from .const import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+    from datetime import date
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .api import JackeryApi
     from .mqtt_push import JackeryMqttPushClient
 
 from .util import (
@@ -656,7 +660,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Observed for third-party accessories (e.g., Shelly): bindKey=0 and
         # no Jackery model metadata. Those IDs return API code=20000.
         bind_key = dev.get(FIELD_BIND_KEY)
-        if bind_key in (0, "0", False):
+        if bind_key in {0, "0"}:
             return False
         if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):
             return False
@@ -898,7 +902,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         action_id = payload.get(FIELD_ACTION_ID)
         is_subdevice = self._is_subdevice_payload(payload, body)
 
-        if topic.endswith("/device") or topic.endswith("/config"):
+        if topic.endswith(("/device", "/config")):
             if body:
                 if is_subdevice:
                     touched = (
@@ -923,7 +927,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     touched = True
 
         elif topic.endswith("/alert"):
-            updated[PAYLOAD_ALARM] = body if body else payload
+            updated[PAYLOAD_ALARM] = body or payload
             touched = True
 
         elif topic.endswith("/notice"):
@@ -944,16 +948,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         if (
             msg_type
-            in (
+            in {
                 MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
                 MQTT_MESSAGE_QUERY_WEATHER_PLAN,
                 MQTT_MESSAGE_SEND_WEATHER_ALERT,
                 MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
-            )
+            }
             or body.get(FIELD_CMD) == MQTT_CMD_QUERY_WEATHER_PLAN
             or action_id in weather_action_ids
         ):
-            updated[PAYLOAD_WEATHER_PLAN] = body if body else payload
+            updated[PAYLOAD_WEATHER_PLAN] = body or payload
             touched = True
 
         # User-configurable schedule payloads (custom mode / tariff mode /
@@ -962,7 +966,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             msg_type == MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE
             or action_id in MQTT_ACTION_IDS_SCHEDULE
         ):
-            updated[PAYLOAD_TASK_PLAN] = body if body else payload
+            updated[PAYLOAD_TASK_PLAN] = body or payload
             touched = True
 
         # System/config snapshots (work mode, temp unit, standby/off-grid,
@@ -972,15 +976,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             not is_subdevice
             and (
                 msg_type
-                in (
+                in {
                     MQTT_MESSAGE_QUERY_COMBINE_DATA,
                     MQTT_MESSAGE_UPLOAD_COMBINE_DATA,
                     MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA,
                     MQTT_MESSAGE_CONTROL_COMBINE,
-                )
+                }
                 or action_id in MQTT_ACTION_IDS_COMBINE
                 or body.get(FIELD_CMD)
-                in (MQTT_CMD_QUERY_COMBINE_DATA, MQTT_CMD_CONTROL_COMBINE)
+                in {MQTT_CMD_QUERY_COMBINE_DATA, MQTT_CMD_CONTROL_COMBINE}
             )
             and body
         ):
@@ -999,7 +1003,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             or msg_type == MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY
             or action_id in MQTT_ACTION_IDS_SUBDEVICE
         ):
-            source = body if body else payload
+            source = body or payload
             if isinstance(source, dict):
                 touched = (
                     self._merge_subdevice_data(updated, source, device_id=device_id)
@@ -2298,7 +2302,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             company_id = item.get(FIELD_PLATFORM_COMPANY_ID)
             region = item.get(FIELD_COUNTRY) or item.get(FIELD_SYSTEM_REGION)
-            if company_id in (None, "") or not region:
+            if company_id in {None, ""} or not region:
                 continue
             valid.append(item)
         return valid
@@ -2337,7 +2341,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @staticmethod
     def _source_regions(source: dict[str, Any]) -> list[str]:
         raw = source.get(FIELD_SYSTEM_REGION) or source.get(FIELD_COUNTRY)
-        if raw in (None, ""):
+        if raw in {None, ""}:
             return []
         return [part.strip() for part in str(raw).split(",") if part.strip()]
 
@@ -2352,7 +2356,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 or section.get(FIELD_COUNTRY)
                 or section.get(FIELD_SYSTEM_REGION)
             )
-            if raw not in (None, ""):
+            if raw not in {None, ""}:
                 return str(raw).strip().upper()
         return None
 
@@ -2376,7 +2380,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         current: dict[str, Any],
     ) -> dict[str, Any] | None:
         company_id = current.get(FIELD_PLATFORM_COMPANY_ID)
-        if company_id in (None, ""):
+        if company_id in {None, ""}:
             return None
         region = current.get(FIELD_SYSTEM_REGION)
         country = self._device_country_code(device_id)
@@ -2387,7 +2391,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ]
         if not matches:
             return None
-        if region not in (None, ""):
+        if region not in {None, ""}:
             for source in matches:
                 if str(region) in self._source_regions(source):
                     return source
@@ -2411,7 +2415,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         company_id = source.get(FIELD_PLATFORM_COMPANY_ID)
         region = self._source_region_for_device(device_id, source)
-        if company_id in (None, "") or not region:
+        if company_id in {None, ""} or not region:
             raise HomeAssistantError(
                 "Cannot set dynamic tariff: selected provider is missing "
                 "platformCompanyId/country."
@@ -2451,7 +2455,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         current = ((self.data or {}).get(device_id, {}) or {}).get(PAYLOAD_PRICE) or {}
         company_id = current.get(FIELD_PLATFORM_COMPANY_ID)
         region = current.get(FIELD_SYSTEM_REGION)
-        if company_id in (None, "") or not region:
+        if company_id in {None, ""} or not region:
             sources = await self._async_price_sources_for_device(device_id)
             source = self._find_matching_price_source(device_id, sources, current)
             if source is not None:
@@ -3307,9 +3311,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             for month in previous_months
                         )
                     )
-                    for month, source in zip(previous_months, sources, strict=False):
-                        if isinstance(source, dict):
-                            months[month] = source
+                    months.update({
+                        month: source
+                        for month, source in zip(previous_months, sources, strict=False)
+                        if isinstance(source, dict)
+                    })
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(bundle, month_history)
@@ -3495,9 +3501,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 sources = await asyncio.gather(
                     *(_fetch_device_month(prefix, month) for month in previous_months)
                 )
-                for month, source in zip(previous_months, sources, strict=False):
-                    if isinstance(source, dict):
-                        months[month] = source
+                months.update({
+                    month: source
+                    for month, source in zip(previous_months, sources, strict=False)
+                    if isinstance(source, dict)
+                })
                 if months:
                     month_history[prefix] = months
             apply_year_month_backfill(out, month_history)
