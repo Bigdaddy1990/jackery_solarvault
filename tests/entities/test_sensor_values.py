@@ -5,10 +5,10 @@ from typing import Any
 
 from custom_components.jackery_solarvault.const import (
     FIELD_CURRENT_VERSION,
-    FIELD_DEV_MODEL,
-    FIELD_DEV_SN,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
+    FIELD_DEV_MODEL,
+    FIELD_DEV_SN,
     FIELD_MAC,
     FIELD_MODEL,
     FIELD_MODEL_NAME,

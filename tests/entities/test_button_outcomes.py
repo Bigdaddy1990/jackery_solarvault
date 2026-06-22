@@ -20,8 +20,6 @@ regression pin).
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.const import EntityCategory
-from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.jackery_solarvault import (
@@ -40,6 +38,8 @@ from custom_components.jackery_solarvault.button import (
     JackeryRefreshWeatherPlanButton,
     _storm_alert_id,  # noqa: PLC2701
 )
+from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 # ---------------------------------------------------------------------------
 # Helpers shared across tests
