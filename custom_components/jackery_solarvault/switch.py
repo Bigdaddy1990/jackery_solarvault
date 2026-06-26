@@ -617,7 +617,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return None
         return description.is_on_transform(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn this switch on.
 
         If the entity is writable, requests the configured setter to apply the on state
@@ -647,7 +647,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the described switch off for the device.
 
         If the description has no setter this is a no-op.
@@ -727,7 +727,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Returns:
             dict[str, Any]: The payload dictionary for the matching smart plug, or an
             empty dict if no matching plug is found.
-        """  # noqa: D421
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -840,14 +840,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the bound smart plug on.
 
         Set the smart plug's switch to the on state and request a coordinator refresh.
         """
         await self._async_set_state(True)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the smart plug off."""
         await self._async_set_state(False)
 
@@ -861,7 +861,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of extra state attributes for the entity.
-        """  # noqa: D421
+        """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -924,17 +924,17 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the breaker relay is closed."""  # noqa: D421
+        """Return true if the breaker relay is closed."""
         return safe_bool(self._breaker.get(FIELD_SW))
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, True
         )
         await self.coordinator.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, False
@@ -969,7 +969,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
-        """  # noqa: D421
+        """
         attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
         for key in (
             FIELD_NM,
