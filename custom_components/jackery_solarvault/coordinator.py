@@ -663,7 +663,7 @@ def stable_payload_debug_signature(event: dict[str, Any]) -> str:
 
 def exception_debug_message(err: BaseException) -> str:
     """Return a useful debug message for exceptions with empty ``str(err)``."""
-    return f"{type(err).__name__}: {err or "(no message)"}"
+    return f"{type(err).__name__}: {err or '(no message)'}"
 
 
 def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
@@ -1451,7 +1451,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's coordinator polling interval."""  # noqa: D421
+        """Return the integration's coordinator polling interval."""
         return self._configured_update_interval
 
     def _note_property_equivalent_push(self, body: dict[str, Any]) -> None:
@@ -6342,7 +6342,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def statistics_backfill_diagnostics(self) -> dict[str, Any]:
-        """Return redaction-safe statistics repair diagnostics."""  # noqa: D421
+        """Return redaction-safe statistics repair diagnostics."""
         devices = self._statistics_backfill_state.get(
             _STATISTICS_BACKFILL_STORE_DEVICES,
         )
@@ -9117,7 +9117,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:
-        """Return the MQTT client diagnostics block for the diagnostics export."""  # noqa: D421
+        """Return the MQTT client diagnostics block for the diagnostics export."""
         return self.mqtt_diagnostics_snapshot()
 
     def mqtt_diagnostics_snapshot(
@@ -10022,12 +10022,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def polling_diagnostics(self) -> dict[str, Any]:
-        """Return the latest HTTP polling/cache diagnostics."""  # noqa: D421
+        """Return the latest HTTP polling/cache diagnostics."""
         return dict(self._polling_diagnostics)
 
     @property
     def statistics_import_diagnostics(self) -> dict[str, Any]:
-        """Return the latest Recorder import diagnostics."""  # noqa: D421
+        """Return the latest Recorder import diagnostics."""
         return dict(self._statistics_import_diagnostics)
 
     def _metric_source_candidates(
