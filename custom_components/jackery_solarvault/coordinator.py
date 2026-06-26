@@ -663,7 +663,7 @@ def stable_payload_debug_signature(event: dict[str, Any]) -> str:
 
 def exception_debug_message(err: BaseException) -> str:
     """Return a useful debug message for exceptions with empty ``str(err)``."""
-    return f"{type(err).__name__}: {err or "(no message)"}"
+    return f"{type(err).__name__}: {err or '(no message)'}"
 
 
 def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401

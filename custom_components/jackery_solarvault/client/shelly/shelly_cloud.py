@@ -11,7 +11,12 @@ Source: coordinator.py lines 3131-3296 (Phase 6 extraction).
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ...const import (
+from jackery_solarvault.client.mqtt.mqtt_handlers import (
+    merge_smart_plug_lists,
+    merge_subdevice_list_by_identity,
+    merge_subdevice_lists_by_sn,
+)
+from jackery_solarvault.const import (
     FIELD_CONTROL_ALLOWED,
     FIELD_DEVICE_CODE,
     FIELD_DEV_TYPE,
@@ -39,19 +44,14 @@ from ...const import (
     SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_SCAN_NAME_DEV_TYPES,
 )
-from ...handlers.detector import (
+from jackery_solarvault.handlers.detector import (
     entry_subdevice_candidates,
     subdevice_dev_type,
     subdevice_id,
     subdevice_identity_values,
     subdevice_serial,
 )
-from ...handlers.property_merge import merge_dict_values
-from ..mqtt.mqtt_handlers import (
-    merge_smart_plug_lists,
-    merge_subdevice_list_by_identity,
-    merge_subdevice_lists_by_sn,
-)
+from jackery_solarvault.handlers.property_merge import merge_dict_values
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
