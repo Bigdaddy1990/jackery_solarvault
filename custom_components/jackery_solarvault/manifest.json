@@ -1,0 +1,131 @@
+{
+  "domain": "jackery_solarvault",
+  "name": "Jackery SolarVault",
+  "after_dependencies": [
+    "bluetooth",
+    "dhcp",
+    "http"
+    "mdns",
+    "mqtt",
+    "recorder",
+    "zeroconf"
+  ],
+  "bluetooth": [
+    { 
+      "connectable": true,
+      "manufacturer_id": 18434,
+      "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb"
+    }
+  ],
+  "codeowners": [
+    "@Bigdaddy1990"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "dhcp": [
+        {
+        "domain": "jackery",
+        "hostname": "lwip-*",
+        "macaddress": "80F1B2F9E348"
+        },
+      "macaddress": "80F1B2*"
+    }
+  ],
+  "documentation": "https://github.com/Bigdaddy1990/jackery_solarvault",
+  "mqtt": [
+      {
+      "dsmr_reader": [
+        "dsmr/#",
+        ],
+      "esphome": [
+        "esphome/discover/#",
+        ],
+      "lwip": [
+        "hb/",
+        "#",
+        "homeassistant"
+        ],
+      "jackery": [
+        "hb/",
+        "homeassistant/",
+        "jackery/",
+        "#"
+        ],
+      "qbus": [
+        "cloudapp/QBUSMQTTGW/state",
+        "cloudapp/QBUSMQTTGW/config",
+        "cloudapp/QBUSMQTTGW/+/state",
+        ],
+      "tasmota": [
+        "tasmota/discovery/#",
+        ],
+      "tuya": [
+        "tuya/#"
+        ]
+      },
+  ],
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Bigdaddy1990/jackery_solarvault/issues",
+  "loggers": [
+    "custom_components.jackery_solarvault",
+    "custom_components.jackery_solarvault.client",
+    "custom_components.jackery_solarvault.client.api",
+    "custom_components.jackery_solarvault.client.ble",
+    "custom_components.jackery_solarvault.client.ble_transport",
+    "custom_components.jackery_solarvault.client.mqtt_push",
+    "custom_components.jackery_solarvault.client.local_mqtt",
+    "custom_components.jackery_solarvault.client.third_party_mqtt_codec",
+    "aiomqtt",
+    "aiodns",
+    "aiohttp",
+    "ble",
+    "zeroconf",
+    "dhcp",
+    "mdns",
+    "lwip"
+  ],
+  "quality_scale": "custom",
+  "requirements": [
+    "aiomqtt>=2.5.0"
+  ],
+  "version": "0.1.1",
+  "zeroconf": [
+    {
+    "_api._tcp.local.": [
+        {
+            "domain": "jackery",
+            "properties": {
+                "device": "SolarVault",
+                 },
+        },
+    ],
+    "_api._udp.local.": [
+        {
+          "domain": "jackery",
+            "properties": {
+                "device": "SolarVault",
+                },
+        },
+    ],
+    "_http._tcp.local.": [
+        {
+            "domain": "jackery",
+            "properties": {
+                "device": "SolarVault",
+                },
+        },
+    ],
+    "_ipp._tcp.local.": [
+        {
+            "domain": "ipp",
+        },
+    ],
+    "_ipps._tcp.local.": [
+        {
+            "domain": "ipp",
+        },
+        ],
+    },
+  ]
+}
