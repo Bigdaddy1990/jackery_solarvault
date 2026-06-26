@@ -3,8 +3,7 @@
 from json import JSONDecodeError
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-
-from ..client import JackeryAuthError, JackeryError
+from jackery_solarvault.client import JackeryAuthError, JackeryError
 
 try:  # pragma: no cover - SQLAlchemy ships with the recorder; guard for minimal envs
     from sqlalchemy.exc import SQLAlchemyError

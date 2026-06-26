@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
-from ..const import (
+from jackery_solarvault.client.const import (
     APP_REQUEST_META,
     APP_VERSION,
     APP_VERSION_CODE,
@@ -44,7 +44,8 @@ from ..const import (
     SYS_VERSION,
     USER_AGENT,
 )
-from ..util import chart_series_debug
+from jackery_solarvault.client.util import chart_series_debug
+
 from ._crypto import _generate_udid
 
 if TYPE_CHECKING:
@@ -85,7 +86,7 @@ def _write_accepted(data: dict[str, Any]) -> bool:
     Returns:
         `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
     """  # noqa: E501
-    from ..util import safe_bool  # noqa: PLC0415
+    from jackery_solarvault.client.util import safe_bool  # noqa: PLC0415
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -608,7 +609,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_GET} {path} request failed: "
-                f"{type(err).__name__}: {err or "(no message)"}"
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
 
         if self._is_token_expired_response(status, data):
@@ -625,7 +626,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if FIELD_RAW_TEXT in data:
@@ -712,7 +713,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_PUT} {path} request failed: "
-                f"{type(err).__name__}: {err or "(no message)"}"
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -730,7 +731,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -820,7 +821,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_POST} {path} request failed: "
-                f"{type(err).__name__}: {err or "(no message)"}"
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -838,7 +839,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -922,7 +923,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"POST {path} request failed: "
-                f"{type(err).__name__}: {err or "(no message)"}"
+                f"{type(err).__name__}: {err or '(no message)'}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
@@ -938,7 +939,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"POST {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                    f"{type(err).__name__}: {err or '(no message)'}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
