@@ -890,7 +890,7 @@ def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
     """Return meter-head entries sorted by stable serial/id values."""
     if not isinstance(meter_heads, list):
         return []
-    entries: list[tuple[str, dict[str, Any]]] = []
+    return None
 
 
 def sorted_circuits(circuits: object) -> list[dict[str, Any]]:
@@ -2407,7 +2407,7 @@ def trend_series_points(
     series = effective_trend_series_values(source, section, stat_key)
     if not isinstance(series, list) or not series:
         return []
-    series_values = cast(list[Any], series)
+    series_values = cast("list[Any]", series)
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -3260,7 +3260,7 @@ def trend_payload_has_value(
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401
+def first_nonblank(*values: Any) -> str | None:
     """Return the first value that still has content after stripping."""
     for value in values:
         if value is None:
@@ -3271,7 +3271,7 @@ def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401
     return None
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401, PLR0911
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: PLR0911
     """Return the first nonblank value parsed as an integer."""
     for value in values:
         if value is None:

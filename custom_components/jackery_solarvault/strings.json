@@ -94,9 +94,6 @@
       "eps_enabled": {
         "name": "EPS enabled"
       },
-      "subdevice_alarm": {
-        "name": "Safety alarm"
-      },
       "eth_connected": {
         "name": "Ethernet connected"
       },
@@ -105,6 +102,9 @@
       },
       "smart_plug_switch_state": {
         "name": "Smart plug state"
+      },
+      "subdevice_alarm": {
+        "name": "Safety alarm"
       }
     },
     "button": {
@@ -431,11 +431,20 @@
       "ac2_name": {
         "name": "AC2 output name"
       },
+      "ac_discharge_current": {
+        "name": "AC discharge current"
+      },
+      "ac_discharge_time": {
+        "name": "AC discharge time"
+      },
       "ac_input_current": {
         "name": "AC input current"
       },
       "ac_input_power": {
         "name": "AC input power"
+      },
+      "ac_input_power_alt": {
+        "name": "AC input power (alt)"
       },
       "ac_line1_current": {
         "name": "AC line 1 current"
@@ -451,6 +460,12 @@
       },
       "ac_output_apparent_power": {
         "name": "AC output apparent power"
+      },
+      "ac_output_apparent_power_parallel": {
+        "name": "AC apparent power (parallel)"
+      },
+      "ac_output_apparent_power_sum": {
+        "name": "AC apparent power (sum)"
       },
       "ac_output_current": {
         "name": "AC output current"
@@ -475,6 +490,9 @@
       },
       "ac_output_voltage": {
         "name": "AC output voltage"
+      },
+      "ac_output_voltage_2": {
+        "name": "AC output voltage 2"
       },
       "activation_date": {
         "name": "Activation date"
@@ -578,6 +596,18 @@
       "box_mode": {
         "name": "Box mode"
       },
+      "breaker_pc": {
+        "name": "Breaker power config"
+      },
+      "breaker_pr": {
+        "name": "Breaker power rating"
+      },
+      "breaker_sph": {
+        "name": "Breaker phase"
+      },
+      "breaker_sph_pc": {
+        "name": "Breaker phase power"
+      },
       "cell_temperature": {
         "name": "Main battery cell temperature"
       },
@@ -586,6 +616,9 @@
       },
       "charge_limit": {
         "name": "Charge limit"
+      },
+      "charge_output_power": {
+        "name": "Charge output power"
       },
       "charge_plan_power": {
         "name": "Charge plan power"
@@ -767,6 +800,9 @@
       "discharge_limit": {
         "name": "Discharge limit"
       },
+      "discharge_time": {
+        "name": "Discharge time"
+      },
       "energy_plan_power": {
         "name": "Energy plan power"
       },
@@ -860,6 +896,9 @@
       "http_api": {
         "name": "HTTP API cloud"
       },
+      "input_power_allocation": {
+        "name": "Input power allocation"
+      },
       "input_power_portable": {
         "name": "Total input power"
       },
@@ -880,6 +919,9 @@
       },
       "light_sensor": {
         "name": "Light sensor"
+      },
+      "load_mode": {
+        "name": "Load mode"
       },
       "local_mqtt": {
         "name": "Local MQTT"
@@ -943,6 +985,9 @@
       },
       "other_load_power": {
         "name": "Other load power"
+      },
+      "output_power_allocation": {
+        "name": "Output power allocation"
       },
       "output_power_portable": {
         "name": "Total output power"
@@ -1250,8 +1295,20 @@
       "storm_warning_minutes": {
         "name": "Storm warning lead time"
       },
+      "subdevice_alert_count": {
+        "name": "Subdevice alert count"
+      },
+      "symmetry_total_negative": {
+        "name": "Total negative energy (symmetry)"
+      },
+      "symmetry_total_positive": {
+        "name": "Total positive energy (symmetry)"
+      },
       "system_state": {
         "name": "System state"
+      },
+      "system_status_switch": {
+        "name": "System status"
       },
       "task_plan": {
         "name": "Task plan"
@@ -1285,63 +1342,6 @@
       },
       "total_revenue": {
         "name": "App total savings"
-      },
-      "ac_output_voltage_2": {
-        "name": "AC output voltage 2"
-      },
-      "ac_discharge_current": {
-        "name": "AC discharge current"
-      },
-      "ac_discharge_time": {
-        "name": "AC discharge time"
-      },
-      "ac_input_power_alt": {
-        "name": "AC input power (alt)"
-      },
-      "ac_output_apparent_power_parallel": {
-        "name": "AC apparent power (parallel)"
-      },
-      "ac_output_apparent_power_sum": {
-        "name": "AC apparent power (sum)"
-      },
-      "charge_output_power": {
-        "name": "Charge output power"
-      },
-      "discharge_time": {
-        "name": "Discharge time"
-      },
-      "load_mode": {
-        "name": "Load mode"
-      },
-      "input_power_allocation": {
-        "name": "Input power allocation"
-      },
-      "output_power_allocation": {
-        "name": "Output power allocation"
-      },
-      "system_status_switch": {
-        "name": "System status"
-      },
-      "breaker_pc": {
-        "name": "Breaker power config"
-      },
-      "breaker_pr": {
-        "name": "Breaker power rating"
-      },
-      "breaker_sph": {
-        "name": "Breaker phase"
-      },
-      "breaker_sph_pc": {
-        "name": "Breaker phase power"
-      },
-      "subdevice_alert_count": {
-        "name": "Subdevice alert count"
-      },
-      "symmetry_total_positive": {
-        "name": "Total positive energy (symmetry)"
-      },
-      "symmetry_total_negative": {
-        "name": "Total negative energy (symmetry)"
       },
       "total_time": {
         "name": "Total time"
@@ -1608,6 +1608,20 @@
     }
   },
   "services": {
+    "delete_electricity_strategy": {
+      "description": "Delete an electricity strategy plan from the device.",
+      "fields": {
+        "body": {
+          "description": "Strategy body as JSON, usually just needs the tid (task ID).",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Delete electricity strategy"
+    },
     "delete_storm_alert": {
       "description": "Delete a specific weather or storm alert by alert ID over MQTT.",
       "fields": {
@@ -1621,6 +1635,30 @@
         }
       },
       "name": "Delete storm alert"
+    },
+    "insert_electricity_strategy": {
+      "description": "Add a new electricity strategy plan (charge/discharge) to the device.",
+      "fields": {
+        "body": {
+          "description": "Strategy body as JSON. Fields documented in source-of-truth.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Add electricity strategy"
+    },
+    "query_electricity_strategy": {
+      "description": "Query all electricity strategy plans from the device.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Query electricity strategy"
     },
     "query_third_party_mqtt_config": {
       "description": "Query the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
@@ -1704,58 +1742,6 @@
       },
       "name": "Send device schedule"
     },
-    "insert_electricity_strategy": {
-      "description": "Add a new electricity strategy plan (charge/discharge) to the device.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        },
-        "body": {
-          "description": "Strategy body as JSON. Fields documented in source-of-truth.",
-          "name": "Body"
-        }
-      },
-      "name": "Add electricity strategy"
-    },
-    "update_electricity_strategy": {
-      "description": "Update an existing electricity strategy plan on the device.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        },
-        "body": {
-          "description": "Strategy body as JSON.",
-          "name": "Body"
-        }
-      },
-      "name": "Update electricity strategy"
-    },
-    "delete_electricity_strategy": {
-      "description": "Delete an electricity strategy plan from the device.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        },
-        "body": {
-          "description": "Strategy body as JSON, usually just needs the tid (task ID).",
-          "name": "Body"
-        }
-      },
-      "name": "Delete electricity strategy"
-    },
-    "query_electricity_strategy": {
-      "description": "Query all electricity strategy plans from the device.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query electricity strategy"
-    },
     "set_third_party_mqtt_config": {
       "description": "Set the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
       "fields": {
@@ -1789,6 +1775,20 @@
         }
       },
       "name": "Set third-party MQTT config"
+    },
+    "update_electricity_strategy": {
+      "description": "Update an existing electricity strategy plan on the device.",
+      "fields": {
+        "body": {
+          "description": "Strategy body as JSON.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Update electricity strategy"
     }
   },
   "title": "Jackery SolarVault"

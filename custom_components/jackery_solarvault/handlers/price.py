@@ -7,17 +7,17 @@ Source: coordinator.py lines 4641-4692 (Phase 2d extraction).
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_COUNTRY,
     FIELD_PLATFORM_COMPANY_ID,
     FIELD_SYSTEM_REGION,
 )
-from ..util import WHOLE_INT_TEXT_RE
+from jackery_solarvault.util import WHOLE_INT_TEXT_RE
 
 """Domain setter facades."""
 
 if TYPE_CHECKING:
-    from ..coordinator import JackerySolarVaultCoordinator
+    from jackery_solarvault.coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 async def call(
     coordinator: JackerySolarVaultCoordinator,
     method: str,
-    *args: Any,  # noqa: ANN401
-    **kwargs: Any,  # noqa: ANN401
+    *args: Any,
+    **kwargs: Any,
 ) -> object:
     """Call a characterized coordinator setter by name."""
     return await getattr(coordinator, method)(*args, **kwargs)

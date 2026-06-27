@@ -431,7 +431,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the alert count is positive."""  # noqa: D421
+        """Return true if the alert count is positive."""
         raw = self._sub_device.get(self.entity_description.field)
         val = safe_int(raw)
         return val > 0 if val is not None else None
