@@ -30,7 +30,7 @@ python-dateutil
 python_discovery
 pyupgrade
 pyyaml
-ruff>=0.15.17
+ruff>=0.15.20
 serialx
 smellcheck
 types-aiofiles
