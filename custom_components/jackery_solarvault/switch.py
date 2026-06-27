@@ -727,7 +727,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Returns:
             dict[str, Any]: The payload dictionary for the matching smart plug, or an
             empty dict if no matching plug is found.
-        """  # noqa: D421
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -861,7 +861,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of extra state attributes for the entity.
-        """  # noqa: D421
+        """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -924,7 +924,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the breaker relay is closed."""  # noqa: D421
+        """Return true if the breaker relay is closed."""
         return safe_bool(self._breaker.get(FIELD_SW))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -969,7 +969,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
-        """  # noqa: D421
+        """
         attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
         for key in (
             FIELD_NM,
