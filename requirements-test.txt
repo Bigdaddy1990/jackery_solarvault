@@ -22,7 +22,7 @@ pylint
 pytest
 pytest-asyncio
 pytest-cov
-pytest-github-actions-annotate-failures>=0.3.0
+pytest-github-actions-annotate-failures>=0.4.2
 pytest-homeassistant-custom-component  # follows daily HA Version
 pytest_aiohttp
 pytest_socket
