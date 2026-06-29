@@ -1,18 +1,25 @@
 {
   "config": {
     "abort": {
+      "accept_shared_reauth_required": "Re-authentication is required before the shared device can be accepted. Sign in again, then retry.",
+      "accept_shared_successful": "Shared device accepted.",
       "already_configured": "This Jackery account is already configured.",
       "already_in_progress": "A configuration flow for this Jackery account is already in progress.",
       "reauth_entry_missing": "The Jackery entry for re-authentication was not found.",
       "reauth_successful": "Re-authentication was successful.",
       "reconfigure_account_mismatch": "The new email does not match the configured Jackery account. Use the original email or remove the entry first.",
       "reconfigure_entry_missing": "The Jackery entry for reconfiguration was not found.",
-      "reconfigure_successful": "Configuration updated."
+      "reconfigure_successful": "Configuration updated.",
+      "shelly_auth_url_failed": "Could not start Shelly pairing. Please try again later.",
+      "shelly_no_devices": "No Shelly accessories were bound. Make sure you completed the Shelly authorization, then try again.",
+      "shelly_reauth_required": "Re-authentication with the Jackery account is required before pairing Shelly accessories.",
+      "shelly_successful": "Shelly accessories paired; the integration was reloaded."
     },
     "error": {
       "account_required": "Account must not be empty.",
       "cannot_connect": "Could not connect to iot.jackeryapp.com.",
-      "invalid_auth": "Invalid email or password."
+      "invalid_auth": "Invalid email or password.",
+      "accept_shared_failed": "Could not accept the shared device. Check the device ID and QR code ID and try again."
     },
     "step": {
       "reauth_confirm": {
@@ -22,7 +29,25 @@
         "description": "Your saved password for {username} no longer works. Enter the current password to restore the connection.",
         "title": "Re-authenticate Jackery"
       },
-      "reconfigure": {
+      "user": {
+        "data": {
+          "create_calculated_power_sensors": "Create calculated net-power sensors",
+          "create_savings_detail_sensors": "Create savings calculation detail sensors",
+          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
+          "enable_ble_transport": "Enable BLE transport",
+          "password": "Password",
+          "username": "Email"
+        },
+        "data_description": {
+          "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
+          "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
+        },
+        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. Keep the Jackery app signed out of the SolarVault account while Home Assistant should receive live MQTT updates. If the app is opened briefly, Home Assistant pauses MQTT reconnects for a short time, keeps polling over HTTP, and resumes live updates automatically.",
+        "title": "Jackery SolarVault"
+      },
+      "reconfigure_credentials": {
         "data": {
           "create_calculated_power_sensors": "Create calculated net-power sensors",
           "create_savings_detail_sensors": "Create savings calculation detail sensors",
@@ -55,7 +80,7 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -66,23 +91,25 @@
         "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
         "title": "Reconfigure Jackery SolarVault"
       },
-      "user": {
+      "reconfigure": {
+        "title": "Reconfigure Jackery SolarVault",
+        "menu_options": {
+          "reconfigure_credentials": "Update credentials and options",
+          "accept_shared": "Accept a shared device",
+          "shelly": "Pair Shelly cloud accessories"
+        }
+      },
+      "accept_shared": {
+        "title": "Accept a shared device",
+        "description": "Accept a SolarVault that was shared with the Jackery account {username}. Enter the device ID and QR code ID from the sharing invitation. The integration reloads afterwards so the shared device's entities appear.",
         "data": {
-          "create_calculated_power_sensors": "Create calculated net-power sensors",
-          "create_savings_detail_sensors": "Create savings calculation detail sensors",
-          "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
-          "enable_ble_transport": "Enable BLE transport",
-          "password": "Password",
-          "username": "Email"
-        },
-        "data_description": {
-          "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
-          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
-          "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
-          "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
-        },
-        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. Keep the Jackery app signed out of the SolarVault account while Home Assistant should receive live MQTT updates. If the app is opened briefly, Home Assistant pauses MQTT reconnects for a short time, keeps polling over HTTP, and resumes live updates automatically.",
-        "title": "Jackery SolarVault"
+          "dev_id": "Device ID",
+          "qr_code_id": "QR code ID"
+        }
+      },
+      "shelly": {
+        "title": "Pair Shelly cloud accessories",
+        "description": "Link Shelly cloud (Cloud-to-Cloud) accessories to the Jackery account {username}. A browser opens so you can authorize Shelly; the Jackery cloud completes the account link. Return to Home Assistant once you have authorized — the integration then confirms the bound devices and reloads so their entities appear."
       }
     }
   },
@@ -94,6 +121,9 @@
       "eps_enabled": {
         "name": "EPS enabled"
       },
+      "subdevice_alarm": {
+        "name": "Safety alarm"
+      },
       "eth_connected": {
         "name": "Ethernet connected"
       },
@@ -102,9 +132,6 @@
       },
       "smart_plug_switch_state": {
         "name": "Smart plug state"
-      },
-      "subdevice_alarm": {
-        "name": "Safety alarm"
       }
     },
     "button": {
@@ -431,20 +458,11 @@
       "ac2_name": {
         "name": "AC2 output name"
       },
-      "ac_discharge_current": {
-        "name": "AC discharge current"
-      },
-      "ac_discharge_time": {
-        "name": "AC discharge time"
-      },
       "ac_input_current": {
         "name": "AC input current"
       },
       "ac_input_power": {
         "name": "AC input power"
-      },
-      "ac_input_power_alt": {
-        "name": "AC input power (alt)"
       },
       "ac_line1_current": {
         "name": "AC line 1 current"
@@ -460,12 +478,6 @@
       },
       "ac_output_apparent_power": {
         "name": "AC output apparent power"
-      },
-      "ac_output_apparent_power_parallel": {
-        "name": "AC apparent power (parallel)"
-      },
-      "ac_output_apparent_power_sum": {
-        "name": "AC apparent power (sum)"
       },
       "ac_output_current": {
         "name": "AC output current"
@@ -490,9 +502,6 @@
       },
       "ac_output_voltage": {
         "name": "AC output voltage"
-      },
-      "ac_output_voltage_2": {
-        "name": "AC output voltage 2"
       },
       "activation_date": {
         "name": "Activation date"
@@ -596,18 +605,6 @@
       "box_mode": {
         "name": "Box mode"
       },
-      "breaker_pc": {
-        "name": "Breaker power config"
-      },
-      "breaker_pr": {
-        "name": "Breaker power rating"
-      },
-      "breaker_sph": {
-        "name": "Breaker phase"
-      },
-      "breaker_sph_pc": {
-        "name": "Breaker phase power"
-      },
       "cell_temperature": {
         "name": "Main battery cell temperature"
       },
@@ -616,9 +613,6 @@
       },
       "charge_limit": {
         "name": "Charge limit"
-      },
-      "charge_output_power": {
-        "name": "Charge output power"
       },
       "charge_plan_power": {
         "name": "Charge plan power"
@@ -777,7 +771,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery\u2192on-grid today"
+        "name": "Device battery→on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -786,22 +780,19 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid\u2192battery today"
+        "name": "Device on-grid→battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV\u2192battery today"
+        "name": "Device PV→battery today"
       },
       "dhg_recall": {
         "name": "DHG recall"
       },
       "discharge_limit": {
         "name": "Discharge limit"
-      },
-      "discharge_time": {
-        "name": "Discharge time"
       },
       "energy_plan_power": {
         "name": "Energy plan power"
@@ -896,9 +887,6 @@
       "http_api": {
         "name": "HTTP API cloud"
       },
-      "input_power_allocation": {
-        "name": "Input power allocation"
-      },
       "input_power_portable": {
         "name": "Total input power"
       },
@@ -919,9 +907,6 @@
       },
       "light_sensor": {
         "name": "Light sensor"
-      },
-      "load_mode": {
-        "name": "Load mode"
       },
       "local_mqtt": {
         "name": "Local MQTT"
@@ -985,9 +970,6 @@
       },
       "other_load_power": {
         "name": "Other load power"
-      },
-      "output_power_allocation": {
-        "name": "Output power allocation"
       },
       "output_power_portable": {
         "name": "Total output power"
@@ -1295,20 +1277,8 @@
       "storm_warning_minutes": {
         "name": "Storm warning lead time"
       },
-      "subdevice_alert_count": {
-        "name": "Subdevice alert count"
-      },
-      "symmetry_total_negative": {
-        "name": "Total negative energy (symmetry)"
-      },
-      "symmetry_total_positive": {
-        "name": "Total positive energy (symmetry)"
-      },
       "system_state": {
         "name": "System state"
-      },
-      "system_status_switch": {
-        "name": "System status"
       },
       "task_plan": {
         "name": "Task plan"
@@ -1335,13 +1305,70 @@
         "name": "Daily on-grid output (Jackery cloud)"
       },
       "total_carbon_saved": {
-        "name": "Total CO\u2082 saved"
+        "name": "Total CO₂ saved"
       },
       "total_generation": {
         "name": "PV yield total"
       },
       "total_revenue": {
         "name": "App total savings"
+      },
+      "ac_output_voltage_2": {
+        "name": "AC output voltage 2"
+      },
+      "ac_discharge_current": {
+        "name": "AC discharge current"
+      },
+      "ac_discharge_time": {
+        "name": "AC discharge time"
+      },
+      "ac_input_power_alt": {
+        "name": "AC input power (alt)"
+      },
+      "ac_output_apparent_power_parallel": {
+        "name": "AC apparent power (parallel)"
+      },
+      "ac_output_apparent_power_sum": {
+        "name": "AC apparent power (sum)"
+      },
+      "charge_output_power": {
+        "name": "Charge output power"
+      },
+      "discharge_time": {
+        "name": "Discharge time"
+      },
+      "load_mode": {
+        "name": "Load mode"
+      },
+      "input_power_allocation": {
+        "name": "Input power allocation"
+      },
+      "output_power_allocation": {
+        "name": "Output power allocation"
+      },
+      "system_status_switch": {
+        "name": "System status"
+      },
+      "breaker_pc": {
+        "name": "Breaker power config"
+      },
+      "breaker_pr": {
+        "name": "Breaker power rating"
+      },
+      "breaker_sph": {
+        "name": "Breaker phase"
+      },
+      "breaker_sph_pc": {
+        "name": "Breaker phase power"
+      },
+      "subdevice_alert_count": {
+        "name": "Subdevice alert count"
+      },
+      "symmetry_total_positive": {
+        "name": "Total positive energy (symmetry)"
+      },
+      "symmetry_total_negative": {
+        "name": "Total negative energy (symmetry)"
       },
       "total_time": {
         "name": "Total time"
@@ -1488,6 +1515,9 @@
     }
   },
   "exceptions": {
+    "bind_smart_part_failed": {
+      "message": "Could not bind smart part for device {device_id}: {error}"
+    },
     "delete_storm_alert_failed": {
       "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
     },
@@ -1509,6 +1539,15 @@
     "invalid_text_value": {
       "message": "{entity} for device {device_id} must not be empty"
     },
+    "get_share_qr_code_failed": {
+      "message": "Could not fetch the share QR code for device {device_id}: {error}"
+    },
+    "list_shared_devices_failed": {
+      "message": "Could not list shared devices for device {device_id}: {error}"
+    },
+    "list_shared_managers_failed": {
+      "message": "Could not list shared managers for device {device_id}: {error}"
+    },
     "missing_system_id": {
       "message": "Cannot update device {device_id}: missing systemId"
     },
@@ -1527,14 +1566,29 @@
     "refresh_weather_plan_failed": {
       "message": "Could not refresh weather plan for device {device_id}: {error}"
     },
+    "remove_all_shared_access_failed": {
+      "message": "Could not remove all shared access for device {device_id}: {error}"
+    },
+    "remove_shared_access_failed": {
+      "message": "Could not remove shared access for device {device_id}: {error}"
+    },
     "rename_system_failed": {
       "message": "Could not rename Jackery system {system_id}: {error}"
     },
     "send_ble_command_failed": {
       "message": "Could not send BLE command for device {device_id}: {error}"
     },
+    "set_device_nickname_failed": {
+      "message": "Could not set nickname for device {device_id}: {error}"
+    },
     "set_third_party_mqtt_config_failed": {
       "message": "Could not set third-party MQTT config for device {device_id}: {error}"
+    },
+    "unbind_device_failed": {
+      "message": "Could not unbind device {device_id}: {error}"
+    },
+    "unbind_smart_part_failed": {
+      "message": "Could not unbind smart part for device {device_id}: {error}"
     }
   },
   "issues": {
@@ -1542,7 +1596,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (\u00a72 HTTP endpoints, \u00a78 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (§2 HTTP endpoints, §8 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
             "title": "Force a Jackery cloud refresh"
           }
         }
@@ -1594,7 +1648,7 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -1608,19 +1662,19 @@
     }
   },
   "services": {
-    "delete_electricity_strategy": {
-      "description": "Delete an electricity strategy plan from the device.",
+    "bind_smart_part": {
+      "description": "Bind a smart accessory (for example a Smart Plug) to the selected device over MQTT.",
       "fields": {
-        "body": {
-          "description": "Strategy body as JSON, usually just needs the tid (task ID).",
-          "name": "Body"
+        "accessory_sn": {
+          "description": "Serial number of the smart accessory to bind, printed on the accessory or visible in the Jackery app.",
+          "name": "Accessory serial number"
         },
         "device_id": {
-          "description": "Pick a Jackery device.",
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
         }
       },
-      "name": "Delete electricity strategy"
+      "name": "Bind smart part"
     },
     "delete_storm_alert": {
       "description": "Delete a specific weather or storm alert by alert ID over MQTT.",
@@ -1636,29 +1690,43 @@
       },
       "name": "Delete storm alert"
     },
-    "insert_electricity_strategy": {
-      "description": "Add a new electricity strategy plan (charge/discharge) to the device.",
+    "get_share_qr_code": {
+      "description": "Fetch the share QR code for the Jackery account that owns the selected device. Returns the response only.",
       "fields": {
-        "body": {
-          "description": "Strategy body as JSON. Fields documented in source-of-truth.",
-          "name": "Body"
+        "device_id": {
+          "description": "Pick a Jackery device. The QR code is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get share QR code"
+    },
+    "list_shared_devices": {
+      "description": "List the devices shared with the Jackery account that owns the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. The shared-device list is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List shared devices"
+    },
+    "list_shared_managers": {
+      "description": "List the managers of a shared-device binding on the owning Jackery account. Returns the response only.",
+      "fields": {
+        "bind_user_id": {
+          "description": "User ID that owns the shared binding.",
+          "name": "Bind user ID"
         },
         "device_id": {
-          "description": "Pick a Jackery device.",
+          "description": "Pick a Jackery device. The managers are resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
+        },
+        "level": {
+          "description": "Share level filter. Only managers at this level are returned. Defaults to 0.",
+          "name": "Share level"
         }
       },
-      "name": "Add electricity strategy"
-    },
-    "query_electricity_strategy": {
-      "description": "Query all electricity strategy plans from the device.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query electricity strategy"
+      "name": "List shared managers"
     },
     "query_third_party_mqtt_config": {
       "description": "Query the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
@@ -1679,6 +1747,38 @@
         }
       },
       "name": "Refresh weather and storm plan"
+    },
+    "remove_all_shared_access": {
+      "description": "Remove every shared access for a user at a share level on the owning Jackery account, then refresh.",
+      "fields": {
+        "bind_user_id": {
+          "description": "User ID whose shared access entries are removed.",
+          "name": "Bind user ID"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. The removal is performed on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        },
+        "level": {
+          "description": "Share level to remove. Defaults to 0.",
+          "name": "Share level"
+        }
+      },
+      "name": "Remove all shared access"
+    },
+    "remove_shared_access": {
+      "description": "Remove a single shared access for a user on the owning Jackery account, then refresh.",
+      "fields": {
+        "bind_user_id": {
+          "description": "User ID whose shared access is removed.",
+          "name": "Bind user ID"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. The removal targets this device on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Remove shared access"
     },
     "rename_system": {
       "description": "Rename a Jackery SolarVault system through the Jackery cloud API. The name is shown in the Jackery app and Home Assistant device info.",
@@ -1742,6 +1842,72 @@
       },
       "name": "Send device schedule"
     },
+    "insert_electricity_strategy": {
+      "description": "Add a new electricity strategy plan (charge/discharge) to the device.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        },
+        "body": {
+          "description": "Strategy body as JSON. Fields documented in source-of-truth.",
+          "name": "Body"
+        }
+      },
+      "name": "Add electricity strategy"
+    },
+    "update_electricity_strategy": {
+      "description": "Update an existing electricity strategy plan on the device.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        },
+        "body": {
+          "description": "Strategy body as JSON.",
+          "name": "Body"
+        }
+      },
+      "name": "Update electricity strategy"
+    },
+    "delete_electricity_strategy": {
+      "description": "Delete an electricity strategy plan from the device.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        },
+        "body": {
+          "description": "Strategy body as JSON, usually just needs the tid (task ID).",
+          "name": "Body"
+        }
+      },
+      "name": "Delete electricity strategy"
+    },
+    "query_electricity_strategy": {
+      "description": "Query all electricity strategy plans from the device.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Query electricity strategy"
+    },
+    "set_device_nickname": {
+      "description": "Set a custom nickname for a Jackery device through the Jackery cloud API. The nickname is shown in the Jackery app and Home Assistant device info.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        },
+        "nickname": {
+          "description": "New device nickname, 1 to 64 characters.",
+          "name": "Nickname"
+        }
+      },
+      "name": "Set device nickname"
+    },
     "set_third_party_mqtt_config": {
       "description": "Set the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
       "fields": {
@@ -1776,19 +1942,29 @@
       },
       "name": "Set third-party MQTT config"
     },
-    "update_electricity_strategy": {
-      "description": "Update an existing electricity strategy plan on the device.",
+    "unbind_device": {
+      "description": "Unbind (remove) a device from the Jackery account through the Jackery cloud API. This is destructive: the device and its entities are removed from Home Assistant after the next refresh.",
       "fields": {
-        "body": {
-          "description": "Strategy body as JSON.",
-          "name": "Body"
-        },
         "device_id": {
-          "description": "Pick a Jackery device.",
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
         }
       },
-      "name": "Update electricity strategy"
+      "name": "Unbind device"
+    },
+    "unbind_smart_part": {
+      "description": "Unbind (remove) a smart accessory from the selected device over MQTT.",
+      "fields": {
+        "accessory_sn": {
+          "description": "Serial number of the smart accessory to unbind, printed on the accessory or visible in the Jackery app.",
+          "name": "Accessory serial number"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Unbind smart part"
     }
   },
   "title": "Jackery SolarVault"

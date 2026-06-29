@@ -1,15 +1,12 @@
 """Config flow for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
 from homeassistant.config_entries import (
-    ConfigEntry,
     ConfigFlow,
-    ConfigFlowResult,
     OptionsFlow,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -17,7 +14,6 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
-from .client.mqtt.mqtt_session_cache import async_save_mqtt_session
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -37,6 +33,8 @@ from .const import (
     CONF_LOCAL_MQTT_USERNAME,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
+    CONF_SHARED_DEV_ID,
+    CONF_SHARED_QR_CODE_ID,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -48,8 +46,8 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
-    DEFAULT_ENABLE_BLE_WRITES,
-    DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
@@ -58,35 +56,48 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
+    FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED,
+    FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
     FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
     FLOW_ABORT_RECONFIGURE_ENTRY_MISSING,
     FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
+    FLOW_ABORT_SHELLY_AUTH_URL_FAILED,
+    FLOW_ABORT_SHELLY_NO_DEVICES,
+    FLOW_ABORT_SHELLY_REAUTH_REQUIRED,
+    FLOW_ABORT_SHELLY_SUCCESSFUL,
+    FLOW_ERROR_ACCEPT_SHARED_FAILED,
     FLOW_ERROR_ACCOUNT_REQUIRED,
     FLOW_ERROR_BASE,
     FLOW_ERROR_CANNOT_CONNECT,
     FLOW_ERROR_INVALID_AUTH,
+    FLOW_STEP_ACCEPT_SHARED,
     FLOW_STEP_INIT,
     FLOW_STEP_REAUTH_CONFIRM,
     FLOW_STEP_RECONFIGURE,
+    FLOW_STEP_RECONFIGURE_CREDENTIALS,
+    FLOW_STEP_SHELLY,
+    FLOW_STEP_SHELLY_FINISH,
     FLOW_STEP_USER,
-    _OPTION_DEFAULTS,  # noqa: RUF100, W191
+    _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
+)
+from .util import (
     config_entry_bool_option,
     config_entry_int_option,
     config_entry_str_option,
 )
 
-
-)
-from .util import (
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
+    from homeassistant.config_entries import (
+        ConfigEntry,
+        ConfigFlowResult,
+    )
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
     from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -95,12 +106,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 _BOOL_OPTION_DEFAULTS: dict[str, bool] = {
-    CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
-    CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
-    CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_BLE_WRITES: DEFAULT_ENABLE_BLE_WRITES,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
+    **_OPTION_DEFAULTS,
     CONF_THIRD_PARTY_MQTT_ENABLE: DEFAULT_THIRD_PARTY_MQTT_ENABLE,
 }
 
@@ -129,18 +135,18 @@ def _normalize_account(value: str) -> str:
 def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
     """Resolve the current option values for a configuration entry.
 
-    For each known option key (grouped by boolean, string, and integer types), the value is taken from the entry's stored options, falling back to any legacy setup-data value for that key and then to the type-specific default.
+    For each known option key (grouped by boolean, string, and integer types),
+    the value is taken from the entry's stored options, falling back to any
+    legacy setup-data value for that key and then to the type-specific default.
 
     Parameters:
-        entry (ConfigEntry): Configuration entry to read option and legacy setup-data values from.
+        entry (ConfigEntry): Configuration entry to read option and legacy
+            setup-data values from.
 
     Returns:
-        dict[str, Any]: Mapping of option keys to their resolved current values.
-    """  # noqa: E501
-    return value.strip() if isinstance(value, str) else ""
-
-
-    values: dict[str, Any] = {}  # noqa: E303
+        dict[str, bool]: Mapping of option keys to their resolved current values.
+    """
+    values: dict[str, Any] = {}
     for key, bool_default in _BOOL_OPTION_DEFAULTS.items():
         values[key] = config_entry_bool_option(entry, key, bool_default)
     for key, str_default in _STR_OPTION_DEFAULTS.items():
@@ -153,17 +159,25 @@ def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
 def _flow_options(
     user_input: dict[str, Any],
     current_options: dict[str, Any] | None = None,
+    option_keys: frozenset[str] | None = None,
 ) -> dict[str, Any]:
-    """Produce a complete options dictionary by taking values from `user_input` when present, otherwise preserving `current_options`, and finally falling back to the integration's typed defaults.
+    """Produce a complete options dictionary by merging user input with current options.
+
+    Values from `user_input` take priority; missing keys fall back to
+    `current_options` and then to the integration's typed defaults.
 
     Parameters:
-        user_input (dict[str, Any]): Option values provided by the user; may omit keys.
-        current_options (dict[str, Any] | None): Existing stored option values to preserve when `user_input` omits a key.
+        user_input (dict[str, Any]): Option values provided by the user; may
+            omit keys.
+        current_options (dict[str, Any] | None): Existing stored option values
+            to preserve when `user_input` omits a key.
+        option_keys (frozenset[str] | None): Subset of option keys to include;
+            when ``None`` all keys from ``_OPTION_DEFAULTS`` are included.
 
     Returns:
-        dict[str, Any]: A merged options dictionary containing every known option key with its resolved value.
-        value (`True` or `False`).
-    """  # noqa: E501
+        dict[str, Any]: A merged options dictionary containing every included
+        option key with its resolved value.
+    """
     current = current_options or {}
     keys = option_keys or frozenset(_OPTION_DEFAULTS)
     return {
@@ -173,19 +187,38 @@ def _flow_options(
     }
 
 
+def _entry_text(entry: ConfigEntry, key: str) -> str:
+    """Return a string value from entry data, or an empty string when absent."""
+    return str(entry.data.get(key) or "")
+
+
 def _entry_data_from_api_login(
     account: str,
     password: str,
     api: JackeryApi,
     existing_entry: ConfigEntry | None = None,
-    merged: dict[str, Any] = {}
-    for defaults in (  # noqa: E113
-        _BOOL_OPTION_DEFAULTS,
-        _STR_OPTION_DEFAULTS,
-        _INT_OPTION_DEFAULTS,
-    ):
-        for key, default in defaults.items():
-            merged[key] = user_input.get(key, current.get(key, default))
+) -> dict[str, Any]:
+    """Build the entry data dictionary from a successful API login.
+
+    Assembles account credentials together with any API-provided region code
+    and MQTT session bootstrap snapshot into a data mapping suitable for storing
+    on a config entry.
+
+    Parameters:
+        account (str): Normalized account identifier.
+        password (str): Account password.
+        api (JackeryApi): Authenticated API instance used to extract
+            region code and MQTT session data.
+        existing_entry (ConfigEntry | None): Existing entry whose stored region
+            code is used as a fallback when the API does not return one.
+
+    Returns:
+        dict[str, Any]: Entry data mapping ready to be stored on the config entry.
+    """
+    data: dict[str, Any] = {
+        CONF_USERNAME: account,
+        CONF_PASSWORD: password,
+    }
     region_code = api.region_code
     if region_code:
         data[CONF_REGION_CODE] = region_code
@@ -244,15 +277,13 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
         entry options or using in configuration logic.
     """
     options: Mapping[str, Any] = entry.options
+    enable_value = (
+        options.get(CONF_LOCAL_MQTT_ENABLE)
+        if CONF_LOCAL_MQTT_ENABLE in options
+        else options.get(CONF_THIRD_PARTY_MQTT_ENABLE) or DEFAULT_LOCAL_MQTT_ENABLE
+    )
     return {
-        CONF_LOCAL_MQTT_ENABLE: bool(
-            # Explicit user toggle wins; the legacy app-synced flag is only a
-            # fallback when the local toggle was never set. Mirrors the
-            # coordinator so a disable actually sticks and the form reflects it.
-            options.get(CONF_LOCAL_MQTT_ENABLE)
-            if CONF_LOCAL_MQTT_ENABLE in options
-            else options.get(CONF_THIRD_PARTY_MQTT_ENABLE) or DEFAULT_LOCAL_MQTT_ENABLE,
-        ),
+        CONF_LOCAL_MQTT_ENABLE: bool(enable_value),
         CONF_LOCAL_MQTT_HOST: str(
             options.get(CONF_LOCAL_MQTT_HOST)
             or options.get(CONF_THIRD_PARTY_MQTT_IP)
@@ -275,7 +306,7 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
             options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER)
             or options.get(CONF_LOCAL_MQTT_TOPIC)
-            or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+            or "",
         ).strip(),
     }
 
@@ -440,28 +471,31 @@ USER_SCHEMA = vol.Schema({
 class JackeryOptionsFlow(OptionsFlow):
     """Handle the Jackery SolarVault options flow."""
 
-    # No __init__: HA injects self.config_entry automatically since 2024.11.
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Present the options form for the integration or create an options entry from submitted values.
+        """Present the options form or create an entry from submitted values.
 
-        When `user_input` is provided, merge the submitted values with the current stored options and create an options entry. When `user_input` is None, show the options form populated with defaults from the current entry options (BLE, sensor-creation, diagnostics, and third-party MQTT settings).
+        When ``user_input`` is provided, merge the submitted values with the
+        current stored options and create an options entry. When ``user_input``
+        is ``None``, show the options form populated with defaults from the
+        current entry options (BLE, sensor-creation, diagnostics, and
+        third-party MQTT settings).
 
         Parameters:
-            user_input (dict[str, Any] | None): Submitted form values, or None to render the form.
+            user_input (dict[str, Any] | None): Submitted form values, or
+                ``None`` to render the form.
 
         Returns:
-            ConfigFlowResult: The created options entry result, or a form result to display to the user.
-        """  # noqa: E501
+            ConfigFlowResult: The created options entry result, or a form
+            result to display to the user.
+        """
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
-            return self.async_create_entry(
-                title="",
-                data=_flow_options(user_input, current_options),
-            )
+            merged = _flow_options(user_input, current_options)
+            merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
+            return self.async_create_entry(title="", data=merged)
 
         current_create_derived = current_options[
             CONF_CREATE_SMART_METER_DERIVED_SENSORS
@@ -473,7 +507,6 @@ class JackeryOptionsFlow(OptionsFlow):
             CONF_CREATE_SAVINGS_DETAIL_SENSORS
         ]
         current_enable_ble_transport = current_options[CONF_ENABLE_BLE_TRANSPORT]
-        current_enable_ble_writes = current_options[CONF_ENABLE_BLE_WRITES]
         current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
         current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
         current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
@@ -550,7 +583,7 @@ class JackeryOptionsFlow(OptionsFlow):
             ): str,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
             ): str,
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
@@ -561,26 +594,17 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle the initial user-driven configuration step and authenticate the provided Jackery account.
-
-        Validates and normalizes the submitted username, prevents creating a duplicate entry for the same account, attempts to authenticate with the Jackery service using the provided credentials, and on success creates the configuration entry with the supplied credentials and merged initial options. On validation or authentication failure, returns the form populated with appropriate error messages.
-
-        Parameters:
-            user_input (dict[str, Any] | None): Form input submitted by the user. Expected keys include `CONF_USERNAME` and `CONF_PASSWORD`, and may include optional integration option fields.
+    def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
+        """Abort a discovery flow when the integration is already being set up.
 
         Returns:
-            ConfigFlowResult: A flow result that either shows the user form with errors or creates the new configuration entry on successful authentication.
-            duplicate discovery or in-progress flow is detected, `None` otherwise.
-        """  # noqa: E501
+            ConfigFlowResult: An abort result when the integration is already
+            configured or another discovery flow is already in progress, otherwise
+            None so the caller can continue into the user step.
+        """
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
-        if any(
-            progress.get("flow_id") != self.flow_id
-            for progress in self._async_in_progress()
-        ):
+        if self._async_in_progress():
             return self.async_abort(reason="already_in_progress")
         return None
 
@@ -728,13 +752,46 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Reconfigure an existing config entry by validating provided account credentials and updating stored username, password, and options.
+        """Offer a menu of reconfigure actions for the existing entry.
 
-        Validates that the submitted username matches the entry being reconfigured, verifies credentials with the Jackery service, and on success updates and reloads the entry. If input is missing or invalid, presents the reconfigure form prefilled with current option defaults. Aborts if the reconfigure target is missing or the provided account does not match the entry.
-        reconfigured, attempts to authenticate with the Jackery API (preserving
-        existing MQTT/bootstrap metadata from the entry), and on successful
-        authentication updates the entry's stored data and options and ends the flow
-        with a successful abort reason. If authentication fails or a connection error
+        Presents the credentials/options reconfigure path (default) and the
+        accept-shared-device path. Aborts if the reconfigure target is missing.
+
+        Parameters:
+            user_input (dict[str, Any] | None): Unused; menu selection is handled
+                by Home Assistant.
+
+        Returns:
+            ConfigFlowResult: A menu result, or an abort if the entry is missing.
+        """
+        try:
+            self._get_reconfigure_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
+        return self.async_show_menu(
+            step_id=FLOW_STEP_RECONFIGURE,
+            menu_options=[
+                FLOW_STEP_RECONFIGURE_CREDENTIALS,
+                FLOW_STEP_ACCEPT_SHARED,
+                FLOW_STEP_SHELLY,
+            ],
+        )
+
+    async def async_step_reconfigure_credentials(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure an existing entry by validating credentials and updating data.
+
+        Validates that the submitted username matches the entry being
+        reconfigured, verifies credentials with the Jackery service, and on
+        success updates and reloads the entry. If input is missing or invalid,
+        presents the reconfigure form prefilled with current option defaults.
+        Aborts if the reconfigure target is missing or the provided account
+        does not match the entry. Attempts to authenticate with the Jackery
+        API (preserving existing MQTT/bootstrap metadata from the entry), and
+        on successful authentication updates the entry's stored data and
+        options and ends the flow with a successful abort reason. If
+        authentication fails or a connection error
         occurs, the reconfigure form is re-displayed with error messages; if the
         provided account does not match the entry, the flow is aborted.
 
@@ -743,10 +800,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             `None`, the reconfigure form is shown.
 
         Returns:
-            A ConfigFlowResult that shows the reconfigure form with any errors, aborts with a specific reason, or updates and reloads the entry on successful reconfiguration.
-            validation errors, aborts the flow for account mismatches or missing entry,
-            or updates the entry and aborts with a success reason.
-        """  # noqa: E501
+            ConfigFlowResult: A form result with any errors, an abort for
+            account mismatches or a missing entry, or an update-and-reload
+            abort on successful reconfiguration.
+        """
         try:
             entry = self._get_reconfigure_entry()
         except KeyError, RuntimeError:
@@ -792,23 +849,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                         ),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
-                    snapshot = api.mqtt_session_snapshot()
-                    if snapshot is not None:
-                        await async_save_mqtt_session(
-                            self.hass,
-                            entry.entry_id,
-                            **snapshot,
-                        )
-                    self.hass.config_entries.async_update_entry(
-                        entry,
-                        data={**entry.data, **data_updates},
-                        options=_reconfigure_options(entry, user_input),
-                    )
-                    return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL)
 
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
-        stored_username = _entry_text(entry, CONF_USERNAME)
         schema = vol.Schema({
             vol.Required(
                 CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
@@ -880,12 +923,160 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ): str,
         })
         return self.async_show_form(
-            step_id=FLOW_STEP_RECONFIGURE,
+            step_id=FLOW_STEP_RECONFIGURE_CREDENTIALS,
             data_schema=schema,
             description_placeholders={
                 "username": str(entry.data.get(CONF_USERNAME, "")),
             },
             errors=errors,
+        )
+
+    async def async_step_accept_shared(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Accept a device shared with the configured Jackery account.
+
+        Calls the cloud accept-bind endpoint with the supplied device and QR
+        identifiers, then reloads the entry so the newly shared device's
+        entities are surfaced. Authentication failures start a reauth flow; other
+        backend or input errors re-show the form.
+
+        Parameters:
+            user_input (dict[str, Any] | None): Form data containing
+                ``CONF_SHARED_DEV_ID`` and ``CONF_SHARED_QR_CODE_ID`` when
+                submitted.
+
+        Returns:
+            ConfigFlowResult: The accept-shared form (possibly with errors), an
+            update-and-reload abort on success, or a reauth start on auth failure.
+        """
+        try:
+            entry = self._get_reconfigure_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            coordinator = entry.runtime_data
+            try:
+                await coordinator.api.async_accept_shared_device(
+                    dev_id=user_input[CONF_SHARED_DEV_ID],
+                    qr_code_id=user_input[CONF_SHARED_QR_CODE_ID],
+                )
+            except JackeryAuthError:
+                # Starting a reauth flow from inside this active reconfigure flow
+                # is suppressed by Home Assistant, so abort with a reauth-required
+                # reason. The coordinator surfaces the same auth failure on its
+                # next refresh, which triggers the standard reauth flow.
+                return self.async_abort(reason=FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED)
+            except JackeryError as err:
+                _LOGGER.debug("Cannot accept shared Jackery device: %s", err)
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    reason=FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL,
+                )
+
+        return self.async_show_form(
+            step_id=FLOW_STEP_ACCEPT_SHARED,
+            data_schema=vol.Schema({
+                vol.Required(CONF_SHARED_DEV_ID): vol.All(str, vol.Length(min=1)),
+                vol.Required(CONF_SHARED_QR_CODE_ID): vol.All(str, vol.Length(min=1)),
+            }),
+            description_placeholders={
+                "username": str(entry.data.get(CONF_USERNAME, "")),
+            },
+            errors=errors,
+        )
+
+    async def async_step_shelly(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pair Shelly cloud (C2C) accessories via an OAuth external step.
+
+        The Jackery cloud owns the Shelly OAuth account-link: the integration
+        opens the authorization URL returned by ``async_get_shelly_auth_url`` and
+        the user authorizes Shelly in a browser. The redirect is handled by the
+        Jackery cloud (not Home Assistant), so no OAuth code is captured here.
+        When the flow is resumed after authorization the external step is
+        completed and binding is confirmed in :meth:`async_step_shelly_finish`.
+        Authentication failures abort with a reauth-required reason; other
+        backend errors abort with an auth-url-failed reason.
+
+        Parameters:
+            user_input (dict[str, Any] | None): ``None`` on the first entry
+                (which fetches the URL and opens the external step) and a value
+                when the frontend resumes the flow after authorization.
+
+        Returns:
+            ConfigFlowResult: An external-step result on first entry, an
+            external-step-done transition on resume, or an abort on error.
+        """
+        try:
+            entry = self._get_reconfigure_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
+
+        if user_input is not None:
+            return self.async_external_step_done(next_step_id=FLOW_STEP_SHELLY_FINISH)
+
+        coordinator = entry.runtime_data
+        try:
+            payload = await coordinator.api.async_get_shelly_auth_url()
+        except JackeryAuthError:
+            # A reauth flow cannot be started from inside this active reconfigure
+            # flow, so abort with a reauth-required reason; the coordinator
+            # surfaces the same auth failure and triggers the standard reauth.
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_REAUTH_REQUIRED)
+        except JackeryError as err:
+            _LOGGER.debug("Cannot fetch Shelly auth URL: %s", err)
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_AUTH_URL_FAILED)
+
+        auth_url = str(payload.get("authUrl", ""))
+        if not auth_url:
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_AUTH_URL_FAILED)
+        return self.async_external_step(step_id=FLOW_STEP_SHELLY, url=auth_url)
+
+    async def async_step_shelly_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm Shelly binding after the external authorization completes.
+
+        Polls the cloud for bound Shelly devices. On success the entry is
+        reloaded so the newly bound Shelly accessories are surfaced; if no
+        devices are bound the flow aborts with a no-devices reason.
+        Authentication failures abort with a reauth-required reason.
+
+        Parameters:
+            user_input (dict[str, Any] | None): Unused; the finish step takes no
+                user input.
+
+        Returns:
+            ConfigFlowResult: An update-and-reload abort on success, or an abort
+            describing the failure.
+        """
+        try:
+            entry = self._get_reconfigure_entry()
+        except KeyError, RuntimeError:
+            return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
+
+        coordinator = entry.runtime_data
+        try:
+            devices = await coordinator.api.async_get_shelly_devices()
+        except JackeryAuthError:
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_REAUTH_REQUIRED)
+        except JackeryError as err:
+            _LOGGER.debug("Cannot confirm Shelly binding: %s", err)
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_NO_DEVICES)
+
+        if not devices:
+            return self.async_abort(reason=FLOW_ABORT_SHELLY_NO_DEVICES)
+
+        return self.async_update_reload_and_abort(
+            entry,
+            reason=FLOW_ABORT_SHELLY_SUCCESSFUL,
         )
 
     async def async_step_reauth(
@@ -897,15 +1088,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for the account's current password and validate it against Jackery to complete reauthentication.
+        """Prompt for the account password and validate it to complete reauthentication.
 
         Parameters:
-            user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD` when submitted.
+            user_input (dict[str, Any] | None): Form data containing
+                ``CONF_PASSWORD`` when submitted.
 
         Returns:
-            ConfigFlowResult: The next flow result (shows the password form on error or missing input, aborts and updates the entry on successful reauthentication).
-            update-and-abort result after successful reauthentication.
-        """  # noqa: E501
+            ConfigFlowResult: The password form on error or absent input;
+            an update-and-reload abort on successful reauthentication.
+        """
         try:
             entry = self._get_reauth_entry()
         except KeyError, RuntimeError:
@@ -937,20 +1129,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
                     reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
                 )
-                snapshot = api.mqtt_session_snapshot()
-                if snapshot is not None:
-                    await async_save_mqtt_session(
-                        self.hass,
-                        entry.entry_id,
-                        **snapshot,
-                    )
-                self.hass.config_entries.async_update_entry(
-                    entry,
-                    data={**entry.data, **data_updates},
-                )
-                # Reauth intentionally avoids immediate reloads because boot-time
-                # reconnect runs in the background.
-                return self.async_abort(reason=FLOW_ABORT_REAUTH_SUCCESSFUL)
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,

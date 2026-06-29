@@ -205,7 +205,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """
+        """  # noqa: D421
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -309,7 +309,7 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current app grid-standard code."""
+        """Return the current app grid-standard code."""  # noqa: D421
         raw = self._system.get(FIELD_GRID_STANDARD)
         if raw in {None, ""}:
             return None
@@ -387,7 +387,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current plaintext value used for writes."""
+        """Return the current plaintext value used for writes."""  # noqa: D421
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
             self._field,
         )

@@ -172,10 +172,11 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             DeviceInfo: DeviceInfo containing identifiers, manufacturer, name, model,
             and optional `serial_number` and `sw_version`.
         """
-        sys_name = self._system.get(FIELD_DEVICE_NAME)
-        disc_name = self._discovery.get(FIELD_DEVICE_NAME)
-        props_wname = self._properties.get(FIELD_WNAME)
-        name = sys_name or disc_name or props_wname or f"Jackery {self._device_id}"
+        name = first_nonblank_text(
+            self._system.get(FIELD_DEVICE_NAME),
+            self._discovery.get(FIELD_DEVICE_NAME),
+            self._properties.get(FIELD_WNAME),
+            fallback=f"Jackery {self._device_id}",
         )
 
         model = first_nonblank_text(
@@ -186,9 +187,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         sw_version = nonblank_text(self._ota.get(FIELD_CURRENT_VERSION))
         sn = first_nonblank_text(
             self._device_meta.get(FIELD_DEVICE_SN),
-            self._discovery.get(
-            FIELD_DEVICE_SN
-            ),
+            self._discovery.get(FIELD_DEVICE_SN),
         )
 
         return DeviceInfo(
@@ -204,7 +203,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         self,
         plug_index: int,
         plug: dict[str, Any],
-        self, plug_index: int, plug: dict[str, Any], plug_key: str | None = None
+        plug_key: str | None = None,
     ) -> DeviceInfo:
         """Builds DeviceInfo metadata for a smart-plug subdevice attached to the parent.
 

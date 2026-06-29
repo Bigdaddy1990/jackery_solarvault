@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
+from ...const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -31,9 +31,9 @@ async def async_load_discovery_cache(
 ) -> dict[str, dict[str, Any]]:
     """
     Retrieve the cached device index for the specified config entry from persistent storage.
-
+    
     If the stored payload is missing or does not match the expected nested structure, an empty dict is returned.
-
+    
     Returns:
         Mapping from device ID (string) to a shallow copy of that device's metadata dict; returns an empty dict if no valid cache exists.
     """

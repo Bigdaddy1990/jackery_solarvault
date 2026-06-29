@@ -43,8 +43,7 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from jackery_solarvault.const import DEFAULT_BLE_ACK_TIMEOUT_SEC
-
+from ...const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
 
 if TYPE_CHECKING:
@@ -314,7 +313,7 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from jackery_solarvault.const import MQTT_CMD_QUERY_DEVICE_PROPERTY  # noqa: I001, PLC0415
+        from ...const import MQTT_CMD_QUERY_DEVICE_PROPERTY  # noqa: PLC0415
 
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
@@ -391,22 +390,23 @@ class JackeryBleListener:
             return False
         key = self._key_resolver(device_id)
         if key is None:
-            raise RuntimeError(f"no bluetoothKey available for device {device_id}")  # noqa: TRY003
+            msg = f"no bluetoothKey available for device {device_id}"
+            raise RuntimeError(msg)
         # Resolve the effective MTU: explicit override wins (used by
         # tests and the service for diagnostics), then the per-device
         # cached negotiated value, then the Android-app default.
         if mtu_override is not None:
             if isinstance(mtu_override, bool) or not isinstance(mtu_override, int):
-                raise ValueError("mtu_override must be an integer")  # noqa: TRY003
+                msg = "mtu_override must be an integer"
+                raise ValueError(msg)
             mtu = mtu_override
         else:
             mtu = self.mtu_for_device(device_id)
         try:
             chunks = ble.split_body_for_mtu(body, mtu)
         except ValueError as err:
-            raise RuntimeError(  # noqa: TRY003
-                f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
-            ) from err
+            msg = f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
+            raise RuntimeError(msg) from err
         chunk_count = len(chunks)
         _LOGGER.debug(
             "Jackery BLE %s: writing cmd=%d body=%d bytes across %d frame(s) at mtu=%d",
@@ -443,13 +443,21 @@ class JackeryBleListener:
         except TimeoutError as err:
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(  # noqa: TRY003
-                f"BLE write to {device_id} timed out after {timeout_sec}s"
-            ) from err
+            msg = f"BLE write to {device_id} timed out after {timeout_sec}s"
+            raise RuntimeError(msg) from err
+        except asyncio.CancelledError:
+            # CancelledError is a BaseException, so the generic ``Exception``
+            # handler below never sees it. Discard the registered ACK before
+            # propagating so a cancelled write does not leave a stale
+            # pending-ACK record behind.
+            if pending is not None:
+                self._discard_pending_ack(device_id, pending)
+            raise
         except Exception as err:  # bleak surfaces BleakError + variants
             if pending is not None:
                 self._discard_pending_ack(device_id, pending)
-            raise RuntimeError(f"BLE write to {device_id} failed: {err}") from err  # noqa: TRY003
+            msg = f"BLE write to {device_id} failed: {err}"
+            raise RuntimeError(msg) from err
         if pending is not None:
             stats = self.stats_for(device_id)
             try:
@@ -464,10 +472,14 @@ class JackeryBleListener:
                 self._discard_pending_ack(device_id, pending)
                 stats.acks_timed_out += 1
                 stats.last_error = f"ack timeout cmd={cmd}"
-                raise RuntimeError(  # noqa: TRY003
+                msg = (
                     f"BLE ack timeout for cmd={cmd} on {device_id} after "
                     f"{ack_timeout_sec}s"
-                ) from err
+                )
+                raise RuntimeError(msg) from err
+            except asyncio.CancelledError:
+                self._discard_pending_ack(device_id, pending)
+                raise
             stats.acks_received += 1
             stats.last_ack_at = datetime.now()
         return True
@@ -496,7 +508,8 @@ class JackeryBleListener:
             parsed_cmds: set[int] = set()
             for ack_cmd in ack_cmds:
                 if isinstance(ack_cmd, bool) or not isinstance(ack_cmd, int):
-                    raise ValueError("ack_cmds must be an integer")  # noqa: TRY003, TRY004
+                    msg = "ack_cmds must be an integer"
+                    raise ValueError(msg)  # noqa: TRY004
                 parsed_cmds.add(ack_cmd)
             expected_cmds = frozenset(parsed_cmds)
         pending = _PendingAck(

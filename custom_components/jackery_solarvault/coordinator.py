@@ -204,6 +204,7 @@ from .const import (
     APP_STAT_TOTAL_OUT_EPS_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC,
     BATTERY_PACK_HINT_KEYS,
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     BLE_AES_KEY_LENGTHS,
@@ -503,7 +504,9 @@ from .handlers.detector import (
     has_sub_device_accessory,
     is_subdevice_payload,
     smart_meter_accessory_device_id,
+    subdevice_dev_type,
     subdevice_identity_values,
+    subdevice_serial,
     subdevice_stat_id,
 )
 from .handlers.exceptions import (
@@ -566,6 +569,7 @@ import operator
 from .util import (
     app_data_quality_warnings,
     app_month_request_kwargs,
+    app_period_range,
     app_period_request_kwargs,
     app_year_request_kwargs,
     append_payload_debug_line,
@@ -585,6 +589,7 @@ from .util import (
     format_data_quality_warning,
     guard_statistic_totals_from_year,
     normalized_data_quality_warnings,
+    safe_bool,
     safe_float,
     safe_int,
     trend_series_points,
@@ -663,7 +668,7 @@ def stable_payload_debug_signature(event: dict[str, Any]) -> str:
 
 def exception_debug_message(err: BaseException) -> str:
     """Return a useful debug message for exceptions with empty ``str(err)``."""
-    return f"{type(err).__name__}: {err or '(no message)'}"
+    return f"{type(err).__name__}: {err or "(no message)"}"
 
 
 def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
@@ -865,6 +870,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         FIELD_SW_EPS_IN_PW,
         FIELD_SW_EPS_OUT_PW,
     })
+    # devType -> coordinator live bucket holding that accessory's telemetry.
+    # AGENTS.md HTTP-primary: the shadow fallback fills these buckets when the
+    # preferred MQTT (Layer 5) push is absent or stale.
+    _SHADOW_DEV_TYPE_BUCKETS: ClassVar[dict[int, str]] = {
+        SUBDEVICE_DEV_TYPE_BATTERY_PACK: PAYLOAD_BATTERY_PACKS,
+        SUBDEVICE_DEV_TYPE_COMBO: PAYLOAD_SUBDEVICES,
+        SUBDEVICE_DEV_TYPE_CT: PAYLOAD_CT_METER,
+        SUBDEVICE_DEV_TYPE_METER_HEAD: PAYLOAD_METER_HEADS,
+        SUBDEVICE_DEV_TYPE_SOCKET: PAYLOAD_SMART_PLUGS,
+    }
     _DEVICE_YEAR_BACKFILL_STAT_KEYS: ClassVar[dict[str, tuple[str, ...]]] = {
         APP_SECTION_PV_STAT: (
             APP_STAT_TOTAL_SOLAR_ENERGY,
@@ -942,6 +957,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._last_system_info_query: dict[str, float] = {}
         self._system_info_query_interval_sec = 180
         self._last_subdevice_query: dict[str, float] = {}
+        # HTTP property-shadow fallback (Layer 3) reuses the subdevice cadence:
+        # it only fills accessory live buckets when MQTT (Layer 5) is absent or
+        # stale, so it must not run more often than the user's polling interval.
+        self._last_shadow_query: dict[str, float] = {}
         # App-side MQTT subdevices must follow the user's polling interval, not
         # the slow statistic cadence.
         self._subdevice_query_interval_sec = interval_sec
@@ -1027,6 +1046,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._local_daily_snapshots: dict[str, dict[str, Any]] = {}
         self._persisted_local_daily_signature: str | None = None
         self._mqtt_poll_task: asyncio.Task[None] | None = None
+        self._shadow_fallback_task: asyncio.Task[None] | None = None
         self._local_mqtt_unsubs: list[Callable[[], None]] = []
         self._statistics_startup_sync_pending = True
         self._polling_diagnostics: dict[str, Any] = {
@@ -1194,6 +1214,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     PAYLOAD_DEVICE_META: dict(dev),
                 }
 
+        await self._async_enumerate_http_accessories(new_index)
+
         if new_index:
             self._device_index = new_index
             self._last_discovery_refresh_monotonic = time.monotonic()
@@ -1240,6 +1262,94 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "or /v1/device/bind/list.",
             )
 
+    async def _async_enumerate_http_accessories(
+        self,
+        index: dict[str, dict[str, Any]],
+    ) -> None:
+        """Overlay HTTP-enumerated accessories onto each device's system metadata.
+
+        This is the HTTP-primary discovery source for the ``accessories`` list read
+        by the subdevice presence predicates, so subdevices are discovered even when
+        MQTT never connects. It runs on the discovery cadence only and is therefore
+        kept off the hot ``_async_update_data`` poll cycle.
+
+        The call is fully best-effort: every cloud failure, including an
+        authentication failure, is swallowed so it can never break discovery.
+        Enumeration deliberately does not own reauthentication. ``async_discover``'s
+        primary ``system/list`` block runs *before* this and already converts an
+        auth failure to ``ConfigEntryAuthFailed`` (the only exception the setup and
+        update paths handle), so a token that expires mid-discovery is caught by
+        that primary path on the next cycle. ``JackeryAuthError`` is a subclass of
+        ``JackeryError``, so the broad ``except JackeryError`` below absorbs it.
+
+        Args:
+            index: Freshly built device index mapping device id to its discovery
+                record. Accessory entries are merged into each record's system
+                metadata in place, keyed by ``deviceSn`` for idempotency.
+        """
+        if not index:
+            return
+        try:
+            await self.api.async_sync_smart_accessories()
+        except JackeryError as err:
+            _LOGGER.debug("Jackery: accessory sync failed (best-effort): %s", err)
+        for dev_id, record in index.items():
+            try:
+                accessories = await self.api.async_get_accessories_list(dev_id)
+            except JackeryError as err:
+                _LOGGER.debug(
+                    "Jackery: accessory enumeration failed for %s (best-effort): %s",
+                    dev_id,
+                    err,
+                )
+                continue
+            self._overlay_http_accessories(record, accessories)
+
+    @staticmethod
+    def _overlay_http_accessories(
+        record: dict[str, Any],
+        accessories: list[dict[str, Any]],
+    ) -> None:
+        """Merge HTTP accessory entries into a device record's system metadata.
+
+        Entries are merged by ``deviceSn`` so an accessory already present from the
+        ``system/list`` device array and the same accessory returned by
+        ``accessories/list`` collapse to a single dict (idempotent — a duplicate
+        serial is never appended). Entries without a serial are appended as-is.
+
+        Only non-``None`` values from the HTTP item overwrite an existing entry, so
+        a null field in the ``accessories/list`` payload (e.g. ``devType=None``)
+        cannot blank a value ``system/list`` had populated. Blanking ``devType``
+        would silently defeat the presence predicates, which compare
+        ``str(devType) == "<n>"`` and would see ``"None"``.
+
+        Args:
+            record: Discovery record whose system metadata is updated in place.
+            accessories: Accessory dicts from ``async_get_accessories_list``.
+        """
+        valid = [item for item in accessories if isinstance(item, dict)]
+        if not valid:
+            return
+        system_meta = record[PAYLOAD_SYSTEM_META]
+        existing = system_meta.get(FIELD_ACCESSORIES)
+        merged = list(existing) if isinstance(existing, list) else []
+        index_by_sn = {
+            item.get(FIELD_DEVICE_SN): position
+            for position, item in enumerate(merged)
+            if isinstance(item, dict) and item.get(FIELD_DEVICE_SN)
+        }
+        for item in valid:
+            sn = item.get(FIELD_DEVICE_SN)
+            if sn and sn in index_by_sn:
+                position = index_by_sn[sn]
+                non_null = {k: v for k, v in item.items() if v is not None}
+                merged[position] = {**merged[position], **non_null}
+                continue
+            if sn:
+                index_by_sn[sn] = len(merged)
+            merged.append(dict(item))
+        system_meta[FIELD_ACCESSORIES] = merged
+
     async def _async_refresh_discovery_if_due(self) -> None:
         """Refresh discovery metadata periodically for runtime device additions."""
         now = time.monotonic()
@@ -1279,11 +1389,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Observed for third-party accessories (e.g., Shelly): bindKey=0 and
         # no Jackery model metadata. Those IDs return API code=20000.
         bind_key = dev.get(FIELD_BIND_KEY)
-        if bind_key in {0, "0"}:
+        if safe_bool(bind_key) is False:
             return False
-        if dev.get(FIELD_DEV_TYPE) == 3 and bool(dev.get(FIELD_IS_CLOUD)):  # noqa: PLR2004
+        if safe_int(dev.get(FIELD_DEV_TYPE)) == 3 and safe_bool(  # noqa: PLR2004
+            dev.get(FIELD_IS_CLOUD)
+        ):
             return False
-        return not (dev.get(FIELD_MODEL_CODE) is None and not dev.get(FIELD_DEV_MODEL))
+        return not (not dev.get(FIELD_MODEL_CODE) and not dev.get(FIELD_DEV_MODEL))
 
     # ------------------------------------------------------------------
     # MQTT state management — delegated to MqttConnectionManager
@@ -1451,7 +1563,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's coordinator polling interval."""
+        """Return the integration's coordinator polling interval."""  # noqa: D421
         return self._configured_update_interval
 
     def _note_property_equivalent_push(self, body: dict[str, Any]) -> None:
@@ -1465,6 +1577,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._statistics_import_task,
             self._slow_metrics_bg_task,
             self._mqtt_poll_task,
+            self._shadow_fallback_task,
             *self._battery_pack_ota_tasks.values(),
             *self._ble_coalesce_tasks.values(),
         ):
@@ -1475,6 +1588,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._statistics_import_task = None
         self._slow_metrics_bg_task = None
         self._mqtt_poll_task = None
+        self._shadow_fallback_task = None
         self._battery_pack_ota_tasks.clear()
         self._ble_coalesce_tasks.clear()
         self._ble_pending_updates.clear()
@@ -3876,7 +3990,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
 
         async def _relogin() -> None:
-            await self.api.async_login()
+            try:
+                await self.api.async_login()
+            except JackeryAuthError as err:
+                _raise_config_entry_auth_failed(
+                    "Jackery credentials were rejected "
+                    "while refreshing MQTT command credentials",
+                    err,
+                )
 
         async def _stop_mqtt() -> None:
             if self._mqtt is not None:
@@ -6015,6 +6136,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         today = self._local_today()
         now = self._local_now()
         contributions: dict[str, list[tuple[datetime, float, str, bool]]] = {}
+        negatives_by_metric: dict[str, int] = {}
 
         for date_type, section_sources in source_batches:
             for section_prefix, stat_key, metric_key, _label in APP_CHART_STAT_METRICS:
@@ -6078,7 +6200,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     )
                     for point in completed_points:
                         value = safe_float(point.value)
-                        if value is None or value < 0:
+                        if value is None:
+                            continue
+                        if value < 0:
+                            # §2.2 rule-1: energy buckets are always >= 0, so a
+                            # negative value is anomalous. Reject + skip as
+                            # before; tally per metric to warn once below
+                            # instead of logging inside this tight nested loop.
+                            negatives_by_metric[metric_key] = (
+                                negatives_by_metric.get(metric_key, 0) + 1
+                            )
                             continue
                         start = self._local_statistic_start(point.start_date)
                         contributions.setdefault(entity_id, []).append((
@@ -6087,6 +6218,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             reset_period,
                             cumulative_state,
                         ))
+        if negatives_by_metric:
+            # One aggregated line per device-import — never per bucket.
+            _LOGGER.warning(
+                "Rejected %d negative entity-stat value(s) across metric(s) %s "
+                "(§2.2: energy buckets must be >= 0); skipped from import",
+                sum(negatives_by_metric.values()),
+                ", ".join(sorted(negatives_by_metric)),
+            )
         if not contributions:
             return 0, 0
 
@@ -6342,7 +6481,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def statistics_backfill_diagnostics(self) -> dict[str, Any]:
-        """Return redaction-safe statistics repair diagnostics."""
+        """Return redaction-safe statistics repair diagnostics."""  # noqa: D421
         devices = self._statistics_backfill_state.get(
             _STATISTICS_BACKFILL_STORE_DEVICES,
         )
@@ -6504,14 +6643,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return False, 0
 
         samples: list[tuple[datetime, float]] = []
+        negatives_skipped = 0
         for point in points:
             state = safe_float(point.value)
-            if state is None or state < 0:
+            if state is None:
+                continue
+            if state < 0:
+                # §2.2 rule-1: PV / generation / grid / battery energy buckets
+                # are always >= 0, so a negative value is anomalous (corrupt
+                # payload or upstream API fault). Reject + skip as before, but
+                # count it so the rejection is no longer silent.
+                negatives_skipped += 1
                 continue
             samples.append((
                 self._local_statistic_start(point.start_date),
                 round(state, 5),
             ))
+        if negatives_skipped:
+            # Aggregate to one line per (metric, bucket) call — never per bucket.
+            _LOGGER.warning(
+                "Rejected %d negative value(s) for metric '%s' bucket '%s' "
+                "(§2.2: energy buckets must be >= 0); skipped from import",
+                negatives_skipped,
+                metric_key,
+                bucket,
+            )
         if not samples:
             return True, 0
         starts = [start for start, _state in samples]
@@ -6763,45 +6919,45 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         return {}
 
-    async def _async_repair_missing_app_chart_statistics(  # noqa: PLR0912, PLR0914
+    async def _collect_repair_buckets(
         self,
+        *,
         device_id: str,
-        payload: dict[str, Any],
-        from_date: date,
-        to_date: date,
-    ) -> tuple[int, int]:
-        """Backfill historical app chart statistic buckets after an outage.
+        system_id: str | None,
+        ct_device_id: str | None,
+        prefixes: tuple[str, ...],
+        period_plan: tuple[tuple[str, list[date]], ...],
+    ) -> tuple[
+        dict[tuple[str, str, date], dict[str, Any]],
+        dict[str, tuple[str, str]],
+        int,
+    ]:
+        """Fetch and first-gate every historical repair bucket (collect pass).
 
-        The normal coordinator snapshot only contains the app's current
-        week/month/year periods. If HA or the Jackery cloud was unavailable
-        over a calendar boundary, previous week/month/year buckets must be fetched
-        explicitly before importing the current snapshot so cumulative sums stay
-        monotonic and the long-term statistic graph has no avoidable gaps.
+        Each surviving bucket is keyed by ``(prefix, date_type, period_start)``
+        so the containment check can pair a shorter period with the exact
+        longer-period container that contains it, rather than only the single
+        period of one outer iteration. The transport-neutral first gate
+        (:func:`gate_payload_section`) is applied unchanged before a bucket is
+        retained.
+
+        Args:
+            device_id: The Jackery device being repaired.
+            system_id: The device's system id, if known.
+            ct_device_id: The smart-meter accessory device id, if any.
+            prefixes: The distinct section prefixes to fetch per period.
+            period_plan: The ``(date_type, period_starts)`` backfill plan.
+
+        Returns:
+            A ``(collected, period_meta_by_type, fetch_failed_count)`` triple.
+            ``collected`` maps ``(prefix, date_type, period_start)`` to the
+            first-gated source; ``period_meta_by_type`` maps each date type to
+            its ``(bucket, bucket_label)``; ``fetch_failed_count`` counts the
+            per-section fetch failures.
         """
-        name_prefix = self._app_chart_name_prefix(device_id, payload)
-        index = self._device_index.get(device_id) or {}
-        system_id = (
-            str(index.get(FIELD_SYSTEM_ID)) if index.get(FIELD_SYSTEM_ID) else None
-        )
-        ct_device_id = self._smart_meter_accessory_device_id(
-            payload,
-        ) or self._smart_meter_accessory_device_id(index)
-        prefixes = tuple(dict.fromkeys(metric[0] for metric in APP_CHART_STAT_METRICS))
-        repaired_buckets = 0
-        failed_buckets = 0
-        entity_source_batches: list[tuple[str, dict[str, dict[str, Any]]]] = []
-
-        period_plan: tuple[tuple[str, list[date]], ...] = (
-            (DATE_TYPE_WEEK, self._iter_calendar_weeks(from_date, to_date)),
-            (DATE_TYPE_MONTH, self._iter_calendar_months(from_date, to_date)),
-            (
-                DATE_TYPE_YEAR,
-                [
-                    date(year, 1, 1)
-                    for year in self._iter_calendar_years(from_date, to_date)
-                ],
-            ),
-        )
+        collected: dict[tuple[str, str, date], dict[str, Any]] = {}
+        period_meta_by_type: dict[str, tuple[str, str]] = {}
+        fetch_failed_count = 0
 
         for date_type, period_starts in period_plan:
             period_meta = self._app_chart_period_meta(date_type)
@@ -6809,7 +6965,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             bucket, bucket_label = period_meta
             for period_start in period_starts:
-                section_sources: dict[str, dict[str, Any]] = {}
                 for section_prefix in prefixes:
                     try:
                         fetched_source = (
@@ -6825,7 +6980,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     except JackeryAuthError:
                         raise
                     except JackeryError as err:
-                        failed_buckets += 1
+                        fetch_failed_count += 1
                         _LOGGER.debug(
                             "Jackery statistics backfill fetch failed for %s %s %s: %s",
                             device_id,
@@ -6842,44 +6997,220 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             fetched_source,
                         )
                         if gated_source:
-                            section_sources[section_prefix] = gated_source
+                            collected[section_prefix, date_type, period_start] = (
+                                gated_source
+                            )
+                            period_meta_by_type[date_type] = (bucket, bucket_label)
 
                 await asyncio.sleep(0)
 
-                if section_sources:
-                    entity_source_batches.append((date_type, section_sources))
+        return collected, period_meta_by_type, fetch_failed_count
 
-                for (
-                    section_prefix,
+    @staticmethod
+    def _repair_containment_violations(
+        *,
+        collected: dict[tuple[str, str, date], dict[str, Any]],
+        payload: dict[str, Any],
+        to_date: date,
+    ) -> set[tuple[str, str, date]]:
+        """Return collected buckets that break the §2.2 period hierarchy.
+
+        Mirrors :meth:`_gate_snapshot_period_hierarchy` for the backfill path,
+        but validates every shorter-period bucket against the longer-period
+        container that *actually contains it*, identified from the bucket's own
+        ``period_start`` (never ``to_date`` or the current snapshot). This is
+        what makes historical and multi-year backfill correct: a 2024 month is
+        compared to the 2024 year, not the 2026 snapshot.
+
+        For each shorter period a minimal flat unit is assembled holding only
+        that bucket and its containing longer-period bucket(s), and the
+        detector is run with ``today`` anchored *inside* the shorter period so
+        its ``week_inside_current_*`` guards resolve true for the bucket under
+        test. A month-straddling week skips the month check (mirroring the
+        detector's ``week_inside_current_month`` guard).
+
+        Containers are resolved against ``collected`` first. When a container
+        was not fetched, the current snapshot's same-period section is used as
+        a fallback ceiling *only* when that container period is the current
+        calendar period (matched via :func:`app_period_range` against
+        ``to_date``); this restores the current-snapshot coverage of the live
+        gate without ever comparing a historical bucket to a different
+        (current) snapshot period. When the year container is still absent, the
+        PV lifetime ``PAYLOAD_STATISTIC`` total is used as the year-level
+        ceiling; for non-PV prefixes there is no authoritative ceiling, so the
+        bucket is imported without a cross-period withhold rather than
+        over-blocked. The exceeding shorter period is named by
+        ``warning.reference_section`` and is withheld; the lifetime
+        ``PAYLOAD_STATISTIC`` source itself is never withheld.
+
+        Args:
+            collected: Fetched, first-gated buckets keyed by
+                ``(prefix, date_type, period_start)``.
+            payload: The device snapshot, consulted for its current-period
+                container sections and its lifetime ``PAYLOAD_STATISTIC`` total
+                as a PV year-level ceiling.
+            to_date: The repair window's end date, used to identify which
+                container period is the current calendar period.
+
+        Returns:
+            The set of ``(prefix, date_type, period_start)`` keys to withhold.
+        """
+        statistic = payload.get(PAYLOAD_STATISTIC)
+        withheld: set[tuple[str, str, date]] = set()
+
+        def _container_keys(
+            prefix: str,
+            date_type: str,
+            period_start: date,
+        ) -> list[tuple[str, str, date]]:
+            if date_type == DATE_TYPE_WEEK:
+                week_begin, week_end = app_period_range(
+                    DATE_TYPE_WEEK, today=period_start
+                )
+                keys: list[tuple[str, str, date]] = []
+                straddles_month = (
+                    week_begin.month != week_end.month
+                    or week_begin.year != week_end.year
+                )
+                if not straddles_month:
+                    keys.append((
+                        prefix,
+                        DATE_TYPE_MONTH,
+                        date(week_begin.year, week_begin.month, 1),
+                    ))
+                if week_begin.year == week_end.year:
+                    keys.append((prefix, DATE_TYPE_YEAR, date(week_begin.year, 1, 1)))
+                return keys
+            if date_type == DATE_TYPE_MONTH:
+                return [(prefix, DATE_TYPE_YEAR, date(period_start.year, 1, 1))]
+            return []
+
+        def _container_source(
+            container_key: tuple[str, str, date],
+        ) -> dict[str, Any] | None:
+            fetched = collected.get(container_key)
+            if fetched is not None:
+                return fetched
+            container_prefix, container_type, container_start = container_key
+            is_current_period = app_period_range(
+                container_type, today=container_start
+            ) == app_period_range(container_type, today=to_date)
+            if not is_current_period:
+                return None
+            snapshot_source = payload.get(f"{container_prefix}_{container_type}")
+            return snapshot_source if isinstance(snapshot_source, dict) else None
+
+        for (prefix, date_type, period_start), source in collected.items():
+            if date_type not in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
+                continue
+            unit: dict[str, Any] = {f"{prefix}_{date_type}": source}
+            year_key = (prefix, DATE_TYPE_YEAR, date(period_start.year, 1, 1))
+            year_present = False
+            for container_key in _container_keys(prefix, date_type, period_start):
+                container_source = _container_source(container_key)
+                if container_source is None:
+                    continue
+                _container_prefix, container_type, _container_start = container_key
+                unit[f"{prefix}_{container_type}"] = container_source
+                if container_key == year_key:
+                    year_present = True
+            if (
+                not year_present
+                and prefix == APP_SECTION_PV_STAT
+                and isinstance(statistic, dict)
+            ):
+                unit[PAYLOAD_STATISTIC] = statistic
+
+            warnings = app_data_quality_warnings(unit, today=period_start)
+            for warning in warnings:
+                reference_section = warning.reference_section
+                if reference_section == PAYLOAD_STATISTIC:
+                    continue
+                violating_prefix, violating_type = reference_section.rsplit("_", 1)
+                if (violating_prefix, violating_type) == (prefix, date_type):
+                    withheld.add((prefix, date_type, period_start))
+
+        return withheld
+
+    async def _import_collected_repair_buckets(  # noqa: PLR0913
+        self,
+        *,
+        device_id: str,
+        name_prefix: str,
+        payload: dict[str, Any],
+        collected: dict[tuple[str, str, date], dict[str, Any]],
+        period_meta_by_type: dict[str, tuple[str, str]],
+        withheld: set[tuple[str, str, date]],
+        to_date: date,
+    ) -> tuple[int, int]:
+        """Import surviving collected buckets as external + entity statistics.
+
+        Buckets in ``withheld`` are intentionally dropped: they are neither
+        repaired nor failed. Entity batches emit one tuple per
+        ``(date_type, period_start)`` group so distinct period starts of the
+        same date type are not collapsed into a single overwriting dict.
+
+        Args:
+            device_id: The Jackery device being repaired.
+            name_prefix: The user-readable statistic name prefix.
+            payload: The device snapshot, forwarded to the entity importer.
+            collected: All fetched, first-gated buckets.
+            period_meta_by_type: Each date type's ``(bucket, bucket_label)``.
+            withheld: Buckets to drop for §2.2 containment violations.
+            to_date: The repair window's end date (the local "today").
+
+        Returns:
+            A ``(repaired_buckets, failed_buckets)`` accounting pair.
+        """
+        repaired_buckets = 0
+        failed_buckets = 0
+        survivors = {
+            key: source for key, source in collected.items() if key not in withheld
+        }
+
+        for (
+            section_prefix,
+            stat_key,
+            metric_key,
+            label,
+        ) in APP_CHART_STAT_METRICS:
+            for (prefix, date_type, _period_start), source in survivors.items():
+                if prefix != section_prefix:
+                    continue
+                meta = period_meta_by_type.get(date_type)
+                if meta is None:
+                    continue
+                bucket, bucket_label = meta
+                section = f"{section_prefix}_{date_type}"
+                points = trend_series_points(
+                    source,
+                    section,
                     stat_key,
-                    metric_key,
-                    label,
-                ) in APP_CHART_STAT_METRICS:
-                    section_source = section_sources.get(section_prefix)
-                    if section_source is None:
-                        continue
-                    section = f"{section_prefix}_{date_type}"
-                    points = trend_series_points(
-                        section_source,
-                        section,
-                        stat_key,
-                        today=to_date,
-                    )
-                    if not points:
-                        continue
-                    ok, bucket_count = await self._async_add_app_chart_statistics(
-                        device_id=device_id,
-                        name_prefix=name_prefix,
-                        metric_key=metric_key,
-                        label=label,
-                        bucket=bucket,
-                        bucket_label=bucket_label,
-                        points=points,
-                    )
-                    if ok:
-                        repaired_buckets += bucket_count
-                    else:
-                        failed_buckets += 1
+                    today=to_date,
+                )
+                if not points:
+                    continue
+                ok, bucket_count = await self._async_add_app_chart_statistics(
+                    device_id=device_id,
+                    name_prefix=name_prefix,
+                    metric_key=metric_key,
+                    label=label,
+                    bucket=bucket,
+                    bucket_label=bucket_label,
+                    points=points,
+                )
+                if ok:
+                    repaired_buckets += bucket_count
+                else:
+                    failed_buckets += 1
+
+        entity_groups: dict[tuple[str, date], dict[str, dict[str, Any]]] = {}
+        for (prefix, date_type, period_start), source in survivors.items():
+            entity_groups.setdefault((date_type, period_start), {})[prefix] = source
+        entity_source_batches = [
+            (date_type, section_sources)
+            for (date_type, _period_start), section_sources in entity_groups.items()
+        ]
 
         if entity_source_batches:
             (
@@ -6902,6 +7233,94 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
 
         return repaired_buckets, failed_buckets
+
+    async def _async_repair_missing_app_chart_statistics(
+        self,
+        device_id: str,
+        payload: dict[str, Any],
+        from_date: date,
+        to_date: date,
+    ) -> tuple[int, int]:
+        """Backfill historical app chart statistic buckets after an outage.
+
+        The normal coordinator snapshot only contains the app's current
+        week/month/year periods. If HA or the Jackery cloud was unavailable
+        over a calendar boundary, previous week/month/year buckets must be
+        fetched explicitly before importing the current snapshot so cumulative
+        sums stay monotonic and the long-term statistic graph has no avoidable
+        gaps.
+
+        The path is collect → validate-containment → import: every bucket is
+        fetched and first-gated first, then each shorter period is validated
+        against the longer-period container that actually contains it (by the
+        bucket's own ``period_start``), and only surviving buckets reach the
+        recorder. This is what stops historical cross-period inversions — which
+        the prior per-iteration gate could not see — from reaching the HA
+        Recorder.
+        """
+        name_prefix = self._app_chart_name_prefix(device_id, payload)
+        index = self._device_index.get(device_id) or {}
+        system_id = (
+            str(index.get(FIELD_SYSTEM_ID)) if index.get(FIELD_SYSTEM_ID) else None
+        )
+        ct_device_id = self._smart_meter_accessory_device_id(
+            payload,
+        ) or self._smart_meter_accessory_device_id(index)
+        prefixes = tuple(dict.fromkeys(metric[0] for metric in APP_CHART_STAT_METRICS))
+
+        period_plan: tuple[tuple[str, list[date]], ...] = (
+            (DATE_TYPE_WEEK, self._iter_calendar_weeks(from_date, to_date)),
+            (DATE_TYPE_MONTH, self._iter_calendar_months(from_date, to_date)),
+            (
+                DATE_TYPE_YEAR,
+                [
+                    date(year, 1, 1)
+                    for year in self._iter_calendar_years(from_date, to_date)
+                ],
+            ),
+        )
+
+        (
+            collected,
+            period_meta_by_type,
+            failed_buckets,
+        ) = await self._collect_repair_buckets(
+            device_id=device_id,
+            system_id=system_id,
+            ct_device_id=ct_device_id,
+            prefixes=prefixes,
+            period_plan=period_plan,
+        )
+
+        withheld = self._repair_containment_violations(
+            collected=collected,
+            payload=payload,
+            to_date=to_date,
+        )
+        if withheld:
+            withheld_names = sorted(
+                f"{prefix}_{date_type} ({period_start.isoformat()})"
+                for prefix, date_type, period_start in withheld
+            )
+            _LOGGER.warning(
+                "Withholding repaired app chart section(s) %s for %s from "
+                "recorder: violates the AGENTS.md §2.2 period hierarchy "
+                "(shorter period exceeds its longer-period container)",
+                ", ".join(withheld_names),
+                device_id,
+            )
+
+        repaired_buckets, import_failed = await self._import_collected_repair_buckets(
+            device_id=device_id,
+            name_prefix=name_prefix,
+            payload=payload,
+            collected=collected,
+            period_meta_by_type=period_meta_by_type,
+            withheld=withheld,
+            to_date=to_date,
+        )
+
+        return repaired_buckets, failed_buckets + import_failed
 
     def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:  # noqa: PLR0911
         """Return the recovery start date for one device, if needed.
@@ -8725,6 +9144,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # so the recorder is not woken up on every fast HTTP refresh.
         self._schedule_statistics_import(result)
         self._schedule_mqtt_poll_queries(result)
+        # HTTP property-shadow fallback (HTTP-primary): fills subdevice live
+        # buckets when MQTT is absent/stale. Background-only — never awaited in
+        # this hot update path. Runs regardless of MQTT connection state.
+        self._schedule_shadow_fallback(result)
         # Drain queued device-registry removals from the stale-pack
         # cleanup. Fire-and-forget on the same task so a registry
         # hiccup does not break the data refresh.
@@ -8907,196 +9330,208 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 len(dev_refreshers),
             )
             try:
-                for refresh_device in dev_refreshers:
-                    await refresh_device()
-                for sid in sys_ids:
-                    await asyncio.gather(
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_STATISTIC,
-                            self._slow_metrics_interval_sec,
-                            self.api.async_get_system_statistic,
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_ALARM,
-                            self._slow_metrics_interval_sec,
-                            self.api.async_get_alarm,
-                            None,
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_PV_TRENDS,
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_pv_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_DAY),
+                async with asyncio.timeout(BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC):
+                    for refresh_device in dev_refreshers:
+                        await refresh_device()
+                    for sid in sys_ids:
+                        await asyncio.gather(
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_STATISTIC,
+                                self._slow_metrics_interval_sec,
+                                self.api.async_get_system_statistic,
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_PV_TRENDS,
-                                DATE_TYPE_WEEK,
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_ALARM,
+                                self._slow_metrics_interval_sec,
+                                self.api.async_get_alarm,
+                                None,
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_pv_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_PV_TRENDS,
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_pv_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_DAY),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_PV_TRENDS,
-                                DATE_TYPE_MONTH,
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_PV_TRENDS,
+                                    DATE_TYPE_WEEK,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_pv_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                                ),
+                                {},
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_pv_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_PV_TRENDS,
+                                    DATE_TYPE_MONTH,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_pv_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_PV_TRENDS,
-                                DATE_TYPE_YEAR,
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_PV_TRENDS,
+                                    DATE_TYPE_YEAR,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_pv_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                                ),
+                                {},
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_pv_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_HOME_TRENDS,
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_home_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_DAY),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_HOME_TRENDS,
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_home_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_DAY),
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_HOME_TRENDS,
+                                    DATE_TYPE_WEEK,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_home_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_HOME_TRENDS,
-                                DATE_TYPE_WEEK,
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_HOME_TRENDS,
+                                    DATE_TYPE_MONTH,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_home_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                                ),
+                                {},
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_home_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_HOME_TRENDS,
+                                    DATE_TYPE_YEAR,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_home_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_HOME_TRENDS,
-                                DATE_TYPE_MONTH,
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_BATTERY_TRENDS,
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_battery_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_DAY),
+                                ),
+                                {},
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_home_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_BATTERY_TRENDS,
+                                    DATE_TYPE_WEEK,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_battery_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_HOME_TRENDS,
-                                DATE_TYPE_YEAR,
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_BATTERY_TRENDS,
+                                    DATE_TYPE_MONTH,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_battery_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                                ),
+                                {},
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_home_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                            get_with_ttl(
+                                sid,
+                                self._app_period_section(
+                                    APP_SECTION_BATTERY_TRENDS,
+                                    DATE_TYPE_YEAR,
+                                ),
+                                self._slow_metrics_interval_sec,
+                                lambda s: self.api.async_get_battery_trends(
+                                    s,
+                                    **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                                ),
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_BATTERY_TRENDS,
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_battery_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_DAY),
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_PRICE,
+                                self._price_config_interval_sec,
+                                self.api.async_get_power_price,
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_BATTERY_TRENDS,
-                                DATE_TYPE_WEEK,
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_PRICE_SOURCES,
+                                self._price_config_interval_sec,
+                                self.api.async_get_price_sources,
+                                [],
                             ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_battery_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                            get_with_ttl(
+                                sid,
+                                PAYLOAD_PRICE_HISTORY_CONFIG,
+                                self._price_config_interval_sec,
+                                self.api.async_get_price_history_config,
+                                {},
                             ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_BATTERY_TRENDS,
-                                DATE_TYPE_MONTH,
-                            ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_battery_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_MONTH),
-                            ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            self._app_period_section(
-                                APP_SECTION_BATTERY_TRENDS,
-                                DATE_TYPE_YEAR,
-                            ),
-                            self._slow_metrics_interval_sec,
-                            lambda s: self.api.async_get_battery_trends(
-                                s,
-                                **self._trend_query_kwargs(DATE_TYPE_YEAR),
-                            ),
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_PRICE,
-                            self._price_config_interval_sec,
-                            self.api.async_get_power_price,
-                            {},
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_PRICE_SOURCES,
-                            self._price_config_interval_sec,
-                            self.api.async_get_price_sources,
-                            [],
-                        ),
-                        get_with_ttl(
-                            sid,
-                            PAYLOAD_PRICE_HISTORY_CONFIG,
-                            self._price_config_interval_sec,
-                            self.api.async_get_price_history_config,
-                            {},
-                        ),
-                        return_exceptions=True,
-                    )
+                            return_exceptions=True,
+                        )
+            except TimeoutError:
+                _LOGGER.warning(
+                    "Jackery: background slow-metric refresh timed out after %.0fs; "
+                    "aborting cycle (will retry next tick)",
+                    BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC,
+                )
             except asyncio.CancelledError:
+                # Re-raise so the cancel-on-restack guard (above) actually stops
+                # the prior in-flight task; a swallowed CancelledError would let
+                # it keep running and stack. async_shutdown awaits this task under
+                # suppress(CancelledError), so the re-raise is absorbed there.
                 _LOGGER.debug("Jackery: background slow-metric refresh cancelled")
+                raise
             except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug("Jackery: background slow-metric refresh failed: %s", err)
             else:
@@ -9117,7 +9552,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:
-        """Return the MQTT client diagnostics block for the diagnostics export."""
+        """Return the MQTT client diagnostics block for the diagnostics export."""  # noqa: D421
         return self.mqtt_diagnostics_snapshot()
 
     def mqtt_diagnostics_snapshot(
@@ -9728,6 +10163,242 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 exception_debug_message(err),
             )
 
+    def _schedule_shadow_fallback(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Queue the HTTP shadow fallback without blocking the HTTP poll result.
+
+        Unlike :meth:`_schedule_mqtt_poll_queries`, this runs *regardless* of
+        the MQTT connection state: the whole point of the fallback is to fill
+        subdevice buckets when MQTT never connected (HTTP-primary). A single
+        in-flight task handle prevents the background work from piling up.
+
+        Args:
+            snapshot: The freshly-built HTTP coordinator result to scan.
+        """
+        if (
+            self._shadow_fallback_task is not None
+            and not self._shadow_fallback_task.done()
+        ):
+            return
+        self._shadow_fallback_task = self.hass.async_create_background_task(
+            self._async_shadow_fallback(dict(snapshot)),
+            name=f"{DOMAIN}_shadow_fallback",
+        )
+
+    async def _async_shadow_fallback(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Run the shadow fallback, routing background auth failures safely."""
+        try:
+            await self._async_shadow_fallback_for_missing(snapshot)
+        except ConfigEntryAuthFailed as err:
+            self._defer_background_auth_failure(err)
+        except BACKGROUND_TASK_ERRORS as err:
+            _LOGGER.debug(
+                "Jackery shadow fallback failed: %s",
+                exception_debug_message(err),
+            )
+
+    @staticmethod
+    def _entry_accessories(entry: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return enumerated accessories from ``system_meta``/``system``."""
+        for section in (PAYLOAD_SYSTEM_META, PAYLOAD_SYSTEM):
+            system = entry.get(section)
+            if not isinstance(system, dict):
+                continue
+            accessories = system.get(FIELD_ACCESSORIES)
+            if isinstance(accessories, list):
+                return [item for item in accessories if isinstance(item, dict)]
+        return []
+
+    def _shadow_sn_present_in_bucket(
+        self,
+        entry: dict[str, Any],
+        dev_type: int,
+        sub_device_sn: str,
+    ) -> bool:
+        """Return True when the accessory SN already has live-bucket data."""
+        bucket_name = self._SHADOW_DEV_TYPE_BUCKETS.get(dev_type)
+        if bucket_name is None:
+            return False
+        bucket = entry.get(bucket_name)
+        if isinstance(bucket, dict):
+            return subdevice_serial(bucket) == sub_device_sn
+        if isinstance(bucket, list):
+            return any(
+                isinstance(item, dict) and subdevice_serial(item) == sub_device_sn
+                for item in bucket
+            )
+        return False
+
+    @staticmethod
+    def _shadow_parent_device_sn(entry: dict[str, Any]) -> str | None:
+        """Resolve the parent device serial used by the shadow endpoints."""
+        for section in (PAYLOAD_DEVICE, PAYLOAD_DEVICE_META):
+            source = entry.get(section)
+            if isinstance(source, dict) and source.get(FIELD_DEVICE_SN):
+                return str(source[FIELD_DEVICE_SN])
+        return None
+
+    @staticmethod
+    def _shadow_system_id(entry: dict[str, Any]) -> str | None:
+        """Resolve the DIY/system id used by the system-shadow endpoint."""
+        for section in (PAYLOAD_SYSTEM_META, PAYLOAD_SYSTEM):
+            source = entry.get(section)
+            if not isinstance(source, dict):
+                continue
+            sys_id = source.get(FIELD_SYSTEM_ID) or source.get(FIELD_ID)
+            if sys_id:
+                return str(sys_id)
+        return None
+
+    async def _async_shadow_fallback_for_missing(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Fill subdevice live buckets from HTTP shadows when MQTT can't deliver.
+
+        MQTT (Layer 5) stays the *preferred* source for live values; the
+        property shadow only fires when MQTT is absent/disconnected or its
+        cached frame is stale, and only for accessory serials that have no data
+        in their devType bucket yet. The shadow is HTTP, so it must never write
+        ``PAYLOAD_MQTT_LAST`` (that marker means a genuine MQTT frame arrived
+        and would wrongly suppress MQTT preference). Per-SN failures are
+        swallowed best-effort so one accessory cannot abort the rest; auth
+        failures are a ``JackeryError`` subclass and are likewise swallowed here
+        because the primary HTTP path owns re-authentication.
+
+        Args:
+            snapshot: The HTTP coordinator result to scan and backfill.
+        """
+        if not snapshot:
+            return
+        now = time.monotonic()
+        new_data: dict[str, dict[str, Any]] | None = None
+        for device_id, entry in snapshot.items():
+            if self._mqtt_live_properties_are_fresh(entry):
+                continue
+            last_query = self._last_shadow_query.get(device_id, 0.0)
+            if (now - last_query) < self._subdevice_query_interval_sec:
+                continue
+            accessories = self._entry_accessories(entry)
+            if not accessories:
+                continue
+            parent_sn = self._shadow_parent_device_sn(entry)
+            if not parent_sn:
+                continue
+            self._last_shadow_query[device_id] = now
+            working = dict(entry)
+            touched = await self._async_apply_shadows_for_entry(
+                device_id,
+                working,
+                accessories,
+                parent_sn=parent_sn,
+            )
+            if touched:
+                if new_data is None:
+                    new_data = dict(snapshot)
+                new_data[device_id] = working
+        if new_data is not None:
+            self._push_partial_update(new_data)
+
+    async def _async_apply_shadows_for_entry(
+        self,
+        device_id: str,
+        working: dict[str, Any],
+        accessories: list[dict[str, Any]],
+        *,
+        parent_sn: str,
+    ) -> bool:
+        """Fetch + merge shadows for one device's missing accessories."""
+        touched = False
+        system_id = self._shadow_system_id(working)
+        for accessory in accessories:
+            dev_type = subdevice_dev_type(accessory)
+            sub_device_sn = subdevice_serial(accessory)
+            if dev_type is None or sub_device_sn is None:
+                continue
+            if dev_type not in self._SHADOW_DEV_TYPE_BUCKETS:
+                continue
+            if self._shadow_sn_present_in_bucket(working, dev_type, sub_device_sn):
+                continue
+            shadow_bodies = await self._async_fetch_shadow_bodies(
+                device_id,
+                dev_type=dev_type,
+                parent_sn=parent_sn,
+                sub_device_sn=sub_device_sn,
+                system_id=system_id,
+            )
+            for shadow_body in shadow_bodies:
+                # Each body is routed through the SN-keyed merge sink so the
+                # sub-shadow and system-shadow lists combine by serial instead
+                # of one clobbering the other (G-sub-1a bug-(b) guard).
+                if self._merge_subdevice_data(
+                    working,
+                    shadow_body,
+                    device_id=device_id,
+                ):
+                    touched = True
+        return touched
+
+    async def _async_fetch_shadow_bodies(
+        self,
+        device_id: str,
+        *,
+        dev_type: int,
+        parent_sn: str,
+        sub_device_sn: str,
+        system_id: str | None,
+    ) -> list[dict[str, Any]]:
+        """Fetch an accessory's shadow bodies, swallowing best-effort errors.
+
+        Returns the sub-device shadow body and, for COMBO accessories with a
+        resolvable system id, the system-level shadow body as well. Each body
+        is merged independently by the caller so SN-keyed lists are combined
+        rather than overwritten. Per-SN failures yield an empty list so one bad
+        accessory cannot abort the rest.
+        """
+        try:
+            sub_body = await self.api.async_get_sub_shadow(
+                dev_type=str(dev_type),
+                device_sn=parent_sn,
+                sub_device_sn=sub_device_sn,
+            )
+            system_body = await self._async_fetch_combo_system_shadow(
+                dev_type=dev_type,
+                parent_sn=parent_sn,
+                system_id=system_id,
+            )
+        except (TimeoutError, HomeAssistantError, JackeryError) as err:
+            _LOGGER.debug(
+                "Jackery shadow fallback query failed for %s/%s: %s",
+                device_id,
+                sub_device_sn,
+                exception_debug_message(err),
+            )
+            return []
+        return [
+            body for body in (sub_body, system_body) if isinstance(body, dict) and body
+        ]
+
+    async def _async_fetch_combo_system_shadow(
+        self,
+        *,
+        dev_type: int,
+        parent_sn: str,
+        system_id: str | None,
+    ) -> dict[str, Any] | None:
+        """Fetch the system-level shadow body for COMBO accessories only."""
+        if dev_type != SUBDEVICE_DEV_TYPE_COMBO or system_id is None:
+            return None
+        return await self.api.async_get_system_shadow(
+            device_sn=parent_sn,
+            diy_sn=system_id,
+        )
+
     @staticmethod
     def _statistics_http_backfill_dates(
         today: date,
@@ -10022,12 +10693,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def polling_diagnostics(self) -> dict[str, Any]:
-        """Return the latest HTTP polling/cache diagnostics."""
+        """Return the latest HTTP polling/cache diagnostics."""  # noqa: D421
         return dict(self._polling_diagnostics)
 
     @property
     def statistics_import_diagnostics(self) -> dict[str, Any]:
-        """Return the latest Recorder import diagnostics."""
+        """Return the latest Recorder import diagnostics."""  # noqa: D421
         return dict(self._statistics_import_diagnostics)
 
     def _metric_source_candidates(
@@ -10162,14 +10833,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         Calls ``/v1/device/smartMode/getSmartMode`` (GET).
         Returns ``SmartModeInfoData``.
         """
-        return await self.api.async_get_smart_mode_info(system_id=system_id)
+        return await self.api.async_get_smart_mode_info(system_id)
 
     async def async_start_smart_mode(self, system_id: str) -> None:
         """Start or enable smart mode for a system.
 
         Calls ``/v1/device/smartMode/startSmartMode`` (POST).
         """
-        await self.api.async_start_smart_mode(system_id=system_id)
+        await self.api.async_start_smart_mode(system_id)
 
     # ------------------------------------------------------------------
     # TOU (Time-of-Use) Plan

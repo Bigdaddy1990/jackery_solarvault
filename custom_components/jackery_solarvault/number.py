@@ -855,14 +855,14 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             str | None: The unit of measurement, or `None` if not set.
-        """
+        """  # noqa: D421
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
 
     @property
     def suggested_display_precision(self) -> int | None:
-        """Return the suggested number of decimal places for display."""
+        """Return the suggested number of decimal places for display."""  # noqa: D421
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:

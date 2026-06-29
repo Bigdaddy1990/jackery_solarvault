@@ -66,11 +66,10 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """  # noqa: E501
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, timedelta
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -94,12 +93,10 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import JackeryConfigEntry
 from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_METRIC_KEY_BY_SECTION_PREFIX,
@@ -147,6 +144,7 @@ from .const import (
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    APP_STAT_TOTAL_SOLAR_REVENUE,
     APP_STAT_UNIT,
     APP_TOTAL_GUARD_META,
     APP_UNIT_KWH,
@@ -241,6 +239,7 @@ from .const import (
     FIELD_CT_VOLT1,
     FIELD_CT_VOLT2,
     FIELD_CT_VOLT3,
+    FIELD_CURRENCY,
     FIELD_CURRENT_VERSION,
     FIELD_DEFAULT_PW,
     FIELD_DEVICE_NAME,
@@ -431,10 +430,8 @@ from .const import (
     UNRECORDED_ATTRS_HTTP_API,
     UNRECORDED_ATTRS_LOCAL_MQTT,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .entity import JackeryEntity
 from .util import (
-    HomeConsumptionPower,
     append_unique_entity,
     calculated_smart_meter_power,
     circuit_id,
@@ -478,7 +475,9 @@ if TYPE_CHECKING:
 
     from . import JackeryConfigEntry
     from .coordinator import JackerySolarVaultCoordinator
-    from .util import HomeConsumptionPower
+    from .util import (
+        HomeConsumptionPower,
+    )
 
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
@@ -487,7 +486,9 @@ PARALLEL_UPDATES = 0
 
 _LOGGER = logging.getLogger(__name__)
 
-SAVINGS_PRICE_PRECISION = 5
+# Max number of per-bucket period values exposed as an attribute (days in a
+# month). Larger series are chart-curve arrays, not month buckets.
+_MAX_PERIOD_VALUES: Final = 31
 
 
 # ---------------------------------------------------------------------------
@@ -1333,6 +1334,26 @@ class JackerySavingsDetailSensorDescription(SensorEntityDescription):
     transform: Callable[[Any], Any] = safe_float
 
 
+@dataclass(frozen=True, kw_only=True)
+class JackeryBreakerSensorDescription(SensorEntityDescription):
+    """Sensor description for one entry from circuit-breaker payloads.
+
+    Breaker payloads come from MQTT ``QueryCircuitProperty`` responses; each
+    description maps a payload field to a per-circuit sensor.
+    """
+
+    field: str
+    transform: Callable[[Any], Any] = _identity
+
+
+@dataclass(frozen=True, kw_only=True)
+class JackerySubdeviceAlarmSensorDescription(SensorEntityDescription):
+    """Sensor description for one entry from subdevice alarm/event payloads."""
+
+    field: str
+    transform: Callable[[Any], Any] = _identity
+
+
 def _external_chart_metric_key(section: str, stat_key: str) -> str | None:
     """Return the external statistic metric key from const.py mapping."""
     for section_prefix, mapping in APP_CHART_METRIC_KEY_BY_SECTION_PREFIX.items():
@@ -1530,15 +1551,14 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     ),
     # Source: statistic_response.data.totalRevenue (lifetime cumulative
     # revenue / "App-Gesamtersparnis" from /v1/device/stat/systemStatistic).
-    # NOT prescribe device_class=MONETARY for this entity — the docs
-    # describe it as a raw € counter. Removing the MONETARY device_class
-    # avoids the HA-validator restriction (MONETARY allows state_class
-    # TOTAL only) and restores the CHANGELOG "Three-part fix" choice of
-    # TOTAL_INCREASING. That choice lets the Recorder treat the
-    # midnight cloud transient (cloud briefly returns a slightly lower
-    # number when the day rolls over) as a reset instead of misreading
-    # it as a real loss, which previously showed up as a sharp negative
-    # spike on the Energy Dashboard.
+    # state_class=TOTAL_INCREASING per the CHANGELOG "Three-part fix" /
+    # Midnight race condition decision: this is a lifetime cumulative
+    # counter the cloud reports as monotonically growing. TOTAL_INCREASING
+    # lets the Recorder detect cloud-side resets and ignore them instead of
+    # misreading the brief post-midnight transient as a real loss (which is
+    # exactly what state_class=TOTAL did). No device_class=MONETARY is set
+    # here, so the HA "MONETARY only allows TOTAL or None" validation does
+    # not apply to this entity; only the currency unit is published.
     JackeryStatSensorDescription(
         key="total_revenue",
         translation_key="total_revenue",
@@ -1596,6 +1616,69 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_YEAR,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         icon="mdi:solar-power-variant",
+    ),
+    # --- PROTOCOL.md §2.2: /v1/device/stat/pv period PV revenue --------
+    # Source: /v1/device/stat/sys/pv (dateType=week|month|year), field
+    # APP_STAT_TOTAL_SOLAR_REVENUE (PvStatApi$Bean.totalSolarRevenue). These
+    # surface the same period total the cloud reports for the energy charts,
+    # but valued in the device's own currency (PvStatApi$Bean.currency, read
+    # at runtime by JackeryStatSensor.native_unit_of_measurement — see there).
+    #
+    # state_class=TOTAL (NOT TOTAL_INCREASING): like the period-energy
+    # sensors these are per-period totals (week = Mon-Sun, month/year =
+    # calendar) that reset at the app boundary, not a lifetime cumulative
+    # counter. device_class=MONETARY only permits TOTAL or None, so TOTAL is
+    # the correct, HA-valid pairing here (CLAUDE.md "Period sensors are not
+    # cumulative" gotcha). reset_period drives last_reset just like energy.
+    # native_unit_of_measurement here is the EUR fallback; the live unit is
+    # the per-device currency symbol resolved in the property override.
+    JackeryStatSensorDescription(
+        key="pv_revenue_day",
+        translation_key="pv_revenue_day",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_DAY,
+        native_unit_of_measurement=CURRENCY_EURO,
+        icon="mdi:cash",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_week",
+        translation_key="pv_revenue_week",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_WEEK,
+        native_unit_of_measurement=CURRENCY_EURO,
+        icon="mdi:cash",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_month",
+        translation_key="pv_revenue_month",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_MONTH,
+        native_unit_of_measurement=CURRENCY_EURO,
+        icon="mdi:cash",
+    ),
+    JackeryStatSensorDescription(
+        key="pv_revenue_year",
+        translation_key="pv_revenue_year",
+        stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        reset_period=DATE_TYPE_YEAR,
+        native_unit_of_measurement=CURRENCY_EURO,
+        icon="mdi:cash",
     ),
     # --- PROTOCOL.md §2: /v1/device/stat/pv per-channel totals -----
     # Source: /v1/device/stat/sys/pv (dateType=day) field APP_STAT_PV1_ENERGY
@@ -3192,7 +3275,6 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
 
 SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
     JackerySavingsDetailSensorDescription, ...
-    ...,
 ] = (
     JackerySavingsDetailSensorDescription(
         key="savings_calculated_total",
@@ -4078,7 +4160,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Return the selected calculated value."""
+        """The selected calculated value."""
         raw: Any = self._calculation
         for key in self.entity_description.path:
             if not isinstance(raw, dict):
@@ -4093,7 +4175,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return calculation context for diagnostics."""
+        """Calculation context for diagnostics."""
         calculation = self._calculation
         return {
             "source_section": PAYLOAD_STATISTIC,
@@ -4148,7 +4230,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return calculated positive residual power."""
+        """Calculated positive residual power."""
         c = self._components()
         if any(value is None for value in c.values()):
             return None
@@ -4171,7 +4253,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return formula and source components."""
+        """Formula and source components."""
         battery_charge_power, battery_discharge_power, battery_source = (
             self._battery_power_components()
         )
@@ -4518,6 +4600,7 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
     # (verified in the 2026-05-16 production audit).
     last_signature: tuple[Any, ...] = ()
 
+    @callback
     def _add_new_entities() -> None:
         """Detects changes in the coordinator data signature and adds any newly discovered entities to Home Assistant.
 
@@ -4560,7 +4643,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Return the entity's current value."""
+        """The entity's current value."""
         raw = self.entity_description.getter(self._properties)
         if raw is None:
             for fallback in self.entity_description.fallbacks:
@@ -4569,7 +4652,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
                     break
         if raw is None:
             return None
-        return self.entity_description.transform(raw)
+        value = self.entity_description.transform(raw)
         if self.entity_description.value_map is not None:
             mapped = self.entity_description.value_map.get(value)
             if mapped is not None:
@@ -4663,7 +4746,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the local period boundary (last_reset) for the statistic based on the source's request begin date.
+        """The local period boundary (last_reset) for the statistic based on the source's request begin date.
 
         When a reset period is set, use the source section's request metadata `begin_date` to compute the timezone-aware local midnight that marks the period start. If the source data is stale or from the future, or if no valid `begin_date` is available or parseable, fall back to the local period start computed from the current wall clock. This ensures the entity's `last_reset` only advances when the server-side period data is actually present.
 
@@ -4947,7 +5030,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 "chart_series_sum": chart_series_sum,
                 "server_total": server_total,
             }
-            if isinstance(values, list) and len(values) <= 31:
+            if isinstance(values, list) and len(values) <= _MAX_PERIOD_VALUES:
                 attrs["period_values"] = values
             year_backfill = source.get(APP_YEAR_BACKFILL_META)
             if isinstance(year_backfill, dict):
@@ -5093,13 +5176,34 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Return the entity's current value."""
+        """The entity's current value."""
         return self._cached_native_value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         return self._cached_attrs
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Unit of measurement, using the device currency for MONETARY revenue.
+
+        Period PV-revenue sensors (device_class=MONETARY) are valued in the
+        device's own currency, carried per period section as
+        ``PvStatApi$Bean.currency`` (e.g. ``"€"``, ``"$"``). HA renders a
+        MONETARY entity with whatever native unit it publishes, so the live
+        currency symbol is surfaced here rather than baked into the static
+        description. Non-monetary stats and revenue payloads without a
+        currency field fall back to the description's configured unit
+        (CURRENCY_EURO for revenue), so the unit is never empty.
+        """
+        if self.entity_description.device_class != SensorDeviceClass.MONETARY:
+            return self.entity_description.native_unit_of_measurement
+        source = self._source_for_section(self._cached_source_section)
+        currency = source.get(FIELD_CURRENCY)
+        if isinstance(currency, str) and currency.strip():
+            return currency
+        return self.entity_description.native_unit_of_measurement
 
     # --- restored from 24.05\24.05\custom_components\jackery_solarvault\sensor.py ---
     def _local_daily_metric_key(self) -> str | None:
@@ -5170,7 +5274,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     @property
     def _pack(self) -> dict[str, Any]:
-        """Return the battery pack dictionary for this entity's configured pack index.
+        """The battery pack dictionary for this entity's configured pack index.
 
         Selects the pack at the 1-based index stored on the entity from the payload's PAYLOAD_BATTERY_PACKS list. Returns an empty dict when the packs section is missing, not a list, the index is out of range, or the selected entry is not a dict.
 
@@ -5279,7 +5383,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Get the entity's last cached native value.
+        """The entity's last cached native value.
 
         Returns:
             The cached native value from the most recent coordinator update, or `None` if unavailable.
@@ -5300,22 +5404,28 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
                 - sw_version: firmware/version when available
                 - via_device: tuple linking this pack to the main device
         """
-        base_name = (
-            self._system.get(FIELD_DEVICE_NAME)
-            or self._discovery.get(FIELD_DEVICE_NAME)
-            or self._properties.get(FIELD_WNAME)
-            or "SolarVault"
+        base_name = first_nonblank_text(
+            self._system.get(FIELD_DEVICE_NAME),
+            self._discovery.get(FIELD_DEVICE_NAME),
+            self._properties.get(FIELD_WNAME),
+            fallback="SolarVault",
         )
         pack = self._pack
         sn = first_nonblank_text(
-        sn = pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)  # noqa: E251
-        model = (  # noqa: E251
-            pack.get(FIELD_MODEL)
-            or pack.get(FIELD_MODEL_NAME)
-            or pack.get(FIELD_TYPE_NAME)
-            or "SolarVault Zusatzbatterie"
+            pack.get(FIELD_DEVICE_SN),
+            pack.get(FIELD_DEV_SN),
+            pack.get(FIELD_SN),
         )
-        version = pack.get(FIELD_VERSION) or pack.get(FIELD_CURRENT_VERSION)  # noqa: E251
+        model = first_nonblank_text(
+            pack.get(FIELD_MODEL),
+            pack.get(FIELD_MODEL_NAME),
+            pack.get(FIELD_TYPE_NAME),
+            fallback="SolarVault Zusatzbatterie",
+        )
+        version = first_nonblank_text(
+            pack.get(FIELD_VERSION),
+            pack.get(FIELD_CURRENT_VERSION),
+        )
         return DeviceInfo(
             identifiers={
                 (DOMAIN, f"{self._device_id}_battery_pack_{self._pack_index}")
@@ -5406,7 +5516,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Get the smart plug entity's current sensor value from its plug payload.
+        """The smart plug entity's current sensor value from its plug payload.
 
         Reads the configured field from the plug data, falls back to known alias fields when the primary key is missing, and applies the entity description's transform.
 
@@ -5451,7 +5561,6 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
             socket priority, today's energy, total energy, and version.
         """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
-        plug = self._plug
         for key in (
             FIELD_DEVICE_NAME,
             FIELD_SCAN_NAME,
@@ -5537,11 +5646,11 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
         Returns:
             DeviceInfo: Registry info linking the breaker to the parent device.
         """
-        base_name = (
-            self._system.get(FIELD_DEVICE_NAME)
-            or self._discovery.get(FIELD_DEVICE_NAME)
-            or self._properties.get(FIELD_WNAME)
-            or "SolarVault"
+        base_name = first_nonblank_text(
+            self._system.get(FIELD_DEVICE_NAME),
+            self._discovery.get(FIELD_DEVICE_NAME),
+            self._properties.get(FIELD_WNAME),
+            fallback="SolarVault",
         )
         name = breaker.get(FIELD_NM) or f"Sicherung {index}"
         return DeviceInfo(
@@ -5642,11 +5751,11 @@ class JackerySubdeviceAlarmSensor(JackeryEntity, SensorEntity):
         Returns:
             DeviceInfo: Registry info for the alarm subdevice.
         """
-        base_name = (
-            self._system.get(FIELD_DEVICE_NAME)
-            or self._discovery.get(FIELD_DEVICE_NAME)
-            or self._properties.get(FIELD_WNAME)
-            or "SolarVault"
+        base_name = first_nonblank_text(
+            self._system.get(FIELD_DEVICE_NAME),
+            self._discovery.get(FIELD_DEVICE_NAME),
+            self._properties.get(FIELD_WNAME),
+            fallback="SolarVault",
         )
         dev_type = safe_int(item.get(FIELD_DEV_TYPE))
         type_name = "Zubehör"
@@ -5715,7 +5824,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     @property
     def _meter_head(self) -> dict[str, Any]:
-        """Return the meter-head entry matching this entity's captured identity.
+        """The meter-head entry matching this entity's captured identity.
 
         Returns:
             dict: The meter-head dictionary from payload's `PAYLOAD_METER_HEADS` at
@@ -5789,14 +5898,13 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             meter_head.get(FIELD_VERSION),
             meter_head.get(FIELD_CURRENT_VERSION),
         )
-        meter_head_key = getattr(self, "_meter_head_key", None) or stable_subdevice_key(
+        stable_key = getattr(self, "_meter_head_key", None) or stable_subdevice_key(
             "meter_head",
             sn,
             self._meter_head_index,
         )
-        version = meter_head.get(FIELD_VERSION) or meter_head.get(FIELD_CURRENT_VERSION)
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._device_id}_{self._meter_head_key}")},
+            identifiers={(DOMAIN, f"{self._device_id}_{stable_key}")},
             manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),
@@ -6013,7 +6121,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             self._cached_native_value = None
             self._cached_attrs = {}
             return
-        self._cached_native_value = self._value_from_ct(ct)
+        value = self._value_from_ct(ct)
         if (
             self.entity_description.state_class == SensorStateClass.TOTAL_INCREASING
             and isinstance(value, (int, float))
@@ -6091,7 +6199,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         return self._cached_attrs
 
 
@@ -6111,7 +6219,7 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int:
-        """Return the entity's current value."""
+        """The entity's current value."""
         return len(self._properties)
 
     @property
@@ -6386,7 +6494,7 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int:
-        """Return the entity's current value."""
+        """The entity's current value."""
         storm = self._weather_plan.get(FIELD_STORM)
         if isinstance(storm, list):
             return len(storm)
@@ -6394,7 +6502,7 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         return dict(self._weather_plan)
 
 
@@ -6414,7 +6522,7 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int:
-        """Return the entity's current value."""
+        """The entity's current value."""
         plan = self._task_plan
         tasks = None
         if isinstance(plan, dict):
@@ -6427,7 +6535,7 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         return dict(self._task_plan)
 
 
@@ -6455,7 +6563,7 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         props = self._properties
         in_pw = safe_int(props.get(FIELD_BAT_IN_PW))
         out_pw = safe_int(props.get(FIELD_BAT_OUT_PW))
@@ -6465,7 +6573,7 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         http_props = self._http_properties or {}
         merged = self._properties
         return {
@@ -6504,7 +6612,7 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         props = self._properties
         in_pw = safe_int(props.get(FIELD_STACK_IN_PW))
         out_pw = safe_int(props.get(FIELD_STACK_OUT_PW))
@@ -6514,7 +6622,7 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         props = self._properties
         http_props = self._http_properties or {}
         return {
@@ -6563,7 +6671,7 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         props = self._properties
         in_pw = safe_int(jackery_grid_side_input_power(props))
         out_pw = safe_int(jackery_grid_side_output_power(props))
@@ -6573,7 +6681,7 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         props = self._properties
         return {
             "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501
@@ -6632,7 +6740,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         if not isinstance(ct, dict):
             ct = {}
@@ -6643,7 +6751,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         ct = self._payload.get(PAYLOAD_CT_METER) or {}
         props = self._properties
         attrs: dict[str, Any] = {
@@ -6656,7 +6764,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             "scope": (
                 "Jackery-corrected home load; external non-Jackery generation"
                 " must be measured separately"
-            ),  # noqa: COM818
+            ),
         }
         if not isinstance(ct, dict):
             ct = {}
@@ -6738,7 +6846,7 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int:
-        """Return the entity's current value."""
+        """The entity's current value."""
         alarms = self._alarm
         if isinstance(alarms, list):
             return len(alarms)
@@ -6752,7 +6860,7 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         alarms = self._alarm
         if isinstance(alarms, list):
             return {"alarms": alarms}
@@ -6828,7 +6936,7 @@ class JackerySystemMetaSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> Any:  # dynamic sensor state value
-        """Return the entity's current value."""
+        """The entity's current value."""
         return self._system.get(self._source_key)
 
 
@@ -6851,12 +6959,12 @@ class JackeryFirmwareSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         return self._ota.get(FIELD_CURRENT_VERSION)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic attributes for the current state."""
+        """Diagnostic attributes for the current state."""
         ota = self._ota
         attrs: dict[str, Any] = {}
         # Surface only fields that are actually populated (many are null)
@@ -6906,5 +7014,5 @@ class JackeryLocationSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         return safe_float(self._location.get(self._axis))

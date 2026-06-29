@@ -110,16 +110,12 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 120
-PV_TRENDS_PATH: Final = (
-    "/v1/device/stat/sys/pv/trends"  # ?systemId=<id>&beginDate&endDate&dateType
-)
-# Adaptive polling: when MQTT delivered an inbound message within the
-# live threshold, we skip the coordinator HTTP refresh so HTTP only runs as a         #TODO breakes integration guidelines!  # noqa: E501
+# Adaptive polling: when MQTT delivered an inbound message within the live
+# threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
 # keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
 # cloud_polling because HTTP polling is the startup, fallback and keep-alive
 # data path; MQTT push is an optional live enhancement.
 MQTT_LIVE_THRESHOLD_SEC: Final = 30
-# ADAPTIVE_KEEPALIVE_INTERVAL_SEC: Final = 30     #TODO
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
 # the official Jackery app can rotate broker sessions while HTTP credentials
@@ -159,7 +155,8 @@ DEFAULT_THIRD_PARTY_MQTT_USERNAME: Final = ""
 CONF_THIRD_PARTY_MQTT_PASSWORD: Final = "third_party_mqtt_password"
 DEFAULT_THIRD_PARTY_MQTT_PASSWORD: Final = ""
 CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
-# Party-token is App-generated, must filled by Integration and should never shown to User #TODO  # noqa: E501
+# Party token is app-generated; the integration must fill it and must never
+# surface it to the user.
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Safe narrow default from app traces / user reports. Still configurable.
@@ -168,10 +165,6 @@ DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
 
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 # HTTP endpoint constants.
-DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
-SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
-ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
-SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
 _RECONNECT_BACKOFF_SEC: float = 15.0
 RECONNECT_BACKOFF_SEC: Final = _RECONNECT_BACKOFF_SEC
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
@@ -193,93 +186,34 @@ KEEPALIVE_INTERVAL_SEC: Final = _KEEPALIVE_INTERVAL_SEC
 # ---------------------------------------------------------------------------
 # Wire-format constants
 # ---------------------------------------------------------------------------
-POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
-PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
-PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?systemId=<id>
-SAVE_SINGLE_MODE_PATH: Final = (
-    "/v1/device/dynamic/saveSingleMode"  # form: systemId,singlePrice,currency
-)
-SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # form: systemId,platformCompanyId,systemRegion  # noqa: E501
 
 # Device/statistic endpoint group
-DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
-HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...
-BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...
-DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"  # ?deviceId&systemId&...
-DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"  # ?deviceId&...
-DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...
-DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...
-DEVICE_EPS_STAT_PATH: Final = "/v1/device/stat/eps"  # ?deviceId&...
-DEVICE_TODAY_ENERGY_PATH: Final = "/v1/device/stat/today"  # ?deviceSn=<...>
-DEVICE_METER_STAT_PATH: Final = (
-    "/v1/device/stat/meter"  # ?deviceId=<smart-meter subdevice>
-)
-DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"  # ?deviceId&...
-DEVICE_SOCKET_STATISTIC_PATH: Final = (
-    "/v1/device/stat/smartSocketStatistic"  # ?smartSocketId=<socket accessory>
-)
-SHELLY_DEVICES_PATH: Final = "/v1/device/shelly/devices"
-SHELLY_REALTIME_POWER_PATH: Final = "/v1/wss-cloud/device/shelly/device/realtime-power"
-SHELLY_CONTROL_PATH: Final = "/v1/wss-cloud/device/shelly/device/control"
-BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
-OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
-LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>
-SYSTEM_NAME_PATH: Final = "/v1/device/system/name"  # PUT {systemName,id}
 
 # Experimental write endpoint observed in the app traffic.
 # The max-power endpoint was captured but only failed responses (code 10600)
 # have been seen so far. It might be a history log rather than the live setter.
-MAX_POWER_SAVE_PATH: Final = "/v1/device/deviceMaxPowerRecord/saveRecord"
 
 # Legacy endpoint used by Explorer portables — kept as fallback only
-DEVICE_LIST_PATH: Final = "/v1/device/bind/list"
 
 # Crypto material extracted from the Jackery app (iOS+Android both use these)
-AES_KEY: Final = b"1234567890123456"
-RSA_PUBLIC_KEY_B64: Final = (
-    "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
-    "FLYqf9/rnVgURJED+8J9J3Pccd6+9L97/+7COZE5OkejsgOkqeLNC9C3r5mhpE4zk"
-    "/HStss7Q8/5DqkGD1annQ+eoICo3oi0dITZ0Qll56Dowb8lXi6WHViVDdih/oeUwV"
-    "JY89uJNtTWrz7t7QIDAQAB"
-)
-REGISTER_APP_ID: Final = "com.hbxn.jackery"
 
 # --- Android app headers --------------------
 # NB: iOS headers (platform=1) returned empty device lists on a SolarVault-only
 # account. Android headers (platform=2) return data on /v1/device/property.
-APP_VERSION: Final = "v2.1.1"
-APP_VERSION_CODE: Final = "87"
-SYS_VERSION: Final = "Android 16,level 36/[arm64-v8a, armeabi-v7a, armeabi]"
-USER_AGENT: Final = "okhttp/5.3.2"
-DEVICE_MODEL_HEADER: Final = "samsung/SM-S918B"
-PLATFORM_HEADER: Final = "2"
 
-CODE_OK: Final = 0
-CODE_TOKEN_EXPIRED: Final = 10402
 
 # --- Config / Options --------------------------------------------------------
-CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
-CONF_REGION_CODE: Final = "region_code"
-CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
-CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
-CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 # Experimental BLE transport.
 # When enabled, the coordinator subscribes to GATT notify on each known
 # SolarVault and surfaces the decoded/raw frames in diagnostics
 # client/ble.py for the wire-format reference.
-CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
-DEFAULT_ENABLE_BLE_TRANSPORT: Final = True
-CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
 # Default off and gated by JACKERY_DEV_MODE=1
 # ("BLE-Schreibbefehle waren als normale UI-Option erreichbar"). The UI
 # toggle was removed; this flag is consumed only by services/code paths
 # that already check the dev-mode env var.
-DEFAULT_ENABLE_BLE_WRITES: Final = True
-CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 # Default off — diagnostics with full credentials, serial numbers, MQTT
 # topics and bluetoothKey are off by default for security. User must opt
 # in explicitly for local troubleshooting.
-DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
 #: Magic prefix that every plaintext frame starts with.
 BLE_FRAME_MAGIC: str = "DFED"
 #: Protocol version following the magic. Constant in the app's
@@ -383,53 +317,53 @@ BLE_FRAME_OVERHEAD: Final = _BLE_FRAME_OVERHEAD
 #: :func:`chunk_size_for_mtu` to ``247 - 60 = 187`` payload bytes/frame.
 DEFAULT_BLE_MTU: int = 247
 # HTTP endpoint constants. Keep this list aligned with docs/source-of-truth.
-DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>  # noqa: F811
-SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint  # noqa: F811
-ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>  # noqa: F811
-SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>  # noqa: F811
-PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"  # noqa: F811
+DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
+SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
+ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
+SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
+PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"
 # ?systemId=<id>&beginDate&endDate&dateType
-POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>  # noqa: F811
-PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>  # noqa: F811
-PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?systemId=<id>  # noqa: F811
-SAVE_SINGLE_MODE_PATH: Final = "/v1/device/dynamic/saveSingleMode"  # noqa: F811
+POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
+PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
+PRICE_HISTORY_CONFIG_PATH: Final = "/v1/device/dynamic/historyConfig"  # ?systemId=<id>
+SAVE_SINGLE_MODE_PATH: Final = "/v1/device/dynamic/saveSingleMode"
 # form: systemId,singlePrice,currency
 
 # form: systemId, platformCompanyId, systemRegion
-SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"  # noqa: F811
+SAVE_DYNAMIC_MODE_PATH: Final = "/v1/device/dynamic/saveDynamicMode"
 
 # Device/statistic endpoint group from docs/source-of-truth.
-DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>  # noqa: F811
-HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...  # noqa: F811
-BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...  # noqa: F811
-DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"  # ?deviceId&systemId&...  # noqa: F811
-DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"  # ?deviceId&...  # noqa: F811
-DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...  # noqa: F811
-DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...  # noqa: F811
-DEVICE_EPS_STAT_PATH: Final = "/v1/device/stat/eps"  # ?deviceId&...  # noqa: F811
-DEVICE_TODAY_ENERGY_PATH: Final = "/v1/device/stat/today"  # ?deviceSn=<...>  # noqa: F811
+DEVICE_STATISTIC_PATH: Final = "/v1/device/stat/deviceStatistic"  # ?deviceId=<id>
+HOME_TRENDS_PATH: Final = "/v1/device/stat/sys/home/trends"  # ?systemId&...
+BATTERY_TRENDS_PATH: Final = "/v1/device/stat/sys/battery/trends"  # ?systemId&...
+DEVICE_PV_STAT_PATH: Final = "/v1/device/stat/pv"  # ?deviceId&systemId&...
+DEVICE_BATTERY_STAT_PATH: Final = "/v1/device/stat/battery"  # ?deviceId&...
+DEVICE_HOME_STAT_PATH: Final = "/v1/device/stat/onGrid"  # ?deviceId&...
+DEVICE_CT_STAT_PATH: Final = "/v1/device/stat/ct"  # ?deviceId&...
+DEVICE_EPS_STAT_PATH: Final = "/v1/device/stat/eps"  # ?deviceId&...
+DEVICE_TODAY_ENERGY_PATH: Final = "/v1/device/stat/today"  # ?deviceSn=<...>
 DEVICE_PORTABLE_CT_STAT_PATH: Final = "/v1/device/stat/ct/statics"
 # ?deviceId=<portable device>
-DEVICE_METER_STAT_PATH: Final = "/v1/device/stat/meter"  # noqa: F811
+DEVICE_METER_STAT_PATH: Final = "/v1/device/stat/meter"
 # ?deviceId=<smart-meter subdevice>
-DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"  # ?deviceId&...  # noqa: F811
-DEVICE_SOCKET_STATISTIC_PATH: Final = "/v1/device/stat/smartSocketStatistic"  # noqa: F811
+DEVICE_SOCKET_STAT_PATH: Final = "/v1/device/stat/socket"  # ?deviceId&...
+DEVICE_SOCKET_STATISTIC_PATH: Final = "/v1/device/stat/smartSocketStatistic"
 # ?smartSocketId=<socket accessory>
-SHELLY_DEVICES_PATH: Final = "/v1/device/shelly/devices"  # noqa: F811
-SHELLY_REALTIME_POWER_PATH: Final = "/v1/wss-cloud/device/shelly/device/realtime-power"  # noqa: F811
-SHELLY_CONTROL_PATH: Final = "/v1/wss-cloud/device/shelly/device/control"  # noqa: F811
+SHELLY_DEVICES_PATH: Final = "/v1/device/shelly/devices"
+SHELLY_REALTIME_POWER_PATH: Final = "/v1/wss-cloud/device/shelly/device/realtime-power"
+SHELLY_CONTROL_PATH: Final = "/v1/wss-cloud/device/shelly/device/control"
 SHELLY_AUTH_URL_PATH: Final = "/v1/wss-cloud/device/shelly/auth-url"
 SHELLY_UNBIND_DEVICE_PATH: Final = "/v1/wss-cloud/device/shelly/unbind/device"
 SHELLY_UNBIND_ACCOUNT_PATH: Final = "/v1/wss-cloud/device/shelly/unbind/account"
 SHELLY_BINDING_FAILURES_PATH: Final = "/v1/device/shelly/binding/failures"
-BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>  # noqa: F811
-OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>  # noqa: F811
-LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>  # noqa: F811
-SYSTEM_NAME_PATH: Final = "/v1/device/system/name"  # PUT {systemName,id}  # noqa: F811
-MAX_POWER_SAVE_PATH: Final = "/v1/device/deviceMaxPowerRecord/saveRecord"  # noqa: F811
+BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
+OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
+LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>
+SYSTEM_NAME_PATH: Final = "/v1/device/system/name"  # PUT {systemName,id}
+MAX_POWER_SAVE_PATH: Final = "/v1/device/deviceMaxPowerRecord/saveRecord"
 
 # Legacy endpoint used by Explorer portables — kept as fallback only
-DEVICE_LIST_PATH: Final = "/v1/device/bind/list"  # noqa: F811
+DEVICE_LIST_PATH: Final = "/v1/device/bind/list"
 
 # --- Auth endpoints (docs/source-of-truth) ----------------------------------------
 REGISTER_PATH: Final = "/v1/auth/register"
@@ -533,14 +467,14 @@ SYSTEM_SHADOW_DIY_PATH: Final = "/v1/device/property/systemShadow"
 # bytes, Base64-encode them, then AES-ECB the LoginBean with those 24 ASCII
 # bytes and RSA-wrap the same bytes. ``AES_KEY`` is compatibility-only; the
 # app does not require b"1234567890123456" for runtime login.
-AES_KEY: Final = b"1234567890123456"  # noqa: F811
-RSA_PUBLIC_KEY_B64: Final = (  # noqa: F811
+AES_KEY: Final = b"1234567890123456"
+RSA_PUBLIC_KEY_B64: Final = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
     "FLYqf9/rnVgURJED+8J9J3Pccd6+9L97/+7COZE5OkejsgOkqeLNC9C3r5mhpE4zk"
     "/HStss7Q8/5DqkGD1annQ+eoICo3oi0dITZ0Qll56Dowb8lXi6WHViVDdih/oeUwV"
     "JY89uJNtTWrz7t7QIDAQAB"
 )
-REGISTER_APP_ID: Final = "com.hbxn.jackery"  # noqa: F811
+REGISTER_APP_ID: Final = "com.hbxn.jackery"
 
 # --- Android app headers documented in PROTOCOL.md §2 --------------------
 # NB: iOS headers (platform=1) returned empty device lists on a SolarVault-only
@@ -548,38 +482,39 @@ REGISTER_APP_ID: Final = "com.hbxn.jackery"  # noqa: F811
 # NB: Reference meta.app.version=2.1.1/versionCode=93; this pin uses the
 # older v2.0.1/code=87 observed in captured traffic. Intentional — newer
 # versions may change request signatures. Update only after re-capture.
-APP_VERSION: Final = "v2.1.1"  # noqa: F811
-APP_VERSION_CODE: Final = "93"  # noqa: F811
-SYS_VERSION: Final = "Android 16,level 36/[arm64-v8a, armeabi-v7a, armeabi]"  # noqa: F811
-USER_AGENT: Final = "okhttp/5.3.2"  # noqa: F811
-DEVICE_MODEL_HEADER: Final = "samsung/SM-S918B"  # noqa: F811
-PLATFORM_HEADER: Final = "2"  # noqa: F811
+APP_VERSION: Final = "v2.1.1"
+APP_VERSION_CODE: Final = "93"
+SYS_VERSION: Final = "Android 16,level 36/[arm64-v8a, armeabi-v7a, armeabi]"
+USER_AGENT: Final = "okhttp/5.3.2"
+DEVICE_MODEL_HEADER: Final = "samsung/SM-S918B"
+PLATFORM_HEADER: Final = "2"
 
-CODE_OK: Final = 0  # noqa: F811
-CODE_TOKEN_EXPIRED: Final = 10402  # noqa: F811
+CODE_OK: Final = 0
+CODE_TOKEN_EXPIRED: Final = 10402
 
 # --- Config / Options --------------------------------------------------------
-CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"  # noqa: F811
-CONF_REGION_CODE: Final = "region_code"  # noqa: F811
+CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
+CONF_REGION_CODE: Final = "region_code"
 ENTRY_BOOTSTRAP_MQTT_SESSION: Final = "bootstrap_mqtt_session"
-CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"  # noqa: F811
-CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"  # noqa: F811
-CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"  # noqa: F811
+CONF_CREATE_SMART_METER_DERIVED_SENSORS: Final = "create_smart_meter_derived_sensors"
+CONF_CREATE_CALCULATED_POWER_SENSORS: Final = "create_calculated_power_sensors"
+CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 # BLE transport (diagnostic listener).
 # When enabled, the coordinator subscribes to GATT notify on each known
 # SolarVault and surfaces the decoded/raw frames in diagnostics. See
 # docs/source-of-truth + client/ble.py for the wire-format reference.
-CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"  # noqa: F811
-DEFAULT_ENABLE_BLE_TRANSPORT: Final = True  # noqa: F811
-CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"  # noqa: F811
-# Default off and gated by JACKERY_DEV_MODE=1 per the 2026-05-25 safety review. The UI
-# toggle was removed; BLE write commands are gated behind dev mode.
-DEFAULT_ENABLE_BLE_WRITES: Final = True  # noqa: F811
-CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"  # noqa: F811
+CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
+DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
+CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
+# Default off and gated by JACKERY_DEV_MODE=1 per the 2026-05-25 safety review.
+# BLE write commands are an opt-in, dev-mode-gated path: the default must stay
+# False so writes are never enabled implicitly via the option fallback.
+DEFAULT_ENABLE_BLE_WRITES: Final = False
+CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
 # Default off — diagnostics with full credentials, serial numbers, MQTT
 # topics and bluetoothKey are off by default for security. User must opt
 # in explicitly for local troubleshooting.
-DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False  # noqa: F811
+DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
 
 # Optional fallback for home-energy when sys/home/trends is empty.
 # Default stays False: device_home_stat is not the same metric family as
@@ -590,26 +525,33 @@ DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: Final = False
 # Per-period statistics import toggles surfaced in the options flow. Day buckets
 # always import; week/month/year are opt-out. Defaults preserve the baseline
 # behaviour of importing every documented period.
-CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"
-DEFAULT_ENABLE_WEEK_STATISTICS: Final = True
-CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"
-DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
-CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
-DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 # Config-flow step, error and abort identifiers.
 FLOW_STEP_USER: Final = "user"
 FLOW_STEP_INIT: Final = "init"
 FLOW_STEP_REAUTH_CONFIRM: Final = "reauth_confirm"
 FLOW_STEP_RECONFIGURE: Final = "reconfigure"
+FLOW_STEP_RECONFIGURE_CREDENTIALS: Final = "reconfigure_credentials"
+FLOW_STEP_ACCEPT_SHARED: Final = "accept_shared"
+FLOW_STEP_SHELLY: Final = "shelly"
+FLOW_STEP_SHELLY_FINISH: Final = "shelly_finish"
+CONF_SHARED_DEV_ID: Final = "dev_id"
+CONF_SHARED_QR_CODE_ID: Final = "qr_code_id"
 FLOW_ERROR_BASE: Final = "base"
 FLOW_ERROR_INVALID_AUTH: Final = "invalid_auth"
 FLOW_ERROR_CANNOT_CONNECT: Final = "cannot_connect"
 FLOW_ERROR_ACCOUNT_REQUIRED: Final = "account_required"
+FLOW_ERROR_ACCEPT_SHARED_FAILED: Final = "accept_shared_failed"
 FLOW_ABORT_REAUTH_ENTRY_MISSING: Final = "reauth_entry_missing"
 FLOW_ABORT_REAUTH_SUCCESSFUL: Final = "reauth_successful"
 FLOW_ABORT_RECONFIGURE_ENTRY_MISSING: Final = "reconfigure_entry_missing"
 FLOW_ABORT_RECONFIGURE_SUCCESSFUL: Final = "reconfigure_successful"
 FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH: Final = "reconfigure_account_mismatch"
+FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL: Final = "accept_shared_successful"
+FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED: Final = "accept_shared_reauth_required"
+FLOW_ABORT_SHELLY_SUCCESSFUL: Final = "shelly_successful"
+FLOW_ABORT_SHELLY_REAUTH_REQUIRED: Final = "shelly_reauth_required"
+FLOW_ABORT_SHELLY_AUTH_URL_FAILED: Final = "shelly_auth_url_failed"
+FLOW_ABORT_SHELLY_NO_DEVICES: Final = "shelly_no_devices"
 
 DEFAULT_SCAN_INTERVAL_SEC: Final = 15
 DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS: Final = True
@@ -625,6 +567,12 @@ DEFAULT_STORM_WARNING_MINUTES: Final = 120
 REQUEST_TIMEOUT_SEC: Final = 30
 # Slow endpoints (pv_trends, home_trends, battery_trends) need more time
 SLOW_ENDPOINT_TIMEOUT_SEC: Final = 60
+# Hard ceiling for the whole background slow-refresh cycle (Layer 5,
+# supplementary). One hung slow endpoint must not let cache staleness grow
+# unbounded within a cycle; the next tick re-queues. Must stay strictly above
+# SLOW_ENDPOINT_TIMEOUT_SEC / REQUEST_TIMEOUT_SEC so per-request timeouts remain
+# the first line of defense.
+BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC: Final = 120
 
 HTTP_METHOD_GET: Final = "GET"
 HTTP_METHOD_POST: Final = "POST"
@@ -1015,6 +963,8 @@ FIELD_PARAM: Final = "param"
 
 # MQTT credential keys returned by login and consumed by mqtt_push.py
 FIELD_USER_ID: Final = "userId"
+# Share QR code wire key (device/bind/qrcode payload).
+FIELD_QR_CODE_ID: Final = "qrCodeId"
 FIELD_MQTT_PASSWORD: Final = "mqttPassWord"
 MQTT_CREDENTIAL_CLIENT_ID: Final = "client_id"
 MQTT_CREDENTIAL_USERNAME: Final = "username"
@@ -1103,7 +1053,6 @@ CT_TOTAL_ENERGY_PAIR: Final = (
 )
 CT_ATTRIBUTE_FIELDS: Final = (
     FIELD_SCAN_NAME,
-    FIELD_SN,
     FIELD_TYPE_NAME,
     FIELD_SUB_TYPE,
     FIELD_DEV_TYPE,
@@ -1359,24 +1308,18 @@ APP_PERIOD_DATE_TYPES: Final = (
     DATE_TYPE_MONTH,
     DATE_TYPE_YEAR,
 )
-APP_CHART_DATE_TYPES: Final = (
-    DATE_TYPE_HOUR,
-    DATE_TYPE_DAY,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_YEAR,
-)
-APP_CHART_DATE_TYPES: Final = (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)  # noqa: F811
+APP_CHART_DATE_TYPES: Final = (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
 
 # External statistic buckets. The normal entities stay period totals; these
 # bucket names identify HA-recorder series imported from the app chart arrays.
+EXTERNAL_STAT_BUCKET_DAY: Final = "day_hourly"
 EXTERNAL_STAT_BUCKET_DAY_HOURLY: Final = "day_hourly"
 EXTERNAL_STAT_BUCKET_WEEK_DAILY: Final = "week_daily"
 EXTERNAL_STAT_BUCKET_MONTH_DAILY: Final = "month_daily"
 EXTERNAL_STAT_BUCKET_YEAR_MONTHLY: Final = "year_monthly"
 APP_DAY_CHART_BUCKET_LABEL: Final = "app day buckets from 5-minute power curves"
 APP_CHART_BUCKET_BY_DATE_TYPE: Final = {
-    DATE_TYPE_DAY: EXTERNAL_STAT_BUCKET_DAY,  # noqa: F821
+    DATE_TYPE_DAY: EXTERNAL_STAT_BUCKET_DAY,
     DATE_TYPE_WEEK: EXTERNAL_STAT_BUCKET_WEEK_DAILY,
     DATE_TYPE_MONTH: EXTERNAL_STAT_BUCKET_MONTH_DAILY,
     DATE_TYPE_YEAR: EXTERNAL_STAT_BUCKET_YEAR_MONTHLY,
@@ -1772,19 +1715,11 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_CT_METER,
     PAYLOAD_METER_HEADS,
     PAYLOAD_SMART_PLUGS,
-    PAYLOAD_SUBDEVICES,
-    PAYLOAD_ALARM,
     PAYLOAD_WEATHER_PLAN,
     PAYLOAD_TASK_PLAN,
-    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
-    PAYLOAD_LIFETIME_COUNTERS,
     PAYLOAD_NOTICE,
-    PAYLOAD_ELECTRICITY_STRATEGY,
-    PAYLOAD_TOU_SCHEDULE,
-    PAYLOAD_SMART_MODE,
-    PAYLOAD_CIRCUIT_PROPERTY,
-    PAYLOAD_BATTERY_BOUNDARY,
     PAYLOAD_MQTT_LAST,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 
 # Service names and payload fields from services.yaml.
@@ -1805,11 +1740,33 @@ SERVICE_UPDATE_ELECTRICITY_STRATEGY: Final = "update_electricity_strategy"
 SERVICE_DELETE_ELECTRICITY_STRATEGY: Final = "delete_electricity_strategy"
 SERVICE_QUERY_ELECTRICITY_STRATEGY: Final = "query_electricity_strategy"
 SERVICE_QUERY_CURRENT_ELECTRICITY_STRATEGY: Final = "query_current_electricity_strategy"
+# Device-operation services on an already-configured device (runtime ops).
+SERVICE_SET_DEVICE_NICKNAME: Final = "set_device_nickname"
+SERVICE_UNBIND_DEVICE: Final = "unbind_device"
+SERVICE_BIND_SMART_PART: Final = "bind_smart_part"
+SERVICE_UNBIND_SMART_PART: Final = "unbind_smart_part"
+# Account-level sharing services. They resolve the coordinator through a
+# required device_id (device selector) so multi-account setups dispatch to the
+# correct account even though the cloud call itself is account-scoped.
+SERVICE_LIST_SHARED_DEVICES: Final = "list_shared_devices"
+SERVICE_LIST_SHARED_MANAGERS: Final = "list_shared_managers"
+SERVICE_REMOVE_SHARED_ACCESS: Final = "remove_shared_access"
+SERVICE_REMOVE_ALL_SHARED_ACCESS: Final = "remove_all_shared_access"
+SERVICE_GET_SHARE_QR_CODE: Final = "get_share_qr_code"
+# Response envelope keys for the get_share_qr_code service action. Centralized
+# here so the literal "user_id" stays out of services.py (the MQTT-credential
+# key-centralization guard forbids that literal elsewhere).
+SERVICE_RESPONSE_QR_CODE_ID: Final = "qr_code_id"
+SERVICE_RESPONSE_USER_ID: Final = "user_id"
 SERVICE_FIELD_ACTION_ID: Final = "action_id"
 SERVICE_FIELD_SYSTEM_ID: Final = "system_id"
 SERVICE_FIELD_NEW_NAME: Final = "new_name"
 SERVICE_FIELD_DEVICE_ID: Final = "device_id"
 SERVICE_FIELD_ALERT_ID: Final = "alert_id"
+SERVICE_FIELD_NICKNAME: Final = "nickname"
+SERVICE_FIELD_ACCESSORY_SN: Final = "accessory_sn"
+SERVICE_FIELD_BIND_USER_ID: Final = "bind_user_id"
+SERVICE_FIELD_LEVEL: Final = "level"
 SERVICE_FIELD_CMD: Final = "cmd"
 SERVICE_FIELD_FLAGS: Final = "flags"
 SERVICE_FIELD_BODY: Final = "body"
@@ -2172,6 +2129,7 @@ ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC: Final = 49  # ble=0 DevicePropertyChange
 ACTION_ID_PORTABLE_SYNC_MQTT_INFO: Final = 50  # ble=99 DevicePropertyChange
 ACTION_ID_PORTABLE_READ_SUB_CT: Final = 51  # ble=110 QuerySubDeviceGroupProperty
 ACTION_ID_PORTABLE_GET_WIFI_CONFIG: Final = 52  # ble=124 QueryWifiConfig
+ACTION_ID_PORTABLE_DISCHARGE_MEMORY: Final = 53  # b.java SETTING_DISCHARGE_MEMORY
 
 # Frozenset of every portable command ID for routing in coordinator / handlers.
 # Mirrors ``MQTT_ACTION_IDS_*`` but scoped to the
@@ -2227,6 +2185,7 @@ PORTABLE_ACTION_IDS: Final = frozenset({
     ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
     ACTION_ID_PORTABLE_READ_SUB_CT,
     ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
+    ACTION_ID_PORTABLE_DISCHARGE_MEMORY,
 })
 
 # Third-party MQTT bridge body keys per ``ThirdPartyMqttBody.smali``.
@@ -2237,11 +2196,6 @@ FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
 FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
 FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
 FIELD_THIRD_PARTY_MQTT_TOPIC: Final = "topic"
-
-# Per-device BLE AES key — base64-encoded 32-byte value from the device entry
-# in ``/v1/device/system/list``. Used to encrypt/decrypt the DFED-framed BLE
-# packets (PROTOCOL.md §14, ``bb/c`` helper). Already in REDACT_KEYS.
-FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the
@@ -2363,7 +2317,12 @@ SUBDEVICE_SCAN_TYPES: Final[frozenset[str]] = frozenset({
 # Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
 MQTT_ACTION_IDS_DEVICE_PROPERTY: Final = frozenset({3011})
 MQTT_ACTION_IDS_ALARM: Final = frozenset({3042})
-MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({3015, 3016, 3017, 3018})
+MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({
+    ACTION_ID_TIMER_TASK_ADD,
+    ACTION_ID_TIMER_TASK_DELETE,
+    ACTION_ID_TIMER_TASK_UPDATE,
+    ACTION_ID_TIMER_TASK_READ,
+})
 MQTT_ACTION_IDS_COMBINE: Final = frozenset({
     3019,
     3021,
@@ -2381,12 +2340,12 @@ MQTT_ACTION_IDS_COMBINE: Final = frozenset({
 MQTT_ACTION_IDS_SUBDEVICE: Final = frozenset({3014, 3031, 3032, 3033, 3037})
 
 # --- constants unioned from other variants ---
-CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"  # noqa: F811
-DEFAULT_ENABLE_WEEK_STATISTICS: Final = True  # noqa: F811
-CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"  # noqa: F811
-DEFAULT_ENABLE_MONTH_STATISTICS: Final = True  # noqa: F811
-CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"  # noqa: F811
-DEFAULT_ENABLE_YEAR_STATISTICS: Final = True  # noqa: F811
+CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"
+DEFAULT_ENABLE_WEEK_STATISTICS: Final = True
+CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"
+DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
+CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
+DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 EXTERNAL_STAT_BUCKET_DAILY: Final = "daily"
 CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
 CONF_LOCAL_MQTT_HOST: Final = "local_mqtt_host"

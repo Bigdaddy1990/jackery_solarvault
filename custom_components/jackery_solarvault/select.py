@@ -375,7 +375,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        """Return the list of available options."""
+        """Return the list of available options."""  # noqa: D421
         description = self.entity_description
         if description.options_fn is not None:
             return description.options_fn(self)
@@ -383,7 +383,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        """Return the currently-selected option."""
+        """Return the currently-selected option."""  # noqa: D421
         return self.entity_description.current_fn(self)
 
     async def async_select_option(self, option: str) -> None:

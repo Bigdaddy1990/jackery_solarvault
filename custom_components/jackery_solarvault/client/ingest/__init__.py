@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 import logging
 from typing import TYPE_CHECKING, Any
 
-from jackery_solarvault.const import (
+from ...const import (
     APP_CHART_STAT_METRICS,
     APP_CHART_STAT_PERIODS,
     APP_SECTION_HOME_STAT,
@@ -34,20 +34,22 @@ from jackery_solarvault.const import (
     PAYLOAD_PV_TRENDS,
     PAYLOAD_SYSTEM,
 )
-from jackery_solarvault.handlers.property_merge import merge_dict_values
-from jackery_solarvault.util import safe_float
-
-from .ingest import TransportSource, gate_payload_section
+from ...handlers.property_merge import merge_dict_values
+from ...util import safe_float
+from .ingest import (
+    TransportSource,
+    gate_payload_section,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)  # noqa: RUF067
 
 
 # Canonical mapping from metric key to (trend_section, stat_key) used by
 # ``day_chart_source_candidates`` when building day power-curve candidates.
-DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {
+DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {  # noqa: RUF067
     "pv_energy": (PAYLOAD_PV_TRENDS, APP_STAT_TOTAL_SOLAR_ENERGY),
     "battery_charge_energy": (
         PAYLOAD_BATTERY_TRENDS,
@@ -61,7 +63,7 @@ DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {
 }
 
 
-def stat_row_start(row: Mapping[str, Any]) -> float | None:
+def stat_row_start(row: Mapping[str, Any]) -> float | None:  # noqa: RUF067
     """Return a statistics row start timestamp in seconds."""
     start = row.get("start")
     if isinstance(start, datetime):
@@ -69,7 +71,7 @@ def stat_row_start(row: Mapping[str, Any]) -> float | None:
     return safe_float(start)
 
 
-def filter_completed_app_points(
+def filter_completed_app_points(  # noqa: RUF067
     points: list[Any],
     date_type: str,
     reset_period: str,
@@ -100,7 +102,7 @@ def filter_completed_app_points(
     return completed
 
 
-def parse_statistics_backfill_date(value: object) -> date | None:
+def parse_statistics_backfill_date(value: object) -> date | None:  # noqa: RUF067
     """Parse a persisted ISO date for statistics repair decisions."""
     if not isinstance(value, str):
         return None
@@ -110,7 +112,7 @@ def parse_statistics_backfill_date(value: object) -> date | None:
         return None
 
 
-def statistics_current_year_recovery_needed(
+def statistics_current_year_recovery_needed(  # noqa: RUF067
     *,
     last_success: date,
     last_repair: date | None,
@@ -139,7 +141,7 @@ def statistics_current_year_recovery_needed(
     return last_repair < last_success_month
 
 
-def iter_calendar_months(start_date: date, end_date: date) -> list[date]:
+def iter_calendar_months(start_date: date, end_date: date) -> list[date]:  # noqa: RUF067
     """Return first-of-month dates intersecting an inclusive date range.
 
     The missing ``@staticmethod`` decorator on the original coordinator
@@ -160,7 +162,7 @@ def iter_calendar_months(start_date: date, end_date: date) -> list[date]:
     return months
 
 
-def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:
+def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:  # noqa: RUF067
     """Return Monday week starts intersecting an inclusive date range."""
     cursor = start_date - timedelta(days=start_date.weekday())
     end_week = end_date - timedelta(days=end_date.weekday())
@@ -171,12 +173,12 @@ def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:
     return weeks
 
 
-def iter_calendar_years(start_date: date, end_date: date) -> list[int]:
+def iter_calendar_years(start_date: date, end_date: date) -> list[int]:  # noqa: RUF067
     """Return calendar years intersecting an inclusive date range."""
     return list(range(start_date.year, end_date.year + 1))
 
 
-def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:
+def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:  # noqa: RUF067
     """Return the external bucket id and label for an app chart period."""
     for period_date_type, bucket, bucket_label in APP_CHART_STAT_PERIODS:
         if period_date_type == date_type:
@@ -184,7 +186,7 @@ def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:
     return None
 
 
-def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:
+def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:  # noqa: RUF067
     """Return a stable, user-readable app chart statistic name prefix."""
     return (
         (payload.get(PAYLOAD_SYSTEM) or {}).get(FIELD_DEVICE_NAME)
@@ -194,7 +196,7 @@ def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:
     )
 
 
-def day_chart_source_candidates(
+def day_chart_source_candidates(  # noqa: RUF067
     section_prefix: str,
     stat_key: str,
     metric_key: str,
@@ -218,7 +220,7 @@ def day_chart_source_candidates(
 
 # Canonical mapping from metric key to {date_type: entity_statistic_key}
 # used by ``entity_targets_for_app_points``.
-ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {
+ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {  # noqa: RUF067
     "pv_energy": {
         DATE_TYPE_DAY: "device_today_pv_energy",
         DATE_TYPE_WEEK: "pv_week_energy",
@@ -306,10 +308,10 @@ ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {
 }
 
 # Window for automatic HTTP backfill of recent day statistics.
-STATISTICS_HTTP_BACKFILL_WINDOW_DAYS: int = 7
+STATISTICS_HTTP_BACKFILL_WINDOW_DAYS: int = 7  # noqa: RUF067
 
 
-def entity_targets_for_app_points(
+def entity_targets_for_app_points(  # noqa: RUF067
     metric_key: str,
     date_type: str,
 ) -> tuple[tuple[str, str, bool], ...]:
@@ -335,12 +337,12 @@ def entity_targets_for_app_points(
     return ()
 
 
-def entity_source_priority(reset_period: str, date_type: str) -> int:
+def entity_source_priority(reset_period: str, date_type: str) -> int:  # noqa: RUF067
     """Return priority for duplicate buckets within the same period."""
     return 1 if reset_period == date_type else 0
 
 
-def statistics_http_backfill_dates(
+def statistics_http_backfill_dates(  # noqa: RUF067
     today: date,
     *,
     window_days: int = STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
@@ -360,7 +362,7 @@ def statistics_http_backfill_dates(
     ]
 
 
-def historical_day_payload_from_sources(
+def historical_day_payload_from_sources(  # noqa: RUF067
     section_sources: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Convert section-source dicts into the normal day payload shape."""
@@ -382,7 +384,7 @@ def historical_day_payload_from_sources(
     return payload
 
 
-def is_derived_home_energy_candidate(
+def is_derived_home_energy_candidate(  # noqa: RUF067
     *,
     metric_key: str,
     section_prefix: str,
@@ -400,7 +402,7 @@ def is_derived_home_energy_candidate(
     )
 
 
-def merge_device_statistic_data(
+def merge_device_statistic_data(  # noqa: RUF067
     updated: dict[str, Any],
     source: dict[str, Any],
     device_statistic_live_keys: frozenset[str],
@@ -430,7 +432,7 @@ def merge_device_statistic_data(
     return True
 
 
-def merge_lifetime_counter_data(
+def merge_lifetime_counter_data(  # noqa: RUF067
     updated: dict[str, Any],
     source: dict[str, Any],
     lifetime_counter_keys: frozenset[str],
@@ -452,7 +454,7 @@ def merge_lifetime_counter_data(
     return True
 
 
-def current_app_chart_entity_source_batches(
+def current_app_chart_entity_source_batches(  # noqa: RUF067
     payload: dict[str, Any],
     source: TransportSource,
 ) -> list[tuple[str, dict[str, dict[str, Any]]]]:

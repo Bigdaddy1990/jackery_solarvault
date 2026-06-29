@@ -1371,12 +1371,20 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
     def available(self) -> bool:
         """Determine whether the delete storm alert button is currently available.
 
-        The button is available only when the base entity is available and the targeted
-        storm alert still exists.
+        Availability mirrors what the integration actually knows about the alert:
+
+        * If the base entity is unavailable, the button is unavailable.
+        * If the weather plan has not been loaded yet, the alert's existence is
+          *unknown*. The button stays available so that pressing it runs the real
+          delete path, which surfaces the specific domain error (for example
+          ``alert_already_deleted`` / ``alert_not_found``) instead of HA short-
+          circuiting the press with a generic ``entity_action_failed``.
+        * If the weather plan *is* loaded, the alert is definitively present or
+          gone, so availability tracks whether the targeted alert still exists.
 
         Returns:
-            True if the base entity is available and the referenced storm alert exists,
-            False otherwise.
+            True if the base entity is available and either the weather plan is not
+            yet loaded or the referenced storm alert still exists; False otherwise.
         """
         if not super().available:
             return False

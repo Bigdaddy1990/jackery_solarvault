@@ -10,7 +10,7 @@ Reference: jackery_entity_field_candidates_v2.json, hbxn_model_fields.html
 import logging
 from typing import TYPE_CHECKING, Any
 
-from jackery_solarvault.const import (
+from ..const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_BATTERIES,
@@ -68,9 +68,11 @@ from jackery_solarvault.const import (
     SUBDEVICE_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_TYPE_WATER_LEAK,
 )
-from jackery_solarvault.util import first_nonblank_int, safe_int
-
-from .property_merge import find_list_for_key, merge_dict_values
+from ..util import first_nonblank_int, safe_int
+from .property_merge import (
+    find_list_for_key,
+    merge_dict_values,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

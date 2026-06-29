@@ -21,10 +21,12 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, MqttError
+from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ...const import (
+    DOMAIN,
+    LOCAL_MQTT_RUNTIME_KEY,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
     MQTT_KEEPALIVE_SEC,
@@ -32,6 +34,8 @@ from jackery_solarvault.const import (
 )
 
 if TYPE_CHECKING:
+    from aiomqtt import Client as MQTTClient
+
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -372,7 +376,7 @@ class JackeryLocalMqttClient:
         else:
             try:
                 text = raw_bytes.decode("utf-8")
-            except UnicodeDecodeError:
+            except UnicodeDecodeError as err:
                 # Untrusted payload was not valid UTF-8 (likely a binary frame);
                 # expected fallback, surfaced at DEBUG without spamming logs.
                 _LOGGER.debug(
@@ -386,7 +390,7 @@ class JackeryLocalMqttClient:
         if text is not None:
             try:
                 parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError) as err:
                 # Untrusted payload was not valid JSON; expected parse fallback,
                 # logged at DEBUG so busy brokers do not generate log spam.
                 _LOGGER.debug(
@@ -415,12 +419,12 @@ class JackeryLocalMqttClient:
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
-        """Return True for known high-volume non-device topics."""
+        """Return True for known high-volume non-device topics.
 
         Returns:
-            `True` if the topic should be suppressed as noise (`$SYS/` topics or, when  # noqa: E211, E225, E226, E275
+            `True` if the topic should be suppressed as noise (`$SYS/` topics or, when
             the configured filter is globally broad, topics starting with
-            `homeassistant/`), `False` otherwise.  # noqa: E226
+            `homeassistant/`), `False` otherwise.
         """
         if topic.startswith("$SYS/"):
             return True
@@ -430,9 +434,7 @@ class JackeryLocalMqttClient:
 
     @staticmethod
     def _looks_like_home_assistant_state_event_payload(payload: bytes) -> bool:
-        """Return True for high-volume HA state events on a shared topic."""
-
-        event wrapper.
+        """Return True for high-volume HA state events on a shared topic event wrapper.
 
         Scans the first bytes of the payload for Home Assistant event markers commonly
         present in `state_changed` events.
@@ -441,7 +443,7 @@ class JackeryLocalMqttClient:
             `True` if the payload prefix contains all of `"event_type"`,
             `"state_changed"`, `"event_data"`, `"old_state"`, and `"new_state"`,
             `False` otherwise.
-        """  # noqa: E226
+        """
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
             b'"event_type"' in head
@@ -455,24 +457,22 @@ class JackeryLocalMqttClient:
     def _extract_local_jackery_payload(
         payload: dict[str, Any],
     ) -> dict[str, Any] | None:
-        """Return a Jackery payload from raw JSON or an HA-event wrapper."""
+        """Return a Jackery payload from raw JSON or an HA-event wrapper.
 
-        Home Assistant event wrapper.
-
-        If `payload` is a Home Assistant event wrapper (contains `event_type` and  # noqa: E211
-        `event_data`), inspects `event_data["payload"]`, `event_data["body"]`,  # noqa: COM818
-        `event_data["data"]`, and `event_data` itself and returns the first dict
-        candidate whose keys intersect the Jackery marker keys. If `payload` is not an
-        HA wrapper, returns it unchanged.
+        If `payload` is a Home Assistant event wrapper (contains `event_type`
+        and `event_data`), inspects `event_data["payload"]`,
+        `event_data["body"]`, `event_data["data"]`, and `event_data` itself and
+        returns the first dict candidate whose keys intersect the Jackery
+        marker keys. If `payload` is not an HA wrapper, returns it unchanged.
 
         Parameters:
-            payload (dict): Parsed JSON object from an MQTT message, possibly an HA  # noqa: E211
-            event wrapper.
+            payload (dict): Parsed JSON object from an MQTT message, possibly an
+                HA event wrapper.
 
         Returns:
-            dict | None: The extracted Jackery payload dict if found; the original  # noqa: E702
-            `payload` if it is not an HA event wrapper; `None` if a wrapper is present  # noqa: E702
-            but no Jackery payload can be extracted.
+            dict | None: The extracted Jackery payload dict if found; the
+            original `payload` if it is not an HA event wrapper; `None` if a
+            wrapper is present but no Jackery payload can be extracted.
         """
         if "event_type" not in payload or "event_data" not in payload:
             return payload
@@ -496,16 +496,16 @@ class JackeryLocalMqttClient:
         """Determine whether the configured topic filter is the global MQTT wildcard.
 
         Returns:
-        """Return True when the current topic filter is globally broad."""  # noqa: E112
-            otherwise.  # noqa: E113
+            True when the current topic filter is globally broad, False otherwise.
         """
         return self._topic_filter in {"#", "+/#"}
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
-        """Evaluate MQTT wildcard matching for one topic filter."""
+        """Evaluate MQTT wildcard matching for one topic filter.
 
-        (single-level) and '#' (multi-level) wildcards. The empty filter never matches.
+        Supports '+' (single-level) and '#' (multi-level) wildcards. The empty filter
+        never matches.
 
         Returns:
             True if the topic matches the filter, False otherwise.
@@ -546,7 +546,6 @@ class JackeryLocalMqttClient:
             await coro
 
         task = self._hass.async_create_task(
-            _runner(),
             _runner(), name=f"jackery_local_mqtt_{label}"
         )
 
@@ -562,8 +561,8 @@ class JackeryLocalMqttClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
-                _LOGGER.error("Jackery local MQTT %s handler failed: %s", label, err)
+            except Exception:
+                _LOGGER.exception("Jackery local MQTT %s handler failed", label)
 
         task.add_done_callback(_log_task_result)
 
@@ -595,12 +594,10 @@ class JackeryLocalMqttClient:
             # in normal diagnostics exports. The count and ``topics_truncated``
             # flag are still useful to confirm the listener is receiving.
             topics = [REDACTED_VALUE for _ in self._topics_seen]
-            topic_filter = REDACTED_VALUE
         else:
             target = {"host": self._host, "port": self._port}
             last_topic = self._last_topic
             topics = list(self._topics_seen)
-            topic_filter = self._topic_filter
         routing_warning = None
         if (
             self._messages_received > 0

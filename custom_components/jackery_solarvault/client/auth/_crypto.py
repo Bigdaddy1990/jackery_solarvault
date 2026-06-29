@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from jackery_solarvault.client.const import MQTT_MAC_ID_PREFIX
+from ...const import MQTT_MAC_ID_PREFIX
 
 
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
@@ -70,9 +70,11 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
         ValueError: If `bluetooth_key` is not exactly 16 bytes.
     """  # noqa: E501
     if len(bluetooth_key) != 16:  # noqa: PLR2004
-        raise ValueError(  # noqa: TRY003
-            f"encrypt_mqtt_body: bluetoothKey must be 16 bytes, got {len(bluetooth_key)}"  # noqa: E501
+        msg = (
+            "encrypt_mqtt_body: bluetoothKey must be 16 bytes, "
+            f"got {len(bluetooth_key)}"
         )
+        raise ValueError(msg)
     plaintext = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode(
         "utf-8"
     )  # noqa: E501, RUF100
@@ -96,9 +98,10 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
     der_bytes = base64.b64decode(public_key_b64)
     public_key = load_der_public_key(der_bytes)
     if not isinstance(public_key, rsa.RSAPublicKey):
-        raise TypeError(  # noqa: TRY003
+        msg = (
             f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
         )
+        raise TypeError(msg)
     return public_key.encrypt(data, asym_padding.PKCS1v15())
 
 

@@ -15,7 +15,7 @@ import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError  # noqa: TC002
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ...const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,
@@ -120,6 +120,7 @@ class JackeryMqttPushClient:
         # back the birth/availability diagnostics surfaced by the Cloud MQTT and
         # HTTP-API diagnostic sensors.
         self._tls_x509_strict_disabled = False
+        self._birth_publishes = 0
         self._birth_publish_failed = 0
         self._last_birth_at: str | None = None
 
@@ -240,14 +241,16 @@ class JackeryMqttPushClient:
             await self._async_wait_connected(timeout_sec=12.0)
         client = self._client
         if client is None:
-            raise RuntimeError("MQTT client is not running")  # noqa: TRY003
+            msg = "MQTT client is not running"
+            raise RuntimeError(msg)
         try:
             await client.publish(topic, text, qos=qos, retain=retain)
         except MqttError as err:
             self._connected = False
             self._connected_event.clear()
             self._last_error = f"publish failed: {err}"
-            raise RuntimeError(f"MQTT publish failed: {err}") from err  # noqa: TRY003
+            msg = f"MQTT publish failed: {err}"
+            raise RuntimeError(msg) from err
         self._last_published_topic = topic
         self._last_publish_at = self._utc_now_iso()
 
@@ -261,7 +264,8 @@ class JackeryMqttPushClient:
             RuntimeError: If the MQTT client runner is not started, or if the client fails to connect within `timeout_sec`.
         """  # noqa: E501
         if self._runner_task is None:
-            raise RuntimeError("MQTT client is not running")  # noqa: TRY003
+            msg = "MQTT client is not running"
+            raise RuntimeError(msg)
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
@@ -279,13 +283,14 @@ class JackeryMqttPushClient:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
         except TimeoutError as err:
             if self._last_error:
-                raise RuntimeError(  # noqa: TRY003
-                    f"MQTT not connected yet ({self._last_error})"
-                ) from err
+                msg = f"MQTT not connected yet ({self._last_error})"
+                raise RuntimeError(msg) from err
             self._last_error = "publish timeout waiting for MQTT connect"
-            raise RuntimeError("MQTT not connected yet") from err  # noqa: TRY003
+            msg = "MQTT not connected yet"
+            raise RuntimeError(msg) from err
         if not self._connected:
-            raise RuntimeError(f"MQTT not connected yet ({self._last_error})")  # noqa: TRY003
+            msg = f"MQTT not connected yet ({self._last_error})"
+            raise RuntimeError(msg)
 
     async def _async_stop_locked(self) -> None:
         """Stop the current runner task and clear internal connection state.
@@ -352,9 +357,7 @@ class JackeryMqttPushClient:
                             "Jackery MQTT subscribe failed for %s: %s", topic, err
                         )
                 if self._connect_callback is not None:
-                    self._schedule_coroutine(
-                        self._connect_callback(), "connect snapshot"
-                    )
+                    self._schedule_birth_snapshot(self._connect_callback())
                 async for message in client.messages:
                     self._handle_message(str(message.topic), message.payload)
         except MqttCodeError as err:
@@ -418,12 +421,12 @@ class JackeryMqttPushClient:
             return
         self._last_connect_failure_signature = message
         if self._is_connect_auth_failure_rc(rc):
-            _LOGGER.debug(
-                "Jackery MQTT connect failed: %s (streak=%d)",
-                message,
-                self._consecutive_auth_failures,
-            )
+            # Auth rejections are actionable (wrong credentials / shared
+            # session) — surface them at WARNING so the user can act.
+            _LOGGER.warning("Jackery MQTT connect failed: %s", message)
         else:
+            # Transient broker refusals are expected noise on an optional
+            # push layer — keep them at DEBUG.
             _LOGGER.debug("Jackery MQTT connect failed: %s", message)
 
     def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
@@ -591,6 +594,41 @@ class JackeryMqttPushClient:
 
         task.add_done_callback(_log_task_result)
 
+    def _schedule_birth_snapshot(self, coro: Awaitable[None]) -> None:
+        """Dispatch the on-connect app-snapshot publish and track it as a birth.
+
+        The snapshot publish is the Jackery protocol "birth" (MQTT_PROTOCOL.md
+        §3): there is no Last Will, so presence is asserted by this publish. The
+        attempt is counted and timestamped eagerly; if the publish coroutine
+        raises, the failure is recorded so the birth/availability diagnostics
+        surfaced by the Cloud MQTT and HTTP-API sensors stay accurate.
+
+        Args:
+            coro: The snapshot-publish coroutine to dispatch.
+        """
+        self._birth_publishes += 1
+        self._last_birth_at = self._utc_now_iso()
+
+        async def _runner() -> None:
+            await coro
+
+        task = self._hass.async_create_task(
+            _runner(), name="jackery_mqtt_birth snapshot"
+        )
+
+        def _track_birth_result(done: asyncio.Task[None]) -> None:
+            try:
+                done.result()
+            except asyncio.CancelledError:
+                return
+            except Exception as err:  # noqa: BLE001
+                self._birth_publish_failed += 1
+                _LOGGER.error(  # noqa: TRY400
+                    "Jackery MQTT birth snapshot handler failed: %s", err
+                )
+
+        task.add_done_callback(_track_birth_result)
+
     @staticmethod
     def _utc_now_iso() -> str:
         """Get the current UTC time as an ISO 8601 formatted string.
@@ -683,6 +721,9 @@ class JackeryMqttPushClient:
             "tls_custom_ca_loaded": self._tls_custom_ca_loaded,
             "tls_certificate_source": self._tls_certificate_source,
             "library": MQTT_CLIENT_LIBRARY,
+            "birth_publishes": self._birth_publishes,
+            "birth_publish_failed": self._birth_publish_failed,
+            "last_birth_at": self._last_birth_at,
         }
 
     @property

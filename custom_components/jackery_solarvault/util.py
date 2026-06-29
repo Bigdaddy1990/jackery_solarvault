@@ -12,7 +12,7 @@ import operator
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, NamedTuple, cast
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 
 from .const import (
     APP_CHART_LABELS,
@@ -103,6 +103,7 @@ from .const import (
     FIELD_GRID_OUT_PW,
     FIELD_HOME_LOAD_PW,
     FIELD_ID,
+    FIELD_IDX,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
     FIELD_LOAD_PW,
@@ -136,8 +137,23 @@ _LOGGER = logging.getLogger(__name__)
 
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
-_SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_-]+")
+_SUBDEVICE_ID_RE = re.compile(r"[^A-Za-z0-9_]+")
 _DEV_MODE_ENV: str = "JACKERY_DEV_MODE"
+
+# Calendar / time bounds used in validation guards.
+_MONTHS_PER_YEAR: Final = 12
+_MAX_MONTH_BUCKETS: Final = 31
+_HOURS_PER_DAY: Final = 24
+_MAX_HOUR: Final = 23
+_MAX_MINUTE: Final = 59
+# A POSIX timestamp at/above this magnitude is in milliseconds, not seconds.
+_MILLIS_TIMESTAMP_THRESHOLD: Final = 100_000_000_000
+# Treat |value| below this as numerically zero for chart-bucket presence checks.
+_NEAR_ZERO_EPSILON: Final = 0.00001
+# Plausible upper bound for a single electricity price / per-kWh derived rate.
+_MAX_PRICE_PER_KWH: Final = 10
+# Plausible upper bound for a carbon-per-generation correction factor.
+_MAX_CARBON_FACTOR: Final = 5
 _DEV_MODE_CACHED: bool | None = None
 WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
 
@@ -255,19 +271,21 @@ def parse_utc_datetime(
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
         timestamp = float(value)
-        if abs(timestamp) >= 100_000_000_000:
+        if abs(timestamp) >= _MILLIS_TIMESTAMP_THRESHOLD:
             timestamp /= 1000
         try:
             parsed = datetime.fromtimestamp(timestamp, UTC)
         except (OSError, OverflowError, ValueError) as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            msg = f"invalid UTC timestamp: {value!r}"
+            raise ValueError(msg) from err
     elif isinstance(value, str):
         normalized = value.strip()
         if not normalized:
-            raise ValueError("timestamp must not be empty")
+            msg = "timestamp must not be empty"
+            raise ValueError(msg)
         with contextlib.suppress(ValueError, OSError, OverflowError):
             timestamp = float(normalized)
-            if abs(timestamp) >= 100_000_000_000:
+            if abs(timestamp) >= _MILLIS_TIMESTAMP_THRESHOLD:
                 timestamp /= 1000
             return datetime.fromtimestamp(timestamp, UTC)
         if normalized.endswith("Z"):
@@ -275,9 +293,11 @@ def parse_utc_datetime(
         try:
             parsed = datetime.fromisoformat(normalized)
         except ValueError as err:
-            raise ValueError(f"invalid UTC timestamp: {value!r}") from err
+            msg = f"invalid UTC timestamp: {value!r}"
+            raise ValueError(msg) from err
     else:
-        raise ValueError(f"unsupported UTC timestamp: {value!r}")
+        msg = f"unsupported UTC timestamp: {value!r}"
+        raise ValueError(msg)
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -353,7 +373,8 @@ def append_unique_entity(
 def validate_app_period_date_type(date_type: str) -> str:
     """Return a supported Jackery app period type or raise ValueError."""
     if date_type not in APP_PERIOD_DATE_TYPES:
-        raise ValueError(f"Unsupported Jackery app period dateType: {date_type!r}")
+        msg = f"Unsupported Jackery app period dateType: {date_type!r}"
+        raise ValueError(msg)
     return date_type
 
 
@@ -369,7 +390,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
     """  # noqa: E501
     date_type = validate_app_period_date_type(date_type)
     if today is None:
-        today = date.today()
+        today = datetime.now(UTC).astimezone().date()
     if date_type == DATE_TYPE_DAY:
         return today, today
     if date_type == DATE_TYPE_WEEK:
@@ -390,17 +411,16 @@ def _app_period_bound_to_date(value: str | date, *, field_name: str) -> date:
         return value
     normalized = str(value).strip()
     if not normalized:
-        raise ValueError(f"Jackery app period {field_name} must not be empty")
+        msg = f"Jackery app period {field_name} must not be empty"
+        raise ValueError(msg)
     try:
         return date.fromisoformat(normalized)
     except ValueError as err:
-        raise ValueError(
+        msg = (
             f"Jackery app period {field_name} must be an ISO date (YYYY-MM-DD): "
             f"{value!r}"
         )
-        raise ValueError(
-            msg,
-        ) from err
+        raise ValueError(msg) from err
 
 
 def app_period_date_bounds(
@@ -434,10 +454,11 @@ def app_period_date_bounds(
         field_name=APP_REQUEST_END_DATE,
     )
     if begin > end:
-        raise ValueError(
+        msg = (
             "Jackery app period beginDate must be before or equal to endDate: "
             f"{begin.isoformat()} > {end.isoformat()}"
         )
+        raise ValueError(msg)
     return begin.isoformat(), end.isoformat()
 
 
@@ -455,8 +476,9 @@ def app_period_request_kwargs(
 
 def app_month_request_kwargs(year: int, month: int) -> dict[str, str]:
     """Return method kwargs for one explicit calendar-month app request."""
-    if month < 1 or month > 12:
-        raise ValueError(f"Unsupported Jackery app month: {month!r}")
+    if month < 1 or month > _MONTHS_PER_YEAR:
+        msg = f"Unsupported Jackery app month: {month!r}"
+        raise ValueError(msg)
     first = date(year, month, 1)
     last = first.replace(day=calendar.monthrange(year, month)[1])
     begin, end = app_period_date_bounds(
@@ -521,22 +543,32 @@ def safe_float(
 
 
 def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime
-    """Convert a value to an integer when possible.
+    """Convert a value to an integer only when it represents an exact integer.
 
-    Returns None for a None input or when the value cannot be converted to an integer.
+    Accepted: genuine ints and integral floats (``8.0`` -> ``8``). Rejected
+    (yielding ``None``): booleans, non-finite floats, floats with a fractional
+    part (``8.9``), and decimal-format strings such as ``"8.0"`` (only plain
+    integer-format strings like ``"8"`` parse). Rejecting decimal strings keeps
+    string coercion strict while still preserving integral numeric floats so
+    sensor transforms do not silently drop whole values.
 
     Returns:
-        int: The converted integer if successful, `None` otherwise.
+        int: The converted integer if the value is an exact integer, `None` otherwise.
     """
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
-    try:
-        return int(value)
-    except TypeError, ValueError:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        finite_integral = math.isfinite(value) and value.is_integer()
+        return int(value) if finite_integral else None
+    if isinstance(value, str):
+        candidate = value.strip()
         try:
-            return int(float(value))
-        except TypeError, ValueError:
+            return int(candidate)
+        except ValueError:
             return None
+    return None
 
 
 def dev_mode_redactions_disabled() -> bool:
@@ -813,18 +845,14 @@ def smart_plug_serial(plug: object) -> str | None:
     """  # noqa: E501
     if not isinstance(plug, dict):
         return None
-    raw = (
-        plug.get(FIELD_DEVICE_SN)
-        or plug.get(FIELD_DEV_SN)
-        or plug.get(FIELD_SN)
-        or plug.get(FIELD_DEVICE_ID)
-        or plug.get(FIELD_ID)
-        or plug.get(FIELD_DEV_ID)
+    return first_nonblank_text(
+        plug.get(FIELD_DEVICE_SN),
+        plug.get(FIELD_DEV_SN),
+        plug.get(FIELD_SN),
+        plug.get(FIELD_DEVICE_ID),
+        plug.get(FIELD_ID),
+        plug.get(FIELD_DEV_ID),
     )
-    if raw is None:
-        return None
-    serial = str(raw).strip()
-    return serial or None
 
 
 def _sorted_by_serial(
@@ -872,30 +900,80 @@ def meter_head_serial(meter_head: object) -> str | None:
     """Extract the stable identity from a meter-head/collector payload."""
     if not isinstance(meter_head, dict):
         return None
-    raw = (
-        meter_head.get(FIELD_DEVICE_SN)
-        or meter_head.get(FIELD_DEV_SN)
-        or meter_head.get(FIELD_SN)
-        or meter_head.get(FIELD_DEVICE_ID)
-        or meter_head.get(FIELD_ID)
-        or meter_head.get(FIELD_DEV_ID)
+    return first_nonblank_text(
+        meter_head.get(FIELD_DEVICE_SN),
+        meter_head.get(FIELD_DEV_SN),
+        meter_head.get(FIELD_SN),
+        meter_head.get(FIELD_DEVICE_ID),
+        meter_head.get(FIELD_ID),
+        meter_head.get(FIELD_DEV_ID),
     )
-    if raw is None:
-        return None
-    serial = str(raw).strip()
-    return serial or None
 
 
 def sorted_meter_heads(meter_heads: object) -> list[dict[str, Any]]:
     """Return meter-head entries sorted by stable serial/id values."""
     if not isinstance(meter_heads, list):
         return []
-    return None
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in meter_heads:
+        sn = meter_head_serial(entry)
+        if sn is None:
+            continue
+        entries.append((sn, entry))
+    entries.sort(key=operator.itemgetter(0))
+    return [entry for _, entry in entries]
+
+
+def circuit_id(circuit: object) -> str | None:
+    """Extract the stable index identity from a circuit/breaker payload.
+
+    Circuit entries come from MQTT ``QueryCircuitProperty`` payloads and are
+    identified by their ``idx`` (circuit index). ``idx`` may be ``0``, so the
+    presence test uses ``is None`` rather than truthiness.
+    """
+    if not isinstance(circuit, dict):
+        return None
+    return first_nonblank_text(
+        circuit.get(FIELD_IDX),
+        circuit.get(FIELD_ID),
+    )
 
 
 def sorted_circuits(circuits: object) -> list[dict[str, Any]]:
-    for entry in meter_heads:
-        sn = meter_head_serial(entry)
+    """Return circuit/breaker entries sorted by stable index identity."""
+    if not isinstance(circuits, list):
+        return []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in circuits:
+        cid = circuit_id(entry)
+        if cid is None:
+            continue
+        entries.append((cid, entry))
+    entries.sort(key=operator.itemgetter(0))
+    return [entry for _, entry in entries]
+
+
+def sub_device_serial(sub_device: object) -> str | None:
+    """Extract the stable serial identity from a subdevice payload."""
+    if not isinstance(sub_device, dict):
+        return None
+    return first_nonblank_text(
+        sub_device.get(FIELD_DEVICE_SN),
+        sub_device.get(FIELD_DEV_SN),
+        sub_device.get(FIELD_SN),
+        sub_device.get(FIELD_DEVICE_ID),
+        sub_device.get(FIELD_ID),
+        sub_device.get(FIELD_DEV_ID),
+    )
+
+
+def sorted_sub_devices(sub_devices: object) -> list[dict[str, Any]]:
+    """Return subdevice entries sorted by stable serial identity."""
+    if not isinstance(sub_devices, list):
+        return []
+    entries: list[tuple[str, dict[str, Any]]] = []
+    for entry in sub_devices:
+        sn = sub_device_serial(entry)
         if sn is None:
             continue
         entries.append((sn, entry))
@@ -1071,7 +1149,7 @@ def _format_request_range(request: object) -> str | None:
     if not date_type and not begin and not end:
         return None
     if begin or end:
-        return f"{date_type or 'unknown'} {begin or '?'}..{end or '?'}"
+        return f"{date_type or "unknown"} {begin or "?"}..{end or "?"}"
     return str(date_type)
 
 
@@ -1113,7 +1191,7 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     )
 
     if source_request or reference_request:
-        text += f" [{source_section}: {source_request or 'unknown'}; {reference_section}: {reference_request or 'unknown'}]"  # noqa: E501
+        text += f" [{source_section}: {source_request or "unknown"}; {reference_section}: {reference_request or "unknown"}]"  # noqa: E501
     return text
 
 
@@ -1207,7 +1285,7 @@ def app_data_quality_warnings(
         source/reference values (5 decimal places) and optional request and chart-series metadata for diagnostics.
     """  # noqa: E501
     if today is None:
-        today = date.today()
+        today = datetime.now(UTC).astimezone().date()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
     week_inside_current_month = (
         week_begin.year == today.year
@@ -1304,7 +1382,7 @@ def app_data_quality_warnings(
         )
 
     for prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
-        _period_total(prefix, DATE_TYPE_DAY, stat_key)
+        day = _period_total(prefix, DATE_TYPE_DAY, stat_key)
         week = _period_total(prefix, DATE_TYPE_WEEK, stat_key)
         month = _period_total(prefix, DATE_TYPE_MONTH, stat_key)
         year = _period_total(prefix, DATE_TYPE_YEAR, stat_key)
@@ -1512,40 +1590,33 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
 def _compact_year_parts(value: object) -> tuple[float, float] | None:
     """Parse a compact year bucket value into previous- and current-month parts.
 
-    Accepts numeric or string inputs that encode a whole (previous months) and a fractional
-    component (current-month share), and returns a tuple of two floats: (previous_part, current_part).
-    Returns None for None, boolean, empty, or otherwise unparsable/unsupported values.
+    Jackery encodes a device-year chart bucket as ``whole.fraction`` where the
+    integer ``whole`` is the completed previous month's energy and the decimal
+    ``fraction`` is the current month's running partial. This splits the value
+    into ``(previous_part, current_part)``:
+
+    - ``"13.26"`` -> ``(13.0, 0.26)`` (April=13, May=0.26)
+    - ``"2.00"``  -> ``(2.0, 0.0)``  (whole-only bucket; fraction is zero)
+    - ``"3"``     -> ``(3.0, 0.0)``  (no decimal point; pure previous-month whole)
+
+    The previous-month whole is always carried back one bucket by the caller, so
+    a zero-fraction or integer value still contributes its whole to the prior
+    month rather than staying in place.
 
     Returns:
-        tuple[float, float] | None: `(previous_part, current_part)` when the value can be
-        interpreted, or `None` when the input is missing or invalid.
-    """  # noqa: E501
+        tuple[float, float] | None: ``(previous_part, current_part)`` when the
+        value parses to a finite number, or ``None`` when the input is missing
+        or invalid.
+    """
     if value is None or isinstance(value, bool):
         return None
-    text = str(value).strip().replace(",", ".")
-    if not text:
+    parsed = safe_float(value)
+    if parsed is None or math.isnan(parsed) or math.isinf(parsed):
         return None
-
-    sign = -1.0 if text.startswith("-") else 1.0
-    unsigned = text.removeprefix("-")
-    if "." not in unsigned:
-        parsed = safe_float(value)
-        return None if parsed is None else (0.0, parsed)
-
-    whole_text, fraction_text = unsigned.split(".", 1)
-    if not whole_text:
-        whole_text = "0"
-    if not whole_text.isdigit() or not fraction_text.isdigit():
-        parsed = safe_float(value)
-        return None if parsed is None else (0.0, parsed)
-
-    whole = sign * float(int(whole_text))
-    fraction = sign * float(int(fraction_text)) if int(fraction_text) else 0.0
-
-    if fraction == 0.0:  # noqa: RUF069  # fraction is integer-derived (float(int(...))), exact
-        parsed = safe_float(value)
-        return None if parsed is None else (0.0, parsed)
-    return whole, fraction
+    whole = math.floor(abs(parsed))
+    fraction = round(abs(parsed) - whole, 5)
+    sign = -1.0 if parsed < 0 else 1.0
+    return sign * float(whole), sign * fraction
 
 
 def _prefer_raw_year_series_for_real_payload(
@@ -1561,7 +1632,7 @@ def _prefer_raw_year_series_for_real_payload(
         or len(raw_values) < 12  # noqa: PLR2004
     ):
         return False
-    nonzero = [value for value in raw_values if abs(value) > 0.00001]  # noqa: PLR2004
+    nonzero = [value for value in raw_values if abs(value) > _NEAR_ZERO_EPSILON]
     return len(nonzero) == 1 and abs(sum(raw_values) - direct_total) <= tolerance
 
 
@@ -1591,13 +1662,9 @@ def expanded_year_series_values(
         return None
 
     raw_values = [round(safe_float(item) or 0.0, 5) for item in series]
-    raw_sum = round(sum(raw_values), 2)
+    round(sum(raw_values), 2)
     direct_total = safe_float(source.get(stat_key))
 
-    if direct_total is not None:
-        tolerance = max(0.05, abs(direct_total) * 0.005)
-        if abs(raw_sum - direct_total) <= tolerance:
-            return raw_values
     expanded = [0.0 for _ in series]
     has_compact_bucket = False
     for index, raw_value in enumerate(series):
@@ -1606,6 +1673,7 @@ def expanded_year_series_values(
             continue
         previous_value, current_value = parts
         if previous_value:
+            has_compact_bucket = True
             target = index - 1 if index > 0 else index
             expanded[target] += previous_value
         if current_value:
@@ -1613,27 +1681,57 @@ def expanded_year_series_values(
 
     expanded = [round(value, 5) for value in expanded]
 
-    if direct_total is not None:
-        expanded_sum = round(sum(expanded), 2)
-        tolerance = max(0.05, abs(direct_total) * 0.005)
-        expanded_sum = round(sum(expanded), 2)
-        if (
-            has_compact_bucket
-            and abs(expanded_sum - direct_total) <= tolerance
-            and not _prefer_raw_year_series_for_real_payload(
-                section,
-                raw_values,
-                direct_total,
-                tolerance,
-            )
-        ):
-            return expanded
-        if abs(raw_sum - direct_total) <= tolerance:
-            return raw_values
-        if abs(expanded_sum - direct_total) <= tolerance:
-            return expanded
+    if direct_total is None:
         return raw_values
+    return _disambiguate_year_series(
+        section,
+        raw_values,
+        expanded,
+        direct_total,
+        has_compact_bucket=has_compact_bucket,
+    )
 
+
+def _disambiguate_year_series(
+    section: str,
+    raw_values: list[float],
+    expanded: list[float],
+    direct_total: float,
+    *,
+    has_compact_bucket: bool,
+) -> list[float]:
+    """Pick raw vs. compact-expanded year buckets against the documented total.
+
+    When compact encoding is in effect the expanded series is authoritative even
+    if the raw series happens to sum to the same documented total -- the raw
+    layout misattributes a completed month's energy to the wrong bucket (e.g.
+    ``"13.26"`` -> April=13, May=0.26 rather than a lone May=13.26). Known
+    single-month PV snapshots stay raw via
+    :func:`_prefer_raw_year_series_for_real_payload`.
+
+    Returns:
+        list[float]: The chosen series (expanded when it reconciles the total and
+        compact encoding applies, otherwise raw).
+    """
+    tolerance = max(0.05, abs(direct_total) * 0.005)
+    raw_matches = abs(round(sum(raw_values), 2) - direct_total) <= tolerance
+    expanded_matches = abs(round(sum(expanded), 2) - direct_total) <= tolerance
+    prefer_expanded = (
+        has_compact_bucket
+        and expanded_matches
+        and not _prefer_raw_year_series_for_real_payload(
+            section,
+            raw_values,
+            direct_total,
+            tolerance,
+        )
+    )
+    if prefer_expanded:
+        return expanded
+    if raw_matches:
+        return raw_values
+    if has_compact_bucket and expanded_matches:
+        return expanded
     return raw_values
 
 
@@ -1702,7 +1800,7 @@ def _nonzero_months(values: list[float]) -> list[int]:
     return [
         index + 1
         for index, value in enumerate(values[:12])
-        if abs(safe_float(value) or 0.0) > 0.00001
+        if abs(safe_float(value) or 0.0) > _NEAR_ZERO_EPSILON
     ]
 
 
@@ -1790,12 +1888,12 @@ def _configured_or_derived_price(
     price_source = payload.get(PAYLOAD_PRICE)
     if isinstance(price_source, dict):
         configured = safe_float(price_source.get(FIELD_SINGLE_PRICE))
-        if configured is not None and 0 <= configured <= 10:
+        if configured is not None and 0 <= configured <= _MAX_PRICE_PER_KWH:
             return configured, f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
 
     if year_generation is not None and year_generation > 0 and year_revenue is not None:
         derived = year_revenue / year_generation
-        if 0 <= derived <= 10:
+        if 0 <= derived <= _MAX_PRICE_PER_KWH:
             return round(derived, 5), "pv_year_revenue_per_kwh"
     return None, None
 
@@ -2046,7 +2144,7 @@ def _backfill_pv_revenue(
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
-        if month < 1 or month > 12:
+        if month < 1 or month > _MONTHS_PER_YEAR:
             continue
         revenue = _pv_revenue_value(month_source)
         if revenue is None:
@@ -2127,7 +2225,7 @@ def backfill_year_payload_from_months(
         monthly_values = [0.0 for _ in range(12)]
         found_months: list[int] = []
         for month, month_source in sorted(month_sources.items()):
-            if month < 1 or month > 12:
+            if month < 1 or month > _MONTHS_PER_YEAR:
                 continue
             value = _month_value(month_source, month_section, stat_key)
             if value is None:
@@ -2340,9 +2438,15 @@ def guard_statistic_totals_from_year(
                 "pv_revenue_candidates": candidates,
                 "decision": reason,
                 "would_replace_cloud_total": publish_calculated,
-                "published_value": raw_revenue,
-                "published_value_source": "cloud_total",
+                "published_value": (
+                    calculated_revenue if publish_calculated else raw_revenue
+                ),
+                "published_value_source": (
+                    "calculated" if publish_calculated else "cloud_total"
+                ),
             })
+            if publish_calculated:
+                out[APP_STAT_TOTAL_REVENUE] = round(calculated_revenue, 2)
             out[APP_SAVINGS_CALC_META] = savings
 
     raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
@@ -2354,8 +2458,10 @@ def guard_statistic_totals_from_year(
     ):
         factor = raw_carbon / raw_generation
         corrected_carbon = round(year_generation * factor, 2)
-        if 0 < factor < 5 and corrected_carbon > raw_carbon + _tolerance_for_values(
-            raw_carbon, corrected_carbon
+        if (
+            0 < factor < _MAX_CARBON_FACTOR
+            and corrected_carbon
+            > raw_carbon + _tolerance_for_values(raw_carbon, corrected_carbon)
         ):
             out[APP_STAT_TOTAL_CARBON] = corrected_carbon
             meta.setdefault("corrected", {})[APP_STAT_TOTAL_CARBON] = {
@@ -2425,7 +2531,7 @@ def trend_series_points(
     if begin is None:
         return []
     if today is None:
-        today = date.today()
+        today = datetime.now(UTC).astimezone().date()
 
     points: list[TrendStatisticPoint] = []
     for index, value in enumerate(series_values):
@@ -2433,7 +2539,7 @@ def trend_series_points(
             continue
         if date_type == DATE_TYPE_YEAR:
             month = index + 1
-            if month < 1 or month > 12:
+            if month < 1 or month > _MONTHS_PER_YEAR:
                 continue
             bucket_start = begin.replace(month=month, day=1)
         elif date_type in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
@@ -2508,9 +2614,9 @@ def _parse_day_chart_minute(value: object) -> int | None:
     if match is None:
         return None
     hour, minute = int(match.group(1)), int(match.group(2))
-    if hour == 24 and minute == 0:
+    if hour == _HOURS_PER_DAY and minute == 0:
         return None
-    if 0 <= hour <= 23 and 0 <= minute <= 59:
+    if 0 <= hour <= _MAX_HOUR and 0 <= minute <= _MAX_MINUTE:
         return hour * 60 + minute
     return None
 
@@ -2641,7 +2747,7 @@ def day_power_energy_points(
     if begin is None or (end is not None and begin > end):
         return []
     if today is None:
-        today = date.today()
+        today = datetime.now(UTC).astimezone().date()
     if begin > today:
         return []
     if now is None:
@@ -3260,7 +3366,7 @@ def trend_payload_has_value(
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:
+def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401
     """Return the first value that still has content after stripping."""
     for value in values:
         if value is None:
@@ -3271,7 +3377,7 @@ def first_nonblank(*values: Any) -> str | None:
     return None
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: PLR0911
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401, PLR0911
     """Return the first nonblank value parsed as an integer."""
     for value in values:
         if value is None:

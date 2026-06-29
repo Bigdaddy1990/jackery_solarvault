@@ -1,27 +1,25 @@
 """Diagnostics support for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.core import HomeAssistant
 
-from . import JackeryConfigEntry, _local_mqtt_client
+from . import _local_mqtt_client
 from .const import (
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
     CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     REDACT_KEYS as _STATIC_REDACT_KEYS,
 )
-from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
     config_entry_bool_option,
@@ -29,6 +27,14 @@ from .util import (
     dev_mode_redactions_disabled,
     diagnostic_redactions_disabled,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.core import HomeAssistant
+
+    from . import JackeryConfigEntry
+    from .coordinator import JackerySolarVaultCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = frozenset({"#", "+/#"})
@@ -58,9 +64,7 @@ def _redacted_payload_map(
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """  # noqa: E501
     redacted: dict[str, Any] = {}
-    for index, key in enumerate(
-        sorted(payloads, key=lambda value: str(value)), start=1
-    ):
+    for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
         label = f"{prefix}_{index}"
         if isinstance(payload, dict):
@@ -214,9 +218,16 @@ def _local_mqtt_diagnostics(
         dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
         MQTT client is available, otherwise the client's diagnostics snapshot.
     """  # noqa: E501
-    enabled = config_entry_bool_option(
-        entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
-    )
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    if CONF_LOCAL_MQTT_ENABLE in options or CONF_LOCAL_MQTT_ENABLE in data:
+        enabled = config_entry_bool_option(
+            entry, CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE
+        )
+    else:
+        enabled = config_entry_bool_option(
+            entry, CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
+        )
     host = config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "").strip()
     port = str(
         entry.options.get(
@@ -233,6 +244,9 @@ def _local_mqtt_diagnostics(
     ).strip()
 
     client = _local_mqtt_client(hass, entry)
+    coordinator: JackerySolarVaultCoordinator | None = getattr(
+        entry, "runtime_data", None
+    )
     local_mqtt_unsubs = getattr(coordinator, "_local_mqtt_unsubs", None)
     if local_mqtt_unsubs:
         return {
@@ -261,14 +275,14 @@ def _local_mqtt_diagnostics(
         else:
             reason = "client_not_started"
         return {
-            "enabled": False,  # noqa: COM818
-        return {"enabled": False, "disabled_reason": reason}
-            "configured_local_mqtt": {  # noqa: E113
+            "enabled": False,
+            "disabled_reason": reason,
+            "configured_local_mqtt": {
                 "host": host,
                 "port": port,
                 "username_set": bool(username),
                 "password_set": bool(password),
                 "topic_filter": topic_filter,
-            },  # noqa: COM818
+            },
         }
     return client.diagnostics_snapshot(redact=not redactions_disabled)

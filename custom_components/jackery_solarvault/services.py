@@ -17,14 +17,15 @@ The actions follow the same routing contract:
    ``translation_domain`` so HA can render a localized error to the user.
 """
 
+from collections.abc import Callable, Coroutine
 import json
 import logging
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import voluptuous as vol
 
-from homeassistant.core import callback
+from homeassistant.core import SupportsResponse, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError,
@@ -36,37 +37,54 @@ from .client.api import JackeryAuthError, JackeryError
 from .const import (
     DOMAIN,
     FIELD_ID,
+    FIELD_QR_CODE_ID,
     FIELD_SYSTEM_ID,
+    FIELD_USER_ID,
     MQTT_ACTION_IDS_SCHEDULE,
     PAYLOAD_SYSTEM,
+    SERVICE_BIND_SMART_PART,
     SERVICE_DELETE_ELECTRICITY_STRATEGY,
     SERVICE_DELETE_STORM_ALERT,
+    SERVICE_FIELD_ACCESSORY_SN,
     SERVICE_FIELD_ACK_TIMEOUT,
     SERVICE_FIELD_ACTION_ID,
     SERVICE_FIELD_ALERT_ID,
+    SERVICE_FIELD_BIND_USER_ID,
     SERVICE_FIELD_BODY,
     SERVICE_FIELD_CMD,
     SERVICE_FIELD_DEVICE_ID,
     SERVICE_FIELD_ENABLE,
     SERVICE_FIELD_FLAGS,
     SERVICE_FIELD_IP,
+    SERVICE_FIELD_LEVEL,
     SERVICE_FIELD_NEW_NAME,
+    SERVICE_FIELD_NICKNAME,
     SERVICE_FIELD_PASSWORD,
     SERVICE_FIELD_PORT,
     SERVICE_FIELD_SYSTEM_ID,
     SERVICE_FIELD_TOKEN,
     SERVICE_FIELD_USERNAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
+    SERVICE_GET_SHARE_QR_CODE,
     SERVICE_INSERT_ELECTRICITY_STRATEGY,
+    SERVICE_LIST_SHARED_DEVICES,
+    SERVICE_LIST_SHARED_MANAGERS,
     SERVICE_NON_EMPTY_TEXT_PATTERN,
     SERVICE_NUMERIC_ID_PATTERN,
     SERVICE_QUERY_ELECTRICITY_STRATEGY,
     SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG,
     SERVICE_REFRESH_WEATHER_PLAN,
+    SERVICE_REMOVE_ALL_SHARED_ACCESS,
+    SERVICE_REMOVE_SHARED_ACCESS,
     SERVICE_RENAME_SYSTEM,
+    SERVICE_RESPONSE_QR_CODE_ID,
+    SERVICE_RESPONSE_USER_ID,
     SERVICE_SEND_BLE_COMMAND,
     SERVICE_SEND_DEVICE_SCHEDULE,
+    SERVICE_SET_DEVICE_NICKNAME,
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
+    SERVICE_UNBIND_DEVICE,
+    SERVICE_UNBIND_SMART_PART,
     SERVICE_UPDATE_ELECTRICITY_STRATEGY,
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
     _JACKERY_MAIN_DEVICE_RE,
@@ -75,7 +93,8 @@ from .coordinator import JackerySolarVaultCoordinator
 from .util import safe_bool
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant, ServiceCall
+    from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
+    from homeassistant.util.json import JsonValueType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -232,6 +251,88 @@ ELECTRICITY_STRATEGY_SCHEMA = vol.Schema({
 })
 QUERY_ELECTRICITY_STRATEGY_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(cv.string, vol.Length(min=1)),
+})
+SET_DEVICE_NICKNAME_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Required(SERVICE_FIELD_NICKNAME): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=64),
+    ),
+})
+UNBIND_DEVICE_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+})
+BIND_SMART_PART_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Required(SERVICE_FIELD_ACCESSORY_SN): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=64),
+    ),
+})
+UNBIND_SMART_PART_SCHEMA = BIND_SMART_PART_SCHEMA
+LIST_SHARED_DEVICES_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+})
+GET_SHARE_QR_CODE_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+})
+LIST_SHARED_MANAGERS_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Required(SERVICE_FIELD_BIND_USER_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=128),
+    ),
+    vol.Optional(SERVICE_FIELD_LEVEL, default=0): vol.All(
+        vol.Coerce(int),
+        vol.Range(min=0, max=65535),
+    ),
+})
+REMOVE_SHARED_ACCESS_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Required(SERVICE_FIELD_BIND_USER_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=128),
+    ),
+})
+REMOVE_ALL_SHARED_ACCESS_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Required(SERVICE_FIELD_BIND_USER_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+        vol.Length(max=128),
+    ),
+    vol.Optional(SERVICE_FIELD_LEVEL, default=0): vol.All(
+        vol.Coerce(int),
+        vol.Range(min=0, max=65535),
+    ),
 })
 
 
@@ -988,9 +1089,622 @@ async def _async_handle_send_ble_command(
         )
 
 
+async def _async_handle_set_device_nickname(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Set a device nickname through the API client of the matching coordinator."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="set_device_nickname_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "set_device_nickname_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    nickname = _service_required_text(
+        call.data[SERVICE_FIELD_NICKNAME],
+        field_name=SERVICE_FIELD_NICKNAME,
+        translation_key="set_device_nickname_failed",
+        device_id=device_id,
+        max_length=64,
+    )
+    try:
+        await coordinator.api.async_set_device_nickname(device_id, nickname)
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while setting a device nickname. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except JackeryError as err:
+        msg = "set_device_nickname_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+
+
+async def _async_handle_unbind_device(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Unbind a device from the account and refresh so the device drops.
+
+    Destructive: on success the coordinator is asked to refresh so the now-removed
+    device disappears from Home Assistant.
+    """
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="unbind_device_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "unbind_device_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    try:
+        await coordinator.api.async_unbind_device(device_id)
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while unbinding a device. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except JackeryError as err:
+        msg = "unbind_device_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    await coordinator.async_request_refresh()
+
+
+async def _async_handle_bind_smart_part(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Bind a smart accessory to the device via the matching coordinator."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="bind_smart_part_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "bind_smart_part_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    accessory_sn = _service_required_text(
+        call.data[SERVICE_FIELD_ACCESSORY_SN],
+        field_name=SERVICE_FIELD_ACCESSORY_SN,
+        translation_key="bind_smart_part_failed",
+        device_id=device_id,
+        max_length=64,
+    )
+    try:
+        await coordinator.async_bind_smart_part(device_id, accessory_sn)
+    except ConfigEntryAuthFailed:
+        raise
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while binding a smart part. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+        msg = "bind_smart_part_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+
+
+async def _async_handle_unbind_smart_part(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Unbind a smart accessory from the device via the matching coordinator."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="unbind_smart_part_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "unbind_smart_part_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    accessory_sn = _service_required_text(
+        call.data[SERVICE_FIELD_ACCESSORY_SN],
+        field_name=SERVICE_FIELD_ACCESSORY_SN,
+        translation_key="unbind_smart_part_failed",
+        device_id=device_id,
+        max_length=64,
+    )
+    try:
+        await coordinator.async_unbind_smart_part(device_id, accessory_sn)
+    except ConfigEntryAuthFailed:
+        raise
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while unbinding a smart part. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError, RuntimeError, ValueError) as err:
+        msg = "unbind_smart_part_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+
+
+def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
+    """Return a base64 PNG ``data:`` URI encoding the share ``qrCodeId``.
+
+    The Jackery app's accept-bind flow scans a QR, extracts only the
+    ``qrCodeId`` string, and pairs it with the *scanner's* own device id
+    (``device/accept_bind`` takes ``devId`` + ``qrCodeId``). The displayed QR
+    therefore carries just the ``qrCodeId``; ``userId`` and ``devId`` are not
+    part of the scanned payload. This exact scan format is reverse-engineered,
+    not vendor-documented, so the rendering is best-effort.
+
+    segno is imported lazily so the module import stays cheap for the common
+    path that never renders a QR.
+    """
+    import base64  # noqa: PLC0415
+    import io  # noqa: PLC0415
+
+    import segno  # noqa: PLC0415
+
+    buffer = io.BytesIO()
+    segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _notify_share_qr_code(
+    hass: HomeAssistant,
+    *,
+    qr_code_id: object,
+    user_id: object,
+) -> None:
+    """Create a persistent notification with a scannable share QR image.
+
+    Best-effort: a render or notification failure must never fail the service,
+    which still returns the ``{qr_code_id, user_id}`` envelope. The notification
+    documents that the encoded payload (the ``qrCodeId`` string) is a
+    reverse-engineered assumption so the owner can correct it if it does not
+    scan in the Jackery app.
+    """
+    if not isinstance(qr_code_id, str) or not qr_code_id:
+        return
+    try:
+        from homeassistant.components import (  # noqa: PLC0415
+            persistent_notification,
+        )
+
+        data_uri = _render_share_qr_png_data_uri(qr_code_id)
+        message = (
+            f"![Share QR code]({data_uri})\n\n"
+            f"Scan diesen QR-Code mit einem zweiten Jackery-Konto, um den "
+            f"SolarVault zu teilen.\n\n"
+            f"qrCodeId: `{qr_code_id}`\n"
+            f"userId: `{user_id}`\n\n"
+            f"Hinweis: Der QR-Code kodiert die `qrCodeId` (Best-Effort, "
+            f"aus der App rekonstruiert). Falls das Scannen fehlschlägt, "
+            f"nutze die `qrCodeId` oben manuell."
+        )
+        persistent_notification.async_create(
+            hass,
+            message,
+            title="Jackery SolarVault - Freigabe-QR-Code",
+        )
+    except Exception:
+        _LOGGER.debug(
+            "Failed to render or publish the share QR-code notification",
+            exc_info=True,
+        )
+
+
+async def _async_handle_get_share_qr_code(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Return the share QR code for the account that owns the selected device."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="get_share_qr_code_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "get_share_qr_code_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    try:
+        data = await coordinator.api.async_get_qr_code()
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while fetching the share QR code. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError) as err:
+        msg = "get_share_qr_code_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    qr_code_id = data.get(FIELD_QR_CODE_ID)
+    user_id = data.get(FIELD_USER_ID)
+    _notify_share_qr_code(hass, qr_code_id=qr_code_id, user_id=user_id)
+    return {
+        SERVICE_RESPONSE_QR_CODE_ID: qr_code_id,
+        SERVICE_RESPONSE_USER_ID: user_id,
+    }
+
+
+async def _async_handle_list_shared_devices(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Return the devices shared with the account that owns the selected device."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="list_shared_devices_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "list_shared_devices_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    try:
+        devices = await coordinator.api.async_get_device_shared_list()
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while listing shared devices. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError) as err:
+        msg = "list_shared_devices_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    # The cloud payload is JSON-decoded, so its entries are JSON-native at runtime;
+    # cast documents that trust boundary for the ServiceResponse contract.
+    return {"devices": cast("list[JsonValueType]", devices)}
+
+
+async def _async_handle_list_shared_managers(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Return the managers for a shared-device binding on the matching account."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="list_shared_managers_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "list_shared_managers_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    bind_user_id = _service_required_text(
+        call.data[SERVICE_FIELD_BIND_USER_ID],
+        field_name=SERVICE_FIELD_BIND_USER_ID,
+        translation_key="list_shared_managers_failed",
+        device_id=device_id,
+        max_length=128,
+    )
+    level = _service_int(
+        call.data.get(SERVICE_FIELD_LEVEL, 0),
+        field_name=SERVICE_FIELD_LEVEL,
+        translation_key="list_shared_managers_failed",
+        device_id=device_id,
+        min_value=0,
+        max_value=65535,
+    )
+    try:
+        managers = await coordinator.api.async_get_device_shared_managers(
+            bind_user_id=bind_user_id,
+            level=level,
+        )
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while listing shared managers. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError) as err:
+        msg = "list_shared_managers_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    # The cloud payload is JSON-decoded, so its entries are JSON-native at runtime;
+    # cast documents that trust boundary for the ServiceResponse contract.
+    return {"managers": cast("list[JsonValueType]", managers)}
+
+
+async def _async_handle_remove_shared_access(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Remove a single shared access and refresh so the change reflects in HA.
+
+    Destructive: the coordinator is refreshed only after the cloud call succeeds.
+    """
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="remove_shared_access_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "remove_shared_access_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    bind_user_id = _service_required_text(
+        call.data[SERVICE_FIELD_BIND_USER_ID],
+        field_name=SERVICE_FIELD_BIND_USER_ID,
+        translation_key="remove_shared_access_failed",
+        device_id=device_id,
+        max_length=128,
+    )
+    try:
+        await coordinator.api.async_remove_shared_access(
+            bind_user_id=bind_user_id,
+            device_id=device_id,
+        )
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while removing shared access. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError) as err:
+        msg = "remove_shared_access_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    await coordinator.async_request_refresh()
+
+
+async def _async_handle_remove_all_shared_access(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Remove all shared access for a user at a share level and refresh on success.
+
+    Destructive: the coordinator is refreshed only after the cloud call succeeds.
+    """
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="remove_all_shared_access_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        msg = "remove_all_shared_access_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    bind_user_id = _service_required_text(
+        call.data[SERVICE_FIELD_BIND_USER_ID],
+        field_name=SERVICE_FIELD_BIND_USER_ID,
+        translation_key="remove_all_shared_access_failed",
+        device_id=device_id,
+        max_length=128,
+    )
+    level = _service_int(
+        call.data.get(SERVICE_FIELD_LEVEL, 0),
+        field_name=SERVICE_FIELD_LEVEL,
+        translation_key="remove_all_shared_access_failed",
+        device_id=device_id,
+        min_value=0,
+        max_value=65535,
+    )
+    try:
+        await coordinator.api.async_remove_all_shared_access(
+            bind_user_id=bind_user_id,
+            level=level,
+        )
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while removing all shared access. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (JackeryError, LookupError) as err:
+        msg = "remove_all_shared_access_failed"
+        raise _service_validation_error(
+            msg,
+            device_id=device_id,
+            error=err,
+        ) from err
+    await coordinator.async_request_refresh()
+
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
+
+
+_ServiceHandler = Callable[
+    ["HomeAssistant", "ServiceCall"],
+    Coroutine[Any, Any, "ServiceResponse | None"],
+]
+
+
+class _ServiceRegistration(NamedTuple):
+    """One declarative service registration row.
+
+    ``supports_response`` lets read services opt into ``SupportsResponse.ONLY`` so
+    their handler return value is surfaced to the caller; all command services keep
+    the default ``SupportsResponse.NONE``.
+    """
+
+    name: str
+    handler: _ServiceHandler
+    schema: vol.Schema
+    supports_response: SupportsResponse = SupportsResponse.NONE
+
+
+def _service_registrations() -> tuple[_ServiceRegistration, ...]:
+    """Return the declarative table of domain-scoped service actions.
+
+    Kept as a single declarative table so adding a service is one row instead of a
+    fresh ``if not has_service`` branch — that branch-per-service pattern pushed
+    ``async_setup_services`` past the complexity gates. Rows default to
+    ``SupportsResponse.NONE``; read services pass ``SupportsResponse.ONLY``.
+    """
+    return (
+        _ServiceRegistration(
+            SERVICE_RENAME_SYSTEM, _async_handle_rename, RENAME_SCHEMA
+        ),
+        _ServiceRegistration(
+            SERVICE_REFRESH_WEATHER_PLAN,
+            _async_handle_refresh_weather_plan,
+            REFRESH_WEATHER_PLAN_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_DELETE_STORM_ALERT,
+            _async_handle_delete_storm_alert,
+            DELETE_STORM_ALERT_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
+            _async_handle_set_third_party_mqtt_config,
+            SET_THIRD_PARTY_MQTT_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+            _async_handle_query_third_party_mqtt_config,
+            QUERY_THIRD_PARTY_MQTT_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_SEND_BLE_COMMAND,
+            _async_handle_send_ble_command,
+            SEND_BLE_COMMAND_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_SEND_DEVICE_SCHEDULE,
+            _async_handle_send_device_schedule,
+            SEND_DEVICE_SCHEDULE_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_INSERT_ELECTRICITY_STRATEGY,
+            _async_handle_insert_electricity_strategy,
+            ELECTRICITY_STRATEGY_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_UPDATE_ELECTRICITY_STRATEGY,
+            _async_handle_update_electricity_strategy,
+            ELECTRICITY_STRATEGY_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_DELETE_ELECTRICITY_STRATEGY,
+            _async_handle_delete_electricity_strategy,
+            ELECTRICITY_STRATEGY_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_QUERY_ELECTRICITY_STRATEGY,
+            _async_handle_query_electricity_strategy,
+            QUERY_ELECTRICITY_STRATEGY_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_SET_DEVICE_NICKNAME,
+            _async_handle_set_device_nickname,
+            SET_DEVICE_NICKNAME_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_UNBIND_DEVICE,
+            _async_handle_unbind_device,
+            UNBIND_DEVICE_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_BIND_SMART_PART,
+            _async_handle_bind_smart_part,
+            BIND_SMART_PART_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_UNBIND_SMART_PART,
+            _async_handle_unbind_smart_part,
+            UNBIND_SMART_PART_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_LIST_SHARED_DEVICES,
+            _async_handle_list_shared_devices,
+            LIST_SHARED_DEVICES_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+        _ServiceRegistration(
+            SERVICE_LIST_SHARED_MANAGERS,
+            _async_handle_list_shared_managers,
+            LIST_SHARED_MANAGERS_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+        _ServiceRegistration(
+            SERVICE_REMOVE_SHARED_ACCESS,
+            _async_handle_remove_shared_access,
+            REMOVE_SHARED_ACCESS_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_REMOVE_ALL_SHARED_ACCESS,
+            _async_handle_remove_all_shared_access,
+            REMOVE_ALL_SHARED_ACCESS_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_GET_SHARE_QR_CODE,
+            _async_handle_get_share_qr_code,
+            GET_SHARE_QR_CODE_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+    )
 
 
 @callback
@@ -1001,137 +1715,24 @@ def async_setup_services(hass: HomeAssistant) -> None:
     shutdown automatically; multi-entry setups share the same handler
     instances which then dispatch to the matching coordinator.
     """
-    if not hass.services.has_service(DOMAIN, SERVICE_RENAME_SYSTEM):
 
-        async def _handle_rename(call: ServiceCall) -> None:
-            await _async_handle_rename(hass, call)
+    def _make_handler(
+        handler: _ServiceHandler,
+    ) -> Callable[[ServiceCall], Coroutine[Any, Any, ServiceResponse | None]]:
+        async def _handle(call: ServiceCall) -> ServiceResponse | None:
+            return await handler(hass, call)
 
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_RENAME_SYSTEM,
-            _handle_rename,
-            schema=RENAME_SCHEMA,
-        )
+        return _handle
 
-    if not hass.services.has_service(DOMAIN, SERVICE_REFRESH_WEATHER_PLAN):
-
-        async def _handle_refresh_weather_plan(call: ServiceCall) -> None:
-            await _async_handle_refresh_weather_plan(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_REFRESH_WEATHER_PLAN,
-            _handle_refresh_weather_plan,
-            schema=REFRESH_WEATHER_PLAN_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_DELETE_STORM_ALERT):
-
-        async def _handle_delete_storm_alert(call: ServiceCall) -> None:
-            await _async_handle_delete_storm_alert(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_DELETE_STORM_ALERT,
-            _handle_delete_storm_alert,
-            schema=DELETE_STORM_ALERT_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_THIRD_PARTY_MQTT_CONFIG):
-
-        async def _handle_set_third_party_mqtt(call: ServiceCall) -> None:
-            await _async_handle_set_third_party_mqtt_config(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
-            _handle_set_third_party_mqtt,
-            schema=SET_THIRD_PARTY_MQTT_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG):
-
-        async def _handle_query_third_party_mqtt(call: ServiceCall) -> None:
-            await _async_handle_query_third_party_mqtt_config(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG,
-            _handle_query_third_party_mqtt,
-            schema=QUERY_THIRD_PARTY_MQTT_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND_BLE_COMMAND):
-
-        async def _handle_send_ble_command(call: ServiceCall) -> None:
-            await _async_handle_send_ble_command(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SEND_BLE_COMMAND,
-            _handle_send_ble_command,
-            schema=SEND_BLE_COMMAND_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_SEND_DEVICE_SCHEDULE):
-
-        async def _handle_send_device_schedule(call: ServiceCall) -> None:
-            await _async_handle_send_device_schedule(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_SEND_DEVICE_SCHEDULE,
-            _handle_send_device_schedule,
-            schema=SEND_DEVICE_SCHEDULE_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_INSERT_ELECTRICITY_STRATEGY):
-
-        async def _handle_insert_electricity_strategy(call: ServiceCall) -> None:
-            await _async_handle_insert_electricity_strategy(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_INSERT_ELECTRICITY_STRATEGY,
-            _handle_insert_electricity_strategy,
-            schema=ELECTRICITY_STRATEGY_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_UPDATE_ELECTRICITY_STRATEGY):
-
-        async def _handle_update_electricity_strategy(call: ServiceCall) -> None:
-            await _async_handle_update_electricity_strategy(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_UPDATE_ELECTRICITY_STRATEGY,
-            _handle_update_electricity_strategy,
-            schema=ELECTRICITY_STRATEGY_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_DELETE_ELECTRICITY_STRATEGY):
-
-        async def _handle_delete_electricity_strategy(call: ServiceCall) -> None:
-            await _async_handle_delete_electricity_strategy(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_DELETE_ELECTRICITY_STRATEGY,
-            _handle_delete_electricity_strategy,
-            schema=ELECTRICITY_STRATEGY_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_QUERY_ELECTRICITY_STRATEGY):
-
-        async def _handle_query_electricity_strategy(call: ServiceCall) -> None:
-            await _async_handle_query_electricity_strategy(hass, call)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_QUERY_ELECTRICITY_STRATEGY,
-            _handle_query_electricity_strategy,
-            schema=QUERY_ELECTRICITY_STRATEGY_SCHEMA,
-        )
+    for registration in _service_registrations():
+        if not hass.services.has_service(DOMAIN, registration.name):
+            hass.services.async_register(
+                DOMAIN,
+                registration.name,
+                _make_handler(registration.handler),
+                schema=registration.schema,
+                supports_response=registration.supports_response,
+            )
 
 
 def _strip_jackery_subdevice_suffix(device_id: str) -> str:

@@ -65,10 +65,6 @@ set_third_party_mqtt_config:
       example: '12345678'
       selector:
         text: null
-    topic:
-      example: homeassistant
-      selector:
-        text: null
     token:
       example: ''
       selector:
@@ -211,3 +207,123 @@ query_electricity_strategy:
       selector:
         device:
           integration: jackery_solarvault
+set_device_nickname:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    nickname:
+      required: true
+      example: Balkonkraftwerk Süd
+      selector:
+        text: null
+unbind_device:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+bind_smart_part:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    accessory_sn:
+      required: true
+      example: SP1A1234567890
+      selector:
+        text: null
+unbind_smart_part:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    accessory_sn:
+      required: true
+      example: SP1A1234567890
+      selector:
+        text: null
+get_share_qr_code:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+list_shared_devices:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+list_shared_managers:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    bind_user_id:
+      required: true
+      example: '12345678'
+      selector:
+        text: null
+    level:
+      required: false
+      default: 0
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box
+remove_shared_access:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    bind_user_id:
+      required: true
+      example: '12345678'
+      selector:
+        text: null
+remove_all_shared_access:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
+    bind_user_id:
+      required: true
+      example: '12345678'
+      selector:
+        text: null
+    level:
+      required: false
+      default: 0
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 65535
+          mode: box

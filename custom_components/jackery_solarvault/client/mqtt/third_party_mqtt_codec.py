@@ -41,28 +41,30 @@ def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
     then Base64-encodes the ciphertext without line wrapping.
     """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
-        raise ValueError(
+        msg = (
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
             f"for bb/e.d(String), got {len(bluetooth_key)} bytes"
         )
+        raise ValueError(msg)
     ciphertext = aes_encrypt(value.encode("utf-8"), bluetooth_key, bluetooth_key)
     return base64.b64encode(ciphertext).decode("ascii")
 
 
-
-def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:  # noqa: E303
-   """Decode one ThirdPartMQTTConfig secret like ``bb/e.c(String)``."""  # noqa: E111
-    if len(bluetooth_key) != BLE_AES_IV_LEN:  # noqa: E113
-        raise ValueError(
+def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
+    """Decode one ThirdPartMQTTConfig secret like ``bb/e.c(String)``."""
+    if len(bluetooth_key) != BLE_AES_IV_LEN:
+        msg = (
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
             f"for bb/e.c(String), got {len(bluetooth_key)} bytes"
         )
+        raise ValueError(msg)
     try:
         ciphertext = base64.b64decode(value)
         plaintext = aes_decrypt(ciphertext, bluetooth_key, bluetooth_key)
         return plaintext.decode("utf-8")
     except (ValueError, UnicodeDecodeError) as err:
-        raise ValueError("invalid app-encoded third-party MQTT field") from err
+        msg = "invalid app-encoded third-party MQTT field"
+        raise ValueError(msg) from err
 
 
 def generate_third_party_mqtt_token() -> str:

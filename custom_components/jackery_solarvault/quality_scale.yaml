@@ -7,7 +7,7 @@ action-setup:
 appropriate-polling:
   status: done
 brands:
-  status: todo
+  status: done
 common-modules:
   status: done
 config-flow-test-coverage:

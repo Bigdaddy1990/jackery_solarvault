@@ -8,7 +8,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from jackery_solarvault.const import (
+from ...const import (
     MQTT_APP_CONFLICT_PAUSE_SEC,
     MQTT_RECONNECT_THROTTLE_SEC,
 )
