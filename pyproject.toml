@@ -1,6 +1,6 @@
 # pyproject.toml — Tooling für die jackery_solarvault Home-Assistant-Integration
 [build-system]
-requires = ["setuptools<=80.0.0", "wheel"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-dir]
@@ -10,13 +10,55 @@ build-backend = "setuptools.build_meta"
 include = ["custom_components*"]
 
 [tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
+dependencies = { file = ["requirements*.txt"] }
 
 [tool.setuptools.dynamic.optional-dependencies]
-tests = { file = ["requirements-test.txt"] }
+tests = { file = ["requirements-test.txt", "requirements-dev.txt"] }
+pytest = { file = ["requirements-dev.txt"] }
+hassfest = { file = ["requirements-dev.txt"] }
+hacs-action = { file = ["requirements-dev.txt"] }
+codecov = { file = ["requirements-dev.txt"] }
+codefactor = { file = ["requirements-dev.txt"] }
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.uv]
+# Ensure that the setuptools v80.0.0 is used whenever a package has a build dependency
+# on setuptools.
+build-constraint-dependencies = ["setuptools<=80.0.0","wheel"]
+no-cache = true
+link-mode = "hardlink"
+index-strategy = "unsafe-best-match"
+fork-strategy = "requires-python"
+cache-dir = "./.uv_cache"
+python-downloads = "automatic"
+python-preference = "system"
+package = true
+managed = true
+#upgrade-package = ["hassfest"]
+# Require that the package is available on the following platforms:
+required-environments = [
+    # Linux on x86_64 (Intel/AMD)
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    # Windows on x86_64 (Intel/AMD)
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
+[tool.uv.sources]
+jackery-solarvault = { workspace = true }
+
+[tool.uv.pip]
+all-extras = true
+allow-empty-requirements = true
+compile-bytecode = true
+config-settings = { editable_mode = "compat" }
+extra-build-dependencies = { pytest = ["setuptools"] }
+prerelease = "if-necessary-or-explicit"
+python = "3.14"
+python-version = "3.11"
+strict = true
+universal = true
 
 [project]
 name = "jackery_solarvault"
@@ -25,7 +67,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Bigdaddy1990" }]
-keywords = ["homeassistant", "jackery_solarvault", "solar", "automation", "telemetry"]
+keywords = ["homeassistant", "jackery_solarvault", "solar", "automation", "telemetry", "solarvaut", "jackery", "hacs", "custom_components"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
@@ -34,7 +76,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = ">=3.14"
+requires-python = ">=3.14.6"
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
@@ -246,9 +288,9 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.17"
+required-version = ">=0.15.18"
 line-length = 88
-src = ["custom_components","tests"]
+src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
 show-fixes = true
 fix = true
@@ -256,6 +298,7 @@ unsafe-fixes = true
 force-exclude = true
 output-format= "github"
 preview = true
+respect-gitignore = true
 exclude = [
     ".bzr",
     ".direnv",
@@ -282,6 +325,7 @@ exclude = [
     "buck-out",
     "build",
     "dist",
+	"*egg-info",
     "node_modules",
     "site-packages",
     "venv",
@@ -290,6 +334,8 @@ exclude = [
     "logs",
     "APP",
     ".scripts",
+	".html",
+	".bat"
 ]
 
 [tool.ruff.analyze]
@@ -297,6 +343,8 @@ detect-string-imports = true
 direction = "dependencies"
 string-imports-min-dots = 2
 preview= true
+# Exclude type-checking-only imports from the graph
+type-checking-imports = true
 
 [tool.ruff.format]
 preview = true
@@ -306,14 +354,16 @@ line-ending = "lf"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
 skip-magic-trailing-comma = false
+# Use the configured quote style for nested strings (Python 3.12+ only).
+nested-string-quote-style = "preferred"
 
 [tool.ruff.lint]
 preview = true
 select = [
-  "ANN",
+  "ANN",    # annotations
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
-  "BLE",    # ble?
+  "BLE",
   "C",      # complexity
   "COM818", # Trailing comma on bare tuple prohibited
   "D",      # docstrings
@@ -382,25 +432,94 @@ select = [
   "W",      # pycodestyle
   "Q"
 ]
-
-ignore = []
+# Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
+extend-unsafe-fixes = ["E", "E501", "F401"]
+ignore = ["D417", "TID252"] 
+# Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
-future-annotations = true
+future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
+task-tags = ["TODO", "FIX"]
 
 [project.scripts]
 hass = "homeassistant.__main__:main"
+
+[dependency-groups]
+dev = [
+    "aiohttp>=3.13.3",
+    "aiomqtt>=2.5.1",
+    "annotated-doc",
+    "annotated-types",
+    "annotatedyaml>=1.0.2",
+    "ast-grep-cli",
+    "astral",
+    "astroid>=4.1.2",
+    "attrs",
+    "autotyping",
+    "codecov",
+    "coverage[toml]>=7.5.4",
+    "defusedxml",
+    "fastmcp",
+    "homeassistant>=2026.6.1",
+    "homeassistant-stubs",
+    "hypothesis",
+    "ifaddr",
+    "iniconfig",
+    "jinja2>=3.1.6",
+    "mcp",
+    "mgrep",
+    "multidict",
+    "mypy>=1.19.1",
+    "numpy",
+    "packaging>=26.0",
+    "pip>=26.0",
+    "pre-commit",
+    "prek",
+    "pydantic",
+    "pylint",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-github-actions-annotate-failures>=0.3.0",
+    "pytest-homeassistant-custom-component>=0.13.340",
+    "pyupgrade",
+    "pyyaml",
+    "ruff>=0.15.18",
+    "semgrep",
+    "smellcheck",
+    "ty",
+    "types-aiofiles>=25.1.0.20251011",
+    "types-atomicwrites>=1.4.5.1",
+    "types-caldav>=1.3.0.20250516",
+    "types-chardet>=0.1.5",
+    "types-croniter>=6.0.0.20250809",
+    "types-decorator>=5.2.0.20251101",
+    "types-pexpect>=4.9.0.20250916",
+    "types-protobuf>=6.30.2.20250914",
+    "types-psutil>=7.1.1.20251122",
+    "types-pyserial>=3.5.0.20251001",
+    "types-python-dateutil>=2.9.0.20260124",
+    "types-python-slugify>=8.0.2.20240310",
+    "types-pytz>=2025.2.0.20251108",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
+    "types-xmltodict>=1.0.1.20260113",
+    "typing-extensions>=4.15.0,<5.0",
+    "uv",
+    "voluptuous>=0.15.2",
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["F401", "F403", "E402", "RUF067"]
+"**/__init__.py" = ["E402", "F403"]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 
 [tool.ruff.lint.pydocstyle]
-convention = "google"
+convention = "google" # Accepts: "google", "numpy", or "pep257".
 property-decorators = ["propcache.api.cached_property"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
@@ -413,7 +532,7 @@ property-decorators = ["propcache.api.cached_property"]
 force-sort-within-sections = true
 known-first-party = ["homeassistant", "custom_components", "pytest_"]
 combine-as-imports = true
-split-on-trailing-comma = false
+split-on-trailing-comma = true
 case-sensitive = true
 order-by-type = true
 single-line-exclusions = ["os", "json"]
@@ -423,7 +542,7 @@ single-line-exclusions = ["os", "json"]
 keep-runtime-typing = true
 
 [tool.ruff.lint.flake8-annotations]
-allow-star-arg-any = true
+allow-star-arg-any = false
 
 [tool.ruff.lint.flake8-builtins]
 strict-checking = true
@@ -440,6 +559,9 @@ exempt-modules = ["typing", "typing_extensions"]
 # an import to be moved into a type-checking block.
 quote-annotations = true
 strict = true
+
+[tool.ruff.lint.flake8-bandit]
+check-typed-exception = false
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
@@ -549,7 +671,8 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 
 # per-path overrides
 [tool.smellcheck.per-file-ignores]
-"scripts/*" = []
+"scripts/**" = []
+"docs/**" = []
 # Untracked scratch parsers (gitignored); suppress every rule (smellcheck
 # resolves only exact rule IDs, no family prefixes or wildcards).
 "*_tmp_*.py" = [
@@ -842,7 +965,7 @@ per-file-ignores = [
 
 # Bandit configuration aligned with Home Assistant guidelines
 [tool.bandit]
-exclude_dirs = ["tests", "scripts", "docs"]
+exclude_dirs = ["scripts", "docs", "htmlcov", ]
 tests = []
 skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608", "B612", "B703"]
 
