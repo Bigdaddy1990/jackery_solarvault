@@ -608,7 +608,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_GET} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
 
         if self._is_token_expired_response(status, data):
@@ -625,7 +625,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
 
         if FIELD_RAW_TEXT in data:
@@ -712,7 +712,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_PUT} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -730,7 +730,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -820,7 +820,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"{HTTP_METHOD_POST} {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info(
@@ -838,7 +838,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):
@@ -922,7 +922,7 @@ class BaseHTTPMixin:
                 self._timeouts_total += 1
             raise JackeryApiError(  # noqa: TRY003
                 f"POST {path} request failed: "
-                f"{type(err).__name__}: {err or '(no message)'}"
+                f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for POST %s", path)
@@ -938,7 +938,7 @@ class BaseHTTPMixin:
                     self._timeouts_total += 1
                 raise JackeryApiError(  # noqa: TRY003
                     f"POST {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or '(no message)'}"
+                    f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
 
         if self._is_auth_failure_response(status, data):

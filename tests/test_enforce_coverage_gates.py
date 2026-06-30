@@ -1,7 +1,5 @@
 """Tests for coverage gate enforcement."""
 
-from __future__ import annotations  # noqa: TID251
-
 from contextlib import contextmanager
 from decimal import Decimal
 from pathlib import Path

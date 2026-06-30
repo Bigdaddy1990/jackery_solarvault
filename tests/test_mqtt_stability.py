@@ -401,9 +401,9 @@ def test_passive_disconnect_triggers_throttled_reconnect_recovery() -> None:
     # It re-establishes the session throttled (force=False) and non-blocking
     # (wait_connected=False). The docstring still narrates the old
     # force=True/wait_connected=True regression, so assert on the actual call.
-    assert (
-        "_async_ensure_mqtt(force=False, wait_connected=False)" in handler_body
-    ), handler_body
+    assert "_async_ensure_mqtt(force=False, wait_connected=False)" in handler_body, (
+        handler_body
+    )
     # And it is scheduled as a fire-and-forget background task so the
     # disconnect callback never blocks the event loop.
     assert "async_create_background_task" in handler_body, handler_body
