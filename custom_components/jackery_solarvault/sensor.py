@@ -5087,16 +5087,12 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             if day_bucket_fallback is not None
             else section
         )
-        stale_period = (
-            False
-            if day_bucket_fallback is not None
-            else self._reset_period and self._is_period_data_stale()
+        period_guard_enabled = (
+            day_bucket_fallback is None
+            and self.entity_description.device_class == SensorDeviceClass.ENERGY
         )
-        future_period = (
-            False
-            if day_bucket_fallback is not None
-            else self._reset_period and self._is_period_data_future()
-        )
+        stale_period = period_guard_enabled and self._is_period_data_stale()
+        future_period = period_guard_enabled and self._is_period_data_future()
         # Stale/future guard per CHANGELOG "Three-part fix" / Midnight
         # race: None for ALL periods (incl. DAY), HA Recorder writes
         # "unavailable" instead of a fake 0 that would clash with the

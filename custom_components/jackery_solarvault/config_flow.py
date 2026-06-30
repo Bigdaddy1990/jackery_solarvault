@@ -123,6 +123,24 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
 }
 
 
+async def _async_update_reload_and_abort(
+    flow: ConfigFlow,
+    entry: ConfigEntry,
+    *,
+    data_updates: Mapping[str, Any] | None = None,
+    options: Mapping[str, Any] | None = None,
+    reason: str,
+) -> ConfigFlowResult:
+    """Update an entry, await its reload, then abort the flow."""
+    data = {**entry.data, **(data_updates or {})}
+    update_kwargs: dict[str, Any] = {"data": data}
+    if options is not None:
+        update_kwargs["options"] = options
+    flow.hass.config_entries.async_update_entry(entry, **update_kwargs)
+    await flow.hass.config_entries.async_reload(entry.entry_id)
+    return flow.async_abort(reason=reason)
+
+
 def _normalize_account(value: str) -> str:
     """Normalize an account identifier by stripping leading and trailing whitespace.
 
@@ -838,7 +856,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
-                    return self.async_update_reload_and_abort(
+                    return await _async_update_reload_and_abort(
+                        self,
                         entry,
                         data_updates={
                             CONF_USERNAME: account,
@@ -974,7 +993,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot accept shared Jackery device: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
-                return self.async_update_reload_and_abort(
+                return await _async_update_reload_and_abort(
+                    self,
                     entry,
                     reason=FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL,
                 )
@@ -1074,7 +1094,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         if not devices:
             return self.async_abort(reason=FLOW_ABORT_SHELLY_NO_DEVICES)
 
-        return self.async_update_reload_and_abort(
+        return await _async_update_reload_and_abort(
+            self,
             entry,
             reason=FLOW_ABORT_SHELLY_SUCCESSFUL,
         )
@@ -1124,7 +1145,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
-                return self.async_update_reload_and_abort(
+                return await _async_update_reload_and_abort(
+                    self,
                     entry,
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
                     reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
