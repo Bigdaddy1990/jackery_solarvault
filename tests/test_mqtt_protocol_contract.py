@@ -561,9 +561,7 @@ def test_mqtt_uses_captured_qos_zero() -> None:
 
     assert "qos: int = 0" in mqtt_source
     assert "subscribe(topic, qos=0)" in mqtt_source
-    assert (
-        "async_publish_json(topic, payload, qos=0, retain=False)" in command_source
-    )
+    assert "async_publish_json(topic, payload, qos=0, retain=False)" in command_source
 
 
 def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
