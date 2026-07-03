@@ -10,7 +10,7 @@ Reference: jackery_entity_field_candidates_v2.json, hbxn_model_fields.html
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from ..const import (  # noqa: RUF100, TID252
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_BATTERIES,
@@ -42,6 +42,7 @@ from ..const import (
     FIELD_RB,
     FIELD_SCAN_NAME,
     FIELD_SN,
+    FIELD_SUB_DEVICE,
     FIELD_SUB_TYPE,
     FIELD_TYPE_NAME,
     FIELD_UPDATES,
@@ -68,7 +69,7 @@ from ..const import (
     SUBDEVICE_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_TYPE_WATER_LEAK,
 )
-from ..util import first_nonblank_int, safe_int
+from ..util import first_nonblank_int, safe_int  # noqa: RUF100, TID252
 from .property_merge import (
     find_list_for_key,
     merge_dict_values,
@@ -133,7 +134,7 @@ def normalize_battery_pack_payload(item: object) -> dict[str, Any]:
     return normalized
 
 
-def looks_like_battery_pack(
+def looks_like_battery_pack(  # noqa: PLR0911  # flat reject/accept chain keeps subdevice classification explicit
     item: object,
     ct_meter_keys: frozenset[str],
     battery_pack_hint_keys: frozenset[str],
@@ -148,6 +149,11 @@ def looks_like_battery_pack(
         in NON_BATTERY_SUBDEVICE_TYPES
     ):
         return False
+    if (
+        str(item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "")
+        == str(SUBDEVICE_DEV_TYPE_BATTERY_PACK)
+    ):
+        return True
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
     if "shelly" in scan_name or "3em" in scan_name:
         return False
@@ -186,6 +192,16 @@ def battery_packs_from_source(
             if looks_like_battery_pack(item, ct_meter_keys, battery_pack_hint_keys)
         ]
         return packs or None
+    sub_devices = find_list_for_key(source, FIELD_SUB_DEVICE)
+    if sub_devices:
+        normalized = [normalize_battery_pack_payload(item) for item in sub_devices]
+        packs = [
+            item
+            for item in normalized
+            if looks_like_battery_pack(item, ct_meter_keys, battery_pack_hint_keys)
+        ]
+        if packs:
+            return packs
     normalized_source = normalize_battery_pack_payload(source)
     if looks_like_battery_pack(
         normalized_source,

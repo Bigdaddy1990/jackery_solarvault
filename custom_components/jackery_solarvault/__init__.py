@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     HomeAssistantError as HomeAssistantError,
@@ -20,6 +21,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )  # noqa: E501, RUF100, TC001
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
@@ -63,6 +65,7 @@ from .const import (
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
+    PAYLOAD_DEBUG_LOGGER_NAME,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
@@ -81,6 +84,7 @@ from .util import (
     config_entry_bool_option,
     config_entry_int_option,
     config_entry_str_option,
+    dev_mode_redactions_disabled,
 )
 
 if TYPE_CHECKING:
@@ -191,6 +195,15 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:  # n
         True on successful setup.
     """
     await _load_dotenv_if_present(Path(hass.config.config_dir))
+    # ``JACKERY_DEV_MODE=1`` is the documented gate for the dedicated
+    # payload-debug JSONL logger (see const.py). Nothing else raises this child
+    # logger to DEBUG, so without this the coordinator's payload-debug gate
+    # (``_PAYLOAD_DEBUG_LOGGER.level != DEBUG``) never opens and
+    # ``jackery_solarvault_payload_debug.jsonl`` is never written. This does not
+    # emit records through the logger (the JSONL is a direct file append), so it
+    # cannot flood the main Home Assistant log.
+    if dev_mode_redactions_disabled():
+        logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME).setLevel(logging.DEBUG)
     async_setup_services(hass)
     return True
 
@@ -585,23 +598,103 @@ def _handle_optional_startup_result(  # noqa: RUF067
         _LOGGER.warning("Jackery %s could not start: %s", label, result)
 
 
+async def _async_start_layer5_transports(  # noqa: RUF067
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Start the supplementary Layer-5 transports after Home Assistant has started.
+
+    Layer 5 — cloud MQTT push, the HA-MQTT listener, the direct local MQTT
+    listener, and the BLE diagnostic channel — is supplementary and must never
+    run on the HA startup/boot path: the HTTP/cloud path is the single
+    unconditional data path and must never be blocked or delayed by Layer 5
+    (docs/AGENTS.md §1.2; RESUME §HART-VERBOTEN "kein MQTT in async_setup_entry").
+    This coroutine is scheduled only from an EVENT_HOMEASSISTANT_STARTED hook
+    (see :func:`_register_deferred_layer5_start`), so a slow or blocking
+    transport connect can never stall Home Assistant boot. Each transport
+    failure is non-fatal: auth failures are deferred to the coordinator, other
+    failures are logged, and none prevent the others from starting.
+    """
+    (
+        mqtt_result,
+        local_listener_result,
+        direct_local_mqtt_result,
+        ble_result,
+    ) = await asyncio.gather(
+        coordinator.async_start_mqtt(),
+        coordinator.async_start_local_mqtt_listener(),
+        _async_start_local_mqtt(hass, entry, coordinator),
+        coordinator.async_start_ble_transport(),
+        return_exceptions=True,
+    )
+    _handle_optional_startup_result(coordinator, mqtt_result, label="MQTT push")
+    _handle_optional_startup_result(
+        coordinator,
+        local_listener_result,
+        label="HA-MQTT listener",
+    )
+    _handle_optional_startup_result(
+        coordinator,
+        direct_local_mqtt_result,
+        label="local MQTT listener",
+    )
+    _handle_optional_startup_result(coordinator, ble_result, label="BLE transport")
+
+    hass.async_create_background_task(
+        coordinator.async_apply_local_mqtt_config_to_devices(),
+        name=f"{DOMAIN}_apply_local_mqtt_config",
+    )
+
+
+def _register_deferred_layer5_start(  # noqa: RUF067
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Schedule Layer-5 transport startup to run only once HA has fully started.
+
+    ``async_at_started`` invokes the callback after ``EVENT_HOMEASSISTANT_STARTED``
+    fires, or synchronously if the entry is (re)loaded while Home Assistant is
+    already running (still off the boot path, since a reload only runs after
+    ``async_setup_entry`` has returned). The transports then run in their own
+    background task so they never block the entry startup task or the event loop.
+    Both the started-hook unsubscribe and the transport task are tied to entry
+    unload so nothing outlives the entry.
+    """
+
+    @callback
+    def _on_hass_started(_hass: HomeAssistant) -> None:
+        task = hass.async_create_background_task(
+            _async_start_layer5_transports(hass, entry, coordinator),
+            name=f"{DOMAIN}_layer5_{entry.entry_id}",
+        )
+
+        @callback
+        def _cancel_layer5_task() -> None:
+            task.cancel()
+
+        entry.async_on_unload(_cancel_layer5_task)
+
+    entry.async_on_unload(async_at_started(hass, _on_hass_started))
+
+
 async def _async_finish_entry_startup(  # noqa: RUF067
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """Complete the entry's background startup sequence for API/cloud and local.
-
-    transports.
+    """Complete the entry's background HTTP startup sequence.
 
     Performs API/cloud authentication (defers coordinator auth failure on auth errors),
     attempts discovery with cache fallback, runs optional state/load hooks, and
-    runs the first HTTP data refresh, and only after that starts MQTT,
-    HA-MQTT listener, direct local MQTT listener, and BLE transport. Non-fatal
-    transport failures are logged/handled by the coordinator and do not block
-    overall entry startup. After transports are started it triggers statistics
-    imports and schedules applying local MQTT configuration to devices. Always
-    removes the per-entry startup task reference from the runtime bucket on exit.
+    runs the first HTTP data refresh, then triggers HTTP-derived statistics
+    imports. Layer 5 transports (cloud MQTT, HA-MQTT listener, direct local
+    MQTT listener, BLE) are NOT started here: they are supplementary and must
+    never run on the boot path, so this only registers a deferred starter that
+    fires after EVENT_HOMEASSISTANT_STARTED (see
+    :func:`_register_deferred_layer5_start`). Always removes the per-entry
+    startup task reference from the runtime bucket on exit.
     """
     try:
         try:
@@ -629,36 +722,17 @@ async def _async_finish_entry_startup(  # noqa: RUF067
         if not _handle_refresh_startup_result(coordinator, refresh_result):
             return
 
-        (
-            mqtt_result,
-            local_listener_result,
-            direct_local_mqtt_result,
-            ble_result,
-        ) = await asyncio.gather(
-            coordinator.async_start_mqtt(),
-            coordinator.async_start_local_mqtt_listener(),
-            _async_start_local_mqtt(hass, entry, coordinator),
-            coordinator.async_start_ble_transport(),
-            return_exceptions=True,
-        )
-        _handle_optional_startup_result(coordinator, mqtt_result, label="MQTT push")
-        _handle_optional_startup_result(
-            coordinator,
-            local_listener_result,
-            label="HA-MQTT listener",
-        )
-        _handle_optional_startup_result(
-            coordinator,
-            direct_local_mqtt_result,
-            label="local MQTT listener",
-        )
-        _handle_optional_startup_result(coordinator, ble_result, label="BLE transport")
-
+        # HTTP-derived statistics backfills are part of the primary path and
+        # stay on the startup task so entities keep filling in promptly.
         coordinator.async_start_statistics_imports()
-        hass.async_create_background_task(
-            coordinator.async_apply_local_mqtt_config_to_devices(),
-            name=f"{DOMAIN}_apply_local_mqtt_config",
-        )
+
+        # Layer 5 (cloud MQTT, local MQTT, BLE) is supplementary and MUST NOT
+        # run on the HA startup/boot path: the HTTP/cloud path is the single
+        # unconditional data path and must never be blocked or delayed
+        # (docs/AGENTS.md §1.2; RESUME §HART-VERBOTEN "kein MQTT in
+        # async_setup_entry"). Defer Layer 5 until Home Assistant has fully
+        # started so a slow or blocking transport connect can never stall boot.
+        _register_deferred_layer5_start(hass, entry, coordinator)
     finally:
         bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if isinstance(bucket, dict):

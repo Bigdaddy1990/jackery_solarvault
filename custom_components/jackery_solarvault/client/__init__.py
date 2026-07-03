@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export
+def __getattr__(name: str) -> Any:  # noqa: ANN401  # PEP 562 module __getattr__ returns arbitrary re-exported attributes
     """Get a module attribute.
 
     Parameters:
