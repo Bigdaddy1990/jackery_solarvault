@@ -24,7 +24,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     DOMAIN,
     LOCAL_MQTT_RUNTIME_KEY,
     MQTT_CLIENT_LIBRARY,
@@ -91,7 +91,7 @@ LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
 class JackeryLocalMqttClient:
     """Async-native subscriber for the user's local MQTT broker."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913  # constructor takes distinct broker-config values; a params object adds no clarity
         self,
         hass: HomeAssistant,
         *,
@@ -215,37 +215,15 @@ class JackeryLocalMqttClient:
                 clean_session=True,
                 logger=_AIOMQTT_LOGGER,
             ) as client:
-                self._client = client
-                self._connected = True
                 connected = True
-                self._last_connect_at = self._utc_now_iso()
-                self._last_error = None
-                self._connected_event.set()
-                _LOGGER.info(
-                    "Jackery local MQTT connected to %s:%s; subscribing %r",
-                    self._host,
-                    self._port,
-                    self._topic_filter,
-                )
-                try:
-                    await client.subscribe(self._topic_filter, qos=0)
-                except MqttError as err:
-                    self._last_error = f"subscribe failed: {err}"
-                    _LOGGER.warning(
-                        "Jackery local MQTT subscribe failed for %r: %s",
-                        self._topic_filter,
-                        err,
-                    )
-                    return
-                async for message in client.messages:
-                    self._handle_message(str(message.topic), message.payload)
+                await self._run_connected_session(client)
         except MqttCodeError as err:
             self._handle_connect_failure(self._extract_mqtt_code(err))
         except MqttError as err:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001  # aiomqtt/network surface varied errors during connect setup; recorded for diagnostics
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery local MQTT connect setup failed: %s", err)
@@ -258,6 +236,36 @@ class JackeryLocalMqttClient:
             # Make sure waiters in ``async_start`` cannot deadlock on a session
             # that exited before the broker accepted us.
             self._connected_event.set()
+
+    async def _run_connected_session(self, client: aiomqtt.Client) -> None:
+        """Mark connection state, subscribe, and consume messages for one session.
+
+        Parameters:
+            client (aiomqtt.Client): The connected aiomqtt client for this session.
+        """
+        self._client = client
+        self._connected = True
+        self._last_connect_at = self._utc_now_iso()
+        self._last_error = None
+        self._connected_event.set()
+        _LOGGER.info(
+            "Jackery local MQTT connected to %s:%s; subscribing %r",
+            self._host,
+            self._port,
+            self._topic_filter,
+        )
+        try:
+            await client.subscribe(self._topic_filter, qos=0)
+        except MqttError as err:
+            self._last_error = f"subscribe failed: {err}"
+            _LOGGER.warning(
+                "Jackery local MQTT subscribe failed for %r: %s",
+                self._topic_filter,
+                err,
+            )
+            return
+        async for message in client.messages:
+            self._handle_message(str(message.topic), message.payload)
 
     def _handle_connect_failure(self, rc: int) -> None:
         """Mark the client as disconnected after a broker CONNACK refusal and update diagnostic state.
@@ -346,17 +354,7 @@ class JackeryLocalMqttClient:
             self._blocked_by_filter_count += 1
             return
 
-        raw_bytes: bytes
-        decoded_text_hint: str | None
-        if isinstance(payload, str):
-            raw_bytes = payload.encode("utf-8", errors="replace")
-            decoded_text_hint = payload
-        elif isinstance(payload, bytes):
-            raw_bytes = payload
-            decoded_text_hint = None
-        else:
-            raw_bytes = bytes(payload)
-            decoded_text_hint = None
+        raw_bytes, decoded_text_hint = self._normalize_payload(payload)
 
         if len(raw_bytes) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
             self._payload_too_large_count += 1
@@ -371,8 +369,49 @@ class JackeryLocalMqttClient:
         if self._sink is None:
             return
 
+        data, drop = self._decode_payload_to_data(raw_bytes, decoded_text_hint)
+        if drop:
+            return
+
+        if self._sink is not None:
+            self._messages_forwarded += 1
+            self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
+
+    @staticmethod
+    def _normalize_payload(
+        payload: bytes | bytearray | str,
+    ) -> tuple[bytes, str | None]:
+        """Normalize a raw MQTT payload to bytes plus an optional decoded-text hint.
+
+        Parameters:
+            payload (bytes | bytearray | str): Raw message payload.
+
+        Returns:
+            tuple[bytes, str | None]: The payload as bytes and, when the payload was
+                already a string, the original text (else None).
+        """
+        if isinstance(payload, str):
+            return payload.encode("utf-8", errors="replace"), payload
+        if isinstance(payload, bytes):
+            return payload, None
+        return bytes(payload), None
+
+    def _decode_payload_to_data(
+        self, raw_bytes: bytes, decoded_text_hint: str | None
+    ) -> tuple[dict[str, Any] | None, bool]:
+        """Decode/parse a payload into an optional Jackery data dict.
+
+        Parameters:
+            raw_bytes (bytes): Raw payload bytes.
+            decoded_text_hint (str | None): Pre-decoded text when the payload was
+                already a string, else None.
+
+        Returns:
+            tuple[dict[str, Any] | None, bool]: The parsed data dict (or None) and
+                a drop flag; when the flag is True the caller must not forward.
+        """
         if decoded_text_hint is not None:
-            text = decoded_text_hint
+            text: str | None = decoded_text_hint
         else:
             try:
                 text = raw_bytes.decode("utf-8")
@@ -386,37 +425,36 @@ class JackeryLocalMqttClient:
                 )
                 text = None
 
-        data: dict[str, Any] | None = None
-        if text is not None:
-            try:
-                parsed = json.loads(text)
-            except (json.JSONDecodeError, ValueError) as err:
-                # Untrusted payload was not valid JSON; expected parse fallback,
-                # logged at DEBUG so busy brokers do not generate log spam.
-                _LOGGER.debug(
-                    "Jackery local MQTT: non-JSON payload on %r: %s",
-                    self._last_topic,
-                    err,
-                )
-                parsed = None
-            if isinstance(parsed, dict):
-                data = self._extract_local_jackery_payload(parsed)
-                if data is None:
-                    self._home_assistant_event_count += 1
-                    self._messages_dropped += 1
-                    return
-            elif parsed is not None:
-                # Non-object JSON (list/scalar) is unusual for these devices;
-                # surface it via dropped counter so diagnostics shows the rate.
-                self._messages_dropped += 1
-        else:
+        if text is None:
             # Binary frame — leave ``data`` None; the sink can still inspect
             # the raw bytes if a future binary decoder is plugged in.
             self._messages_dropped += 1
+            return None, False
 
-        if self._sink is not None:
-            self._messages_forwarded += 1
-            self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
+        try:
+            parsed = json.loads(text)
+        except (json.JSONDecodeError, ValueError) as err:
+            # Untrusted payload was not valid JSON; expected parse fallback,
+            # logged at DEBUG so busy brokers do not generate log spam.
+            _LOGGER.debug(
+                "Jackery local MQTT: non-JSON payload on %r: %s",
+                self._last_topic,
+                err,
+            )
+            return None, False
+
+        if isinstance(parsed, dict):
+            data = self._extract_local_jackery_payload(parsed)
+            if data is None:
+                self._home_assistant_event_count += 1
+                self._messages_dropped += 1
+                return None, True
+            return data, False
+        if parsed is not None:
+            # Non-object JSON (list/scalar) is unusual for these devices;
+            # surface it via dropped counter so diagnostics shows the rate.
+            self._messages_dropped += 1
+        return None, False
 
     def _should_drop_broad_noise_topic(self, topic: str) -> bool:
         """Return True for known high-volume non-device topics.

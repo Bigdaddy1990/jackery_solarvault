@@ -56,7 +56,7 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 def _isoformat_day(today: date) -> str:
     """
     Return the ISO-formatted day string for the given date.
-
+    
     Returns:
         The date formatted as `YYYY-MM-DD`.
     """
@@ -170,13 +170,13 @@ def daily_delta(  # noqa: PLR0911
 ) -> int | None:
     """
     Compute today's energy delta by subtracting the stored midnight anchor from the current lifetime counter.
-
+    
     Parameters:
         snapshot (dict | None): Stored snapshot expected to contain `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
         metric_key (str): Key in `snapshot["values"]` identifying the metric anchor to use.
         current_lifetime_wh (int | float | None): Current lifetime energy counter for the metric; if `None` the delta is disabled.
         today (date): Local date used to validate that `snapshot["day"]` matches the current day.
-
+    
     Returns:
         int | None: Delta in watt-hours as an `int` when the snapshot is valid for `today`, the anchor exists and both the anchor and current value convert to integers and `current >= anchor`; `None` otherwise.
     """
@@ -214,14 +214,14 @@ def refresh_snapshot(
 ) -> dict[str, Any]:
     """
     Produce a per-device snapshot anchored to `today` containing integer-convertible lifetime metric anchors.
-
+    
     If `snapshot` is missing or its recorded day differs from `today`, a new snapshot is created by anchoring every metric in `current_values` whose value is not `None` and can be converted to `int`. If `snapshot` is already for `today`, existing integer anchors are preserved and metrics from `current_values` are added only when an anchor does not already exist and the value is convertible to `int`. Entries with `None` or non-convertible values are omitted.
-
+    
     Parameters:
         snapshot (dict[str, Any] | None): Existing per-device snapshot; may be `None`.
         today (date): Current date used as the snapshot day.
         current_values (dict[str, int | float | None]): Current lifetime metric readings; `None` or non-numeric values are ignored.
-
+    
     Returns:
         dict[str, Any]: Snapshot with keys `"day"` (ISO `YYYY-MM-DD`) and `"values"` (mapping metric keys to integer Wh anchors).
     """
@@ -262,7 +262,7 @@ def refresh_snapshot(
 def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
     """
     Report whether the snapshot represents a different day than the given date.
-
+    
     Returns:
         `True` when `snapshot` is not a dict or its `"day"` value does not equal `today.isoformat()`, `False` otherwise.
     """
@@ -289,10 +289,10 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 def local_daily_signature(snapshots: Mapping[str, Any]) -> str:
     """
     Produce a stable JSON signature for a snapshots mapping.
-
+    
     Parameters:
         snapshots (Mapping[str, Any]): Mapping of device IDs to per-device snapshot objects; used to detect content changes.
-
+    
     Returns:
         signature (str): Deterministic JSON string representation of `snapshots` (stable key ordering) suitable for change detection.
     """

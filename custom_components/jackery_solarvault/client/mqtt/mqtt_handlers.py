@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 import logging
 from typing import Any
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     BATTERY_PACK_STALE_THRESHOLD_SEC,
     DEVICE_LIFETIME_COUNTER_KEYS,
     FIELD_ACTION_ID,
@@ -53,12 +53,12 @@ from ...const import (
     PAYLOAD_BATTERY_PACKS,
     SUBDEVICE_ONLY_PROPERTY_KEYS,
 )
-from ...handlers.detector import subdevice_identity_values
-from ...handlers.property_merge import (
+from ...handlers.detector import subdevice_identity_values  # noqa: RUF100, TID252
+from ...handlers.property_merge import (  # noqa: RUF100, TID252
     merge_dict_values,
     sync_property_aliases,
 )
-from ...util import safe_float
+from ...util import safe_float  # noqa: RUF100, TID252
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -388,7 +388,7 @@ def merge_circuits(
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental circuit breaker telemetry using idx to align updates."""
-    from ...util import circuit_id  # noqa: PLC0415
+    from ...util import circuit_id  # noqa: PLC0415, RUF100, TID252
 
     return _merge_subdevice_lists_by_fn(current, updates, circuit_id)
 
@@ -398,7 +398,7 @@ def merge_sub_devices(
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge generic sub-device telemetry using serial numbers to align updates."""
-    from ...util import sub_device_serial  # noqa: PLC0415
+    from ...util import sub_device_serial  # noqa: PLC0415, RUF100, TID252
 
     return _merge_subdevice_lists_by_fn(current, updates, sub_device_serial)
 
