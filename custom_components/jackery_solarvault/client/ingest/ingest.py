@@ -23,7 +23,7 @@ import logging
 import math
 from typing import Any
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     APP_CHART_SERIES_Y,
     APP_CHART_SERIES_Y1,
     APP_CHART_SERIES_Y2,
@@ -49,11 +49,17 @@ from ...const import (
     APP_STAT_PV4_ENERGY,
     APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_SOLAR_ENERGY,
+    FIELD_DEVICE_ID,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_ID,
+    FIELD_DEV_SN,
+    FIELD_ID,
     FIELD_PV1,
     FIELD_PV2,
     FIELD_PV3,
     FIELD_PV4,
     FIELD_PV_PW,
+    FIELD_SN,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_STATISTIC,
 )
@@ -109,6 +115,18 @@ _CHART_SERIES_KEYS: frozenset[str] = frozenset({
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
 })
+
+_DICT_LIST_SERIAL_KEYS: tuple[str, ...] = (
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
+    FIELD_SN,
+)
+
+_DICT_LIST_ID_KEYS: tuple[str, ...] = (
+    FIELD_DEVICE_ID,
+    FIELD_DEV_ID,
+    FIELD_ID,
+)
 
 
 class TransportSource(StrEnum):
@@ -375,6 +393,59 @@ def _is_blankable(value: object) -> bool:
     return isinstance(value, (list, dict)) and not value
 
 
+def _dict_list_identity_values(item: dict[str, Any]) -> frozenset[str]:
+    """Return stable identity tokens for a live-property list item."""
+    identities: set[str] = set()
+    for key in _DICT_LIST_SERIAL_KEYS:
+        value = item.get(key)
+        if not _is_blankable(value):
+            identities.add(f"serial:{value}")
+    for key in _DICT_LIST_ID_KEYS:
+        value = item.get(key)
+        if not _is_blankable(value):
+            identities.add(f"{key}:{value}")
+    return frozenset(identities)
+
+
+def _clean_dict_list_update(update: dict[str, Any]) -> dict[str, Any]:
+    """Drop blank values before appending a new live-property list item."""
+    return {key: value for key, value in update.items() if not _is_blankable(value)}
+
+
+def _merge_identified_dict_lists(
+    current: list[Any],
+    updates: list[Any],
+) -> list[dict[str, Any]] | None:
+    """Merge sparse live-property lists when update items carry stable IDs."""
+    if not all(isinstance(item, dict) for item in current):
+        return None
+    if not all(isinstance(item, dict) for item in updates):
+        return None
+
+    typed_updates = [item for item in updates if isinstance(item, dict)]
+    update_identities = [_dict_list_identity_values(item) for item in typed_updates]
+    if not update_identities or any(not identities for identities in update_identities):
+        return None
+
+    merged = [dict(item) for item in current if isinstance(item, dict)]
+    for raw_update, identities in zip(typed_updates, update_identities, strict=True):
+        target_idx = next(
+            (
+                idx
+                for idx, item in enumerate(merged)
+                if identities & _dict_list_identity_values(item)
+            ),
+            None,
+        )
+        if target_idx is None:
+            cleaned = _clean_dict_list_update(raw_update)
+            if cleaned:
+                merged.append(cleaned)
+        else:
+            merged[target_idx] = merge_live_properties(merged[target_idx], raw_update)
+    return merged
+
+
 def merge_live_properties(
     base: dict[str, Any],
     update: dict[str, Any],
@@ -403,6 +474,14 @@ def merge_live_properties(
         current = merged.get(key)
         if isinstance(current, dict) and isinstance(value, dict):
             merged[key] = merge_live_properties(current, value)
+        elif isinstance(current, list) and isinstance(value, list):
+            list_merge = _merge_identified_dict_lists(current, value)
+            if list_merge is not None:
+                merged[key] = list_merge
+            elif _is_blankable(value) and not _is_blankable(current):
+                continue
+            else:
+                merged[key] = value
         elif _is_blankable(value) and not _is_blankable(current):
             continue
         elif _is_negative_generation_live_value(key, value):

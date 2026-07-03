@@ -31,7 +31,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .client import JackeryAuthError, JackeryError
+from .client import JackeryApiError, JackeryAuthError, JackeryError
 from .client.auth.discovery_cache import (
     async_load_discovery_cache,
     async_save_discovery_cache,
@@ -464,6 +464,7 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
     PAYLOAD_WIFI_CONFIG,
     PAYLOAD_WIFI_LIST,
+    PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID,
     PRESERVED_FAST_PAYLOAD_KEYS,
     PRICE_CONFIG_INTERVAL_SEC,
     REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
@@ -473,6 +474,7 @@ from .const import (
     SHELLY_CONTROL_ACTION_OFF,
     SHELLY_CONTROL_ACTION_ON,
     SHELLY_CONTROL_FUNCTION_SWITCH,
+    SHELLY_REALTIME_FETCH_TIMEOUT_SEC,
     SLOW_METRICS_INTERVAL_SEC,
     SUBDEVICE_DEV_TYPE_BATTERY_PACK,
     SUBDEVICE_DEV_TYPE_BREAKER,
@@ -2948,8 +2950,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Route accessory data to accessory sections instead of main props."""
         touched = False
 
-        packs = self._battery_packs_from_source(source)
-        if packs:
+        def _merge_battery_packs(packs: list[dict[str, Any]]) -> None:
+            nonlocal device_id, touched
             merged_packs = self._merge_battery_pack_lists(
                 updated.get(PAYLOAD_BATTERY_PACKS),
                 packs,
@@ -2987,6 +2989,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         if identifier not in self._pending_device_removals:
                             self._pending_device_removals.append(identifier)
             touched = True
+
+        packs = self._battery_packs_from_source(source)
+        if packs:
+            _merge_battery_packs(packs)
 
         ct = self._find_dict_with_any_key(source, self._CT_METER_KEYS)
         if ct:
@@ -3039,11 +3045,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if isinstance(sub_devices, list):
             sub_device_dicts = [item for item in sub_devices if isinstance(item, dict)]
             if sub_device_dicts:
-                updated[PAYLOAD_SUBDEVICES] = _merge_sub_devices_fn(
-                    updated.get(PAYLOAD_SUBDEVICES),
-                    sub_device_dicts,
-                )
-                touched = True
+                battery_pack_dicts: list[dict[str, Any]] = []
+                regular_sub_device_dicts: list[dict[str, Any]] = []
+                for item in sub_device_dicts:
+                    item_packs = self._battery_packs_from_source(item)
+                    if item_packs:
+                        battery_pack_dicts.extend(item_packs)
+                    else:
+                        regular_sub_device_dicts.append(item)
+                if battery_pack_dicts:
+                    _merge_battery_packs(battery_pack_dicts)
+                if regular_sub_device_dicts:
+                    updated[PAYLOAD_SUBDEVICES] = _merge_sub_devices_fn(
+                        updated.get(PAYLOAD_SUBDEVICES),
+                        regular_sub_device_dicts,
+                    )
+                    touched = True
 
         mirror = {
             key: value
@@ -3658,15 +3675,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _endpoint_backoff_note_failure(self, key: str, err: JackeryError) -> bool:
         """Record backoff state for known persistent cloud endpoint failures."""
-        code_match = re.search(r"\bcode=(\d+)\b", str(err))
+        err_message = str(err)
+        code_match = re.search(r"\bcode=(\d+)\b", err_message)
         code: int | None = None
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
             except TypeError, ValueError:
                 code = None
-        if code not in _ENDPOINT_BACKOFF_CODES:
+        err_message_lower = err_message.lower()
+        timeout_failure = isinstance(err, JackeryApiError) and (
+            "timeouterror" in err_message_lower or "timed out" in err_message_lower
+        )
+        if code not in _ENDPOINT_BACKOFF_CODES and not timeout_failure:
             return False
+        failure_code = code if code is not None else 0
         now_monotonic = time.monotonic()
         previous = self._endpoint_backoff.get(key)
         previous_level = -1
@@ -3681,13 +3704,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         else:
             previous_code = 0
-        if previous_code == code and previous_level >= 0:
+        if previous_code == failure_code and previous_level >= 0:
             level = min(previous_level + 1, len(_ENDPOINT_BACKOFF_DELAYS_SEC) - 1)
         else:
             level = 0
         delay_sec = _ENDPOINT_BACKOFF_DELAYS_SEC[level]
         self._endpoint_backoff[key] = {
-            "code": code,
+            "code": failure_code,
             "level": level,
             "until": now_monotonic + delay_sec,
         }
@@ -3695,7 +3718,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER.debug(
                 "Jackery endpoint backoff entered for %s (code=%d, delay=%ss)",
                 key,
-                code,
+                failure_code,
                 delay_sec,
             )
         return True
@@ -5564,7 +5587,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
 
     # --- Portable / Explorer powerstation commands ---------------------------
-    # Portable devices use ``cmd=<portable_msg_id>`` (1-53) with the same
+    # Portable devices use ``action_id=<portable_msg_id>`` (1-53) and
+    # ``cmd=<ble_msg_type>`` with the same
     # ``messageType=DevicePropertyChange`` envelope as home commands but routed
     # through the ``PortableControlFormat`` on the broker.
 
@@ -5603,12 +5627,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Toggle a portable output (DC/DC-USB/DC-CAR/AC/AC240/light/screen).
 
         Sends ``{field: 1}`` to enable or ``{field: 0}`` to disable via
-        ``DevicePropertyChange`` with ``cmd=<action_id>``.
+        ``DevicePropertyChange`` with ``cmd=<ble_msg_type>``.
         """
         await self.async_send_portable_command(
             device_id,
             action_id=action_id,
-            cmd=action_id,
+            cmd=PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID[action_id],
             body_fields={field: 1 if enabled else 0},
         )
         self._apply_local_property_patch(device_id, {field: 1 if enabled else 0})
@@ -5625,7 +5649,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self.async_send_portable_command(
             device_id,
             action_id=action_id,
-            cmd=action_id,
+            cmd=PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID[action_id],
             body_fields={field: value},
         )
         self._apply_local_property_patch(device_id, {field: value})
@@ -5642,7 +5666,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self.async_send_portable_command(
             device_id,
             action_id=action_id,
-            cmd=action_id,
+            cmd=PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID[action_id],
             body_fields={field: value},
         )
         self._apply_local_property_patch(device_id, {field: value})
@@ -5992,8 +6016,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         def _load_compiled_hours() -> set[int]:
             with session_scope(session=recorder.get_session()) as session:
+                # An ``HH:55`` short-term run marker proves the ``HH:00`` compile
+                # run already fired — and that run is what writes the LONG-TERM
+                # ``statistics`` row for the PREVIOUS hour (``HH-1``). It does NOT
+                # prove ``HH:00``'s own long-term row exists yet (that lands only
+                # when the ``HH+1:00`` run fires). Mapping the marker to ``HH:00``
+                # let the importer pre-create a ``source="recorder"`` long-term
+                # row that the recorder then INSERTs at ``HH+1:00`` → ``UNIQUE
+                # constraint failed`` → aborted recorder transaction / DB
+                # corruption. Subtract the extra hour so a marker only ever marks
+                # hours whose long-term row the recorder has already written; the
+                # import then UPDATEs an existing row instead of racing an INSERT.
                 return {
-                    round(item[0].timestamp()) - 55 * 60
+                    round(item[0].timestamp()) - 55 * 60 - 3600
                     for item in session
                     .query(StatisticsRuns.start)
                     .filter(
@@ -8741,18 +8776,34 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return
             per_dev = self._slow_cache.setdefault(f"dev:{dev_id}:shelly_cloud", {})
             ttl_sec = max(1, int(self._configured_update_interval.total_seconds()))
+
+            def _make_shelly_realtime_fetcher(
+                shelly_id: str,
+            ) -> Callable[[], Awaitable[dict[str, Any]]]:
+                async def _fetch() -> dict[str, Any]:
+                    try:
+                        async with asyncio.timeout(SHELLY_REALTIME_FETCH_TIMEOUT_SEC):
+                            return await self.api.async_get_shelly_realtime_power(
+                                shelly_id,
+                            )
+                    except TimeoutError as err:
+                        msg = (
+                            "Shelly realtime-power fetch timed out after "
+                            f"{SHELLY_REALTIME_FETCH_TIMEOUT_SEC}s for {shelly_id}"
+                        )
+                        raise JackeryApiError(msg) from err
+
+                return _fetch
+
             for shelly_id in shelly_ids:
+                shelly_id_str = str(shelly_id)
                 realtime = await _get_with_ttl_for(
                     per_dev,
-                    f"realtime:{shelly_id}",
+                    f"realtime:{shelly_id_str}",
                     ttl_sec,
-                    cast(
-                        "Callable[[], Awaitable[dict[str, Any]]]",
-                        lambda sid=shelly_id: self.api.async_get_shelly_realtime_power(
-                            sid,
-                        ),
-                    ),
+                    _make_shelly_realtime_fetcher(shelly_id_str),
                     {},
+                    backoff_key=f"shelly_realtime:{shelly_id_str}",
                     stale_ok=stale_ok,
                 )
                 if isinstance(realtime, dict):

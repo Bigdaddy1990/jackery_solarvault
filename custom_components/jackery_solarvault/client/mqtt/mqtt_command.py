@@ -11,7 +11,7 @@ import math
 import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     FIELD_ACTION_ID,
     FIELD_BODY,
     FIELD_DEVICE_SN,
@@ -22,7 +22,7 @@ from ...const import (
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
 )
-from ..api import (
+from ..api import (  # noqa: RUF100, TID252
     JackeryAuthError,
     JackeryError,
     encrypt_mqtt_body,

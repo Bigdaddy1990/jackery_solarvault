@@ -34,7 +34,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (
+from ..const import (  # noqa: RUF100, TID252
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
     ACCESSORIES_LIST_PATH,
@@ -170,6 +170,7 @@ from ..const import (
     LOGIN_AES_SEED_LEN,
     LOGIN_PATH,
     LOGIN_TIMEOUT_SEC,
+    LOGOUT_PATH,
     MAX_POWER_SAVE_PATH,
     MODIFY_INFO_PATH,
     MQTT_CLIENT_ID_SUFFIX,
@@ -202,6 +203,7 @@ from ..const import (
     QUERY_TOU_PLAN_PATH,
     REDACTED_VALUE,
     REGISTER_APP_ID,
+    REGISTER_PATH,
     REQUEST_TIMEOUT_SEC,
     RESET_PASSWORD_PATH,
     RSA_PUBLIC_KEY_B64,
@@ -238,9 +240,10 @@ from ..const import (
     UPLOAD_HEADIMG_PATH,
     USER_AGENT,
     USER_INFO_PATH,
+    VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
 )
-from ..util import (
+from ..util import (  # noqa: RUF100, TID252
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
@@ -421,7 +424,7 @@ __all__ = [
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from ..coordinator import (
+    from ..coordinator import (  # noqa: RUF100, TID252
         JackerySolarVaultCoordinator,
     )
 
@@ -459,7 +462,7 @@ def _data_field_accepted(data: dict[str, Any]) -> bool:
 
 
 if TYPE_CHECKING:
-    from ..types import MqttSessionSnapshot
+    from ..types import MqttSessionSnapshot  # noqa: RUF100, TID252
 
 
 class JackeryError(Exception):
@@ -484,7 +487,7 @@ def _write_accepted(data: dict[str, Any]) -> bool:
         `True` if the response's `data` field is not explicitly `False`, `False`
         otherwise.
     """
-    from ..util import safe_bool  # noqa: PLC0415
+    from ..util import safe_bool  # noqa: PLC0415, RUF100, TID252
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -498,7 +501,7 @@ write_accepted = _write_accepted
 class JackeryApi:  # noqa: PLR0904
     """Async client for the Jackery SolarVault cloud (full monolith)."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917  # constructor takes distinct client-config values; a params object adds no clarity
         self,
         session: aiohttp.ClientSession,
         account: str,
@@ -667,6 +670,65 @@ class JackeryApi:  # noqa: PLR0904
         self._mqtt_mac_id_source = "generated"
         return _generate_udid(self._account)
 
+    async def _post_login_request(
+        self,
+        url: str,
+        form_body: dict[str, str],
+        headers: dict[str, str],
+    ) -> Any:  # noqa: ANN401  # decoded JSON is arbitrary; callers use dict .get accessors
+        """POST the encrypted login form and return the decoded JSON response.
+
+        Parameters:
+            url (str): Fully-qualified login endpoint URL.
+            form_body (dict[str, str]): Form-urlencoded login fields.
+            headers (dict[str, str]): Request headers.
+
+        Returns:
+            Any: The decoded JSON response body.
+
+        Raises:
+            JackeryApiError: On non-OK HTTP status, invalid JSON, or transport failure.
+        """
+        try:
+            async with self._session.post(
+                url,
+                data=form_body,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=LOGIN_TIMEOUT_SEC),
+            ) as resp:
+                return await self._decode_login_response(resp)
+        except (TimeoutError, aiohttp.ClientError) as err:
+            msg = f"Login request failed: {err}"
+            raise JackeryApiError(msg) from err
+
+    @staticmethod
+    async def _decode_login_response(resp: aiohttp.ClientResponse) -> Any:  # noqa: ANN401  # decoded JSON is arbitrary; callers use dict .get accessors
+        """Validate the login HTTP response and return its decoded JSON body.
+
+        Parameters:
+            resp (aiohttp.ClientResponse): The open login response.
+
+        Returns:
+            Any: The decoded JSON response body.
+
+        Raises:
+            JackeryApiError: On non-OK HTTP status or invalid JSON.
+        """
+        if resp.status != HTTPStatus.OK:
+            msg = f"Login HTTP {resp.status}"
+            raise JackeryApiError(msg)
+        try:
+            return await resp.json(content_type=None)
+        except (
+            aiohttp.ContentTypeError,
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+            ValueError,
+        ) as err:
+            raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
+            msg = f"Login returned invalid JSON: {raw!r}"
+            raise JackeryApiError(msg) from err
+
     async def async_login(self) -> str:
         """Perform the encrypted login flow and store session and MQTT credentials.
 
@@ -704,30 +766,7 @@ class JackeryApi:  # noqa: PLR0904
         headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
         form_body = {"aesEncryptData": aes_blob, "rsaForAesKey": rsa_blob}
 
-        try:
-            async with self._session.post(
-                url,
-                data=form_body,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=LOGIN_TIMEOUT_SEC),
-            ) as resp:
-                if resp.status != HTTPStatus.OK:
-                    msg = f"Login HTTP {resp.status}"
-                    raise JackeryApiError(msg)
-                try:
-                    data = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    msg = f"Login returned invalid JSON: {raw!r}"
-                    raise JackeryApiError(msg) from err
-        except (TimeoutError, aiohttp.ClientError) as err:
-            msg = f"Login request failed: {err}"
-            raise JackeryApiError(msg) from err
+        data = await self._post_login_request(url, form_body, headers)
 
         if self._extract_code(data) != CODE_OK:
             msg = (
@@ -846,7 +885,8 @@ class JackeryApi:  # noqa: PLR0904
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError("Login succeeded without returning a token")
+            msg = "Login succeeded without returning a token"
+            raise JackeryAuthError(msg)
         return self._token
 
     @staticmethod
@@ -964,11 +1004,11 @@ class JackeryApi:  # noqa: PLR0904
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001  # best-effort debug logging must never break the API path
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
-    def _http_payload_debug(
+    def _http_payload_debug(  # noqa: PLR0913  # keyword-only builder for distinct debug-event fields
         *,
         method: str,
         path: str,
@@ -1166,6 +1206,92 @@ class JackeryApi:  # noqa: PLR0904
             {"email": email, "verificationCode": verification_code},
         )
 
+    async def async_logout(self) -> dict[str, Any]:
+        """POST /v1/auth/loginOut — invalidate the current session token.
+
+        Mirrors ``LoginOutApi`` (source-of-truth ``auth/loginOut``), which takes
+        no request body — the backend identifies the session from the bearer
+        token on the request. API-surface completeness only: Home Assistant runs
+        on a long-lived dedicated account and never triggers logout during normal
+        operation, so this wrapper is provided for parity, not UI-wired.
+
+        Returns:
+            dict: Backend response payload (typically empty on success).
+        """
+        data = await self._post_json(LOGOUT_PATH, {})
+        return self._payload_dict(data, LOGOUT_PATH)
+
+    async def async_register(
+        self,
+        *,
+        email: str,
+        password: str,
+        verification_code: str,
+        region_code: str | None = None,
+    ) -> dict[str, Any]:
+        """POST /v1/auth/register — create a new Jackery cloud account.
+
+        Mirrors ``RegisterAccountApi`` (source-of-truth ``auth/register``) with
+        request fields ``email``, ``password``, ``regionCode``,
+        ``registerAppId`` and ``verificationCode``. ``registerAppId`` is fixed to
+        the app identifier; ``regionCode`` falls back to this client's learned
+        region when not supplied. API-surface completeness only: Home Assistant
+        uses an existing account, so this wrapper is provided for parity with the
+        source-of-truth catalog and is not UI-wired.
+
+        Parameters:
+            email: Account email address.
+            password: Account password.
+            verification_code: Email verification code from
+                :meth:`async_send_verification_code`.
+            region_code: Optional region/country code; falls back to the client's
+                configured region when omitted.
+
+        Returns:
+            dict: Backend response payload.
+        """
+        params = {
+            "email": email,
+            "password": password,
+            "verificationCode": verification_code,
+            FIELD_REGISTER_APP_ID: REGISTER_APP_ID,
+        }
+        resolved_region = region_code or self._region_code
+        if resolved_region:
+            params[FIELD_REGION_CODE] = resolved_region
+        data = await self._post_json(REGISTER_PATH, params)
+        return self._payload_dict(data, REGISTER_PATH)
+
+    async def async_send_verification_code(
+        self,
+        *,
+        email: str,
+        method: str = "email",
+        phone: str | None = None,
+    ) -> dict[str, Any]:
+        """GET /v1/auth/verificationCode — request a verification code.
+
+        Mirrors ``GetVerificationCodeApi`` (source-of-truth
+        ``auth/verificationCode``) with request fields ``email``, ``method`` and
+        ``phone``. This is the code-issuing counterpart to
+        :meth:`async_check_verification_code`. API-surface completeness only:
+        Home Assistant uses an existing account, so this wrapper is provided for
+        parity with the source-of-truth catalog and is not UI-wired.
+
+        Parameters:
+            email: Account email address.
+            method: ``"email"`` or ``"sms"``.
+            phone: Phone number (required when method is ``"sms"``).
+
+        Returns:
+            dict: Backend response payload.
+        """
+        params = {"email": email, "method": method}
+        if phone:
+            params["phone"] = phone
+        data = await self._get_json(VERIFY_CODE_PATH, params=params)
+        return self._payload_dict(data, VERIFY_CODE_PATH)
+
     # --- confirmed endpoints -----------------------------------------------
     async def async_get_system_list(self) -> list[dict[str, Any]]:
         """GET /v1/device/system/list — all systems + their devices.  # noqa: E226.
@@ -1312,7 +1438,7 @@ class JackeryApi:  # noqa: PLR0904
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
 
-    async def _async_get_device_period_stat(
+    async def _async_get_device_period_stat(  # noqa: PLR0913  # keyword-only query params for a period-stat endpoint
         self,
         path: str,
         *,
@@ -1628,7 +1754,21 @@ class JackeryApi:  # noqa: PLR0904
         guid: str,
         timezone_offset: int,
     ) -> dict[str, Any]:
-        """POST /v1/device/bind — bind a device to the account."""
+        """POST /v1/device/bind — bind a device to the account.
+
+        Known limitation (own-hardware onboarding, RE-blocked): binding a
+        brand-new *unprovisioned* unit requires ``bind_key`` and ``guid``, which
+        the vendor app derives from a Nordic BLE Wi-Fi-provisioning exchange.
+        That provisioning protocol — the GATT service/characteristic UUIDs, the
+        ``WRITE_WIFI_INFO``/``READ_WIFI_LIST`` payload schema, and the origin of
+        ``guid`` plus its bootstrap crypto — is absent from source-of-truth and
+        only observable with a physical unprovisioned device and a capture rig
+        (nRF Connect GATT dump + Frida). Until those captures exist there is no
+        HA config-flow onboarding for a factory-fresh unit: users pair once in
+        the Jackery app and HA then discovers the bound device. This method is
+        wired and correct; it is simply unreachable without ``guid``. See the
+        deferred BLE-provisioning epic in the pairing workstream plan.
+        """
         return await self._post_json(
             DEVICE_BIND_PATH,
             {
