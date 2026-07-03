@@ -99,14 +99,10 @@ from .const import (
     FIELD_DEVICE_SN,
     FIELD_DEV_ID,
     FIELD_DEV_SN,
-    FIELD_GRID_IN_PW,
-    FIELD_GRID_OUT_PW,
-    FIELD_HOME_LOAD_PW,
     FIELD_ID,
     FIELD_IDX,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
-    FIELD_LOAD_PW,
     FIELD_OTHER_LOAD_PW,
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
@@ -254,8 +250,8 @@ def utc_now() -> datetime:
 
 
 def parse_utc_datetime(
-    value: Any,
-) -> datetime:  # arbitrary payload timestamp, coerced at runtime
+    value: float | str | datetime,
+) -> datetime:  # parsed timestamp types
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
 
     Parameters:
@@ -265,7 +261,8 @@ def parse_utc_datetime(
         datetime: The parsed datetime normalized to UTC with tzinfo set.
 
     Raises:
-        ValueError: If the input is an empty string, an unsupported type, or an invalid timestamp/ISO string.
+        ValueError: If the input is an empty string or an invalid timestamp/ISO string.
+        TypeError: If the input is not a datetime, numeric, or string value.
     """  # noqa: E501
     if isinstance(value, datetime):
         parsed = value
@@ -297,7 +294,7 @@ def parse_utc_datetime(
             raise ValueError(msg) from err
     else:
         msg = f"unsupported UTC timestamp: {value!r}"
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
@@ -306,7 +303,7 @@ def parse_utc_datetime(
 
 def coordinator_entity_signature(
     coordinator_data: dict[str, Any] | None,
-) -> tuple[Any, ...]:
+) -> tuple[tuple[str, tuple[str, ...], int, tuple[str, ...], bool, bool, bool], ...]:
     """Produce a deterministic, lightweight "shape" signature for coordinator payloads used during entity setup.
 
     Parameters:
@@ -345,10 +342,10 @@ def coordinator_entity_signature(
     return tuple(sig)
 
 
-def append_unique_entity(
-    entities: list[Any],
+def append_unique_entity[EntityT](
+    entities: list[EntityT],
     seen_unique_ids: set[str],
-    entity: object,
+    entity: EntityT,
     *,
     platform: str,
     logger: logging.Logger,
@@ -510,8 +507,8 @@ def app_year_request_kwargs(year: int) -> dict[str, str]:
 
 
 def safe_float(
-    value: Any,
-) -> float | None:  # arbitrary payload value, coerced at runtime
+    value: float | str | None,
+) -> float | None:  # numeric payload value
     """Parse a payload value into a Python float or return None when it cannot be interpreted.
 
     Parameters:
@@ -525,24 +522,36 @@ def safe_float(
     if value is None:
         return None
     if isinstance(value, str):
-        candidate = value.strip()
-        if not candidate:
-            return None
-        if "," in candidate and "." not in candidate:
-            if candidate.count(",") != 1:
-                return None
-            candidate = candidate.replace(",", ".")
-        try:
-            return float(candidate)
-        except ValueError:
-            return None
+        return _parse_float_string(value)
     try:
         return float(value)
     except TypeError, ValueError:
         return None
 
 
-def safe_int(value: Any) -> int | None:  # arbitrary payload value, coerced at runtime
+def _parse_float_string(value: str) -> float | None:
+    """Parse a payload string into a float, tolerating a single comma decimal.
+
+    Parameters:
+        value (str): Candidate numeric string.
+
+    Returns:
+        float | None: The parsed float, or None for empty/malformed strings.
+    """
+    candidate = value.strip()
+    if not candidate:
+        return None
+    if "," in candidate and "." not in candidate:
+        if candidate.count(",") != 1:
+            return None
+        candidate = candidate.replace(",", ".")
+    try:
+        return float(candidate)
+    except ValueError:
+        return None
+
+
+def safe_int(value: object) -> int | None:  # integral payload value
     """Convert a value to an integer only when it represents an exact integer.
 
     Accepted: genuine ints and integral floats (``8.0`` -> ``8``). Rejected
@@ -579,7 +588,7 @@ def dev_mode_redactions_disabled() -> bool:
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
     """  # noqa: E501
-    global _DEV_MODE_CACHED
+    global _DEV_MODE_CACHED  # noqa: PLW0603  # module-level memoization cache for a one-time env lookup
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
         _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
@@ -607,8 +616,8 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
 
 
 def _payload_debug_redacted(
-    value: Any, redactions_disabled: bool | None = None
-) -> Any:  # recursive JSON walker over arbitrary payload
+    value: object, redactions_disabled: bool | None = None
+) -> object:  # recursive JSON walker over payload
     """Create a JSON-serializable copy of `value` with sensitive fields redacted.
 
     When `redactions_disabled` is True (or when omitted and diagnostics redactions are disabled), returns a normalized passthrough of `value`. Otherwise, recursively replaces values for keys listed in `REDACT_KEYS` with `REDACTED_VALUE`, preserves overall structure, and converts tuples to lists so the result is JSON-serializable.
@@ -647,8 +656,8 @@ def _payload_debug_redacted(
 
 
 def _payload_debug_passthrough(
-    value: Any,
-) -> Any:  # recursive JSON walker over arbitrary payload
+    value: object,
+) -> object:  # recursive JSON walker over payload
     """Normalize a nested structure into JSON-serializable types.
 
     Converts mapping keys to strings and converts tuples to lists while recursively
@@ -675,8 +684,8 @@ def _payload_debug_passthrough(
 
 
 def redacted_json_safe_payload(
-    value: Any,
-) -> Any:  # recursive JSON walker over arbitrary payload
+    value: object,
+) -> object:  # recursive JSON walker over payload
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
     The redaction is applied recursively to nested dicts/lists/tuples while preserving the overall structure and types that are JSON-serializable.
@@ -810,7 +819,7 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: Any) -> bool | None:  # arbitrary payload value, coerced at runtime
+def safe_bool(value: bool | float | str | None) -> bool | None:  # noqa: PLR0911  # boolean payload value; flat type-dispatch guard chain is clearest as-is
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -1019,7 +1028,9 @@ def jackery_online_state(value: object) -> bool | None:
             return True
         if normalized in {"offline", "disconnected", "unavailable"}:
             return False
-    return safe_bool(value)
+    if isinstance(value, (bool, int, float, str, type(None))):
+        return safe_bool(value)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1331,7 +1342,7 @@ def app_data_quality_warnings(
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
-    def _add_warning(
+    def _add_warning(  # noqa: PLR0913  # keyword-only builder for distinct data-quality-warning fields
         *,
         reason: str,
         metric_key: str,
@@ -1610,7 +1621,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
     """
     if value is None or isinstance(value, bool):
         return None
-    parsed = safe_float(value)
+    parsed = safe_float(value) if isinstance(value, (int, float, str)) else None
     if parsed is None or math.isnan(parsed) or math.isinf(parsed):
         return None
     whole = math.floor(abs(parsed))
@@ -1943,7 +1954,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(
+def _calculated_savings_from_year(  # noqa: PLR0914  # cohesive savings estimation; intermediate totals kept named for clarity
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -2173,7 +2184,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(
+def backfill_year_payload_from_months(  # noqa: PLR0912  # per-month aggregation dispatch; branch chain mirrors the section shape
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -2324,7 +2335,7 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(
+def guard_statistic_totals_from_year(  # noqa: PLR0914  # data-quality guard; named per-metric totals aid diagnostics
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -2486,7 +2497,7 @@ def compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def trend_series_points(
+def trend_series_points(  # noqa: PLR0912  # trend-series parsing dispatches over unit/label/series shapes
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2562,7 +2573,7 @@ def _trend_bucket_energy_value(
     stat_key: str,
 ) -> float | None:
     """Return a Recorder-safe energy bucket while preserving direction semantics."""
-    value = safe_float(raw)
+    value = safe_float(raw) if isinstance(raw, (int, float, str)) else None
     if value is None:
         return None
     if _is_signed_output_energy_stat(section, stat_key):
@@ -2654,7 +2665,7 @@ def _day_power_sample_energy_value(
     stat_key: str,
 ) -> float | None:
     """Return the directional app day-curve sample value to integrate."""
-    value = safe_float(raw)
+    value = safe_float(raw) if isinstance(raw, (int, float, str)) else None
     if value is None:
         return None
     if section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS)):
@@ -2699,7 +2710,74 @@ def _scalar_day_energy_points(
     ]
 
 
-def day_power_energy_points(
+def _reconcile_rounded_day_values(
+    rounded_values: list[float], scalar_total: float
+) -> list[float]:
+    """Nudge the last non-zero bucket so rounded values sum to the scalar total.
+
+    Parameters:
+        rounded_values (list[float]): Per-bucket kWh values already rounded.
+        scalar_total (float): Target period total the buckets should sum to.
+
+    Returns:
+        list[float]: The reconciled values (a new list; input is not mutated).
+    """
+    if not rounded_values:
+        return rounded_values
+    diff = round(scalar_total - sum(rounded_values), 5)
+    if not diff:
+        return rounded_values
+    adjusted = list(rounded_values)
+    target_index = next(
+        (idx for idx in range(len(adjusted) - 1, -1, -1) if adjusted[idx] > 0),
+        len(adjusted) - 1,
+    )
+    adjusted[target_index] = round(max(adjusted[target_index] + diff, 0.0), 5)
+    return adjusted
+
+
+def _resolve_day_request_window(
+    source: dict[str, Any],
+    *,
+    today: date | None,
+    now: datetime | None,
+) -> tuple[date, datetime] | None:
+    """Resolve and validate the request day window for a day-power payload.
+
+    Parameters:
+        source (dict[str, Any]): App payload containing request meta.
+        today (date | None): Reference date for "today" comparisons; defaults to
+            the current local date.
+        now (datetime | None): Reference time; defaults to current time.
+
+    Returns:
+        tuple[date, datetime] | None: The resolved ``(begin, now)`` pair, or
+            ``None`` when the request window is missing or out of range.
+    """
+    request = source.get(APP_REQUEST_META)
+    begin = None
+    end = None
+    if isinstance(request, dict):
+        begin = _parse_iso_date(
+            request.get(APP_REQUEST_BEGIN_DATE)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+        )
+        end = _parse_iso_date(
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+        )
+
+    if begin is None or (end is not None and begin > end):
+        return None
+    if today is None:
+        today = datetime.now(UTC).astimezone().date()
+    if begin > today:
+        return None
+    if now is None:
+        now = datetime.now()
+    return begin, now
+
+
+def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2732,26 +2810,10 @@ def day_power_energy_points(
     if unit and unit not in {"w", APP_UNIT_KWH}:
         return []
 
-    request = source.get(APP_REQUEST_META)
-    begin = None
-    end = None
-    if isinstance(request, dict):
-        begin = _parse_iso_date(
-            request.get(APP_REQUEST_BEGIN_DATE)
-            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
-        )
-        end = _parse_iso_date(
-            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
-        )
-
-    if begin is None or (end is not None and begin > end):
+    window = _resolve_day_request_window(source, today=today, now=now)
+    if window is None:
         return []
-    if today is None:
-        today = datetime.now(UTC).astimezone().date()
-    if begin > today:
-        return []
-    if now is None:
-        now = datetime.now()
+    begin, now = window
 
     labels = source.get(APP_CHART_LABELS)
     parsed_labels = labels if isinstance(labels, list) else None
@@ -2828,21 +2890,8 @@ def day_power_energy_points(
 
     bucket_items = sorted(buckets.items())
     rounded_values = [round(max(value, 0.0), 5) for _minute, value in bucket_items]
-
-    if scalar_total is not None and raw_total > 0 and rounded_values:
-        diff = round(scalar_total - sum(rounded_values), 5)
-        if diff:
-            target_index = next(
-                (
-                    idx
-                    for idx in range(len(rounded_values) - 1, -1, -1)
-                    if rounded_values[idx] > 0
-                ),
-                len(rounded_values) - 1,
-            )
-            rounded_values[target_index] = round(
-                max(rounded_values[target_index] + diff, 0.0), 5
-            )
+    if scalar_total is not None and raw_total > 0:
+        rounded_values = _reconcile_rounded_day_values(rounded_values, scalar_total)
 
     return [
         TrendStatisticPoint(
@@ -2928,7 +2977,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(
+def calculated_smart_meter_power(  # noqa: PLR0911  # flat guard chain over CT calculation variants; clearest as-is
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -3021,9 +3070,7 @@ def jackery_reported_home_load_power(props: dict[str, Any]) -> float | None:
     Returns:
         float | None: The reported power in watts if present and parseable, `None` otherwise.
     """  # noqa: E501
-    return first_power_value(
-        props, FIELD_OTHER_LOAD_PW, FIELD_HOME_LOAD_PW, FIELD_LOAD_PW
-    )
+    return first_power_value(props, FIELD_OTHER_LOAD_PW)
 
 
 def jackery_grid_side_input_power(props: dict[str, Any]) -> float | None:
@@ -3033,7 +3080,9 @@ def jackery_grid_side_input_power(props: dict[str, Any]) -> float | None:
         float: AC input power in watts, or `None` if no suitable value is present.
     """
     return first_nonzero_power_value(
-        props, FIELD_GRID_IN_PW, FIELD_IN_ONGRID_PW, FIELD_IN_GRID_SIDE_PW
+        props,
+        FIELD_IN_GRID_SIDE_PW,
+        FIELD_IN_ONGRID_PW,
     )
 
 
@@ -3047,7 +3096,9 @@ def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
         float: Power in watts if a known output field contains a numeric value, `None` otherwise.
     """  # noqa: E501
     return first_nonzero_power_value(
-        props, FIELD_GRID_OUT_PW, FIELD_OUT_ONGRID_PW, FIELD_OUT_GRID_SIDE_PW
+        props,
+        FIELD_OUT_GRID_SIDE_PW,
+        FIELD_OUT_ONGRID_PW,
     )
 
 
@@ -3102,7 +3153,9 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
+def _chart_series_key_for_stat(  # noqa: PLR0911, PLR0912  # exhaustive section/stat → series-key mapping table
+    section: str, stat_key: str
+) -> str | None:
     """Map an app section and statistic key to the corresponding chart-series key.
 
     Parameters:
@@ -3209,7 +3262,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(
+def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3268,7 +3321,7 @@ def trend_series_total(
     return round(sum(valid_values), 2)
 
 
-def trend_series_has_value(
+def trend_series_has_value(  # noqa: PLR0911  # flat guard chain over series/value shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3316,7 +3369,7 @@ def trend_series_has_value(
 
 def task_plan_value(
     task_plan: dict[str, Any], *keys: str
-) -> Any:  # payload value of unknown type by design
+) -> str | int | float | bool | None:  # primitive payload value
     """Retrieve the first non-None value for any of the given keys from a task-plan payload.
 
     Searches in this order: the top-level of `task_plan`, the `TASK_PLAN_BODY` dictionary (if present), then each dictionary item in the `TASK_PLAN_TASKS` list (if present). Keys are checked in the order provided and the first non-`None` match is returned.

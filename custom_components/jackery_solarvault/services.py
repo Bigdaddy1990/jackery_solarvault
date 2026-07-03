@@ -73,6 +73,7 @@ from .const import (
     SERVICE_NUMERIC_ID_PATTERN,
     SERVICE_QUERY_ELECTRICITY_STRATEGY,
     SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+    SERVICE_REFRESH_SUBDEVICES,
     SERVICE_REFRESH_WEATHER_PLAN,
     SERVICE_REMOVE_ALL_SHARED_ACCESS,
     SERVICE_REMOVE_SHARED_ACCESS,
@@ -163,6 +164,12 @@ RENAME_SCHEMA = vol.Schema({
     ),
 })
 REFRESH_WEATHER_PLAN_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+})
+REFRESH_SUBDEVICES_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
         cv.string,
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
@@ -816,6 +823,54 @@ async def _async_handle_refresh_weather_plan(
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="refresh_weather_plan_failed",
+            translation_placeholders={
+                "device_id": device_id,
+                "error": str(err),
+            },
+        ) from err
+
+
+async def _async_handle_refresh_subdevices(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> None:
+    """Force accessory/sub-device rediscovery on the matching coordinator.
+
+    Re-runs the smart-accessory enumeration against the Jackery cloud, then
+    requests a full coordinator refresh so any newly discovered (or removed)
+    accessories are reflected in the entity registry. This is the manual
+    counterpart to the automatic enumeration that runs on the polling cycle.
+    """
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="refresh_subdevices_failed",
+    )
+    coordinator = _coordinator_for_device(hass, device_id)
+    if coordinator is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="refresh_subdevices_failed",
+            translation_placeholders={
+                "device_id": device_id,
+                "error": "no Jackery entry owns this device id",
+            },
+        )
+    try:
+        await coordinator.api.async_sync_smart_accessories()
+        await coordinator.async_request_refresh()
+    except ConfigEntryAuthFailed:
+        raise
+    except JackeryAuthError as err:
+        msg = (
+            "Jackery credentials were rejected while refreshing sub-devices. "
+            "Re-authentication is required."
+        )
+        raise ConfigEntryAuthFailed(msg) from err
+    except (HomeAssistantError, JackeryError, LookupError) as err:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="refresh_subdevices_failed",
             translation_placeholders={
                 "device_id": device_id,
                 "error": str(err),
@@ -1610,6 +1665,11 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
             SERVICE_REFRESH_WEATHER_PLAN,
             _async_handle_refresh_weather_plan,
             REFRESH_WEATHER_PLAN_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_REFRESH_SUBDEVICES,
+            _async_handle_refresh_subdevices,
+            REFRESH_SUBDEVICES_SCHEMA,
         ),
         _ServiceRegistration(
             SERVICE_DELETE_STORM_ALERT,

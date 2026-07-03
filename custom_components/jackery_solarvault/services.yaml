@@ -18,6 +18,14 @@ refresh_weather_plan:
       selector:
         device:
           integration: jackery_solarvault
+refresh_subdevices:
+  fields:
+    device_id:
+      required: true
+      example: '573702884982521856'
+      selector:
+        device:
+          integration: jackery_solarvault
 delete_storm_alert:
   fields:
     device_id:

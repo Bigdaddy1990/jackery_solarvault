@@ -123,24 +123,6 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
 }
 
 
-async def _async_update_reload_and_abort(
-    flow: ConfigFlow,
-    entry: ConfigEntry,
-    *,
-    data_updates: Mapping[str, Any] | None = None,
-    options: Mapping[str, Any] | None = None,
-    reason: str,
-) -> ConfigFlowResult:
-    """Update an entry, await its reload, then abort the flow."""
-    data = {**entry.data, **(data_updates or {})}
-    update_kwargs: dict[str, Any] = {"data": data}
-    if options is not None:
-        update_kwargs["options"] = options
-    flow.hass.config_entries.async_update_entry(entry, **update_kwargs)
-    await flow.hass.config_entries.async_reload(entry.entry_id)
-    return flow.async_abort(reason=reason)
-
-
 def _normalize_account(value: str) -> str:
     """Normalize an account identifier by stripping leading and trailing whitespace.
 
@@ -358,22 +340,58 @@ def _merge_local_mqtt_options(
             - CONF_LOCAL_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
     """
+    # The options/reconfigure forms expose these fields under the legacy
+    # ``third_party_mqtt_*`` keys, while the stored option + coordinator read the
+    # ``local_mqtt_*`` keys (``_current_local_mqtt_options`` resolves either).
+    # Read the ``local_*`` key first (direct/newer forms), then fall back to the
+    # form's ``third_party_*`` key, then the current value. Without the middle
+    # fallback the submitted switch/host/port/credentials were silently dropped
+    # and the toggle appeared to do nothing. ``local_*`` precedence also avoids
+    # the reconfigure form's ``bool``-typed ``third_party_mqtt_ip`` field.
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(
-            user_input.get(CONF_LOCAL_MQTT_ENABLE, current[CONF_LOCAL_MQTT_ENABLE]),
+            user_input.get(
+                CONF_LOCAL_MQTT_ENABLE,
+                user_input.get(
+                    CONF_THIRD_PARTY_MQTT_ENABLE,
+                    current[CONF_LOCAL_MQTT_ENABLE],
+                ),
+            ),
         ),
         CONF_LOCAL_MQTT_HOST: str(
-            user_input.get(CONF_LOCAL_MQTT_HOST, current[CONF_LOCAL_MQTT_HOST]) or "",
+            user_input.get(
+                CONF_LOCAL_MQTT_HOST,
+                user_input.get(CONF_THIRD_PARTY_MQTT_IP, current[CONF_LOCAL_MQTT_HOST]),
+            )
+            or "",
         ).strip(),
         CONF_LOCAL_MQTT_PORT: _coerce_local_mqtt_port(
-            user_input.get(CONF_LOCAL_MQTT_PORT, current[CONF_LOCAL_MQTT_PORT]),
+            user_input.get(
+                CONF_LOCAL_MQTT_PORT,
+                user_input.get(
+                    CONF_THIRD_PARTY_MQTT_PORT,
+                    current[CONF_LOCAL_MQTT_PORT],
+                ),
+            ),
         ),
         CONF_LOCAL_MQTT_USERNAME: str(
-            user_input.get(CONF_LOCAL_MQTT_USERNAME, current[CONF_LOCAL_MQTT_USERNAME])
+            user_input.get(
+                CONF_LOCAL_MQTT_USERNAME,
+                user_input.get(
+                    CONF_THIRD_PARTY_MQTT_USERNAME,
+                    current[CONF_LOCAL_MQTT_USERNAME],
+                ),
+            )
             or "",
         ),
         CONF_LOCAL_MQTT_PASSWORD: str(
-            user_input.get(CONF_LOCAL_MQTT_PASSWORD, current[CONF_LOCAL_MQTT_PASSWORD])
+            user_input.get(
+                CONF_LOCAL_MQTT_PASSWORD,
+                user_input.get(
+                    CONF_THIRD_PARTY_MQTT_PASSWORD,
+                    current[CONF_LOCAL_MQTT_PASSWORD],
+                ),
+            )
             or "",
         ),
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
@@ -856,8 +874,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
-                    return await _async_update_reload_and_abort(
-                        self,
+                    return self.async_update_reload_and_abort(
                         entry,
                         data_updates={
                             CONF_USERNAME: account,
@@ -993,8 +1010,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot accept shared Jackery device: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
-                return await _async_update_reload_and_abort(
-                    self,
+                return self.async_update_reload_and_abort(
                     entry,
                     reason=FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL,
                 )
@@ -1094,8 +1110,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         if not devices:
             return self.async_abort(reason=FLOW_ABORT_SHELLY_NO_DEVICES)
 
-        return await _async_update_reload_and_abort(
-            self,
+        return self.async_update_reload_and_abort(
             entry,
             reason=FLOW_ABORT_SHELLY_SUCCESSFUL,
         )
@@ -1145,8 +1160,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
-                return await _async_update_reload_and_abort(
-                    self,
+                return self.async_update_reload_and_abort(
                     entry,
                     data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
                     reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
