@@ -7,17 +7,17 @@ Source: coordinator.py lines 4641-4692 (Phase 2d extraction).
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..const import (
+from ..const import (  # noqa: RUF100, TID252
     FIELD_COUNTRY,
     FIELD_PLATFORM_COMPANY_ID,
     FIELD_SYSTEM_REGION,
 )
-from ..util import WHOLE_INT_TEXT_RE
+from ..util import WHOLE_INT_TEXT_RE  # noqa: RUF100, TID252
 
 """Domain setter facades."""
 
 if TYPE_CHECKING:
-    from ..coordinator import JackerySolarVaultCoordinator
+    from ..coordinator import JackerySolarVaultCoordinator  # noqa: RUF100, TID252
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from json import JSONDecodeError
 
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
-from ..client import JackeryAuthError, JackeryError
+from ..client import JackeryAuthError, JackeryError  # noqa: RUF100, TID252
 
 try:  # pragma: no cover - SQLAlchemy ships with the recorder; guard for minimal envs
     from sqlalchemy.exc import SQLAlchemyError

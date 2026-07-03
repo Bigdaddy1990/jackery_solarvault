@@ -8,7 +8,14 @@ from datetime import date, datetime, timedelta
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
+    APP_CHART_SERIES_Y,
+    APP_CHART_SERIES_Y1,
+    APP_CHART_SERIES_Y2,
+    APP_CHART_SERIES_Y3,
+    APP_CHART_SERIES_Y4,
+    APP_CHART_SERIES_Y5,
+    APP_CHART_SERIES_Y6,
     APP_CHART_STAT_METRICS,
     APP_CHART_STAT_PERIODS,
     APP_SECTION_HOME_STAT,
@@ -34,8 +41,8 @@ from ...const import (
     PAYLOAD_PV_TRENDS,
     PAYLOAD_SYSTEM,
 )
-from ...handlers.property_merge import merge_dict_values
-from ...util import safe_float
+from ...handlers.property_merge import merge_dict_values  # noqa: RUF100, TID252
+from ...util import safe_float  # noqa: RUF100, TID252
 from .ingest import (
     TransportSource,
     gate_payload_section,
@@ -45,6 +52,16 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _LOGGER = logging.getLogger(__name__)  # noqa: RUF067
+
+_APP_CHART_SERIES_KEYS = (  # noqa: RUF067
+    APP_CHART_SERIES_Y,
+    APP_CHART_SERIES_Y1,
+    APP_CHART_SERIES_Y2,
+    APP_CHART_SERIES_Y3,
+    APP_CHART_SERIES_Y4,
+    APP_CHART_SERIES_Y5,
+    APP_CHART_SERIES_Y6,
+)
 
 
 # Canonical mapping from metric key to (trend_section, stat_key) used by
@@ -454,6 +471,24 @@ def merge_lifetime_counter_data(  # noqa: RUF067
     return True
 
 
+def _coalesced_day_chart_bucket_source(  # noqa: RUF067
+    source: dict[str, Any],
+) -> dict[str, Any]:
+    """Return a copy with upstream-null day chart buckets represented as zero."""
+    updated: dict[str, Any] | None = None
+    for series_key in _APP_CHART_SERIES_KEYS:
+        series = source.get(series_key)
+        if not isinstance(series, list):
+            continue
+        coalesced = [0.0 if safe_float(raw) is None else raw for raw in series]
+        if coalesced == series:
+            continue
+        if updated is None:
+            updated = dict(source)
+        updated[series_key] = coalesced
+    return source if updated is None else updated
+
+
 def current_app_chart_entity_source_batches(  # noqa: RUF067
     payload: dict[str, Any],
     source: TransportSource,
@@ -467,7 +502,12 @@ def current_app_chart_entity_source_batches(  # noqa: RUF067
             section = f"{section_prefix}_{date_type}"
             section_payload = payload.get(section)
             if isinstance(section_payload, dict):
-                gated_source = gate_payload_section(source, section, section_payload)
+                raw_source = (
+                    _coalesced_day_chart_bucket_source(section_payload)
+                    if date_type == DATE_TYPE_DAY
+                    else section_payload
+                )
+                gated_source = gate_payload_section(source, section, raw_source)
                 if gated_source:
                     section_sources[section_prefix] = gated_source
         if section_sources:

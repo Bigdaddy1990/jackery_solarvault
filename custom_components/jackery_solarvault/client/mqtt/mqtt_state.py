@@ -8,7 +8,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     MQTT_APP_CONFLICT_PAUSE_SEC,
     MQTT_RECONNECT_THROTTLE_SEC,
 )

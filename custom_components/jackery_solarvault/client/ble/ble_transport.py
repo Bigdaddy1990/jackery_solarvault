@@ -43,7 +43,7 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ...const import DEFAULT_BLE_ACK_TIMEOUT_SEC
+from ...const import DEFAULT_BLE_ACK_TIMEOUT_SEC  # noqa: RUF100, TID252
 from . import ble
 
 if TYPE_CHECKING:
@@ -313,7 +313,9 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from ...const import MQTT_CMD_QUERY_DEVICE_PROPERTY  # noqa: PLC0415
+        from ...const import (  # noqa: PLC0415
+            MQTT_CMD_QUERY_DEVICE_PROPERTY,  # noqa: PLC0415, RUF100, TID252
+        )
 
         try:  # noqa: PLW0717
             while not self._stop_event.is_set():
@@ -459,30 +461,55 @@ class JackeryBleListener:
             msg = f"BLE write to {device_id} failed: {err}"
             raise RuntimeError(msg) from err
         if pending is not None:
-            stats = self.stats_for(device_id)
-            try:
-                # ``shield`` keeps the future alive even if ``wait_for``
-                # cancels the inner wait on timeout — we want to discard
-                # it ourselves so the notify handler can observe the
-                # removal cleanly.
-                await asyncio.wait_for(
-                    asyncio.shield(pending.future), timeout=ack_timeout_sec
-                )
-            except TimeoutError as err:
-                self._discard_pending_ack(device_id, pending)
-                stats.acks_timed_out += 1
-                stats.last_error = f"ack timeout cmd={cmd}"
-                msg = (
-                    f"BLE ack timeout for cmd={cmd} on {device_id} after "
-                    f"{ack_timeout_sec}s"
-                )
-                raise RuntimeError(msg) from err
-            except asyncio.CancelledError:
-                self._discard_pending_ack(device_id, pending)
-                raise
-            stats.acks_received += 1
-            stats.last_ack_at = datetime.now()
+            await self._await_pending_ack(
+                device_id,
+                pending,
+                cmd=cmd,
+                ack_timeout_sec=ack_timeout_sec,
+            )
         return True
+
+    async def _await_pending_ack(
+        self,
+        device_id: str,
+        pending: _PendingAck,
+        *,
+        cmd: int,
+        ack_timeout_sec: float,
+    ) -> None:
+        """Wait for a registered ACK future, updating stats and cleanup.
+
+        Parameters:
+            device_id (str): Device the ACK is expected from.
+            pending (_PendingAck): The pending ACK record to await.
+            cmd (int): Logical command identifier (for stats/error messages).
+            ack_timeout_sec (float): Timeout in seconds to wait for the ACK.
+
+        Raises:
+            RuntimeError: When the ACK wait times out.
+        """
+        stats = self.stats_for(device_id)
+        try:
+            # ``shield`` keeps the future alive even if ``wait_for``
+            # cancels the inner wait on timeout — we want to discard
+            # it ourselves so the notify handler can observe the
+            # removal cleanly.
+            await asyncio.wait_for(
+                asyncio.shield(pending.future), timeout=ack_timeout_sec
+            )
+        except TimeoutError as err:
+            self._discard_pending_ack(device_id, pending)
+            stats.acks_timed_out += 1
+            stats.last_error = f"ack timeout cmd={cmd}"
+            msg = (
+                f"BLE ack timeout for cmd={cmd} on {device_id} after {ack_timeout_sec}s"
+            )
+            raise RuntimeError(msg) from err
+        except asyncio.CancelledError:
+            self._discard_pending_ack(device_id, pending)
+            raise
+        stats.acks_received += 1
+        stats.last_ack_at = datetime.now()
 
     # ------------------------------------------------------------------
     # ACK registry (internal)
