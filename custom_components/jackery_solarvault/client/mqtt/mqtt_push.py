@@ -15,7 +15,7 @@ import aiomqtt
 from aiomqtt import Client as MQTTClient, MqttError  # noqa: TC002
 from aiomqtt.exceptions import MqttCodeError
 
-from ...const import (
+from ...const import (  # noqa: RUF100, TID252
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_TOLERANCE,

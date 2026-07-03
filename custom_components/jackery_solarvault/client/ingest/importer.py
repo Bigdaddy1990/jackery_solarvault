@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...coordinator import JackerySolarVaultCoordinator
+    from ...coordinator import JackerySolarVaultCoordinator  # noqa: RUF100, TID252
 
 _LOGGER = logging.getLogger(__name__)
 
