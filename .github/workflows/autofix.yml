@@ -50,9 +50,9 @@ jobs:
 
       - name: Install deps (uv)
         run: |
-          uv pip install --system -r requirements.txt
-          uv pip install --system -r requirements-test.txt --prerelease=allow
-          uv pip install --system --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+          uv pip install -r requirements.txt
+          uv pip install -r requirements-test.txt --prerelease=allow
+          uv pip install --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
       - run: ruff check --fix
