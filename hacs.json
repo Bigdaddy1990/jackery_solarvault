@@ -9,5 +9,6 @@
     "FR",
     "ES"
   ],
-  "name": "Jackery SolarVault"
+  "name": "Jackery SolarVault",
+  "zip_release": true
 }

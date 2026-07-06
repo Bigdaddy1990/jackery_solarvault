@@ -1,5 +1,2 @@
-aiomqtt
-bleak-retry-connector
-cryptography
-
-segno>=1.6.6
+requests
+beautifulsoup4
