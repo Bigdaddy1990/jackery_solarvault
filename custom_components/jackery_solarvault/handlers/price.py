@@ -14,8 +14,6 @@ from ..const import (  # noqa: RUF100, TID252
 )
 from ..util import WHOLE_INT_TEXT_RE  # noqa: RUF100, TID252
 
-"""Domain setter facades."""
-
 if TYPE_CHECKING:
     from ..coordinator import JackerySolarVaultCoordinator  # noqa: RUF100, TID252
 

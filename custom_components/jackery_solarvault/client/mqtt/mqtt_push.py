@@ -18,6 +18,7 @@ from aiomqtt.exceptions import MqttCodeError
 from ...const import (  # noqa: RUF100, TID252
     FIELD_BODY,
     FIELD_DATA,
+    MQTT_AUTH_FAILURE_RCS,
     MQTT_AUTH_FAILURE_TOLERANCE,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
@@ -64,7 +65,42 @@ class _AioMqttPassiveDisconnectFilter(logging.Filter):
         )
 
 
+class _AioMqttTeardownNoiseFilter(logging.Filter):
+    """Demote late-callback teardown noise from aiomqtt/paho internals.
+
+    During stop/reconnect the broker's late SUBACK/DISCONNECT callbacks race
+    our teardown: aiomqtt then logs ``Unexpected message ID ... in
+    on_subscribe callback`` (with a ``KeyError: _pending_subscribes``
+    traceback) and paho logs ``Caught exception in on_...`` at ERROR. These
+    are expected races on an optional push layer, not actionable failures —
+    suppress them unless the aiomqtt child logger is explicitly set to
+    DEBUG, in which case they pass through demoted to DEBUG.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
+        """Suppress or demote known teardown-race records.
+
+        Parameters:
+            record (logging.LogRecord): The log record to evaluate.
+
+        Returns:
+            bool: `True` if the record should be logged, `False` if suppressed.
+        """
+        message = record.getMessage()
+        if (
+            "Unexpected message ID" not in message
+            and "Caught exception in on_" not in message
+        ):
+            return True
+        if not _AIOMQTT_LOGGER.isEnabledFor(logging.DEBUG):
+            return False
+        record.levelno = logging.DEBUG
+        record.levelname = logging.getLevelName(logging.DEBUG)
+        return True
+
+
 _AIOMQTT_LOGGER.addFilter(_AioMqttPassiveDisconnectFilter())
+_AIOMQTT_LOGGER.addFilter(_AioMqttTeardownNoiseFilter())
 
 
 class JackeryMqttPushClient:
@@ -122,6 +158,7 @@ class JackeryMqttPushClient:
         self._tls_x509_strict_disabled = False
         self._birth_publishes = 0
         self._birth_publish_failed = 0
+        self._birth_not_connected_logged = False
         self._last_birth_at: str | None = None
 
     async def async_start(
@@ -324,8 +361,9 @@ class JackeryMqttPushClient:
         On successful connection, sets internal connection flags and timestamps, subscribes to topics in self._topics, and forwards incoming messages to the internal message handler. If configured, schedules the connect callback once connected and schedules the disconnect callback when a previously established session ends. On errors, updates internal error state and sets or clears the connected event to reflect whether the termination was a connect failure.
         """  # noqa: E501
         connected = False
+        raw_client: MQTTClient | None = None
         try:  # noqa: PLW0717
-            async with aiomqtt.Client(
+            raw_client = aiomqtt.Client(
                 hostname=MQTT_HOST,
                 port=MQTT_PORT,
                 identifier=client_id,
@@ -335,7 +373,8 @@ class JackeryMqttPushClient:
                 keepalive=MQTT_KEEPALIVE_SEC,
                 clean_session=True,
                 logger=_AIOMQTT_LOGGER,
-            ) as client:
+            )
+            async with raw_client as client:
                 self._client = client
                 self._connected = True
                 connected = True
@@ -344,6 +383,9 @@ class JackeryMqttPushClient:
                 self._last_error = None
                 self._last_connect_failure_signature = None
                 self._consecutive_auth_failures = 0
+                # Fresh session: the next not-connected birth failure is
+                # news again.
+                self._birth_not_connected_logged = False
                 _LOGGER.info(
                     "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # noqa: E501
                     len(self._topics),
@@ -357,7 +399,7 @@ class JackeryMqttPushClient:
                             "Jackery MQTT subscribe failed for %s: %s", topic, err
                         )
                 if self._connect_callback is not None:
-                    self._schedule_birth_snapshot(self._connect_callback())
+                    self._schedule_birth_snapshot(self._connect_callback)
                 async for message in client.messages:
                     self._handle_message(str(message.topic), message.payload)
         except MqttCodeError as err:
@@ -374,6 +416,7 @@ class JackeryMqttPushClient:
             was_connected = connected
             self._client = None
             self._connected = False
+            self._finalize_raw_client(raw_client)
             if was_connected:
                 self._last_disconnect_at = self._utc_now_iso()
             if self._is_connect_failure_error(self._last_error):
@@ -472,9 +515,45 @@ class JackeryMqttPushClient:
             rc (int): CONNACK return code to evaluate.
 
         Returns:
-            True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes), False otherwise.
+            True if `rc` is an MQTT v3 auth code (4, 5) or in the MQTT v5
+            rejection class 128-135 (includes 133 "client identifier not
+            valid" used by the Jackery broker for banned client ids), False
+            otherwise.
         """  # noqa: E501
-        return rc in {4, 5, 134, 135}
+        return rc in MQTT_AUTH_FAILURE_RCS
+
+    @staticmethod
+    def _finalize_raw_client(client: object | None) -> None:
+        """Neutralise pending aiomqtt session futures after teardown.
+
+        aiomqtt resolves its private ``_connected``/``_disconnected`` futures
+        from late paho socket callbacks. When a session ends on a CONNACK
+        failure — or our stop/reconnect cancels it mid-connect — those
+        futures either keep an exception nobody ever awaits ("Future
+        exception was never retrieved" jobs in the HA log) or are touched
+        again by a late DISCONNECT callback (CancelledError raised inside
+        ``_on_disconnect``). Consume already-set exceptions and pre-complete
+        pending futures so the abandoned client instance is garbage
+        collected silently and late callbacks hit aiomqtt's own
+        ``done()`` early-return guards.
+
+        Parameters:
+            client: The abandoned aiomqtt client instance, or None.
+        """
+        if client is None:
+            return
+        for name in ("_connected", "_disconnected"):
+            future = getattr(client, name, None)
+            if not isinstance(future, asyncio.Future):
+                continue
+            if not future.done():
+                with contextlib.suppress(asyncio.InvalidStateError):
+                    future.set_result(None)
+                continue
+            if future.cancelled():
+                continue
+            with contextlib.suppress(Exception):
+                future.exception()
 
     @staticmethod
     def _is_connect_failure_error(error: str | None) -> bool:
@@ -594,23 +673,37 @@ class JackeryMqttPushClient:
 
         task.add_done_callback(_log_task_result)
 
-    def _schedule_birth_snapshot(self, coro: Awaitable[None]) -> None:
+    def _schedule_birth_snapshot(
+        self,
+        publish: Callable[[], Awaitable[None]],
+    ) -> None:
         """Dispatch the on-connect app-snapshot publish and track it as a birth.
 
         The snapshot publish is the Jackery protocol "birth" (MQTT_PROTOCOL.md
         §3): there is no Last Will, so presence is asserted by this publish. The
-        attempt is counted and timestamped eagerly; if the publish coroutine
-        raises, the failure is recorded so the birth/availability diagnostics
-        surfaced by the Cloud MQTT and HTTP-API sensors stay accurate.
+        attempt is counted and timestamped eagerly; failures are recorded so the
+        birth/availability diagnostics stay accurate. Taking the CALLABLE (not a
+        coroutine) lets a dead session skip without ever creating the publish
+        coroutine, and "not connected" failures — expected while the broker
+        rejects the session (app conflict / rc=133 pause) — log once at DEBUG
+        instead of spamming ERROR on every reconnect attempt.
 
         Args:
-            coro: The snapshot-publish coroutine to dispatch.
+            publish: Zero-arg factory for the snapshot-publish coroutine.
         """
         self._birth_publishes += 1
         self._last_birth_at = self._utc_now_iso()
+        if not self._connected:
+            self._birth_publish_failed += 1
+            if not self._birth_not_connected_logged:
+                self._birth_not_connected_logged = True
+                _LOGGER.debug(
+                    "Jackery MQTT birth snapshot skipped: session not connected"
+                )
+            return
 
         async def _runner() -> None:
-            await coro
+            await publish()
 
         task = self._hass.async_create_task(
             _runner(), name="jackery_mqtt_birth snapshot"
@@ -623,6 +716,14 @@ class JackeryMqttPushClient:
                 return
             except Exception as err:  # noqa: BLE001
                 self._birth_publish_failed += 1
+                if "not connected" in str(err).lower():
+                    if not self._birth_not_connected_logged:
+                        self._birth_not_connected_logged = True
+                        _LOGGER.debug(
+                            "Jackery MQTT birth snapshot failed (not connected): %s",
+                            err,
+                        )
+                    return
                 _LOGGER.error(  # noqa: TRY400
                     "Jackery MQTT birth snapshot handler failed: %s", err
                 )

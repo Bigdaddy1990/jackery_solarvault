@@ -99,6 +99,8 @@ from .const import (
     FIELD_DEVICE_SN,
     FIELD_DEV_ID,
     FIELD_DEV_SN,
+    FIELD_GRID_IN_PW,
+    FIELD_GRID_OUT_PW,
     FIELD_ID,
     FIELD_IDX,
     FIELD_IN_GRID_SIDE_PW,
@@ -1561,7 +1563,7 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     return None
 
 
-def _is_day_period_payload(source: dict[str, Any], section: str) -> bool:
+def is_day_period_payload(source: dict[str, Any], section: str) -> bool:
     """Determine whether the given trend payload corresponds to a day-period request.
 
     Inspects the section suffix for explicit period markers and, if absent, consults the payload's request metadata to infer the date type.
@@ -3102,6 +3104,63 @@ def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
     )
 
 
+def jackery_inverter_ac_input_power(props: dict[str, Any]) -> float | None:
+    """AC power the inverter draws on its AC port (grid/AC charging).
+
+    ``gridInPw`` (SystemBody) / ``inOngridPw`` (HomeBody) are the
+    inverter's AC input, NOT the household grid import — the import
+    measurement point is ``inGridSidePw``.
+
+    Returns:
+        float | None: AC input power in watts, or `None` when neither
+        inverter field is present.
+    """
+    return first_nonzero_power_value(
+        props,
+        FIELD_GRID_IN_PW,
+        FIELD_IN_ONGRID_PW,
+    )
+
+
+def jackery_inverter_ac_output_power(props: dict[str, Any]) -> float | None:
+    """Total AC power the inverter delivers (house share + grid export).
+
+    ``gridOutPw`` (SystemBody) / ``outOngridPw`` (HomeBody) per the
+    SystemBody wire identity ``otherLoadPw = gridOutPw - outGridSidePw +
+    inGridSidePw``; the pure export is ``outGridSidePw``.
+
+    Returns:
+        float | None: AC output power in watts, or `None` when neither
+        inverter field is present.
+    """
+    return first_nonzero_power_value(
+        props,
+        FIELD_GRID_OUT_PW,
+        FIELD_OUT_ONGRID_PW,
+    )
+
+
+def jackery_grid_net_power(props: dict[str, Any]) -> int | None:
+    """Net grid-side power: positive = import, negative = export.
+
+    Uses only the true grid-side measurement fields ``inGridSidePw`` /
+    ``outGridSidePw``. The on-grid family (``gridIn/OutPw``,
+    ``in/outOngridPw``) is the inverter's AC input/output (house share +
+    export) per the SystemBody wire identity ``otherLoadPw = gridOutPw -
+    outGridSidePw + inGridSidePw`` and must never be used as an
+    import/export fallback.
+
+    Returns:
+        int | None: Net grid power in watts, or `None` when the device
+        reports no grid-side measurement point (HomeBody frames).
+    """
+    in_pw = safe_int(first_power_value(props, FIELD_IN_GRID_SIDE_PW))
+    out_pw = safe_int(first_power_value(props, FIELD_OUT_GRID_SIDE_PW))
+    if in_pw is None or out_pw is None:
+        return None
+    return in_pw - out_pw
+
+
 def jackery_corrected_home_consumption_power(
     ct: dict[str, Any],
     props: dict[str, Any],
@@ -3247,7 +3306,7 @@ def day_power_series_key(
     Returns:
         The chart-series key string for the given `section`/`stat_key` when `source` is a day-period payload, `None` otherwise.
     """  # noqa: E501
-    if not _is_day_period_payload(source, section):
+    if not is_day_period_payload(source, section):
         return None
     if (
         section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
@@ -3278,7 +3337,7 @@ def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total s
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total cannot be determined.
     """  # noqa: E501
-    if _is_day_period_payload(source, section):
+    if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
 
@@ -3333,7 +3392,7 @@ def trend_series_has_value(  # noqa: PLR0911  # flat guard chain over series/val
     Returns:
         `true` if a numeric value can be derived from the payload for the section and stat_key, `false` otherwise.
     """  # noqa: E501
-    if _is_day_period_payload(source, section):
+    if is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
     series_key = trend_series_key(section, stat_key)

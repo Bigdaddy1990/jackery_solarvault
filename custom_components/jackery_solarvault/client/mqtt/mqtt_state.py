@@ -10,29 +10,16 @@ from typing import TYPE_CHECKING
 
 from ...const import (  # noqa: RUF100, TID252
     MQTT_APP_CONFLICT_PAUSE_SEC,
+    MQTT_AUTH_FAILURE_RCS,
+    MQTT_CONNECT_BACKOFF_STEPS_SEC,
     MQTT_RECONNECT_THROTTLE_SEC,
+    MQTT_TRANSIENT_BACKOFF_STEPS_SEC,
 )
 
 if TYPE_CHECKING:
     from .mqtt_push import JackeryMqttPushClient
 
 _LOGGER = logging.getLogger(__name__)
-
-# Permanent failures (auth / protocol) — long backoff
-MQTT_CONNECT_BACKOFF_STEPS_SEC: tuple[int, ...] = (
-    300,
-    900,
-    3600,
-    21600,
-)
-
-# Transient failures (server unavailable, network hiccup) — short backoff
-MQTT_TRANSIENT_BACKOFF_STEPS_SEC: tuple[int, ...] = (
-    30,
-    60,
-    120,
-    300,
-)
 
 
 def is_mqtt_auth_failure(message: object) -> bool:
@@ -49,16 +36,18 @@ def is_mqtt_auth_failure(message: object) -> bool:
         indicators, False otherwise.
     """
     text = str(message or "").lower()
-    return (
-        "connect rc=4" in text
-        or "connect rc=5" in text
-        or "connect rc=134" in text
-        or "connect rc=135" in text
-        or "code 134" in text
-        or "code 135" in text
-        or "bad user name or password" in text
-        or "not authorized" in text
-    )
+    if any(f"connect rc={rc}" in text for rc in MQTT_AUTH_FAILURE_RCS):
+        return True
+    # aiomqtt/paho surface CONNACK rejections as "[code:<rc>] ...". Only the
+    # MQTT v5 class (128-135) is unambiguous there — low numbers collide with
+    # paho client-side error codes (e.g. code 4 = MQTT_ERR_NO_CONN).
+    if any(
+        f"code:{rc}" in text or f"code {rc}" in text
+        for rc in MQTT_AUTH_FAILURE_RCS
+        if rc >= 128  # noqa: PLR2004
+    ):
+        return True
+    return "bad user name or password" in text or "not authorized" in text
 
 
 def is_transient_connect_failure(message: object) -> bool:
@@ -66,17 +55,20 @@ def is_transient_connect_failure(message: object) -> bool:
 
     or server issue.
 
-    Checks the message text for known transient indicators such as "connect rc=133",
+    Checks the message text for known transient indicators such as
     "server unavailable",
     "connection refused", "connection timed out", or the word "unknown".
+    Auth/ban rejections (including MQTT v5 rc=133) are never transient —
+    they are classified by :func:`is_mqtt_auth_failure` first.
 
     Returns:
         `true` if the message indicates a transient connect failure, `false` otherwise.
     """
+    if is_mqtt_auth_failure(message):
+        return False
     text = str(message or "").lower()
     return (
-        "connect rc=133" in text
-        or "server unavailable" in text
+        "server unavailable" in text
         or "connection refused" in text
         or "connection timed out" in text
         or "unknown" in text
@@ -194,7 +186,8 @@ class MqttConnectionManager:
             if transient
             else MQTT_CONNECT_BACKOFF_STEPS_SEC
         )
-        if signature == self.backoff_signature:
+        repeated = signature == self.backoff_signature
+        if repeated:
             self.backoff_step = min(
                 self.backoff_step + 1,
                 len(backoff_steps) - 1,
@@ -204,7 +197,11 @@ class MqttConnectionManager:
             self.backoff_step = 0
         delay = backoff_steps[self.backoff_step]
         self.backoff_until_monotonic = time.monotonic() + delay
-        _LOGGER.info(
+        # Announce a new failure signature once at INFO; repeats of the
+        # same signature only grow the backoff and stay at DEBUG so a
+        # broker outage cannot flood the HA log.
+        _LOGGER.log(
+            logging.DEBUG if repeated else logging.INFO,
             "Jackery MQTT paused for %ds after %s connect failure (%s); "
             "HTTP, BLE and local MQTT remain active",
             delay,
@@ -248,7 +245,12 @@ class MqttConnectionManager:
             return
         self.app_conflict_pause_cycles += 1
         self.paused_until_monotonic = now + MQTT_APP_CONFLICT_PAUSE_SEC
-        _LOGGER.info(
+        # First pause cycle of an incident is actionable (shared account /
+        # ban) and logged at INFO; follow-up cycles of the same incident
+        # are demoted to DEBUG to keep the reconnect loop quiet. The cycle
+        # counter resets once a connection succeeds.
+        _LOGGER.log(
+            logging.INFO if self.app_conflict_pause_cycles == 1 else logging.DEBUG,
             "Jackery MQTT paused for %ds after broker credential rejection "
             "(streak %s, pause cycle %d: %s); HTTP polling remains active",
             MQTT_APP_CONFLICT_PAUSE_SEC,

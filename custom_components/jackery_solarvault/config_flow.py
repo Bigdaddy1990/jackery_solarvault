@@ -7,7 +7,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import (
     ConfigFlow,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -46,7 +46,6 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_IP,
@@ -122,6 +121,25 @@ _INT_OPTION_DEFAULTS: dict[str, int] = {
     CONF_THIRD_PARTY_MQTT_PORT: DEFAULT_THIRD_PARTY_MQTT_PORT,
 }
 
+# Full persistable option surface. ``_flow_options`` must iterate this —
+# iterating only ``_OPTION_DEFAULTS`` (the sensor/BLE bools) silently dropped
+# every submitted ``third_party_mqtt_*`` value, so the ThirdPartMQTTConfig
+# codec and the local-MQTT fallback never saw UI input (owner escalation
+# 2026-07-04).
+_ALL_OPTION_DEFAULTS: dict[str, Any] = {
+    **_BOOL_OPTION_DEFAULTS,
+    **_STR_OPTION_DEFAULTS,
+    **_INT_OPTION_DEFAULTS,
+}
+
+# Reconfigure keeps the entity-creating exclusion but must persist the
+# third-party MQTT fields its form exposes.
+_THIRD_PARTY_OPTION_KEYS: frozenset[str] = (
+    frozenset(_STR_OPTION_DEFAULTS)
+    | frozenset(_INT_OPTION_DEFAULTS)
+    | {CONF_THIRD_PARTY_MQTT_ENABLE}
+)
+
 
 def _normalize_account(value: str) -> str:
     """Normalize an account identifier by stripping leading and trailing whitespace.
@@ -179,10 +197,10 @@ def _flow_options(
         option key with its resolved value.
     """
     current = current_options or {}
-    keys = option_keys or frozenset(_OPTION_DEFAULTS)
+    keys = option_keys or frozenset(_ALL_OPTION_DEFAULTS)
     return {
         key: user_input.get(key, current.get(key, default))
-        for key, default in _OPTION_DEFAULTS.items()
+        for key, default in _ALL_OPTION_DEFAULTS.items()
         if key in keys
     }
 
@@ -277,11 +295,12 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
         entry options or using in configuration logic.
     """
     options: Mapping[str, Any] = entry.options
-    enable_value = (
-        options.get(CONF_LOCAL_MQTT_ENABLE)
-        if CONF_LOCAL_MQTT_ENABLE in options
-        else options.get(CONF_THIRD_PARTY_MQTT_ENABLE) or DEFAULT_LOCAL_MQTT_ENABLE
-    )
+    if CONF_LOCAL_MQTT_ENABLE in options:
+        enable_value = options.get(CONF_LOCAL_MQTT_ENABLE)
+    elif CONF_THIRD_PARTY_MQTT_ENABLE in options:
+        enable_value = options.get(CONF_THIRD_PARTY_MQTT_ENABLE)
+    else:
+        enable_value = DEFAULT_THIRD_PARTY_MQTT_ENABLE
     return {
         CONF_LOCAL_MQTT_ENABLE: bool(enable_value),
         CONF_LOCAL_MQTT_HOST: str(
@@ -404,55 +423,6 @@ def _merge_local_mqtt_options(
     }
 
 
-def _local_mqtt_option_schema(
-    current: dict[str, Any],
-) -> dict[vol.Optional, object]:
-    """Build voluptuous Optional schema entries for the six local MQTT option fields.
-
-    The returned mapping contains vol.Optional descriptors for:
-    - CONF_LOCAL_MQTT_ENABLE (bool)
-    - CONF_LOCAL_MQTT_HOST (str)
-    - CONF_LOCAL_MQTT_PORT (int, 1-65535)
-    - CONF_LOCAL_MQTT_USERNAME (str)
-    - CONF_LOCAL_MQTT_PASSWORD (str)
-    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
-
-    Parameters:
-        current: Normalized local-MQTT options (e.g. from
-        `_current_local_mqtt_options`) used as form defaults.
-
-    Returns:
-        dict[vol.Optional, object]: Mapping of vol.Optional keys to their voluptuous
-        validators suitable for inclusion in a vol.Schema.
-    """
-    return {
-        vol.Optional(
-            CONF_LOCAL_MQTT_ENABLE,
-            default=current[CONF_LOCAL_MQTT_ENABLE],
-        ): bool,
-        vol.Optional(
-            CONF_LOCAL_MQTT_HOST,
-            default=current[CONF_LOCAL_MQTT_HOST],
-        ): str,
-        vol.Optional(
-            CONF_LOCAL_MQTT_PORT,
-            default=current[CONF_LOCAL_MQTT_PORT],
-        ): vol.All(int, vol.Range(min=1, max=65535)),
-        vol.Optional(
-            CONF_LOCAL_MQTT_USERNAME,
-            default=current[CONF_LOCAL_MQTT_USERNAME],
-        ): str,
-        vol.Optional(
-            CONF_LOCAL_MQTT_PASSWORD,
-            default=current[CONF_LOCAL_MQTT_PASSWORD],
-        ): str,
-        vol.Optional(
-            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-            default=current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-        ): str,
-    }
-
-
 def _reconfigure_options(
     entry: ConfigEntry,
     user_input: dict[str, Any],
@@ -475,7 +445,7 @@ def _reconfigure_options(
         _flow_options(
             user_input,
             current_options,
-            _RECONFIGURE_IN_PLACE_OPTION_KEYS,
+            _RECONFIGURE_IN_PLACE_OPTION_KEYS | _THIRD_PARTY_OPTION_KEYS,
         ),
     )
     merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
@@ -504,8 +474,15 @@ USER_SCHEMA = vol.Schema({
 })
 
 
-class JackeryOptionsFlow(OptionsFlow):
-    """Handle the Jackery SolarVault options flow."""
+class JackeryOptionsFlow(OptionsFlowWithReload):
+    """Handle the Jackery SolarVault options flow.
+
+    Derives from ``OptionsFlowWithReload`` so the flow manager schedules a
+    full entry reload whenever the flow finishes with changed options. The
+    integration must therefore never register a config entry update
+    listener (HA raises ``ValueError`` on submit otherwise, and listeners
+    trigger the 2026.12 reload deprecation in reauth/reconfigure helpers).
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -617,6 +594,12 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_THIRD_PARTY_MQTT_TOKEN,
                 default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
             ): str,
+            # Single bridge mask (owner rule 2026-07-05): the third-party
+            # fields above ARE the one mask. The local listener derives its
+            # ``local_mqtt_*`` values from them via
+            # ``_merge_local_mqtt_options`` below, so no duplicate
+            # ``local_mqtt_*`` field block is exposed here. Only the shared
+            # topic filter is surfaced.
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
@@ -874,15 +857,19 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
+                    # _reconfigure_options preserves entry.options keys the
+                    # form does not expose and merges the submitted
+                    # local-MQTT fields; _flow_options alone emitted only
+                    # the sensor-toggle keys and wiped local_mqtt_* /
+                    # third_party_mqtt_* on every credentials submit
+                    # (P8 regression 2026-07-03).
                     return self.async_update_reload_and_abort(
                         entry,
                         data_updates={
                             CONF_USERNAME: account,
                             CONF_PASSWORD: user_input[CONF_PASSWORD],
                         },
-                        options=_flow_options(
-                            user_input, _current_option_values(entry)
-                        ),
+                        options=_reconfigure_options(entry, user_input),
                         reason=FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
                     )
 
@@ -924,7 +911,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_IP,
                 default=current_options[CONF_THIRD_PARTY_MQTT_IP],
-            ): bool,
+            ): str,
             vol.Optional(
                 CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
                 default=current_options[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK],

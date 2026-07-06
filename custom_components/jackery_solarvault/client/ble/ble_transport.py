@@ -43,8 +43,14 @@ from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ...const import DEFAULT_BLE_ACK_TIMEOUT_SEC  # noqa: RUF100, TID252
+from ...const import (  # noqa: RUF100, TID252
+    BLE_CONNECT_BACKOFF_INITIAL_SEC,
+    BLE_KEEPALIVE_INTERVAL_SEC,
+    BLE_STOP_TIMEOUT_SEC,
+    DEFAULT_BLE_ACK_TIMEOUT_SEC,
+)
 from . import ble
+from .backoff import BleConnectBackoff
 
 if TYPE_CHECKING:
     from bleak import BleakClient
@@ -64,24 +70,14 @@ _LOGGER = logging.getLogger(__name__)
 #: Default timeout for the GATT connect + notify-subscribe handshake.
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 
-#: Minimum time between (re)connect attempts when the device drops the link.
-_RECONNECT_BACKOFF_SEC: float = 30.0
+#: Hard timeout for ``async_stop()`` — see :data:`.const.BLE_STOP_TIMEOUT_SEC`.
+_STOP_TIMEOUT_SEC: float = BLE_STOP_TIMEOUT_SEC
 
-#: Hard timeout for ``async_stop()`` to wait for in-flight connection
-#: runners to honour cancellation. HA's shutdown sequence reports tasks
-#: that exceed its own per-integration timeout (typically 30 s for
-#: ``async_unload_entry``) — keep this well below that so the listener
-#: never becomes the reason a shutdown logs "tasks still pending".
-_STOP_TIMEOUT_SEC: float = 5.0
-
-#: How often to write a no-op query frame to keep the GATT session
-#: warm. The SolarVault peripheral closes idle GATT sessions after
-#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
-#: every 6-20 s without traffic). 15 s sits comfortably below that and
-#: doubles as a property-refresh — the device answers each ``cmd=106``
-#: with a ``DevicePropertyChange`` notify that the sink merges into
-#: ``coordinator.data`` via the existing cmd=107 path.
-_KEEPALIVE_INTERVAL_SEC: float = 15.0
+#: Keep-alive cadence — see :data:`.const.BLE_KEEPALIVE_INTERVAL_SEC` for the
+#: full rationale (peripheral idle timeout ~20 s; raising this above 20 s
+#: would trade one small write per 15 s for a full disconnect/reconnect
+#: cycle every ~20 s, which is what actually stresses ESPHome BT-proxies).
+_KEEPALIVE_INTERVAL_SEC: float = BLE_KEEPALIVE_INTERVAL_SEC
 
 
 # ---------------------------------------------------------------------------
@@ -151,11 +147,10 @@ class _PendingAck:
 
 
 FrameSink = Callable[[str, BleFrameObservation], Awaitable[None]]
-"""Async sink called for every observed frame.
-
-``device_id`` is the Jackery numeric device id (matches coordinator state).
-``observation`` carries the decoded or raw frame.
-"""
+# Async sink called for every observed frame.
+#
+# ``device_id`` is the Jackery numeric device id (matches coordinator state).
+# ``observation`` carries the decoded or raw frame.
 
 
 class JackeryBleListener:
@@ -215,6 +210,19 @@ class JackeryBleListener:
         # back to :data:`ble.DEFAULT_BLE_MTU` (matches the Android app)
         # when bleak hasn't exposed a value yet.
         self._mtu: dict[str, int] = {}
+        # Per-device connect pacing. Lives on the listener (not the
+        # runner task) so the spacing survives runner respawns — an
+        # advertisement or ``async_ensure_connected`` arriving right
+        # after a failed connect must not restart the hammering.
+        self._connect_backoff: dict[str, BleConnectBackoff] = {}
+
+    def connect_backoff_for(self, device_id: str) -> BleConnectBackoff:
+        """Return — and create on demand — the connect pacing for a device."""
+        backoff = self._connect_backoff.get(device_id)
+        if backoff is None:
+            backoff = BleConnectBackoff()
+            self._connect_backoff[device_id] = backoff
+        return backoff
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """Get the cached BLE MAC address for the given device id.
@@ -259,7 +267,7 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    async def async_ensure_connected(
+    async def async_ensure_connected(  # noqa: PLR0911  # flat transport guard chain; the connect-backoff gate is the 7th early exit
         self,
         device_id: str,
         *,
@@ -274,6 +282,21 @@ class JackeryBleListener:
             return False
         task = self._connections.get(device_id)
         if task is None or task.done():
+            # Respect the per-device connect pacing: after a failed
+            # connect (or a fresh link loss) no new runner is spawned in
+            # the same coordinator cycle — callers fall back to the next
+            # transport instead of hammering the BT-proxy again.
+            wait_sec = self.connect_backoff_for(device_id).seconds_until_allowed(
+                asyncio.get_running_loop().time()
+            )
+            if wait_sec > 0:
+                _LOGGER.debug(
+                    "Jackery BLE %s: connect backoff active (%.1fs left); "
+                    "not reconnecting this cycle",
+                    device_id,
+                    wait_sec,
+                )
+                return False
             self._connections[device_id] = self._hass.async_create_background_task(
                 self._async_run_connection(device_id, address),
                 name=f"jackery_ble_{device_id}",
@@ -797,7 +820,7 @@ class JackeryBleListener:
                     # Returning here would kill the runner and require an
                     # external trigger (new advertisement) to reconnect,
                     # which can take minutes or never happen. Instead we
-                    # wait one ``_RECONNECT_BACKOFF_SEC`` window and look
+                    # wait one ``BLE_CONNECT_BACKOFF_INITIAL_SEC`` window and look
                     # the address up again. ``async_ble_device_from_address``
                     # is cheap and idempotent; the matcher callback in
                     # parallel still works, and ``_stop_event`` aborts the
@@ -807,12 +830,12 @@ class JackeryBleListener:
                         "now; retrying in %ss",
                         device_id,
                         address,
-                        _RECONNECT_BACKOFF_SEC,
+                        BLE_CONNECT_BACKOFF_INITIAL_SEC,
                     )
                     try:
                         await asyncio.wait_for(
                             self._stop_event.wait(),
-                            timeout=_RECONNECT_BACKOFF_SEC,
+                            timeout=BLE_CONNECT_BACKOFF_INITIAL_SEC,
                         )
                         return  # stop_event fired during the wait  # noqa: TRY300
                     except TimeoutError:
@@ -843,12 +866,12 @@ class JackeryBleListener:
                         "Jackery BLE %s connect failed: %s; retrying in %ss",
                         device_id,
                         err,
-                        _RECONNECT_BACKOFF_SEC,
+                        BLE_CONNECT_BACKOFF_INITIAL_SEC,
                     )
                     try:
                         await asyncio.wait_for(
                             self._stop_event.wait(),
-                            timeout=_RECONNECT_BACKOFF_SEC,
+                            timeout=BLE_CONNECT_BACKOFF_INITIAL_SEC,
                         )
                         return  # stop_event fired during the wait  # noqa: TRY300
                     except TimeoutError:
@@ -933,11 +956,11 @@ class JackeryBleListener:
                 _LOGGER.info(
                     "Jackery BLE %s: lost link, backoff %ss before retry",
                     device_id,
-                    _RECONNECT_BACKOFF_SEC,
+                    BLE_CONNECT_BACKOFF_INITIAL_SEC,
                 )
                 try:
                     await asyncio.wait_for(
-                        self._stop_event.wait(), timeout=_RECONNECT_BACKOFF_SEC
+                        self._stop_event.wait(), timeout=BLE_CONNECT_BACKOFF_INITIAL_SEC
                     )
                 except TimeoutError:
                     continue

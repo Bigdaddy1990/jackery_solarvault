@@ -1,27 +1,19 @@
-"""Central payload ingestion gate for the Jackery SolarVault integration.
+"""Stats/trends ingestion gate for the Jackery SolarVault integration.
 
-Every transport — HTTP/REST polling, cloud MQTT push, local MQTT and BLE —
-funnels its decoded payloads through this single module so the data path is
-identical regardless of how a frame arrived. The gate enforces two rules:
-
-* **Live device-property fields** are merged with :func:`merge_live_properties`,
-  which never blanks a populated field with an empty/``None`` value. A sparse
-  push frame (MQTT/BLE) can refresh or add fields but can never wipe the live
-  values another transport (the HTTP poll) already delivered. This is what keeps
-  live state stable when MQTT/BLE are active.
-* **Periodic long-term values** (cumulative energy stat/trend sections) are
-  identified by section prefix so the coordinator routes them to the HA recorder
-  instead of mixing them into live state.
+Live device-property fields must bypass ingest entirely: HTTP/API is the
+primary live path, while MQTT/BLE frames are incomplete supplemental telemetry.
+Only periodic long-term values (cumulative energy stat/trend sections) enter
+this module so broken cloud totals, empty buckets, and impossible PV generation
+samples can be withheld before recorder use.
 
 The gate holds no Home Assistant dependencies and performs no transport I/O; it
-is pure data normalization so it stays unit-testable and reusable by every
-transport layer.
+is pure stats/trends normalization so it stays unit-testable.
 """
 
 from enum import StrEnum
 import logging
 import math
-from typing import Any
+from typing import Any, Final
 
 from ...const import (  # noqa: RUF100, TID252
     APP_CHART_SERIES_Y,
@@ -31,6 +23,8 @@ from ...const import (  # noqa: RUF100, TID252
     APP_CHART_SERIES_Y4,
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
+    APP_DEVICE_STAT_BATTERY_CHARGE,
+    APP_DEVICE_STAT_BATTERY_DISCHARGE,
     APP_DEVICE_STAT_PV_ENERGY,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
@@ -47,19 +41,11 @@ from ...const import (  # noqa: RUF100, TID252
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_TODAY_BATTERY_CHARGE,
+    APP_STAT_TODAY_BATTERY_DISCHARGE,
+    APP_STAT_TODAY_GENERATION,
     APP_STAT_TOTAL_GENERATION,
     APP_STAT_TOTAL_SOLAR_ENERGY,
-    FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
-    FIELD_DEV_ID,
-    FIELD_DEV_SN,
-    FIELD_ID,
-    FIELD_PV1,
-    FIELD_PV2,
-    FIELD_PV3,
-    FIELD_PV4,
-    FIELD_PV_PW,
-    FIELD_SN,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_STATISTIC,
 )
@@ -84,16 +70,6 @@ GENERATION_SCALAR_FIELDS: frozenset[str] = frozenset({
     APP_STAT_PV4_ENERGY,
 })
 
-#: Live (instantaneous) PV *power* property keys. Per
-#: docs/SENSOR_SOURCE_PATHS.md (``pvPw`` = pv_power_total, ``pv1``..``pv4`` =
-#: per-string PV power) these are generation magnitudes and physically >= 0.
-GENERATION_LIVE_POWER_FIELDS: frozenset[str] = frozenset({
-    FIELD_PV_PW,
-    FIELD_PV1,
-    FIELD_PV2,
-    FIELD_PV3,
-    FIELD_PV4,
-})
 
 #: Section prefixes whose chart ``y``/``y1``..``y6`` series are PV *generation*
 #: curves (solar produced energy). Only PV stat/trends qualify: per the
@@ -115,18 +91,6 @@ _CHART_SERIES_KEYS: frozenset[str] = frozenset({
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
 })
-
-_DICT_LIST_SERIAL_KEYS: tuple[str, ...] = (
-    FIELD_DEVICE_SN,
-    FIELD_DEV_SN,
-    FIELD_SN,
-)
-
-_DICT_LIST_ID_KEYS: tuple[str, ...] = (
-    FIELD_DEVICE_ID,
-    FIELD_DEV_ID,
-    FIELD_ID,
-)
 
 
 class TransportSource(StrEnum):
@@ -262,16 +226,73 @@ def _filter_negative_series_samples(
     return cleaned
 
 
+#: ``device_statistic`` day counters and the ``statistic``
+#: (systemStatistic) today counters that can cross-confirm their zeros.
+#: Source: types.py SystemStatistic DTO / /v1/device/stat/systemStatistic.
+_DEVICE_STATISTIC_ZERO_CONFIRMATION: Final[dict[str, str]] = {
+    APP_DEVICE_STAT_PV_ENERGY: APP_STAT_TODAY_GENERATION,
+    APP_DEVICE_STAT_BATTERY_CHARGE: APP_STAT_TODAY_BATTERY_CHARGE,
+    APP_DEVICE_STAT_BATTERY_DISCHARGE: APP_STAT_TODAY_BATTERY_DISCHARGE,
+}
+
+
+def _zero_period_payload_confirmed(
+    section_key: str,
+    payload: dict[str, Any],
+    confirmation_source: dict[str, Any] | None,
+) -> bool:
+    """Return whether a zero-only period payload is confirmed by a sibling.
+
+    AGENTS.md §2.2 rule 7: zero values are ignored unless confirmed by
+    another source. A zero-only ``device_statistic`` payload is confirmed
+    when EVERY numeric day counter it carries has a mapped sibling today
+    counter in the ``statistic`` section of the same cycle that also
+    reads zero (mutual validation is strict — one unmapped or non-zero
+    sibling keeps the drop).
+    """
+    if section_key != PAYLOAD_DEVICE_STATISTIC or not confirmation_source:
+        return False
+    numeric_fields = [
+        key for key, value in payload.items() if _numeric_value(value) is not None
+    ]
+    if not numeric_fields:
+        return False
+    for field in numeric_fields:
+        sibling_key = _DEVICE_STATISTIC_ZERO_CONFIRMATION.get(field)
+        if sibling_key is None:
+            return False
+        sibling_value = _numeric_value(confirmation_source.get(sibling_key))
+        if sibling_value is None or not math.isclose(sibling_value, 0.0):
+            return False
+    return True
+
+
 def gate_payload_section(
     source: TransportSource,
     section_key: str,
     payload: dict[str, Any],
+    *,
+    confirmation_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Gate a decoded payload section before live-state or recorder use."""
     if not allow_periodic_section_from_source(source, section_key):
         return {}
     if _is_unconfirmed_zero_period_payload(section_key, payload):
-        return {}
+        if not _zero_period_payload_confirmed(
+            section_key, payload, confirmation_source
+        ):
+            _LOGGER.debug(
+                "Dropping zero-only period payload for section %s "
+                "(no sibling confirmation): %s",
+                section_key,
+                sorted(payload),
+            )
+            return {}
+        _LOGGER.debug(
+            "Zero-only period payload for section %s confirmed by sibling "
+            "statistic today counters",
+            section_key,
+        )
     return _reject_negative_generation_section(section_key, dict(payload))
 
 
@@ -373,136 +394,3 @@ def _is_unconfirmed_zero_period_payload(
     if not numbers or any(not math.isclose(number, 0.0) for number in numbers):
         return False
     return not has_populated_series
-
-
-def _is_blankable(value: object) -> bool:
-    """Determine whether a value should be treated as blank.
-
-    A value is considered blank if it is:
-    - `None`
-    - a string that is empty or contains only whitespace
-    - an empty `list` or `dict`
-
-    Returns:
-        `True` if the value is blank as described above, `False` otherwise.
-    """
-    if value is None:
-        return True
-    if isinstance(value, str) and not value.strip():
-        return True
-    return isinstance(value, (list, dict)) and not value
-
-
-def _dict_list_identity_values(item: dict[str, Any]) -> frozenset[str]:
-    """Return stable identity tokens for a live-property list item."""
-    identities: set[str] = set()
-    for key in _DICT_LIST_SERIAL_KEYS:
-        value = item.get(key)
-        if not _is_blankable(value):
-            identities.add(f"serial:{value}")
-    for key in _DICT_LIST_ID_KEYS:
-        value = item.get(key)
-        if not _is_blankable(value):
-            identities.add(f"{key}:{value}")
-    return frozenset(identities)
-
-
-def _clean_dict_list_update(update: dict[str, Any]) -> dict[str, Any]:
-    """Drop blank values before appending a new live-property list item."""
-    return {key: value for key, value in update.items() if not _is_blankable(value)}
-
-
-def _merge_identified_dict_lists(
-    current: list[Any],
-    updates: list[Any],
-) -> list[dict[str, Any]] | None:
-    """Merge sparse live-property lists when update items carry stable IDs."""
-    if not all(isinstance(item, dict) for item in current):
-        return None
-    if not all(isinstance(item, dict) for item in updates):
-        return None
-
-    typed_updates = [item for item in updates if isinstance(item, dict)]
-    update_identities = [_dict_list_identity_values(item) for item in typed_updates]
-    if not update_identities or any(not identities for identities in update_identities):
-        return None
-
-    merged = [dict(item) for item in current if isinstance(item, dict)]
-    for raw_update, identities in zip(typed_updates, update_identities, strict=True):
-        target_idx = next(
-            (
-                idx
-                for idx, item in enumerate(merged)
-                if identities & _dict_list_identity_values(item)
-            ),
-            None,
-        )
-        if target_idx is None:
-            cleaned = _clean_dict_list_update(raw_update)
-            if cleaned:
-                merged.append(cleaned)
-        else:
-            merged[target_idx] = merge_live_properties(merged[target_idx], raw_update)
-    return merged
-
-
-def merge_live_properties(
-    base: dict[str, Any],
-    update: dict[str, Any],
-) -> dict[str, Any]:
-    """Produce a merged mapping of live device properties where populated base values.
-
-    are never overwritten by blank update values.
-
-    Performs an update-wins merge: dictionary values are merged recursively;
-    non-dictionary values from `update` replace those in `base` unless the `update`
-    value is considered blank (None, an empty or whitespace-only string, or an empty
-    list/dict) and the corresponding `base` value is populated. The inputs are not
-    mutated.
-
-    Parameters:
-        base (dict[str, Any]): Original live properties to merge into.
-        update (dict[str, Any]): Incoming update to apply; blank values in this mapping
-        will not replace populated values from `base`.
-
-    Returns:
-        dict[str, Any]: A new mapping containing the merged properties with the "never
-        blank populated keys" rule enforced.
-    """
-    merged: dict[str, Any] = dict(base)
-    for key, value in update.items():
-        current = merged.get(key)
-        if isinstance(current, dict) and isinstance(value, dict):
-            merged[key] = merge_live_properties(current, value)
-        elif isinstance(current, list) and isinstance(value, list):
-            list_merge = _merge_identified_dict_lists(current, value)
-            if list_merge is not None:
-                merged[key] = list_merge
-            elif _is_blankable(value) and not _is_blankable(current):
-                continue
-            else:
-                merged[key] = value
-        elif _is_blankable(value) and not _is_blankable(current):
-            continue
-        elif _is_negative_generation_live_value(key, value):
-            _LOGGER.warning(
-                "Rejecting negative live generation value: %s=%r", key, value
-            )
-            continue
-        else:
-            merged[key] = value
-    return merged
-
-
-def _is_negative_generation_live_value(key: str, value: object) -> bool:
-    """Return whether a live property is a negative PV/generation power value.
-
-    Only the instantaneous PV-power generation keys in
-    :data:`GENERATION_LIVE_POWER_FIELDS` are guarded; signed/directional fields
-    (battery flow, grid power) are left untouched so legitimately-signed values
-    are never clamped.
-    """
-    if key not in GENERATION_LIVE_POWER_FIELDS:
-        return False
-    number = _numeric_value(value)
-    return number is not None and number < 0

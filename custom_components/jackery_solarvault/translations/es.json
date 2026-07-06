@@ -16,12 +16,20 @@
       "shelly_successful": "Accesorios Shelly vinculados; la integración se recargó."
     },
     "error": {
+      "accept_shared_failed": "No se pudo aceptar el dispositivo compartido. Comprueba el ID del dispositivo y el ID del código QR e inténtalo de nuevo.",
       "account_required": "La cuenta no puede estar vacía.",
       "cannot_connect": "No se pudo conectar a iot.jackeryapp.com.",
-      "invalid_auth": "Correo electrónico o contraseña no válidos.",
-      "accept_shared_failed": "No se pudo aceptar el dispositivo compartido. Comprueba el ID del dispositivo y el ID del código QR e inténtalo de nuevo."
+      "invalid_auth": "Correo electrónico o contraseña no válidos."
     },
     "step": {
+      "accept_shared": {
+        "data": {
+          "dev_id": "ID del dispositivo",
+          "qr_code_id": "ID del código QR"
+        },
+        "description": "Acepta una SolarVault compartida con la cuenta de Jackery {username}. Introduce el ID del dispositivo y el ID del código QR de la invitación de uso compartido. La integración se recarga después para que aparezcan las entidades del dispositivo compartido.",
+        "title": "Aceptar un dispositivo compartido"
+      },
       "reauth_confirm": {
         "data": {
           "password": "Contraseña"
@@ -29,23 +37,13 @@
         "description": "La contraseña guardada para {username} ya no funciona. Introduce la contraseña actual para restaurar la conexión.",
         "title": "Volver a autenticar Jackery"
       },
-      "user": {
-        "data": {
-          "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
-          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
-          "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
-          "enable_ble_transport": "Activar transporte BLE",
-          "password": "Contraseña",
-          "username": "Correo electrónico"
+      "reconfigure": {
+        "menu_options": {
+          "accept_shared": "Aceptar un dispositivo compartido",
+          "reconfigure_credentials": "Actualizar credenciales y opciones",
+          "shelly": "Vincular accesorios de Shelly cloud"
         },
-        "data_description": {
-          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
-          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
-          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
-          "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada."
-        },
-        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la región y las credenciales MQTT se detectan automáticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Actívalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesión activa por cuenta. Mantén la app de Jackery cerrada en la cuenta SolarVault mientras Home Assistant deba recibir actualizaciones MQTT en vivo. Si abres la app brevemente, Home Assistant pausa las reconexiones MQTT por un corto tiempo, sigue consultando por HTTP y reanuda las actualizaciones en vivo automáticamente.",
-        "title": "Jackery SolarVault"
+        "title": "Reconfigurar Jackery SolarVault"
       },
       "reconfigure_credentials": {
         "data": {
@@ -59,6 +57,8 @@
           "enable_unredacted_diagnostics": "Activar diagnóstico de desarrollo sin redactar",
           "enable_week_statistics": "Importar estadísticas semanales",
           "enable_year_statistics": "Importar estadísticas anuales",
+          "local_mqtt_enable": "Activar el escucha MQTT local",
+          "local_mqtt_host": "Host del broker MQTT local",
           "password": "Contraseña",
           "third_party_mqtt_enable": "Activar puente MQTT de terceros",
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
@@ -80,6 +80,8 @@
           "enable_unredacted_diagnostics": "Desactiva la redacción en la exportación de diagnóstico y el JSONL de depuración de payload para pruebas locales. Expone credenciales, números de serie, IDs de dispositivo, temas MQTT y valores bluetoothKey. Desactívalo antes de compartir archivos.",
           "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "local_mqtt_enable": "Se suscribe al broker MQTT local de la SolarVault para telemetría LAN. El MQTT en la nube se pausa mientras la conexión local está activa; la API HTTP en la nube sigue sondeando.",
+          "local_mqtt_host": "IP o nombre de host del broker MQTT local en el que publica la SolarVault, por ejemplo 192.168.x.x.",
           "third_party_mqtt_enable": "Pide a la SolarVault que publique telemetría en tu propio broker MQTT (PROTOCOL.md §5 / §15). Experimental: el relé REST en la nube para este comando está bloqueado en el servidor, por lo que la integración publica el frame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) primero directamente por BLE y luego por MQTT en la nube. El usuario, la contraseña y el token se codifican con el códec ThirdPartMQTTConfig compatible con la app antes de enviarse.",
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",
           "third_party_mqtt_password": "Contraseña opcional del broker MQTT.",
@@ -91,25 +93,27 @@
         "description": "Actualiza la contraseña y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID único de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
         "title": "Reconfigurar Jackery SolarVault"
       },
-      "reconfigure": {
-        "title": "Reconfigurar Jackery SolarVault",
-        "menu_options": {
-          "reconfigure_credentials": "Actualizar credenciales y opciones",
-          "accept_shared": "Aceptar un dispositivo compartido",
-          "shelly": "Vincular accesorios de Shelly cloud"
-        }
-      },
-      "accept_shared": {
-        "title": "Aceptar un dispositivo compartido",
-        "description": "Acepta una SolarVault compartida con la cuenta de Jackery {username}. Introduce el ID del dispositivo y el ID del código QR de la invitación de uso compartido. La integración se recarga después para que aparezcan las entidades del dispositivo compartido.",
-        "data": {
-          "dev_id": "ID del dispositivo",
-          "qr_code_id": "ID del código QR"
-        }
-      },
       "shelly": {
-        "title": "Vincular accesorios de Shelly cloud",
-        "description": "Vincula accesorios de Shelly cloud (Cloud-to-Cloud) con la cuenta de Jackery {username}. Se abre un navegador para que autorices Shelly; la nube de Jackery completa el enlace de la cuenta. Vuelve a Home Assistant una vez autorizado: la integración confirma los dispositivos vinculados y se recarga para que aparezcan sus entidades."
+        "description": "Vincula accesorios de Shelly cloud (Cloud-to-Cloud) con la cuenta de Jackery {username}. Se abre un navegador para que autorices Shelly; la nube de Jackery completa el enlace de la cuenta. Vuelve a Home Assistant una vez autorizado: la integración confirma los dispositivos vinculados y se recarga para que aparezcan sus entidades.",
+        "title": "Vincular accesorios de Shelly cloud"
+      },
+      "user": {
+        "data": {
+          "create_calculated_power_sensors": "Crear sensores calculados de potencia neta",
+          "create_savings_detail_sensors": "Crear sensores de detalle del cálculo de ahorro",
+          "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
+          "enable_ble_transport": "Activar transporte BLE",
+          "password": "Contraseña",
+          "username": "Correo electrónico"
+        },
+        "data_description": {
+          "create_calculated_power_sensors": "Crea sensores locales opcionales de potencia neta a partir de valores que Jackery ya entrega: carga de la batería principal menos descarga, carga del sistema/conjunto de baterías menos descarga y entrada de red menos salida. Estos sensores son útiles para paneles que necesitan un valor neto con signo, pero no son valores separados de la app. Desactivados de forma predeterminada para que los valores brutos de Jackery sigan siendo inequívocos.",
+          "create_savings_detail_sensors": "Crea sensores opcionales para el cálculo de ahorro: ahorro calculado, energía CA autoconsumida, precio, energía perdida del sistema de baterías, energía perdida del inversor/conversión, excedente FV tras el autoconsumo y potencia instantánea calculada de pérdida del inversor/conversión. Desactivados de forma predeterminada porque son valores intermedios de diagnóstico.",
+          "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
+          "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada."
+        },
+        "description": "Introduce tus credenciales de la nube de Jackery. El dispositivo, la región y las credenciales MQTT se detectan automáticamente desde el protocolo de la nube/app de Jackery; los ID manuales no se exponen intencionadamente.\n\nLos sensores calculados opcionales de potencia neta son derivaciones locales de los valores brutos de Jackery. Actívalos solo si necesitas un valor neto con signo adicional para paneles.\n\nJackery normalmente permite solo una sesión activa por cuenta. Mantén la app de Jackery cerrada en la cuenta SolarVault mientras Home Assistant deba recibir actualizaciones MQTT en vivo. Si abres la app brevemente, Home Assistant pausa las reconexiones MQTT por un corto tiempo, sigue consultando por HTTP y reanuda las actualizaciones en vivo automáticamente.",
+        "title": "Jackery SolarVault"
       }
     }
   },
@@ -121,9 +125,6 @@
       "eps_enabled": {
         "name": "EPS habilitado"
       },
-      "subdevice_alarm": {
-        "name": "Alarma de seguridad"
-      },
       "eth_connected": {
         "name": "Ethernet conectado"
       },
@@ -132,6 +133,9 @@
       },
       "smart_plug_switch_state": {
         "name": "Estado del enchufe inteligente"
+      },
+      "subdevice_alarm": {
+        "name": "Alarma de seguridad"
       }
     },
     "button": {
@@ -458,11 +462,20 @@
       "ac2_name": {
         "name": "Nombre de salida CA2"
       },
+      "ac_discharge_current": {
+        "name": "Corriente de descarga CA"
+      },
+      "ac_discharge_time": {
+        "name": "Tiempo de descarga CA"
+      },
       "ac_input_current": {
         "name": "Corriente de entrada CA"
       },
       "ac_input_power": {
         "name": "Potencia de entrada CA"
+      },
+      "ac_input_power_alt": {
+        "name": "Potencia de entrada CA (alt)"
       },
       "ac_line1_current": {
         "name": "Corriente de línea CA 1"
@@ -478,6 +491,12 @@
       },
       "ac_output_apparent_power": {
         "name": "Potencia aparente de salida CA"
+      },
+      "ac_output_apparent_power_parallel": {
+        "name": "Potencia aparente CA (paralelo)"
+      },
+      "ac_output_apparent_power_sum": {
+        "name": "Potencia aparente CA (suma)"
       },
       "ac_output_current": {
         "name": "Corriente de salida CA"
@@ -502,6 +521,9 @@
       },
       "ac_output_voltage": {
         "name": "Tensión de salida CA"
+      },
+      "ac_output_voltage_2": {
+        "name": "Tensión de salida CA 2"
       },
       "activation_date": {
         "name": "Fecha de activación"
@@ -605,6 +627,18 @@
       "box_mode": {
         "name": "Modo de caja"
       },
+      "breaker_pc": {
+        "name": "Configuración de potencia del disyuntor"
+      },
+      "breaker_pr": {
+        "name": "Potencia nominal del disyuntor"
+      },
+      "breaker_sph": {
+        "name": "Fase del disyuntor"
+      },
+      "breaker_sph_pc": {
+        "name": "Potencia de fase del disyuntor"
+      },
       "cell_temperature": {
         "name": "Temperatura de celda de la batería principal"
       },
@@ -613,6 +647,9 @@
       },
       "charge_limit": {
         "name": "Límite de carga"
+      },
+      "charge_output_power": {
+        "name": "Potencia de salida de carga"
       },
       "charge_plan_power": {
         "name": "Potencia del plan de carga"
@@ -794,6 +831,9 @@
       "discharge_limit": {
         "name": "Límite de descarga"
       },
+      "discharge_time": {
+        "name": "Tiempo de descarga"
+      },
       "energy_plan_power": {
         "name": "Potencia del plan de energía"
       },
@@ -858,13 +898,13 @@
         "name": "Indicadores de funciones habilitadas"
       },
       "grid_in_power": {
-        "name": "Entrada de red"
+        "name": "Importación de red"
       },
       "grid_net_power": {
         "name": "Potencia neta del lado de red"
       },
       "grid_out_power": {
-        "name": "Salida de red"
+        "name": "Exportación a red"
       },
       "grid_standard": {
         "name": "Estándar de red"
@@ -887,11 +927,20 @@
       "http_api": {
         "name": "API HTTP en la nube"
       },
+      "input_power_allocation": {
+        "name": "Asignación de potencia de entrada"
+      },
       "input_power_portable": {
         "name": "Potencia de entrada total"
       },
       "input_temperature": {
         "name": "Temperatura de entrada"
+      },
+      "inverter_ac_input_power": {
+        "name": "Entrada CA del inversor"
+      },
+      "inverter_ac_output_power": {
+        "name": "Salida CA del inversor"
       },
       "last_offline": {
         "name": "Última vez sin conexión"
@@ -907,6 +956,9 @@
       },
       "light_sensor": {
         "name": "Sensor de luz"
+      },
+      "load_mode": {
+        "name": "Modo de carga"
       },
       "local_mqtt": {
         "name": "MQTT local"
@@ -970,6 +1022,9 @@
       },
       "other_load_power": {
         "name": "Potencia de otras cargas"
+      },
+      "output_power_allocation": {
+        "name": "Asignación de potencia de salida"
       },
       "output_power_portable": {
         "name": "Potencia de salida total"
@@ -1277,7 +1332,19 @@
       "storm_warning_minutes": {
         "name": "Tiempo de antelación de alerta de tormenta"
       },
+      "subdevice_alert_count": {
+        "name": "Número de alertas del subdispositivo"
+      },
+      "symmetry_total_negative": {
+        "name": "Energía negativa total (simetría)"
+      },
+      "symmetry_total_positive": {
+        "name": "Energía positiva total (simetría)"
+      },
       "system_state": {
+        "name": "Estado del sistema"
+      },
+      "system_status_switch": {
         "name": "Estado del sistema"
       },
       "task_plan": {
@@ -1312,63 +1379,6 @@
       },
       "total_revenue": {
         "name": "Ahorro total de la app"
-      },
-      "ac_output_voltage_2": {
-        "name": "Tensión de salida CA 2"
-      },
-      "ac_discharge_current": {
-        "name": "Corriente de descarga CA"
-      },
-      "ac_discharge_time": {
-        "name": "Tiempo de descarga CA"
-      },
-      "ac_input_power_alt": {
-        "name": "Potencia de entrada CA (alt)"
-      },
-      "ac_output_apparent_power_parallel": {
-        "name": "Potencia aparente CA (paralelo)"
-      },
-      "ac_output_apparent_power_sum": {
-        "name": "Potencia aparente CA (suma)"
-      },
-      "charge_output_power": {
-        "name": "Potencia de salida de carga"
-      },
-      "discharge_time": {
-        "name": "Tiempo de descarga"
-      },
-      "load_mode": {
-        "name": "Modo de carga"
-      },
-      "input_power_allocation": {
-        "name": "Asignación de potencia de entrada"
-      },
-      "output_power_allocation": {
-        "name": "Asignación de potencia de salida"
-      },
-      "system_status_switch": {
-        "name": "Estado del sistema"
-      },
-      "breaker_pc": {
-        "name": "Configuración de potencia del disyuntor"
-      },
-      "breaker_pr": {
-        "name": "Potencia nominal del disyuntor"
-      },
-      "breaker_sph": {
-        "name": "Fase del disyuntor"
-      },
-      "breaker_sph_pc": {
-        "name": "Potencia de fase del disyuntor"
-      },
-      "subdevice_alert_count": {
-        "name": "Número de alertas del subdispositivo"
-      },
-      "symmetry_total_positive": {
-        "name": "Energía positiva total (simetría)"
-      },
-      "symmetry_total_negative": {
-        "name": "Energía negativa total (simetría)"
       },
       "total_time": {
         "name": "Tiempo total"
@@ -1527,6 +1537,9 @@
     "entity_action_failed": {
       "message": "No se pudo actualizar {entity} para el dispositivo {device_id}: {error}"
     },
+    "get_share_qr_code_failed": {
+      "message": "No se pudo obtener el código QR de uso compartido del dispositivo {device_id}: {error}"
+    },
     "invalid_number_allowed_values": {
       "message": "{entity} para el dispositivo {device_id} debe ser uno de estos valores: {allowed_values}"
     },
@@ -1538,9 +1551,6 @@
     },
     "invalid_text_value": {
       "message": "{entity} para el dispositivo {device_id} no puede estar vacío"
-    },
-    "get_share_qr_code_failed": {
-      "message": "No se pudo obtener el código QR de uso compartido del dispositivo {device_id}: {error}"
     },
     "list_shared_devices_failed": {
       "message": "No se pudieron listar los dispositivos compartidos del dispositivo {device_id}: {error}"
@@ -1562,6 +1572,9 @@
     },
     "query_third_party_mqtt_config_failed": {
       "message": "No se pudo consultar la configuracion MQTT de terceros para el dispositivo {device_id}: {error}"
+    },
+    "refresh_subdevices_failed": {
+      "message": "No se pudieron actualizar los subdispositivos del dispositivo {device_id}: {error}"
     },
     "refresh_weather_plan_failed": {
       "message": "No se pudo actualizar el plan meteorológico para el dispositivo {device_id}: {error}"
@@ -1589,9 +1602,6 @@
     },
     "unbind_smart_part_failed": {
       "message": "No se pudo desvincular el accesorio inteligente para el dispositivo {device_id}: {error}"
-    },
-    "refresh_subdevices_failed": {
-      "message": "No se pudieron actualizar los subdispositivos del dispositivo {device_id}: {error}"
     }
   },
   "issues": {
@@ -1679,6 +1689,20 @@
       },
       "name": "Vincular accesorio inteligente"
     },
+    "delete_electricity_strategy": {
+      "description": "Elimina un plan de estrategia eléctrica del dispositivo.",
+      "fields": {
+        "body": {
+          "description": "Cuerpo de la estrategia como JSON, normalmente solo necesita el tid (ID de tarea).",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Eliminar estrategia eléctrica"
+    },
     "delete_storm_alert": {
       "description": "Elimina una alerta meteorológica o de tormenta específica por ID de alerta mediante MQTT.",
       "fields": {
@@ -1702,6 +1726,20 @@
         }
       },
       "name": "Obtener código QR de uso compartido"
+    },
+    "insert_electricity_strategy": {
+      "description": "Añade un nuevo plan de estrategia eléctrica (carga/descarga) al dispositivo.",
+      "fields": {
+        "body": {
+          "description": "Cuerpo de la estrategia como JSON. Los campos están documentados en la fuente de verdad.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Añadir estrategia eléctrica"
     },
     "list_shared_devices": {
       "description": "Lista los dispositivos compartidos con la cuenta de Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
@@ -1731,6 +1769,16 @@
       },
       "name": "Listar administradores compartidos"
     },
+    "query_electricity_strategy": {
+      "description": "Consulta todos los planes de estrategia eléctrica del dispositivo.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Consultar estrategias eléctricas"
+    },
     "query_third_party_mqtt_config": {
       "description": "Consulta la configuracion experimental del puente MQTT de terceros mediante el canal de comandos MQTT de Jackery existente.",
       "fields": {
@@ -1740,6 +1788,16 @@
         }
       },
       "name": "Consultar configuracion MQTT de terceros"
+    },
+    "refresh_subdevices": {
+      "description": "Fuerza una redetección de accesorios y subdispositivos desde la nube de Jackery y, a continuación, actualiza todas las entidades. Úsalo después de añadir o quitar físicamente un accesorio.",
+      "fields": {
+        "device_id": {
+          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en diagnósticos en raw_api.system_list_response.data[].devices[].deviceId).",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Actualizar subdispositivos"
     },
     "refresh_weather_plan": {
       "description": "Consulta el plan meteorológico y de tormentas actual del dispositivo. La respuesta se expone en los atributos del sensor de diagnóstico Plan meteorológico.",
@@ -1845,58 +1903,6 @@
       },
       "name": "Enviar horario del dispositivo"
     },
-    "insert_electricity_strategy": {
-      "description": "Añade un nuevo plan de estrategia eléctrica (carga/descarga) al dispositivo.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        },
-        "body": {
-          "description": "Cuerpo de la estrategia como JSON. Los campos están documentados en la fuente de verdad.",
-          "name": "Body"
-        }
-      },
-      "name": "Añadir estrategia eléctrica"
-    },
-    "update_electricity_strategy": {
-      "description": "Actualiza un plan de estrategia eléctrica existente en el dispositivo.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        },
-        "body": {
-          "description": "Cuerpo de la estrategia como JSON.",
-          "name": "Body"
-        }
-      },
-      "name": "Actualizar estrategia eléctrica"
-    },
-    "delete_electricity_strategy": {
-      "description": "Elimina un plan de estrategia eléctrica del dispositivo.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        },
-        "body": {
-          "description": "Cuerpo de la estrategia como JSON, normalmente solo necesita el tid (ID de tarea).",
-          "name": "Body"
-        }
-      },
-      "name": "Eliminar estrategia eléctrica"
-    },
-    "query_electricity_strategy": {
-      "description": "Consulta todos los planes de estrategia eléctrica del dispositivo.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Consultar estrategias eléctricas"
-    },
     "set_device_nickname": {
       "description": "Establece un apodo personalizado para un dispositivo Jackery mediante la API en la nube de Jackery. El apodo se muestra en la app de Jackery y en la informacion del dispositivo de Home Assistant.",
       "fields": {
@@ -1969,15 +1975,19 @@
       },
       "name": "Desvincular accesorio inteligente"
     },
-    "refresh_subdevices": {
-      "description": "Fuerza una redetección de accesorios y subdispositivos desde la nube de Jackery y, a continuación, actualiza todas las entidades. Úsalo después de añadir o quitar físicamente un accesorio.",
+    "update_electricity_strategy": {
+      "description": "Actualiza un plan de estrategia eléctrica existente en el dispositivo.",
       "fields": {
+        "body": {
+          "description": "Cuerpo de la estrategia como JSON.",
+          "name": "Body"
+        },
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. Las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery (visible en diagnósticos en raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Elige un dispositivo Jackery.",
           "name": "ID del dispositivo"
         }
       },
-      "name": "Actualizar subdispositivos"
+      "name": "Actualizar estrategia eléctrica"
     }
   },
   "title": "Jackery SolarVault"

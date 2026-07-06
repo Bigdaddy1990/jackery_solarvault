@@ -48,26 +48,24 @@ RECORDER_IMPORT_ERRORS: tuple[type[BaseException], ...] = (
     *_RECORDER_BASE_ERRORS,
     *_SQLALCHEMY_IMPORT_ERRORS,
 )
-"""Synchronous failures from recorder statistics import calls.
-
-``async_import_statistics`` validates ``statistic_id``/``source`` and may raise
-``HomeAssistantError``/``ValueError`` before queuing. If the recorder surfaces a
-database error synchronously it derives from ``sqlalchemy.exc.SQLAlchemyError``
-(e.g. ``IntegrityError`` for a UNIQUE collision), which is *not* covered by
-``BACKGROUND_TASK_ERRORS``. This tuple makes such failures catchable and
-visible instead of escaping the per-statistic loop into the background task.
-"""
+# Synchronous failures from recorder statistics import calls.
+#
+# ``async_import_statistics`` validates ``statistic_id``/``source`` and may raise
+# ``HomeAssistantError``/``ValueError`` before queuing. If the recorder surfaces
+# a database error synchronously it derives from ``sqlalchemy.exc.SQLAlchemyError``
+# (e.g. ``IntegrityError`` for a UNIQUE collision), which is not covered by
+# ``BACKGROUND_TASK_ERRORS``. This tuple makes such failures catchable and
+# visible instead of escaping the per-statistic loop into the background task.
 
 RECORDER_BACKGROUND_TASK_ERRORS: tuple[type[BaseException], ...] = (
     *BACKGROUND_TASK_ERRORS,
     *RECORDER_IMPORT_ERRORS,
 )
-"""Background statistics-import task errors: base task errors + recorder/DB errors.
-
-Pre-combined as a single annotated tuple so the ``except`` clause references one
-``tuple[type[BaseException], ...]`` instead of an inline starred unpack (which
-mypy rejects as a non-exception-class expression in ``except`` position).
-"""
+# Background statistics-import task errors: base task errors + recorder/DB errors.
+#
+# Pre-combined as a single annotated tuple so the ``except`` clause references
+# one ``tuple[type[BaseException], ...]`` instead of an inline starred unpack
+# (which mypy rejects as a non-exception-class expression in ``except``).
 
 PAYLOAD_PARSE_ERRORS = (
     UnicodeDecodeError,

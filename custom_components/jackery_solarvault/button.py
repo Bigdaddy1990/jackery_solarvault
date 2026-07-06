@@ -48,6 +48,7 @@ from .const import (
     FIELD_END_TS,
     FIELD_MANUAL,
     FIELD_MESSAGE_TYPE,
+    FIELD_MODEL_CODE,
     FIELD_REBOOT,
     FIELD_SN,
     FIELD_START_TS,
@@ -908,7 +909,14 @@ async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
         entities: list[ButtonEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
+            # PortableBody buttons are gated on model code 3002 exactly
+            # like the portable sensors. Ungated, every home device grew
+            # the portable twin set ("Zeitzone synchronisieren" x2 —
+            # HA suffixes the name collision with _2).
+            is_portable = str(props.get(FIELD_MODEL_CODE) or "") == "3002"
             for description in QUERY_BUTTON_DESCRIPTIONS:
+                if description.key.startswith("portable_") and not is_portable:
+                    continue
                 _append_unique(
                     entities,
                     JackeryQueryButton(coordinator, dev_id, description=description),
