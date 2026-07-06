@@ -36,6 +36,8 @@ _HTTP_RETRY_ATTEMPTS = 3
 _HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
 HTTP_RETRY_ATTEMPTS: Final = _HTTP_RETRY_ATTEMPTS
 HTTP_RETRY_BACKOFF_SEC: Final = _HTTP_RETRY_BACKOFF_SEC
+# Automatic HTTP re-login is independent of MQTT/BLE reconnect state.
+AUTH_AUTO_RELOGIN_COOLDOWN_SEC: Final[int] = 60
 
 # Diagnostics export schema version (bump on breaking diagnostics-shape changes).
 DIAGNOSTICS_SCHEMA_VERSION: Final = 1
@@ -110,11 +112,13 @@ PACK_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 120
-# Adaptive polling: when MQTT delivered an inbound message within the live
-# threshold, we skip the coordinator HTTP refresh so HTTP only runs as a
-# keep-alive every ``ADAPTIVE_KEEPALIVE_INTERVAL_SEC``. The integration remains
-# cloud_polling because HTTP polling is the startup, fallback and keep-alive
-# data path; MQTT push is an optional live enhancement.
+MQTT_TRANSIENT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (30, 60, 120)
+MQTT_CONNECT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (300, 900, 1800)
+# Freshness window: an MQTT frame newer than this marks the MQTT channel as
+# live. Used to pause redundant cloud-MQTT once local-MQTT delivers and for
+# staleness diagnostics. HTTP polling is NEVER skipped based on this — HTTP is
+# the always-on, authoritative data path and is never gated by MQTT/BLE state
+# (owner invariant 2026-07-05).
 MQTT_LIVE_THRESHOLD_SEC: Final = 30
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
@@ -161,28 +165,80 @@ DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
 # Safe narrow default from app traces / user reports. Still configurable.
 # Broad wildcards (for example ``#``) remain blocked separately.
-DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
+# Empty by default: the local listener falls back to the scoped Jackery prefix
+# ``hb/app/#`` (LOCAL_MQTT_DEFAULT_TOPIC_FILTER). The old "homeassistant" default
+# only matched Home Assistant's own event stream, never the device's
+# ``hb/app/<userId>/...`` frames, so local MQTT delivered zero frames on the
+# out-of-the-box config (owner live capture 2026-07-05).
+DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = ""
 
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
-# HTTP endpoint constants.
-_RECONNECT_BACKOFF_SEC: float = 15.0
-RECONNECT_BACKOFF_SEC: Final = _RECONNECT_BACKOFF_SEC
+# BLE-first command writes ensure a connection for the command's own device_id
+# before the GATT write (the write path returns False — "BLE command
+# unavailable" — when no client is keyed by that device_id). Kept short so a
+# button press falls back to MQTT quickly when BLE is genuinely down; an
+# already-live keep-alive connection resolves instantly with no added latency
+# (owner live capture 2026-07-05: every BLE write fell back because
+# ensure_connected was skipped, connect_timeout_sec defaulted to 0).
+BLE_COMMAND_CONNECT_TIMEOUT_SEC: float = 4.0
+# Setup/reload login resilience. OptionsFlowWithReload reloads the whole entry
+# on every options change, and each reload re-runs ``api.async_login()``. On a
+# single-session Jackery account a reload that races the mobile app (or a burst
+# of option toggles) can get a transient JackeryAuthError / rate-limit — which
+# previously escalated straight to ConfigEntryAuthFailed and paused polling with
+# a reauth prompt. The poll path already tolerates one transient 401; setup must
+# too. Retry a few times with backoff before treating the rejection as a real
+# credential failure (owner: "reauth must not pause polling").
+SETUP_LOGIN_MAX_ATTEMPTS: Final[int] = 3
+SETUP_LOGIN_RETRY_DELAY_SEC: Final[float] = 3.0
+# Hard ceiling for one coordinator update cycle. A single await inside the poll
+# that never returns (a stuck aiohttp read, an SSL drop with no client timeout,
+# a wedged transport) would otherwise stall HA's DataUpdateCoordinator forever —
+# it never schedules the next refresh until the current one returns, so polling
+# silently "hangs". Bounding the cycle turns a hang into an UpdateFailed that HA
+# logs and reschedules on the normal interval. Generous vs the ~15 s cadence so
+# a merely slow cycle never trips it (owner: recurring "polling festhängt").
+COORDINATOR_UPDATE_TIMEOUT_SEC: Final[float] = 90.0
+# Hard ceiling for tearing the coordinator down on unload. Transport teardown
+# (a bleak GATT disconnect to an unresponsive ESP32 BT-proxy, an aiomqtt broker
+# disconnect, or a background task wedged in an un-cancellable getaddrinfo)
+# previously blocked ``async_unload_entry`` for ~78 s — which stalled every
+# options-triggered reload and froze polling for that whole window (owner live
+# capture 2026-07-05). Bounding it turns a hung teardown into a logged warning;
+# the unload proceeds and the OS/GC reclaims any straggler.
+COORDINATOR_SHUTDOWN_TIMEOUT_SEC: Final[float] = 10.0
+#: Initial minimum spacing between GATT connect attempts per device.
+#: ESPHome BT-proxies are known to crash under rapid connect/disconnect
+#: cycles (8 stored ``esp32.crash`` reports delivered 2026-07-03
+#: 22:33:41 local when the proxy reconnected after a reboot). 30 s
+#: matches the previous fixed reconnect delay, so the normal reconnect
+#: cadence is unchanged — the backoff only slows things down further
+#: when connects keep failing.
+BLE_CONNECT_BACKOFF_INITIAL_SEC: Final[float] = 30.0
+#: Cap for the exponential connect backoff (initial, doubled, cap). Bounded
+#: at 60 s so a recovered proxy/peripheral is picked up again within a
+#: minute while a broken one is probed at most once per minute.
+BLE_CONNECT_BACKOFF_MAX_SEC: Final[float] = 60.0
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
 #: runners to honour cancellation. HA's shutdown sequence reports tasks
 #: that exceed its own per-integration timeout (typically 30 s for
 #: ``async_unload_entry``) — keep this well below that so the listener
 #: never becomes the reason a shutdown logs "tasks still pending".
-_STOP_TIMEOUT_SEC: float = 5.0
-STOP_TIMEOUT_SEC: Final = _STOP_TIMEOUT_SEC
-#: How often to write a no-op query frame to keep the GATT session
-#: warm. The SolarVault peripheral closes idle GATT sessions after
-#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
-#: every 6-20 s without traffic). 15 s sits comfortably below that and
-#: doubles as a property-refresh — the device answers each ``cmd=106``
-#: with a ``DevicePropertyChange`` notify that the sink merges into
-#: ``coordinator.data`` via the existing cmd=107 path.
-_KEEPALIVE_INTERVAL_SEC: float = 15.0
-KEEPALIVE_INTERVAL_SEC: Final = _KEEPALIVE_INTERVAL_SEC
+BLE_STOP_TIMEOUT_SEC: Final[float] = 5.0
+#: How often to write a no-op ``cmd=106`` query frame to keep the GATT
+#: session warm. The SolarVault peripheral closes idle GATT sessions
+#: after roughly 20 s (observed 2026-05-17 production log: BLE
+#: disconnects every 6-20 s without traffic). 15 s sits comfortably
+#: below that and doubles as a property-refresh — the device answers
+#: each ``cmd=106`` with a ``DevicePropertyChange`` notify that the sink
+#: merges into ``coordinator.data`` via the existing cmd=107 path.
+#:
+#: Deliberately NOT raised above 20 s to spare the BT-proxy: a longer
+#: interval lets the peripheral drop the session, which turns one small
+#: keep-alive write per 15 s into a full disconnect + reconnect cycle
+#: every ~20 s — connect churn is what crashes ESPHome proxies, not a
+#: 20-byte write.
+BLE_KEEPALIVE_INTERVAL_SEC: Final[float] = 15.0
 # ---------------------------------------------------------------------------
 # Wire-format constants
 # ---------------------------------------------------------------------------
@@ -575,6 +631,30 @@ SHELLY_REALTIME_FETCH_TIMEOUT_SEC: Final = 8
 # SLOW_ENDPOINT_TIMEOUT_SEC / REQUEST_TIMEOUT_SEC so per-request timeouts remain
 # the first line of defense.
 BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC: Final = 120
+
+# Poll-cadence watchdog (P6 stall 2026-07-03): the scheduled interval
+# timer was observed to vanish together with a BLE outage, silently
+# stopping the cloud HTTP poll for 152 s. The watchdog checks the age of
+# the last completed refresh on an independent time track and forces a
+# refresh when it exceeds STALL_FACTOR x update_interval (min 60 s).
+POLL_WATCHDOG_CHECK_INTERVAL_SEC: Final = 30
+POLL_WATCHDOG_STALL_FACTOR: Final = 4
+POLL_WATCHDOG_MIN_STALL_SEC: Final = 60.0
+
+# The CombineData system-info cache exists so SystemBody-only keys survive
+# temporary MQTT disconnects; after this window it stops filling instead of
+# presenting hours-old configuration state as current (2026-07-03).
+SYSTEM_INFO_CACHE_MAX_AGE_SEC: Final = 900.0
+# Diagnostic MARKER (never a gate): after this many consecutive polls with a
+# byte-identical live-key projection of /v1/device/property the device's
+# cloud shadow is likely frozen; surfaced as a payload flag in diagnostics.
+CLOUD_PROPERTY_STALE_CYCLES: Final = 20
+PAYLOAD_CLOUD_PROPERTY_STALE: Final = "cloud_property_body_stale"
+# Per-key stale marker for the pv* family: the cloud shadow can keep the
+# MPPT/pv keys at last-daylight values after DC shutdown while grid and
+# battery keys keep updating (live finding 2026-07-03: pvPw=129 W at
+# 22:40 across every poll). Diagnostic MARKER only — never a gate.
+PAYLOAD_PV_PROPERTY_STALE: Final = "pv_property_keys_stale"
 
 HTTP_METHOD_GET: Final = "GET"
 HTTP_METHOD_POST: Final = "POST"
@@ -1416,6 +1496,12 @@ APP_STAT_TOTAL_TREND_CHARGE_ENERGY: Final = "totalChgEgy"
 APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: Final = "totalDisChgEgy"
 APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
 APP_STAT_TODAY_LOAD: Final = "todayLoad"
+# SystemStatisticApi today counters (types.py SystemStatistic DTO) — used
+# to cross-confirm zero-only ``device_statistic`` day counters per
+# AGENTS.md §2.2 rule 7 ("0 ignored unless confirmed by another source").
+APP_STAT_TODAY_GENERATION: Final = "todayGeneration"
+APP_STAT_TODAY_BATTERY_CHARGE: Final = "todayBatteryChg"
+APP_STAT_TODAY_BATTERY_DISCHARGE: Final = "todayBatteryDisChg"
 APP_STAT_TOTAL_GENERATION: Final = "totalGeneration"
 APP_STAT_TOTAL_REVENUE: Final = "totalRevenue"
 # PvStatApi$Bean per docs/html/jackery_http_model_fields_v2.html — separate
@@ -1671,6 +1757,12 @@ MQTT_TOPIC_SUFFIXES: Final = (
     MQTT_TOPIC_CONFIG,
     MQTT_TOPIC_NOTICE,
 )
+# Scoped default subscription for the direct local-MQTT client when the user
+# leaves the topic filter empty. The device mirrors its cloud topics onto the
+# local broker under the Jackery prefix ``hb/app/<userId>/...``, so subscribing
+# to ``hb/app/#`` catches all of them while staying off the broker-wide ``#``
+# that BLOCKED_LOCAL_MQTT_TOPIC_FILTERS rejects for CPU safety.
+LOCAL_MQTT_DEFAULT_TOPIC_FILTER: Final = f"{MQTT_TOPIC_PREFIX}/#"
 MQTT_CONNACK_REASONS: Final = {
     0: "Connection accepted",
     1: "unacceptable protocol version",
@@ -1678,10 +1770,24 @@ MQTT_CONNACK_REASONS: Final = {
     3: "server unavailable",
     4: "bad user name or password",
     5: "not authorized",
+    128: "unspecified error",
+    129: "malformed packet",
+    130: "protocol error",
+    131: "implementation specific error",
+    132: "unsupported protocol version",
+    133: "client identifier not valid (banned)",
     134: "bad user name or password",
     135: "not authorized",
     136: "server unavailable",
 }
+
+# CONNACK codes treated as broker-side credential/ban rejections. Covers the
+# MQTT v3 auth codes (4/5) and the MQTT v5 rejection class 128-135: the
+# Jackery broker answers a banned/duplicate client id with 133 ("client
+# identifier not valid") and pairs it with MqttCodeError code 128
+# ("unspecified error"), so the whole v5 class must trigger the
+# app-conflict pause instead of the transient reconnect backoff.
+MQTT_AUTH_FAILURE_RCS: Final = frozenset({4, 5, *range(128, 136)})
 
 # Subdevice type markers observed in docs/source-of-truth. devType=1 is a
 # BatteryPackSub query target. All other concrete devType values are excluded

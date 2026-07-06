@@ -15,11 +15,19 @@ from custom_components.jackery_solarvault.const import (
     APP_REQUEST_META,
     BATTERY_PACK_PATH,
     BOX_STAT_PATH,
+    CHECK_VERIFY_CODE_PATH,
     DEVICE_PV_STAT_PATH,
+    DEVICE_QR_CODE_PATH,
     FIELD_DATA,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
+    FIELD_REGION_CODE,
+    FIELD_REGISTER_APP_ID,
     FIELD_SYSTEM_ID,
+    LOGOUT_PATH,
+    REGISTER_APP_ID,
+    REGISTER_PATH,
+    VERIFY_CODE_PATH,
 )
 
 
@@ -80,6 +88,98 @@ async def test_async_get_accessories_contract_stringifies_ids() -> None:
             "parentDeviceId": "456",
         },
     )
+
+
+@pytest.mark.asyncio()
+async def test_async_check_verification_code_contract_sends_code() -> None:
+    """Verification-code checks send the app catalog's code field."""
+    api = _make_api()
+    post_json = AsyncMock(return_value={FIELD_DATA: {"valid": True}})
+
+    with patch.object(api, "_post_json", post_json):
+        result = await api.async_check_verification_code(
+            email="owner@example.com",
+            code="123456",
+        )
+
+    assert result == {FIELD_DATA: {"valid": True}}
+    post_json.assert_awaited_once_with(
+        CHECK_VERIFY_CODE_PATH,
+        {"email": "owner@example.com", "method": "email", "code": "123456"},
+    )
+
+
+@pytest.mark.asyncio()
+async def test_async_register_contract_sends_app_identity_and_region() -> None:
+    """Registration wrapper preserves source-of-truth request fields."""
+    api = JackeryApi(Mock(), "tester@example.com", "secret", region_code="de")
+    payload = {"userId": "user-1"}
+    post_json = AsyncMock(return_value={FIELD_DATA: payload})
+
+    with patch.object(api, "_post_json", post_json):
+        result = await api.async_register(
+            email="owner@example.com",
+            password="secret",
+            verification_code="123456",
+        )
+
+    assert result == payload
+    post_json.assert_awaited_once_with(
+        REGISTER_PATH,
+        {
+            "email": "owner@example.com",
+            "password": "secret",
+            "verificationCode": "123456",
+            FIELD_REGISTER_APP_ID: REGISTER_APP_ID,
+            FIELD_REGION_CODE: "DE",
+        },
+    )
+
+
+@pytest.mark.asyncio()
+async def test_async_send_verification_code_contract_uses_query_params() -> None:
+    """Verification-code issuance uses the app catalog query fields."""
+    api = _make_api()
+    get_json = AsyncMock(return_value={FIELD_DATA: {"sent": True}})
+
+    with patch.object(api, "_get_json", get_json):
+        result = await api.async_send_verification_code(
+            email="owner@example.com",
+            phone="+491234",
+        )
+
+    assert result == {"sent": True}
+    get_json.assert_awaited_once_with(
+        VERIFY_CODE_PATH,
+        params={"email": "owner@example.com", "method": "email", "phone": "+491234"},
+    )
+
+
+@pytest.mark.asyncio()
+async def test_async_logout_contract_has_empty_body() -> None:
+    """Logout wrapper sends the app catalog's body-less POST."""
+    api = _make_api()
+    post_json = AsyncMock(return_value={FIELD_DATA: {"ok": True}})
+
+    with patch.object(api, "_post_json", post_json):
+        result = await api.async_logout()
+
+    assert result == {"ok": True}
+    post_json.assert_awaited_once_with(LOGOUT_PATH, {})
+
+
+@pytest.mark.asyncio()
+async def test_async_get_qr_code_contract_has_no_query_params() -> None:
+    """QR-code wrapper requests the account share code without parameters."""
+    api = _make_api()
+    payload = {"qrCodeId": "qr-1", "userId": "user-1"}
+    get_json = AsyncMock(return_value={FIELD_DATA: payload})
+
+    with patch.object(api, "_get_json", get_json):
+        result = await api.async_get_qr_code()
+
+    assert result == payload
+    get_json.assert_awaited_once_with(DEVICE_QR_CODE_PATH)
 
 
 @pytest.mark.asyncio()

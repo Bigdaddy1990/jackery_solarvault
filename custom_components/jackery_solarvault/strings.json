@@ -57,6 +57,8 @@
           "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
           "enable_week_statistics": "Import week statistics",
           "enable_year_statistics": "Import year statistics",
+          "local_mqtt_enable": "Enable local MQTT listener",
+          "local_mqtt_host": "Local MQTT broker host",
           "password": "Password",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
@@ -78,6 +80,8 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
+          "local_mqtt_enable": "Subscribes to the SolarVault's local MQTT broker for LAN telemetry. Cloud MQTT pauses while the local connection is active; the cloud HTTP API keeps polling.",
+          "local_mqtt_host": "IP or hostname of the local MQTT broker the SolarVault publishes to, for example 192.168.x.x.",
           "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
@@ -894,13 +898,13 @@
         "name": "Function enable flags"
       },
       "grid_in_power": {
-        "name": "On-grid input"
+        "name": "Grid import"
       },
       "grid_net_power": {
         "name": "Grid-side net power"
       },
       "grid_out_power": {
-        "name": "On-grid output"
+        "name": "Grid export"
       },
       "grid_standard": {
         "name": "Grid standard"
@@ -931,6 +935,12 @@
       },
       "input_temperature": {
         "name": "Input temperature"
+      },
+      "inverter_ac_input_power": {
+        "name": "Inverter AC input"
+      },
+      "inverter_ac_output_power": {
+        "name": "Inverter AC output"
       },
       "last_offline": {
         "name": "Last offline"

@@ -814,13 +814,15 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Checks each key in `entity_description.source_keys` in order and parses the
         first non-`None` value with `safe_float`. If `entity_description.integer_value`
-        is true, the parsed value is rounded to the nearest integer and returned as a
-        `float`. If no source key yields a usable value, returns
+        is true, the parsed value is rounded and returned as an `int` so the state
+        string carries no fractional part (a port must render as ``1883``, not
+        ``1883.0``). If no source key yields a usable value, returns
         `entity_description.none_fallback`.
 
         Returns:
-            The found native value as a `float` (rounded to an integer when
-            configured), or `entity_description.none_fallback` (which may be `None`).
+            The found native value as a `float` (an `int` when configured via
+            `integer_value`), or `entity_description.none_fallback` (which may be
+            `None`).
         """
         section = self._section()
         for key in self.entity_description.source_keys:
@@ -828,7 +830,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             if val is not None:
                 fval = safe_float(val)
                 if fval is not None and self.entity_description.integer_value:
-                    return float(round(fval))
+                    return round(fval)
                 return fval
         return self.entity_description.none_fallback
 

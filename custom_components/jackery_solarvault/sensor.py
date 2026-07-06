@@ -440,9 +440,13 @@ from .util import (
     effective_trend_series_values,
     first_nonblank_text,
     first_power_value,
+    is_day_period_payload,
     jackery_corrected_home_consumption_power,
+    jackery_grid_net_power,
     jackery_grid_side_input_power,
     jackery_grid_side_output_power,
+    jackery_inverter_ac_input_power,
+    jackery_inverter_ac_output_power,
     meter_head_serial,
     nonblank_text,
     redacted_json_safe_payload,
@@ -630,8 +634,26 @@ class JackerySensorDescription(SensorEntityDescription):
     ha_derived: bool = False
 
 
+# Shown for network address fields the device omits while that interface is
+# down. ``eip``/``emac`` are real HomeBody fields (smali: HomeBody.eip/emac)
+# that the device only sends while Ethernet is up (ethPort != 0); on a
+# WLAN-only device they are simply absent. Render an explicit "not connected"
+# dash instead of Unknown (owner directive 2026-07-05: "0 oder -").
+_NETWORK_DISCONNECTED_PLACEHOLDER: Final = "—"
+
+
 def _prop(key: str) -> Callable[[dict[str, Any]], Any]:
     return lambda props: props.get(key)
+
+
+def _prop_or_disconnected(key: str) -> Callable[[dict[str, Any]], Any]:
+    return lambda props: props.get(key) or _NETWORK_DISCONNECTED_PLACEHOLDER
+
+
+def _battery_pack_serial(pack: dict[str, Any]) -> str | None:
+    """Return a battery pack's own serial, or None when the payload omits it."""
+    raw = pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
+    return str(raw) if raw else None
 
 
 def _prop_any(*keys: str) -> Callable[[dict[str, Any]], Any]:
@@ -791,14 +813,17 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         icon="mdi:solar-panel",
     ),
     # --- Grid --------------------------------------------------------------
+    # ``inGridSidePw``/``outGridSidePw`` are the only true grid
+    # import/export measurement points. The on-grid family
+    # (``gridIn/OutPw``, ``in/outOngridPw``) is the inverter's AC
+    # input/output (house share + export) per the SystemBody identity
+    # ``otherLoadPw = gridOutPw - outGridSidePw + inGridSidePw`` and is
+    # exposed by the inverter_ac_* sensors below — never as an
+    # import/export fallback (B5 duplicate-export bug).
     JackerySensorDescription(
         key="grid_in_power",
         translation_key="grid_in_power",
-        getter=_prop_power_any(
-            FIELD_GRID_IN_PW,
-            FIELD_IN_ONGRID_PW,
-            FIELD_IN_GRID_SIDE_PW,
-        ),
+        getter=_prop(FIELD_IN_GRID_SIDE_PW),
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
@@ -807,15 +832,29 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="grid_out_power",
         translation_key="grid_out_power",
-        getter=_prop_power_any(
-            FIELD_GRID_OUT_PW,
-            FIELD_OUT_ONGRID_PW,
-            FIELD_OUT_GRID_SIDE_PW,
-        ),
+        getter=_prop(FIELD_OUT_GRID_SIDE_PW),
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         icon="mdi:transmission-tower-export",
+    ),
+    JackerySensorDescription(
+        key="inverter_ac_input_power",
+        translation_key="inverter_ac_input_power",
+        getter=jackery_inverter_ac_input_power,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        icon="mdi:sine-wave",
+    ),
+    JackerySensorDescription(
+        key="inverter_ac_output_power",
+        translation_key="inverter_ac_output_power",
+        getter=jackery_inverter_ac_output_power,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        icon="mdi:sine-wave",
     ),
     # --- EPS (Emergency Power Supply, AC OUT) ------------------------------
     JackerySensorDescription(
@@ -966,7 +1005,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="ethernet_ip",
         translation_key="ethernet_ip",
-        getter=_prop(FIELD_EIP),
+        getter=_prop_or_disconnected(FIELD_EIP),
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:ethernet",
     ),
@@ -980,7 +1019,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         key="ethernet_mac",
         translation_key="ethernet_mac",
-        getter=_prop(FIELD_EMAC),
+        getter=_prop_or_disconnected(FIELD_EMAC),
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:ethernet",
     ),
@@ -1099,6 +1138,10 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         getter=_prop(FIELD_DEFAULT_PW),
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        # ``defaultPw`` is a SystemBody field other models report; the
+        # SolarVault 3 Pro Max never sends it, so keep the entity
+        # default-disabled instead of permanently "unknown".
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="standby_power",
@@ -2894,50 +2937,47 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="charge_limit",
         getter=_prop(FIELD_CL),
         device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="discharge_limit",
         translation_key="discharge_limit",
         getter=_prop(FIELD_DL),
         device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="power_mode",
         translation_key="power_mode",
         getter=_prop(FIELD_PM),
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="power_source_selector",
         translation_key="power_source_selector",
         getter=_prop(FIELD_PSS),
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="ups_mode",
         translation_key="ups_mode",
         getter=_prop(FIELD_UPS),
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="wifi_switch_status",
         translation_key="wifi_switch_status",
         getter=_prop(FIELD_WSS),
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="auto_standby_timer",
         translation_key="auto_standby_timer",
         getter=_prop(FIELD_AST),
-        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.MINUTES,
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
         key="external_pack_connected",
@@ -4213,6 +4253,11 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
         )
 
     def _components(self) -> dict[str, float | None]:
+        # Power balance at the INVERTER boundary. The AC side must use the
+        # inverter's total AC output (gridOutPw/outOngridPw = house share
+        # + export) — using only the grid-side export (outGridSidePw)
+        # omitted the house-fed share and inflated the "loss" by the whole
+        # household consumption (live finding 2026-07-03: 1995 W "loss").
         props = self._properties
         battery_charge_power, battery_discharge_power, _source = (
             self._battery_power_components()
@@ -4221,8 +4266,12 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
             "pv_power": safe_float(props.get(FIELD_PV_PW)),
             "battery_charge_power": battery_charge_power,
             "battery_discharge_power": battery_discharge_power,
-            "grid_side_input_power": safe_float(jackery_grid_side_input_power(props)),
-            "grid_side_output_power": safe_float(jackery_grid_side_output_power(props)),
+            "inverter_ac_input_power": safe_float(
+                jackery_inverter_ac_input_power(props)
+            ),
+            "inverter_ac_output_power": safe_float(
+                jackery_inverter_ac_output_power(props)
+            ),
         }
 
     @property
@@ -4233,19 +4282,19 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
             return None
         pv_power = safe_float(c.get("pv_power"))
         battery_discharge_power = safe_float(c.get("battery_discharge_power"))
-        grid_side_input_power = safe_float(c.get("grid_side_input_power"))
+        inverter_ac_input_power = safe_float(c.get("inverter_ac_input_power"))
         battery_charge_power = safe_float(c.get("battery_charge_power"))
-        grid_side_output_power = safe_float(c.get("grid_side_output_power"))
+        inverter_ac_output_power = safe_float(c.get("inverter_ac_output_power"))
         if (
             pv_power is None
             or battery_discharge_power is None
-            or grid_side_input_power is None
+            or inverter_ac_input_power is None
             or battery_charge_power is None
-            or grid_side_output_power is None
+            or inverter_ac_output_power is None
         ):
             return None
-        produced = pv_power + battery_discharge_power + grid_side_input_power
-        consumed = battery_charge_power + grid_side_output_power
+        produced = pv_power + battery_discharge_power + inverter_ac_input_power
+        consumed = battery_charge_power + inverter_ac_output_power
         return round(max(0.0, produced - consumed), 2)
 
     @property
@@ -4256,10 +4305,14 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
         )
         return {
             "formula": (
-                "max(pv_power + battery_discharge_power + grid_side_input_power "
-                "- battery_charge_power - grid_side_output_power, 0)"
+                "max(pv_power + battery_discharge_power + inverter_ac_input_power "
+                "- battery_charge_power - inverter_ac_output_power, 0)"
             ),
-            "scope": "calculated residual from SolarVault DC/AC live power fields",
+            "scope": (
+                "calculated residual at the inverter boundary; "
+                "inverter_ac_output_power = house share + grid export "
+                "(gridOutPw/outOngridPw)"
+            ),
             "battery_power_source": battery_source,
             "stackInPw": self._properties.get(FIELD_STACK_IN_PW),
             "stackOutPw": self._properties.get(FIELD_STACK_OUT_PW),
@@ -4872,28 +4925,6 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return source if isinstance(source, dict) else {}
         return self._statistic
 
-    def _non_negative_period_raw(
-        self,
-        raw: float | None,
-    ) -> float | int | None:
-        """Clamp negative energy period totals to zero when applicable.
-
-        If the sensor has a reset period and its device_class is `SensorDeviceClass.ENERGY`,
-        parses `raw` as a float and returns `0` when the parsed value is less than zero.
-        Otherwise returns the original `raw` value unchanged.
-
-        Returns:
-            The original `raw` value, or `0` when a negative energy total was detected.
-        """  # noqa: E501
-        if self._reset_period is None:
-            return raw
-        if self.entity_description.device_class != SensorDeviceClass.ENERGY:
-            return raw
-        parsed = safe_float(raw)
-        if parsed is not None and parsed < 0:
-            return 0
-        return raw
-
     def _current_day_bucket_from_period_chart(
         self,
         section: str,
@@ -4971,9 +5002,19 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             _, values, chart_series_sum, server_total = self._resolve_period_value(
                 source, section, stat_key
             )
-            raw: float | None = chart_series_sum
-            if raw is None:
+            # Day-period payloads carry the intraday POWER curve as their
+            # chart series (5-min samples, unit "w") — summing it is not
+            # an energy total (live finding 2026-07-03: 47493 "kWh" vs
+            # the server scalar 3.58). The scalar stat field is the only
+            # authoritative day total; the series sum applies solely to
+            # week/month/year energy-bucket charts.
+            raw: float | None
+            if is_day_period_payload(source, section):
                 raw = server_total
+            else:
+                raw = chart_series_sum
+                if raw is None:
+                    raw = server_total
             if raw is None:
                 # PROTOCOL.md §2 fallback — try documented alternate
                 # source (e.g. deviceStatistic for today_* sensors).
@@ -4982,7 +5023,9 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                     fb_total = effective_period_total_value(
                         fb_source, fb_section, fb_stat_key
                     )
-                    if fb_total is None:
+                    if fb_total is None and not is_day_period_payload(
+                        fb_source, fb_section
+                    ):
                         fb_total = _trend_series_sum(fb_source, fb_section, fb_stat_key)
                     if fb_total is not None:
                         raw = fb_total
@@ -4994,6 +5037,28 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                             self._resolve_period_value(source, section, stat_key)
                         )
                         break
+            day_bucket_fallback: str | None = None
+            if raw is None:
+                # The cloud answers ``data: null`` for every dateType=day
+                # endpoint at night; derive today's value from the month/
+                # week chart bucket exactly like the non-period path does.
+                day_sources = (
+                    (section, stat_key),
+                    *self.entity_description.fallback_sources,
+                )
+                for candidate_section, candidate_stat_key in day_sources:
+                    bucket = self._current_day_bucket_from_period_chart(
+                        candidate_section,
+                        candidate_stat_key,
+                    )
+                    if bucket is None:
+                        continue
+                    raw, bucket_section, bucket_source = bucket
+                    section = bucket_section
+                    stat_key = candidate_stat_key
+                    source = bucket_source
+                    day_bucket_fallback = f"current_day_bucket_from_{bucket_section}"
+                    break
 
             # Stale-period guard per CHANGELOG "Three-part fix" / Midnight
             # race. When the wall clock has crossed a period boundary but
@@ -5007,12 +5072,26 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             # energy spike where the cloud briefly served 0 inside the
             # same period anchor and the Energy Dashboard rendered a
             # -X kWh delta).
-            self._cached_source_section = section
-            stale_period = self._reset_period and self._is_period_data_stale()
-            future_period = self._reset_period and self._is_period_data_future()
+            # A current-day bucket lifted from a month/week chart is
+            # already indexed to today's date; do not compare the chart's
+            # period begin (month/week start) to a daily reset boundary.
+            self._cached_source_section = (
+                self.entity_description.section
+                if day_bucket_fallback is not None
+                else section
+            )
+            stale_period = (
+                False
+                if day_bucket_fallback is not None
+                else self._reset_period and self._is_period_data_stale()
+            )
+            future_period = (
+                False
+                if day_bucket_fallback is not None
+                else self._reset_period and self._is_period_data_future()
+            )
             if stale_period or future_period:
                 raw = None
-            raw = self._non_negative_period_raw(raw)
             self._cached_native_value = (
                 self.entity_description.transform(raw) if raw is not None else None
             )
@@ -5029,6 +5108,8 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 "chart_series_sum": chart_series_sum,
                 "server_total": server_total,
             }
+            if day_bucket_fallback is not None:
+                attrs["fallback"] = day_bucket_fallback
             if isinstance(values, list) and len(values) <= _MAX_PERIOD_VALUES:
                 attrs["period_values"] = values
             year_backfill = source.get(APP_YEAR_BACKFILL_META)
@@ -5050,7 +5131,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         # ---- non-period stat path (totalGeneration, todayLoad, price, ...)
         raw = source.get(stat_key)
-        day_bucket_fallback: str | None = None
+        day_bucket_fallback = None
         if raw is None:
             for fb_section, fb_stat_key in self.entity_description.fallback_sources:
                 fb_source = self._source_for_section(fb_section)
@@ -5103,7 +5184,6 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         # produce a negative Energy-Dashboard delta.
         if stale_period or future_period:
             raw = None
-        raw = self._non_negative_period_raw(raw)
         self._cached_native_value = (
             self.entity_description.transform(raw) if raw is not None else None
         )
@@ -5261,6 +5341,11 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             f"battery_pack_{pack_index}_{description.key}",
         )
         self._pack_index = pack_index
+        # Pinned on first successful resolution so the entity keeps tracking
+        # ITS pack by serial even if the payload list reorders (index-only
+        # lookup made a reordered pack read a sibling's data or flip to
+        # Unknown — the "duplicate/Unbekannt Zusatzbatterie" symptom).
+        self._pack_sn: str | None = None
         self.entity_description = description
         self._attr_translation_key = description.translation_key
         self._attr_icon = description.icon
@@ -5283,11 +5368,23 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         packs = self._payload.get(PAYLOAD_BATTERY_PACKS) or []
         if not isinstance(packs, list):
             return {}
+        pack_dicts = [pack for pack in packs if isinstance(pack, dict)]
+        # Prefer matching by the pack's own serial: the SN-keyed merge sink can
+        # reorder the list between polls, and index-only lookup then made this
+        # entity read a sibling pack's values or flip to Unknown.
+        if self._pack_sn is not None:
+            for pack in pack_dicts:
+                if _battery_pack_serial(pack) == self._pack_sn:
+                    return pack
         try:
-            pack = packs[self._pack_index - 1]
+            pack = pack_dicts[self._pack_index - 1]
         except IndexError:
             return {}
-        return pack if isinstance(pack, dict) else {}
+        # Pin the serial on first resolution so subsequent polls track by SN.
+        sn = _battery_pack_serial(pack)
+        if sn is not None:
+            self._pack_sn = sn
+        return pack
 
     def _value_from_pack(self, pack: dict[str, Any]) -> Any:  # noqa: ANN401  # dynamically computed HA sensor state value
         """Extracts the described battery-pack field from a battery-pack payload and applies the entity transform.
@@ -5963,7 +6060,6 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         self.entity_description = description
         self._cached_native_value: Any = None
         self._cached_attrs: dict[str, Any] = {}
-        self._last_known_value: float | None = None
 
     @staticmethod
     def _directional_value(
@@ -6118,17 +6214,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
             self._cached_native_value = None
             self._cached_attrs = {}
             return
-        value = self._value_from_ct(ct)
-        if (
-            self.entity_description.state_class == SensorStateClass.TOTAL_INCREASING
-            and isinstance(value, (int, float))
-            and self._last_known_value is not None
-            and value < self._last_known_value
-        ):
-            value = self._last_known_value
-        if isinstance(value, (int, float)):
-            self._last_known_value = value
-        self._cached_native_value = value
+        self._cached_native_value = self._value_from_ct(ct)
         self._cached_attrs = self._attrs_from_ct(ct)
 
     @callback
@@ -6669,22 +6755,17 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
     @property
     def native_value(self) -> int | None:
         """The entity's current value."""
-        props = self._properties
-        in_pw = safe_int(jackery_grid_side_input_power(props))
-        out_pw = safe_int(jackery_grid_side_output_power(props))
-        if in_pw is None or out_pw is None:
-            return None
-        return in_pw - out_pw
+        return jackery_grid_net_power(self._properties)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Diagnostic attributes for the current state."""
         props = self._properties
         return {
-            "formula": "inOngridPw/gridInPw/inGridSidePw - outOngridPw/gridOutPw/outGridSidePw",  # noqa: E501
-            "source": "on-grid_fields_preferred_then_grid-side_fallback",
-            "positive": "grid-side input exceeds output",
-            "negative": "grid-side output exceeds input",
+            "formula": "inGridSidePw - outGridSidePw",
+            "source": "grid_side_fields_only_no_inverter_fallback",
+            "positive": "grid import exceeds export",
+            "negative": "grid export exceeds import",
             FIELD_IN_GRID_SIDE_PW: props.get(FIELD_IN_GRID_SIDE_PW),
             FIELD_OUT_GRID_SIDE_PW: props.get(FIELD_OUT_GRID_SIDE_PW),
             FIELD_IN_ONGRID_PW: props.get(FIELD_IN_ONGRID_PW),

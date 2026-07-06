@@ -1,24 +1,24 @@
 {
   "config": {
     "abort": {
-      "accept_shared_reauth_required": "Une nouvelle authentification est requise avant d'accepter l'appareil partag\u00e9. Reconnectez-vous, puis r\u00e9essayez.",
-      "accept_shared_successful": "Appareil partag\u00e9 accept\u00e9.",
-      "already_configured": "Ce compte Jackery est d\u00e9j\u00e0 configur\u00e9.",
-      "already_in_progress": "Un flux de configuration est d\u00e9j\u00e0 en cours pour ce compte Jackery.",
-      "reauth_entry_missing": "L'entr\u00e9e Jackery pour la r\u00e9authentification est introuvable.",
-      "reauth_successful": "La r\u00e9authentification a r\u00e9ussi.",
-      "reconfigure_account_mismatch": "La nouvelle adresse e-mail ne correspond pas au compte Jackery configur\u00e9. Utilisez l'adresse e-mail d'origine ou supprimez d'abord l'entr\u00e9e.",
-      "reconfigure_entry_missing": "L\u2019entr\u00e9e Jackery \u00e0 reconfigurer est introuvable.",
-      "reconfigure_successful": "Configuration mise \u00e0 jour.",
-      "shelly_auth_url_failed": "Impossible de d\u00e9marrer l'association Shelly. Veuillez r\u00e9essayer plus tard.",
-      "shelly_no_devices": "Aucun accessoire Shelly n'a \u00e9t\u00e9 li\u00e9. Assurez-vous d'avoir termin\u00e9 l'autorisation Shelly, puis r\u00e9essayez.",
+      "accept_shared_reauth_required": "Une nouvelle authentification est requise avant d'accepter l'appareil partagé. Reconnectez-vous, puis réessayez.",
+      "accept_shared_successful": "Appareil partagé accepté.",
+      "already_configured": "Ce compte Jackery est déjà configuré.",
+      "already_in_progress": "Un flux de configuration est déjà en cours pour ce compte Jackery.",
+      "reauth_entry_missing": "L'entrée Jackery pour la réauthentification est introuvable.",
+      "reauth_successful": "La réauthentification a réussi.",
+      "reconfigure_account_mismatch": "La nouvelle adresse e-mail ne correspond pas au compte Jackery configuré. Utilisez l'adresse e-mail d'origine ou supprimez d'abord l'entrée.",
+      "reconfigure_entry_missing": "L’entrée Jackery à reconfigurer est introuvable.",
+      "reconfigure_successful": "Configuration mise à jour.",
+      "shelly_auth_url_failed": "Impossible de démarrer l'association Shelly. Veuillez réessayer plus tard.",
+      "shelly_no_devices": "Aucun accessoire Shelly n'a été lié. Assurez-vous d'avoir terminé l'autorisation Shelly, puis réessayez.",
       "shelly_reauth_required": "Une nouvelle authentification au compte Jackery est requise avant d'associer des accessoires Shelly.",
-      "shelly_successful": "Accessoires Shelly associ\u00e9s ; l'int\u00e9gration a \u00e9t\u00e9 recharg\u00e9e."
+      "shelly_successful": "Accessoires Shelly associés ; l'intégration a été rechargée."
     },
     "error": {
-      "accept_shared_failed": "Impossible d'accepter l'appareil partag\u00e9. V\u00e9rifiez l'ID de l'appareil et l'ID du code QR, puis r\u00e9essayez.",
-      "account_required": "Le compte ne doit pas \u00eatre vide.",
-      "cannot_connect": "Impossible de se connecter \u00e0 iot.jackeryapp.com.",
+      "accept_shared_failed": "Impossible d'accepter l'appareil partagé. Vérifiez l'ID de l'appareil et l'ID du code QR, puis réessayez.",
+      "account_required": "Le compte ne doit pas être vide.",
+      "cannot_connect": "Impossible de se connecter à iot.jackeryapp.com.",
       "invalid_auth": "Adresse e-mail ou mot de passe invalide."
     },
     "step": {
@@ -27,39 +27,41 @@
           "dev_id": "ID de l'appareil",
           "qr_code_id": "ID du code QR"
         },
-        "description": "Acceptez une SolarVault partag\u00e9e avec le compte Jackery {username}. Saisissez l'ID de l'appareil et l'ID du code QR figurant dans l'invitation de partage. L'int\u00e9gration est ensuite recharg\u00e9e afin que les entit\u00e9s de l'appareil partag\u00e9 apparaissent.",
-        "title": "Accepter un appareil partag\u00e9"
+        "description": "Acceptez une SolarVault partagée avec le compte Jackery {username}. Saisissez l'ID de l'appareil et l'ID du code QR figurant dans l'invitation de partage. L'intégration est ensuite rechargée afin que les entités de l'appareil partagé apparaissent.",
+        "title": "Accepter un appareil partagé"
       },
       "reauth_confirm": {
         "data": {
           "password": "Mot de passe"
         },
-        "description": "Le mot de passe enregistr\u00e9 pour {username} ne fonctionne plus. Saisissez le mot de passe actuel pour restaurer la connexion.",
-        "title": "R\u00e9authentifier Jackery"
+        "description": "Le mot de passe enregistré pour {username} ne fonctionne plus. Saisissez le mot de passe actuel pour restaurer la connexion.",
+        "title": "Réauthentifier Jackery"
       },
       "reconfigure": {
         "menu_options": {
-          "accept_shared": "Accepter un appareil partag\u00e9",
-          "reconfigure_credentials": "Mettre \u00e0 jour les identifiants et les options",
+          "accept_shared": "Accepter un appareil partagé",
+          "reconfigure_credentials": "Mettre à jour les identifiants et les options",
           "shelly": "Associer les accessoires Shelly cloud"
         },
         "title": "Reconfigurer Jackery SolarVault"
       },
       "reconfigure_credentials": {
         "data": {
-          "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
-          "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
-          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
+          "create_calculated_power_sensors": "Créer des capteurs de puissance nette calculée",
+          "create_savings_detail_sensors": "Créer des capteurs de détail du calcul des économies",
+          "create_smart_meter_derived_sensors": "Créer des capteurs Smart Meter calculés",
           "enable_ble_transport": "Activer le transport BLE",
-          "enable_ble_writes": "Activer les \u00e9critures BLE exp\u00e9rimentales",
-          "enable_derived_home_energy_fallback": "Autoriser le fallback d'\u00e9nergie domicile d\u00e9riv\u00e9",
+          "enable_ble_writes": "Activer les écritures BLE expérimentales",
+          "enable_derived_home_energy_fallback": "Autoriser le fallback d'énergie domicile dérivé",
           "enable_month_statistics": "Importer les statistiques mensuelles",
-          "enable_unredacted_diagnostics": "Activer les diagnostics d\u00e9veloppeur non masqu\u00e9s",
+          "enable_unredacted_diagnostics": "Activer les diagnostics développeur non masqués",
           "enable_week_statistics": "Importer les statistiques hebdomadaires",
           "enable_year_statistics": "Importer les statistiques annuelles",
+          "local_mqtt_enable": "Activer l'écouteur MQTT local",
+          "local_mqtt_host": "Hôte du broker MQTT local",
           "password": "Mot de passe",
           "third_party_mqtt_enable": "Activer le pont MQTT tiers",
-          "third_party_mqtt_ip": "IP / nom d'h\u00f4te du broker MQTT tiers",
+          "third_party_mqtt_ip": "IP / nom d'hôte du broker MQTT tiers",
           "third_party_mqtt_password": "Mot de passe MQTT tiers",
           "third_party_mqtt_port": "Port du broker MQTT tiers",
           "third_party_mqtt_token": "Jeton MQTT tiers",
@@ -68,47 +70,49 @@
           "username": "Adresse e-mail"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
-          "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
+          "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
+          "create_savings_detail_sensors": "Crée des capteurs facultatifs pour le calcul des économies : économies calculées, énergie CA autoconsommée, prix, énergie perdue du système de batteries, énergie perdue de l'onduleur/conversion, résidu PV après autoconsommation et puissance instantanée calculée de perte onduleur/conversion. Désactivés par défaut car ce sont des valeurs intermédiaires de diagnostic.",
+          "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
           "enable_ble_writes": "Autorise les ecritures locales experimentales de commandes BLE lorsque le transport BLE est connecte. Desactive par defaut; a utiliser uniquement pour tester le controle direct du SolarVault.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, d\u00e9rive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs d\u00e9riv\u00e9es sont marqu\u00e9es dans les attributs et diagnostics de source.",
-          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_unredacted_diagnostics": "D\u00e9sactive le masquage dans l'export de diagnostics et le JSONL de debug des payloads pour le d\u00e9pannage local. Cela expose les identifiants, num\u00e9ros de s\u00e9rie, IDs d'appareil, topics MQTT et valeurs bluetoothKey. D\u00e9sactivez cette option avant de partager des fichiers.",
-          "enable_week_statistics": "Importe la charge utile de la p\u00e9riode hebdomadaire dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "third_party_mqtt_enable": "Demande \u00e0 la SolarVault de publier la t\u00e9l\u00e9m\u00e9trie vers votre propre broker MQTT (PROTOCOL.md \u00a75 / \u00a715). Exp\u00e9rimental : le relais REST cloud pour cette commande est bloqu\u00e9 c\u00f4t\u00e9 serveur, donc l'int\u00e9gration publie d'abord la trame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) directement via BLE, puis via MQTT cloud. Le nom d'utilisateur, le mot de passe et le jeton sont encod\u00e9s avec le codec ThirdPartMQTTConfig compatible avec l'application avant l'envoi.",
-          "third_party_mqtt_ip": "IP ou nom d'h\u00f4te de votre broker MQTT local, par exemple 192.168.x.x.",
+          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, dérive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs dérivées sont marquées dans les attributs et diagnostics de source.",
+          "enable_month_statistics": "Importe la charge utile de la période mensuelle dans les séries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "enable_unredacted_diagnostics": "Désactive le masquage dans l'export de diagnostics et le JSONL de debug des payloads pour le dépannage local. Cela expose les identifiants, numéros de série, IDs d'appareil, topics MQTT et valeurs bluetoothKey. Désactivez cette option avant de partager des fichiers.",
+          "enable_week_statistics": "Importe la charge utile de la période hebdomadaire dans les séries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "enable_year_statistics": "Importe la charge utile de la période annuelle dans les séries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "local_mqtt_enable": "S'abonne au broker MQTT local de la SolarVault pour la télémétrie LAN. Le MQTT cloud est mis en pause tant que la connexion locale est active ; l'API HTTP cloud continue d'interroger.",
+          "local_mqtt_host": "IP ou nom d'hôte du broker MQTT local vers lequel la SolarVault publie, par exemple 192.168.x.x.",
+          "third_party_mqtt_enable": "Demande à la SolarVault de publier la télémétrie vers votre propre broker MQTT (PROTOCOL.md §5 / §15). Expérimental : le relais REST cloud pour cette commande est bloqué côté serveur, donc l'intégration publie d'abord la trame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) directement via BLE, puis via MQTT cloud. Le nom d'utilisateur, le mot de passe et le jeton sont encodés avec le codec ThirdPartMQTTConfig compatible avec l'application avant l'envoi.",
+          "third_party_mqtt_ip": "IP ou nom d'hôte de votre broker MQTT local, par exemple 192.168.x.x.",
           "third_party_mqtt_password": "Mot de passe facultatif du broker MQTT.",
-          "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par d\u00e9faut est 1883.",
-          "third_party_mqtt_token": "Jeton du pont MQTT. Si laiss\u00e9 vide, l'int\u00e9gration g\u00e9n\u00e8re automatiquement un jeton de secours stable \u00e0 9 chiffres de style application.",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour l'abonnement du listener local. La valeur par d\u00e9faut est `homeassistant` ; ajustez-le au topic de votre broker si n\u00e9cessaire.",
+          "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par défaut est 1883.",
+          "third_party_mqtt_token": "Jeton du pont MQTT. Si laissé vide, l'intégration génère automatiquement un jeton de secours stable à 9 chiffres de style application.",
+          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour l'abonnement du listener local. La valeur par défaut est `homeassistant` ; ajustez-le au topic de votre broker si nécessaire.",
           "third_party_mqtt_username": "Nom d'utilisateur facultatif du broker MQTT. Laissez vide pour les brokers anonymes."
         },
-        "description": "Mettez \u00e0 jour le mot de passe et les interrupteurs de capteurs facultatifs du compte Jackery {username}. L'adresse e-mail doit correspondre au compte configur\u00e9 \u00e0 l'origine afin que l'ID unique de l'entr\u00e9e reste stable. Pour changer de compte, supprimez d'abord l'entr\u00e9e.",
+        "description": "Mettez à jour le mot de passe et les interrupteurs de capteurs facultatifs du compte Jackery {username}. L'adresse e-mail doit correspondre au compte configuré à l'origine afin que l'ID unique de l'entrée reste stable. Pour changer de compte, supprimez d'abord l'entrée.",
         "title": "Reconfigurer Jackery SolarVault"
       },
       "shelly": {
-        "description": "Associez les accessoires Shelly cloud (Cloud-to-Cloud) au compte Jackery {username}. Un navigateur s'ouvre pour autoriser Shelly ; le cloud Jackery finalise la liaison du compte. Revenez \u00e0 Home Assistant une fois l'autorisation effectu\u00e9e : l'int\u00e9gration confirme alors les appareils li\u00e9s et se recharge pour faire appara\u00eetre leurs entit\u00e9s.",
+        "description": "Associez les accessoires Shelly cloud (Cloud-to-Cloud) au compte Jackery {username}. Un navigateur s'ouvre pour autoriser Shelly ; le cloud Jackery finalise la liaison du compte. Revenez à Home Assistant une fois l'autorisation effectuée : l'intégration confirme alors les appareils liés et se recharge pour faire apparaître leurs entités.",
         "title": "Associer les accessoires Shelly cloud"
       },
       "user": {
         "data": {
-          "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
-          "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
-          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
+          "create_calculated_power_sensors": "Créer des capteurs de puissance nette calculée",
+          "create_savings_detail_sensors": "Créer des capteurs de détail du calcul des économies",
+          "create_smart_meter_derived_sensors": "Créer des capteurs Smart Meter calculés",
           "enable_ble_transport": "Activer le transport BLE",
           "password": "Mot de passe",
           "username": "Adresse e-mail"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
-          "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
+          "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
+          "create_savings_detail_sensors": "Crée des capteurs facultatifs pour le calcul des économies : économies calculées, énergie CA autoconsommée, prix, énergie perdue du système de batteries, énergie perdue de l'onduleur/conversion, résidu PV après autoconsommation et puissance instantanée calculée de perte onduleur/conversion. Désactivés par défaut car ce sont des valeurs intermédiaires de diagnostic.",
+          "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut."
         },
-        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la r\u00e9gion et les identifiants MQTT sont d\u00e9couverts automatiquement \u00e0 partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas expos\u00e9s.\n\nLes capteurs facultatifs de puissance nette calcul\u00e9e sont des d\u00e9rivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette sign\u00e9e suppl\u00e9mentaire pour les tableaux de bord.\n\nJackery autorise g\u00e9n\u00e9ralement une seule session active par compte. Gardez l'application Jackery d\u00e9connect\u00e9e du compte SolarVault lorsque Home Assistant doit recevoir les mises \u00e0 jour MQTT en direct. Si l'application est ouverte bri\u00e8vement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises \u00e0 jour en direct.",
+        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nJackery autorise généralement une seule session active par compte. Gardez l'application Jackery déconnectée du compte SolarVault lorsque Home Assistant doit recevoir les mises à jour MQTT en direct. Si l'application est ouverte brièvement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises à jour en direct.",
         "title": "Jackery SolarVault"
       }
     }
@@ -119,10 +123,10 @@
         "name": "EPS actif"
       },
       "eps_enabled": {
-        "name": "EPS activ\u00e9"
+        "name": "EPS activé"
       },
       "eth_connected": {
-        "name": "Ethernet connect\u00e9"
+        "name": "Ethernet connecté"
       },
       "online": {
         "name": "En ligne"
@@ -131,12 +135,12 @@
         "name": "Etat de la prise connectee"
       },
       "subdevice_alarm": {
-        "name": "Alarme de s\u00e9curit\u00e9"
+        "name": "Alarme de sécurité"
       }
     },
     "button": {
       "delete_storm_alert": {
-        "name": "Supprimer l\u2019alerte temp\u00eate"
+        "name": "Supprimer l’alerte tempête"
       },
       "portable_current_charge_plan": {
         "name": "Plan de charge actuel"
@@ -145,7 +149,7 @@
         "name": "Obtenir le plan de charge"
       },
       "portable_get_electricity_data_count": {
-        "name": "Obtenir le nombre de donn\u00e9es \u00e9lectriques"
+        "name": "Obtenir le nombre de données électriques"
       },
       "portable_get_peaks_troughs": {
         "name": "Obtenir les pics et les creux"
@@ -157,7 +161,7 @@
         "name": "Obtenir la configuration Wi-Fi"
       },
       "portable_power_off": {
-        "name": "\u00c9teindre"
+        "name": "Éteindre"
       },
       "portable_power_pack_blink": {
         "name": "Faire clignoter le pack batterie"
@@ -178,7 +182,7 @@
         "name": "Actualiser les informations de l'appareil"
       },
       "portable_refresh_electricity_count": {
-        "name": "Actualiser le nombre de donn\u00e9es \u00e9lectriques"
+        "name": "Actualiser le nombre de données électriques"
       },
       "portable_refresh_sub_ct": {
         "name": "Actualiser le sous-CT"
@@ -190,7 +194,7 @@
         "name": "Actualiser la liste Wi-Fi"
       },
       "portable_restart": {
-        "name": "Red\u00e9marrer l'appareil portable"
+        "name": "Redémarrer l'appareil portable"
       },
       "portable_send_time_zone": {
         "name": "Envoyer le fuseau horaire"
@@ -202,7 +206,7 @@
         "name": "Synchroniser le fuseau horaire"
       },
       "read_custom_mode_schedule": {
-        "name": "Lire le programme personnalis\u00e9"
+        "name": "Lire le programme personnalisé"
       },
       "read_smart_plug_schedule": {
         "name": "Lire le programme de prise intelligente"
@@ -211,10 +215,10 @@
         "name": "Lire le programme tarifaire"
       },
       "reboot_device": {
-        "name": "Red\u00e9marrer l'appareil"
+        "name": "Redémarrer l'appareil"
       },
       "refresh_battery_packs": {
-        "name": "Actualiser les batteries suppl\u00e9mentaires"
+        "name": "Actualiser les batteries supplémentaires"
       },
       "refresh_device_info": {
         "name": "Actualiser les informations appareil"
@@ -223,19 +227,19 @@
         "name": "Actualiser la version OTA appareil"
       },
       "refresh_meter_heads": {
-        "name": "Actualiser les t\u00eates de compteur"
+        "name": "Actualiser les têtes de compteur"
       },
       "refresh_smart_meter": {
         "name": "Actualiser le compteur intelligent / CT"
       },
       "refresh_smart_plugs": {
-        "name": "Actualiser les prises connect\u00e9es"
+        "name": "Actualiser les prises connectées"
       },
       "refresh_subdevice_combo": {
-        "name": "Actualiser les sous-appareils combin\u00e9s"
+        "name": "Actualiser les sous-appareils combinés"
       },
       "refresh_system_info": {
-        "name": "Actualiser les informations syst\u00e8me"
+        "name": "Actualiser les informations système"
       },
       "refresh_third_party_mqtt_config": {
         "name": "Actualiser la configuration MQTT tierce"
@@ -244,7 +248,7 @@
         "name": "Actualiser le fuseau horaire"
       },
       "refresh_weather_plan": {
-        "name": "Actualiser le plan m\u00e9t\u00e9o"
+        "name": "Actualiser le plan météo"
       },
       "refresh_wifi_config": {
         "name": "Actualiser la configuration Wi-Fi"
@@ -270,34 +274,34 @@
         "name": "Puissance de sortie maximale"
       },
       "portable_ac_countdown": {
-        "name": "Compte \u00e0 rebours de sortie CA"
+        "name": "Compte à rebours de sortie CA"
       },
       "portable_auto_shutdown_time": {
-        "name": "D\u00e9lai d'arr\u00eat automatique"
+        "name": "Délai d'arrêt automatique"
       },
       "portable_bluetooth_sleep": {
-        "name": "D\u00e9lai de veille Bluetooth"
+        "name": "Délai de veille Bluetooth"
       },
       "portable_charge_power": {
         "name": "Limite de puissance de charge"
       },
       "portable_dc_car_countdown": {
-        "name": "Compte \u00e0 rebours de sortie CC voiture"
+        "name": "Compte à rebours de sortie CC voiture"
       },
       "portable_dc_countdown": {
-        "name": "Compte \u00e0 rebours de sortie CC"
+        "name": "Compte à rebours de sortie CC"
       },
       "portable_dc_usb_countdown": {
-        "name": "Compte \u00e0 rebours de sortie USB CC"
+        "name": "Compte à rebours de sortie USB CC"
       },
       "portable_energy_storage_charge_limit": {
-        "name": "Limite de charge du stockage d'\u00e9nergie"
+        "name": "Limite de charge du stockage d'énergie"
       },
       "portable_output_priority": {
-        "name": "Mode de priorit\u00e9 de sortie"
+        "name": "Mode de priorité de sortie"
       },
       "portable_output_priority_soc": {
-        "name": "Seuil SOC de priorit\u00e9 de sortie"
+        "name": "Seuil SOC de priorité de sortie"
       },
       "single_tariff_price_set": {
         "name": "Prix du tarif unique"
@@ -306,7 +310,7 @@
         "name": "Limite de charge"
       },
       "soc_discharge_limit_set": {
-        "name": "Limite de d\u00e9charge"
+        "name": "Limite de décharge"
       },
       "third_party_mqtt_port": {
         "name": "Port MQTT tiers"
@@ -314,7 +318,7 @@
     },
     "select": {
       "auto_off_island_mode": {
-        "name": "Arr\u00eat auto (hors r\u00e9seau)",
+        "name": "Arrêt auto (hors réseau)",
         "state": {
           "h_12": "12 h",
           "h_2": "2 h",
@@ -333,28 +337,28 @@
         }
       },
       "electricity_price_mode": {
-        "name": "Mode de prix de l'\u00e9lectricit\u00e9",
+        "name": "Mode de prix de l'électricité",
         "state": {
-          "dynamic": "Prix dynamique de l'\u00e9lectricit\u00e9",
+          "dynamic": "Prix dynamique de l'électricité",
           "single": "Tarif fixe"
         }
       },
       "electricity_price_provider": {
-        "name": "Fournisseur de prix de l'\u00e9lectricit\u00e9"
+        "name": "Fournisseur de prix de l'électricité"
       },
       "portable_ac1_priority": {
-        "name": "Priorit\u00e9 de sortie CA1",
+        "name": "Priorité de sortie CA1",
         "state": {
           "battery-first": "Batterie d'abord",
-          "grid-first": "R\u00e9seau d'abord",
+          "grid-first": "Réseau d'abord",
           "solar-first": "Solaire d'abord"
         }
       },
       "portable_ac2_priority": {
-        "name": "Priorit\u00e9 de sortie CA2",
+        "name": "Priorité de sortie CA2",
         "state": {
           "battery-first": "Batterie d'abord",
-          "grid-first": "R\u00e9seau d'abord",
+          "grid-first": "Réseau d'abord",
           "solar-first": "Solaire d'abord"
         }
       },
@@ -367,41 +371,41 @@
         }
       },
       "portable_dc_priority": {
-        "name": "Priorit\u00e9 de sortie CC",
+        "name": "Priorité de sortie CC",
         "state": {
           "battery-first": "Batterie d'abord",
-          "grid-first": "R\u00e9seau d'abord",
+          "grid-first": "Réseau d'abord",
           "solar-first": "Solaire d'abord"
         }
       },
       "portable_output_priority": {
-        "name": "Priorit\u00e9 de sortie",
+        "name": "Priorité de sortie",
         "state": {
           "battery-first": "Batterie d'abord",
-          "grid-first": "R\u00e9seau d'abord",
+          "grid-first": "Réseau d'abord",
           "solar-first": "Solaire d'abord"
         }
       },
       "portable_power_mode": {
         "name": "Mode de puissance",
         "state": {
-          "eco": "\u00c9co",
+          "eco": "Éco",
           "performance": "Performance",
           "standard": "Standard"
         }
       },
       "portable_ups_model": {
-        "name": "Mod\u00e8le UPS",
+        "name": "Modèle UPS",
         "state": {
           "agm": "agm",
-          "custom": "Personnalis\u00e9",
+          "custom": "Personnalisé",
           "gel": "gel",
           "lifepo4": "LiFePO4",
           "standard": "Standard"
         }
       },
       "storm_warning_minutes_select": {
-        "name": "Pr\u00e9avis d'alerte temp\u00eate",
+        "name": "Préavis d'alerte tempête",
         "state": {
           "min_1020": "17 h",
           "min_1080": "18 h",
@@ -432,17 +436,17 @@
         }
       },
       "temp_unit_select": {
-        "name": "Unit\u00e9 de temp\u00e9rature",
+        "name": "Unité de température",
         "state": {
           "celsius": "Celsius",
           "fahrenheit": "Fahrenheit"
         }
       },
       "work_mode_select": {
-        "name": "Mode d'utilisation de l'\u00e9nergie",
+        "name": "Mode d'utilisation de l'énergie",
         "state": {
           "ai_smart": "Mode intelligent IA",
-          "custom": "Mode personnalis\u00e9",
+          "custom": "Mode personnalisé",
           "self_use": "Autoconsommation",
           "tariff": "Mode tarif"
         }
@@ -450,7 +454,7 @@
     },
     "sensor": {
       "ability_bits": {
-        "name": "Indicateurs de capacit\u00e9"
+        "name": "Indicateurs de capacité"
       },
       "ac1_name": {
         "name": "Nom de sortie CA1"
@@ -459,19 +463,19 @@
         "name": "Nom de sortie CA2"
       },
       "ac_discharge_current": {
-        "name": "Courant de d\u00e9charge CA"
+        "name": "Courant de décharge CA"
       },
       "ac_discharge_time": {
-        "name": "Temps de d\u00e9charge CA"
+        "name": "Temps de décharge CA"
       },
       "ac_input_current": {
-        "name": "Courant d'entr\u00e9e CA"
+        "name": "Courant d'entrée CA"
       },
       "ac_input_power": {
-        "name": "Puissance d'entr\u00e9e CA"
+        "name": "Puissance d'entrée CA"
       },
       "ac_input_power_alt": {
-        "name": "Puissance d'entr\u00e9e CA (alt)"
+        "name": "Puissance d'entrée CA (alt)"
       },
       "ac_line1_current": {
         "name": "Courant ligne CA 1"
@@ -489,7 +493,7 @@
         "name": "Puissance apparente de sortie CA"
       },
       "ac_output_apparent_power_parallel": {
-        "name": "Puissance apparente CA (parall\u00e8le)"
+        "name": "Puissance apparente CA (parallèle)"
       },
       "ac_output_apparent_power_sum": {
         "name": "Puissance apparente CA (somme)"
@@ -504,7 +508,7 @@
         "name": "Courant de sortie CA 2"
       },
       "ac_output_frequency": {
-        "name": "Fr\u00e9quence de sortie CA"
+        "name": "Fréquence de sortie CA"
       },
       "ac_output_mode": {
         "name": "Mode de sortie CA"
@@ -528,7 +532,7 @@
         "name": "Alarmes actives"
       },
       "ambient_temperature": {
-        "name": "Temp\u00e9rature ambiante"
+        "name": "Température ambiante"
       },
       "auto_standby": {
         "name": "Mode veille automatique"
@@ -552,55 +556,55 @@
         "name": "Nombre de batteries"
       },
       "battery_discharge_month_energy": {
-        "name": "\u00c9nergie mensuelle de d\u00e9charge de la batterie"
+        "name": "Énergie mensuelle de décharge de la batterie"
       },
       "battery_discharge_power": {
-        "name": "Puissance de d\u00e9charge de la batterie principale"
+        "name": "Puissance de décharge de la batterie principale"
       },
       "battery_discharge_week_energy": {
-        "name": "\u00c9nergie hebdomadaire de d\u00e9charge de la batterie"
+        "name": "Énergie hebdomadaire de décharge de la batterie"
       },
       "battery_discharge_year_energy": {
-        "name": "\u00c9nergie annuelle de d\u00e9charge de la batterie"
+        "name": "Énergie annuelle de décharge de la batterie"
       },
       "battery_low_state": {
-        "name": "\u00c9tat batterie faible"
+        "name": "État batterie faible"
       },
       "battery_net_power": {
         "name": "Puissance nette de la batterie principale"
       },
       "battery_pack_cell_temperature": {
-        "name": "Temp\u00e9rature des cellules du pack batterie"
+        "name": "Température des cellules du pack batterie"
       },
       "battery_pack_charge_power": {
         "name": "Puissance de charge du pack batterie"
       },
       "battery_pack_communication_state": {
-        "name": "\u00c9tat de communication du pack batterie"
+        "name": "État de communication du pack batterie"
       },
       "battery_pack_count": {
         "name": "Nombre de packs batterie"
       },
       "battery_pack_discharge_power": {
-        "name": "Puissance de d\u00e9charge du pack batterie"
+        "name": "Puissance de décharge du pack batterie"
       },
       "battery_pack_firmware_version": {
         "name": "Version du firmware du pack batterie"
       },
       "battery_pack_lifetime_charge_energy": {
-        "name": "\u00c9nergie totale charg\u00e9e du pack batterie"
+        "name": "Énergie totale chargée du pack batterie"
       },
       "battery_pack_lifetime_discharge_energy": {
-        "name": "\u00c9nergie totale d\u00e9charg\u00e9e du pack batterie"
+        "name": "Énergie totale déchargée du pack batterie"
       },
       "battery_pack_serial_number": {
-        "name": "Num\u00e9ro de s\u00e9rie du pack batterie"
+        "name": "Numéro de série du pack batterie"
       },
       "battery_pack_soc": {
         "name": "SOC du pack batterie"
       },
       "battery_pack_update_status": {
-        "name": "\u00c9tat de mise \u00e0 jour du pack batterie"
+        "name": "État de mise à jour du pack batterie"
       },
       "battery_soc": {
         "name": "Niveau total de batterie"
@@ -609,19 +613,19 @@
         "name": "Niveau de la batterie principale"
       },
       "battery_stack_net_power": {
-        "name": "Puissance nette du syst\u00e8me de batteries"
+        "name": "Puissance nette du système de batteries"
       },
       "battery_state": {
-        "name": "\u00c9tat de la batterie"
+        "name": "État de la batterie"
       },
       "battery_temperature": {
-        "name": "Temp\u00e9rature de la batterie"
+        "name": "Température de la batterie"
       },
       "ble_transport": {
         "name": "Transport BLE"
       },
       "box_mode": {
-        "name": "Mode bo\u00eetier"
+        "name": "Mode boîtier"
       },
       "breaker_pc": {
         "name": "Configuration de puissance du disjoncteur"
@@ -636,10 +640,10 @@
         "name": "Puissance de phase du disjoncteur"
       },
       "cell_temperature": {
-        "name": "Temp\u00e9rature des cellules de la batterie principale"
+        "name": "Température des cellules de la batterie principale"
       },
       "charge_input_power_portable": {
-        "name": "Puissance d'entr\u00e9e de charge"
+        "name": "Puissance d'entrée de charge"
       },
       "charge_limit": {
         "name": "Limite de charge"
@@ -651,25 +655,25 @@
         "name": "Puissance du plan de charge"
       },
       "charge_status": {
-        "name": "\u00c9tat de charge"
+        "name": "État de charge"
       },
       "charge_status_code": {
-        "name": "Code d'\u00e9tat de charge"
+        "name": "Code d'état de charge"
       },
       "charge_status_limit": {
-        "name": "Limite d'\u00e9tat de charge"
+        "name": "Limite d'état de charge"
       },
       "charge_status_type": {
-        "name": "Type d'\u00e9tat de charge"
+        "name": "Type d'état de charge"
       },
       "charging_input_power": {
-        "name": "Puissance d'entr\u00e9e de charge"
+        "name": "Puissance d'entrée de charge"
       },
       "cloud_mqtt": {
         "name": "MQTT cloud"
       },
       "conversion_loss_power": {
-        "name": "Puissance calcul\u00e9e de perte onduleur/conversion"
+        "name": "Puissance calculée de perte onduleur/conversion"
       },
       "country_code": {
         "name": "Code pays"
@@ -699,7 +703,7 @@
         "name": "Export reseau CT annuel"
       },
       "ct_state": {
-        "name": "\u00c9tat CT"
+        "name": "État CT"
       },
       "dc_output_config": {
         "name": "Configuration de sortie CC"
@@ -711,7 +715,7 @@
         "name": "Puissance de sortie CC"
       },
       "dc_output_type": {
-        "name": "D\u00e9tail du type de sortie CC"
+        "name": "Détail du type de sortie CC"
       },
       "dc_output_voltage": {
         "name": "Tension de sortie CC"
@@ -720,157 +724,157 @@
         "name": "Type de sortie CC"
       },
       "dc_usb_connected": {
-        "name": "USB CC connect\u00e9"
+        "name": "USB CC connecté"
       },
       "dc_usb_type": {
         "name": "Type d'USB CC"
       },
       "default_power": {
-        "name": "Puissance de charge par d\u00e9faut"
+        "name": "Puissance de charge par défaut"
       },
       "device_activation": {
         "name": "Activation de l'appareil"
       },
       "device_ongrid_input_month_energy": {
-        "name": "Entr\u00e9e mensuelle c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Entrée mensuelle côté réseau de l'appareil"
       },
       "device_ongrid_input_week_energy": {
-        "name": "Entr\u00e9e hebdomadaire c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Entrée hebdomadaire côté réseau de l'appareil"
       },
       "device_ongrid_input_year_energy": {
-        "name": "Entr\u00e9e annuelle c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Entrée annuelle côté réseau de l'appareil"
       },
       "device_ongrid_output_month_energy": {
-        "name": "Sortie mensuelle c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Sortie mensuelle côté réseau de l'appareil"
       },
       "device_ongrid_output_week_energy": {
-        "name": "Sortie hebdomadaire c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Sortie hebdomadaire côté réseau de l'appareil"
       },
       "device_ongrid_output_year_energy": {
-        "name": "Sortie annuelle c\u00f4t\u00e9 r\u00e9seau de l'appareil"
+        "name": "Sortie annuelle côté réseau de l'appareil"
       },
       "device_pv1_day_energy": {
-        "name": "\u00c9nergie PV1 quotidienne"
+        "name": "Énergie PV1 quotidienne"
       },
       "device_pv1_month_energy": {
-        "name": "\u00c9nergie PV1 mensuelle"
+        "name": "Énergie PV1 mensuelle"
       },
       "device_pv1_week_energy": {
-        "name": "\u00c9nergie PV1 hebdomadaire"
+        "name": "Énergie PV1 hebdomadaire"
       },
       "device_pv1_year_energy": {
-        "name": "\u00c9nergie PV1 annuelle"
+        "name": "Énergie PV1 annuelle"
       },
       "device_pv2_day_energy": {
-        "name": "\u00c9nergie PV2 quotidienne"
+        "name": "Énergie PV2 quotidienne"
       },
       "device_pv2_month_energy": {
-        "name": "\u00c9nergie PV2 mensuelle"
+        "name": "Énergie PV2 mensuelle"
       },
       "device_pv2_week_energy": {
-        "name": "\u00c9nergie PV2 hebdomadaire"
+        "name": "Énergie PV2 hebdomadaire"
       },
       "device_pv2_year_energy": {
-        "name": "\u00c9nergie PV2 annuelle"
+        "name": "Énergie PV2 annuelle"
       },
       "device_pv3_day_energy": {
-        "name": "\u00c9nergie PV3 quotidienne"
+        "name": "Énergie PV3 quotidienne"
       },
       "device_pv3_month_energy": {
-        "name": "\u00c9nergie PV3 mensuelle"
+        "name": "Énergie PV3 mensuelle"
       },
       "device_pv3_week_energy": {
-        "name": "\u00c9nergie PV3 hebdomadaire"
+        "name": "Énergie PV3 hebdomadaire"
       },
       "device_pv3_year_energy": {
-        "name": "\u00c9nergie PV3 annuelle"
+        "name": "Énergie PV3 annuelle"
       },
       "device_pv4_day_energy": {
-        "name": "\u00c9nergie PV4 quotidienne"
+        "name": "Énergie PV4 quotidienne"
       },
       "device_pv4_month_energy": {
-        "name": "\u00c9nergie PV4 mensuelle"
+        "name": "Énergie PV4 mensuelle"
       },
       "device_pv4_week_energy": {
-        "name": "\u00c9nergie PV4 hebdomadaire"
+        "name": "Énergie PV4 hebdomadaire"
       },
       "device_pv4_year_energy": {
-        "name": "\u00c9nergie PV4 annuelle"
+        "name": "Énergie PV4 annuelle"
       },
       "device_today_battery_charge": {
         "name": "Charge batterie de l'appareil aujourd'hui"
       },
       "device_today_battery_discharge": {
-        "name": "D\u00e9charge batterie de l'appareil aujourd'hui"
+        "name": "Décharge batterie de l'appareil aujourd'hui"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Appareil batterie\u2192r\u00e9seau aujourd'hui"
+        "name": "Appareil batterie→réseau aujourd'hui"
       },
       "device_today_ongrid_input": {
-        "name": "Entr\u00e9e c\u00f4t\u00e9 r\u00e9seau de l'appareil aujourd'hui"
+        "name": "Entrée côté réseau de l'appareil aujourd'hui"
       },
       "device_today_ongrid_output": {
-        "name": "Sortie c\u00f4t\u00e9 r\u00e9seau de l'appareil aujourd'hui"
+        "name": "Sortie côté réseau de l'appareil aujourd'hui"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Appareil r\u00e9seau\u2192batterie aujourd'hui"
+        "name": "Appareil réseau→batterie aujourd'hui"
       },
       "device_today_pv_energy": {
         "name": "PV de l'appareil aujourd'hui"
       },
       "device_today_pv_to_battery": {
-        "name": "Appareil PV\u2192batterie aujourd'hui"
+        "name": "Appareil PV→batterie aujourd'hui"
       },
       "dhg_recall": {
         "name": "Rappel DHG"
       },
       "discharge_limit": {
-        "name": "Limite de d\u00e9charge"
+        "name": "Limite de décharge"
       },
       "discharge_time": {
-        "name": "Temps de d\u00e9charge"
+        "name": "Temps de décharge"
       },
       "energy_plan_power": {
-        "name": "Puissance du plan \u00e9nerg\u00e9tique"
+        "name": "Puissance du plan énergétique"
       },
       "eps_in_power": {
-        "name": "Puissance d'entr\u00e9e EPS"
+        "name": "Puissance d'entrée EPS"
       },
       "eps_input_day_energy": {
-        "name": "\u00c9nergie d'entr\u00e9e EPS quotidienne"
+        "name": "Énergie d'entrée EPS quotidienne"
       },
       "eps_input_month_energy": {
-        "name": "\u00c9nergie d'entr\u00e9e EPS mensuelle"
+        "name": "Énergie d'entrée EPS mensuelle"
       },
       "eps_input_week_energy": {
-        "name": "\u00c9nergie d'entr\u00e9e EPS hebdomadaire"
+        "name": "Énergie d'entrée EPS hebdomadaire"
       },
       "eps_input_year_energy": {
-        "name": "\u00c9nergie d'entr\u00e9e EPS annuelle"
+        "name": "Énergie d'entrée EPS annuelle"
       },
       "eps_out_power": {
         "name": "Puissance de sortie EPS"
       },
       "eps_output_day_energy": {
-        "name": "\u00c9nergie de sortie EPS quotidienne"
+        "name": "Énergie de sortie EPS quotidienne"
       },
       "eps_output_month_energy": {
-        "name": "\u00c9nergie de sortie EPS mensuelle"
+        "name": "Énergie de sortie EPS mensuelle"
       },
       "eps_output_week_energy": {
-        "name": "\u00c9nergie de sortie EPS hebdomadaire"
+        "name": "Énergie de sortie EPS hebdomadaire"
       },
       "eps_output_year_energy": {
-        "name": "\u00c9nergie de sortie EPS annuelle"
+        "name": "Énergie de sortie EPS annuelle"
       },
       "eps_switch_state": {
-        "name": "\u00c9tat de l'interrupteur EPS"
+        "name": "État de l'interrupteur EPS"
       },
       "error_code": {
         "name": "Code d'erreur"
       },
       "eth_port": {
-        "name": "\u00c9tat du port Ethernet"
+        "name": "État du port Ethernet"
       },
       "ethernet_ip": {
         "name": "Adresse IP Ethernet"
@@ -882,70 +886,76 @@
         "name": "Port Ethernet"
       },
       "external_pack_connected": {
-        "name": "Pack batterie externe connect\u00e9"
+        "name": "Pack batterie externe connecté"
       },
       "firmware_version": {
         "name": "Version du firmware"
       },
       "follow_meter_state": {
-        "name": "\u00c9tat de suivi du compteur"
+        "name": "État de suivi du compteur"
       },
       "function_enable_flags": {
-        "name": "Indicateurs de fonctions activ\u00e9es"
+        "name": "Indicateurs de fonctions activées"
       },
       "grid_in_power": {
-        "name": "Entr\u00e9e c\u00f4t\u00e9 r\u00e9seau"
+        "name": "Import réseau"
       },
       "grid_net_power": {
-        "name": "Puissance nette c\u00f4t\u00e9 r\u00e9seau"
+        "name": "Puissance nette côté réseau"
       },
       "grid_out_power": {
-        "name": "Sortie c\u00f4t\u00e9 r\u00e9seau"
+        "name": "Export réseau"
       },
       "grid_standard": {
-        "name": "Norme r\u00e9seau"
+        "name": "Norme réseau"
       },
       "grid_state": {
-        "name": "\u00c9tat du r\u00e9seau"
+        "name": "État du réseau"
       },
       "home_consumption_power": {
         "name": "Puissance de consommation domestique"
       },
       "home_month_energy": {
-        "name": "\u00c9nergie mensuelle de consommation domestique"
+        "name": "Énergie mensuelle de consommation domestique"
       },
       "home_week_energy": {
-        "name": "\u00c9nergie hebdomadaire de consommation domestique"
+        "name": "Énergie hebdomadaire de consommation domestique"
       },
       "home_year_energy": {
-        "name": "\u00c9nergie annuelle de consommation domestique"
+        "name": "Énergie annuelle de consommation domestique"
       },
       "http_api": {
         "name": "API HTTP cloud"
       },
       "input_power_allocation": {
-        "name": "R\u00e9partition de la puissance d'entr\u00e9e"
+        "name": "Répartition de la puissance d'entrée"
       },
       "input_power_portable": {
-        "name": "Puissance d'entr\u00e9e totale"
+        "name": "Puissance d'entrée totale"
       },
       "input_temperature": {
-        "name": "Temp\u00e9rature d'entr\u00e9e"
+        "name": "Température d'entrée"
+      },
+      "inverter_ac_input_power": {
+        "name": "Entrée CA de l'onduleur"
+      },
+      "inverter_ac_output_power": {
+        "name": "Sortie CA de l'onduleur"
       },
       "last_offline": {
-        "name": "Derni\u00e8re d\u00e9connexion"
+        "name": "Dernière déconnexion"
       },
       "last_online": {
-        "name": "Derni\u00e8re connexion"
+        "name": "Dernière connexion"
       },
       "last_update": {
-        "name": "Derni\u00e8re mise \u00e0 jour"
+        "name": "Dernière mise à jour"
       },
       "latitude": {
         "name": "Latitude"
       },
       "light_sensor": {
-        "name": "Capteur de luminosit\u00e9"
+        "name": "Capteur de luminosité"
       },
       "load_mode": {
         "name": "Mode de charge"
@@ -972,10 +982,10 @@
         "name": "Puissance de sortie maximale"
       },
       "max_system_input_power": {
-        "name": "Puissance d'entr\u00e9e maximale du syst\u00e8me"
+        "name": "Puissance d'entrée maximale du système"
       },
       "max_system_output_power": {
-        "name": "Puissance de sortie maximale du syst\u00e8me"
+        "name": "Puissance de sortie maximale du système"
       },
       "meter_head_charging_energy": {
         "name": "Energie de charge du compteur"
@@ -1002,28 +1012,28 @@
         "name": "Puissance de sortie du compteur"
       },
       "off_grid_shutdown_state": {
-        "name": "\u00c9tat d'arr\u00eat hors r\u00e9seau"
+        "name": "État d'arrêt hors réseau"
       },
       "off_grid_time": {
-        "name": "Minuteur d'arr\u00eat hors r\u00e9seau"
+        "name": "Minuteur d'arrêt hors réseau"
       },
       "ongrid_state": {
-        "name": "\u00c9tat connect\u00e9 au r\u00e9seau"
+        "name": "État connecté au réseau"
       },
       "other_load_power": {
         "name": "Puissance des autres charges"
       },
       "output_power_allocation": {
-        "name": "R\u00e9partition de la puissance de sortie"
+        "name": "Répartition de la puissance de sortie"
       },
       "output_power_portable": {
         "name": "Puissance de sortie totale"
       },
       "output_temperature": {
-        "name": "Temp\u00e9rature de sortie"
+        "name": "Température de sortie"
       },
       "panel_temperature": {
-        "name": "Temp\u00e9rature du panneau"
+        "name": "Température du panneau"
       },
       "power_count": {
         "name": "Nombre de puissance"
@@ -1038,10 +1048,10 @@
         "name": "Mode de puissance"
       },
       "power_price": {
-        "name": "Prix de l'\u00e9lectricit\u00e9"
+        "name": "Prix de l'électricité"
       },
       "power_source_selector": {
-        "name": "S\u00e9lecteur de source d'alimentation"
+        "name": "Sélecteur de source d'alimentation"
       },
       "pv1_power": {
         "name": "PV1"
@@ -1056,7 +1066,7 @@
         "name": "PV4"
       },
       "pv_month_energy": {
-        "name": "\u00c9nergie PV mensuelle"
+        "name": "Énergie PV mensuelle"
       },
       "pv_power_total": {
         "name": "Puissance PV totale"
@@ -1074,37 +1084,37 @@
         "name": "Revenu PV annuel"
       },
       "pv_week_energy": {
-        "name": "\u00c9nergie PV hebdomadaire"
+        "name": "Énergie PV hebdomadaire"
       },
       "pv_year_energy": {
-        "name": "\u00c9nergie PV annuelle"
+        "name": "Énergie PV annuelle"
       },
       "raw_properties": {
-        "name": "Propri\u00e9t\u00e9s brutes"
+        "name": "Propriétés brutes"
       },
       "reboot_flag": {
-        "name": "Indicateur de red\u00e9marrage"
+        "name": "Indicateur de redémarrage"
       },
       "remaining_runtime": {
         "name": "Autonomie restante"
       },
       "savings_battery_loss_year_energy": {
-        "name": "\u00c9nergie annuelle perdue du syst\u00e8me de batteries"
+        "name": "Énergie annuelle perdue du système de batteries"
       },
       "savings_calculated_total": {
-        "name": "\u00c9conomies calcul\u00e9es"
+        "name": "Économies calculées"
       },
       "savings_conversion_loss_year_energy": {
-        "name": "\u00c9nergie annuelle perdue onduleur/conversion"
+        "name": "Énergie annuelle perdue onduleur/conversion"
       },
       "savings_energy": {
-        "name": "\u00c9nergie CA autoconsomm\u00e9e"
+        "name": "Énergie CA autoconsommée"
       },
       "savings_price": {
-        "name": "Prix des \u00e9conomies"
+        "name": "Prix des économies"
       },
       "savings_pv_residual_year_energy": {
-        "name": "\u00c9nergie PV r\u00e9siduelle annuelle apr\u00e8s autoconsommation"
+        "name": "Énergie PV résiduelle annuelle après autoconsommation"
       },
       "sleep_mode_flag": {
         "name": "Indicateur de mode veille"
@@ -1119,16 +1129,16 @@
         "name": "Mode de communication du Smart Meter"
       },
       "smart_meter_export_month_energy": {
-        "name": "Export r\u00e9seau mensuel du Smart Meter"
+        "name": "Export réseau mensuel du Smart Meter"
       },
       "smart_meter_export_week_energy": {
-        "name": "Export r\u00e9seau hebdomadaire du Smart Meter"
+        "name": "Export réseau hebdomadaire du Smart Meter"
       },
       "smart_meter_export_year_energy": {
-        "name": "Export r\u00e9seau annuel du Smart Meter"
+        "name": "Export réseau annuel du Smart Meter"
       },
       "smart_meter_frequency": {
-        "name": "Fr\u00e9quence du Smart Meter"
+        "name": "Fréquence du Smart Meter"
       },
       "smart_meter_fun_form": {
         "name": "Forme de fonction du Smart Meter"
@@ -1143,22 +1153,22 @@
         "name": "Puissance brute d'import par phase du Smart Meter"
       },
       "smart_meter_import_month_energy": {
-        "name": "Import r\u00e9seau mensuel du Smart Meter"
+        "name": "Import réseau mensuel du Smart Meter"
       },
       "smart_meter_import_week_energy": {
-        "name": "Import r\u00e9seau hebdomadaire du Smart Meter"
+        "name": "Import réseau hebdomadaire du Smart Meter"
       },
       "smart_meter_import_year_energy": {
-        "name": "Import r\u00e9seau annuel du Smart Meter"
+        "name": "Import réseau annuel du Smart Meter"
       },
       "smart_meter_ip_address": {
         "name": "Adresse IP du Smart Meter"
       },
       "smart_meter_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total du Smart Meter"
+        "name": "Export réseau total du Smart Meter"
       },
       "smart_meter_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total du Smart Meter"
+        "name": "Import réseau total du Smart Meter"
       },
       "smart_meter_mac_address": {
         "name": "Adresse MAC du Smart Meter"
@@ -1170,10 +1180,10 @@
         "name": "Puissance nette d'import du Smart Meter"
       },
       "smart_meter_panel_charging_energy": {
-        "name": "\u00c9nergie de charge du panneau Smart Meter"
+        "name": "Énergie de charge du panneau Smart Meter"
       },
       "smart_meter_panel_discharging_energy": {
-        "name": "\u00c9nergie de d\u00e9charge du panneau Smart Meter"
+        "name": "Énergie de décharge du panneau Smart Meter"
       },
       "smart_meter_phase_1_apparent_power": {
         "name": "Puissance apparente phase 1 du Smart Meter"
@@ -1182,10 +1192,10 @@
         "name": "Courant phase 1 du Smart Meter"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 1 du Smart Meter"
+        "name": "Export réseau total phase 1 du Smart Meter"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 1 du Smart Meter"
+        "name": "Import réseau total phase 1 du Smart Meter"
       },
       "smart_meter_phase_1_power": {
         "name": "Puissance phase 1 du Smart Meter"
@@ -1194,7 +1204,7 @@
         "name": "Facteur de puissance phase 1 du Smart Meter"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "Puissance r\u00e9active phase 1 du Smart Meter"
+        "name": "Puissance réactive phase 1 du Smart Meter"
       },
       "smart_meter_phase_1_voltage": {
         "name": "Tension phase 1 du Smart Meter"
@@ -1206,10 +1216,10 @@
         "name": "Courant phase 2 du Smart Meter"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 2 du Smart Meter"
+        "name": "Export réseau total phase 2 du Smart Meter"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 2 du Smart Meter"
+        "name": "Import réseau total phase 2 du Smart Meter"
       },
       "smart_meter_phase_2_power": {
         "name": "Puissance phase 2 du Smart Meter"
@@ -1218,7 +1228,7 @@
         "name": "Facteur de puissance phase 2 du Smart Meter"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "Puissance r\u00e9active phase 2 du Smart Meter"
+        "name": "Puissance réactive phase 2 du Smart Meter"
       },
       "smart_meter_phase_2_voltage": {
         "name": "Tension phase 2 du Smart Meter"
@@ -1230,10 +1240,10 @@
         "name": "Courant phase 3 du Smart Meter"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 3 du Smart Meter"
+        "name": "Export réseau total phase 3 du Smart Meter"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 3 du Smart Meter"
+        "name": "Import réseau total phase 3 du Smart Meter"
       },
       "smart_meter_phase_3_power": {
         "name": "Puissance phase 3 du Smart Meter"
@@ -1242,7 +1252,7 @@
         "name": "Facteur de puissance phase 3 du Smart Meter"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "Puissance r\u00e9active phase 3 du Smart Meter"
+        "name": "Puissance réactive phase 3 du Smart Meter"
       },
       "smart_meter_phase_3_voltage": {
         "name": "Tension phase 3 du Smart Meter"
@@ -1254,7 +1264,7 @@
         "name": "Facteur de puissance du Smart Meter"
       },
       "smart_meter_reactive_power": {
-        "name": "Puissance r\u00e9active du Smart Meter"
+        "name": "Puissance réactive du Smart Meter"
       },
       "smart_meter_voltage": {
         "name": "Tension du Smart Meter"
@@ -1263,10 +1273,10 @@
         "name": "Mode intelligent actif"
       },
       "smart_mode_time_difference": {
-        "name": "Diff\u00e9rence de temps du mode intelligent"
+        "name": "Différence de temps du mode intelligent"
       },
       "smart_plug_communication_mode": {
-        "name": "Mode de communication de la prise connect\u00e9e"
+        "name": "Mode de communication de la prise connectée"
       },
       "smart_plug_communication_state": {
         "name": "Etat de communication de la prise connectee"
@@ -1278,13 +1288,13 @@
         "name": "Puissance d'entree de la prise connectee"
       },
       "smart_plug_ip_address": {
-        "name": "Adresse IP de la prise connect\u00e9e"
+        "name": "Adresse IP de la prise connectée"
       },
       "smart_plug_last_update_ts": {
-        "name": "Horodatage de derni\u00e8re mise \u00e0 jour de la prise connect\u00e9e"
+        "name": "Horodatage de dernière mise à jour de la prise connectée"
       },
       "smart_plug_mac_address": {
-        "name": "Adresse MAC de la prise connect\u00e9e"
+        "name": "Adresse MAC de la prise connectée"
       },
       "smart_plug_output_power": {
         "name": "Puissance de sortie de la prise connectee"
@@ -1293,7 +1303,7 @@
         "name": "Priorite de la prise connectee"
       },
       "smart_plug_switch_cycle": {
-        "name": "Cycle de commutation de la prise connect\u00e9e"
+        "name": "Cycle de commutation de la prise connectée"
       },
       "smart_plug_today_energy": {
         "name": "Energie journaliere de la prise connectee"
@@ -1305,76 +1315,76 @@
         "name": "Limite de charge"
       },
       "soc_discharge_limit": {
-        "name": "Limite de d\u00e9charge"
+        "name": "Limite de décharge"
       },
       "stack_in_power": {
-        "name": "Puissance de charge du syst\u00e8me de batteries"
+        "name": "Puissance de charge du système de batteries"
       },
       "stack_out_power": {
-        "name": "Puissance de d\u00e9charge du syst\u00e8me de batteries"
+        "name": "Puissance de décharge du système de batteries"
       },
       "standby_power": {
         "name": "Puissance en veille"
       },
       "storm_warning_enabled": {
-        "name": "Alerte temp\u00eate activ\u00e9e"
+        "name": "Alerte tempête activée"
       },
       "storm_warning_minutes": {
-        "name": "Pr\u00e9avis d'alerte temp\u00eate"
+        "name": "Préavis d'alerte tempête"
       },
       "subdevice_alert_count": {
         "name": "Nombre d'alertes du sous-appareil"
       },
       "symmetry_total_negative": {
-        "name": "\u00c9nergie n\u00e9gative totale (sym\u00e9trie)"
+        "name": "Énergie négative totale (symétrie)"
       },
       "symmetry_total_positive": {
-        "name": "\u00c9nergie positive totale (sym\u00e9trie)"
+        "name": "Énergie positive totale (symétrie)"
       },
       "system_state": {
-        "name": "\u00c9tat du syst\u00e8me"
+        "name": "État du système"
       },
       "system_status_switch": {
-        "name": "\u00c9tat du syst\u00e8me"
+        "name": "État du système"
       },
       "task_plan": {
-        "name": "Plan des t\u00e2ches"
+        "name": "Plan des tâches"
       },
       "temp_unit": {
-        "name": "Unit\u00e9 de temp\u00e9rature"
+        "name": "Unité de température"
       },
       "timezone": {
         "name": "Fuseau horaire"
       },
       "today_battery_energy": {
-        "name": "\u00c9nergie batterie aujourd'hui"
+        "name": "Énergie batterie aujourd'hui"
       },
       "today_feed_in_energy": {
-        "name": "\u00c9nergie inject\u00e9e aujourd'hui"
+        "name": "Énergie injectée aujourd'hui"
       },
       "today_grid_import_energy": {
-        "name": "Import r\u00e9seau aujourd'hui"
+        "name": "Import réseau aujourd'hui"
       },
       "today_home_load_energy": {
         "name": "Consommation domestique aujourd'hui"
       },
       "today_load": {
-        "name": "Sortie quotidienne c\u00f4t\u00e9 r\u00e9seau (cloud Jackery)"
+        "name": "Sortie quotidienne côté réseau (cloud Jackery)"
       },
       "total_carbon_saved": {
-        "name": "CO\u2082 total \u00e9conomis\u00e9"
+        "name": "CO₂ total économisé"
       },
       "total_generation": {
         "name": "Production PV totale"
       },
       "total_revenue": {
-        "name": "\u00c9conomies totales de l'app"
+        "name": "Économies totales de l'app"
       },
       "total_time": {
         "name": "Temps total"
       },
       "tou_plan_tasks": {
-        "name": "T\u00e2ches du plan TOU"
+        "name": "Tâches du plan TOU"
       },
       "ups_mode": {
         "name": "Mode UPS"
@@ -1398,7 +1408,7 @@
         "name": "Puissance USB-C3"
       },
       "weather_plan": {
-        "name": "Plan m\u00e9t\u00e9o"
+        "name": "Plan météo"
       },
       "wifi_ip": {
         "name": "Adresse IP"
@@ -1416,7 +1426,7 @@
         "name": "SSID WiFi"
       },
       "wifi_switch_status": {
-        "name": "\u00c9tat du commutateur WiFi"
+        "name": "État du commutateur WiFi"
       },
       "work_mode": {
         "name": "Mode de fonctionnement"
@@ -1424,7 +1434,7 @@
     },
     "switch": {
       "auto_standby_set": {
-        "name": "Arr\u00eat auto (connect\u00e9 au r\u00e9seau)"
+        "name": "Arrêt auto (connecté au réseau)"
       },
       "breaker_switch": {
         "name": "Interrupteur du disjoncteur"
@@ -1436,7 +1446,7 @@
         "name": "Suivre le Smart Meter"
       },
       "off_grid_shutdown": {
-        "name": "Arr\u00eat auto (mode hors r\u00e9seau)"
+        "name": "Arrêt auto (mode hors réseau)"
       },
       "portable_ac240_output": {
         "name": "Sortie CA 240V"
@@ -1457,19 +1467,19 @@
         "name": "Sortie USB CC"
       },
       "portable_discharge_memory": {
-        "name": "M\u00e9moire de d\u00e9charge"
+        "name": "Mémoire de décharge"
       },
       "portable_energy_saving": {
-        "name": "\u00c9conomie d'\u00e9nergie"
+        "name": "Économie d'énergie"
       },
       "portable_light": {
-        "name": "\u00c9clairage"
+        "name": "Éclairage"
       },
       "portable_output_priority_switch": {
-        "name": "Priorit\u00e9 de sortie"
+        "name": "Priorité de sortie"
       },
       "portable_screen": {
-        "name": "\u00c9cran"
+        "name": "Écran"
       },
       "portable_super_charge": {
         "name": "Super charge"
@@ -1487,7 +1497,7 @@
         "name": "Veille"
       },
       "storm_warning": {
-        "name": "Alerte temp\u00eate"
+        "name": "Alerte tempête"
       },
       "third_party_mqtt_enable": {
         "name": "Pont MQTT tiers"
@@ -1498,7 +1508,7 @@
         "name": "Code standard reseau"
       },
       "system_name": {
-        "name": "Nom du syst\u00e8me"
+        "name": "Nom du système"
       },
       "third_party_mqtt_ip": {
         "name": "Broker MQTT tiers"
@@ -1519,40 +1529,40 @@
       "message": "Impossible de lier l'accessoire intelligent pour l'appareil {device_id} : {error}"
     },
     "delete_storm_alert_failed": {
-      "message": "Impossible de supprimer l'alerte temp\u00eate {alert_id} pour l'appareil {device_id} : {error}"
+      "message": "Impossible de supprimer l'alerte tempête {alert_id} pour l'appareil {device_id} : {error}"
     },
     "dynamic_tariff_unavailable": {
-      "message": "Le tarif dynamique n'est pas disponible pour {entity} sur l'appareil {device_id}. Attendez la prochaine actualisation ou choisissez d'abord un fournisseur de prix d'\u00e9lectricit\u00e9."
+      "message": "Le tarif dynamique n'est pas disponible pour {entity} sur l'appareil {device_id}. Attendez la prochaine actualisation ou choisissez d'abord un fournisseur de prix d'électricité."
     },
     "entity_action_failed": {
-      "message": "Impossible de mettre \u00e0 jour {entity} pour l'appareil {device_id} : {error}"
+      "message": "Impossible de mettre à jour {entity} pour l'appareil {device_id} : {error}"
     },
     "get_share_qr_code_failed": {
-      "message": "Impossible de r\u00e9cup\u00e9rer le code QR de partage pour l'appareil {device_id} : {error}"
+      "message": "Impossible de récupérer le code QR de partage pour l'appareil {device_id} : {error}"
     },
     "invalid_number_allowed_values": {
-      "message": "{entity} pour l'appareil {device_id} doit \u00eatre l'une de ces valeurs : {allowed_values}"
+      "message": "{entity} pour l'appareil {device_id} doit être l'une de ces valeurs : {allowed_values}"
     },
     "invalid_number_range": {
-      "message": "{entity} pour l'appareil {device_id} doit \u00eatre compris entre {min} et {max}"
+      "message": "{entity} pour l'appareil {device_id} doit être compris entre {min} et {max}"
     },
     "invalid_select_option": {
       "message": "{option} n'est pas une option valide pour {entity} sur l'appareil {device_id}"
     },
     "invalid_text_value": {
-      "message": "{entity} pour l'appareil {device_id} ne doit pas \u00eatre vide"
+      "message": "{entity} pour l'appareil {device_id} ne doit pas être vide"
     },
     "list_shared_devices_failed": {
-      "message": "Impossible de lister les appareils partag\u00e9s pour l'appareil {device_id} : {error}"
+      "message": "Impossible de lister les appareils partagés pour l'appareil {device_id} : {error}"
     },
     "list_shared_managers_failed": {
-      "message": "Impossible de lister les gestionnaires partag\u00e9s pour l'appareil {device_id} : {error}"
+      "message": "Impossible de lister les gestionnaires partagés pour l'appareil {device_id} : {error}"
     },
     "missing_system_id": {
-      "message": "Impossible de mettre \u00e0 jour l'appareil {device_id} : systemId manquant"
+      "message": "Impossible de mettre à jour l'appareil {device_id} : systemId manquant"
     },
     "mqtt_command_failed": {
-      "message": "La commande MQTT Jackery a \u00e9chou\u00e9 ({error}). Derni\u00e8re erreur MQTT : {mqtt_last_error}"
+      "message": "La commande MQTT Jackery a échoué ({error}). Dernière erreur MQTT : {mqtt_last_error}"
     },
     "mqtt_missing_device_sn": {
       "message": "Impossible d'envoyer la commande MQTT Jackery pour {device_id} : deviceSn manquant"
@@ -1564,25 +1574,25 @@
       "message": "Impossible d'interroger la configuration MQTT tierce pour l'appareil {device_id} : {error}"
     },
     "refresh_subdevices_failed": {
-      "message": "Impossible d'actualiser les sous-appareils pour l'appareil {device_id}\u00a0: {error}"
+      "message": "Impossible d'actualiser les sous-appareils pour l'appareil {device_id} : {error}"
     },
     "refresh_weather_plan_failed": {
-      "message": "Impossible d'actualiser le plan m\u00e9t\u00e9o pour l'appareil {device_id} : {error}"
+      "message": "Impossible d'actualiser le plan météo pour l'appareil {device_id} : {error}"
     },
     "remove_all_shared_access_failed": {
-      "message": "Impossible de supprimer tous les acc\u00e8s partag\u00e9s pour l'appareil {device_id} : {error}"
+      "message": "Impossible de supprimer tous les accès partagés pour l'appareil {device_id} : {error}"
     },
     "remove_shared_access_failed": {
-      "message": "Impossible de supprimer l'acc\u00e8s partag\u00e9 pour l'appareil {device_id} : {error}"
+      "message": "Impossible de supprimer l'accès partagé pour l'appareil {device_id} : {error}"
     },
     "rename_system_failed": {
-      "message": "Impossible de renommer le syst\u00e8me Jackery {system_id} : {error}"
+      "message": "Impossible de renommer le système Jackery {system_id} : {error}"
     },
     "send_ble_command_failed": {
       "message": "Impossible d'envoyer la commande BLE pour l'appareil {device_id} : {error}"
     },
     "set_device_nickname_failed": {
-      "message": "Impossible de d\u00e9finir le surnom de l'appareil {device_id} : {error}"
+      "message": "Impossible de définir le surnom de l'appareil {device_id} : {error}"
     },
     "set_third_party_mqtt_config_failed": {
       "message": "Impossible de configurer MQTT tiers pour l'appareil {device_id} : {error}"
@@ -1599,41 +1609,41 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery a renvoy\u00e9 des statistiques application/cloud contradictoires. {count} avertissement(s) d\u00e9tect\u00e9(s). Premi\u00e8re m\u00e9trique concern\u00e9e : {metric}. Exemples : {examples}. Les \u00e9tats des entit\u00e9s ne sont pas r\u00e9par\u00e9s silencieusement ; activez le logger custom_components.jackery_solarvault.payload_debug=debug, puis utilisez le journal de d\u00e9bogage du payload jackery_solarvault_payload_debug.jsonl et les diagnostics pour comparer les valeurs brutes, les s\u00e9ries de graphique analys\u00e9es et les sections source document\u00e9es dans docs/PROTOCOL.md (\u00a72 endpoints HTTP, \u00a78 priorit\u00e9 des sources de donn\u00e9es).\n\nConfirmez pour forcer une actualisation depuis le cloud Jackery. Les incoh\u00e9rences transitoires disparaissent lorsqu'un nouveau payload coh\u00e9rent arrive. Si l'avertissement revient, ouvrez une issue sur le tracker de l'int\u00e9gration avec le dump de diagnostic.",
+            "description": "Jackery a renvoyé des statistiques application/cloud contradictoires. {count} avertissement(s) détecté(s). Première métrique concernée : {metric}. Exemples : {examples}. Les états des entités ne sont pas réparés silencieusement ; activez le logger custom_components.jackery_solarvault.payload_debug=debug, puis utilisez le journal de débogage du payload jackery_solarvault_payload_debug.jsonl et les diagnostics pour comparer les valeurs brutes, les séries de graphique analysées et les sections source documentées dans docs/PROTOCOL.md (§2 endpoints HTTP, §8 priorité des sources de données).\n\nConfirmez pour forcer une actualisation depuis le cloud Jackery. Les incohérences transitoires disparaissent lorsqu'un nouveau payload cohérent arrive. Si l'avertissement revient, ouvrez une issue sur le tracker de l'intégration avec le dump de diagnostic.",
             "title": "Forcer une actualisation du cloud Jackery"
           }
         }
       },
-      "title": "Les statistiques de l'application Jackery sont incoh\u00e9rentes"
+      "title": "Les statistiques de l'application Jackery sont incohérentes"
     },
     "device_not_activated": {
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "L'appareil Jackery {device_id} indique activated=0 dans le syst\u00e8me cloud. C'est un signal de qualit\u00e9 des donn\u00e9es c\u00f4t\u00e9 cloud, pas une preuve que l'appareil n'est pas appair\u00e9 localement. Certains endpoints Jackery de tendances, statistiques et historique peuvent renvoyer des donn\u00e9es vides ou nulles tant que le cloud signale cet \u00e9tat.\n\nPour v\u00e9rifier :\n1. Ouvrez l'application mobile Jackery\n2. Confirmez que l'appareil est enregistr\u00e9 et affich\u00e9 comme 'En ligne'\n3. Revenez ici et forcez une actualisation cloud\n\nLe probl\u00e8me de r\u00e9paration sera supprim\u00e9 lorsque le cloud Jackery indiquera activated=1 ou cessera de renvoyer le signal incoh\u00e9rent.",
+            "description": "L'appareil Jackery {device_id} indique activated=0 dans le système cloud. C'est un signal de qualité des données côté cloud, pas une preuve que l'appareil n'est pas appairé localement. Certains endpoints Jackery de tendances, statistiques et historique peuvent renvoyer des données vides ou nulles tant que le cloud signale cet état.\n\nPour vérifier :\n1. Ouvrez l'application mobile Jackery\n2. Confirmez que l'appareil est enregistré et affiché comme 'En ligne'\n3. Revenez ici et forcez une actualisation cloud\n\nLe problème de réparation sera supprimé lorsque le cloud Jackery indiquera activated=1 ou cessera de renvoyer le signal incohérent.",
             "title": "Forcer une actualisation du cloud Jackery"
           }
         }
       },
-      "title": "Appareil Jackery non activ\u00e9 dans le cloud"
+      "title": "Appareil Jackery non activé dans le cloud"
     }
   },
   "options": {
     "step": {
       "init": {
         "data": {
-          "create_calculated_power_sensors": "Cr\u00e9er des capteurs de puissance nette calcul\u00e9e",
-          "create_savings_detail_sensors": "Cr\u00e9er des capteurs de d\u00e9tail du calcul des \u00e9conomies",
-          "create_smart_meter_derived_sensors": "Cr\u00e9er des capteurs Smart Meter calcul\u00e9s",
+          "create_calculated_power_sensors": "Créer des capteurs de puissance nette calculée",
+          "create_savings_detail_sensors": "Créer des capteurs de détail du calcul des économies",
+          "create_smart_meter_derived_sensors": "Créer des capteurs Smart Meter calculés",
           "enable_ble_transport": "Activer le transport BLE",
-          "enable_ble_writes": "Activer les \u00e9critures BLE exp\u00e9rimentales",
-          "enable_derived_home_energy_fallback": "Autoriser le fallback d'\u00e9nergie domicile d\u00e9riv\u00e9",
+          "enable_ble_writes": "Activer les écritures BLE expérimentales",
+          "enable_derived_home_energy_fallback": "Autoriser le fallback d'énergie domicile dérivé",
           "enable_month_statistics": "Importer les statistiques mensuelles",
-          "enable_unredacted_diagnostics": "Activer les diagnostics d\u00e9veloppeur non masqu\u00e9s",
+          "enable_unredacted_diagnostics": "Activer les diagnostics développeur non masqués",
           "enable_week_statistics": "Importer les statistiques hebdomadaires",
           "enable_year_statistics": "Importer les statistiques annuelles",
           "third_party_mqtt_enable": "Activer le pont MQTT tiers",
-          "third_party_mqtt_ip": "IP / nom d'h\u00f4te du broker MQTT tiers",
+          "third_party_mqtt_ip": "IP / nom d'hôte du broker MQTT tiers",
           "third_party_mqtt_password": "Mot de passe MQTT tiers",
           "third_party_mqtt_port": "Port du broker MQTT tiers",
           "third_party_mqtt_token": "Jeton MQTT tiers",
@@ -1641,49 +1651,49 @@
           "third_party_mqtt_username": "Nom d'utilisateur MQTT tiers"
         },
         "data_description": {
-          "create_calculated_power_sensors": "Cr\u00e9e des capteurs locaux facultatifs de puissance nette \u00e0 partir de valeurs d\u00e9j\u00e0 fournies par Jackery : charge de la batterie principale moins d\u00e9charge, charge du syst\u00e8me/ensemble de batteries moins d\u00e9charge, et entr\u00e9e c\u00f4t\u00e9 r\u00e9seau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette sign\u00e9e, mais ce ne sont pas des valeurs d'application distinctes. D\u00e9sactiv\u00e9s par d\u00e9faut afin que les valeurs brutes Jackery restent sans ambigu\u00eft\u00e9.",
-          "create_savings_detail_sensors": "Cr\u00e9e des capteurs facultatifs pour le calcul des \u00e9conomies : \u00e9conomies calcul\u00e9es, \u00e9nergie CA autoconsomm\u00e9e, prix, \u00e9nergie perdue du syst\u00e8me de batteries, \u00e9nergie perdue de l'onduleur/conversion, r\u00e9sidu PV apr\u00e8s autoconsommation et puissance instantan\u00e9e calcul\u00e9e de perte onduleur/conversion. D\u00e9sactiv\u00e9s par d\u00e9faut car ce sont des valeurs interm\u00e9diaires de diagnostic.",
-          "create_smart_meter_derived_sensors": "Cr\u00e9e des capteurs nets suppl\u00e9mentaires, des capteurs de flux brut par phase et la consommation domestique calcul\u00e9e \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. D\u00e9sactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
+          "create_calculated_power_sensors": "Crée des capteurs locaux facultatifs de puissance nette à partir de valeurs déjà fournies par Jackery : charge de la batterie principale moins décharge, charge du système/ensemble de batteries moins décharge, et entrée côté réseau moins sortie. Ces capteurs sont utiles pour les tableaux de bord qui ont besoin d'une valeur nette signée, mais ce ne sont pas des valeurs d'application distinctes. Désactivés par défaut afin que les valeurs brutes Jackery restent sans ambiguïté.",
+          "create_savings_detail_sensors": "Crée des capteurs facultatifs pour le calcul des économies : économies calculées, énergie CA autoconsommée, prix, énergie perdue du système de batteries, énergie perdue de l'onduleur/conversion, résidu PV après autoconsommation et puissance instantanée calculée de perte onduleur/conversion. Désactivés par défaut car ce sont des valeurs intermédiaires de diagnostic.",
+          "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut.",
           "enable_ble_writes": "Autorise les ecritures locales experimentales de commandes BLE lorsque le transport BLE est connecte. Desactive par defaut; a utiliser uniquement pour tester le controle direct du SolarVault.",
-          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, d\u00e9rive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs d\u00e9riv\u00e9es sont marqu\u00e9es dans les attributs et diagnostics de source.",
-          "enable_month_statistics": "Importe la charge utile de la p\u00e9riode mensuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_unredacted_diagnostics": "D\u00e9sactive le masquage dans l'export de diagnostics et le JSONL de debug des payloads pour le d\u00e9pannage local. Cela expose les identifiants, num\u00e9ros de s\u00e9rie, IDs d'appareil, topics MQTT et valeurs bluetoothKey. D\u00e9sactivez cette option avant de partager des fichiers.",
-          "enable_week_statistics": "Importe la charge utile de la p\u00e9riode hebdomadaire dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "enable_year_statistics": "Importe la charge utile de la p\u00e9riode annuelle dans les s\u00e9ries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La s\u00e9rie externe horaire day_hourly est import\u00e9e ind\u00e9pendamment.",
-          "third_party_mqtt_enable": "Demande \u00e0 la SolarVault de publier la t\u00e9l\u00e9m\u00e9trie vers votre propre broker MQTT (PROTOCOL.md \u00a75 / \u00a715). Exp\u00e9rimental : le relais REST cloud pour cette commande est bloqu\u00e9 c\u00f4t\u00e9 serveur, donc l'int\u00e9gration publie d'abord la trame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) directement via BLE, puis via MQTT cloud. Le nom d'utilisateur, le mot de passe et le jeton sont encod\u00e9s avec le codec ThirdPartMQTTConfig compatible avec l'application avant l'envoi.",
-          "third_party_mqtt_ip": "IP ou nom d'h\u00f4te de votre broker MQTT local, par exemple 192.168.x.x.",
+          "enable_derived_home_energy_fallback": "Si sys/home/trends est indisponible, dérive home_energy depuis device_home_stat.totalOutGridEnergy. Les valeurs dérivées sont marquées dans les attributs et diagnostics de source.",
+          "enable_month_statistics": "Importe la charge utile de la période mensuelle dans les séries statistiques sensor.* et jackery_solarvault:*_month_daily correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "enable_unredacted_diagnostics": "Désactive le masquage dans l'export de diagnostics et le JSONL de debug des payloads pour le dépannage local. Cela expose les identifiants, numéros de série, IDs d'appareil, topics MQTT et valeurs bluetoothKey. Désactivez cette option avant de partager des fichiers.",
+          "enable_week_statistics": "Importe la charge utile de la période hebdomadaire dans les séries statistiques sensor.* et jackery_solarvault:*_week_daily correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "enable_year_statistics": "Importe la charge utile de la période annuelle dans les séries statistiques sensor.* et jackery_solarvault:*_year_monthly correspondantes. La série externe horaire day_hourly est importée indépendamment.",
+          "third_party_mqtt_enable": "Demande à la SolarVault de publier la télémétrie vers votre propre broker MQTT (PROTOCOL.md §5 / §15). Expérimental : le relais REST cloud pour cette commande est bloqué côté serveur, donc l'intégration publie d'abord la trame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) directement via BLE, puis via MQTT cloud. Le nom d'utilisateur, le mot de passe et le jeton sont encodés avec le codec ThirdPartMQTTConfig compatible avec l'application avant l'envoi.",
+          "third_party_mqtt_ip": "IP ou nom d'hôte de votre broker MQTT local, par exemple 192.168.x.x.",
           "third_party_mqtt_password": "Mot de passe facultatif du broker MQTT.",
-          "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par d\u00e9faut est 1883.",
-          "third_party_mqtt_token": "Jeton du pont MQTT. Si laiss\u00e9 vide, l'int\u00e9gration g\u00e9n\u00e8re automatiquement un jeton de secours stable \u00e0 9 chiffres de style application.",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour l'abonnement du listener local. La valeur par d\u00e9faut est `homeassistant` ; ajustez-le au topic de votre broker si n\u00e9cessaire.",
+          "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par défaut est 1883.",
+          "third_party_mqtt_token": "Jeton du pont MQTT. Si laissé vide, l'intégration génère automatiquement un jeton de secours stable à 9 chiffres de style application.",
+          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour l'abonnement du listener local. La valeur par défaut est `homeassistant` ; ajustez-le au topic de votre broker si nécessaire.",
           "third_party_mqtt_username": "Nom d'utilisateur facultatif du broker MQTT. Laissez vide pour les brokers anonymes."
         },
-        "description": "Les capteurs calcul\u00e9s sont des d\u00e9rivations locales facultatives. Les capteurs Smart Meter calculent des valeurs nettes, des valeurs de flux brut par phase et la consommation domestique \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, ils utilisent la puissance nette du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. Ce ne sont pas des valeurs brutes suppl\u00e9mentaires de l'application Jackery.",
+        "description": "Les capteurs calculés sont des dérivations locales facultatives. Les capteurs Smart Meter calculent des valeurs nettes, des valeurs de flux brut par phase et la consommation domestique à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, ils utilisent la puissance nette du Smart Meter plus l'entrée/sortie côté réseau Jackery. Ce ne sont pas des valeurs brutes supplémentaires de l'application Jackery.",
         "title": "Options Jackery"
       }
     }
   },
   "services": {
     "bind_smart_part": {
-      "description": "Lie un accessoire intelligent (par exemple un Smart Plug) \u00e0 l'appareil s\u00e9lectionn\u00e9 via MQTT.",
+      "description": "Lie un accessoire intelligent (par exemple un Smart Plug) à l'appareil sélectionné via MQTT.",
       "fields": {
         "accessory_sn": {
-          "description": "Num\u00e9ro de s\u00e9rie de l'accessoire intelligent \u00e0 lier, imprim\u00e9 sur l'accessoire ou visible dans l'application Jackery.",
-          "name": "Num\u00e9ro de s\u00e9rie de l'accessoire"
+          "description": "Numéro de série de l'accessoire intelligent à lier, imprimé sur l'accessoire ou visible dans l'application Jackery.",
+          "name": "Numéro de série de l'accessoire"
         },
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
       "name": "Lier un accessoire intelligent"
     },
     "delete_electricity_strategy": {
-      "description": "Supprime un plan de strat\u00e9gie tarifaire de l'appareil.",
+      "description": "Supprime un plan de stratégie tarifaire de l'appareil.",
       "fields": {
         "body": {
-          "description": "Corps de la strat\u00e9gie au format JSON, ne n\u00e9cessite g\u00e9n\u00e9ralement que le tid (ID de t\u00e2che).",
+          "description": "Corps de la stratégie au format JSON, ne nécessite généralement que le tid (ID de tâche).",
           "name": "Body"
         },
         "device_id": {
@@ -1691,37 +1701,37 @@
           "name": "ID de l'appareil"
         }
       },
-      "name": "Supprimer la strat\u00e9gie tarifaire"
+      "name": "Supprimer la stratégie tarifaire"
     },
     "delete_storm_alert": {
-      "description": "Supprime une alerte m\u00e9t\u00e9o ou temp\u00eate sp\u00e9cifique par ID d'alerte via MQTT.",
+      "description": "Supprime une alerte météo ou tempête spécifique par ID d'alerte via MQTT.",
       "fields": {
         "alert_id": {
-          "description": "Identifiant d'alerte provenant des attributs de diagnostic du plan m\u00e9t\u00e9o, g\u00e9n\u00e9ralement storm[].alertId.",
+          "description": "Identifiant d'alerte provenant des attributs de diagnostic du plan météo, généralement storm[].alertId.",
           "name": "ID d'alerte"
         },
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Sélectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de l'appareil"
         }
       },
-      "name": "Supprimer l'alerte temp\u00eate"
+      "name": "Supprimer l'alerte tempête"
     },
     "get_share_qr_code": {
-      "description": "R\u00e9cup\u00e8re le code QR de partage du compte Jackery propri\u00e9taire de l'appareil s\u00e9lectionn\u00e9. Renvoie uniquement la r\u00e9ponse.",
+      "description": "Récupère le code QR de partage du compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
       "fields": {
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. Le code QR est r\u00e9solu sur le compte propri\u00e9taire ; les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Sélectionnez un appareil Jackery. Le code QR est résolu sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
-      "name": "R\u00e9cup\u00e9rer le code QR de partage"
+      "name": "Récupérer le code QR de partage"
     },
     "insert_electricity_strategy": {
-      "description": "Ajoute un nouveau plan de strat\u00e9gie tarifaire (charge/d\u00e9charge) \u00e0 l'appareil.",
+      "description": "Ajoute un nouveau plan de stratégie tarifaire (charge/décharge) à l'appareil.",
       "fields": {
         "body": {
-          "description": "Corps de la strat\u00e9gie au format JSON. Les champs sont document\u00e9s dans la source de v\u00e9rit\u00e9.",
+          "description": "Corps de la stratégie au format JSON. Les champs sont documentés dans la source de vérité.",
           "name": "Body"
         },
         "device_id": {
@@ -1729,45 +1739,45 @@
           "name": "ID de l'appareil"
         }
       },
-      "name": "Ajouter une strat\u00e9gie tarifaire"
+      "name": "Ajouter une stratégie tarifaire"
     },
     "list_shared_devices": {
-      "description": "Liste les appareils partag\u00e9s avec le compte Jackery propri\u00e9taire de l'appareil s\u00e9lectionn\u00e9. Renvoie uniquement la r\u00e9ponse.",
+      "description": "Liste les appareils partagés avec le compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
       "fields": {
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. La liste des appareils partag\u00e9s est r\u00e9solue sur le compte propri\u00e9taire ; les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Sélectionnez un appareil Jackery. La liste des appareils partagés est résolue sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
-      "name": "Lister les appareils partag\u00e9s"
+      "name": "Lister les appareils partagés"
     },
     "list_shared_managers": {
-      "description": "Liste les gestionnaires d'une liaison d'appareil partag\u00e9 sur le compte Jackery propri\u00e9taire. Renvoie uniquement la r\u00e9ponse.",
+      "description": "Liste les gestionnaires d'une liaison d'appareil partagé sur le compte Jackery propriétaire. Renvoie uniquement la réponse.",
       "fields": {
         "bind_user_id": {
-          "description": "ID de l'utilisateur propri\u00e9taire de la liaison partag\u00e9e.",
+          "description": "ID de l'utilisateur propriétaire de la liaison partagée.",
           "name": "ID utilisateur de liaison"
         },
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. Les gestionnaires sont r\u00e9solus sur le compte propri\u00e9taire ; les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Sélectionnez un appareil Jackery. Les gestionnaires sont résolus sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         },
         "level": {
-          "description": "Filtre de niveau de partage. Seuls les gestionnaires de ce niveau sont renvoy\u00e9s. La valeur par d\u00e9faut est 0.",
+          "description": "Filtre de niveau de partage. Seuls les gestionnaires de ce niveau sont renvoyés. La valeur par défaut est 0.",
           "name": "Niveau de partage"
         }
       },
-      "name": "Lister les gestionnaires partag\u00e9s"
+      "name": "Lister les gestionnaires partagés"
     },
     "query_electricity_strategy": {
-      "description": "Interroge tous les plans de strat\u00e9gie tarifaire de l'appareil.",
+      "description": "Interroge tous les plans de stratégie tarifaire de l'appareil.",
       "fields": {
         "device_id": {
           "description": "Choisissez un appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
-      "name": "Interroger les strat\u00e9gies tarifaires"
+      "name": "Interroger les stratégies tarifaires"
     },
     "query_third_party_mqtt_config": {
       "description": "Interroge la configuration experimentale du pont MQTT tiers via le canal de commande MQTT Jackery existant.",
@@ -1780,70 +1790,70 @@
       "name": "Interroger la configuration MQTT tierce"
     },
     "refresh_subdevices": {
-      "description": "Force une red\u00e9couverte des accessoires et des sous-appareils depuis le cloud Jackery, puis actualise toutes les entit\u00e9s. \u00c0 utiliser apr\u00e8s avoir ajout\u00e9 ou retir\u00e9 physiquement un accessoire.",
+      "description": "Force une redécouverte des accessoires et des sous-appareils depuis le cloud Jackery, puis actualise toutes les entités. À utiliser après avoir ajouté ou retiré physiquement un accessoire.",
       "fields": {
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de l'appareil"
         }
       },
       "name": "Actualiser les sous-appareils"
     },
     "refresh_weather_plan": {
-      "description": "Interroge le plan m\u00e9t\u00e9o et temp\u00eate actuel de l'appareil. La r\u00e9ponse est expos\u00e9e dans les attributs du capteur de diagnostic Plan m\u00e9t\u00e9o.",
+      "description": "Interroge le plan météo et tempête actuel de l'appareil. La réponse est exposée dans les attributs du capteur de diagnostic Plan météo.",
       "fields": {
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
+          "description": "Sélectionnez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery (visible dans les diagnostics sous raw_api.system_list_response.data[].devices[].deviceId).",
           "name": "ID de l'appareil"
         }
       },
-      "name": "Actualiser le plan m\u00e9t\u00e9o et temp\u00eate"
+      "name": "Actualiser le plan météo et tempête"
     },
     "remove_all_shared_access": {
-      "description": "Supprime tous les acc\u00e8s partag\u00e9s d'un utilisateur \u00e0 un niveau de partage sur le compte Jackery propri\u00e9taire, puis actualise.",
+      "description": "Supprime tous les accès partagés d'un utilisateur à un niveau de partage sur le compte Jackery propriétaire, puis actualise.",
       "fields": {
         "bind_user_id": {
-          "description": "ID de l'utilisateur dont les acc\u00e8s partag\u00e9s sont supprim\u00e9s.",
+          "description": "ID de l'utilisateur dont les accès partagés sont supprimés.",
           "name": "ID utilisateur de liaison"
         },
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. La suppression est effectu\u00e9e sur le compte propri\u00e9taire ; les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Sélectionnez un appareil Jackery. La suppression est effectuée sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         },
         "level": {
-          "description": "Niveau de partage \u00e0 supprimer. La valeur par d\u00e9faut est 0.",
+          "description": "Niveau de partage à supprimer. La valeur par défaut est 0.",
           "name": "Niveau de partage"
         }
       },
-      "name": "Supprimer tous les acc\u00e8s partag\u00e9s"
+      "name": "Supprimer tous les accès partagés"
     },
     "remove_shared_access": {
-      "description": "Supprime un seul acc\u00e8s partag\u00e9 d'un utilisateur sur le compte Jackery propri\u00e9taire, puis actualise.",
+      "description": "Supprime un seul accès partagé d'un utilisateur sur le compte Jackery propriétaire, puis actualise.",
       "fields": {
         "bind_user_id": {
-          "description": "ID de l'utilisateur dont l'acc\u00e8s partag\u00e9 est supprim\u00e9.",
+          "description": "ID de l'utilisateur dont l'accès partagé est supprimé.",
           "name": "ID utilisateur de liaison"
         },
         "device_id": {
-          "description": "S\u00e9lectionnez un appareil Jackery. La suppression cible cet appareil sur le compte propri\u00e9taire ; les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Sélectionnez un appareil Jackery. La suppression cible cet appareil sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
-      "name": "Supprimer l'acc\u00e8s partag\u00e9"
+      "name": "Supprimer l'accès partagé"
     },
     "rename_system": {
-      "description": "Renomme un syst\u00e8me Jackery SolarVault via l'API cloud Jackery. Le nom est affich\u00e9 dans l'application Jackery et les informations d'appareil Home Assistant.",
+      "description": "Renomme un système Jackery SolarVault via l'API cloud Jackery. Le nom est affiché dans l'application Jackery et les informations d'appareil Home Assistant.",
       "fields": {
         "new_name": {
-          "description": "Nouveau nom d'affichage, de 1 \u00e0 64 caract\u00e8res.",
+          "description": "Nouveau nom d'affichage, de 1 à 64 caractères.",
           "name": "Nouveau nom"
         },
         "system_id": {
-          "description": "ID num\u00e9rique du syst\u00e8me Jackery. Il est visible dans les diagnostics sous raw_api.system_list_response.data[].id.",
-          "name": "ID du syst\u00e8me"
+          "description": "ID numérique du système Jackery. Il est visible dans les diagnostics sous raw_api.system_list_response.data[].id.",
+          "name": "ID du système"
         }
       },
-      "name": "Renommer le syst\u00e8me SolarVault"
+      "name": "Renommer le système SolarVault"
     },
     "send_ble_command": {
       "description": "Envoie une trame de commande BLE binaire experimentale a l'appareil selectionne. Necessite le transport BLE, les ecritures BLE et une connexion BLE active.",
@@ -1876,36 +1886,36 @@
       "name": "Envoyer une commande BLE"
     },
     "send_device_schedule": {
-      "description": "Envoie une trame DownloadDeviceSchedule (cmd=112) \u00e0 l'appareil s\u00e9lectionn\u00e9. Choisissez l'actionId pour ADD (3015), DELETE (3016), UPDATE (3017) ou READ (3018) et transmettez le corps du programme tel quel. La structure du corps provient de la capture Frida-PCAP dans docs/Markdown/MQTT_PROTOCOL.md.",
+      "description": "Envoie une trame DownloadDeviceSchedule (cmd=112) à l'appareil sélectionné. Choisissez l'actionId pour ADD (3015), DELETE (3016), UPDATE (3017) ou READ (3018) et transmettez le corps du programme tel quel. La structure du corps provient de la capture Frida-PCAP dans docs/Markdown/MQTT_PROTOCOL.md.",
       "fields": {
         "action_id": {
           "description": "Action TIMER_TASK : 3015=ADD, 3016=DELETE, 3017=UPDATE, 3018=READ.",
           "name": "Action ID"
         },
         "body": {
-          "description": "Corps du programme au format JSON. Champs typiques : actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (masque de bits de 7 caract\u00e8res lun-dim), tid (ID de t\u00e2che). L'int\u00e9gration ajoute cmd=112 automatiquement.",
+          "description": "Corps du programme au format JSON. Champs typiques : actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (masque de bits de 7 caractères lun-dim), tid (ID de tâche). L'intégration ajoute cmd=112 automatiquement.",
           "name": "Body"
         },
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
       "name": "Envoyer le programme de l'appareil"
     },
     "set_device_nickname": {
-      "description": "D\u00e9finit un surnom personnalis\u00e9 pour un appareil Jackery via l'API cloud Jackery. Le surnom est affich\u00e9 dans l'application Jackery et dans les informations de l'appareil Home Assistant.",
+      "description": "Définit un surnom personnalisé pour un appareil Jackery via l'API cloud Jackery. Le surnom est affiché dans l'application Jackery et dans les informations de l'appareil Home Assistant.",
       "fields": {
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         },
         "nickname": {
-          "description": "Nouveau surnom de l'appareil, de 1 \u00e0 64 caract\u00e8res.",
+          "description": "Nouveau surnom de l'appareil, de 1 à 64 caractères.",
           "name": "Surnom"
         }
       },
-      "name": "D\u00e9finir le surnom de l'appareil"
+      "name": "Définir le surnom de l'appareil"
     },
     "set_third_party_mqtt_config": {
       "description": "Configure le pont MQTT tiers experimental via le canal de commande MQTT Jackery existant.",
@@ -1942,34 +1952,34 @@
       "name": "Configurer MQTT tiers"
     },
     "unbind_device": {
-      "description": "Dissocie (supprime) un appareil du compte Jackery via l'API cloud Jackery. Action destructive : l'appareil et ses entit\u00e9s sont supprim\u00e9s de Home Assistant apr\u00e8s la prochaine actualisation.",
+      "description": "Dissocie (supprime) un appareil du compte Jackery via l'API cloud Jackery. Action destructive : l'appareil et ses entités sont supprimés de Home Assistant après la prochaine actualisation.",
       "fields": {
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
       "name": "Dissocier l'appareil"
     },
     "unbind_smart_part": {
-      "description": "Dissocie (supprime) un accessoire intelligent de l'appareil s\u00e9lectionn\u00e9 via MQTT.",
+      "description": "Dissocie (supprime) un accessoire intelligent de l'appareil sélectionné via MQTT.",
       "fields": {
         "accessory_sn": {
-          "description": "Num\u00e9ro de s\u00e9rie de l'accessoire intelligent \u00e0 dissocier, imprim\u00e9 sur l'accessoire ou visible dans l'application Jackery.",
-          "name": "Num\u00e9ro de s\u00e9rie de l'accessoire"
+          "description": "Numéro de série de l'accessoire intelligent à dissocier, imprimé sur l'accessoire ou visible dans l'application Jackery.",
+          "name": "Numéro de série de l'accessoire"
         },
         "device_id": {
-          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID num\u00e9rique de l'appareil Jackery.",
+          "description": "Choisissez un appareil Jackery. Les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
           "name": "ID de l'appareil"
         }
       },
       "name": "Dissocier l'accessoire intelligent"
     },
     "update_electricity_strategy": {
-      "description": "Met \u00e0 jour un plan de strat\u00e9gie tarifaire existant sur l'appareil.",
+      "description": "Met à jour un plan de stratégie tarifaire existant sur l'appareil.",
       "fields": {
         "body": {
-          "description": "Corps de la strat\u00e9gie au format JSON.",
+          "description": "Corps de la stratégie au format JSON.",
           "name": "Body"
         },
         "device_id": {
@@ -1977,7 +1987,7 @@
           "name": "ID de l'appareil"
         }
       },
-      "name": "Mettre \u00e0 jour la strat\u00e9gie tarifaire"
+      "name": "Mettre à jour la stratégie tarifaire"
     }
   },
   "title": "Jackery SolarVault"

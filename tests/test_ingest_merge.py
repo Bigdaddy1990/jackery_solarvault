@@ -1,19 +1,19 @@
-"""Regression tests for transport-agnostic live payload merging."""
+"""Regression tests for sparse live payload merging outside the ingest gate."""
 
 from typing import Any
 
-from custom_components.jackery_solarvault.client.ingest.ingest import (
-    merge_live_properties,
-)
 from custom_components.jackery_solarvault.const import (
     FIELD_DEVICE_SN,
     PAYLOAD_SUBDEVICES,
+)
+from custom_components.jackery_solarvault.handlers.property_merge import (
+    merge_present_dict_values,
 )
 
 _BASE_POWER = 10
 
 
-def test_merge_live_properties_merges_identified_dict_lists() -> None:
+def test_merge_present_dict_values_merges_identified_dict_lists() -> None:
     """Sparse child-device updates preserve existing siblings and static fields."""
     base: dict[str, Any] = {
         PAYLOAD_SUBDEVICES: [
@@ -30,7 +30,7 @@ def test_merge_live_properties_merges_identified_dict_lists() -> None:
         "modes": ["eco"],
     }
 
-    merged = merge_live_properties(base, update)
+    merged = merge_present_dict_values(base, update)
 
     assert merged[PAYLOAD_SUBDEVICES] == [
         {FIELD_DEVICE_SN: "plug-1", "model": "Smart Plug", "power": 11},
@@ -39,3 +39,13 @@ def test_merge_live_properties_merges_identified_dict_lists() -> None:
     ]
     assert merged["modes"] == ["eco"]
     assert base[PAYLOAD_SUBDEVICES][0]["power"] == _BASE_POWER
+
+
+def test_merge_present_dict_values_keeps_existing_list_on_blank_update() -> None:
+    """Sparse live updates must not erase populated list values."""
+    merged = merge_present_dict_values(
+        {"modes": ["auto", "manual"]},
+        {"modes": []},
+    )
+
+    assert merged["modes"] == ["auto", "manual"]

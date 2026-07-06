@@ -244,9 +244,11 @@ def _print_deprecation_warning_internal_impl(  # noqa: PLR0913, PLR0917
     log_when_no_integration_is_found: bool,
 ) -> None:
     from homeassistant.core import async_get_hass_or_none  # noqa: PLC0415
+    from homeassistant.helpers.frame import (  # noqa: PLC0415
+        MissingIntegrationFrame,
+        get_integration_frame,
+    )
     from homeassistant.loader import async_suggest_report_issue  # noqa: PLC0415
-
-    from .frame import MissingIntegrationFrame, get_integration_frame  # noqa: PLC0415
 
     logger = logging.getLogger(module_name)
     if breaks_in_ha_version:

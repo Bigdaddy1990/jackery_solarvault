@@ -53,8 +53,9 @@ all-extras = true
 allow-empty-requirements = true
 compile-bytecode = true
 config-settings = { editable_mode = "compat" }
+extra-build-dependencies = { pytest = ["setuptools"] }
 prerelease = "if-necessary-or-explicit"
-python = "3.14"
+python = "3.15"
 python-version = "3.11"
 strict = true
 universal = true
@@ -71,11 +72,12 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = ">=3.14.4"
+requires-python = "==3.14.6"
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
@@ -287,7 +289,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.18"
+required-version = ">=0.15.20"
 line-length = 88
 src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
@@ -433,14 +435,14 @@ select = [
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "E501", "F401"]
-ignore = ["D417", "TID252"]
+ignore = ["D417", "TID252"] 
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
-task-tags = ["TODO", "FIX"]
+task-tags = ["TODO", "FIX", "BUG"]
 
 [project.scripts]
 hass = "homeassistant.__main__:main"
@@ -461,33 +463,35 @@ dev = [
     "coverage[toml]>=7.5.4",
     "defusedxml",
     "fastmcp",
-    "homeassistant>=2026.6.1",
+    "homeassistant>=2026.7.0",
     "homeassistant-stubs",
     "hypothesis",
     "ifaddr",
     "iniconfig",
-    "jinja2>=3.1.6",
+    "jinja2",
     "mcp",
     "mgrep",
     "multidict",
-    "mypy>=1.19.1",
+    "mypy",
     "numpy",
     "packaging>=26.0",
     "pip>=26.0",
     "pre-commit",
+    "pre-commit-hooks",
     "prek",
     "pydantic",
     "pylint",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-github-actions-annotate-failures>=0.3.0",
-    "pytest-homeassistant-custom-component>=0.13.340",
+    "pytest-github-actions-annotate-failures>=0.4.0",
+    "pytest-homeassistant",
+    "pytest-homeassistant-custom-component",
     "pyupgrade",
     "pyyaml",
-    "ruff>=0.15.18",
+    "ruff>=0.15.20",
+    "segno",
     "semgrep",
-    "segno>=1.6.6",
     "smellcheck",
     "ty",
     "types-aiofiles>=25.1.0.20251011",
@@ -652,7 +656,7 @@ overgeneral-exceptions = [
 runtime-typing = false
 
 [tool.pylint.CODE_STYLE]
-max-line-length-suggestions = 72
+max-line-length-suggestions = 88
 
 [tool.pylint.TYPECHECK]
 ignored-classes = [
@@ -971,6 +975,6 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 
 [tool.cfduplication]
 # Minimum duplicated line threshold
-MinLineCount= 50
+MinLineCount= 15
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**", "tests/**", "scripts/**"]

@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import TYPE_CHECKING, Any, Final
 import uuid
 
@@ -59,6 +60,7 @@ from ..const import (  # noqa: RUF100, TID252
     APP_VERSION,
     APP_VERSION_CODE,
     APP_VERSION_PATH,
+    AUTH_AUTO_RELOGIN_COOLDOWN_SEC,
     BANNER_LIST_PATH,
     BASE_URL,
     BATTERY_PACK_PATH,
@@ -251,6 +253,7 @@ from ..util import (  # noqa: RUF100, TID252
 )
 
 _LOGGER = logging.getLogger(__name__)
+
 
 # Expected byte length of the decoded MQTT password seed (AES-256 key material).
 _MQTT_SEED_LEN: Final = 32
@@ -563,6 +566,8 @@ class JackeryApi:  # noqa: PLR0904
         self._requests_failed = 0
         self._timeouts_total = 0
         self._auth_retries = 0
+        # Monotonic timestamp of the last automatic re-login (loop protection).
+        self._last_auto_relogin_monotonic: float | None = None
 
     @property
     def region_code(self) -> str | None:
@@ -812,8 +817,15 @@ class JackeryApi:  # noqa: PLR0904
         self._mqtt_mac_id = mac_id
         return token
 
-    async def async_get_mqtt_credentials(self) -> dict[str, str]:
-        """Return MQTT credentials for the active REST login session.
+    def _derive_mqtt_credentials(self) -> dict[str, str] | None:
+        """Derive MQTT credentials from the cached login session, or None.
+
+        Pure and cache-only: reads the MQTT session fields captured at the
+        last HTTP login (userId/seed/macId) and computes the app-compatible
+        client id, username and AES-CBC password. Returns None when those
+        fields are absent or unusable. Performs NO login and raises NO auth
+        error — the sole login/auth path is the HTTP/API client, never a
+        MQTT/BLE transport (owner invariant 2026-07-05).
 
         Runtime-verified app algorithm from MQTT_PROTOCOL.md::
 
@@ -823,29 +835,15 @@ class JackeryApi:  # noqa: PLR0904
             key = seed  # AES-256 key
             iv = seed[:16]
             password = base64(AES - 256 - CBC - PKCS5(username_utf8, key, iv))
-            # userId: MQTT user id from the login response.
-
-        Raises:
-            JackeryAuthError: If the client is not logged in or required MQTT
-                fields are missing, if `mqttPassWord` is not valid base64, or
-                if the decoded seed is not 32 bytes.
         """
-        await self._ensure_token()
         if not self._mqtt_user_id or not self._mqtt_seed_b64 or not self._mqtt_mac_id:
-            msg = "Login response missing MQTT fields (userId/mqttPassWord/macId)"
-            raise JackeryAuthError(msg)
-
+            return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except (binascii.Error, ValueError) as err:
-            msg = "Invalid mqttPassWord base64 in login response"
-            raise JackeryAuthError(msg) from err
+        except binascii.Error, ValueError:
+            return None
         if len(seed) != _MQTT_SEED_LEN:
-            msg = (
-                f"Unexpected mqttPassWord decoded length: {len(seed)} "
-                f"(expected {_MQTT_SEED_LEN})"
-            )
-            raise JackeryAuthError(msg)
+            return None
 
         client_id = (
             f"{self._mqtt_user_id}{MQTT_USERNAME_SEPARATOR}{MQTT_CLIENT_ID_SUFFIX}"
@@ -863,6 +861,41 @@ class JackeryApi:  # noqa: PLR0904
             MQTT_CREDENTIAL_PASSWORD: password,
             MQTT_CREDENTIAL_USER_ID: self._mqtt_user_id,
         }
+
+    def get_cached_mqtt_credentials(self) -> dict[str, str] | None:
+        """Return already-derived MQTT credentials without any login.
+
+        The credential accessor for MQTT transport paths (cloud + local).
+        Reads only the session cached by the HTTP login and returns None
+        when no usable session is present — the caller MUST treat that as
+        "not ready yet, back off", never as an auth failure. NEVER triggers
+        login or token refresh (owner invariant 2026-07-05).
+
+        Returns:
+            The MQTT credential dict, or None when no session is cached.
+        """
+        return self._derive_mqtt_credentials()
+
+    async def async_get_mqtt_credentials(self) -> dict[str, str]:
+        """Return MQTT credentials for the active REST login session.
+
+        HTTP/API path only: ensures a valid login token first, so a missing
+        session escalates to reauth. MQTT transports must use
+        ``get_cached_mqtt_credentials`` instead, which never logs in.
+
+        Raises:
+            JackeryAuthError: If the client is not logged in or required MQTT
+                fields are missing/invalid in the login response.
+        """
+        await self._ensure_token()
+        creds = self._derive_mqtt_credentials()
+        if creds is None:
+            msg = (
+                "Login response missing or invalid MQTT fields "
+                "(userId/mqttPassWord/macId)"
+            )
+            raise JackeryAuthError(msg)
+        return creds
 
     @property
     def mqtt_fingerprint(self) -> tuple[str | None, str | None, str | None]:
@@ -984,6 +1017,107 @@ class JackeryApi:  # noqa: PLR0904
         return (
             f"{method} {path} authorization failed: HTTP {status} code={code} msg={msg}"
         )
+
+    def _auto_relogin_allowed(self) -> bool:
+        """Return True when the automatic re-login cooldown has elapsed."""
+        last = self._last_auto_relogin_monotonic
+        if last is None:
+            return True
+        return (time.monotonic() - last) >= AUTH_AUTO_RELOGIN_COOLDOWN_SEC
+
+    def _note_auto_relogin(self) -> None:
+        """Record an automatic re-login for cooldown tracking and diagnostics."""
+        self._auth_retries += 1
+        self._last_auto_relogin_monotonic = time.monotonic()
+
+    async def _relogin_and_retry_request(
+        self,
+        method: str,
+        path: str,
+        request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+    ) -> tuple[int, dict[str, Any]] | None:
+        """Run exactly one rate-limited full re-login plus request retry.
+
+        Single-session Jackery accounts rotate the HTTP session when another
+        client logs in; the backend then rejects the old token with a plain
+        HTTP 401 instead of the documented token-expired code (10402). One
+        automatic full ``async_login`` plus request retry recovers that case
+        without opening an HA reauth flow. A per-client cooldown (max one
+        automatic re-login per :data:`AUTH_AUTO_RELOGIN_COOLDOWN_SEC`)
+        prevents re-login loops when the credentials are truly rejected.
+
+        Returns:
+            The retried ``(status, data)`` tuple, or ``None`` when the
+            cooldown suppressed the re-login attempt.
+
+        Raises:
+            JackeryAuthError: When the full re-login itself is rejected.
+            JackeryApiError: When the retried request fails at the transport
+                level.
+        """
+        if not self._auto_relogin_allowed():
+            _LOGGER.debug(
+                "Jackery %s %s rejected again within the re-login cooldown; "
+                "propagating auth failure",
+                method,
+                path,
+            )
+            return None
+        self._note_auto_relogin()
+        _LOGGER.info(
+            "Jackery session rejected — one automatic re-login for %s %s",
+            method,
+            path,
+        )
+        async with self._lock:
+            self._token = None
+            await self.async_login()
+        try:
+            return await self._request_json_with_retry(method, path, request)
+        except (TimeoutError, aiohttp.ClientError) as err:
+            self._requests_failed += 1
+            if isinstance(err, TimeoutError):
+                self._timeouts_total += 1
+            msg = (
+                f"{method} {path} request failed after re-login: "
+                f"{type(err).__name__}: {err or "(no message)"}"
+            )
+            raise JackeryApiError(msg) from err
+
+    async def _recover_auth_failure_or_raise(
+        self,
+        method: str,
+        path: str,
+        request: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+        status: int,
+        data: dict[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
+        """Recover a rejected session once or raise :class:`JackeryAuthError`.
+
+        Called after :meth:`_is_auth_failure_response` classified ``status``/
+        ``data`` as an authorization failure. Delegates to
+        :meth:`_relogin_and_retry_request` for the single rate-limited
+        re-login and re-raises when the retried (or unretried, if the
+        cooldown suppressed the attempt) response still fails auth.
+
+        Returns:
+            The recovered ``(status, data)`` tuple on success.
+
+        Raises:
+            JackeryAuthError: When the rejection persists after the one
+                automatic re-login, when the cooldown suppressed it, or when
+                the re-login itself is rejected.
+            JackeryApiError: When the retried request fails at the transport
+                level.
+        """
+        retried = await self._relogin_and_retry_request(method, path, request)
+        if retried is not None:
+            status, data = retried
+        if self._is_auth_failure_response(status, data):
+            raise JackeryAuthError(
+                self._auth_failure_message(method, path, status, data),
+            )
+        return status, data
 
     async def _emit_payload_debug(
         self,
@@ -1129,6 +1263,7 @@ class JackeryApi:  # noqa: PLR0904
         self,
         *,
         email: str,
+        code: str,
         method: str = "email",
         phone: str | None = None,
     ) -> dict[str, Any]:
@@ -1136,6 +1271,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Parameters:
             email: Account email address.
+            code: Verification code from :meth:`async_send_verification_code`.
             method: ``"email"`` or ``"sms"``.
             phone: Phone number (required when method is ``"sms"``).
 
@@ -1143,6 +1279,7 @@ class JackeryApi:  # noqa: PLR0904
             dict: Backend response data.
         """
         payload = {
+            "code": code,
             "email": email,
             "method": method,
         }
@@ -3618,7 +3755,7 @@ class JackeryApi:  # noqa: PLR0904
 
         if self._is_token_expired_response(status, data):
             _LOGGER.info("Jackery token expired — re-login for GET %s", path)
-            self._auth_retries += 1
+            self._note_auto_relogin()
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -3641,8 +3778,8 @@ class JackeryApi:  # noqa: PLR0904
                 ) from err
 
         if self._is_auth_failure_response(status, data):
-            raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_GET, path, status, data),
+            status, data = await self._recover_auth_failure_or_raise(
+                HTTP_METHOD_GET, path, _do, status, data
             )
         if status != HTTPStatus.OK:
             msg = f"{HTTP_METHOD_GET} {path} HTTP {status}"
@@ -3751,7 +3888,7 @@ class JackeryApi:  # noqa: PLR0904
                 HTTP_METHOD_PUT,
                 path,
             )
-            self._auth_retries += 1
+            self._note_auto_relogin()
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -3774,8 +3911,8 @@ class JackeryApi:  # noqa: PLR0904
                 ) from err
 
         if self._is_auth_failure_response(status, data):
-            raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
+            status, data = await self._recover_auth_failure_or_raise(
+                HTTP_METHOD_PUT, path, _do, status, data
             )
         if status != HTTPStatus.OK:
             msg_0 = f"{HTTP_METHOD_PUT} {path} HTTP {status}"
@@ -3897,6 +4034,7 @@ class JackeryApi:  # noqa: PLR0904
             _LOGGER.info(
                 "Jackery token expired — re-login for %s %s", HTTP_METHOD_POST, path
             )
+            self._note_auto_relogin()
             self._token = None
             await self._ensure_token()
             try:
@@ -3913,8 +4051,8 @@ class JackeryApi:  # noqa: PLR0904
                 ) from err
 
         if self._is_auth_failure_response(status, data):
-            raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+            status, data = await self._recover_auth_failure_or_raise(
+                HTTP_METHOD_POST, path, _do, status, data
             )
         if status != HTTPStatus.OK:
             msg_0 = f"{HTTP_METHOD_POST} {path} HTTP {status}"
@@ -4076,7 +4214,7 @@ class JackeryApi:  # noqa: PLR0904
         """
         return await self._post_json(MODIFY_INFO_PATH, {"nickName": nick_name})
 
-    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915  # linear request/re-login/retry ladder; splitting would thread session state through helpers
         """Generic JSON-body POST with auto re-login on expiry."""
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
@@ -4130,6 +4268,7 @@ class JackeryApi:  # noqa: PLR0904
                 path,
             )
             self._auth_retries += 1
+            self._note_auto_relogin()
             async with self._lock:
                 self._token = None
                 await self.async_login()
@@ -4152,9 +4291,17 @@ class JackeryApi:  # noqa: PLR0904
                 ) from err
 
         if self._is_auth_failure_response(status, data):
-            raise JackeryAuthError(
-                self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+            retried = await self._relogin_and_retry_request(
+                HTTP_METHOD_POST,
+                path,
+                _do,
             )
+            if retried is not None:
+                status, data = retried
+            if self._is_auth_failure_response(status, data):
+                raise JackeryAuthError(
+                    self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
+                )
         if status != HTTPStatus.OK:
             msg_0 = f"{HTTP_METHOD_POST} {path} HTTP {status}"
             raise JackeryApiError(msg_0)

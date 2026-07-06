@@ -71,7 +71,7 @@ class JwtResponseData(TypedDict):
 
 
 UserInfoResponseData = LoginResponseData
-"""user/info response data — same shape as LoginResponseData."""
+# user/info response data has the same shape as LoginResponseData.
 
 
 class MqttCredentialsResponseData(TypedDict):

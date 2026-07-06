@@ -48,6 +48,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
+    COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
     CT_PERIOD_SENSOR_SUFFIXES,
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -61,21 +62,25 @@ from .const import (
     DOMAIN,
     ENTRY_BOOTSTRAP_MQTT_SESSION,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
+    LOCAL_MQTT_DEFAULT_TOPIC_FILTER,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
+    MQTT_TOPIC_PREFIX,
     PAYLOAD_DEBUG_LOGGER_NAME,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
+    SETUP_LOGIN_MAX_ATTEMPTS,
+    SETUP_LOGIN_RETRY_DELAY_SEC,
     SMART_METER_DERIVED_SENSOR_SUFFIXES,
     STALE_ENERGY_HELPER_PREFIX,
     STALE_HELPER_VENDOR_TOKENS,
     STALE_NET_POWER_SUFFIX,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .client.mqtt.mqtt_session_cache import (
+from .client.auth.mqtt_session_cache import (
     async_load_mqtt_session,
     async_save_mqtt_session,
 )
@@ -457,19 +462,42 @@ async def _async_authenticate_api_layer(  # noqa: RUF067
         )
     else:
         bootstrap = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
-    try:
-        await api.async_login()
-    except JackeryAuthError as err:
-        msg = f"Jackery login rejected the credentials: {err}"
-        raise ConfigEntryAuthFailed(
-            msg,
-        ) from err
-    except JackeryError as err:
-        msg = (
-            "Jackery cloud login is unavailable; Layer 5 startup is blocked "
-            f"until HTTP login succeeds: {err}"
-        )
-        raise UpdateFailed(msg) from err
+    # Retry a transient login rejection before triggering reauth. Every reload
+    # (OptionsFlowWithReload fires one per options change) re-runs this login;
+    # on the single-session Jackery account a reload that races the mobile app
+    # or a burst of option toggles can get a transient JackeryAuthError /
+    # rate-limit. The poll path already tolerates one transient 401 — the setup
+    # login must too, otherwise a transient escalates to ConfigEntryAuthFailed
+    # and pauses polling with a reauth prompt (owner 2026-07-05: "reauth must
+    # not pause polling"). Only a rejection that persists across all attempts is
+    # treated as a real credential failure.
+    for attempt in range(SETUP_LOGIN_MAX_ATTEMPTS):
+        try:
+            await api.async_login()
+        except JackeryAuthError as err:
+            if attempt + 1 >= SETUP_LOGIN_MAX_ATTEMPTS:
+                msg = (
+                    "Jackery login rejected the credentials after "
+                    f"{SETUP_LOGIN_MAX_ATTEMPTS} attempts: {err}"
+                )
+                raise ConfigEntryAuthFailed(msg) from err
+            _LOGGER.info(
+                "Jackery setup login rejected (attempt %d/%d); retrying in "
+                "%.0fs instead of triggering reauth: %s",
+                attempt + 1,
+                SETUP_LOGIN_MAX_ATTEMPTS,
+                SETUP_LOGIN_RETRY_DELAY_SEC,
+                err,
+            )
+            await asyncio.sleep(SETUP_LOGIN_RETRY_DELAY_SEC)
+        except JackeryError as err:
+            msg = (
+                "Jackery cloud login is unavailable; Layer 5 startup is blocked "
+                f"until HTTP login succeeds: {err}"
+            )
+            raise UpdateFailed(msg) from err
+        else:
+            break
     snapshot = api.mqtt_session_snapshot()
     if snapshot is not None and not any(
         snapshot == existing for existing in (cached, bootstrap)
@@ -810,16 +838,26 @@ async def _async_start_local_mqtt(  # noqa: RUF067
     if not host:
         return
 
-    # An explicitly-configured topic filter (even empty) is respected verbatim:
-    # an empty value means "no filtering configured" and must keep the listener
-    # disabled rather than silently falling back to a broad default subscription
-    # (CPU-safety contract). Only the two user keys are consulted here.
+    # The device mirrors its cloud topics onto the local broker under the
+    # Jackery prefix ``hb/app/<userId>/...`` (MQTT_PROTOCOL.md). An empty user
+    # filter must fall back to that scoped prefix subscription rather than
+    # disabling the listener: the UI tells users to leave the filter empty, so
+    # requiring it here left the listener permanently silent and local MQTT
+    # delivered zero frames (owner escalation 2026-07-05). The prefix scope
+    # keeps this off the broker-wide ``#`` that the guard below still blocks.
     topic_filter = (
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
         or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
     ).strip()
-    if not topic_filter:
-        return
+    # Empty OR a non-Jackery filter falls back to the scoped ``hb/app/#``
+    # subscription. The device only ever publishes under the Jackery
+    # ``hb/app/<userId>/...`` prefix, so any other value (notably the legacy
+    # "homeassistant" default, which only matches HA's own event stream)
+    # subscribes the direct client to a topic the device never uses and yields
+    # zero frames — confirmed on the owner's live capture 2026-07-05
+    # (stored topic_filter="homeassistant", 0 local frames).
+    if not topic_filter or not topic_filter.startswith(MQTT_TOPIC_PREFIX):
+        topic_filter = LOCAL_MQTT_DEFAULT_TOPIC_FILTER
 
     if topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
         _LOGGER.warning(
@@ -952,7 +990,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         timedelta(seconds=interval_sec),
     )
     entry.runtime_data = coordinator
-    entry._last_applied_options = dict(entry.options or {})  # noqa: SLF001
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
     try:
@@ -985,7 +1022,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         startup_task.cancel()
 
     entry.async_on_unload(_cancel_startup_task)
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    # No update listener is registered: options changes are applied by a
+    # full entry reload scheduled by ``OptionsFlowWithReload`` (see
+    # ``JackeryOptionsFlow``). Registering a listener here would trigger
+    # the HA 2026.12 reload deprecation in reauth/reconfigure helpers and
+    # make the options flow raise ``ValueError`` on submit.
     return True
 
 
@@ -1106,38 +1147,6 @@ def _async_remove_entities_with_suffixes(  # noqa: RUF067
             registry.async_remove(ent.entity_id)
 
 
-async def _async_update_listener(  # noqa: RUF067
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Apply options changes without a full reload when possible.
-
-    Entity-creating option toggles (smart_meter_derived, calculated_power,
-    savings_detail) require a full reload because entity sets change.
-    All other options (MQTT settings, BLE toggle, statistics toggles) are
-    applied in-place by the coordinator without tearing down platforms.
-    """
-    entity_creating_options: frozenset[str] = frozenset({
-        CONF_CREATE_SMART_METER_DERIVED_SENSORS,
-        CONF_CREATE_CALCULATED_POWER_SENSORS,
-        CONF_CREATE_SAVINGS_DETAIL_SENSORS,
-    })
-    coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
-    old_options = dict(getattr(entry, "_last_applied_options", {}) or {})
-    new_options = dict(entry.options or {})
-    entry._last_applied_options = dict(new_options)  # noqa: SLF001
-
-    entity_options_changed = any(
-        old_options.get(key) != new_options.get(key) for key in entity_creating_options
-    )
-    if entity_options_changed:
-        await hass.config_entries.async_reload(entry.entry_id)
-        return
-
-    if isinstance(coordinator, JackerySolarVaultCoordinator):
-        await coordinator.async_request_refresh()
-
-
 async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067
     """Unload the config entry and tear down its runtime resources.
 
@@ -1157,7 +1166,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     if not unload_ok:
         return False
     if isinstance(coordinator, JackerySolarVaultCoordinator):
-        await coordinator.async_shutdown()
+        # Bound the teardown: a hung transport disconnect (bleak GATT to an
+        # unresponsive BT-proxy, an aiomqtt broker close, or a getaddrinfo-wedged
+        # background task) must not block the unload. An un-bounded shutdown
+        # stalled every options-reload for ~78 s and froze polling for that whole
+        # window (owner live capture 2026-07-05). On timeout, proceed with the
+        # unload and let the OS/GC reclaim any straggler.
+        try:
+            async with asyncio.timeout(COORDINATOR_SHUTDOWN_TIMEOUT_SEC):
+                await coordinator.async_shutdown()
+        except TimeoutError:
+            _LOGGER.warning(
+                "Jackery: coordinator shutdown exceeded %.0fs; proceeding with "
+                "unload so the reload cannot stall polling",
+                COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
+            )
     # HA convention on unload: drop the runtime_data reference so any
     # stragglers cannot keep the coordinator alive. Same narrowing caveat
     # as the setup-failure path above.

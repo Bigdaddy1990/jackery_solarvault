@@ -9,7 +9,7 @@ import json
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any
 
 from ...const import (  # noqa: RUF100, TID252
     FIELD_ACTION_ID,
@@ -22,11 +22,7 @@ from ...const import (  # noqa: RUF100, TID252
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
 )
-from ..api import (  # noqa: RUF100, TID252
-    JackeryAuthError,
-    JackeryError,
-    encrypt_mqtt_body,
-)
+from ..api import encrypt_mqtt_body  # noqa: RUF100, TID252
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -159,7 +155,6 @@ async def publish_mqtt_command(  # noqa: PLR0913
     cmd: int,
     body_fields: dict[str, Any],
     ensure_mqtt_cb: Callable[[], Awaitable[None]],
-    relogin_cb: Callable[[], Awaitable[None]],
     stop_mqtt_cb: Callable[[], Awaitable[None]],
 ) -> None:
     """Build, encrypt, and publish an MQTT command payload.
@@ -175,25 +170,23 @@ async def publish_mqtt_command(  # noqa: PLR0913
         cmd: Numeric command code.
         body_fields: Command body fields.
         ensure_mqtt_cb: Callable to ensure MQTT is connected.
-        relogin_cb: Callable to refresh HTTP credentials.
         stop_mqtt_cb: Callable to stop/restart the MQTT client.
     """
     await ensure_mqtt_cb()
 
-    try:
-        creds = await api.async_get_mqtt_credentials()
-    except JackeryAuthError as err:
-        _raise_config_entry_auth_failed(
-            "Jackery credentials were rejected while preparing an MQTT command",
-            err,
-        )
-    except JackeryError as err:
+    # Cache-only: the command path is MQTT transport and must NEVER trigger
+    # login/reauth (owner invariant 2026-07-05). It consumes the session the
+    # HTTP/API login cached; a missing session is a transient "not ready"
+    # failure, not an auth failure.
+    creds = api.get_cached_mqtt_credentials()
+    if creds is None:
         from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
 
-        msg = f"Could not build Jackery MQTT credentials: {err}"
-        raise HomeAssistantError(
-            msg,
-        ) from err
+        msg = (
+            "Jackery MQTT credentials are not available yet; the HTTP login "
+            "session has not been cached"
+        )
+        raise HomeAssistantError(msg)
 
     user_id = creds[MQTT_CREDENTIAL_USER_ID]
     topic = f"{MQTT_TOPIC_PREFIX}/{user_id}/{MQTT_TOPIC_COMMAND}"
@@ -232,23 +225,24 @@ async def publish_mqtt_command(  # noqa: PLR0913
                 msg = "MQTT client is not connected"
                 raise RuntimeError(msg)  # noqa: TRY301
             await mqtt.async_publish_json(topic, payload, qos=0, retain=False)
+            # TX observability: without this line a successful publish is
+            # invisible in the HA log, making command/ACK correlation on a
+            # live instance impossible (B-button finding 2026-07-03).
+            _LOGGER.debug(
+                "Jackery MQTT TX %s: messageType=%s actionId=%s cmd=%s",
+                device_id,
+                message_type,
+                action_id,
+                cmd,
+            )
             return  # noqa: TRY300
         except RuntimeError as err:
             last_err = err
             if attempt == 0:
-                try:
-                    await relogin_cb()
-                except JackeryAuthError as relogin_err:
-                    _raise_config_entry_auth_failed(
-                        "Jackery credentials rejected while refreshing "
-                        "MQTT command credentials",
-                        relogin_err,
-                    )
-                except JackeryError as relogin_err:
-                    _LOGGER.debug(
-                        "Jackery re-login before MQTT command retry failed: %s",
-                        relogin_err,
-                    )
+                # Transport-only retry: restart the MQTT client and try once
+                # more. Credential refresh is NOT done here — the HTTP/API
+                # login path owns auth and re-caches rotated credentials
+                # independently (owner invariant 2026-07-05).
                 await stop_mqtt_cb()
                 continue
 
@@ -263,20 +257,3 @@ async def publish_mqtt_command(  # noqa: PLR0913
             "mqtt_last_error": str(mqtt_last_error) if mqtt_last_error else "n/a",
         },
     ) from last_err
-
-
-def _raise_config_entry_auth_failed(message: str, err: Exception) -> NoReturn:
-    """Raise a ConfigEntryAuthFailed to indicate the config entry's credentials are.
-
-    invalid.
-
-    Parameters:
-        message (str): Human-readable error message to attach to the raised exception.
-        err (Exception): Original exception to chain as the cause.
-
-    Raises:
-        ConfigEntryAuthFailed: Always raised with `message` and chained from `err`.
-    """
-    from homeassistant.exceptions import ConfigEntryAuthFailed  # noqa: PLC0415
-
-    raise ConfigEntryAuthFailed(message) from err
