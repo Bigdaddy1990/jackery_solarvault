@@ -149,9 +149,8 @@ def looks_like_battery_pack(  # noqa: PLR0911  # flat reject/accept chain keeps 
         in NON_BATTERY_SUBDEVICE_TYPES
     ):
         return False
-    if (
-        str(item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "")
-        == str(SUBDEVICE_DEV_TYPE_BATTERY_PACK)
+    if str(item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "") == str(
+        SUBDEVICE_DEV_TYPE_BATTERY_PACK
     ):
         return True
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()

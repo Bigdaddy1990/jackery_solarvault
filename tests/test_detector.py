@@ -49,8 +49,11 @@ def test_battery_pack_extraction_still_ignores_unknown_subdevice_wrappers() -> N
         ],
     }
 
-    assert battery_packs_from_source(
-        source,
-        frozenset(),
-        BATTERY_PACK_HINT_KEYS,
-    ) is None
+    assert (
+        battery_packs_from_source(
+            source,
+            frozenset(),
+            BATTERY_PACK_HINT_KEYS,
+        )
+        is None
+    )
