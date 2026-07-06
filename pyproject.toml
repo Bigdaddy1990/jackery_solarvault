@@ -461,7 +461,7 @@ dev = [
     "coverage[toml]>=7.5.4",
     "defusedxml",
     "fastmcp",
-    "homeassistant>=2026.6.1",
+    "homeassistant>=2026.7.1",
     "homeassistant-stubs",
     "hypothesis",
     "ifaddr",
