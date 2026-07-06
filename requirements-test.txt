@@ -1,6 +1,5 @@
 aiohttp>=3.14.1
 aiomqtt
-astroid
 annotatedyaml
 astroid
 coverage
@@ -16,6 +15,7 @@ prek
 protobuf
 pydantic
 pyjwt
+pylint
 pytest
 pytest-asyncio
 pytest-cov
@@ -23,9 +23,8 @@ pytest-github-actions-annotate-failures>=0.4.0
 pytest-homeassistant
 pytest-homeassistant-custom-component
 pyyaml
-pylint
-semgo
 ruff>=0.15.20
+semgo
 syrupy
 types-aiofiles>=25.1.0.20251011
 types-atomicwrites>=1.4.5.1

@@ -435,7 +435,7 @@ select = [
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "E501", "F401"]
-ignore = ["D417", "TID252"] 
+ignore = ["D417", "TID252"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []

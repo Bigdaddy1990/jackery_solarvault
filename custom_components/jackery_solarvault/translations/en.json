@@ -82,7 +82,7 @@
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "local_mqtt_enable": "Subscribes to the SolarVault's local MQTT broker for LAN telemetry. Cloud MQTT pauses while the local connection is active; the cloud HTTP API keeps polling.",
           "local_mqtt_host": "IP or hostname of the local MQTT broker the SolarVault publishes to, for example 192.168.x.x.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -94,7 +94,7 @@
         "title": "Reconfigure Jackery SolarVault"
       },
       "shelly": {
-        "description": "Link Shelly cloud (Cloud-to-Cloud) accessories to the Jackery account {username}. A browser opens so you can authorize Shelly; the Jackery cloud completes the account link. Return to Home Assistant once you have authorized — the integration then confirms the bound devices and reloads so their entities appear.",
+        "description": "Link Shelly cloud (Cloud-to-Cloud) accessories to the Jackery account {username}. A browser opens so you can authorize Shelly; the Jackery cloud completes the account link. Return to Home Assistant once you have authorized \u2014 the integration then confirms the bound devices and reloads so their entities appear.",
         "title": "Pair Shelly cloud accessories"
       },
       "user": {
@@ -808,7 +808,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -817,13 +817,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "dhg_recall": {
         "name": "DHG recall"
@@ -1372,7 +1372,7 @@
         "name": "Daily on-grid output (Jackery cloud)"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "PV yield total"
@@ -1609,7 +1609,7 @@
       "fix_flow": {
         "step": {
           "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (§2 HTTP endpoints, §8 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
+            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (\u00a72 HTTP endpoints, \u00a78 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
             "title": "Force a Jackery cloud refresh"
           }
         }
@@ -1661,7 +1661,7 @@
           "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
