@@ -25,6 +25,7 @@ the command falls through to the MQTT path under test.
 import csv
 from dataclasses import dataclass
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -36,6 +37,8 @@ from custom_components.jackery_solarvault.button import QUERY_BUTTON_DESCRIPTION
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     FIELD_DEVICE_SN,
+    FIELD_MODEL_CODE,
+    PAYLOAD_DEBUG_LOGGER_NAME,
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
     PAYLOAD_PROPERTIES,
@@ -175,9 +178,17 @@ def _make_api_stub() -> MagicMock:
     """
     api = MagicMock(name="JackeryApi")
     api.async_login = AsyncMock(return_value=None)
+    # MQTT transports consume cached credentials only (owner invariant
+    # 2026-07-05); the command path reads this sync accessor, never the
+    # login-capable async one.
+    api.get_cached_mqtt_credentials = MagicMock(
+        return_value={"user_id": _MQTT_USER_ID},
+    )
     api.async_get_mqtt_credentials = AsyncMock(
         return_value={"user_id": _MQTT_USER_ID},
     )
+    api.async_get_system_list = AsyncMock(return_value=[])
+    api.async_list_devices_legacy = AsyncMock(return_value=[])
     api.mqtt_session_snapshot = MagicMock(return_value=None)
     api.hydrate_mqtt_session = MagicMock(return_value=None)
     api.async_close = AsyncMock(return_value=None)
@@ -200,7 +211,8 @@ def _portable_device_payload() -> dict[str, dict[str, Any]]:
         _DEVICE_ID: {
             PAYLOAD_DEVICE: {FIELD_DEVICE_SN: _DEVICE_SN},
             PAYLOAD_DISCOVERY: {FIELD_DEVICE_SN: _DEVICE_SN},
-            PAYLOAD_PROPERTIES: {"soc": 55},
+            # PortableBody model code — portable buttons are gated on it.
+            PAYLOAD_PROPERTIES: {"soc": 55, FIELD_MODEL_CODE: "3002"},
         },
     }
 
@@ -230,9 +242,15 @@ async def portable_setup(
     entry.add_to_hass(hass)
 
     api = _make_api_stub()
-    with patch(
-        "custom_components.jackery_solarvault.JackeryApi",
-        return_value=api,
+    with (
+        patch(
+            "custom_components.jackery_solarvault.JackeryApi",
+            return_value=api,
+        ),
+        patch(
+            "custom_components.jackery_solarvault._async_finish_entry_startup",
+            AsyncMock(return_value=None),
+        ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -368,3 +386,97 @@ async def test_portable_button_publishes_catalog_ble_msg_type(
     body = json.loads(envelope["body"])
     assert body["cmd"] == row.ble_msg_type
     assert body["cmd"] != row.msg_id
+
+
+async def test_home_devices_get_no_portable_button_twins(
+    hass: HomeAssistant,
+    portable_setup: tuple[MockConfigEntry, _CapturingMqtt],
+) -> None:
+    """Portable buttons must not duplicate onto non-portable devices.
+
+    Live finding 2026-07-03: the home SolarVault carried the full
+    portable twin set ("Zeitzone synchronisieren" x2, HA suffixing the
+    colliding names with ``_2``) because the button platform, unlike the
+    sensor platform, never gated the portable family on model code 3002.
+    """
+    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
+    entry, _capturing = portable_setup
+    coordinator = entry.runtime_data
+    data = dict(coordinator.data)
+    data["dev-home-9"] = {
+        PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "SN-HOME-0009"},
+        PAYLOAD_DISCOVERY: {FIELD_DEVICE_SN: "SN-HOME-0009"},
+        PAYLOAD_PROPERTIES: {"soc": 50},
+    }
+    coordinator.async_set_updated_data(data)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    assert (
+        registry.async_get_entity_id("button", DOMAIN, "dev-home-9_sync_time_zone")
+        is not None
+    ), "home button family must still be created"
+    assert (
+        registry.async_get_entity_id(
+            "button",
+            DOMAIN,
+            "dev-home-9_portable_sync_time_zone",
+        )
+        is None
+    ), "portable twin must not exist on a home device"
+
+
+async def test_button_press_leaves_a_tx_trace(
+    hass: HomeAssistant,
+    portable_setup: tuple[MockConfigEntry, _CapturingMqtt],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A successful command publish is observable in log and payload debug.
+
+    Live finding 2026-07-03: neither ``publish_mqtt_command`` nor the
+    payload-debug JSONL recorded outbound commands, so a cloud-MQTT
+    button press could not be correlated with any device ACK. A press
+    must leave (a) a DEBUG "Jackery MQTT TX" log line and (b) a
+    ``kind="mqtt_tx"`` payload-debug event carrying actionId and cmd.
+    """
+    _entry, _capturing = portable_setup
+    row = _ASSERTED_ROWS[0]
+    description = _PORTABLE_BUTTONS_BY_MSG_ID[row.msg_id]
+    entity_id = _entity_id_for(hass, description.key)
+
+    tx_events: list[dict[str, Any]] = []
+
+    def _capture_line(
+        _path: str,
+        event: dict[str, Any],
+        _redactions_disabled: bool,  # positional executor-job signature
+    ) -> None:
+        tx_events.append(event)
+
+    payload_debug_logger = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
+    old_level = payload_debug_logger.level
+    payload_debug_logger.setLevel(logging.DEBUG)
+    try:
+        with (
+            caplog.at_level(
+                logging.DEBUG,
+                logger="custom_components.jackery_solarvault.client.mqtt",
+            ),
+            patch(
+                "custom_components.jackery_solarvault.coordinator."
+                "append_payload_debug_line",
+                side_effect=_capture_line,
+            ),
+        ):
+            await _press(hass, entity_id)
+    finally:
+        payload_debug_logger.setLevel(old_level)
+
+    assert any("Jackery MQTT TX" in record.getMessage() for record in caplog.records), (
+        "successful publish must log a TX line"
+    )
+    mqtt_tx = [event for event in tx_events if event.get("kind") == "mqtt_tx"]
+    assert mqtt_tx, "successful publish must emit a payload-debug mqtt_tx event"
+    assert mqtt_tx[0]["payload"]["actionId"] == row.msg_id
+    assert mqtt_tx[0]["payload"]["cmd"] == row.ble_msg_type
