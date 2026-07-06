@@ -152,9 +152,7 @@ async def test_device_period_diagnostics_keep_context_for_null_payload() -> None
             APP_REQUEST_END_DATE: "2026-07-03",
         },
     }
-    stored = api.last_device_period_stat_responses[
-        f"{DEVICE_PV_STAT_PATH}:dev-1:day"
-    ]
+    stored = api.last_device_period_stat_responses[f"{DEVICE_PV_STAT_PATH}:dev-1:day"]
     assert stored[APP_REQUEST_META] == {
         "path": DEVICE_PV_STAT_PATH,
         "params": {
