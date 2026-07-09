@@ -23,7 +23,7 @@ pytest-github-actions-annotate-failures>=0.4.0
 pytest-homeassistant
 pytest-homeassistant-custom-component
 pyyaml
-ruff>=0.15.20
+ruff>=0.15.21
 semgo
 syrupy
 types-aiofiles>=25.1.0.20251011

@@ -489,7 +489,7 @@ dev = [
     "pytest-homeassistant-custom-component",
     "pyupgrade",
     "pyyaml",
-    "ruff>=0.15.20",
+    "ruff>=0.15.21",
     "segno",
     "semgrep",
     "smellcheck",

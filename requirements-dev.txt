@@ -38,7 +38,7 @@ pytest-homeassistant-custom-component
 python
 pyupgrade
 pyyaml
-ruff>=0.15.20
+ruff>=0.15.21
 semgo
 semgrep
 smellcheck
