@@ -8,7 +8,7 @@ hypothesis
 jinja2
 mypy
 numpy
-packaging>=26.0
+packaging>=26.2
 pip>=26.0
 pre-commit
 prek
