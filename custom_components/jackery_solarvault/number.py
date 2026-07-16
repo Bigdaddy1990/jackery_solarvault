@@ -82,7 +82,7 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _rounded_int(value: Any) -> int:  # noqa: ANN401
+def _rounded_int(value: Any) -> int:  # ruff:ignore[any-type]
     """Round a value accepted by Home Assistant as a number to the nearest integer.
 
     Parameters:
@@ -140,7 +140,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 # ---------------------------------------------------------------------------
 
 
-def _wire_int(value: Any) -> int:  # noqa: ANN401
+def _wire_int(value: Any) -> int:  # ruff:ignore[any-type]
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
@@ -161,7 +161,7 @@ def _wire_int(value: Any) -> int:  # noqa: ANN401
     return parsed
 
 
-def _wire_float(value: Any) -> float:  # noqa: ANN401
+def _wire_float(value: Any) -> float:  # ruff:ignore[any-type]
     """Parse an arbitrary input into a float suitable for coordinator setter calls.
 
     Parameters:
@@ -225,7 +225,7 @@ async def _set_max_feed_grid(
         select 800, otherwise 2500.
     """
     parsed = _wire_int(value)
-    await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)  # noqa: PLR2004
+    await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)  # ruff:ignore[magic-value-comparison]
 
 
 async def _set_max_output_power(
@@ -469,7 +469,7 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
-        if feed_limit is not None and feed_limit > 800:  # noqa: PLR2004
+        if feed_limit is not None and feed_limit > 800:  # ruff:ignore[magic-value-comparison]
             return 2500.0
     for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
         meta = payload.get(section) or {}
@@ -478,7 +478,7 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     max_out_int = safe_int(props.get(FIELD_MAX_OUT_PW))
     if max_out_int is None:
         max_out_int = 2500
-    return 800.0 if max_out_int <= 800 else 2500.0  # noqa: PLR2004
+    return 800.0 if max_out_int <= 800 else 2500.0  # ruff:ignore[magic-value-comparison]
 
 
 def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
@@ -492,7 +492,7 @@ def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
         tuple[float, ...]: Allowed feed-in values; either `(800.0,)` when the device's
         dynamic max is 800 or less, otherwise `(800.0, 2500.0)`.
     """
-    if _max_feed_grid_dynamic_max(payload) <= 800:  # noqa: PLR2004
+    if _max_feed_grid_dynamic_max(payload) <= 800:  # ruff:ignore[magic-value-comparison]
         return (800.0,)
     return (800.0, 2500.0)
 
@@ -857,14 +857,14 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             str | None: The unit of measurement, or `None` if not set.
-        """  # noqa: D421
+        """  # ruff:ignore[property-docstring-starts-with-verb]
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(self._payload)
         return self.entity_description.native_unit_of_measurement
 
     @property
     def suggested_display_precision(self) -> int | None:
-        """Return the suggested number of decimal places for display."""  # noqa: D421
+        """Return the suggested number of decimal places for display."""  # ruff:ignore[property-docstring-starts-with-verb]
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
@@ -967,7 +967,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(  # noqa: RUF029
+async def async_setup_entry(  # ruff:ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,

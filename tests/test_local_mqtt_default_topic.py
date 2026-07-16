@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_start_local_mqtt,  # noqa: PLC2701  # tests exercise the module-private setup helper directly
+    _async_start_local_mqtt,  # ruff:ignore[import-private-name]  # tests exercise the module-private setup helper directly
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,

@@ -25,15 +25,15 @@ _BACKOFF_ERROR = JackeryApiError("cloud says code=10422")
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for private policy helpers without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._endpoint_backoff = {}  # noqa: SLF001
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # noqa: SLF001
-    coordinator._cloud_mqtt_paused_by_local_mqtt_count = 0  # noqa: SLF001
+    coordinator._endpoint_backoff = {}  # ruff:ignore[private-member-access]
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff:ignore[private-member-access]
+    coordinator._cloud_mqtt_paused_by_local_mqtt_count = 0  # ruff:ignore[private-member-access]
     return coordinator
 
 
 def _backoff_remaining(coordinator: JackerySolarVaultCoordinator, key: str) -> int:
     """Return the rounded backoff delay stored for a test key."""
-    state = coordinator._endpoint_backoff[key]  # noqa: SLF001
+    state = coordinator._endpoint_backoff[key]  # ruff:ignore[private-member-access]
     return int(state["until"] - _NOW)
 
 
@@ -48,7 +48,7 @@ def test_kwh_endpoint_backoff_is_capped_at_two_minutes(
     )
 
     for _ in range(_REPEATED_FAILURE_COUNT):
-        assert coordinator._endpoint_backoff_note_failure(  # noqa: SLF001
+        assert coordinator._endpoint_backoff_note_failure(  # ruff:ignore[private-member-access]
             _KWH_BACKOFF_KEY,
             _BACKOFF_ERROR,
         )
@@ -67,7 +67,7 @@ def test_very_slow_endpoint_backoff_still_allows_long_escalation(
     )
 
     for _ in range(_REPEATED_FAILURE_COUNT):
-        assert coordinator._endpoint_backoff_note_failure(  # noqa: SLF001
+        assert coordinator._endpoint_backoff_note_failure(  # ruff:ignore[private-member-access]
             _VERY_SLOW_BACKOFF_KEY,
             _BACKOFF_ERROR,
         )
@@ -81,8 +81,8 @@ def test_very_slow_endpoint_backoff_still_allows_long_escalation(
 def _live_local_coordinator() -> JackerySolarVaultCoordinator:
     """Build a coordinator whose local MQTT channel counts as live."""
     coordinator = _bare_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = time.monotonic()  # noqa: SLF001
-    coordinator._mqtt = cast(  # noqa: SLF001
+    coordinator._local_mqtt_last_message_monotonic = time.monotonic()  # ruff:ignore[private-member-access]
+    coordinator._mqtt = cast(  # ruff:ignore[private-member-access]
         "Any",
         SimpleNamespace(
             is_connected=True,
@@ -93,7 +93,7 @@ def _live_local_coordinator() -> JackerySolarVaultCoordinator:
         mqtt_fingerprint=("client", "host", "session"),
         async_get_mqtt_credentials=AsyncMock(return_value={}),
     )
-    coordinator._mqtt_mgr = MagicMock()  # noqa: SLF001
+    coordinator._mqtt_mgr = MagicMock()  # ruff:ignore[private-member-access]
     return coordinator
 
 
@@ -102,11 +102,11 @@ async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> No
     """A live local MQTT channel pauses cloud MQTT and avoids credential I/O."""
     coordinator = _live_local_coordinator()
 
-    await coordinator._async_ensure_mqtt(force=False)  # noqa: SLF001
+    await coordinator._async_ensure_mqtt(force=False)  # ruff:ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_awaited_once()  # noqa: SLF001
+    cast("Any", coordinator._mqtt).async_stop.assert_awaited_once()  # ruff:ignore[private-member-access]
     cast("Any", coordinator.api).async_get_mqtt_credentials.assert_not_awaited()
-    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_not_called()  # noqa: SLF001
+    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_not_called()  # ruff:ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -119,10 +119,10 @@ async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     """
     coordinator = _live_local_coordinator()
 
-    await coordinator._async_ensure_mqtt(force=True, wait_connected=True)  # noqa: SLF001
+    await coordinator._async_ensure_mqtt(force=True, wait_connected=True)  # ruff:ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # noqa: SLF001
-    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()  # noqa: SLF001
+    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff:ignore[private-member-access]
+    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()  # ruff:ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -137,18 +137,18 @@ async def test_connected_but_silent_local_client_does_not_pause_cloud(
     MQTT command fallback — while local delivered exactly nothing.
     """
     coordinator = _live_local_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # noqa: SLF001
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff:ignore[private-member-access]
     monkeypatch.setattr(
         type(coordinator),
         "_local_mqtt_direct_client_connected",
         lambda _self: True,
     )
 
-    assert coordinator._local_mqtt_is_active() is False  # noqa: SLF001
+    assert coordinator._local_mqtt_is_active() is False  # ruff:ignore[private-member-access]
 
-    await coordinator._async_ensure_mqtt(force=False)  # noqa: SLF001
+    await coordinator._async_ensure_mqtt(force=False)  # ruff:ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # noqa: SLF001
+    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff:ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -156,7 +156,7 @@ async def test_local_mqtt_message_marks_local_channel_live() -> None:
     """HA/local MQTT frames count as local activity even without direct-client state."""
     coordinator = _bare_coordinator()
     handler = AsyncMock(return_value=None)
-    cast("Any", coordinator)._async_handle_mqtt_message = handler  # noqa: SLF001
+    cast("Any", coordinator)._async_handle_mqtt_message = handler  # ruff:ignore[private-member-access]
 
     await coordinator.async_handle_local_mqtt_message(
         "jackery/local",
@@ -166,5 +166,5 @@ async def test_local_mqtt_message_marks_local_channel_live() -> None:
         },
     )
 
-    assert coordinator._local_mqtt_is_active() is True  # noqa: SLF001
+    assert coordinator._local_mqtt_is_active() is True  # ruff:ignore[private-member-access]
     handler.assert_awaited_once()

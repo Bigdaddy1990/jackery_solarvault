@@ -35,8 +35,8 @@ _SYSTEM_ID = "573702884982521856"
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the shadow-poll policy without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._last_shadow_query = {}  # noqa: SLF001
-    coordinator._subdevice_query_interval_sec = 0  # noqa: SLF001
+    coordinator._last_shadow_query = {}  # ruff:ignore[private-member-access]
+    coordinator._subdevice_query_interval_sec = 0  # ruff:ignore[private-member-access]
     return coordinator
 
 
@@ -61,7 +61,7 @@ async def test_shadow_poll_runs_despite_fresh_mqtt_and_no_accessories() -> None:
         "_async_apply_shadows_for_entry",
         AsyncMock(return_value=False),
     ) as apply_shadows:
-        await coordinator._async_shadow_fallback_for_missing(snapshot)  # noqa: SLF001
+        await coordinator._async_shadow_fallback_for_missing(snapshot)  # ruff:ignore[private-member-access]
 
     apply_shadows.assert_awaited_once()
     await_args = apply_shadows.await_args
@@ -80,7 +80,7 @@ async def test_system_shadow_is_fetched_without_a_combo_accessory() -> None:
         async_get_system_shadow=get_system_shadow,
     )
 
-    result = await coordinator._async_fetch_system_shadow_body(  # noqa: SLF001
+    result = await coordinator._async_fetch_system_shadow_body(  # ruff:ignore[private-member-access]
         _DEVICE_ID,
         parent_sn=_PARENT_SN,
         system_id=_SYSTEM_ID,
@@ -102,7 +102,7 @@ async def test_system_shadow_skips_only_without_system_id() -> None:
         async_get_system_shadow=get_system_shadow,
     )
 
-    result = await coordinator._async_fetch_system_shadow_body(  # noqa: SLF001
+    result = await coordinator._async_fetch_system_shadow_body(  # ruff:ignore[private-member-access]
         _DEVICE_ID,
         parent_sn=_PARENT_SN,
         system_id=None,

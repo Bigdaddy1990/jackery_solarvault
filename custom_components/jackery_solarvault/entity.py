@@ -108,7 +108,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         Returns:
             dict[str, Any]: PV trends data from the device payload, or an empty dict if
             not present.
-        """  # noqa: D421
+        """  # ruff:ignore[property-docstring-starts-with-verb]
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
@@ -118,7 +118,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         Returns:
             The alarm payload object from the device payload, or None if no alarm data
             is present.
-        """  # noqa: D421
+        """  # ruff:ignore[property-docstring-starts-with-verb]
         return self._payload.get(PAYLOAD_ALARM)
 
     @property

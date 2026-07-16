@@ -19,7 +19,7 @@ from .coordinator import JackerySolarVaultCoordinator
 from .handlers.exceptions import BACKGROUND_TASK_ERRORS
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant  # noqa: F811
+    from homeassistant.core import HomeAssistant  # ruff:ignore[redefined-while-unused]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class AppDataInconsistencyRepairFlow(RepairsFlow):
             await coordinator.async_request_refresh()
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:  # ruff:ignore[blind-except]
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
@@ -150,7 +150,7 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
+async def async_create_fix_flow(  # ruff:ignore[unused-async]  # HA awaits this entry point
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,
@@ -173,6 +173,6 @@ async def async_create_fix_flow(  # noqa: RUF029  # HA awaits this entry point
             "device_id": device_id,
         }
         return DeviceNotActivatedRepairFlow(entry_id, description_placeholders)
-    msg = f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"  # noqa: F841
+    msg = f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"  # ruff:ignore[unused-variable]
     msg_0 = f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
     raise data_entry_flow.UnknownFlow(msg_0)
