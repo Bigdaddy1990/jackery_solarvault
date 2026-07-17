@@ -182,7 +182,7 @@ class JackeryBleListener:
             key_resolver (Callable[[str], bytes | None]): Returns the 16- or 32-byte AES key for a given device_id, or None if unavailable.
             ble_address_resolver (Callable[[str], str | None]): Returns the BLE MAC for a given device_id, or None; the listener also caches discovered addresses and exposes them via address_for_device_id.
             serial_resolver (Callable[[str], str | None] | None): Maps a BLE-broadcast serial string to a Jackery device_id; when omitted incoming advertisements with unmapped serials are logged but not associated.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         self._hass = hass
         self._sink = sink
         self._key_resolver = key_resolver
@@ -229,7 +229,7 @@ class JackeryBleListener:
 
         Returns:
             The MAC address string for the device, or `None` if no cached address exists.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return self._device_addresses.get(device_id)
 
     # ------------------------------------------------------------------
@@ -247,7 +247,7 @@ class JackeryBleListener:
         """
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
-            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
+            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # ruff:ignore[private-member-access]
                 self._mtu[device_id] = value
                 _LOGGER.debug(
                     "Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)",
@@ -267,7 +267,7 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    async def async_ensure_connected(  # noqa: PLR0911  # flat transport guard chain; the connect-backoff gate is the 7th early exit
+    async def async_ensure_connected(  # ruff:ignore[too-many-return-statements]  # flat transport guard chain; the connect-backoff gate is the 7th early exit
         self,
         device_id: str,
         *,
@@ -336,18 +336,18 @@ class JackeryBleListener:
         # lookup — ``ble_transport`` is imported during
         # ``async_start_ble_transport`` from the coordinator, but the
         # const module is already loaded at that point.
-        from ...const import (  # noqa: PLC0415
+        from ...const import (  # ruff:ignore[import-outside-top-level]
             MQTT_CMD_QUERY_DEVICE_PROPERTY,  # noqa: PLC0415, RUF100, TID252
         )
 
-        try:  # noqa: PLW0717
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             while not self._stop_event.is_set():
                 try:
                     await asyncio.wait_for(
                         self._stop_event.wait(),
                         timeout=_KEEPALIVE_INTERVAL_SEC,
                     )
-                    return  # stop_event fired  # noqa: TRY300
+                    return  # stop_event fired  # ruff:ignore[try-consider-else]
                 except TimeoutError:
                     pass
                 if device_id not in self._clients:
@@ -370,10 +370,10 @@ class JackeryBleListener:
                         device_id,
                         err,
                     )
-        except asyncio.CancelledError:  # noqa: TRY203
+        except asyncio.CancelledError:  # ruff:ignore[useless-try-except]
             raise
 
-    async def async_send_command(  # noqa: PLR0912, PLR0913
+    async def async_send_command(  # ruff:ignore[too-many-branches, too-many-arguments]
         self,
         device_id: str,
         *,
@@ -404,7 +404,7 @@ class JackeryBleListener:
 
         Raises:
             RuntimeError: When the payload cannot be chunked for the selected MTU, on GATT-layer failures (including write timeouts), or when an ACK wait times out.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         client = self._clients.get(device_id)
         if client is None:
             _LOGGER.debug(
@@ -551,7 +551,7 @@ class JackeryBleListener:
         Returns:
             _PendingAck: A record containing `expected_cmds` (a `frozenset` of the provided command IDs or `None`)
                 and `future`, an `asyncio.Future` that will be resolved with the matching `ble.BleBinaryFrame`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         loop = asyncio.get_running_loop()
         expected_cmds: frozenset[int] | None = None
         if ack_cmds:
@@ -559,7 +559,7 @@ class JackeryBleListener:
             for ack_cmd in ack_cmds:
                 if isinstance(ack_cmd, bool) or not isinstance(ack_cmd, int):
                     msg = "ack_cmds must be an integer"
-                    raise ValueError(msg)  # noqa: TRY004
+                    raise ValueError(msg)  # ruff:ignore[type-check-without-type-error]
                 parsed_cmds.add(ack_cmd)
             expected_cmds = frozenset(parsed_cmds)
         pending = _PendingAck(
@@ -631,10 +631,12 @@ class JackeryBleListener:
 
         Parameters:
             device_ids (list[str]): Device IDs to monitor; a background connection task will be created lazily for a device the first time an advertisement matching the listener's BLE matcher is seen.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         # Deferred imports keep this module importable in unit-test
         # environments without BlueZ / bleak.
-        from homeassistant.components import bluetooth  # noqa: PLC0415
+        from homeassistant.components import (
+            bluetooth,
+        )
 
         self._stop_event.clear()
 
@@ -672,12 +674,12 @@ class JackeryBleListener:
         """Stop the BLE listener and release its resources.
 
         Signals the listener to stop, unregisters Bluetooth advertisement callbacks, cancels active connection runner tasks and waits up to _STOP_TIMEOUT_SEC for them to exit, clears connection state, and cancels any pending ACK futures so callers waiting for acknowledgements do not hang. Logs the listener shutdown.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         self._stop_event.set()
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
+            except Exception as err:  # pragma: no cover — HA callback contract is sync  # ruff:ignore[blind-except]
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Cancel any running connection tasks.
@@ -752,7 +754,7 @@ class JackeryBleListener:
 
         Returns:
             `device_id` if the advertisement maps to a known device, `None` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         address = service_info.address
         # Step 1: address cache hit.
         for cached_id, cached_mac in self._device_addresses.items():
@@ -791,21 +793,21 @@ class JackeryBleListener:
             )
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:  # noqa: PLR0912, PLR0915
+    async def _async_run_connection(self, device_id: str, address: str) -> None:  # ruff:ignore[too-many-branches, too-many-statements]
         """Maintain a persistent BLE GATT session for the given device, subscribing to notifications and reconnecting on link loss.
 
         This coroutine opens and publishes a Bleak client for the given address, subscribes to the notify characteristic, runs a keep-alive while connected, and tears down and retries the session on disconnect until the listener is stopped or the task is cancelled.
 
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
-        """  # noqa: E501
-        from bleak.exc import BleakError  # noqa: I001, PLC0415
-        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection  # noqa: PLC0415
+        """  # ruff:ignore[line-too-long]
+        from bleak.exc import BleakError  # ruff:ignore[unsorted-imports, import-outside-top-level]
+        from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection  # ruff:ignore[import-outside-top-level]
 
-        from homeassistant.components import bluetooth  # noqa: PLC0415
+        from homeassistant.components import bluetooth  # ruff:ignore[import-outside-top-level]
 
         stats = self.stats_for(device_id)
-        try:  # noqa: PLW0717
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             while not self._stop_event.is_set():
                 ble_device = bluetooth.async_ble_device_from_address(
                     self._hass, address, connectable=True
@@ -837,7 +839,7 @@ class JackeryBleListener:
                             self._stop_event.wait(),
                             timeout=BLE_CONNECT_BACKOFF_INITIAL_SEC,
                         )
-                        return  # stop_event fired during the wait  # noqa: TRY300
+                        return  # stop_event fired during the wait  # ruff:ignore[try-consider-else]
                     except TimeoutError:
                         continue
                 stats.connect_attempts += 1
@@ -873,7 +875,7 @@ class JackeryBleListener:
                             self._stop_event.wait(),
                             timeout=BLE_CONNECT_BACKOFF_INITIAL_SEC,
                         )
-                        return  # stop_event fired during the wait  # noqa: TRY300
+                        return  # stop_event fired during the wait  # ruff:ignore[try-consider-else]
                     except TimeoutError:
                         continue
 
@@ -919,7 +921,7 @@ class JackeryBleListener:
                     # do not all fire it reliably, so the 1s poll is a deliberate
                     # robustness net that a single ``Event.wait()`` cannot replace
                     # (hence ASYNC110 is suppressed below).
-                    while not self._stop_event.is_set() and client.is_connected:  # noqa: ASYNC110
+                    while not self._stop_event.is_set() and client.is_connected:  # ruff:ignore[async-busy-wait]
                         await asyncio.sleep(1.0)
                 except BleakError as err:
                     stats.last_error = f"notify: {err}"
@@ -1002,7 +1004,7 @@ class JackeryBleListener:
 
         Parameters:
             device_id (str): Identifier of the device whose disconnect is being recorded.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now()
         # Promoted from DEBUG to INFO: peripheral disconnects are the
@@ -1019,7 +1021,7 @@ class JackeryBleListener:
         """Process a BLE notification: decode into a BleFrameObservation, update per-device statistics, resolve any pending ACK waiters for a successfully parsed frame, and forward the observation to the configured async sink.
 
         If a per-device AES key is available the method attempts to decrypt the raw payload and, on decryption failure, performs a single fallback try after base64-decoding the payload. A BleFrameObservation (containing the original bytes, base64 encoding, the parsed frame when decoding succeeds, or a human-readable decode error) is always created and forwarded to the sink. When a frame is parsed successfully this method resolves matching pending ACK futures and increments decode-related counters; when parsing fails it increments the decode-failure counter.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         stats = self.stats_for(device_id)
         stats.frames_received += 1
         b64 = base64.b64encode(raw).decode("ascii")
@@ -1071,7 +1073,7 @@ class JackeryBleListener:
                 stats.last_error = f"notify: {decode_error}"
         try:
             await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
+        except Exception as err:  # pragma: no cover — sink misbehaviour  # ruff:ignore[blind-except]
             _LOGGER.debug("Jackery BLE %s sink raised: %s", device_id, err)
 
 

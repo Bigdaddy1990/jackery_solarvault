@@ -166,7 +166,7 @@ def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
 
     Returns:
         bool: The resolved boolean value (`true` or `false`), or `default` if the value is missing or not parseable.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -188,7 +188,7 @@ def config_entry_str_option(entry: object, key: str, default: str) -> str:
 
     Returns:
         str: The resolved option value coerced to `str`, or `default` when unset.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -209,7 +209,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
 
     Returns:
         int: The resolved integer option or `default` if not present or not convertible.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -265,7 +265,7 @@ def parse_utc_datetime(
     Raises:
         ValueError: If the input is an empty string or an invalid timestamp/ISO string.
         TypeError: If the input is not a datetime, numeric, or string value.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -315,7 +315,7 @@ def coordinator_entity_signature(
         tuple[tuple[Any, ...], ...]: A tuple of per-device signature tuples. Each entry preserves the device ID and includes,
         in order: a tuple of smart-plug serials, battery pack count, a tuple of meter-head serials, a boolean indicating presence of an
         alarm payload, a boolean indicating presence of an OTA current version, and a boolean indicating presence of a CT meter.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not coordinator_data:
         return ()
     sig: list[Any] = []
@@ -358,7 +358,7 @@ def append_unique_entity[EntityT](
 
     Returns:
         `True` if the entity was appended, `False` if it was skipped due to a duplicate `unique_id`.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         logger.debug("Skip duplicate %s unique_id=%s", platform, uid)
@@ -386,7 +386,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
 
     Returns:
         tuple[date, date]: (begin_date, end_date) for the requested period, inclusive.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     date_type = validate_app_period_date_type(date_type)
     if today is None:
         today = datetime.now(UTC).astimezone().date()
@@ -442,7 +442,7 @@ def app_period_date_bounds(
 
     Raises:
         ValueError: If inputs are invalid for a date bound or if the resolved begin date is after the resolved end date.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -520,7 +520,7 @@ def safe_float(
 
     Returns:
         float_value (float | None): The parsed float on success, or `None` if `value` is `None` or cannot be converted.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if value is None:
         return None
     if isinstance(value, str):
@@ -589,8 +589,8 @@ def dev_mode_redactions_disabled() -> bool:
 
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
-    """  # noqa: E501
-    global _DEV_MODE_CACHED  # noqa: PLW0603  # module-level memoization cache for a one-time env lookup
+    """  # ruff:ignore[line-too-long]
+    global _DEV_MODE_CACHED  # ruff:ignore[global-statement]  # module-level memoization cache for a one-time env lookup
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
         _DEV_MODE_CACHED = raw.strip().lower() in {"1", "true", "yes", "on"}
@@ -605,7 +605,7 @@ def diagnostic_redactions_disabled(entry: object | None = None) -> bool:
 
     Returns:
         bool: `True` if redactions are disabled, `False` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if dev_mode_redactions_disabled():
         return True
     if entry is None:
@@ -631,7 +631,7 @@ def _payload_debug_redacted(
 
     Returns:
         Any: A redacted, JSON-serializable representation of `value` (or a normalized passthrough when redactions are disabled).
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if redactions_disabled is None:
         redactions_disabled = diagnostic_redactions_disabled()
     if redactions_disabled:
@@ -694,7 +694,7 @@ def redacted_json_safe_payload(
 
     Returns:
         Any: The input value converted into a JSON-safe structure with sensitive fields replaced by the module's redaction marker.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return _payload_debug_redacted(value, redactions_disabled=False)
 
 
@@ -706,7 +706,7 @@ def active_redact_keys(entry: object | None = None) -> frozenset[str]:
 
     Returns:
         frozenset[str]: An empty set when redactions are disabled, otherwise a frozenset containing the keys that must be redacted (`REDACT_KEYS`).
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if diagnostic_redactions_disabled(entry):
         return frozenset()
     return frozenset(REDACT_KEYS)
@@ -724,7 +724,7 @@ def chart_series_debug(source: object) -> dict[str, Any]:
         dict[str, Any]: Mapping of chart-series keys to diagnostics objects as described above.
         When present in the source, includes top-level `labels` (from `APP_CHART_LABELS`) and `request`
         (from `APP_REQUEST_META`) entries.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not isinstance(source, dict):
         return {}
     result: dict[str, Any] = {}
@@ -804,7 +804,7 @@ def append_payload_debug_line(
         path (str | Path): Path to the JSONL file to append. Parent directories will be created if missing.
         event (dict[str, Any]): Event payload to serialize and write (will be redacted unless redactions are disabled).
         redactions_disabled (bool | None): When `True`, write the event without redaction; when `False`, enforce redaction; when `None`, use the module's default redaction behavior.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
@@ -821,12 +821,12 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: bool | float | str | None) -> bool | None:  # noqa: PLR0911  # boolean payload value; flat type-dispatch guard chain is clearest as-is
+def safe_bool(value: bool | float | str | None) -> bool | None:  # ruff:ignore[too-many-return-statements]  # boolean payload value; flat type-dispatch guard chain is clearest as-is
     """Interpret a payload value as a boolean.
 
     Returns:
         `True` if the value represents a true state, `False` if it represents a false state, `None` if the value is `None` or cannot be interpreted.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if value is None:
         return None
     if isinstance(value, bool):
@@ -853,7 +853,7 @@ def smart_plug_serial(plug: object) -> str | None:
 
     Returns:
         serial (str | None): The trimmed value from serial fields, falling back to cloud id fields for Shelly Cloud sockets.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not isinstance(plug, dict):
         return None
     return first_nonblank_text(
@@ -868,7 +868,7 @@ def smart_plug_serial(plug: object) -> str | None:
 
 def _sorted_by_serial(
     items: object,
-    serial_fn: Any,  # noqa: ANN401
+    serial_fn: Any,  # ruff:ignore[any-type]
 ) -> list[dict[str, Any]]:
     """Return items sorted by identity extracted via `serial_fn`, omitting items.
 
@@ -894,7 +894,7 @@ def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
 
     Returns:
         list[dict[str, Any]]: The input entries that contain a stable identity (as determined by `smart_plug_serial`), sorted ascending by that identity. Entries without an identity are omitted.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not isinstance(plugs, list):
         return []
     entries: list[tuple[str, dict[str, Any]]] = []
@@ -1023,7 +1023,7 @@ def jackery_online_state(value: object) -> bool | None:
 
     Returns:
         True if the marker indicates online, False if it indicates offline, None when the value cannot be interpreted.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"online", "connected", "available"}:
@@ -1083,7 +1083,7 @@ class AppDataQualityWarning(NamedTuple):
 
         Returns:
             dict[str, object]: Diagnostic dictionary containing required fields and any available optional fields.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         payload: dict[str, object] = {
             DATA_QUALITY_KEY_LEVEL: self.level,
             DATA_QUALITY_KEY_REASON: self.reason,
@@ -1197,18 +1197,18 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     source_text = "unknown" if source_value is None else str(source_value)
     reference_text = "unknown" if reference_value is None else str(reference_value)
 
-    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # noqa: E501
+    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # ruff:ignore[line-too-long]
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
     reference_request = _format_request_range(
         warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST)
     )
 
     if source_request or reference_request:
-        text += f" [{source_section}: {source_request or "unknown"}; {reference_section}: {reference_request or "unknown"}]"  # noqa: E501
+        text += f" [{source_section}: {source_request or "unknown"}; {reference_section}: {reference_request or "unknown"}]"  # ruff:ignore[line-too-long]
     return text
 
 
-def verify_and_backfill(  # noqa: PLR0911, PLR0912
+def verify_and_backfill(  # ruff:ignore[too-many-return-statements, too-many-branches]
     cloud_value: float | None,
     local_value: float | None,
     *,
@@ -1296,7 +1296,7 @@ def app_data_quality_warnings(
     Returns:
         list[AppDataQualityWarning]: A list of deterministic warnings (possibly empty). Each warning includes rounded
         source/reference values (5 decimal places) and optional request and chart-series metadata for diagnostics.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if today is None:
         today = datetime.now(UTC).astimezone().date()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
@@ -1340,11 +1340,11 @@ def app_data_quality_warnings(
 
         Returns:
             str | None: The chart-series key for the given section and statistic when the section exists and contains a mapping; `None` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
-    def _add_warning(  # noqa: PLR0913  # keyword-only builder for distinct data-quality-warning fields
+    def _add_warning(  # ruff:ignore[too-many-arguments]  # keyword-only builder for distinct data-quality-warning fields
         *,
         reason: str,
         metric_key: str,
@@ -1369,7 +1369,7 @@ def app_data_quality_warnings(
 
         Side effects:
                 Appends a populated AppDataQualityWarning to the module-level `warnings` list. The warning includes chart-series key hints (derived from `stat_key`) and, when the source is not the overall statistic section, marks the total method as `"chart_series_sum"`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -1521,7 +1521,7 @@ def external_trend_statistic_id(
 
     Returns:
         str: A statistic id string in the form "<domain>:<device>_<metric>_<bucket>" where each part is normalized by `statistic_id_part`.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return (
         f"{domain}:"
         f"{statistic_id_part(device_id)}_"
@@ -1549,7 +1549,7 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     Returns:
         str | None: One of the `DATE_TYPE_*` suffix values when found, `None` if no date type can be determined.
         date type can be determined.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
         date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
@@ -1574,7 +1574,7 @@ def is_day_period_payload(source: dict[str, Any], section: str) -> bool:
 
     Returns:
         bool: `True` if the section/request date type is day, `False` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if section.endswith(f"_{DATE_TYPE_DAY}"):
         return True
     if section.endswith((
@@ -1591,7 +1591,7 @@ def is_device_year_period_section(source: dict[str, Any], section: str) -> bool:
 
     Returns:
         `true` if the section's request dateType is year and the section name starts with a device statistic prefix (PV, home, battery, or CT), `false` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return _trend_date_type(section, source) == DATE_TYPE_YEAR and section.startswith((
         APP_SECTION_PV_STAT,
         APP_SECTION_HOME_STAT,
@@ -1642,7 +1642,7 @@ def _prefer_raw_year_series_for_real_payload(
     if (
         not section.startswith(APP_SECTION_PV_STAT)
         or direct_total is None
-        or len(raw_values) < 12  # noqa: PLR2004
+        or len(raw_values) < 12  # ruff:ignore[magic-value-comparison]
     ):
         return False
     nonzero = [value for value in raw_values if abs(value) > _NEAR_ZERO_EPSILON]
@@ -1666,7 +1666,7 @@ def expanded_year_series_values(
             - If a documented scalar total (`stat_key`) is present, returns the expanded list only when its sum matches
               the documented total within a small tolerance; otherwise returns the raw series values.
             - If the series key is missing or the series is not a list, returns `None`.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1764,7 +1764,7 @@ def effective_trend_series_values(
 
     Returns:
         list[float] | None: Normalized list of floats rounded to 5 decimals, or `None` if the chart series key is not applicable or the series value is not a list.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1790,7 +1790,7 @@ def effective_period_total_value(
 
     Returns:
         float: The period total rounded to 2 decimals when available, `None` if no value can be determined.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
@@ -1837,7 +1837,7 @@ def year_payload_appears_current_month_only(
     Returns:
         bool: `True` if any inspected series has non-zero values only for `current_month`, `False` otherwise.
         `current_month`, `False` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1956,7 +1956,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(  # noqa: PLR0914  # cohesive savings estimation; intermediate totals kept named for clarity
+def _calculated_savings_from_year(  # ruff:ignore[too-many-locals]  # cohesive savings estimation; intermediate totals kept named for clarity
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -1979,7 +1979,7 @@ def _calculated_savings_from_year(  # noqa: PLR0914  # cohesive savings estimati
             - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
         None: If required inputs are missing (no usable device/home/CT totals or no configured/derivable price).
         configured/derivable price).
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -2153,7 +2153,7 @@ def _backfill_pv_revenue(
     Side effects:
         - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -2186,7 +2186,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(  # noqa: PLR0912  # per-month aggregation dispatch; branch chain mirrors the section shape
+def backfill_year_payload_from_months(  # ruff:ignore[too-many-branches]  # per-month aggregation dispatch; branch chain mirrors the section shape
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -2212,7 +2212,7 @@ def backfill_year_payload_from_months(  # noqa: PLR0912  # per-month aggregation
 
     Returns:
         A dictionary payload: either the unchanged `year_source` or a modified copy with corrected series/stat fields and `APP_YEAR_BACKFILL_META` when corrections were applied.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -2298,7 +2298,7 @@ def apply_year_month_backfill(
     Parameters:
         payload (dict[str, Any]): The full app payload to update; year-section keys (e.g. "<prefix>_year") may be replaced.
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section prefix to a mapping of 1-based month index -> month payload dict used to reconstruct year-series values.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             APP_SECTION_PV_STAT,
@@ -2337,7 +2337,7 @@ def apply_year_month_backfill(
         )
 
 
-def guard_statistic_totals_from_year(  # noqa: PLR0914  # data-quality guard; named per-metric totals aid diagnostics
+def guard_statistic_totals_from_year(  # ruff:ignore[too-many-locals]  # data-quality guard; named per-metric totals aid diagnostics
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -2354,7 +2354,7 @@ def guard_statistic_totals_from_year(  # noqa: PLR0914  # data-quality guard; na
     Parameters:
         payload (dict[str, Any]): App payload containing `PAYLOAD_STATISTIC` and period sections (e.g., PV year section).
         previous_statistic (dict[str, Any] | None): Optional prior statistic mapping whose `APP_STAT_TOTAL_GENERATION` may be used as a lower bound when the PV year section is absent.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     statistic = payload.get(PAYLOAD_STATISTIC)
     if not isinstance(statistic, dict):
         return
@@ -2495,11 +2495,11 @@ def compact_json(value: object) -> str:
 
     Returns:
         compact (str): JSON string with non-ASCII characters preserved and without unnecessary whitespace.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def trend_series_points(  # noqa: PLR0912  # trend-series parsing dispatches over unit/label/series shapes
+def trend_series_points(  # ruff:ignore[too-many-branches]  # trend-series parsing dispatches over unit/label/series shapes
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2516,7 +2516,7 @@ def trend_series_points(  # noqa: PLR0912  # trend-series parsing dispatches ove
 
     Returns:
         list[TrendStatisticPoint]: Points for each valid series bucket with the bucket start date and the value rounded to 5 decimals. Empty list when the series is missing, not kWh, out of range, or cannot be mapped to dates.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
@@ -2620,7 +2620,7 @@ def _parse_day_chart_minute(value: object) -> int | None:
     Returns:
         int: Minutes after local midnight for a valid label (0-1439).
         None: If the input is not a valid H:MM label or represents the disallowed `24:00` end marker.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not isinstance(value, str):
         return None
     match = _DAY_CHART_MINUTE_RE.fullmatch(value)
@@ -2652,7 +2652,7 @@ def _day_power_sample_minute(
         minute_of_day (int | None): Minutes after local midnight (0-1439) for the sample, or `None` if the computed minute is outside the day range or no valid label/index mapping exists.
         sample, or `None` if the computed minute is outside the day range or no valid
         label/index mapping exists.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
         if minute is not None:
@@ -2779,7 +2779,7 @@ def _resolve_day_request_window(
     return begin, now
 
 
-def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
+def day_power_energy_points(  # ruff:ignore[too-many-return-statements, too-many-branches, too-many-arguments, too-many-locals]  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2802,7 +2802,7 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914  # cohe
 
     Returns:
         list[TrendStatisticPoint]: Ordered list of points where `start_date` is the bucket start (local date/time for the request day) and `value` is the bucket kWh (rounded to 5 decimal places). Returns an empty list for invalid inputs, unsupported units, out-of-range request dates, or when scaling rules prevent producing buckets.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
         return []
     series_key = day_power_series_key(source, section, stat_key)
@@ -2825,7 +2825,7 @@ def day_power_energy_points(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914  # cohe
     series = source.get(series_key)
     scalar_total = effective_period_total_value(source, section, stat_key)
     if not isinstance(series, list) or not series:
-        if scalar_total != 0.0:  # noqa: RUF069  # exact zero means safe zero-fill
+        if scalar_total != 0.0:  # ruff:ignore[float-equality-comparison]  # exact zero means safe zero-fill
             return _scalar_day_energy_points(
                 begin=begin,
                 scalar_total=scalar_total,
@@ -2923,7 +2923,7 @@ def directional_power_value(
 
     Returns:
         float | None: The net power (sum of positive keys minus sum of negative keys) if at least one numeric value is present, `None` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     positive = 0.0
     negative = 0.0
     found = False
@@ -2953,7 +2953,7 @@ def signed_phase_power_values(ct: dict[str, Any]) -> list[float] | None:
 
     Returns:
         list[float] | None: A list of signed per-phase power values in the same order as CT_PHASE_POWER_PAIRS, or `None` if any phase value is missing or cannot be computed.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     values: list[float] = []
     for pos_key, neg_key in CT_PHASE_POWER_PAIRS:
         value = directional_power_value(ct, (pos_key,), (neg_key,))
@@ -2979,7 +2979,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(  # noqa: PLR0911  # flat guard chain over CT calculation variants; clearest as-is
+def calculated_smart_meter_power(  # ruff:ignore[too-many-return-statements]  # flat guard chain over CT calculation variants; clearest as-is
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -2996,7 +2996,7 @@ def calculated_smart_meter_power(  # noqa: PLR0911  # flat guard chain over CT c
 
     Returns:
         float | None: Calculated power in the same units as the input values, or `None` when required inputs are missing or the calculation mode is unrecognized.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -3036,7 +3036,7 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
 
     Returns:
         float | None: The first value successfully coerced to a number, or `None` if no numeric value is found.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     for key in keys:
         if key in source and source.get(key) is not None:
             value = safe_float(source.get(key))
@@ -3071,7 +3071,7 @@ def jackery_reported_home_load_power(props: dict[str, Any]) -> float | None:
 
     Returns:
         float | None: The reported power in watts if present and parseable, `None` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return first_power_value(props, FIELD_OTHER_LOAD_PW)
 
 
@@ -3096,7 +3096,7 @@ def jackery_grid_side_output_power(props: dict[str, Any]) -> float | None:
 
     Returns:
         float: Power in watts if a known output field contains a numeric value, `None` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return first_nonzero_power_value(
         props,
         FIELD_OUT_GRID_SIDE_PW,
@@ -3181,7 +3181,7 @@ def jackery_corrected_home_consumption_power(
             - `jackery_output_power`: Jackery grid-side output power,
             - `source`: string indicating which data was used (`FIELD_OTHER_LOAD_PW` when reported, otherwise `"smart_meter_net_minus_input_plus_output"`).
         Returns `None` when insufficient inputs are available to compute a corrected consumption.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -3196,7 +3196,7 @@ def jackery_corrected_home_consumption_power(
             source=FIELD_OTHER_LOAD_PW,
         )
 
-    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # noqa: RUF069  # parsed device powers (or 0.0 default); exact-zero means absent/zero
+    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # ruff:ignore[float-equality-comparison]  # parsed device powers (or 0.0 default); exact-zero means absent/zero
         return None
 
     calculated = meter_net - jackery_input + jackery_output
@@ -3212,7 +3212,7 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(  # noqa: PLR0911, PLR0912  # exhaustive section/stat → series-key mapping table
+def _chart_series_key_for_stat(  # ruff:ignore[too-many-return-statements, too-many-branches]  # exhaustive section/stat → series-key mapping table
     section: str, stat_key: str
 ) -> str | None:
     """Map an app section and statistic key to the corresponding chart-series key.
@@ -3223,7 +3223,7 @@ def _chart_series_key_for_stat(  # noqa: PLR0911, PLR0912  # exhaustive section/
 
     Returns:
         str | None: The chart-series key (e.g., `APP_CHART_SERIES_Y`, `APP_CHART_SERIES_Y1`, ...) associated with the given section/stat pair, or `None` if no mapping exists.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
 
@@ -3285,7 +3285,7 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a week/month/year payload or no mapping exists.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not section.endswith((
         f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
@@ -3305,7 +3305,7 @@ def day_power_series_key(
 
     Returns:
         The chart-series key string for the given `section`/`stat_key` when `source` is a day-period payload, `None` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if not is_day_period_payload(source, section):
         return None
     if (
@@ -3321,7 +3321,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total shapes; clearest as-is
+def trend_series_total(  # ruff:ignore[too-many-return-statements]  # flat guard chain over series/total shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3336,7 +3336,7 @@ def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total s
 
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total cannot be determined.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -3354,7 +3354,7 @@ def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total s
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0  # noqa: RUF069  # parsed/round(,2) period total; exact-zero is intentional
+            and server_total == 0.0  # ruff:ignore[float-equality-comparison]  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
@@ -3380,7 +3380,7 @@ def trend_series_total(  # noqa: PLR0911  # flat guard chain over series/total s
     return round(sum(valid_values), 2)
 
 
-def trend_series_has_value(  # noqa: PLR0911  # flat guard chain over series/value shapes; clearest as-is
+def trend_series_has_value(  # ruff:ignore[too-many-return-statements]  # flat guard chain over series/value shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3391,7 +3391,7 @@ def trend_series_has_value(  # noqa: PLR0911  # flat guard chain over series/val
 
     Returns:
         `true` if a numeric value can be derived from the payload for the section and stat_key, `false` otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
@@ -3408,7 +3408,7 @@ def trend_series_has_value(  # noqa: PLR0911  # flat guard chain over series/val
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0  # noqa: RUF069  # parsed/round(,2) period total; exact-zero is intentional
+            and server_total == 0.0  # ruff:ignore[float-equality-comparison]  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
@@ -3439,7 +3439,7 @@ def task_plan_value(
 
     Returns:
         Any: The first non-`None` value found for the provided keys, or `None` if none are present.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:
             return task_plan.get(key)
@@ -3472,13 +3472,13 @@ def trend_payload_has_value(
 
     Returns:
         True if a usable period value exists, False otherwise.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401
+def first_nonblank(*values: Any) -> str | None:  # ruff:ignore[any-type]
     """Return the first value that still has content after stripping."""
     for value in values:
         if value is None:
@@ -3489,7 +3489,7 @@ def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401
     return None
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: ANN401, PLR0911
+def first_nonblank_int(*values: Any) -> int | None:  # ruff:ignore[any-type, too-many-return-statements]
     """Return the first nonblank value parsed as an integer."""
     for value in values:
         if value is None:
@@ -3539,6 +3539,6 @@ def normalize_account(value: str) -> str:
     return value.strip()
 
 
-def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: ANN401
+def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # ruff:ignore[any-type]
     """Return a config-entry boolean option with safe legacy value parsing."""
     return config_entry_bool_option(entry, key, default)

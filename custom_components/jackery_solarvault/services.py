@@ -100,7 +100,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _coerce_service_int(raw: Any) -> int:  # noqa: ANN401
+def _coerce_service_int(raw: Any) -> int:  # ruff:ignore[any-type]
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
         msg = "expected integer"
@@ -129,7 +129,7 @@ def _coerce_service_int(raw: Any) -> int:  # noqa: ANN401
     raise vol.Invalid(msg)
 
 
-def _coerce_service_float(raw: Any) -> float:  # noqa: ANN401
+def _coerce_service_float(raw: Any) -> float:  # ruff:ignore[any-type]
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
         msg = "expected finite number"
@@ -433,7 +433,7 @@ def _service_validation_error(
 
 def _device_id_from_service(
     hass: HomeAssistant,
-    raw: Any,  # noqa: ANN401
+    raw: Any,  # ruff:ignore[any-type]
     *,
     translation_key: str,
     extra_placeholders: dict[str, str] | None = None,
@@ -455,7 +455,7 @@ def _device_id_from_service(
     )
 
 
-def _rename_system_id_from_service(raw: Any) -> str:  # noqa: ANN401
+def _rename_system_id_from_service(raw: Any) -> str:  # ruff:ignore[any-type]
     """Return a validated system id from a direct rename service call."""
     system_id = ""
     if isinstance(raw, str):
@@ -478,7 +478,7 @@ def _rename_system_id_from_service(raw: Any) -> str:  # noqa: ANN401
     )
 
 
-def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: ANN401
+def _rename_name_from_service(raw: Any, system_id: str) -> str:  # ruff:ignore[any-type]
     """Return a validated system name from a direct rename service call."""
     if not isinstance(raw, str):
         raise ServiceValidationError(
@@ -499,7 +499,7 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: ANN401
                 "error": f"{SERVICE_FIELD_NEW_NAME} must not be empty",
             },
         )
-    if len(parsed) > 64:  # noqa: PLR2004
+    if len(parsed) > 64:  # ruff:ignore[magic-value-comparison]
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="rename_system_failed",
@@ -511,7 +511,7 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: ANN401
     return parsed
 
 
-def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # noqa: ANN401
+def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # ruff:ignore[any-type]
     """Return a validated storm-alert id from a direct service call."""
     alert_id = ""
     if isinstance(raw, str):
@@ -538,7 +538,7 @@ def _reject_json_constant(constant: str) -> object:
     raise ValueError(msg)
 
 
-def _json_native_value(value: Any) -> Any:  # noqa: ANN401
+def _json_native_value(value: Any) -> Any:  # ruff:ignore[any-type]
     """Return a JSON-native value or raise ValueError."""
     if value is None or isinstance(value, str | bool | int):
         return value
@@ -554,7 +554,7 @@ def _json_native_value(value: Any) -> Any:  # noqa: ANN401
         for key, item in value.items():
             if not isinstance(key, str):
                 msg = "body object keys must be strings"
-                raise ValueError(msg)  # noqa: TRY004
+                raise ValueError(msg)  # ruff:ignore[type-check-without-type-error]
             normalized[key] = _json_native_value(item)
         return normalized
     msg = "body must contain only JSON-compatible values"
@@ -576,7 +576,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     return normalized
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # noqa: ANN401
+def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # ruff:ignore[any-type]
     """Return a dict body from a service object or JSON string."""
     if isinstance(raw_body, dict):
         return _json_native_body(raw_body, device_id)
@@ -610,7 +610,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
 
 
 def _service_bool(
-    raw: Any,  # noqa: ANN401
+    raw: Any,  # ruff:ignore[any-type]
     *,
     field_name: str,
     translation_key: str,
@@ -628,7 +628,7 @@ def _service_bool(
 
 
 def _service_required_text(
-    raw: Any,  # noqa: ANN401
+    raw: Any,  # ruff:ignore[any-type]
     *,
     field_name: str,
     translation_key: str,
@@ -659,7 +659,7 @@ def _service_required_text(
 
 
 def _service_optional_text(
-    raw: Any,  # noqa: ANN401
+    raw: Any,  # ruff:ignore[any-type]
     *,
     field_name: str,
     translation_key: str,
@@ -685,8 +685,8 @@ def _service_optional_text(
     return parsed
 
 
-def _service_int(  # noqa: PLR0913
-    raw: Any,  # noqa: ANN401
+def _service_int(  # ruff:ignore[too-many-arguments]
+    raw: Any,  # ruff:ignore[any-type]
     *,
     field_name: str,
     translation_key: str,
@@ -712,8 +712,8 @@ def _service_int(  # noqa: PLR0913
     return parsed
 
 
-def _service_float(  # noqa: PLR0913
-    raw: Any,  # noqa: ANN401
+def _service_float(  # ruff:ignore[too-many-arguments]
+    raw: Any,  # ruff:ignore[any-type]
     *,
     field_name: str,
     translation_key: str,
@@ -1327,10 +1327,10 @@ def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
     segno is imported lazily so the module import stays cheap for the common
     path that never renders a QR.
     """
-    import base64  # noqa: PLC0415
-    import io  # noqa: PLC0415
+    import base64  # ruff:ignore[import-outside-top-level]
+    import io  # ruff:ignore[import-outside-top-level]
 
-    import segno  # noqa: PLC0415
+    import segno  # ruff:ignore[import-outside-top-level]
 
     buffer = io.BytesIO()
     segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
@@ -1355,7 +1355,7 @@ def _notify_share_qr_code(
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
     try:
-        from homeassistant.components import (  # noqa: PLC0415
+        from homeassistant.components import (  # ruff:ignore[import-outside-top-level]
             persistent_notification,
         )
 

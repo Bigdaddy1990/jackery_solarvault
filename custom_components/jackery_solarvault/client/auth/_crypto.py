@@ -68,8 +68,8 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` is not exactly 16 bytes.
-    """  # noqa: E501
-    if len(bluetooth_key) != 16:  # noqa: PLR2004
+    """  # ruff:ignore[line-too-long]
+    if len(bluetooth_key) != 16:  # ruff:ignore[magic-value-comparison]
         msg = (
             "encrypt_mqtt_body: bluetoothKey must be 16 bytes, "
             f"got {len(bluetooth_key)}"
@@ -115,7 +115,7 @@ def _generate_udid(seed: str) -> str:
 
     Returns:
         str: MQTT UDID string comprising `MQTT_MAC_ID_PREFIX` followed by 32 lowercase hex characters (no dashes).
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     md5_digest = hashlib.md5(seed.encode("utf-8"), usedforsecurity=False).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")

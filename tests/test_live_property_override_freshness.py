@@ -49,8 +49,8 @@ def _bare_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the override policy without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._live_property_key_monotonic = {}  # noqa: SLF001
-    coordinator._configured_update_interval = timedelta(seconds=15)  # noqa: SLF001
+    coordinator._live_property_key_monotonic = {}  # ruff:ignore[private-member-access]
+    coordinator._configured_update_interval = timedelta(seconds=15)  # ruff:ignore[private-member-access]
     monkeypatch.setattr(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         lambda: _NOW,
@@ -63,9 +63,9 @@ def test_power_only_live_frames_do_not_override_http_properties(
 ) -> None:
     """Fresh HTTP values win even when a supplemental pvPw frame is newer."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._live_property_key_monotonic["dev-1"] = {FIELD_PV_PW: _NOW}  # noqa: SLF001
+    coordinator._live_property_key_monotonic["dev-1"] = {FIELD_PV_PW: _NOW}  # ruff:ignore[private-member-access]
 
-    guarded = coordinator._http_properties_with_live_overrides(  # noqa: SLF001
+    guarded = coordinator._http_properties_with_live_overrides(  # ruff:ignore[private-member-access]
         "dev-1",
         _ENTRY,
         dict(_HTTP_PROPS),
@@ -81,12 +81,12 @@ def test_recently_pushed_keys_do_not_override_present_http_fields(
 ) -> None:
     """Recent live stamps never turn MQTT/BLE into the primary live source."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._live_property_key_monotonic["dev-1"] = {  # noqa: SLF001
+    coordinator._live_property_key_monotonic["dev-1"] = {  # ruff:ignore[private-member-access]
         FIELD_SOC: _NOW,
         FIELD_BAT_SOC: _NOW,
     }
 
-    guarded = coordinator._http_properties_with_live_overrides(  # noqa: SLF001
+    guarded = coordinator._http_properties_with_live_overrides(  # ruff:ignore[private-member-access]
         "dev-1",
         _ENTRY,
         dict(_HTTP_PROPS),
@@ -100,14 +100,14 @@ def test_recent_live_fields_fill_http_omissions(
 ) -> None:
     """Supplemental live values fill keys that HTTP did not provide."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._live_property_key_monotonic["dev-1"] = {  # noqa: SLF001
+    coordinator._live_property_key_monotonic["dev-1"] = {  # ruff:ignore[private-member-access]
         FIELD_SOC: _NOW,
         FIELD_PV_PW: _NOW,
     }
     http_props = dict(_HTTP_PROPS)
     del http_props[FIELD_PV_PW]
 
-    guarded = coordinator._http_properties_with_live_overrides(  # noqa: SLF001
+    guarded = coordinator._http_properties_with_live_overrides(  # ruff:ignore[private-member-access]
         "dev-1",
         _ENTRY,
         http_props,
@@ -123,12 +123,12 @@ def test_expired_stamps_let_http_win_everywhere(
 ) -> None:
     """Stamps older than the freshness window stop shielding entirely."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._live_property_key_monotonic["dev-1"] = {  # noqa: SLF001
+    coordinator._live_property_key_monotonic["dev-1"] = {  # ruff:ignore[private-member-access]
         FIELD_SOC: _NOW - _STALE_AGE_SEC,
         FIELD_PV_PW: _NOW - _STALE_AGE_SEC,
     }
 
-    guarded = coordinator._http_properties_with_live_overrides(  # noqa: SLF001
+    guarded = coordinator._http_properties_with_live_overrides(  # ruff:ignore[private-member-access]
         "dev-1",
         _ENTRY,
         dict(_HTTP_PROPS),
@@ -143,10 +143,10 @@ def test_note_live_property_keys_stamps_only_delivered_live_keys(
     """Only live keys actually present (and non-None) in the frame get stamped."""
     coordinator = _bare_coordinator(monkeypatch)
 
-    coordinator._note_live_property_keys(  # noqa: SLF001
+    coordinator._note_live_property_keys(  # ruff:ignore[private-member-access]
         "dev-1",
         {FIELD_PV_PW: 123, FIELD_SOC: None, "notALiveKey": 1},
     )
 
-    stamps = coordinator._live_property_key_monotonic["dev-1"]  # noqa: SLF001
+    stamps = coordinator._live_property_key_monotonic["dev-1"]  # ruff:ignore[private-member-access]
     assert stamps == {FIELD_PV_PW: _NOW}

@@ -84,8 +84,8 @@ def _write_accepted(data: dict[str, Any]) -> bool:
 
     Returns:
         `True` if the response's `data` field is not explicitly `False`, `False` otherwise.
-    """  # noqa: E501
-    from ..util import safe_bool  # noqa: PLC0415
+    """  # ruff:ignore[line-too-long]
+    from ..util import safe_bool  # ruff:ignore[import-outside-top-level]
 
     return safe_bool(data.get(FIELD_DATA)) is not False
 
@@ -100,7 +100,7 @@ class BaseHTTPMixin:
 
     Subclasses (domain mixins) use ``self._get_json``, ``self._put_json``,
     ``self._post_form`` without worrying about auth, retries, or counters.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
 
     # Declared here so BaseHTTPMixin methods (e.g. ``_get_token``) can call
     # ``self.async_login()`` even though the implementation lives in
@@ -111,7 +111,7 @@ class BaseHTTPMixin:
 
         Returns:
             token (str): Session token string to include in authenticated request headers.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         raise NotImplementedError
 
     # --- __init__ state (set by JackeryApi.__init__) -----------------------
@@ -158,7 +158,7 @@ class BaseHTTPMixin:
 
         Returns:
                 headers (dict[str, str]): Mapping of HTTP header names to values. Includes the auth token header when `with_token` is True and a token is present.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         h = {
             "accept-encoding": "gzip",
             "accept-language": "de-DE",
@@ -191,11 +191,11 @@ class BaseHTTPMixin:
 
         Raises:
             JackeryAuthError: If the normalized value does not match 33 lowercase hexadecimal characters.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         mac_id = value.strip().lower()
         # App values are 33 hex chars (prefix 2/9 + 32-char UUID-no-dash).
         if not re.fullmatch(r"[0-9a-f]{33}", mac_id):
-            raise JackeryAuthError(  # noqa: TRY003
+            raise JackeryAuthError(  # ruff:ignore[raise-vanilla-args]
                 "Invalid mqtt_mac_id format. Expected 33 lowercase hex chars "
                 "(example: 271c55f5731fa3d9ba1fe131e088946e0)."
             )
@@ -236,7 +236,7 @@ class BaseHTTPMixin:
 
         Parameters:
             systems (list[dict]): List of system metadata dictionaries returned by the system list API.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if self._region_code:
             return
         for item in systems:
@@ -258,17 +258,17 @@ class BaseHTTPMixin:
 
         Raises:
             JackeryAuthError: If a login attempt completes without providing a token.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if self._token is None:
             async with self._lock:
                 if self._token is None:
                     await self.async_login()
         if self._token is None:
-            raise JackeryAuthError("Login succeeded without returning a token")  # noqa: TRY003
+            raise JackeryAuthError("Login succeeded without returning a token")  # ruff:ignore[raise-vanilla-args]
         return self._token
 
     @staticmethod
-    def _extract_code(data: object) -> int | None:  # noqa: PLR0911
+    def _extract_code(data: object) -> int | None:  # ruff:ignore[too-many-return-statements]
         """Extracts the backend numeric ``code`` value from a parsed API response.
 
         Parameters:
@@ -276,7 +276,7 @@ class BaseHTTPMixin:
 
         Returns:
             int | None: The ``code`` parsed as an integer when present as an integer or a numeric string, ``None`` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not isinstance(data, dict):
             return None
         code = data.get(FIELD_CODE)
@@ -307,7 +307,7 @@ class BaseHTTPMixin:
 
         Returns:
             True if the response indicates the token has expired, False otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
@@ -322,7 +322,7 @@ class BaseHTTPMixin:
 
         Returns:
             ``True`` if any auth-related marker is present in the response text, ``False`` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not isinstance(data, dict):
             return False
         parts = [
@@ -366,12 +366,12 @@ class BaseHTTPMixin:
 
         Returns:
             bool: `True` if the response indicates an authentication or authorization failure, `False` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if status in {401, 403}:
             return True
         if self._is_token_expired_response(status, data):
             return True
-        if status != 200:  # noqa: PLR2004
+        if status != 200:  # ruff:ignore[magic-value-comparison]
             return self._response_has_auth_failure_text(data)
         code = self._extract_code(data)
         return code not in {CODE_OK, None} and self._response_has_auth_failure_text(
@@ -385,7 +385,7 @@ class BaseHTTPMixin:
         Returns:
             str: Formatted message containing the HTTP method, request path, status code,
             backend `code` value, and the backend message/error text.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         code = data.get(FIELD_CODE)
         msg = data.get(FIELD_MSG) or data.get("message") or data.get("error")
         return (
@@ -403,7 +403,7 @@ class BaseHTTPMixin:
         or a zero-argument factory that produces the event dict when invoked. If the
         callback returns an awaitable it will be awaited. Exceptions raised by the
         callback are caught and logged at debug level.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         callback = self.payload_debug_callback
         if callback is None:
             return
@@ -414,11 +414,11 @@ class BaseHTTPMixin:
             result = callback(event)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:  # ruff:ignore[blind-except]
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
-    def _http_payload_debug(  # noqa: PLR0913
+    def _http_payload_debug(  # ruff:ignore[too-many-arguments]
         *,
         method: str,
         path: str,
@@ -433,7 +433,7 @@ class BaseHTTPMixin:
 
         Returns:
             dict[str, Any]: A mapping representing the debug event suitable for redaction and emission.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -459,7 +459,7 @@ class BaseHTTPMixin:
 
         Returns:
             dict: The payload dict from `FIELD_DATA` when present and a dict, otherwise an empty dict.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
             return payload
@@ -486,7 +486,7 @@ class BaseHTTPMixin:
 
         Returns:
             list[dict[str, Any]]: The list of dictionary items from the payload, or an empty list.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         payload = data.get(FIELD_DATA)
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
@@ -512,7 +512,7 @@ class BaseHTTPMixin:
 
         Returns:
             dict[str, Any]: The matching item; if none match returns the first item when available, otherwise an empty dict.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         requested_sn = str(device_sn)
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
@@ -537,7 +537,7 @@ class BaseHTTPMixin:
 
         Returns:
             dict[str, Any]: A copy of `data` with `APP_REQUEST_META` ensured at the top level (containing `path` and `params`), and with `APP_REQUEST_META` added to the payload dict when `payload_request` is provided.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         response = dict(data)
         response.setdefault(APP_REQUEST_META, {"path": path, "params": dict(params)})
         payload = response.get(FIELD_DATA)
@@ -568,7 +568,7 @@ class BaseHTTPMixin:
         Raises:
             JackeryAuthError: When the response indicates an authentication/authorization failure.
             JackeryApiError: For network/timeout errors, non-200 HTTP responses, or backend errors.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
         effective_timeout = request_timeout or REQUEST_TIMEOUT_SEC
@@ -580,7 +580,7 @@ class BaseHTTPMixin:
 
             Returns:
                 tuple[int, dict]: A pair of the HTTP status code and the parsed response body (JSON object or a dict containing `FIELD_RAW_TEXT` on decode failure).
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             async with self._session.get(
                 url,
                 params=params,
@@ -606,7 +606,7 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"{HTTP_METHOD_GET} {path} request failed: "
                 f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
@@ -623,13 +623,13 @@ class BaseHTTPMixin:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                     f"{HTTP_METHOD_GET} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
 
         if FIELD_RAW_TEXT in data:
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"{HTTP_METHOD_GET} {path} returned invalid JSON: "
                 f"{data[FIELD_RAW_TEXT]!r}"
             )
@@ -637,12 +637,12 @@ class BaseHTTPMixin:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_GET, path, status, data)
             )
-        if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")  # noqa: TRY003
+        if status != 200:  # ruff:ignore[magic-value-comparison]
+            raise JackeryApiError(f"{HTTP_METHOD_GET} {path} HTTP {status}")  # ruff:ignore[raise-vanilla-args]
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # noqa: E501
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
+                f"{HTTP_METHOD_GET} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # ruff:ignore[line-too-long]
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -665,7 +665,7 @@ class BaseHTTPMixin:
         Raises:
             JackeryAuthError: When the response indicates an authentication or authorization failure.
             JackeryApiError: On network/request failures, timeouts, non-200 HTTP status, or backend error codes.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -674,7 +674,7 @@ class BaseHTTPMixin:
 
             Returns:
                 dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
@@ -684,7 +684,7 @@ class BaseHTTPMixin:
 
             Returns:
                 A tuple (status, body) where `status` is the HTTP status code and `body` is the parsed JSON response when available; if the response cannot be decoded as JSON, `body` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to HTTP_RAW_TEXT_LIMIT.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             async with self._session.put(
                 url,
                 json=payload,
@@ -710,7 +710,7 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"{HTTP_METHOD_PUT} {path} request failed: "
                 f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
@@ -728,7 +728,7 @@ class BaseHTTPMixin:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                     f"{HTTP_METHOD_PUT} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
@@ -737,12 +737,12 @@ class BaseHTTPMixin:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_PUT, path, status, data)
             )
-        if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")  # noqa: TRY003
+        if status != 200:  # ruff:ignore[magic-value-comparison]
+            raise JackeryApiError(f"{HTTP_METHOD_PUT} {path} HTTP {status}")  # ruff:ignore[raise-vanilla-args]
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # noqa: E501
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
+                f"{HTTP_METHOD_PUT} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)}"  # ruff:ignore[line-too-long]
             )
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -769,7 +769,7 @@ class BaseHTTPMixin:
         Raises:
             JackeryApiError: On network/timeout failures, non-200 HTTP status, or backend errors.
             JackeryAuthError: When the response indicates an authentication or authorization failure.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -778,7 +778,7 @@ class BaseHTTPMixin:
 
             Returns:
                 dict[str, str]: Mapping of header names to values for a form POST request; includes the authentication token header if the client has one.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
             return headers
@@ -792,7 +792,7 @@ class BaseHTTPMixin:
 
             Returns:
                 tuple[int, dict]: A pair of (HTTP status code, parsed response). The response dict is either the decoded JSON object or `{FIELD_RAW_TEXT: <truncated text>}` on parse failure.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             async with self._session.post(
                 url,
                 data=body,
@@ -818,7 +818,7 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"{HTTP_METHOD_POST} {path} request failed: "
                 f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
@@ -836,7 +836,7 @@ class BaseHTTPMixin:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                     f"{HTTP_METHOD_POST} {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
@@ -845,13 +845,13 @@ class BaseHTTPMixin:
             raise JackeryAuthError(
                 self._auth_failure_message(HTTP_METHOD_POST, path, status, data)
             )
-        if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")  # noqa: TRY003
+        if status != 200:  # ruff:ignore[magic-value-comparison]
+            raise JackeryApiError(f"{HTTP_METHOD_POST} {path} HTTP {status}")  # ruff:ignore[raise-vanilla-args]
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             # Surface the whole response so callers can show it to the user
-            raise JackeryApiError(  # noqa: TRY003
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # noqa: E501
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
+                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # ruff:ignore[line-too-long]
                 f"data={data.get(FIELD_DATA)!r}"
             )
         await self._emit_payload_debug(
@@ -875,7 +875,7 @@ class BaseHTTPMixin:
 
         Returns:
             response (dict): Parsed response object from the API.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -884,7 +884,7 @@ class BaseHTTPMixin:
 
             Returns:
                 dict[str, str]: Mapping of HTTP header names to values with the content-type set to JSON and token headers included when present.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             headers = self._headers(with_token=True)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
@@ -894,7 +894,7 @@ class BaseHTTPMixin:
 
             Returns:
                 tuple[int, dict]: A pair of (status, data) where `status` is the HTTP status code and `data` is the parsed JSON response when parsing succeeds. If the response cannot be parsed as JSON, `data` is a dict containing `FIELD_RAW_TEXT` with the response text truncated to `HTTP_RAW_TEXT_LIMIT`.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             async with self._session.post(
                 url,
                 json=payload,
@@ -920,7 +920,7 @@ class BaseHTTPMixin:
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"POST {path} request failed: "
                 f"{type(err).__name__}: {err or "(no message)"}"
             ) from err
@@ -936,7 +936,7 @@ class BaseHTTPMixin:
                 self._requests_failed += 1
                 if isinstance(err, TimeoutError):
                     self._timeouts_total += 1
-                raise JackeryApiError(  # noqa: TRY003
+                raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                     f"POST {path} request failed after re-login: "
                     f"{type(err).__name__}: {err or "(no message)"}"
                 ) from err
@@ -945,11 +945,11 @@ class BaseHTTPMixin:
             raise JackeryAuthError(
                 self._auth_failure_message("POST", path, status, data)
             )
-        if status != 200:  # noqa: PLR2004
-            raise JackeryApiError(f"POST {path} HTTP {status}")  # noqa: TRY003
+        if status != 200:  # ruff:ignore[magic-value-comparison]
+            raise JackeryApiError(f"POST {path} HTTP {status}")  # ruff:ignore[raise-vanilla-args]
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
-            raise JackeryApiError(  # noqa: TRY003
+            raise JackeryApiError(  # ruff:ignore[raise-vanilla-args]
                 f"POST {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
                 f"data={data.get(FIELD_DATA)!r}"
             )
@@ -995,7 +995,7 @@ class BaseHTTPMixin:
             seed_b64 (str): Base64-encoded MQTT seed; falsy values are stored as None.
             mac_id (str): MQTT MAC identifier; falsy values are stored as None.
             mac_id_source (str | None): Optional source descriptor for the MAC identifier; if provided, sets the MAC ID source.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         self._mqtt_user_id = user_id or None
         self._mqtt_seed_b64 = seed_b64 or None
         self._mqtt_mac_id = mac_id or None
@@ -1007,7 +1007,7 @@ class BaseHTTPMixin:
 
         Returns:
             snapshot (dict[str, str] | None): A dict containing `MQTT_SESSION_USER_ID`, `MQTT_SESSION_SEED_B64`, `MQTT_SESSION_MAC_ID`, and `MQTT_SESSION_MAC_ID_SOURCE` when all required fields are present, otherwise `None`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not (self._mqtt_user_id and self._mqtt_seed_b64 and self._mqtt_mac_id):
             return None
         return {
