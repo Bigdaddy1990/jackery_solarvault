@@ -87,7 +87,7 @@ async def watchdog_setup(
         await hass.async_block_till_done()
 
     coordinator = entry.runtime_data
-    coordinator._async_update_data = AsyncMock(return_value={})  # noqa: SLF001
+    coordinator._async_update_data = AsyncMock(return_value={})  # ruff:ignore[private-member-access]
 
     yield entry
 
@@ -108,7 +108,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
 ) -> None:
     """A silent poll stall triggers a warning and a forced refresh."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_refresh_completed_monotonic = (  # noqa: SLF001
+    coordinator._last_http_refresh_completed_monotonic = (  # ruff:ignore[private-member-access]
         time.monotonic() - _STALL_AGE_SEC
     )
 
@@ -124,7 +124,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
         ) as forced_refresh,
     ):
         await _tick_watchdog(hass)
-        coordinator._last_http_refresh_completed_monotonic = time.monotonic()  # noqa: SLF001
+        coordinator._last_http_refresh_completed_monotonic = time.monotonic()  # ruff:ignore[private-member-access]
 
     assert any(
         "poll watchdog" in record.getMessage().lower() for record in caplog.records
@@ -139,7 +139,7 @@ async def test_watchdog_stays_silent_while_polling_is_healthy(
 ) -> None:
     """A recent completed refresh must not trigger the watchdog."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_refresh_completed_monotonic = (  # noqa: SLF001
+    coordinator._last_http_refresh_completed_monotonic = (  # ruff:ignore[private-member-access]
         time.monotonic() - _FRESH_AGE_SEC
     )
 

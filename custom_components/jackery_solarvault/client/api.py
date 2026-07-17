@@ -309,7 +309,7 @@ def encrypt_mqtt_body(body: dict[str, Any], bluetooth_key: bytes) -> str:
     Raises:
         ValueError: If `bluetooth_key` is not exactly 16 bytes.
     """
-    if len(bluetooth_key) != 16:  # noqa: PLR2004
+    if len(bluetooth_key) != 16:  # ruff:ignore[magic-value-comparison]
         msg = (
             "encrypt_mqtt_body: bluetoothKey must be "
             f"16 bytes, got {len(bluetooth_key)}"
@@ -501,10 +501,10 @@ write_accepted = _write_accepted
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:  # noqa: PLR0904
+class JackeryApi:  # ruff:ignore[too-many-public-methods]
     """Async client for the Jackery SolarVault cloud (full monolith)."""
 
-    def __init__(  # noqa: PLR0913, PLR0917  # constructor takes distinct client-config values; a params object adds no clarity
+    def __init__(  # ruff:ignore[too-many-arguments, too-many-positional-arguments]  # constructor takes distinct client-config values; a params object adds no clarity
         self,
         session: aiohttp.ClientSession,
         account: str,
@@ -680,7 +680,7 @@ class JackeryApi:  # noqa: PLR0904
         url: str,
         form_body: dict[str, str],
         headers: dict[str, str],
-    ) -> Any:  # noqa: ANN401  # decoded JSON is arbitrary; callers use dict .get accessors
+    ) -> Any:  # ruff:ignore[any-type]  # decoded JSON is arbitrary; callers use dict .get accessors
         """POST the encrypted login form and return the decoded JSON response.
 
         Parameters:
@@ -707,7 +707,7 @@ class JackeryApi:  # noqa: PLR0904
             raise JackeryApiError(msg) from err
 
     @staticmethod
-    async def _decode_login_response(resp: aiohttp.ClientResponse) -> Any:  # noqa: ANN401  # decoded JSON is arbitrary; callers use dict .get accessors
+    async def _decode_login_response(resp: aiohttp.ClientResponse) -> Any:  # ruff:ignore[any-type]  # decoded JSON is arbitrary; callers use dict .get accessors
         """Validate the login HTTP response and return its decoded JSON body.
 
         Parameters:
@@ -1138,11 +1138,11 @@ class JackeryApi:  # noqa: PLR0904
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001  # best-effort debug logging must never break the API path
+        except Exception as err:  # ruff:ignore[blind-except]  # best-effort debug logging must never break the API path
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
-    def _http_payload_debug(  # noqa: PLR0913  # keyword-only builder for distinct debug-event fields
+    def _http_payload_debug(  # ruff:ignore[too-many-arguments]  # keyword-only builder for distinct debug-event fields
         *,
         method: str,
         path: str,
@@ -1472,7 +1472,7 @@ class JackeryApi:  # noqa: PLR0904
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
 
-    async def async_get_alarm(self, system_id: str | int) -> Any:  # noqa: ANN401  # parsed JSON response, indexed by callers
+    async def async_get_alarm(self, system_id: str | int) -> Any:  # ruff:ignore[any-type]  # parsed JSON response, indexed by callers
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -1553,7 +1553,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: The response `data` payload as a dict; empty dict if the payload is missing or not a dict.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         data = await self._get_json(
             PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
         )
@@ -1568,14 +1568,14 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: Mapping of statistic keys to their values as strings in kWh.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         data = await self._get_json(
             DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
 
-    async def _async_get_device_period_stat(  # noqa: PLR0913  # keyword-only query params for a period-stat endpoint
+    async def _async_get_device_period_stat(  # ruff:ignore[too-many-arguments]  # keyword-only query params for a period-stat endpoint
         self,
         path: str,
         *,
@@ -1599,7 +1599,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict[str, Any]: Normalized payload dict from the endpoint's `data` field, augmented with `APP_REQUEST_META`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         # PROTOCOL.md §2: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
         begin_date, end_date = app_period_date_bounds(
@@ -1651,7 +1651,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: Parsed response payload from the endpoint, typically containing chart series and related metadata.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return await self._async_get_device_period_stat(
             DEVICE_PV_STAT_PATH,
             device_id=device_id,
@@ -1690,7 +1690,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             payload (dict): Normalized response payload containing chart/statistics data. When available, includes `APP_REQUEST_META` with request metadata (excluding `deviceId`).
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return await self._async_get_device_period_stat(
             DEVICE_HOME_STAT_PATH,
             device_id=device_id,
@@ -1717,7 +1717,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
                 dict[str, Any]: Parsed payload dictionary containing CT/smart-meter statistics. The payload may include request metadata (APP_REQUEST_META) when a date range was provided.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
             device_id=device_id,
@@ -1742,7 +1742,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             A dictionary containing the parsed payload with the meter panel totals from the device meter statistics endpoint.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         data = await self._get_json(
             DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
         )
@@ -1761,7 +1761,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             list[dict]: Battery pack dictionaries extracted from the response; empty list if no packs are found or the response shape is unrecognized.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         """GET /v1/device/battery/pack/list — sub-battery pack status.
 
         App decompile (BatteryPackApi + BatteryPackSub):
@@ -1825,7 +1825,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Returns:
             dict: OTA information object for the device, or an empty dict if no suitable item is found.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         data = await self._get_json(
             OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
         )
@@ -2072,7 +2072,7 @@ class JackeryApi:  # noqa: PLR0904
             {"bindKey": bind_key, "deviceSn": device_sn, "guid": guid},
         )
 
-    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
         """Create or configure a system using backend-provided parameters.
 
         Parameters:
@@ -2655,7 +2655,7 @@ class JackeryApi:  # noqa: PLR0904
         Raises:
             JackeryAuthError: When the response indicates an authorization or authentication failure.
             JackeryApiError: On network/request failures, non-200 HTTP status, or backend `code` that is neither `CODE_OK` nor `None`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         try:
             price = float(single_price)
         except ValueError as err:
@@ -3623,7 +3623,7 @@ class JackeryApi:  # noqa: PLR0904
     @staticmethod
     def _is_transient_http_status(status: int) -> bool:
         """Return True for server-side statuses that are safe to retry."""
-        return 500 <= status < 600  # noqa: PLR2004
+        return 500 <= status < 600  # ruff:ignore[magic-value-comparison]
 
     async def _request_json_with_retry(
         self,
@@ -3949,7 +3949,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Raises:
             JackeryApiError: If `system_name` is empty after trimming or if the API request fails.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         """PUT /v1/device/system/name — rename a system.
 
         Captured body: {"systemName": "SolarVault", "id": "<systemId>"}
@@ -3987,7 +3987,7 @@ class JackeryApi:  # noqa: PLR0904
         Raises:
             JackeryApiError: On network/timeout failures, non-200 HTTP status, or when the response `code` indicates an error.
             JackeryAuthError: When the response indicates an authentication or authorization failure.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -4067,7 +4067,7 @@ class JackeryApi:  # noqa: PLR0904
                 f" data={data.get(FIELD_DATA)!r}"
             )
             msg_0 = (
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # noqa: E501
+                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "  # ruff:ignore[line-too-long]
                 f"data={data.get(FIELD_DATA)!r}"
             )
             raise JackeryApiError(msg_0)
@@ -4104,7 +4104,7 @@ class JackeryApi:  # noqa: PLR0904
 
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not isinstance(max_power, int) or max_power < 0:
             msg = "max_power must be a non-negative integer"
             raise JackeryApiError(msg)
@@ -4214,7 +4214,7 @@ class JackeryApi:  # noqa: PLR0904
         """
         return await self._post_json(MODIFY_INFO_PATH, {"nickName": nick_name})
 
-    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915  # linear request/re-login/retry ladder; splitting would thread session state through helpers
+    async def _post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:  # ruff:ignore[too-many-statements]  # linear request/re-login/retry ladder; splitting would thread session state through helpers
         """Generic JSON-body POST with auto re-login on expiry."""
         await self._ensure_token()
         url = f"{BASE_URL}{path}"

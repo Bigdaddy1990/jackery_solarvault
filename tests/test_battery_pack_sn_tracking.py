@@ -13,7 +13,7 @@ from unittest.mock import PropertyMock, patch
 from custom_components.jackery_solarvault.const import PAYLOAD_BATTERY_PACKS
 from custom_components.jackery_solarvault.sensor import (
     JackeryBatteryPackSensor,
-    _battery_pack_serial,  # noqa: PLC2701  # test drives the module-private serial resolver
+    _battery_pack_serial,  # ruff:ignore[import-private-name]  # test drives the module-private serial resolver
 )
 
 _SN_A = "HQ2C01400955HP3"
@@ -32,8 +32,8 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
 def test_pack_tracks_by_serial_after_reorder() -> None:
     """After the list reorders, the entity still reads its own pack by serial."""
     sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
-    sensor._pack_index = 1  # noqa: SLF001
-    sensor._pack_sn = None  # noqa: SLF001
+    sensor._pack_index = 1  # ruff:ignore[private-member-access]
+    sensor._pack_sn = None  # ruff:ignore[private-member-access]
 
     ordered = {
         PAYLOAD_BATTERY_PACKS: [
@@ -54,10 +54,10 @@ def test_pack_tracks_by_serial_after_reorder() -> None:
         new_callable=PropertyMock,
     ) as payload:
         payload.return_value = ordered
-        first: dict[str, Any] = sensor._pack  # noqa: SLF001
+        first: dict[str, Any] = sensor._pack  # ruff:ignore[private-member-access]
         assert first["deviceSn"] == _SN_A  # index 1 -> pack A, pins its serial
 
         payload.return_value = reordered  # pack A now sits at index 2
-        second: dict[str, Any] = sensor._pack  # noqa: SLF001
+        second: dict[str, Any] = sensor._pack  # ruff:ignore[private-member-access]
         assert second["deviceSn"] == _SN_A  # still pack A by serial, not index-1 (B)
         assert second["batSoc"] == _SOC_A

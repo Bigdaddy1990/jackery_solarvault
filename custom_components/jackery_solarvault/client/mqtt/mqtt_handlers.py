@@ -190,7 +190,7 @@ def normalize_ble_main_lifetime_counters(
 
 
 def merge_battery_pack_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while.
@@ -261,7 +261,7 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
@@ -321,7 +321,7 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Merge Shelly Cloud accessory data by stable identity values and return an.
@@ -361,7 +361,7 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental smart-plug telemetry entries using device serial numbers to.
@@ -384,7 +384,7 @@ def merge_smart_plug_lists(
 
 
 def merge_circuits(
-    current: Any,  # noqa: ANN401
+    current: Any,  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental circuit breaker telemetry using idx to align updates."""
@@ -394,7 +394,7 @@ def merge_circuits(
 
 
 def merge_sub_devices(
-    current: Any,  # noqa: ANN401
+    current: Any,  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge generic sub-device telemetry using serial numbers to align updates."""
@@ -404,9 +404,9 @@ def merge_sub_devices(
 
 
 def _merge_subdevice_lists_by_fn(
-    current: Any,  # noqa: ANN401
+    current: Any,  # ruff:ignore[any-type]
     updates: list[dict[str, Any]],
-    serial_fn: Any,  # noqa: ANN401
+    serial_fn: Any,  # ruff:ignore[any-type]
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
 
@@ -538,7 +538,7 @@ def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def merge_battery_pack_lifetime_from_ble(  # noqa: PLR0911, PLR0912
+def merge_battery_pack_lifetime_from_ble(  # ruff:ignore[too-many-return-statements, too-many-branches]
     updated: dict[str, Any],
     body: dict[str, Any],
 ) -> bool:
@@ -657,7 +657,7 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge OTA metadata into an existing battery-pack list by matching serial numbers.

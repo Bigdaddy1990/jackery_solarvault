@@ -1,6 +1,6 @@
 """Unit coverage for Jackery config-flow option helpers."""
 
-# ruff: noqa: SLF001
+# ruff:file-ignore[private-member-access]
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast

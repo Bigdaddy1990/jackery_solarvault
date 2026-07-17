@@ -51,9 +51,9 @@ from .ingest import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-_LOGGER = logging.getLogger(__name__)  # noqa: RUF067
+_LOGGER = logging.getLogger(__name__)  # ruff:ignore[non-empty-init-module]
 
-_APP_CHART_SERIES_KEYS = (  # noqa: RUF067
+_APP_CHART_SERIES_KEYS = (  # ruff:ignore[non-empty-init-module]
     APP_CHART_SERIES_Y,
     APP_CHART_SERIES_Y1,
     APP_CHART_SERIES_Y2,
@@ -66,7 +66,7 @@ _APP_CHART_SERIES_KEYS = (  # noqa: RUF067
 
 # Canonical mapping from metric key to (trend_section, stat_key) used by
 # ``day_chart_source_candidates`` when building day power-curve candidates.
-DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {  # noqa: RUF067
+DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {  # ruff:ignore[non-empty-init-module]
     "pv_energy": (PAYLOAD_PV_TRENDS, APP_STAT_TOTAL_SOLAR_ENERGY),
     "battery_charge_energy": (
         PAYLOAD_BATTERY_TRENDS,
@@ -80,7 +80,7 @@ DAY_TREND_SOURCE_BY_METRIC_KEY: dict[str, tuple[str, str]] = {  # noqa: RUF067
 }
 
 
-def stat_row_start(row: Mapping[str, Any]) -> float | None:  # noqa: RUF067
+def stat_row_start(row: Mapping[str, Any]) -> float | None:  # ruff:ignore[non-empty-init-module]
     """Return a statistics row start timestamp in seconds."""
     start = row.get("start")
     if isinstance(start, datetime):
@@ -88,7 +88,7 @@ def stat_row_start(row: Mapping[str, Any]) -> float | None:  # noqa: RUF067
     return safe_float(start)
 
 
-def filter_completed_app_points(  # noqa: RUF067
+def filter_completed_app_points(  # ruff:ignore[non-empty-init-module]
     points: list[Any],
     date_type: str,
     reset_period: str,
@@ -119,7 +119,7 @@ def filter_completed_app_points(  # noqa: RUF067
     return completed
 
 
-def parse_statistics_backfill_date(value: object) -> date | None:  # noqa: RUF067
+def parse_statistics_backfill_date(value: object) -> date | None:  # ruff:ignore[non-empty-init-module]
     """Parse a persisted ISO date for statistics repair decisions."""
     if not isinstance(value, str):
         return None
@@ -129,7 +129,7 @@ def parse_statistics_backfill_date(value: object) -> date | None:  # noqa: RUF06
         return None
 
 
-def statistics_current_year_recovery_needed(  # noqa: RUF067
+def statistics_current_year_recovery_needed(  # ruff:ignore[non-empty-init-module]
     *,
     last_success: date,
     last_repair: date | None,
@@ -158,7 +158,7 @@ def statistics_current_year_recovery_needed(  # noqa: RUF067
     return last_repair < last_success_month
 
 
-def iter_calendar_months(start_date: date, end_date: date) -> list[date]:  # noqa: RUF067
+def iter_calendar_months(start_date: date, end_date: date) -> list[date]:  # ruff:ignore[non-empty-init-module]
     """Return first-of-month dates intersecting an inclusive date range.
 
     The missing ``@staticmethod`` decorator on the original coordinator
@@ -172,14 +172,14 @@ def iter_calendar_months(start_date: date, end_date: date) -> list[date]:  # noq
     months: list[date] = []
     while cursor <= end_month:
         months.append(cursor)
-        if cursor.month == 12:  # noqa: PLR2004
+        if cursor.month == 12:  # ruff:ignore[magic-value-comparison]
             cursor = cursor.replace(year=cursor.year + 1, month=1)
         else:
             cursor = cursor.replace(month=cursor.month + 1)
     return months
 
 
-def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:  # noqa: RUF067
+def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:  # ruff:ignore[non-empty-init-module]
     """Return Monday week starts intersecting an inclusive date range."""
     cursor = start_date - timedelta(days=start_date.weekday())
     end_week = end_date - timedelta(days=end_date.weekday())
@@ -190,12 +190,12 @@ def iter_calendar_weeks(start_date: date, end_date: date) -> list[date]:  # noqa
     return weeks
 
 
-def iter_calendar_years(start_date: date, end_date: date) -> list[int]:  # noqa: RUF067
+def iter_calendar_years(start_date: date, end_date: date) -> list[int]:  # ruff:ignore[non-empty-init-module]
     """Return calendar years intersecting an inclusive date range."""
     return list(range(start_date.year, end_date.year + 1))
 
 
-def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:  # noqa: RUF067
+def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:  # ruff:ignore[non-empty-init-module]
     """Return the external bucket id and label for an app chart period."""
     for period_date_type, bucket, bucket_label in APP_CHART_STAT_PERIODS:
         if period_date_type == date_type:
@@ -203,7 +203,7 @@ def app_chart_period_meta(date_type: str) -> tuple[str, str] | None:  # noqa: RU
     return None
 
 
-def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:  # noqa: RUF067
+def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:  # ruff:ignore[non-empty-init-module]
     """Return a stable, user-readable app chart statistic name prefix."""
     return (
         (payload.get(PAYLOAD_SYSTEM) or {}).get(FIELD_DEVICE_NAME)
@@ -213,7 +213,7 @@ def app_chart_name_prefix(device_id: str, payload: dict[str, Any]) -> str:  # no
     )
 
 
-def day_chart_source_candidates(  # noqa: RUF067
+def day_chart_source_candidates(  # ruff:ignore[non-empty-init-module]
     section_prefix: str,
     stat_key: str,
     metric_key: str,
@@ -237,7 +237,7 @@ def day_chart_source_candidates(  # noqa: RUF067
 
 # Canonical mapping from metric key to {date_type: entity_statistic_key}
 # used by ``entity_targets_for_app_points``.
-ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {  # noqa: RUF067
+ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {  # ruff:ignore[non-empty-init-module]
     "pv_energy": {
         DATE_TYPE_DAY: "device_today_pv_energy",
         DATE_TYPE_WEEK: "pv_week_energy",
@@ -325,10 +325,10 @@ ENTITY_STATISTIC_KEY_BY_METRIC_PERIOD: dict[str, dict[str, str]] = {  # noqa: RU
 }
 
 # Window for automatic HTTP backfill of recent day statistics.
-STATISTICS_HTTP_BACKFILL_WINDOW_DAYS: int = 7  # noqa: RUF067
+STATISTICS_HTTP_BACKFILL_WINDOW_DAYS: int = 7  # ruff:ignore[non-empty-init-module]
 
 
-def entity_targets_for_app_points(  # noqa: RUF067
+def entity_targets_for_app_points(  # ruff:ignore[non-empty-init-module]
     metric_key: str,
     date_type: str,
 ) -> tuple[tuple[str, str, bool], ...]:
@@ -354,12 +354,12 @@ def entity_targets_for_app_points(  # noqa: RUF067
     return ()
 
 
-def entity_source_priority(reset_period: str, date_type: str) -> int:  # noqa: RUF067
+def entity_source_priority(reset_period: str, date_type: str) -> int:  # ruff:ignore[non-empty-init-module]
     """Return priority for duplicate buckets within the same period."""
     return 1 if reset_period == date_type else 0
 
 
-def statistics_http_backfill_dates(  # noqa: RUF067
+def statistics_http_backfill_dates(  # ruff:ignore[non-empty-init-module]
     today: date,
     *,
     window_days: int = STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
@@ -379,7 +379,7 @@ def statistics_http_backfill_dates(  # noqa: RUF067
     ]
 
 
-def historical_day_payload_from_sources(  # noqa: RUF067
+def historical_day_payload_from_sources(  # ruff:ignore[non-empty-init-module]
     section_sources: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """Convert section-source dicts into the normal day payload shape."""
@@ -401,7 +401,7 @@ def historical_day_payload_from_sources(  # noqa: RUF067
     return payload
 
 
-def is_derived_home_energy_candidate(  # noqa: RUF067
+def is_derived_home_energy_candidate(  # ruff:ignore[non-empty-init-module]
     *,
     metric_key: str,
     section_prefix: str,
@@ -419,7 +419,7 @@ def is_derived_home_energy_candidate(  # noqa: RUF067
     )
 
 
-def merge_device_statistic_data(  # noqa: RUF067
+def merge_device_statistic_data(  # ruff:ignore[non-empty-init-module]
     updated: dict[str, Any],
     source: dict[str, Any],
     device_statistic_live_keys: frozenset[str],
@@ -449,7 +449,7 @@ def merge_device_statistic_data(  # noqa: RUF067
     return True
 
 
-def merge_lifetime_counter_data(  # noqa: RUF067
+def merge_lifetime_counter_data(  # ruff:ignore[non-empty-init-module]
     updated: dict[str, Any],
     source: dict[str, Any],
     lifetime_counter_keys: frozenset[str],
@@ -471,7 +471,7 @@ def merge_lifetime_counter_data(  # noqa: RUF067
     return True
 
 
-def _coalesced_day_chart_bucket_source(  # noqa: RUF067
+def _coalesced_day_chart_bucket_source(  # ruff:ignore[non-empty-init-module]
     source: dict[str, Any],
 ) -> dict[str, Any]:
     """Return a copy with upstream-null day chart buckets represented as zero."""
@@ -489,7 +489,7 @@ def _coalesced_day_chart_bucket_source(  # noqa: RUF067
     return source if updated is None else updated
 
 
-def current_app_chart_entity_source_batches(  # noqa: RUF067
+def current_app_chart_entity_source_batches(  # ruff:ignore[non-empty-init-module]
     payload: dict[str, Any],
     source: TransportSource,
 ) -> list[tuple[str, dict[str, dict[str, Any]]]]:

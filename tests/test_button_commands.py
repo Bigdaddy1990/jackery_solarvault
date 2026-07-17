@@ -257,12 +257,12 @@ async def portable_setup(
 
     coordinator = entry.runtime_data
     capturing = _CapturingMqtt()
-    coordinator._mqtt = capturing  # noqa: SLF001
+    coordinator._mqtt = capturing  # ruff:ignore[private-member-access]
     # Mock only the broker-connect boundary. ``_async_ensure_mqtt`` opens a
     # real TLS socket to emqx.jackeryapp.com; the command under test does
     # not depend on it (the client is already "connected" via the capture
     # stub), so no-op it to keep the publish path offline and deterministic.
-    coordinator._async_ensure_mqtt = AsyncMock(return_value=None)  # noqa: SLF001
+    coordinator._async_ensure_mqtt = AsyncMock(return_value=None)  # ruff:ignore[private-member-access]
 
     coordinator.async_set_updated_data(_portable_device_payload())
     await hass.async_block_till_done()
@@ -283,7 +283,9 @@ def _entity_id_for(hass: HomeAssistant, translation_key: str) -> str:
     Returns:
         str: The concrete ``button.*`` entity id registered in HA.
     """
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+    from homeassistant.helpers import (
+        entity_registry as er,
+    )
 
     registry = er.async_get(hass)
     unique_id = f"{_DEVICE_ID}_{translation_key}"
@@ -399,7 +401,9 @@ async def test_home_devices_get_no_portable_button_twins(
     colliding names with ``_2``) because the button platform, unlike the
     sensor platform, never gated the portable family on model code 3002.
     """
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+    from homeassistant.helpers import (
+        entity_registry as er,
+    )
 
     entry, _capturing = portable_setup
     coordinator = entry.runtime_data

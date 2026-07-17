@@ -121,7 +121,7 @@ SUBDEVICE_ALARM_DESCRIPTIONS: tuple[
 )
 
 
-async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
+async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -399,7 +399,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     entity_description: JackerySubdeviceAlarmBinarySensorDescription
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # ruff:ignore[too-many-arguments]
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -431,7 +431,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the alert count is positive."""  # noqa: D421
+        """Return true if the alert count is positive."""  # ruff:ignore[property-docstring-starts-with-verb]
         raw = self._sub_device.get(self.entity_description.field)
         val = safe_int(raw)
         return val > 0 if val is not None else None
