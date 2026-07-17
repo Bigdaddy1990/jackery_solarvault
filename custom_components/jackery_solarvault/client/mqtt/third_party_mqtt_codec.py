@@ -165,7 +165,7 @@ def stable_third_party_mqtt_token(
     """
     raw_token = str(token).strip()
     if raw_token:
-        if len(raw_token) != 9 or not raw_token.isdecimal():  # noqa: PLR2004
+        if len(raw_token) != 9 or not raw_token.isdecimal():  # ruff:ignore[magic-value-comparison]
             msg = (
                 "Third-party MQTT token must be a separate 9-digit decimal "
                 "value; topic belongs in the topic filter option"

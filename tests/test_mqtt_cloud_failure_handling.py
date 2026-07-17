@@ -45,9 +45,9 @@ _TWO_ATTEMPTS = 2
 def test_connack_ban_class_codes_are_auth_failures() -> None:
     """MQTT v5 reason codes 128-135 must pause like credential rejections."""
     for rc in (4, 5, 128, 133, 134, 135):
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # noqa: SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff:ignore[private-member-access]
     for rc in (0, 2, 3, 136):
-        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # noqa: SLF001
+        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff:ignore[private-member-access]
 
 
 def test_is_mqtt_auth_failure_matches_rc133_and_code128() -> None:
@@ -89,7 +89,7 @@ def test_handle_connect_error_rc133_pauses_instead_of_backoff() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_finalize_raw_client_consumes_future_exceptions() -> None:  # noqa: RUF029  # needs a running loop for create_future
+async def test_finalize_raw_client_consumes_future_exceptions() -> None:  # ruff:ignore[unused-async]  # needs a running loop for create_future
     """Set exceptions are retrieved and pending futures are pre-completed."""
     loop = asyncio.get_running_loop()
     connected = loop.create_future()
@@ -97,23 +97,23 @@ async def test_finalize_raw_client_consumes_future_exceptions() -> None:  # noqa
     disconnected.set_exception(RuntimeError("[code:128] Unspecified error"))
     raw = SimpleNamespace(_connected=connected, _disconnected=disconnected)
 
-    JackeryMqttPushClient._finalize_raw_client(raw)  # noqa: SLF001
+    JackeryMqttPushClient._finalize_raw_client(raw)  # ruff:ignore[private-member-access]
 
     assert connected.done()
     assert connected.result() is None
-    assert disconnected._log_traceback is False  # noqa: SLF001
+    assert disconnected._log_traceback is False  # ruff:ignore[private-member-access]
 
 
-async def test_finalize_raw_client_tolerates_cancelled_and_missing() -> None:  # noqa: RUF029  # needs a running loop for create_future
+async def test_finalize_raw_client_tolerates_cancelled_and_missing() -> None:  # ruff:ignore[unused-async]  # needs a running loop for create_future
     """Cancelled futures and non-future attributes must not raise."""
     loop = asyncio.get_running_loop()
     cancelled = loop.create_future()
     cancelled.cancel()
 
-    JackeryMqttPushClient._finalize_raw_client(  # noqa: SLF001
+    JackeryMqttPushClient._finalize_raw_client(  # ruff:ignore[private-member-access]
         SimpleNamespace(_connected=cancelled, _disconnected=None)
     )
-    JackeryMqttPushClient._finalize_raw_client(None)  # noqa: SLF001
+    JackeryMqttPushClient._finalize_raw_client(None)  # ruff:ignore[private-member-access]
 
     assert cancelled.cancelled()
 
@@ -182,7 +182,7 @@ async def test_birth_snapshot_not_dispatched_when_connection_lost(
     assert client.is_connected is False
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # noqa: SLF001
+        client._schedule_birth_snapshot(callback)  # ruff:ignore[private-member-access]
         await hass.async_block_till_done()
 
     callback.assert_not_awaited()
@@ -200,12 +200,12 @@ async def test_birth_snapshot_not_connected_error_is_debug_and_deduplicated(
     error = RuntimeError(f"MQTT not connected yet ({_RC133_MESSAGE})")
     callback = AsyncMock(side_effect=error)
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True  # noqa: SLF001
+    client._connected = True  # ruff:ignore[private-member-access]
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # noqa: SLF001
+        client._schedule_birth_snapshot(callback)  # ruff:ignore[private-member-access]
         await hass.async_block_till_done()
-        client._schedule_birth_snapshot(callback)  # noqa: SLF001
+        client._schedule_birth_snapshot(callback)  # ruff:ignore[private-member-access]
         await hass.async_block_till_done()
 
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
@@ -221,10 +221,10 @@ async def test_birth_snapshot_unexpected_error_still_logged_as_error(
     """Genuine handler bugs keep surfacing at ERROR."""
     callback = AsyncMock(side_effect=ValueError("boom"))
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True  # noqa: SLF001
+    client._connected = True  # ruff:ignore[private-member-access]
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # noqa: SLF001
+        client._schedule_birth_snapshot(callback)  # ruff:ignore[private-member-access]
         await hass.async_block_till_done()
 
     assert any(

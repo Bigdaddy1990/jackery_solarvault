@@ -51,7 +51,7 @@ length picks the cipher mode — observed in the wild: a SolarVault 3 Pro
 Max returned a 16-byte key (AES-128). The crypto helpers below accept
 both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
-"""  # noqa: E501
+"""  # ruff:ignore[line-too-long]
 
 from dataclasses import dataclass
 import logging
@@ -132,7 +132,7 @@ def hex16(value: int) -> str:
     if the value does not fit into 16 bits — the caller is responsible for
     range-checking inputs (e.g. ``CHUNK_LEN <= (MTU - 60)``).
     """
-    if not 0 <= value <= 0xFFFF:  # noqa: PLR2004
+    if not 0 <= value <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"hex16: {value} does not fit into 16 bits"
         raise ValueError(msg)
     return f"{value:04X}"
@@ -149,7 +149,7 @@ def parse_hex16(text: str) -> int:
 
     Raises:
         ValueError: If `text` is not exactly 4 characters long or contains invalid hexadecimal digits.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     if len(text) != _HEX16_WIDTH:
         msg = f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         raise ValueError(msg)
@@ -165,7 +165,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     return data.hex().upper()
 
 
@@ -345,7 +345,7 @@ class BleBinaryFrame:
 # from the captured request frames.
 
 
-def build_binary_frame(  # noqa: PLR0913
+def build_binary_frame(  # ruff:ignore[too-many-arguments]
     *,
     cmd: int,
     body: bytes,
@@ -360,19 +360,19 @@ def build_binary_frame(  # noqa: PLR0913
     The default ``trailer`` of four zero bytes is a placeholder until the
     firmware-side checksum algorithm is identified.
     """
-    if not 0 <= cmd <= 0xFFFF:  # noqa: PLR2004
+    if not 0 <= cmd <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"cmd {cmd} does not fit into 16 bits"
         raise ValueError(msg)
-    if not 0 <= flags <= 0xFFFF:  # noqa: PLR2004
+    if not 0 <= flags <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"flags {flags} does not fit into 16 bits"
         raise ValueError(msg)
-    if not 1 <= frame_index <= 0xFFFF:  # noqa: PLR2004
+    if not 1 <= frame_index <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"frame_index {frame_index} out of range"
         raise ValueError(msg)
-    if not 1 <= chunk_count <= 0xFFFF:  # noqa: PLR2004
+    if not 1 <= chunk_count <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"chunk_count {chunk_count} out of range"
         raise ValueError(msg)
-    if len(body) > 0xFFFF:  # noqa: PLR2004
+    if len(body) > 0xFFFF:  # ruff:ignore[magic-value-comparison]
         msg = f"body too long: {len(body)} bytes"
         raise ValueError(msg)
     if len(trailer) != _BINARY_FRAME_TRAILER_LEN:

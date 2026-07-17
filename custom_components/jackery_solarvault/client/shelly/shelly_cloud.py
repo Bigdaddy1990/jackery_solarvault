@@ -169,7 +169,7 @@ def shelly_cloud_device_matches_entry(
     )
 
 
-def merge_shelly_cloud_item(  # noqa: PLR0911, PLR0912
+def merge_shelly_cloud_item(  # ruff:ignore[too-many-return-statements, too-many-branches]
     entry: dict[str, Any],
     source: Mapping[str, Any],
 ) -> bool:
