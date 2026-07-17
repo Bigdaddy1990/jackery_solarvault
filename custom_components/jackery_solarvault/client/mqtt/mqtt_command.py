@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def coerce_transport_cmd(cmd: Any) -> int:  # arbitrary cmd input  # noqa: ANN401
+def coerce_transport_cmd(cmd: Any) -> int:  # arbitrary cmd input  # ruff:ignore[any-type]
     """Coerce an arbitrary command value into an integer suitable for transport.
 
     Parameters:
@@ -52,7 +52,7 @@ def coerce_transport_cmd(cmd: Any) -> int:  # arbitrary cmd input  # noqa: ANN40
     """
     if isinstance(cmd, bool):
         msg = "cmd must be an integer"
-        raise ValueError(msg)  # noqa: TRY004
+        raise ValueError(msg)  # ruff:ignore[type-check-without-type-error]
     if isinstance(cmd, int):
         return cmd
     if isinstance(cmd, float):
@@ -118,12 +118,12 @@ def command_body_for_transport(
     return body
 
 
-def build_smali_command_envelope(  # noqa: PLR0913
+def build_smali_command_envelope(  # ruff:ignore[too-many-arguments]
     *,
     device_sn: str,
     message_type: str,
     action_id: int,
-    body: Any,  # noqa: ANN401
+    body: Any,  # ruff:ignore[any-type]
     timestamp_ms: int,
     version: int = 0,
 ) -> dict[str, Any]:
@@ -143,10 +143,10 @@ def build_smali_command_envelope(  # noqa: PLR0913
     }
 
 
-async def publish_mqtt_command(  # noqa: PLR0913
+async def publish_mqtt_command(  # ruff:ignore[too-many-arguments]
     *,
     mqtt: JackeryMqttPushClient,
-    api: Any,  # JackeryApi — avoids circular import  # noqa: ANN401
+    api: Any,  # JackeryApi — avoids circular import  # ruff:ignore[any-type]
     device_id: str,
     device_sn: str,
     bt_key: bytes | None,
@@ -180,7 +180,9 @@ async def publish_mqtt_command(  # noqa: PLR0913
     # failure, not an auth failure.
     creds = api.get_cached_mqtt_credentials()
     if creds is None:
-        from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+        from homeassistant.exceptions import (
+            HomeAssistantError,
+        )
 
         msg = (
             "Jackery MQTT credentials are not available yet; the HTTP login "
@@ -195,7 +197,7 @@ async def publish_mqtt_command(  # noqa: PLR0913
 
     # Layer C: encrypt body with bluetoothKey per PROTOCOL.md §14.
     payload_str: str
-    if bt_key is not None and len(bt_key) == 16:  # noqa: PLR2004
+    if bt_key is not None and len(bt_key) == 16:  # ruff:ignore[magic-value-comparison]
         try:
             payload_str = encrypt_mqtt_body(body, bt_key)
         except (ValueError, TypeError) as err:
@@ -218,12 +220,12 @@ async def publish_mqtt_command(  # noqa: PLR0913
 
     last_err: Exception | None = None
     for attempt in range(2):
-        try:  # noqa: PLW0717
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             if not mqtt.is_connected:
                 await ensure_mqtt_cb()
             if mqtt is None or not mqtt.is_connected:
                 msg = "MQTT client is not connected"
-                raise RuntimeError(msg)  # noqa: TRY301
+                raise RuntimeError(msg)  # ruff:ignore[raise-within-try]
             await mqtt.async_publish_json(topic, payload, qos=0, retain=False)
             # TX observability: without this line a successful publish is
             # invisible in the HA log, making command/ACK correlation on a
@@ -235,7 +237,7 @@ async def publish_mqtt_command(  # noqa: PLR0913
                 action_id,
                 cmd,
             )
-            return  # noqa: TRY300
+            return  # ruff:ignore[try-consider-else]
         except RuntimeError as err:
             last_err = err
             if attempt == 0:
@@ -247,7 +249,9 @@ async def publish_mqtt_command(  # noqa: PLR0913
                 continue
 
     mqtt_last_error = mqtt.diagnostics.get("last_error") if mqtt else None
-    from homeassistant.exceptions import HomeAssistantError  # noqa: PLC0415
+    from homeassistant.exceptions import (
+        HomeAssistantError,
+    )
 
     raise HomeAssistantError(
         translation_domain="jackery_solarvault",

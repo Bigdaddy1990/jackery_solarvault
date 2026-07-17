@@ -29,14 +29,14 @@ _CMD = 107
 async def test_ble_first_ensures_connection_before_write() -> None:
     """The BLE-first router passes a positive connect timeout to the write."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=_CMD)  # noqa: SLF001
-    cast("Any", coordinator)._command_body_for_transport = MagicMock(  # noqa: SLF001
+    cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=_CMD)  # ruff:ignore[private-member-access]
+    cast("Any", coordinator)._command_body_for_transport = MagicMock(  # ruff:ignore[private-member-access]
         return_value=b"body",
     )
     send_ble = AsyncMock(return_value=True)
     cast("Any", coordinator).async_send_ble_command = send_ble
 
-    await coordinator._async_publish_command_ble_first(  # noqa: SLF001
+    await coordinator._async_publish_command_ble_first(  # ruff:ignore[private-member-access]
         _DEVICE_ID,
         message_type="DevicePropertyChange",
         action_id=_ACTION_ID,

@@ -83,7 +83,7 @@ class _FakeClock:
 def _make_api(session: _FakeSession) -> JackeryApi:
     """Build a logged-in API client whose transport boundary is scripted."""
     api = JackeryApi(cast("Any", session), "tester@example.com", "secret")
-    api._token = "token-1"  # noqa: SLF001  # seed an active session without real login IO
+    api._token = "token-1"  # ruff:ignore[private-member-access]  # seed an active session without real login IO
     return api
 
 
@@ -91,7 +91,7 @@ def _login_mock(api: JackeryApi) -> AsyncMock:
     """Successful full re-login boundary mock that rotates the session token."""
 
     def _login() -> str:
-        api._token = "token-2"  # noqa: SLF001
+        api._token = "token-2"  # ruff:ignore[private-member-access]
         return "token-2"
 
     return AsyncMock(side_effect=_login)

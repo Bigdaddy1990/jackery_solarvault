@@ -62,7 +62,7 @@ def _redacted_payload_map(
 
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     redacted: dict[str, Any] = {}
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
@@ -74,7 +74,7 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this entry point
+async def async_get_config_entry_diagnostics(  # ruff:ignore[unused-async]  # HA awaits this entry point
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
@@ -87,7 +87,7 @@ async def async_get_config_entry_diagnostics(  # noqa: RUF029  # HA awaits this 
             - `options`: redacted copy of the config entry's options.
             - `devices`: mapping of stable local device labels to redacted device payloads.
             - `raw_api`: raw diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill (redacted according to the entry's redaction settings).
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys(entry)
     redactions_disabled = diagnostic_redactions_disabled(entry)
@@ -217,7 +217,7 @@ def _local_mqtt_diagnostics(
     Returns:
         dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
         MQTT client is available, otherwise the client's diagnostics snapshot.
-    """  # noqa: E501
+    """  # ruff:ignore[line-too-long]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     if CONF_LOCAL_MQTT_ENABLE in options or CONF_LOCAL_MQTT_ENABLE in data:

@@ -159,7 +159,9 @@ def _entity_id_for(hass: HomeAssistant, key: str) -> str:
     Returns:
         str: The concrete ``sensor.*`` entity id registered in HA.
     """
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+    from homeassistant.helpers import (
+        entity_registry as er,
+    )
 
     registry = er.async_get(hass)
     unique_id = f"{_DEVICE_ID}_{key}"

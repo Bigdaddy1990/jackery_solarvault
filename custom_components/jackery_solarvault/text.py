@@ -75,7 +75,7 @@ _THIRD_PARTY_MQTT_TEXT_FIELDS: tuple[
 )
 
 
-async def async_setup_entry(  # noqa: RUF029  # HA awaits this entry point
+async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -205,7 +205,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """  # noqa: D421
+        """  # ruff:ignore[property-docstring-starts-with-verb]
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -309,7 +309,7 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current app grid-standard code."""  # noqa: D421
+        """Return the current app grid-standard code."""  # ruff:ignore[property-docstring-starts-with-verb]
         raw = self._system.get(FIELD_GRID_STANDARD)
         if raw in {None, ""}:
             return None
@@ -366,7 +366,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
     _attr_native_min = 0
     _attr_native_max = 128
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # ruff:ignore[too-many-arguments]
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -387,7 +387,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current plaintext value used for writes."""  # noqa: D421
+        """Return the current plaintext value used for writes."""  # ruff:ignore[property-docstring-starts-with-verb]
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
             self._field,
         )

@@ -629,7 +629,7 @@ statistics_during_period: Any
 session_scope: Any
 SENSOR_DOMAIN: Any
 er: Any
-try:  # noqa: PLW0717
+try:  # ruff:ignore[too-many-statements-in-try-clause]
     from homeassistant.components.recorder import get_instance
     from homeassistant.components.recorder.db_schema import (
         Statistics,
@@ -689,7 +689,7 @@ def exception_debug_message(err: BaseException) -> str:
     return f"{type(err).__name__}: {err or "(no message)"}"
 
 
-def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
+def control_int(value: Any, field_name: str) -> int:  # ruff:ignore[any-type]
     """Return a finite integer control value or raise a coordinator error."""
     parsed = None if isinstance(value, bool) else safe_int(value)
     if parsed is None:
@@ -698,7 +698,7 @@ def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401
     return parsed
 
 
-def transport_cmd(value: Any) -> int:  # noqa: ANN401
+def transport_cmd(value: Any) -> int:  # ruff:ignore[any-type]
     """Return a command integer for MQTT/BLE transport routing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
@@ -809,7 +809,7 @@ class RejectionMetrics:
         }
 
 
-class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # noqa: PLR0904
+class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # ruff:ignore[too-many-public-methods]
     """Polls all known Jackery devices.
 
     Architecture
@@ -951,7 +951,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         APP_SECTION_HOME_TRENDS: (APP_STAT_TOTAL_HOME_ENERGY,),
     }
 
-    def __init__(  # noqa: PLR0915
+    def __init__(  # ruff:ignore[too-many-statements]
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
@@ -1262,7 +1262,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Bound the dedup cache to prevent unbounded memory growth. With
         # ~10 topics per device the cap is never hit in normal operation;
         # it only guards against pathological churn.
-        if len(self._payload_debug_last_sig) >= 256:  # noqa: PLR2004
+        if len(self._payload_debug_last_sig) >= 256:  # ruff:ignore[magic-value-comparison]
             oldest = next(iter(self._payload_debug_last_sig))
             self._payload_debug_last_sig.pop(oldest, None)
             self._payload_debug_last_emit_ts.pop(oldest, None)
@@ -1278,7 +1278,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             diagnostic_redactions_disabled(self.entry),
         )
 
-    async def async_discover(self) -> None:  # noqa: PLR0912
+    async def async_discover(self) -> None:  # ruff:ignore[too-many-branches]
         """Populate _device_index from config or /v1/device/system/list."""
         new_index: dict[str, dict[str, Any]] = {}
 
@@ -1499,7 +1499,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         bind_key = dev.get(FIELD_BIND_KEY)
         if safe_bool(bind_key) is False:
             return False
-        if safe_int(dev.get(FIELD_DEV_TYPE)) == 3 and safe_bool(  # noqa: PLR2004
+        if safe_int(dev.get(FIELD_DEV_TYPE)) == 3 and safe_bool(  # ruff:ignore[magic-value-comparison]
             dev.get(FIELD_IS_CLOUD)
         ):
             return False
@@ -1539,7 +1539,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def record_http_auth_rejection(self, status: int, data: object) -> None:
         """Record HTTP/API authentication rejection metrics."""
         reason = f"http_{status}"
-        if self.api._is_token_expired_response(status, data):  # noqa: SLF001
+        if self.api._is_token_expired_response(status, data):  # ruff:ignore[private-member-access]
             self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
             return
         self.rejection_metrics.increment("http_auth_rejections", reason)
@@ -1671,7 +1671,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's coordinator polling interval."""  # noqa: D421
+        """Return the integration's coordinator polling interval."""  # ruff:ignore[property-docstring-starts-with-verb]
         return self._configured_update_interval
 
     def _note_property_equivalent_push(self, body: dict[str, Any]) -> None:
@@ -1717,7 +1717,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _ble_writes_enabled(self) -> bool:
         """Return whether experimental BLE writes are allowed for this entry."""
-        from .util import config_entry_bool_option  # noqa: PLC0415
+        from .util import (
+            config_entry_bool_option,
+        )
 
         return config_entry_bool_option(
             self.entry,
@@ -1729,7 +1731,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             DEFAULT_ENABLE_BLE_WRITES,
         )
 
-    async def async_send_ble_command(  # noqa: PLR0913
+    async def async_send_ble_command(  # ruff:ignore[too-many-arguments]
         self,
         device_id: str,
         *,
@@ -1793,7 +1795,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         empty dict when BLE is disabled or the listener is not running so
         the integration stays usable on systems without Bluetooth.
         """
-        from .util import config_entry_bool_option  # noqa: PLC0415
+        from .util import (
+            config_entry_bool_option,
+        )
 
         ble_enabled = config_entry_bool_option(
             self.entry,
@@ -2022,7 +2026,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         await mqtt.async_stop()
 
-    async def async_start_ble_transport(self) -> None:  # noqa: PLR0915
+    async def async_start_ble_transport(self) -> None:  # ruff:ignore[too-many-statements]
         """Start the optional BLE listener if the config-entry option is set.
 
         Safe to call repeatedly; only the first call attaches a listener.
@@ -2031,9 +2035,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         if self._ble_listener is not None:
             return
-        from homeassistant.helpers import config_validation as _cv  # noqa: F401, I001, PLC0415
+        from homeassistant.helpers import config_validation as _cv  # ruff:ignore[unused-import, unsorted-imports, import-outside-top-level]
 
-        from .util import config_entry_bool_option  # noqa: PLC0415
+        from .util import config_entry_bool_option  # ruff:ignore[import-outside-top-level]
 
         if not config_entry_bool_option(
             self.entry,
@@ -2042,7 +2046,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             return
         try:
-            from .client.ble.ble_transport import JackeryBleListener  # noqa: PLC0415
+            from .client.ble.ble_transport import (
+                JackeryBleListener,
+            )
         except ImportError as err:
             _LOGGER.warning(
                 "Jackery BLE transport requested but module import failed: %s",
@@ -2050,7 +2056,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             return
 
-        async def _sink(device_id: str, observation: BleFrameObservation) -> None:  # noqa: PLR0911, PLR0912
+        async def _sink(device_id: str, observation: BleFrameObservation) -> None:  # ruff:ignore[too-many-return-statements, too-many-branches]
             """Merge BLE-delivered JSON bodies into ``coordinator.data``.
 
             Mirrors the cmd-routing of ``_async_handle_mqtt_message`` so
@@ -2236,7 +2242,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # export; both surfaces are off by default.
 
         if dev_mode_redactions_disabled():
-            import hashlib as _hashlib  # noqa: PLC0415
+            import hashlib as _hashlib  # ruff:ignore[import-outside-top-level]
 
             for device_id in self._device_index:
                 key = self.device_bluetooth_key(device_id)
@@ -2405,7 +2411,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 raise
         self._mqtt_mgr.record_connect_success(mqtt, fingerprint)
 
-    async def _async_handle_mqtt_message(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    async def _async_handle_mqtt_message(  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
         self,
         topic: str,
         payload: dict[str, Any],
@@ -2626,7 +2632,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # /v1/device/property HTTP endpoint. The app requests them with
         # READ_DEVICE_INFO (QueryDeviceProperty, actionId=3011, cmd=106).
         if (
-            not is_subdevice  # noqa: PLR0916
+            not is_subdevice  # ruff:ignore[too-many-boolean-expressions]
             and not (
                 is_wifi_config
                 or is_wifi_list
@@ -3216,7 +3222,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return True when add-on packs exist or are expected."""
         return battery_packs_need_query(payload)
 
-    def _merge_subdevice_data(  # noqa: PLR0912, PLR0914, PLR0915
+    def _merge_subdevice_data(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]
         self,
         updated: dict[str, Any],
         source: dict[str, Any],
@@ -3406,7 +3412,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields."""
@@ -3415,7 +3421,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -3424,7 +3430,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_list_by_identity(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
         update: dict[str, Any],
     ) -> list[dict[str, Any]]:
         """Merge Shelly Cloud accessory data by stable ids, never by index."""
@@ -3433,7 +3439,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``."""
@@ -3647,7 +3653,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_refresh_battery_pack_ota(self, device_id: str) -> None:
         """Fetch per-pack OTA metadata and push a partial coordinator update."""
-        try:  # noqa: PLW0717
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             payload = (self.data or {}).get(device_id) or {}
             packs = payload.get(PAYLOAD_BATTERY_PACKS)
             if not isinstance(packs, list) or not packs:
@@ -3695,7 +3701,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -4172,9 +4178,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
 
     @staticmethod
-    def _coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401
+    def _coerce_transport_cmd(cmd: Any) -> int:  # ruff:ignore[any-type]
         """Coerce transport cmd input to an integer (delegated to client)."""
-        from .client.mqtt.mqtt_command import coerce_transport_cmd  # noqa: PLC0415
+        from .client.mqtt.mqtt_command import (
+            coerce_transport_cmd,
+        )
 
         return coerce_transport_cmd(cmd)
 
@@ -4185,11 +4193,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         cmd: object,
     ) -> dict[str, Any]:
         """Build command body shared by MQTT and BLE (delegated to client)."""
-        from .client.mqtt.mqtt_command import command_body_for_transport  # noqa: I001, PLC0415
+        from .client.mqtt.mqtt_command import command_body_for_transport  # ruff:ignore[unsorted-imports, import-outside-top-level]
 
         return command_body_for_transport(body_fields, cmd=cmd)
 
-    async def _async_publish_command_ble_first(  # noqa: PLR0913
+    async def _async_publish_command_ble_first(  # ruff:ignore[too-many-arguments]
         self,
         device_id: str,
         *,
@@ -4284,7 +4292,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
             raise
 
-    async def _async_publish_command(  # noqa: PLR0913
+    async def _async_publish_command(  # ruff:ignore[too-many-arguments]
         self,
         device_id: str,
         *,
@@ -4295,7 +4303,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ensure_mqtt: bool = True,
     ) -> None:
         """Publish an MQTT command — delegates to client/mqtt_command.py."""
-        from .client.mqtt.mqtt_command import publish_mqtt_command  # noqa: PLC0415
+        from .client.mqtt.mqtt_command import (
+            publish_mqtt_command,
+        )
 
         if self._mqtt is None and ensure_mqtt:
             await self._async_ensure_mqtt(force=True, wait_connected=True)
@@ -4412,7 +4422,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         def _soc_limit(value: object) -> int | None:
             parsed = safe_int(value)
-            if parsed is None or parsed < 0 or parsed > 100:  # noqa: PLR2004
+            if parsed is None or parsed < 0 or parsed > 100:  # ruff:ignore[magic-value-comparison]
                 return None
             return parsed
 
@@ -5340,7 +5350,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             token=str(config.get(FIELD_THIRD_PARTY_MQTT_TOKEN) or "").strip(),
         )
 
-    async def async_set_third_party_mqtt_config(  # noqa: PLR0913
+    async def async_set_third_party_mqtt_config(  # ruff:ignore[too-many-arguments]
         self,
         device_id: str,
         *,
@@ -5985,7 +5995,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         self._apply_local_property_patch(device_id, {field: value})
 
-    async def _async_query_subdevices_for_missing(  # noqa: PLR0912, PLR0915
+    async def _async_query_subdevices_for_missing(  # ruff:ignore[too-many-branches, too-many-statements]
         self,
         *,
         force: bool = False,
@@ -6182,8 +6192,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts or not states:
             return 0.0
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder import (
+                get_instance,
+            )
+            from homeassistant.components.recorder.statistics import (  # ruff:ignore[import-outside-top-level]
                 statistics_during_period,
             )
         except (ImportError, RuntimeError) as err:
@@ -6242,12 +6254,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> tuple[float, float]:
         """Return previous ``sum`` and same-period ``state`` for an entity."""
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-            from homeassistant.components.recorder.db_schema import (  # noqa: PLC0415
+            from homeassistant.components.recorder import (
+                get_instance,
+            )
+            from homeassistant.components.recorder.db_schema import (  # ruff:ignore[import-outside-top-level]
                 Statistics,
                 StatisticsMeta,
             )
-            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
+            from homeassistant.helpers.recorder import (
+                session_scope,
+            )
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity-statistic offset unavailable: %s", err)
             return 0.0, 0.0
@@ -6312,9 +6328,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not starts:
             return set()
         try:
-            from homeassistant.components.recorder import get_instance  # noqa: I001, PLC0415
-            from homeassistant.components.recorder.db_schema import StatisticsRuns  # noqa: PLC0415
-            from homeassistant.helpers.recorder import session_scope  # noqa: PLC0415
+            from homeassistant.components.recorder import get_instance  # ruff:ignore[unsorted-imports, import-outside-top-level]
+            from homeassistant.components.recorder.db_schema import StatisticsRuns  # ruff:ignore[import-outside-top-level]
+            from homeassistant.helpers.recorder import session_scope  # ruff:ignore[import-outside-top-level]
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder run markers unavailable: %s", err)
             return set()
@@ -6350,7 +6366,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         StatisticsRuns.start < range_end + timedelta(hours=1),
                     )
                     .all()
-                    if item[0] is not None and item[0].minute == 55  # noqa: PLR2004
+                    if item[0] is not None and item[0].minute == 55  # ruff:ignore[magic-value-comparison]
                 }
 
         try:
@@ -6362,8 +6378,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def _entity_statistic_ids_by_key(self, device_id: str) -> dict[str, str]:
         """Return current entity statistic IDs for app-chart repair keys."""
         try:
-            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # noqa: I001, PLC0415
-            from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+            from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN  # ruff:ignore[unsorted-imports, import-outside-top-level]
+            from homeassistant.helpers import entity_registry as er  # ruff:ignore[import-outside-top-level]
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Entity registry unavailable for entity repair: %s", err)
             return {}
@@ -6406,7 +6422,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return entity-key/reset/cumulative-state targets for app buckets."""
         return entity_targets_for_app_points(metric_key, date_type)
 
-    def _completed_entity_app_points(  # noqa: PLR6301
+    def _completed_entity_app_points(  # ruff:ignore[no-self-use]
         self,
         points: list[Any],
         *,
@@ -6456,7 +6472,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             })
         return statistics
 
-    async def _async_import_app_chart_entity_statistics_for_device(  # noqa: PLR0912, PLR0914, PLR0915
+    async def _async_import_app_chart_entity_statistics_for_device(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]
         self,
         *,
         device_id: str,
@@ -6469,15 +6485,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not entity_ids:
             return 0, 0
         try:
-            from homeassistant.components.recorder.models import (  # noqa: I001, PLC0415
+            from homeassistant.components.recorder.models import (  # ruff:ignore[unsorted-imports, import-outside-top-level]
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (  # ruff:ignore[import-outside-top-level]
                 async_import_statistics,
             )
-            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
-            from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
+            from homeassistant.const import UnitOfEnergy  # ruff:ignore[import-outside-top-level]
+            from homeassistant.util.unit_conversion import EnergyConverter  # ruff:ignore[import-outside-top-level]
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder entity statistics import unavailable: %s", err)
             return 0, 1
@@ -6663,7 +6679,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             imported_rows += len(statistics)
         return imported_rows, failed_rows
 
-    def _current_app_chart_entity_source_batches(  # noqa: PLR6301
+    def _current_app_chart_entity_source_batches(  # ruff:ignore[no-self-use]
         self,
         payload: dict[str, Any],
     ) -> list[tuple[str, dict[str, dict[str, Any]]]]:
@@ -6720,7 +6736,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         warnings = normalized_data_quality_warnings(warnings)
 
         try:
-            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+            from homeassistant.helpers import (
+                issue_registry as ir,
+            )
         except ImportError, RuntimeError:
             if warnings:
                 examples = "; ".join(
@@ -6830,7 +6848,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def statistics_backfill_diagnostics(self) -> dict[str, Any]:
-        """Return redaction-safe statistics repair diagnostics."""  # noqa: D421
+        """Return redaction-safe statistics repair diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
         devices = self._statistics_backfill_state.get(
             _STATISTICS_BACKFILL_STORE_DEVICES,
         )
@@ -6923,7 +6941,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return candidate payload sections for one day power-curve metric."""
         return day_chart_source_candidates(section_prefix, stat_key, metric_key)
 
-    def _day_chart_points_for_metric(  # noqa: PLR0913
+    def _day_chart_points_for_metric(  # ruff:ignore[too-many-arguments]
         self,
         payload: dict[str, Any],
         section_prefix: str,
@@ -6957,7 +6975,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return points
         return []
 
-    async def _async_add_app_chart_statistics(  # noqa: PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
+    async def _async_add_app_chart_statistics(  # ruff:ignore[too-many-return-statements, too-many-branches, too-many-arguments, too-many-locals, too-many-statements]
         self,
         *,
         device_id: str,
@@ -6977,16 +6995,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not points:
             return True, 0
         try:
-            from homeassistant.components.recorder.models import (  # noqa: I001, PLC0415
+            from homeassistant.components.recorder.models import (  # ruff:ignore[unsorted-imports, import-outside-top-level]
                 StatisticData,
                 StatisticMeanType,
                 StatisticMetaData,
             )
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+            from homeassistant.components.recorder.statistics import (  # ruff:ignore[import-outside-top-level]
                 async_add_external_statistics,
             )
-            from homeassistant.const import UnitOfEnergy  # noqa: PLC0415
-            from homeassistant.util.unit_conversion import EnergyConverter  # noqa: PLC0415
+            from homeassistant.const import UnitOfEnergy  # ruff:ignore[import-outside-top-level]
+            from homeassistant.util.unit_conversion import EnergyConverter  # ruff:ignore[import-outside-top-level]
         except (ImportError, RuntimeError) as err:
             _LOGGER.debug("Recorder statistics import unavailable: %s", err)
             return False, 0
@@ -7043,9 +7061,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # causes ``IntegrityError``.  We filter out rows whose ``state``
         # hasn't changed since the last successful import.
         existing_states: dict[float, float] = {}
-        try:  # noqa: PLW0717
-            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
-            from homeassistant.components.recorder.statistics import (  # noqa: PLC0415
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
+            from homeassistant.components.recorder import (
+                get_instance,
+            )
+            from homeassistant.components.recorder.statistics import (  # ruff:ignore[import-outside-top-level]
                 statistics_during_period,
             )
 
@@ -7211,7 +7231,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         successful_devices.add(device_id)
         return successful_devices
 
-    async def _async_fetch_historical_app_chart_source(  # noqa: PLR0911, PLR0913
+    async def _async_fetch_historical_app_chart_source(  # ruff:ignore[too-many-return-statements, too-many-arguments]
         self,
         *,
         device_id: str,
@@ -7481,7 +7501,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         return withheld
 
-    async def _import_collected_repair_buckets(  # noqa: PLR0913
+    async def _import_collected_repair_buckets(  # ruff:ignore[too-many-arguments]
         self,
         *,
         device_id: str,
@@ -7671,7 +7691,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         return repaired_buckets, failed_buckets + import_failed
 
-    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:  # noqa: PLR0911
+    def _statistics_repair_from_date(self, device_id: str, today: date) -> date | None:  # ruff:ignore[too-many-return-statements]
         """Return the recovery start date for one device, if needed.
 
         On first run (``last_success`` not persisted yet) the method seeds
@@ -7897,7 +7917,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             raise UpdateFailed(msg) from err
 
-    async def _async_update_data_guarded(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    async def _async_update_data_guarded(  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
         self,
         _retry_discovery_once: bool = True,
     ) -> dict[str, dict[str, Any]]:
@@ -8128,16 +8148,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._stat_import_last_sig.clear()
         self._cached_date = today
 
-        async def _get_with_ttl_for(  # noqa: PLR0911, PLR0913
+        async def _get_with_ttl_for(  # ruff:ignore[too-many-return-statements, too-many-arguments]
             cache: dict[str, tuple[float, Any]],
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401
+            default: Any,  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
             """Generic TTL cache helper operating on any dict.
 
             When *stale_ok* is ``True`` and the TTL has expired, the
@@ -8189,15 +8209,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._endpoint_backoff_note_success(backoff_key)
             return value
 
-        async def _get_with_ttl(  # noqa: PLR0913
+        async def _get_with_ttl(  # ruff:ignore[too-many-arguments]
             sys_id: str,
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401
+            default: Any,  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
             *,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -8233,7 +8253,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return []
             return [item for item in devices if isinstance(item, dict)]
 
-        async def _fetch_system(  # noqa: PLR0914
+        async def _fetch_system(  # ruff:ignore[too-many-locals]
             sys_id: str,
             *,
             stale_ok: bool = False,
@@ -8543,7 +8563,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:  # forwards arbitrary cached payload  # noqa: ANN401
+                    ) -> Any:  # forwards arbitrary cached payload  # ruff:ignore[any-type]
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         return await _get_with_ttl(
                             sys_id,
@@ -8579,7 +8599,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             system_cache[sys_id] = bundle
             return bundle
 
-        async def _fetch_device_extras(  # noqa: PLR0914, PLR0915
+        async def _fetch_device_extras(  # ruff:ignore[too-many-locals, too-many-statements]
             dev_id: str,
             dev_sn: str | None,
             sys_id: str | None,
@@ -8673,8 +8693,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             stale_ok=stale_ok,
                         ),
                     )
-                task_names.append(battery_key)  # noqa: FURB113
-                tasks.append(  # noqa: FURB113
+                task_names.append(battery_key)  # ruff:ignore[repeated-append]
+                tasks.append(  # ruff:ignore[repeated-append]
                     _get_with_ttl_for(
                         per_dev,
                         battery_key,
@@ -8795,8 +8815,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # REST pack/list is slow and often returns null for SolarVault.
                 # Live pack values are refreshed via MQTT subdevice queries.
                 pack_interval_sec = self._slow_metrics_interval_sec
-                task_names.append(PAYLOAD_OTA)  # noqa: FURB113
-                tasks.append(  # noqa: FURB113
+                task_names.append(PAYLOAD_OTA)  # ruff:ignore[repeated-append]
+                tasks.append(  # ruff:ignore[repeated-append]
                     _get_with_ttl_for(
                         per_dev,
                         PAYLOAD_OTA,
@@ -8865,7 +8885,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     fetch_missing=False,
                 )
 
-            async def _fetch_device_month(  # noqa: PLR0911
+            async def _fetch_device_month(  # ruff:ignore[too-many-return-statements]
                 prefix: str,
                 month: int,
             ) -> dict[str, Any]:
@@ -9514,7 +9534,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             act_issue_id = (
                 f"{self.entry.entry_id}_{dev_id}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
             )
-            from homeassistant.helpers import issue_registry as ir  # noqa: PLC0415
+            from homeassistant.helpers import (
+                issue_registry as ir,
+            )
 
             for domain, existing_issue_id in tuple(ir.async_get(self.hass).issues):
                 if (
@@ -9612,7 +9634,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             def _make_device_refresher(
                 descriptor: tuple[str, str | None, str | None, str | None],
             ) -> Callable[[], Awaitable[Any]]:
-                async def _refresh() -> Any:  # forwards device extras  # noqa: ANN401
+                async def _refresh() -> Any:  # forwards device extras  # ruff:ignore[any-type]
                     return await _fetch_device_extras(
                         descriptor[0],
                         descriptor[1],
@@ -9632,7 +9654,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # buckets back into ``self.data`` and push a partial update.
                 # Auth / transient failures stay isolated so they never flip
                 # ``last_update_success``.
-                async def _refresh() -> Any:  # noqa: ANN401
+                async def _refresh() -> Any:  # ruff:ignore[any-type]
                     if not self.data or enrich_dev_id not in self.data:
                         return None
                     enrich_entry = dict(self.data[enrich_dev_id])
@@ -9682,7 +9704,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             if shelly_cache_stale:
 
-                async def _refresh_shelly() -> Any:  # noqa: ANN401
+                async def _refresh_shelly() -> Any:  # ruff:ignore[any-type]
                     return await _fetch_shelly_cloud_devices(stale_ok=False)
 
                 device_refreshers.append(_refresh_shelly)
@@ -9999,7 +10021,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:
-        """Return the MQTT client diagnostics block for the diagnostics export."""  # noqa: D421
+        """Return the MQTT client diagnostics block for the diagnostics export."""  # ruff:ignore[property-docstring-starts-with-verb]
         return self.mqtt_diagnostics_snapshot()
 
     def mqtt_diagnostics_snapshot(
@@ -10206,14 +10228,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._local_mqtt_unsubs:
             return
         try:
-            from homeassistant.components import mqtt  # noqa: PLC0415
+            from homeassistant.components import (
+                mqtt,
+            )
         except ImportError:
             _LOGGER.debug("Jackery local MQTT listener skipped: mqtt not available")
             return
 
         topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
 
-        async def _handle_local_mqtt_message(message: Any) -> None:  # noqa: ANN401
+        async def _handle_local_mqtt_message(message: Any) -> None:  # ruff:ignore[any-type]
             raw_payload = message.payload
             if isinstance(raw_payload, bytes):
                 raw_payload = raw_payload.decode()
@@ -10239,7 +10263,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             await self._async_note_local_mqtt_frame()
             await self._async_handle_mqtt_message(str(message.topic), payload)
 
-        def _queue_local_mqtt_message(message: Any) -> None:  # noqa: ANN401
+        def _queue_local_mqtt_message(message: Any) -> None:  # ruff:ignore[any-type]
             self.hass.async_create_background_task(
                 _handle_local_mqtt_message(message),
                 name=f"{DOMAIN}_local_mqtt_message",
@@ -10291,7 +10315,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not address:
             return False
         try:
-            from homeassistant.components import bluetooth  # noqa: PLC0415
+            from homeassistant.components import (
+                bluetooth,
+            )
         except ImportError:
             return False
         return bool(
@@ -11173,7 +11199,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             imported_rows += bucket_count
         return success, imported_rows
 
-    async def _async_http_backfill_recent_day_statistics(  # noqa: PLR0914
+    async def _async_http_backfill_recent_day_statistics(  # ruff:ignore[too-many-locals]
         self,
         snapshot: dict[str, dict[str, Any]],
         *,
@@ -11284,12 +11310,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def polling_diagnostics(self) -> dict[str, Any]:
-        """Return the latest HTTP polling/cache diagnostics."""  # noqa: D421
+        """Return the latest HTTP polling/cache diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
         return dict(self._polling_diagnostics)
 
     @property
     def statistics_import_diagnostics(self) -> dict[str, Any]:
-        """Return the latest Recorder import diagnostics."""  # noqa: D421
+        """Return the latest Recorder import diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
         return dict(self._statistics_import_diagnostics)
 
     def _metric_source_candidates(

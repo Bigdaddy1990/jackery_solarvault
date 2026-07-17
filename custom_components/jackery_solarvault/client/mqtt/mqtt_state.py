@@ -44,7 +44,7 @@ def is_mqtt_auth_failure(message: object) -> bool:
     if any(
         f"code:{rc}" in text or f"code {rc}" in text
         for rc in MQTT_AUTH_FAILURE_RCS
-        if rc >= 128  # noqa: PLR2004
+        if rc >= 128  # ruff:ignore[magic-value-comparison]
     ):
         return True
     return "bad user name or password" in text or "not authorized" in text
@@ -329,7 +329,7 @@ class MqttConnectionManager:
 
         # Throttle
         if (
-            not force  # noqa: PLR0916
+            not force  # ruff:ignore[too-many-boolean-expressions]
             and mqtt.is_started
             and (
                 (

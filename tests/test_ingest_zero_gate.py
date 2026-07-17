@@ -218,12 +218,12 @@ def test_nested_zero_periodic_payload_is_dropped_without_confirmation() -> None:
 
 def test_series_helper_rejects_non_list_values() -> None:
     """Only chart/list values can mark a zero-period payload as populated."""
-    assert ingest_gate._has_populated_series("0.1") is False  # noqa: SLF001
+    assert ingest_gate._has_populated_series("0.1") is False  # ruff:ignore[private-member-access]
 
 
 def test_zero_confirmation_requires_numeric_fields() -> None:
     """A zero confirmation needs actual numeric day counters to validate."""
-    result = ingest_gate._zero_period_payload_confirmed(  # noqa: SLF001
+    result = ingest_gate._zero_period_payload_confirmed(  # ruff:ignore[private-member-access]
         PAYLOAD_DEVICE_STATISTIC,
         {"text": "not-a-number"},
         _CONFIRMING_STATISTIC,
