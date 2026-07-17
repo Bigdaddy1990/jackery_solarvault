@@ -14,7 +14,7 @@ fastmcp
 hacs-action
 hassfest
 homeassisstant-stubs
-homeassistant>=2026.7.0
+homeassistant>=2026.7.2
 hypothesis
 ifaddr
 iniconfig
