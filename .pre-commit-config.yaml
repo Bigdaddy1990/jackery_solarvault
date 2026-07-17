@@ -50,7 +50,7 @@ repos:
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.21
+    rev: v0.15.22
     hooks:
       - id: ruff-check
         args:

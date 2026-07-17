@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.jackery_solarvault import (
-    _async_authenticate_api_layer,  # noqa: PLC2701  # test drives the module-private setup login helper
+    _async_authenticate_api_layer,  # ruff:ignore[import-private-name]  # test drives the module-private setup login helper
 )
 from custom_components.jackery_solarvault.client.api import JackeryAuthError
 from custom_components.jackery_solarvault.const import SETUP_LOGIN_MAX_ATTEMPTS

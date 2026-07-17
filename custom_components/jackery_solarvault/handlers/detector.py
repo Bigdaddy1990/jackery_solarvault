@@ -134,7 +134,7 @@ def normalize_battery_pack_payload(item: object) -> dict[str, Any]:
     return normalized
 
 
-def looks_like_battery_pack(  # noqa: PLR0911  # flat reject/accept chain keeps subdevice classification explicit
+def looks_like_battery_pack(  # ruff:ignore[too-many-return-statements]  # flat reject/accept chain keeps subdevice classification explicit
     item: object,
     ct_meter_keys: frozenset[str],
     battery_pack_hint_keys: frozenset[str],

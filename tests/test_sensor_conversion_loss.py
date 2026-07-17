@@ -148,7 +148,9 @@ async def test_conversion_loss_balances_at_the_inverter_boundary(
     historical export-only formula reported 1995 W — the household
     consumption disguised as "loss".
     """
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+    from homeassistant.helpers import (
+        entity_registry as er,
+    )
 
     await hass.async_block_till_done()
     registry = er.async_get(hass)

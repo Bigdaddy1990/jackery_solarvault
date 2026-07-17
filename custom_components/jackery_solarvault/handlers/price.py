@@ -23,8 +23,8 @@ _LOGGER = logging.getLogger(__name__)
 async def call(
     coordinator: JackerySolarVaultCoordinator,
     method: str,
-    *args: Any,  # noqa: ANN401
-    **kwargs: Any,  # noqa: ANN401
+    *args: Any,  # ruff:ignore[any-type]
+    **kwargs: Any,  # ruff:ignore[any-type]
 ) -> object:
     """Call a characterized coordinator setter by name."""
     return await getattr(coordinator, method)(*args, **kwargs)
