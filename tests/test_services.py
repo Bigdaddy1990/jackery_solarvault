@@ -1,6 +1,6 @@
 """Behavior tests for Jackery SolarVault Home Assistant service actions."""
 
-# ruff: noqa: SLF001
+# ruff:file-ignore[private-member-access]
 
 import math
 from types import SimpleNamespace

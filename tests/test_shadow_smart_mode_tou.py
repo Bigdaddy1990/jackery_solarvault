@@ -48,7 +48,7 @@ async def test_smart_mode_bucket_filled_from_http() -> None:
     )
     working: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_SYSTEM_ID: _SYSTEM_ID}}
 
-    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # noqa: SLF001
+    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # ruff:ignore[private-member-access]
 
     assert filled is True
     assert working[PAYLOAD_SMART_MODE]["isActive"] == 1
@@ -66,7 +66,7 @@ async def test_smart_mode_skipped_without_system_id() -> None:
     )
     working: dict[str, Any] = {}
 
-    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # noqa: SLF001
+    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # ruff:ignore[private-member-access]
 
     assert filled is False
     assert PAYLOAD_SMART_MODE not in working
@@ -84,7 +84,7 @@ async def test_tou_bucket_filled_from_http() -> None:
     )
     working: dict[str, Any] = {PAYLOAD_DEVICE: {FIELD_DEVICE_ID: _NUMERIC_DEVICE_ID}}
 
-    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # noqa: SLF001
+    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # ruff:ignore[private-member-access]
 
     assert filled is True
     assert working[PAYLOAD_TOU_SCHEDULE]["tasks"] == body["tasks"]
@@ -101,7 +101,7 @@ async def test_tou_skipped_without_device_id() -> None:
     cast("Any", coordinator).api = SimpleNamespace(async_query_tou_plan=query_tou)
     working: dict[str, Any] = {}
 
-    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # noqa: SLF001
+    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # ruff:ignore[private-member-access]
 
     assert filled is False
     assert PAYLOAD_TOU_SCHEDULE not in working

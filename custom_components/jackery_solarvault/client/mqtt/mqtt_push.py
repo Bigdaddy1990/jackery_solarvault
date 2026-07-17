@@ -1,7 +1,10 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
-from collections.abc import Awaitable, Callable  # noqa: TC003
+from collections.abc import (  # ruff:ignore[typing-only-standard-library-import]
+    Awaitable,
+    Callable,
+)
 import contextlib
 from datetime import UTC, datetime
 import hashlib
@@ -12,7 +15,10 @@ import ssl
 from typing import TYPE_CHECKING, Any
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, MqttError  # noqa: TC002
+from aiomqtt import (  # ruff:ignore[typing-only-third-party-import]
+    Client as MQTTClient,
+    MqttError,
+)
 from aiomqtt.exceptions import MqttCodeError
 
 from ...const import (  # noqa: RUF100, TID252
@@ -43,7 +49,7 @@ _AIOMQTT_LOGGER.setLevel(logging.WARNING)
 class _AioMqttPassiveDisconnectFilter(logging.Filter):
     """Hide expected passive broker reset noise from aiomqtt internals."""
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
+    def filter(self, record: logging.LogRecord) -> bool:  # ruff:ignore[no-self-use]
         """Filter out common aiomqtt passive socket-reset log messages.
 
         Parameters:
@@ -77,7 +83,7 @@ class _AioMqttTeardownNoiseFilter(logging.Filter):
     DEBUG, in which case they pass through demoted to DEBUG.
     """
 
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: PLR6301
+    def filter(self, record: logging.LogRecord) -> bool:  # ruff:ignore[no-self-use]
         """Suppress or demote known teardown-race records.
 
         Parameters:
@@ -120,7 +126,7 @@ class JackeryMqttPushClient:
             message_callback (Callable[[str, dict[str, Any]], Awaitable[None]]): Async callback invoked for each received message with arguments (topic, parsed JSON object).
             connect_callback (Callable[[], Awaitable[None]] | None): Optional async callback invoked once after a successful connection is established.
             disconnect_callback (Callable[[], Awaitable[None]] | None): Optional async callback invoked after a prior successful connection when the client disconnects.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         self._hass = hass
         self._message_callback = message_callback
         self._connect_callback = connect_callback
@@ -178,7 +184,7 @@ class JackeryMqttPushClient:
             username (str): MQTT username for authentication.
             password (str): MQTT password for authentication.
             user_id (str): User identifier used to construct the subscription topic namespace.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         fingerprint = self._credential_fingerprint(client_id, username, password)
         async with self._lock:
             if self._runner_task is not None and self._fingerprint == fingerprint:
@@ -233,7 +239,7 @@ class JackeryMqttPushClient:
 
         Returns:
             str: Hexadecimal SHA-256 digest of the provided credentials.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         hasher = hashlib.sha256()
         for value in (client_id, username, password):
             encoded = value.encode()
@@ -245,7 +251,7 @@ class JackeryMqttPushClient:
         """Stop the MQTT runner and disconnect the client.
 
         Acquires the internal lock, stops any active background session task, and clears internal connection state before returning.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         async with self._lock:
             await self._async_stop_locked()
 
@@ -272,7 +278,7 @@ class JackeryMqttPushClient:
 
         Raises:
                 RuntimeError: If the MQTT client is not running or the publish fails.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if not self._connected:
             await self._async_wait_connected(timeout_sec=12.0)
@@ -299,7 +305,7 @@ class JackeryMqttPushClient:
 
         Raises:
             RuntimeError: If the MQTT client runner is not started, or if the client fails to connect within `timeout_sec`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if self._runner_task is None:
             msg = "MQTT client is not running"
             raise RuntimeError(msg)
@@ -315,7 +321,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
         except TimeoutError as err:
@@ -333,7 +339,7 @@ class JackeryMqttPushClient:
         """Stop the current runner task and clear internal connection state.
 
         If a background runner task exists, cancel it and wait for its completion while suppressing cancellation, MQTT, and generic exceptions. Clears the stored client, fingerprint, subscribed topics, connected flag, and connected event so the instance is left in a stopped state.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         task = self._runner_task
         if task is None:
             return
@@ -348,7 +354,7 @@ class JackeryMqttPushClient:
         with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
             await task
 
-    async def _async_run_session(  # noqa: PLR0912
+    async def _async_run_session(  # ruff:ignore[too-many-branches]
         self,
         *,
         client_id: str,
@@ -359,10 +365,10 @@ class JackeryMqttPushClient:
         """Manage an MQTT client session: connect, subscribe to configured topics, process incoming messages, and update connection state.
 
         On successful connection, sets internal connection flags and timestamps, subscribes to topics in self._topics, and forwards incoming messages to the internal message handler. If configured, schedules the connect callback once connected and schedules the disconnect callback when a previously established session ends. On errors, updates internal error state and sets or clears the connected event to reflect whether the termination was a connect failure.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         connected = False
         raw_client: MQTTClient | None = None
-        try:  # noqa: PLW0717
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             raw_client = aiomqtt.Client(
                 hostname=MQTT_HOST,
                 port=MQTT_PORT,
@@ -387,7 +393,7 @@ class JackeryMqttPushClient:
                 # news again.
                 self._birth_not_connected_logged = False
                 _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # noqa: E501
+                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # ruff:ignore[line-too-long]
                     len(self._topics),
                     self._tls_certificate_source,
                 )
@@ -408,7 +414,7 @@ class JackeryMqttPushClient:
             self._handle_disconnect_error(str(err), connected)
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:  # ruff:ignore[blind-except]
             self._last_error = f"connect failed: {err}"
             self._connected_event.set()
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", err)
@@ -435,7 +441,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         message = f"connect rc={rc} ({reason})"
@@ -479,7 +485,7 @@ class JackeryMqttPushClient:
         Parameters:
                 error (str): The error message to record.
                 was_connected (bool): If True, record the error as a disconnect; if False, record it as a connect failure.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if self._is_connect_failure_error(self._last_error):
             return
         if was_connected:
@@ -498,7 +504,7 @@ class JackeryMqttPushClient:
 
         Returns:
             int: Extracted integer return code, or 0 if no integer code is present.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
@@ -519,7 +525,7 @@ class JackeryMqttPushClient:
             rejection class 128-135 (includes 133 "client identifier not
             valid" used by the Jackery broker for banned client ids), False
             otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return rc in MQTT_AUTH_FAILURE_RCS
 
     @staticmethod
@@ -564,7 +570,7 @@ class JackeryMqttPushClient:
 
         Returns:
             bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
@@ -577,7 +583,7 @@ class JackeryMqttPushClient:
 
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and `verify_mode = ssl.CERT_REQUIRED`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -632,7 +638,7 @@ class JackeryMqttPushClient:
 
         Behavior:
                 Parses the payload as JSON and requires the top-level value to be an object (dict). On decode or parse failure, or when the JSON value is not an object, increments `_messages_dropped` and sets `_last_message_error`. If the parsed object does not contain a dict at `FIELD_BODY` but does contain a dict at `FIELD_DATA`, copies `FIELD_DATA` into `FIELD_BODY`. On successful validation increments `_messages_seen`, records `_last_message_at` (UTC ISO), clears `_last_message_error`, and schedules the configured message callback with `(topic, data)`.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         try:
             if isinstance(payload, str):
                 text = payload
@@ -668,8 +674,8 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)  # noqa: TRY400
+            except Exception as err:  # ruff:ignore[blind-except]
+                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)  # ruff:ignore[error-instead-of-exception]
 
         task.add_done_callback(_log_task_result)
 
@@ -714,7 +720,7 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:  # ruff:ignore[blind-except]
                 self._birth_publish_failed += 1
                 if "not connected" in str(err).lower():
                     if not self._birth_not_connected_logged:
@@ -724,7 +730,7 @@ class JackeryMqttPushClient:
                             err,
                         )
                     return
-                _LOGGER.error(  # noqa: TRY400
+                _LOGGER.error(  # ruff:ignore[error-instead-of-exception]
                     "Jackery MQTT birth snapshot handler failed: %s", err
                 )
 
@@ -750,11 +756,11 @@ class JackeryMqttPushClient:
 
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if topic is None:
             return None
         parts = topic.split("/")
-        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:  # noqa: PLR2004
+        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:  # ruff:ignore[magic-value-comparison]
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 
@@ -783,7 +789,7 @@ class JackeryMqttPushClient:
               - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
                 "tls_certificate_source": TLS and certificate source flags
               - "library": identifier of the MQTT client library
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
 
         def topic_value(topic: str | None) -> str | None:
             """Produce the topic with the user-specific segment redacted when redaction is enabled.
@@ -793,7 +799,7 @@ class JackeryMqttPushClient:
 
             Returns:
                 str | None: The redacted topic when redaction is enabled, the original topic when redaction is disabled, or `None` if `topic` is `None`.
-            """  # noqa: E501
+            """  # ruff:ignore[line-too-long]
             return self._redact_topic(topic) if redact_topics else topic
 
         return {
@@ -833,7 +839,7 @@ class JackeryMqttPushClient:
 
         Returns:
             dict[str, Any]: Diagnostics snapshot containing connection state and flags, timestamps for last connect/disconnect/message/publish, message counters and last message error, subscribed topics and last published topic (topics may be redacted), TLS status and certificate source, broker constants, connection attempt and authentication-failure metrics, and other fields useful for debugging and monitoring.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return self.diagnostics_snapshot()
 
     def _seconds_since_last_message(self) -> float | None:
@@ -843,7 +849,7 @@ class JackeryMqttPushClient:
 
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if unavailable or invalid.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if self._last_message_at is None:
             return None
         try:
@@ -859,7 +865,7 @@ class JackeryMqttPushClient:
 
         Returns:
             float | None: Number of seconds since the last message, or `None` if no last-message timestamp is available.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return self._seconds_since_last_message()
 
     @property
@@ -868,7 +874,7 @@ class JackeryMqttPushClient:
 
         Returns:
             int: Count of consecutive authentication failures observed for connect attempts.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         return self._consecutive_auth_failures
 
     def _mqtt_silent_for_too_long(self) -> bool:
@@ -878,7 +884,7 @@ class JackeryMqttPushClient:
 
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
-        """  # noqa: E501
+        """  # ruff:ignore[line-too-long]
         if not self._connected:
             return False
         elapsed = self._seconds_since_last_message()

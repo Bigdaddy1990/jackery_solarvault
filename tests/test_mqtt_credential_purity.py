@@ -90,19 +90,19 @@ async def test_ensure_mqtt_without_creds_does_not_reauth() -> None:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     mqtt = MagicMock(name="mqtt")
     mqtt.is_connected = False
-    coordinator._mqtt = mqtt  # noqa: SLF001
-    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(  # noqa: SLF001
+    coordinator._mqtt = mqtt  # ruff:ignore[private-member-access]
+    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(  # ruff:ignore[private-member-access]
         return_value=False,
     )
     mgr = MagicMock(name="mqtt_mgr")
     mgr.should_skip_reconnect = MagicMock(return_value=False)
-    coordinator._mqtt_mgr = mgr  # noqa: SLF001
+    coordinator._mqtt_mgr = mgr  # ruff:ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         mqtt_fingerprint=(_USER_ID, _MAC_ID, _SEED_B64),
         get_cached_mqtt_credentials=MagicMock(return_value=None),
     )
 
-    await coordinator._async_ensure_mqtt(force=True)  # noqa: SLF001
+    await coordinator._async_ensure_mqtt(force=True)  # ruff:ignore[private-member-access]
 
     mqtt.async_start.assert_not_called()
 

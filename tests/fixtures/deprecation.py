@@ -1,15 +1,21 @@
-"""Deprecation helpers for Home Assistant."""  # noqa: INP001
+"""Deprecation helpers for Home Assistant."""  # ruff:ignore[implicit-namespace-package]
 
-from collections.abc import Callable  # noqa: TC003
+from collections.abc import Callable  # ruff:ignore[typing-only-standard-library-import]
 from contextlib import suppress
-from enum import EnumType, IntEnum, IntFlag, StrEnum, _EnumDict  # noqa: TC003
+from enum import (  # ruff:ignore[typing-only-standard-library-import]
+    EnumType,
+    IntEnum,
+    IntFlag,
+    StrEnum,
+    _EnumDict,
+)
 import functools
 import inspect
 import logging
 from typing import Any, NamedTuple, cast
 
 
-def deprecated_substitute[_ObjectT: object](  # noqa: UP049
+def deprecated_substitute[_ObjectT: object](  # ruff:ignore[private-type-parameter]
     substitute_name: str,
 ) -> Callable[[Callable[[_ObjectT], Any]], Callable[[_ObjectT], Any]]:
     """Help migrate properties to new names.
@@ -23,7 +29,7 @@ def deprecated_substitute[_ObjectT: object](  # noqa: UP049
     def decorator(func: Callable[[_ObjectT], Any]) -> Callable[[_ObjectT], Any]:
         """Decorate function as deprecated."""
 
-        def func_wrapper(self: _ObjectT) -> Any:  # noqa: ANN401
+        def func_wrapper(self: _ObjectT) -> Any:  # ruff:ignore[any-type]
             """Wrap for the original function."""
             if hasattr(self, substitute_name):
                 # If this platform is still using the old property, issue
@@ -43,7 +49,7 @@ def deprecated_substitute[_ObjectT: object](  # noqa: UP049
                         inspect.getfile(self.__class__),
                     )
                     warnings[module_name] = True
-                    setattr(func, "_deprecated_substitute_warnings", warnings)  # noqa: B010
+                    setattr(func, "_deprecated_substitute_warnings", warnings)  # ruff:ignore[set-attr-with-constant]
 
                 # Return the old property
                 return getattr(self, substitute_name)
@@ -58,8 +64,8 @@ def get_deprecated(
     config: dict[str, Any],
     new_name: str,
     old_name: str,
-    default: Any | None = None,  # noqa: ANN401
-) -> Any | None:  # noqa: ANN401
+    default: Any | None = None,  # ruff:ignore[any-type]
+) -> Any | None:  # ruff:ignore[any-type]
     """Allow an old config name to be deprecated with a replacement.
 
     If the new config isn't found, but the old one is, the old value is used
@@ -67,7 +73,7 @@ def get_deprecated(
     """
     if old_name in config:
         module = inspect.getmodule(inspect.stack(context=0)[1].frame)
-        if module is not None:  # noqa: SIM108
+        if module is not None:  # ruff:ignore[if-else-block-instead-of-if-exp]
             module_name = module.__name__
         else:
             # If Python is unable to access the sources files, the call stack frame
@@ -89,7 +95,7 @@ def get_deprecated(
     return config.get(new_name, default)
 
 
-def deprecated_class[_T](  # noqa: UP049
+def deprecated_class[_T](  # ruff:ignore[private-type-parameter]
     replacement: str, *, breaks_in_ha_version: str | None = None
 ) -> Callable[[type[_T]], type[_T]]:
     """Mark class as deprecated and provide a replacement class to be used instead.
@@ -102,7 +108,7 @@ def deprecated_class[_T](  # noqa: UP049
         """Decorate class as deprecated."""
         base_meta = type(cls)
 
-        def __call__(self: type[Any], *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401, N807
+        def __call__(self: type[Any], *args: Any, **kwargs: Any) -> Any:  # ruff:ignore[any-type, dunder-function-name]
             _print_deprecation_warning(
                 cls, replacement, "class", "instantiated", breaks_in_ha_version
             )
@@ -126,12 +132,12 @@ def deprecated_class[_T](  # noqa: UP049
             },
         )
 
-        return cast(type[_T], deprecated_cls)  # noqa: TC006
+        return cast(type[_T], deprecated_cls)  # ruff:ignore[runtime-cast-value]
 
     return deprecated_decorator
 
 
-def deprecated_function[**_P, _R](  # noqa: UP049
+def deprecated_function[**_P, _R](  # ruff:ignore[private-type-parameter]
     replacement: str, *, breaks_in_ha_version: str | None = None
 ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Mark function as deprecated and provide a replacement to be used instead.
@@ -156,7 +162,7 @@ def deprecated_function[**_P, _R](  # noqa: UP049
     return deprecated_decorator
 
 
-def deprecated_hass_argument[**_P, _T](  # noqa: UP049
+def deprecated_hass_argument[**_P, _T](  # ruff:ignore[private-type-parameter]
     breaks_in_ha_version: str | None = None,
 ) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
     """Decorate function to indicate that first argument hass will be ignored."""
@@ -164,7 +170,9 @@ def deprecated_hass_argument[**_P, _T](  # noqa: UP049
     def _decorator(func: Callable[_P, _T]) -> Callable[_P, _T]:
         @functools.wraps(func)
         def _inner(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-            from homeassistant.core import HomeAssistant  # noqa: PLC0415
+            from homeassistant.core import (
+                HomeAssistant,
+            )
 
             in_arg = len(args) > 0 and isinstance(args[0], HomeAssistant)
             in_kwarg = "hass" in kwargs and isinstance(kwargs["hass"], HomeAssistant)
@@ -192,7 +200,7 @@ def deprecated_hass_argument[**_P, _T](  # noqa: UP049
 
 
 def _print_deprecation_warning(
-    obj: Any,  # noqa: ANN401
+    obj: Any,  # ruff:ignore[any-type]
     replacement: str,
     description: str,
     verb: str,
@@ -209,7 +217,7 @@ def _print_deprecation_warning(
     )
 
 
-def _print_deprecation_warning_internal(  # noqa: PLR0913, PLR0917
+def _print_deprecation_warning_internal(  # ruff:ignore[too-many-arguments, too-many-positional-arguments]
     obj_name: str,
     module_name: str,
     replacement: str,
@@ -233,7 +241,7 @@ def _print_deprecation_warning_internal(  # noqa: PLR0913, PLR0917
         )
 
 
-def _print_deprecation_warning_internal_impl(  # noqa: PLR0913, PLR0917
+def _print_deprecation_warning_internal_impl(  # ruff:ignore[too-many-arguments, too-many-positional-arguments]
     obj_name: str,
     module_name: str,
     replacement: str,
@@ -243,12 +251,16 @@ def _print_deprecation_warning_internal_impl(  # noqa: PLR0913, PLR0917
     *,
     log_when_no_integration_is_found: bool,
 ) -> None:
-    from homeassistant.core import async_get_hass_or_none  # noqa: PLC0415
-    from homeassistant.helpers.frame import (  # noqa: PLC0415
+    from homeassistant.core import (
+        async_get_hass_or_none,
+    )
+    from homeassistant.helpers.frame import (  # ruff:ignore[import-outside-top-level]
         MissingIntegrationFrame,
         get_integration_frame,
     )
-    from homeassistant.loader import async_suggest_report_issue  # noqa: PLC0415
+    from homeassistant.loader import (
+        async_suggest_report_issue,
+    )
 
     logger = logging.getLogger(module_name)
     if breaks_in_ha_version:
@@ -335,14 +347,14 @@ class DeferredDeprecatedAlias[T]:
 
     @functools.cached_property
     def value(self) -> T:
-        """Return the value."""  # noqa: D421
+        """Return the value."""  # ruff:ignore[property-docstring-starts-with-verb]
         return self._value_fn()
 
 
 _PREFIX_DEPRECATED = "_DEPRECATED_"
 
 
-def check_if_deprecated_constant(name: str, module_globals: dict[str, Any]) -> Any:  # noqa: ANN401
+def check_if_deprecated_constant(name: str, module_globals: dict[str, Any]) -> Any:  # ruff:ignore[any-type]
     """Check if the not found name is a deprecated constant.
 
     If it is, print a deprecation warning and return the value of the constant.
@@ -352,7 +364,7 @@ def check_if_deprecated_constant(name: str, module_globals: dict[str, Any]) -> A
     value = replacement = None
     description = "constant"
     if (deprecated_const := module_globals.get(_PREFIX_DEPRECATED + name)) is None:
-        raise AttributeError(f"Module {module_name!r} has no attribute {name!r}")  # noqa: TRY003
+        raise AttributeError(f"Module {module_name!r} has no attribute {name!r}")  # ruff:ignore[raise-vanilla-args]
     if isinstance(deprecated_const, DeprecatedConstant):
         value = deprecated_const.value
         replacement = deprecated_const.replacement
@@ -427,13 +439,13 @@ class EnumWithDeprecatedMembers(EnumType):
         classdict: _EnumDict,
         *,
         deprecated: dict[str, tuple[str, str]],
-        **kwds: Any,  # noqa: ANN401
-    ) -> Any:  # noqa: ANN401
+        **kwds: Any,  # ruff:ignore[any-type]
+    ) -> Any:  # ruff:ignore[any-type]
         """Create a new class."""
         classdict["__deprecated__"] = deprecated
         return super().__new__(mcs, cls, bases, classdict, **kwds)
 
-    def __getattribute__(cls, name: str) -> Any:  # noqa: ANN401
+    def __getattribute__(cls, name: str) -> Any:  # ruff:ignore[any-type]
         """Warn if accessing a deprecated member."""
         deprecated = super().__getattribute__("__deprecated__")
         if name in deprecated:

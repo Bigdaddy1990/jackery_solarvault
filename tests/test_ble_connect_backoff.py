@@ -127,7 +127,7 @@ class _StubHass:
         return _StubTask()
 
 
-async def _noop_sink(_device_id: str, _observation: object) -> None:  # noqa: RUF029  # listener sink must be a coroutine function
+async def _noop_sink(_device_id: str, _observation: object) -> None:  # ruff:ignore[unused-async]  # listener sink must be a coroutine function
     return None
 
 
@@ -138,7 +138,7 @@ def _make_listener(hass: _StubHass) -> JackeryBleListener:
         key_resolver=lambda _device_id: None,
         ble_address_resolver=lambda _device_id: None,
     )
-    listener._device_addresses[_DEVICE_ID] = _ADDRESS  # noqa: SLF001
+    listener._device_addresses[_DEVICE_ID] = _ADDRESS  # ruff:ignore[private-member-access]
     return listener
 
 

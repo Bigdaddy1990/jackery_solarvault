@@ -29,12 +29,12 @@ def _stat_sensor() -> JackeryStatSensor:
         },
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID  # noqa: SLF001
+    mutable._device_id = _DEVICE_ID  # ruff:ignore[private-member-access]
     mutable.entity_description = description
-    mutable._reset_period = description.reset_period  # noqa: SLF001
-    mutable._cached_native_value = None  # noqa: SLF001
-    mutable._cached_attrs = {}  # noqa: SLF001
-    mutable._cached_source_section = description.section  # noqa: SLF001
+    mutable._reset_period = description.reset_period  # ruff:ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff:ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff:ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff:ignore[private-member-access]
     return sensor
 
 
@@ -42,6 +42,6 @@ def test_stat_entity_does_not_clamp_negative_period_values() -> None:
     """Stats/trends quality decisions belong upstream, not in the entity."""
     sensor = _stat_sensor()
 
-    sensor._refresh_cache()  # noqa: SLF001
+    sensor._refresh_cache()  # ruff:ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_NEGATIVE_KWH)
