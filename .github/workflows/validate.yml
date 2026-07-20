@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Install ruff
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Install unit-test deps
@@ -76,7 +76,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "No tests/ha fixtures found; skipping HA fixture test job."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.fixtures.outputs.exists == 'true'
         with:
           python-version: "3.14"
