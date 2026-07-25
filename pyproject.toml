@@ -535,6 +535,8 @@ max-complexity = 25
 # is no longer enforced for comments and strings in this one file; `ruff
 # format` still holds all *code* lines in it to the 88-character limit.
 "**/sensor.py" = ["line-too-long"]
+"custom_components/jackery_solarvault/*.py" = ["line-too-long"]
+"custom_components/jackery_solarvault/client/*.py" = ["line-too-long"]
 "custom_components/jackery_solarvault/const.py" = ["hardcoded-password-string"]
 "tests/*" = [
     "import-outside-top-level",

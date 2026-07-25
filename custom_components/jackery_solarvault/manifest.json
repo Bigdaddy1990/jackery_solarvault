@@ -61,13 +61,13 @@
     {
       "type": "_api._tcp.local.",
       "properties": {
-        "device": "SolarVault"
+        "device": "solarvault"
       }
     },
     {
       "type": "_http._tcp.local.",
       "properties": {
-        "device": "SolarVault"
+        "device": "solarvault"
       }
     }
   ]
