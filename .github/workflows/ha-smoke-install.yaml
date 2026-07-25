@@ -57,6 +57,3 @@ jobs:
       - name: Validate installation with hass --script check_config
         run: |
           hass --script check_config --config smoke-config
-
-      # Commit all changed files back to the repository
-      - uses: stefanzweifel/git-auto-commit-action@v7
