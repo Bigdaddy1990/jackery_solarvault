@@ -6,7 +6,7 @@ Languages:
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
 Una integración personalizada de [Home Assistant](https://www.home-assistant.io/) que lleva tus estaciones de energía Jackery SolarVault, HomePower y Explorer directamente a tu hogar inteligente.
 
@@ -49,6 +49,7 @@ La integración crea docenas de entidades por dispositivo para brindarte visibil
 | `text` | identificadores de Wi-Fi y diagnóstico |
 
 ### 🛠️ Servicios Avanzados
+
 También exponemos más de 60 servicios personalizados en Home Assistant, brindándote el poder de la App Jackery en tus automatizaciones:
 - **Gestión de Dispositivos:** `bind_device`, `unbind_device`, `get_share_qr_code`
 - **Cloud-to-Cloud:** `get_shelly_auth_url`, `list_shelly_devices`
@@ -60,6 +61,7 @@ También exponemos más de 60 servicios personalizados en Home Assistant, brind�
 ## 🛠️ Instalación
 
 ### HACS (Recomendado)
+
 1. Abre HACS.
 2. Abre el menú de tres puntos.
 3. Selecciona `Repositorios personalizados`.
@@ -70,6 +72,7 @@ También exponemos más de 60 servicios personalizados en Home Assistant, brind�
 8. Selecciona `Jackery SolarVault`.
 
 ### Opción 2: Manual
+
 1. Descarga la última versión (release).
 2. Copia la carpeta `custom_components/jackery_solarvault` en tu directorio `config/custom_components/` de Home Assistant.
 3. Reinicia Home Assistant.
@@ -87,6 +90,7 @@ También exponemos más de 60 servicios personalizados en Home Assistant, brind�
 > **Solución:** ¡Crea una **segunda cuenta de Jackery dedicada** solo para Home Assistant! Comparte tus dispositivos Jackery desde tu cuenta principal de la aplicación con esta nueva cuenta dedicada para HA.
 
 ### Opciones de Configuración
+
 - **Correo Electrónico y Contraseña:** Las credenciales de tu cuenta dedicada de la Nube de Jackery.
 - **Bluetooth (BLE):** Opcional. Permite la comunicación directa cuando tu servidor de HA está dentro del alcance Bluetooth de la Jackery.
 - **MQTT Local:** Opcional. Usa esto si tu dispositivo está configurado para publicar datos a un bróker MQTT local.
@@ -96,6 +100,7 @@ También exponemos más de 60 servicios personalizados en Home Assistant, brind�
 ## 💡 Automatizaciones y Ejemplos
 
 **Notificar cuando la batería está baja:**
+
 ```yaml
 automation:
   - alias: "Jackery Advertencia de Batería Baja"
@@ -110,6 +115,7 @@ automation:
 ```
 
 **Configurar un horario de Tiempo de Uso (Time-of-Use):**
+
 ```yaml
 action: jackery_solarvault.save_tou_plan
 data:
@@ -136,4 +142,4 @@ data:
 
 ## 📜 Licencia
 
-Este proyecto está licenciado bajo la Licencia MIT - consulta el archivo [LICENSE](LICENSE) para más detalles.
+Este proyecto está licenciado bajo la Licencia MIT - consulta el archivo [LICENSE](../LICENSE) para más detalles.

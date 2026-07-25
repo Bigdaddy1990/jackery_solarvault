@@ -111,6 +111,41 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
         ), lang
 
 
+def _assert_keys_sorted(value: Any, path: str = "") -> None:
+    """Recursively assert every JSON object in ``value`` has alphabetically sorted keys.
+
+    Parameters:
+        value (Any): The value to inspect; dicts are checked and recursed into,
+            lists are recursed into by index, other values are ignored.
+        path (str): Dotted/bracketed location used to identify failures.
+    """
+    if isinstance(value, dict):
+        keys = list(value.keys())
+        assert keys == sorted(keys), f"keys not sorted at {path or "<root>"}: {keys}"
+        for key, child in value.items():
+            _assert_keys_sorted(child, f"{path}.{key}" if path else key)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _assert_keys_sorted(item, f"{path}[{index}]")
+
+
+def test_strings_and_translation_files_have_alphabetically_sorted_keys() -> None:
+    """strings.json and every locale file must keep keys sorted at every nesting level.
+
+    The integration keeps large nested objects (entities, services, issues)
+    alphabetically sorted so merges and reviews stay predictable. This guards
+    against a future edit accidentally reintroducing an unsorted block.
+    """
+    paths = [TRANSLATION_ROOT / "strings.json"]
+    paths.extend(
+        TRANSLATION_ROOT / "translations" / f"{lang}.json" for lang in LANGUAGES
+    )
+
+    for path in paths:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        _assert_keys_sorted(data)
+
+
 def test_repair_issue_translations_are_fixable_or_descriptive() -> None:
     """Repair issues must define exactly one of description or fix_flow."""
     paths = [TRANSLATION_ROOT / "strings.json"]

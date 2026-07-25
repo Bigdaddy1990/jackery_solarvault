@@ -26,8 +26,6 @@ jobs:
           persist-credentials: true
 
       - uses: home-assistant/actions/hassfest@master
-      # Commit all changed files back to the repository
-      - uses: stefanzweifel/git-auto-commit-action@v7
   hacs:
     name: HACS Validation
     runs-on: ubuntu-latest

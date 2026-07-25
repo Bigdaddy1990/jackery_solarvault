@@ -106,6 +106,49 @@ def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
     assert manifest["iot_class"] == "cloud_polling"
 
 
+def test_manifest_zeroconf_properties_use_lowercase_values() -> None:
+    """Zeroconf discovery property values must be lowercase.
+
+    Home Assistant lowercases discovered zeroconf property values before
+    matching them against the manifest, so an uppercase manifest value such
+    as the old "SolarVault" can never match a real advertisement and would
+    silently break zeroconf discovery. This pins the fix that changed the
+    "device" property to the lowercase "solarvault".
+    """
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    zeroconf_entries = manifest.get("zeroconf", [])
+    assert zeroconf_entries, "manifest.json must declare zeroconf entries"
+
+    for entry in zeroconf_entries:
+        properties = entry.get("properties", {})
+        for key, value in properties.items():
+            assert isinstance(value, str)
+            assert value == value.lower(), (
+                f"zeroconf property {key!r} for type {entry.get("type")!r} "
+                f"must be lowercase, got {value!r}"
+            )
+
+    device_values = {
+        entry["properties"]["device"]
+        for entry in zeroconf_entries
+        if "device" in entry.get("properties", {})
+    }
+    assert device_values == {"solarvault"}
+
+
+def test_manifest_zeroconf_covers_expected_service_types() -> None:
+    """Both the API and HTTP zeroconf service types must be declared."""
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    zeroconf_types = {entry["type"] for entry in manifest.get("zeroconf", [])}
+    assert zeroconf_types == {"_api._tcp.local.", "_http._tcp.local."}
+
+
 def test_no_duplicate_literal_dict_keys() -> None:
     """Catch accidental duplicate payload keys such as login registerAppId."""
     for path in _python_sources():
