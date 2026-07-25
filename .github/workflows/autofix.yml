@@ -46,7 +46,7 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install -r requirements-test.txt --prerelease=allow
+          pip install -r requirements-test.txt
           pip install --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
       - uses: astral-sh/ruff-action@v3
