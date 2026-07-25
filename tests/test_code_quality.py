@@ -165,10 +165,12 @@ def test_manifest_zeroconf_entries_match_expected_structure() -> None:
         "_api._tcp.local.": {"device": "solarvault"},
         "_http._tcp.local.": {"device": "solarvault"},
     }
+    entries = manifest.get("zeroconf", [])
     actual = {
         entry["type"]: entry.get("properties", {})
-        for entry in manifest.get("zeroconf", [])
+        for entry in entries
     }
+    assert len(entries) == len(expected)
     assert actual == expected
 
 
