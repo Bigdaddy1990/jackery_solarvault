@@ -13,23 +13,38 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.jackery_solarvault.const import (
+    ACTION_ID_PORTABLE_AC_COUNTDOWN,
     ACTION_ID_PORTABLE_AC_OUTPUT_DELAY,
+    ACTION_ID_PORTABLE_AUTO_SHUTDOWN_TIME,
     ACTION_ID_PORTABLE_BLUETOOTH_SLEEP,
+    ACTION_ID_PORTABLE_DC_CAR_COUNTDOWN,
+    ACTION_ID_PORTABLE_DC_COUNTDOWN,
+    ACTION_ID_PORTABLE_DC_USB_COUNTDOWN,
     ACTION_ID_PORTABLE_DISCHARGE_MEMORY,
+    ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SWITCH,
     ACTION_ID_PORTABLE_SETTING_BATTERY,
     ACTION_ID_PORTABLE_SETTING_CHARGE,
+    ACTION_ID_PORTABLE_SET_CHARGE_POWER,
 )
 from custom_components.jackery_solarvault.number import (
+    _async_portable_set_number,
     _set_portable_ac1_priority_soc,
     _set_portable_ac2_priority_soc,
+    _set_portable_ac_countdown,
     _set_portable_ac_output_delay,
+    _set_portable_auto_shutdown_time,
     _set_portable_bluetooth_sleep,
+    _set_portable_charge_power,
     _set_portable_custom_use_charge_limit,
     _set_portable_custom_use_discharge_limit,
+    _set_portable_dc_car_countdown,
+    _set_portable_dc_countdown,
     _set_portable_dc_priority_soc,
+    _set_portable_dc_usb_countdown,
+    _set_portable_energy_storage_charge_limit,
 )
 from custom_components.jackery_solarvault.select import (
     _OPTION_TO_BATTERY_MODE,
@@ -221,3 +236,120 @@ async def test_custom_use_charge_limit_delegates_to_upper_bound() -> None:
 
     kwargs = coord.async_portable_set_custom_use_battery.await_args.kwargs
     assert kwargs["charge_limit"] == _CUSTOM_UPPER
+
+
+_CHARGE_POWER_WATTS = 500
+_ENERGY_STORAGE_CHARGE_LIMIT_PCT = 90
+_AUTO_SHUTDOWN_MINUTES = 45
+_AC_COUNTDOWN_SECONDS = 1800
+_DC_COUNTDOWN_SECONDS = 900
+_DC_USB_COUNTDOWN_SECONDS = 600
+_DC_CAR_COUNTDOWN_SECONDS = 1200
+
+
+@pytest.mark.asyncio()
+async def test_async_portable_set_number_forwards_action_field_and_int_value() -> None:
+    """The shared helper forwards action_id/field and coerces value to int."""
+    coord = _coord()
+
+    await _async_portable_set_number(
+        coord,
+        _DEVICE,
+        action_id=ACTION_ID_PORTABLE_SET_CHARGE_POWER,
+        field="csc",
+        value=_CHARGE_POWER_WATTS,
+    )
+
+    coord.async_portable_set_number.assert_awaited_once_with(
+        _DEVICE,
+        action_id=ACTION_ID_PORTABLE_SET_CHARGE_POWER,
+        field="csc",
+        value=_CHARGE_POWER_WATTS,
+    )
+
+
+@pytest.mark.asyncio()
+async def test_async_portable_set_number_truncates_float_toward_zero() -> None:
+    """A fractional value is truncated via ``int()``, not rounded."""
+    coord = _coord()
+
+    await _async_portable_set_number(
+        coord,
+        _DEVICE,
+        action_id=ACTION_ID_PORTABLE_SET_CHARGE_POWER,
+        field="csc",
+        value=12.7,
+    )
+
+    kwargs = coord.async_portable_set_number.await_args.kwargs
+    assert kwargs["value"] == 12
+
+
+@pytest.mark.parametrize(
+    ["setter", "action_id", "field", "raw_value"],
+    [
+        [
+            _set_portable_charge_power,
+            ACTION_ID_PORTABLE_SET_CHARGE_POWER,
+            "csc",
+            _CHARGE_POWER_WATTS,
+        ],
+        [
+            _set_portable_energy_storage_charge_limit,
+            ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
+            "dt",
+            _ENERGY_STORAGE_CHARGE_LIMIT_PCT,
+        ],
+        [
+            _set_portable_auto_shutdown_time,
+            ACTION_ID_PORTABLE_AUTO_SHUTDOWN_TIME,
+            "ast",
+            _AUTO_SHUTDOWN_MINUTES,
+        ],
+        [
+            _set_portable_ac_countdown,
+            ACTION_ID_PORTABLE_AC_COUNTDOWN,
+            "oact",
+            _AC_COUNTDOWN_SECONDS,
+        ],
+        [
+            _set_portable_dc_countdown,
+            ACTION_ID_PORTABLE_DC_COUNTDOWN,
+            "odct",
+            _DC_COUNTDOWN_SECONDS,
+        ],
+        [
+            _set_portable_dc_usb_countdown,
+            ACTION_ID_PORTABLE_DC_USB_COUNTDOWN,
+            "odcut",
+            _DC_USB_COUNTDOWN_SECONDS,
+        ],
+        [
+            _set_portable_dc_car_countdown,
+            ACTION_ID_PORTABLE_DC_CAR_COUNTDOWN,
+            "odcct",
+            _DC_CAR_COUNTDOWN_SECONDS,
+        ],
+    ],
+)
+@pytest.mark.asyncio()
+async def test_number_setter_routes_through_shared_helper_with_correct_key(
+    setter: Any,  # ruff:ignore[any-type]
+    action_id: int,
+    field: str,
+    raw_value: int,
+) -> None:
+    """Each refactored setter still writes its pinned action_id/field/value.
+
+    These setters were rewired to delegate to ``_async_portable_set_number``;
+    this pins their per-field wiring so the shared-helper refactor cannot
+    silently swap one setter's action_id/field for another's.
+    """
+    coord = _coord()
+
+    await setter(coord, _DEVICE, raw_value)
+
+    kwargs = coord.async_portable_set_number.await_args.kwargs
+    assert kwargs["action_id"] == action_id
+    assert kwargs["field"] == field
+    assert kwargs["value"] == raw_value
