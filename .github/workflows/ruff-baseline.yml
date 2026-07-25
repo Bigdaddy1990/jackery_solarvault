@@ -23,19 +23,19 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           ref: ${{ github.head_ref }}
 
-      - run: python -m pip install --upgrade pip ruff
+      - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
           ruff check . --fix || true
-          ruff check . --fix --unsafe-fixes --line-length 88 || true
-          ruff check . --line-length 88 || true
+          ruff check . --fix --unsafe-fixes || true
+          ruff check . --target-version py314 || true
+          ruff check . --extend-select RUF100 || true
           ruff check . --preview || true
-          ruff check . --add-noqa || true
-          ruff format . | true
-          ruff check . --fix || true
-          ruff check . --fix --unsafe-fixes --line-length 88 || true
-          ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
           ruff check . --output-format=github || true
-          ruff format . | true
+          ruff check . --exit-non-zero-on-fix || true
+          ruff format .
+          
+          pre-commit run --all-files || true
+          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
           
       - uses: peter-evans/create-pull-request@v8
         with:
@@ -43,6 +43,7 @@ jobs:
           title: "chore: ruff baseline (format+fix)"
           commit-message: "chore: ruff baseline (format+fix)"
           body: "Automated ruff baseline via GitHub Actions."
+          
   #    - name: Commit baseline changes
   #      run: |
   #        if [ -z "$(git status --porcelain)" ]; then
