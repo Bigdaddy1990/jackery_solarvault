@@ -149,6 +149,52 @@ def test_manifest_zeroconf_covers_expected_service_types() -> None:
     assert zeroconf_types == {"_api._tcp.local.", "_http._tcp.local."}
 
 
+def test_manifest_zeroconf_entries_match_expected_structure() -> None:
+    """Pin the full zeroconf entry shape, not just the lowercase-value rule.
+
+    Regression guard for the "SolarVault" -> "solarvault" fix: rather than
+    only checking casing, compare each entry's full ``type``/``properties``
+    mapping against the expected structure so an entry that regresses to the
+    old value (or drops the "device" property entirely) fails loudly.
+    """
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    expected = {
+        "_api._tcp.local.": {"device": "solarvault"},
+        "_http._tcp.local.": {"device": "solarvault"},
+    }
+    actual = {
+        entry["type"]: entry.get("properties", {})
+        for entry in manifest.get("zeroconf", [])
+    }
+    assert actual == expected
+
+
+def test_previously_unsorted_imports_no_longer_carry_stale_ruff_ignore() -> None:
+    """Imports that are actually sorted must not keep a leftover ignore pragma.
+
+    ``import operator`` in ``__init__.py``, ``import logging`` in
+    ``config_flow.py``, the ``dataclass`` import in ``number.py`` and the
+    ``TYPE_CHECKING``-only ``Callable`` import in ``sensor.py`` previously
+    carried a ``# ruff:ignore[unsorted-imports]`` pragma even though they were
+    already correctly ordered relative to their surrounding block. Pin the
+    cleanup so the dead pragma is not silently reintroduced.
+    """
+    checks = {
+        CUSTOM_COMPONENT / "__init__.py": "import operator",
+        CUSTOM_COMPONENT / "config_flow.py": "import logging",
+        CUSTOM_COMPONENT / "number.py": "from dataclasses import dataclass",
+        CUSTOM_COMPONENT / "sensor.py": "from collections.abc import Callable",
+    }
+    for path, plain_import in checks.items():
+        text = path.read_text(encoding="utf-8")
+        assert plain_import in text, f"{path}: expected import {plain_import!r}"
+        stale = f"{plain_import}  # ruff:ignore[unsorted-imports]"
+        assert stale not in text, f"{path}: stale unsorted-imports pragma reappeared"
+
+
 def test_no_duplicate_literal_dict_keys() -> None:
     """Catch accidental duplicate payload keys such as login registerAppId."""
     for path in _python_sources():

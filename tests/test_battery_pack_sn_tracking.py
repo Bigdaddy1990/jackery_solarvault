@@ -121,6 +121,23 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
     assert battery_pack_serial({"batSoc": 5}) is None
 
 
+def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
+    """deviceSn wins over devSn/sn, and a blank/whitespace-only value is None.
+
+    A field that goes empty (e.g. ``""`` or all-whitespace) must not resolve
+    to a falsy-but-truthy pack identity that would still pass an
+    ``is not None`` check while breaking equality-based serial matching.
+    """
+    assert (
+        battery_pack_serial({"deviceSn": _SN_A, "devSn": _SN_B, "sn": _SN_BEFORE_A})
+        == _SN_A
+    )
+    assert battery_pack_serial({"devSn": _SN_B, "sn": _SN_BEFORE_A}) == _SN_B
+    assert battery_pack_serial({"deviceSn": ""}) is None
+    assert battery_pack_serial({"deviceSn": "   "}) is None
+    assert battery_pack_serial({"deviceSn": f"  {_SN_A}  "}) == _SN_A
+
+
 def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
     """A newly inserted earlier serial cannot rebind the existing entity."""
     sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)

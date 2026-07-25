@@ -387,6 +387,29 @@ async def test_get_dynamic_price_login_url_missing_system_raises() -> None:
 
 
 @pytest.mark.asyncio()
+async def test_get_dynamic_price_login_url_success_forwards_and_returns() -> None:
+    """With a resolvable systemId, the login URL call forwards it and returns.
+
+    Complements ``test_get_dynamic_price_login_url_missing_system_raises``
+    (negative path) with the happy path so a regression that stops forwarding
+    the resolved ``system_id`` — or that stops returning the client payload —
+    is caught too.
+    """
+    coordinator = _coordinator(home_config=True)
+    _api(coordinator).async_get_dynamic_price_login_url = AsyncMock(
+        return_value=_SENTINEL,
+    )
+
+    result = await coordinator.async_get_dynamic_price_login_url(_DEVICE, 5)
+
+    assert result is _SENTINEL
+    _api(coordinator).async_get_dynamic_price_login_url.assert_awaited_once_with(
+        platform_company_id=5,
+        system_id="sys-1",
+    )
+
+
+@pytest.mark.asyncio()
 async def test_sync_alerts_refreshes_and_returns() -> None:
     """Syncing alerts forwards content/id, refreshes, and returns the result."""
     coordinator = _coordinator()
