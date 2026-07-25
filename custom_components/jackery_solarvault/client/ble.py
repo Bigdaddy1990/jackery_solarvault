@@ -162,7 +162,8 @@ def parse_hex16(text: str) -> int:
 
 
 def hex_encode(data: bytes) -> str:
-    """Produce an uppercase hexadecimal string of the given bytes with no separators or "0x" prefix.
+    """Produce an uppercase hexadecimal string of the given bytes with no separators or
+    "0x" prefix.
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.

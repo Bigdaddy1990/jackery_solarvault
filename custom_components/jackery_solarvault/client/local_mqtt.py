@@ -522,7 +522,9 @@ class JackeryLocalMqttClient:
         present in `state_changed` events.
 
         Returns:
-            `True` if the payload prefix contains all of `"event_type"`, `"state_changed"`, `"event_data"`, `"old_state"`, and `"new_state"`, `False` otherwise.
+            `True` if the payload prefix contains all of `"event_type"`,
+            `"state_changed"`, `"event_data"`, `"old_state"`, and `"new_state"`,
+            `False` otherwise.
         """
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
@@ -540,7 +542,11 @@ class JackeryLocalMqttClient:
         """Extract the Jackery payload dictionary from a parsed MQTT JSON object or its
         Home Assistant event wrapper.
 
-        If `payload` is a Home Assistant event wrapper (contains `event_type` and `event_data`), inspects `event_data["payload"]`, `event_data["body"]`, `event_data["data"]`, and `event_data` itself and returns the first dict candidate whose keys intersect the Jackery marker keys. If `payload` is not an HA wrapper, returns it unchanged.
+        If `payload` is a Home Assistant event wrapper (contains `event_type` and
+        `event_data`), inspects `event_data["payload"]`, `event_data["body"]`,
+        `event_data["data"]`, and `event_data` itself and returns the first dict
+        candidate whose keys intersect the Jackery marker keys. If `payload` is
+        not an HA wrapper, returns it unchanged.
 
         Parameters:
             payload (dict): Parsed JSON object from an MQTT message, possibly an HA
@@ -610,7 +616,8 @@ class JackeryLocalMqttClient:
 
         Parameters:
             coro (Awaitable[None]): Coroutine to run as a background task.
-            label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
+            label (str): Short label used to name the task
+            (`jackery_local_mqtt_{label}`) and included in error logs.
         """
 
         async def _runner() -> None:
@@ -758,11 +765,12 @@ class JackeryLocalMqttClient:
         offset.
 
         Returns:
-            iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
+            iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone
+            offset (e.g. "2026-05-27T12:34:56+00:00").
         """
         return datetime.now(UTC).isoformat()
 
-    # --- restored from 01.06\custom_components\jackery_solarvault\client\local_mqtt.py ---
+    # --- restored from 01.06\\custom_components\\jackery_solarvault\\client\\local_mqtt.py
     @staticmethod
     def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
         """Detect whether a byte payload appears to be a Home Assistant event-style JSON

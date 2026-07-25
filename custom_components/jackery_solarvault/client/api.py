@@ -923,12 +923,12 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
     @property
     def mqtt_mac_id_source(self) -> str:
-        """Return the source identifier for the current MQTT MAC ID (login vs cached)."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Source identifier for the current MQTT MAC ID (login vs cached)."""
         return self._mqtt_mac_id_source
 
     @property
     def mqtt_mac_id(self) -> str | None:
-        """Return the MAC ID assigned to this MQTT session by login."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """MAC ID assigned to this MQTT session by login."""
         return self._mqtt_mac_id
 
     async def _ensure_token(self) -> str:
@@ -3883,7 +3883,8 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             device_sn (str): Device serial number to match (compared as a string).
 
         Returns:
-            dict[str, Any]: The matching OTA item, the first item as a fallback, or `{}` if `items` is empty.
+            dict[str, Any]: The matching OTA item, the first item as a fallback, or
+            `{}` if `items` is empty.
         """
         requested_sn = str(device_sn)
         for item in items:
@@ -4332,8 +4333,8 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
                 f" data={data.get(FIELD_DATA)!r}"
             )
             msg_0 = (
-                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} msg={data.get(FIELD_MSG)!r} "
-                f"data={data.get(FIELD_DATA)!r}"
+                f"{HTTP_METHOD_POST} {path} code={data.get(FIELD_CODE)} "
+                f"msg={data.get(FIELD_MSG)!r} data={data.get(FIELD_DATA)!r}"
             )
             raise JackeryApiError(msg_0)
         await self._emit_payload_debug(
